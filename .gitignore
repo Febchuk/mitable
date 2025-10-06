@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Claude artifacts
+.claude/
+CLAUDE.md
+
+
