@@ -1,0 +1,44 @@
+// IPC Channel definitions for Electron window communication
+
+export const IPC_CHANNELS = {
+  // Help system
+  HELP_REQUEST: "help-request",
+  HELP_RESPONSE: "help-response",
+  CAPTURE_SCREENSHOT: "capture-screenshot",
+  SCREENSHOT_CAPTURED: "screenshot-captured",
+
+  // Guide system
+  GUIDE_START: "guide-start",
+  GUIDE_NEXT_STEP: "guide-next-step",
+  GUIDE_COMPLETE: "guide-complete",
+  GUIDE_CANCEL: "guide-cancel",
+  GUIDE_DATA: "guide-data",
+
+  // Overlay system
+  OVERLAY_SHOW: "overlay-show",
+  OVERLAY_HIDE: "overlay-hide",
+  OVERLAY_HIGHLIGHT_UPDATE: "overlay-highlight-update",
+
+  // Nudge system
+  NUDGE_SHOW: "nudge-show",
+  NUDGE_HIDE: "nudge-hide",
+  NUDGE_ACCEPT: "nudge-accept",
+  NUDGE_DISMISS: "nudge-dismiss",
+
+  // Window management
+  WINDOW_SHOW: "window-show",
+  WINDOW_HIDE: "window-hide",
+  WINDOW_TOGGLE: "window-toggle",
+  SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
+
+  // Agent window
+  AGENT_TOGGLE: "agent-toggle",
+  AGENT_SHOW_CONSOLE: "agent-show-console",
+
+  // Conversation management
+  CONVERSATION_NEW: "conversation-new",
+  CONVERSATION_LOAD: "conversation-load",
+  CONVERSATION_UPDATE: "conversation-update",
+} as const;
+
+export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
