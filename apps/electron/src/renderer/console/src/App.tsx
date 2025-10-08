@@ -2,6 +2,8 @@ import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider } from "./context/SidebarContext";
 import { UserProvider } from "./context/UserContext";
 import { RoadmapProvider } from "./context/RoadmapContext";
+import { NudgesProvider } from "./context/NudgesContext";
+import { ChatsProvider } from "./context/ChatsContext";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
 import HomeView from "./components/views/HomeView";
 import RoadmapView from "./components/views/RoadmapView";
@@ -14,15 +16,19 @@ function App() {
       <SidebarProvider>
         <UserProvider>
           <RoadmapProvider>
-            <Routes>
-              <Route path="/" element={<ConsoleLayout />}>
-                <Route index element={<Navigate to="/home" replace />} />
-                <Route path="home" element={<HomeView />} />
-                <Route path="roadmap" element={<RoadmapView />} />
-                <Route path="nudges" element={<NudgesView />} />
-                <Route path="chats" element={<ChatsView />} />
-              </Route>
-            </Routes>
+            <NudgesProvider>
+              <ChatsProvider>
+                <Routes>
+                  <Route path="/" element={<ConsoleLayout />}>
+                    <Route index element={<Navigate to="/home" replace />} />
+                    <Route path="home" element={<HomeView />} />
+                    <Route path="roadmap" element={<RoadmapView />} />
+                    <Route path="nudges" element={<NudgesView />} />
+                    <Route path="chats" element={<ChatsView />} />
+                  </Route>
+                </Routes>
+              </ChatsProvider>
+            </NudgesProvider>
           </RoadmapProvider>
         </UserProvider>
       </SidebarProvider>

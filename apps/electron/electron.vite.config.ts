@@ -24,6 +24,10 @@ export default defineConfig({
           guide: resolve(__dirname, "src/preload/guide.ts"),
           nudge: resolve(__dirname, "src/preload/nudge.ts"),
         },
+        output: {
+          format: "cjs",
+          entryFileNames: "[name].js",
+        },
       },
     },
   },

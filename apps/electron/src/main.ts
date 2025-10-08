@@ -20,7 +20,7 @@ function createAgentWindow() {
     skipTaskbar: true,
     show: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/agent.mjs"),
+      preload: join(__dirname, "../preload/agent.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -52,7 +52,7 @@ function createConsoleWindow() {
     height: 800,
     backgroundColor: "#000000",
     webPreferences: {
-      preload: join(__dirname, "../preload/console.mjs"),
+      preload: join(__dirname, "../preload/console.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -88,7 +88,7 @@ function createOverlayWindow() {
     focusable: false,
     show: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/overlay.mjs"),
+      preload: join(__dirname, "../preload/overlay.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -116,7 +116,7 @@ function createGuideWindow() {
     alwaysOnTop: true,
     show: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/guide.mjs"),
+      preload: join(__dirname, "../preload/guide.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -142,7 +142,7 @@ function createNudgeWindow() {
     alwaysOnTop: true,
     show: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/nudge.mjs"),
+      preload: join(__dirname, "../preload/nudge.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
