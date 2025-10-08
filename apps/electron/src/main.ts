@@ -18,6 +18,7 @@ function createAgentWindow() {
     alwaysOnTop: true,
     resizable: false,
     skipTaskbar: true,
+    show: false,
     webPreferences: {
       preload: join(__dirname, "../preload/agent.mjs"),
       contextIsolation: true,
@@ -38,13 +39,18 @@ function createAgentWindow() {
   } else {
     agentWindow.loadFile(join(__dirname, "../renderer/agent.html"));
   }
+
+  agentWindow.on("closed", () => {
+    // Don't set to null - allow recreation via Cmd+H
+    agentWindow = null;
+  });
 }
 
 function createConsoleWindow() {
   consoleWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    show: false,
+    backgroundColor: "#000000",
     webPreferences: {
       preload: join(__dirname, "../preload/console.mjs"),
       contextIsolation: true,
@@ -54,9 +60,14 @@ function createConsoleWindow() {
 
   if (!app.isPackaged) {
     consoleWindow.loadURL("http://localhost:5173/console");
+    consoleWindow.webContents.openDevTools();
   } else {
     consoleWindow.loadFile(join(__dirname, "../renderer/console.html"));
   }
+
+  consoleWindow.on("closed", () => {
+    app.quit(); // Quit app when main console window is closed
+  });
 }
 
 function createOverlayWindow() {
@@ -90,6 +101,10 @@ function createOverlayWindow() {
   } else {
     overlayWindow.loadFile(join(__dirname, "../renderer/overlay.html"));
   }
+
+  overlayWindow.on("closed", () => {
+    overlayWindow = null;
+  });
 }
 
 function createGuideWindow() {
@@ -112,6 +127,10 @@ function createGuideWindow() {
   } else {
     guideWindow.loadFile(join(__dirname, "../renderer/guide.html"));
   }
+
+  guideWindow.on("closed", () => {
+    guideWindow = null;
+  });
 }
 
 function createNudgeWindow() {
@@ -134,57 +153,95 @@ function createNudgeWindow() {
   } else {
     nudgeWindow.loadFile(join(__dirname, "../renderer/nudge.html"));
   }
+
+  nudgeWindow.on("closed", () => {
+    nudgeWindow = null;
+  });
 }
 
 // IPC Handlers
 function setupIPC() {
   // Agent window toggle
   ipcMain.on(IPC_CHANNELS.AGENT_TOGGLE, () => {
-    if (agentWindow?.isVisible()) {
-      agentWindow.hide();
-    } else {
-      agentWindow?.show();
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      if (agentWindow.isVisible()) {
+        agentWindow.hide();
+      } else {
+        agentWindow.show();
+      }
     }
   });
 
   // Show console from agent
   ipcMain.on(IPC_CHANNELS.AGENT_SHOW_CONSOLE, () => {
-    consoleWindow?.show();
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+    }
   });
 
   // Guide system
   ipcMain.on(IPC_CHANNELS.GUIDE_START, (_event, data) => {
-    overlayWindow?.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
-    guideWindow?.webContents.send(IPC_CHANNELS.GUIDE_DATA, data);
-    guideWindow?.show();
-    if (nudgeWindow?.isVisible()) nudgeWindow.hide();
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
+    }
+    if (guideWindow && !guideWindow.isDestroyed()) {
+      guideWindow.webContents.send(IPC_CHANNELS.GUIDE_DATA, data);
+      guideWindow.show();
+    }
+    if (nudgeWindow && !nudgeWindow.isDestroyed() && nudgeWindow.isVisible()) {
+      nudgeWindow.hide();
+    }
   });
 
   ipcMain.on(IPC_CHANNELS.GUIDE_COMPLETE, () => {
-    overlayWindow?.hide();
-    guideWindow?.hide();
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.hide();
+    }
+    if (guideWindow && !guideWindow.isDestroyed()) {
+      guideWindow.hide();
+    }
   });
 
   // Nudge system
   ipcMain.on(IPC_CHANNELS.NUDGE_SHOW, (_event, data) => {
-    nudgeWindow?.webContents.send(IPC_CHANNELS.NUDGE_SHOW, data);
-    nudgeWindow?.show();
-    if (guideWindow?.isVisible()) guideWindow.hide();
+    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      nudgeWindow.webContents.send(IPC_CHANNELS.NUDGE_SHOW, data);
+      nudgeWindow.show();
+    }
+    if (guideWindow && !guideWindow.isDestroyed() && guideWindow.isVisible()) {
+      guideWindow.hide();
+    }
   });
 
   // Dynamic mouse events for overlay
   ipcMain.on(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, (_event, ignore: boolean) => {
-    agentWindow?.setIgnoreMouseEvents(ignore, { forward: true });
-    guideWindow?.setIgnoreMouseEvents(ignore, { forward: true });
-    nudgeWindow?.setIgnoreMouseEvents(ignore, { forward: true });
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      agentWindow.setIgnoreMouseEvents(ignore, { forward: true });
+    }
+    if (guideWindow && !guideWindow.isDestroyed()) {
+      guideWindow.setIgnoreMouseEvents(ignore, { forward: true });
+    }
+    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      nudgeWindow.setIgnoreMouseEvents(ignore, { forward: true });
+    }
   });
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)
 function registerGlobalShortcuts() {
   globalShortcut.register("CommandOrControl+H", () => {
-    consoleWindow?.show();
-    consoleWindow?.focus();
+    if (!agentWindow || agentWindow.isDestroyed()) {
+      // Recreate window if it was closed
+      createAgentWindow();
+    }
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      if (agentWindow.isVisible()) {
+        agentWindow.hide();
+      } else {
+        agentWindow.show();
+        agentWindow.focus();
+      }
+    }
   });
 }
 
@@ -197,9 +254,6 @@ app.whenReady().then(() => {
 
   setupIPC();
   registerGlobalShortcuts();
-
-  // Show agent window by default
-  agentWindow?.show();
 });
 
 app.on("window-all-closed", () => {
