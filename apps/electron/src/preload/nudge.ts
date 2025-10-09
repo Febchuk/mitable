@@ -1,5 +1,12 @@
-import { contextBridge, ipcRenderer } from "electron";
-import { IPC_CHANNELS } from "@mitable/shared";
+const { contextBridge, ipcRenderer } = require("electron");
+
+// IPC channel constants (inlined to avoid requiring external packages with sandboxing)
+const IPC_CHANNELS = {
+  NUDGE_SHOW: "nudge-show",
+  NUDGE_ACCEPT: "nudge-accept",
+  NUDGE_DISMISS: "nudge-dismiss",
+  SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
+} as const;
 
 contextBridge.exposeInMainWorld("nudgeAPI", {
   onNudgeShow: (callback: (data: unknown) => void) => {

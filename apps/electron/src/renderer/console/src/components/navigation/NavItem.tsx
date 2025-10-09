@@ -17,7 +17,7 @@ export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
       className={({ isActive }) =>
         `flex items-center gap-md px-md py-sm rounded-md transition-colors ${
           isActive
-            ? "bg-primary text-white"
+            ? "bg-white text-black"
             : "text-text-secondary hover:bg-background-elevated hover:text-text-primary"
         } ${isCollapsed ? "justify-center" : ""}`
       }

@@ -21,3 +21,12 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* Electron draggable regions */
+.app-drag {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}

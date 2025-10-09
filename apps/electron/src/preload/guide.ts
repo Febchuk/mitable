@@ -1,5 +1,13 @@
-import { contextBridge, ipcRenderer } from "electron";
-import { IPC_CHANNELS } from "@mitable/shared";
+const { contextBridge, ipcRenderer } = require("electron");
+
+// IPC channel constants (inlined to avoid requiring external packages with sandboxing)
+const IPC_CHANNELS = {
+  GUIDE_DATA: "guide-data",
+  GUIDE_NEXT_STEP: "guide-next-step",
+  GUIDE_COMPLETE: "guide-complete",
+  GUIDE_CANCEL: "guide-cancel",
+  SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
+} as const;
 
 contextBridge.exposeInMainWorld("guideAPI", {
   onGuideData: (callback: (data: unknown) => void) => {

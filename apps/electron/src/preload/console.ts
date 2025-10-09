@@ -1,5 +1,14 @@
-import { contextBridge, ipcRenderer } from "electron";
-import { IPC_CHANNELS } from "@mitable/shared";
+const { contextBridge, ipcRenderer } = require("electron");
+
+// IPC channel constants (inlined to avoid requiring external packages with sandboxing)
+const IPC_CHANNELS = {
+  HELP_REQUEST: "help-request",
+  HELP_RESPONSE: "help-response",
+  GUIDE_START: "guide-start",
+  GUIDE_DATA: "guide-data",
+  CONVERSATION_NEW: "conversation-new",
+  CONVERSATION_LOAD: "conversation-load",
+} as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
   // Help system

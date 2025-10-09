@@ -7,6 +7,7 @@ export default {
         // Primary palette (Indigo)
         primary: {
           DEFAULT: "#6366F1",
+          light: "#818CF8",
           hover: "#4F46E5",
           pressed: "#4338CA",
         },

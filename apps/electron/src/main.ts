@@ -20,7 +20,7 @@ function createAgentWindow() {
     skipTaskbar: true,
     show: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/agent.js"),
+      preload: join(__dirname, "../preload/agent.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -35,7 +35,7 @@ function createAgentWindow() {
   }
 
   if (!app.isPackaged) {
-    agentWindow.loadURL("http://localhost:5173/agent");
+    agentWindow.loadURL("http://localhost:5173/agent/index.html");
   } else {
     agentWindow.loadFile(join(__dirname, "../renderer/agent.html"));
   }
@@ -51,15 +51,17 @@ function createConsoleWindow() {
     width: 1200,
     height: 800,
     backgroundColor: "#000000",
+    titleBarStyle: "hidden",
+    maximizable: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/console.js"),
+      preload: join(__dirname, "../preload/console.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
   if (!app.isPackaged) {
-    consoleWindow.loadURL("http://localhost:5173/console");
+    consoleWindow.loadURL("http://localhost:5173/console/index.html");
     consoleWindow.webContents.openDevTools();
   } else {
     consoleWindow.loadFile(join(__dirname, "../renderer/console.html"));
@@ -88,7 +90,7 @@ function createOverlayWindow() {
     focusable: false,
     show: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/overlay.js"),
+      preload: join(__dirname, "../preload/overlay.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -97,7 +99,7 @@ function createOverlayWindow() {
   overlayWindow.setIgnoreMouseEvents(true, { forward: true });
 
   if (!app.isPackaged) {
-    overlayWindow.loadURL("http://localhost:5173/overlay");
+    overlayWindow.loadURL("http://localhost:5173/overlay/index.html");
   } else {
     overlayWindow.loadFile(join(__dirname, "../renderer/overlay.html"));
   }
@@ -116,14 +118,14 @@ function createGuideWindow() {
     alwaysOnTop: true,
     show: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/guide.js"),
+      preload: join(__dirname, "../preload/guide.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
   if (!app.isPackaged) {
-    guideWindow.loadURL("http://localhost:5173/guide");
+    guideWindow.loadURL("http://localhost:5173/guide/index.html");
   } else {
     guideWindow.loadFile(join(__dirname, "../renderer/guide.html"));
   }
@@ -142,14 +144,14 @@ function createNudgeWindow() {
     alwaysOnTop: true,
     show: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/nudge.js"),
+      preload: join(__dirname, "../preload/nudge.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
   if (!app.isPackaged) {
-    nudgeWindow.loadURL("http://localhost:5173/nudge");
+    nudgeWindow.loadURL("http://localhost:5173/nudge/index.html");
   } else {
     nudgeWindow.loadFile(join(__dirname, "../renderer/nudge.html"));
   }

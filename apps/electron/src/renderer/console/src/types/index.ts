@@ -44,6 +44,7 @@ export interface Chat {
 // User types
 export interface User {
   name: string;
+  firstName: string;
   avatarUrl?: string;
   currentWeek: number;
 }

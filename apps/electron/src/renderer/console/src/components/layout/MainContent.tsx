@@ -10,7 +10,7 @@ export default function MainContent({ children }: MainContentProps) {
 
   return (
     <main
-      className={`flex-1 h-full overflow-auto bg-background-primary transition-spacing duration-300 ${
+      className={`flex-1 h-full overflow-auto bg-background-secondary app-drag transition-spacing duration-300 ${
         isCollapsed ? "ml-0" : "ml-0"
       }`}
     >

@@ -1,132 +1,46 @@
+import { useState } from "react";
 import { useUser } from "../../context/UserContext";
-import { useRoadmap } from "../../context/RoadmapContext";
-import { useNavigate } from "react-router-dom";
-import Card from "../ui/Card";
-import Button from "../ui/Button";
-import ProgressBar from "../ui/ProgressBar";
-import { Map, Bell, MessageSquare, CheckCircle2 } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 
 export default function HomeView() {
   const { user } = useUser();
-  const { weeks } = useRoadmap();
-  const navigate = useNavigate();
+  const [inputValue, setInputValue] = useState("");
 
-  const currentWeek = weeks.find((w) => w.number === 1) || weeks[0];
-  const completedTasks = currentWeek?.tasks.filter((t) => t.completed).length || 0;
-  const totalTasks = currentWeek?.tasks.length || 0;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim()) return;
+    // TODO: Handle help request submission
+    console.log("Help request:", inputValue);
+    setInputValue("");
+  };
 
   return (
-    <div className="p-2xl space-y-2xl max-w-6xl">
-      {/* Welcome Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary mb-sm">
-          Welcome back, {user.firstName}!
+    <div className="h-full w-full flex items-center justify-center">
+      <div className="max-w-2xl w-full px-lg app-no-drag">
+        {/* Welcome Heading */}
+        <h1 className="text-5xl font-semibold text-center mb-xl">
+          <span className="text-white">Welcome,</span>{" "}
+          <span className="text-primary-light">{user?.firstName}</span>
         </h1>
-        <p className="text-text-secondary">
-          You're making great progress on your onboarding journey.
-        </p>
-      </div>
 
-      {/* Current Week Summary */}
-      <Card>
-        <div className="flex items-start justify-between mb-lg">
-          <div>
-            <h2 className="text-xl font-semibold text-text-primary mb-xs">
-              Week {currentWeek?.number} Progress
-            </h2>
-            <p className="text-sm text-text-secondary">
-              {completedTasks} of {totalTasks} tasks completed
-            </p>
-          </div>
-          <Button variant="secondary" onClick={() => navigate("/roadmap")}>
-            View Full Roadmap
-          </Button>
-        </div>
-
-        <ProgressBar
-          percentage={currentWeek?.percentage || 0}
-          height="lg"
-          showLabel
-          className="mb-lg"
-        />
-
-        {/* Today's Tasks */}
-        <div className="space-y-md">
-          <h3 className="text-sm font-medium text-text-secondary uppercase tracking-wide">
-            This Week's Tasks
-          </h3>
-          <div className="space-y-sm">
-            {currentWeek?.tasks.slice(0, 5).map((task) => (
-              <div
-                key={task.id}
-                className="flex items-center gap-md p-md bg-background-elevated rounded-md"
-              >
-                <CheckCircle2
-                  size={20}
-                  className={
-                    task.completed ? "text-status-success" : "text-text-tertiary"
-                  }
-                />
-                <div className="flex-1">
-                  <p
-                    className={`text-sm ${
-                      task.completed
-                        ? "text-text-secondary line-through"
-                        : "text-text-primary"
-                    }`}
-                  >
-                    {task.title}
-                  </p>
-                  {task.description && (
-                    <p className="text-xs text-text-tertiary mt-xs">
-                      {task.description}
-                    </p>
-                  )}
-                </div>
-                <span className="text-xs text-text-tertiary">{task.timeEstimate}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Card>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-3 gap-md">
-        <Card
-          hover
-          onClick={() => navigate("/roadmap")}
-          className="flex flex-col items-center justify-center py-xl cursor-pointer"
-        >
-          <Map size={32} className="text-primary mb-md" />
-          <h3 className="text-sm font-medium text-text-primary">Roadmap</h3>
-          <p className="text-xs text-text-secondary mt-xs text-center">
-            View your learning path
-          </p>
-        </Card>
-
-        <Card
-          hover
-          onClick={() => navigate("/nudges")}
-          className="flex flex-col items-center justify-center py-xl cursor-pointer"
-        >
-          <Bell size={32} className="text-primary mb-md" />
-          <h3 className="text-sm font-medium text-text-primary">Nudges</h3>
-          <p className="text-xs text-text-secondary mt-xs text-center">
-            Connect with experts
-          </p>
-        </Card>
-
-        <Card
-          hover
-          onClick={() => navigate("/chats")}
-          className="flex flex-col items-center justify-center py-xl cursor-pointer"
-        >
-          <MessageSquare size={32} className="text-primary mb-md" />
-          <h3 className="text-sm font-medium text-text-primary">Chats</h3>
-          <p className="text-xs text-text-secondary mt-xs text-center">
-            Your conversations
-          </p>
-        </Card>
+        {/* Input Form */}
+        <form onSubmit={handleSubmit} className="relative">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="How can I help you today?"
+            className="w-full bg-[#1A1A1A] text-text-primary placeholder-text-tertiary px-lg py-md pr-16 rounded-full border-none outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+          />
+          <button
+            type="submit"
+            disabled={!inputValue.trim()}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-primary hover:bg-primary-hover disabled:bg-primary/50 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-colors"
+            aria-label="Send message"
+          >
+            <ArrowUp size={20} className="text-white" />
+          </button>
+        </form>
       </div>
     </div>
   );
