@@ -46,12 +46,28 @@ npm run build --workspace=packages/shared
 
 ```bash
 # Start all services (Backend API + Electron with unified dev server)
+# Defaults to employee experience
 npm run dev
+
+# Launch admin experience (Dashboard, Integrations, Setup)
+npm run dev:admin
+
+# Launch employee experience (Home, Roadmap, Nudges, Chats)
+npm run dev:employee
 
 # Or run individual workspaces
 npm run dev --workspace=apps/backend
 npm run dev --workspace=apps/electron
 ```
+
+#### Console Modes
+
+The console window supports two different user experiences:
+
+- **Employee Mode** (default): Access to Home, Roadmap, Nudges, and Chats
+- **Admin Mode**: Access to Dashboard (analytics), Integrations, and Setup
+
+Use the `dev:admin` or `dev:employee` scripts to launch the appropriate experience. The mode is controlled via the `VITE_USER_ROLE` environment variable.
 
 ### Building
 
@@ -91,8 +107,10 @@ npm run format:check
 
 ### Five-Window Electron Architecture
 
-1. **Agent Window** - Always-on-top floating widget
-2. **Console Window** - Main workspace with Roadmap/Nudges/Chats tabs
+1. **Agent Window** - Always-on-top floating widget (Cmd+H)
+2. **Console Window** - Main workspace with role-based navigation
+   - **Employee Mode**: Home, Roadmap, Nudges, Chats
+   - **Admin Mode**: Dashboard (analytics), Integrations, Setup
 3. **Overlay Window** - Fullscreen transparent layer for visual guidance
 4. **Guide Window** - Side panel for step-by-step UI guidance
 5. **Nudge Window** - Expert recommendations panel
@@ -146,6 +164,11 @@ No environment variables needed - electron-vite handles dev server configuration
 - Role-specific templates
 - Adaptive adjustment based on progress
 
+### 5. Admin Dashboard
+- **Dashboard**: Analytics and metrics (Total Savings, Regained Productivity, Top Nudge Themes, Time to Productivity)
+- **Integrations**: Connect to Slack, Notion, Codebase, and other services
+- **Setup**: Configuration and organization settings
+
 ## Global Shortcuts
 
 - **Cmd+H (Ctrl+H)**: Open help console
@@ -168,12 +191,18 @@ No environment variables needed - electron-vite handles dev server configuration
 
 ✅ Monorepo setup complete
 ✅ TypeScript + ESLint + Prettier configured
-✅ 5-window Electron architecture scaffolded
-✅ Basic React apps for all windows
-✅ IPC channels defined
-✅ Shared types and schemas
+✅ 5-window Electron architecture implemented
+✅ Agent window with text/audio modes and conversation dialog
+✅ Console window with role-based navigation
+✅ Employee experience (Home, Roadmap, Nudges, Chats)
+✅ Admin experience (Dashboard, Integrations, Setup)
+✅ Guide window with step-by-step workflow
+✅ Overlay window with visual highlights
+✅ Nudge window with expert recommendations
+✅ IPC channels and window coordination
+✅ Shared types, schemas, and components
 
-🚧 Next: Implement core help system with AI integration
+🚧 Next: Backend API and AI integration (Gemini Vision, OpenAI embeddings)
 
 ## License
 

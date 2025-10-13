@@ -6,13 +6,14 @@ import { RoadmapProvider } from "./context/RoadmapContext";
 import { NudgesProvider } from "./context/NudgesContext";
 import { ChatsProvider } from "./context/ChatsContext";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
-import HomeView from "./components/views/HomeView";
-import RoadmapView from "./components/views/RoadmapView";
-import NudgesView from "./components/views/NudgesView";
-import ChatsView from "./components/views/ChatsView";
+import HomeView from "./components/views/employee/HomeView";
+import RoadmapView from "./components/views/employee/RoadmapView";
+import NudgesView from "./components/views/employee/NudgesView";
+import ChatsView from "./components/views/employee/ChatsView";
 import DashboardView from "./components/views/admin/DashboardView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
+import React from "react";
 
 // Dynamic default route based on user role
 function DefaultRoute() {

@@ -1,5 +1,5 @@
-import { useAdmin } from "../../../context/AdminContext";
-import MetricCard from "../../admin/MetricCard";
+import { useAdmin } from "../../../../context/AdminContext";
+import MetricCard from "./components/MetricCard";
 
 export default function DashboardView() {
   const { savingsMetric, timeToProductivity, productivityData, nudgeThemes } = useAdmin();

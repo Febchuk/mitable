@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
+    "dev:admin": "npm run dev:admin --workspace=apps/electron",
+    "dev:employee": "npm run dev:employee --workspace=apps/electron",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",

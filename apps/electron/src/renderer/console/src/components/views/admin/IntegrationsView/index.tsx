@@ -1,5 +1,5 @@
-import { useAdmin } from "../../../context/AdminContext";
-import IntegrationCard from "../../admin/IntegrationCard";
+import { useAdmin } from "../../../../context/AdminContext";
+import IntegrationCard from "./components/IntegrationCard";
 
 export default function IntegrationsView() {
   const { integrations, connectIntegration, disconnectIntegration } = useAdmin();
