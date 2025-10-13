@@ -20,6 +20,7 @@ declare global {
     guideAPI: {
       onGuideData: (callback: (data: GuideData) => void) => void;
       nextStep: () => void;
+      updateStep: (data: GuideData) => void;
       complete: () => void;
       cancel: () => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
@@ -48,13 +49,31 @@ function App() {
 
   const handlePrevious = () => {
     if (currentStepIndex > 0) {
-      setCurrentStepIndex(currentStepIndex - 1);
+      const newStepIndex = currentStepIndex - 1;
+      setCurrentStepIndex(newStepIndex);
+
+      // Notify overlay of step change
+      if (guideData) {
+        const updatedGuideData = {
+          ...guideData,
+          currentStep: newStepIndex,
+        };
+        window.guideAPI?.updateStep(updatedGuideData);
+      }
     }
   };
 
   const handleNext = () => {
     if (guideData && currentStepIndex < guideData.steps.length - 1) {
-      setCurrentStepIndex(currentStepIndex + 1);
+      const newStepIndex = currentStepIndex + 1;
+      setCurrentStepIndex(newStepIndex);
+
+      // Notify overlay of step change
+      const updatedGuideData = {
+        ...guideData,
+        currentStep: newStepIndex,
+      };
+      window.guideAPI?.updateStep(updatedGuideData);
     }
   };
 

@@ -214,6 +214,13 @@ function setupIPC() {
     }
   });
 
+  // Guide step update - forward to overlay
+  ipcMain.on(IPC_CHANNELS.GUIDE_STEP_UPDATE, (_event, data) => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
+    }
+  });
+
   ipcMain.on(IPC_CHANNELS.GUIDE_COMPLETE, () => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.hide();

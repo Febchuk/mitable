@@ -10,6 +10,7 @@ export const IPC_CHANNELS = {
   // Guide system
   GUIDE_START: "guide-start",
   GUIDE_NEXT_STEP: "guide-next-step",
+  GUIDE_STEP_UPDATE: "guide-step-update",
   GUIDE_COMPLETE: "guide-complete",
   GUIDE_CANCEL: "guide-cancel",
   GUIDE_DATA: "guide-data",
