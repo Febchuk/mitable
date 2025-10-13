@@ -1,0 +1,90 @@
+appId: com.mitable.app
+productName: Mitable AI
+copyright: Copyright © 2025 Mitable Inc.
+directories:
+  buildResources: resources
+  output: dist
+
+# Files to include/exclude
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+
+# ASAR configuration
+asarUnpack:
+  - resources/**
+
+# macOS Configuration
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - zip
+  icon: resources/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+
+dmg:
+  artifactName: ${name}-${version}-mac.${ext}
+  title: ${productName} ${version}
+  icon: resources/icon.icns
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+# Windows Configuration
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - ia32
+    - target: portable
+      arch:
+        - x64
+  icon: resources/icon.ico
+  artifactName: ${name}-${version}-win-${arch}.${ext}
+  publisherName: Mitable Inc.
+  verifyUpdateCodeSignature: false
+
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  license: LICENSE
+
+portable:
+  artifactName: ${name}-${version}-portable.${ext}
+
+# Linux Configuration
+linux:
+  target:
+    - AppImage
+    - deb
+  maintainer: Mitable Inc.
+  category: Utility
+  icon: resources/icon.png
+  artifactName: ${name}-${version}-linux.${ext}
+
+# Disable auto-update for now
+publish: null
+
+# Build optimization
+npmRebuild: false
+nodeGypRebuild: false
