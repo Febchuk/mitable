@@ -14,6 +14,7 @@ export interface Task {
   description?: string;
   timeEstimate: string;
   completed: boolean;
+  isActive?: boolean;
   week: number;
 }
 

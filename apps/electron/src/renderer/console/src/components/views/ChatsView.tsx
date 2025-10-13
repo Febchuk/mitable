@@ -25,7 +25,7 @@ export default function ChatsView() {
   const unreadCount = chats.filter((c) => c.unread).length;
 
   return (
-    <div className="p-2xl space-y-xl max-w-4xl">
+    <div className="p-2xl space-y-xl max-w-4xl app-no-drag">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

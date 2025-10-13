@@ -28,7 +28,7 @@ export default function NudgesView() {
   const resolvedNudges = nudges.filter((n) => n.status === "resolved");
 
   return (
-    <div className="p-2xl space-y-xl max-w-6xl">
+    <div className="p-2xl space-y-xl max-w-6xl app-no-drag">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-text-primary mb-sm">Expert Nudges</h1>

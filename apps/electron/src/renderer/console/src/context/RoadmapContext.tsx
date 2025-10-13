@@ -41,8 +41,9 @@ export function RoadmapProvider({ children }: { children: ReactNode }) {
         {
           id: "1-4",
           title: "Clone repositories and run local setup",
-          timeEstimate: "1 h 15 m",
+          timeEstimate: "1h 15m",
           completed: true,
+          isActive: true,
           week: 1,
         },
         {
@@ -92,12 +93,23 @@ export function RoadmapProvider({ children }: { children: ReactNode }) {
 
   const toggleTask = (taskId: string) => {
     setWeeks((prevWeeks) =>
-      prevWeeks.map((week) => ({
-        ...week,
-        tasks: week.tasks.map((task) =>
+      prevWeeks.map((week) => {
+        // Update the task's completed status
+        const updatedTasks = week.tasks.map((task) =>
           task.id === taskId ? { ...task, completed: !task.completed } : task
-        ),
-      }))
+        );
+
+        // Recalculate week percentage
+        const completedCount = updatedTasks.filter(t => t.completed).length;
+        const totalCount = updatedTasks.length;
+        const newPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+        return {
+          ...week,
+          tasks: updatedTasks,
+          percentage: newPercentage,
+        };
+      })
     );
   };
 
