@@ -34,6 +34,7 @@ export const IPC_CHANNELS = {
   // Agent window
   AGENT_TOGGLE: "agent-toggle",
   AGENT_SHOW_CONSOLE: "agent-show-console",
+  AGENT_RESIZE: "agent-resize",
 
   // Conversation management
   CONVERSATION_NEW: "conversation-new",

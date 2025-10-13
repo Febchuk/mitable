@@ -11,12 +11,12 @@ let nudgeWindow: BrowserWindow | null = null;
 
 function createAgentWindow() {
   agentWindow = new BrowserWindow({
-    width: 80,
+    width: 740,
     height: 80,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
-    resizable: false,
+    resizable: true,
     skipTaskbar: true,
     show: false,
     webPreferences: {
@@ -207,6 +207,23 @@ function setupIPC() {
   // Nudge system
   ipcMain.on(IPC_CHANNELS.NUDGE_SHOW, (_event, data) => {
     if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      // Position nudge window to the right of agent window
+      if (agentWindow && !agentWindow.isDestroyed()) {
+        const agentBounds = agentWindow.getBounds();
+        const nudgeBounds = nudgeWindow.getBounds();
+
+        // Position to the right with 16px gap
+        const x = agentBounds.x + agentBounds.width + 16;
+        const y = agentBounds.y;
+
+        nudgeWindow.setBounds({
+          x,
+          y,
+          width: nudgeBounds.width,
+          height: nudgeBounds.height,
+        });
+      }
+
       nudgeWindow.webContents.send(IPC_CHANNELS.NUDGE_SHOW, data);
       nudgeWindow.show();
     }
@@ -225,6 +242,17 @@ function setupIPC() {
     }
     if (nudgeWindow && !nudgeWindow.isDestroyed()) {
       nudgeWindow.setIgnoreMouseEvents(ignore, { forward: true });
+    }
+  });
+
+  // Agent window resize
+  ipcMain.on(IPC_CHANNELS.AGENT_RESIZE, (_event, mode: 'pill' | 'conversation') => {
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      if (mode === 'pill') {
+        agentWindow.setSize(740, 80, true);
+      } else {
+        agentWindow.setSize(740, 696, true);
+      }
     }
   });
 }

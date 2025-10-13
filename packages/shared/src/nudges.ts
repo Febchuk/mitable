@@ -11,11 +11,12 @@ export const ExpertProfileSchema = z.object({
   name: z.string(),
   email: z.string().email(),
   department: z.string(),
+  role: z.string().optional(),
   expertise: z.array(z.string()),
   avatarUrl: z.string().url().optional(),
   responseRate: z.number().min(0).max(1),
   helpfulnessRating: z.number().min(0).max(5),
-  availability: z.enum(["available", "busy", "offline"]),
+  availability: z.enum(["available", "away", "busy", "offline"]),
 });
 
 export type ExpertProfile = z.infer<typeof ExpertProfileSchema>;

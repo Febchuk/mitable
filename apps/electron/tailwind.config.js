@@ -17,6 +17,16 @@ export default {
           secondary: "#2A2A2A",
           elevated: "#3A3A3A",
         },
+        // Agent pill specific
+        agent: {
+          pill: "#1A1A1A",
+          toggle: {
+            inactive: "#3E3D3D",
+            active: "#FFFFFF",
+          },
+          bubble: "#2A2A2A",
+          card: "#3A3560",
+        },
         surface: {
           DEFAULT: "#2A2A2A",
           elevated: "#3A3A3A",

@@ -1,49 +1,134 @@
+import { useState } from "react";
+import { ExpertProfile } from "@mitable/shared";
+import ExpertListCollapsed from "./components/ExpertListCollapsed";
+import ExpertListExpanded from "./components/ExpertListExpanded";
+
+interface ExpertMatch {
+  expert: ExpertProfile;
+  matchScore: number;
+}
+
+// Mock data based on design
+const mockExperts: ExpertMatch[] = [
+  {
+    expert: {
+      id: "1",
+      userId: "u1",
+      name: "Breanne De Vera",
+      email: "breanne@company.com",
+      department: "Billing",
+      role: "Billing Specialist",
+      expertise: ["billing", "payments"],
+      responseRate: 0.95,
+      helpfulnessRating: 4.8,
+      availability: "available",
+    },
+    matchScore: 0.92,
+  },
+  {
+    expert: {
+      id: "2",
+      userId: "u2",
+      name: "Hamarenoh Goshu",
+      email: "hamarenoh@company.com",
+      department: "Billing",
+      role: "Billing Specialist",
+      expertise: ["billing", "invoicing"],
+      responseRate: 0.88,
+      helpfulnessRating: 4.5,
+      availability: "away",
+    },
+    matchScore: 0.82,
+  },
+  {
+    expert: {
+      id: "3",
+      userId: "u3",
+      name: "Chad Ekong",
+      email: "chad@company.com",
+      department: "Billing",
+      role: "Billing Specialist",
+      expertise: ["billing", "accounts"],
+      responseRate: 0.92,
+      helpfulnessRating: 4.7,
+      availability: "busy",
+    },
+    matchScore: 0.77,
+  },
+  {
+    expert: {
+      id: "4",
+      userId: "u4",
+      name: "Tewo Taiwo",
+      email: "tewo@company.com",
+      department: "Billing",
+      role: "Billing Specialist",
+      expertise: ["billing", "reconciliation"],
+      responseRate: 0.85,
+      helpfulnessRating: 4.3,
+      availability: "available",
+    },
+    matchScore: 0.68,
+  },
+  {
+    expert: {
+      id: "5",
+      userId: "u5",
+      name: "Nailah Kamal",
+      email: "nailah@company.com",
+      department: "Billing",
+      role: "Billing Specialist",
+      expertise: ["billing", "disputes"],
+      responseRate: 0.78,
+      helpfulnessRating: 4.2,
+      availability: "offline",
+    },
+    matchScore: 0.61,
+  },
+];
+
+declare global {
+  interface Window {
+    nudgeAPI: {
+      onNudgeShow: (callback: (data: unknown) => void) => void;
+      accept: (nudgeId: string) => void;
+      dismiss: (nudgeId: string) => void;
+      setIgnoreMouseEvents: (ignore: boolean) => void;
+    };
+  }
+}
+
 function App() {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleEscalate = (expertId: string) => {
+    console.log("Escalating to expert:", expertId);
+    // TODO: Implement escalation logic via IPC
+  };
+
+  const handleMouseEnter = () => {
+    window.nudgeAPI?.setIgnoreMouseEvents(false);
+  };
+
+  const handleMouseLeave = () => {
+    window.nudgeAPI?.setIgnoreMouseEvents(true);
+  };
+
   return (
-    <div className="w-full h-full bg-background-primary text-text-primary p-md rounded-lg shadow-2xl">
-      <header className="mb-md pb-md border-b border-background-tertiary">
-        <h2 className="text-xl font-semibold">Expert Match</h2>
-        <p className="text-sm text-text-secondary mt-xs">We found someone who can help</p>
-      </header>
-
-      <div className="mb-md">
-        <div className="flex items-center gap-md mb-md">
-          <div className="w-12 h-12 rounded-full bg-accent-primary flex items-center justify-center text-xl">
-            👤
-          </div>
-          <div>
-            <h3 className="font-semibold">Sarah Johnson</h3>
-            <p className="text-sm text-text-secondary">Senior Engineer • Engineering</p>
-          </div>
-        </div>
-
-        <div className="space-y-sm">
-          <div className="flex items-center gap-sm text-sm">
-            <span className="text-text-secondary">Response Rate:</span>
-            <div className="flex-1 h-2 bg-background-tertiary rounded-full overflow-hidden">
-              <div className="h-full w-4/5 bg-accent-primary"></div>
-            </div>
-            <span>95%</span>
-          </div>
-
-          <div className="flex items-center gap-sm text-sm">
-            <span className="text-text-secondary">Match Score:</span>
-            <div className="flex-1 h-2 bg-background-tertiary rounded-full overflow-hidden">
-              <div className="h-full w-11/12 bg-accent-primary"></div>
-            </div>
-            <span>92%</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-sm">
-        <button className="w-full py-sm bg-accent-primary hover:bg-accent-secondary rounded-md transition-colors">
-          Connect with Sarah
-        </button>
-        <button className="w-full py-sm bg-background-tertiary hover:bg-background-secondary rounded-md transition-colors">
-          Show Other Experts
-        </button>
-      </div>
+    <div
+      className="w-full h-full flex items-center justify-center p-4"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {isExpanded ? (
+        <ExpertListExpanded
+          experts={mockExperts}
+          onCollapse={() => setIsExpanded(false)}
+          onEscalate={handleEscalate}
+        />
+      ) : (
+        <ExpertListCollapsed experts={mockExperts} onExpand={() => setIsExpanded(true)} />
+      )}
     </div>
   );
 }
