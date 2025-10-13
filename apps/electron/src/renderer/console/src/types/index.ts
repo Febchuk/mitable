@@ -43,11 +43,14 @@ export interface Chat {
 }
 
 // User types
+export type UserRole = "admin" | "employee";
+
 export interface User {
   name: string;
   firstName: string;
   avatarUrl?: string;
   currentWeek: number;
+  role: UserRole;
 }
 
 // Status badge variants
@@ -59,3 +62,36 @@ export type ButtonSize = "sm" | "md" | "lg";
 
 // Avatar sizes
 export type AvatarSize = "sm" | "md" | "lg";
+
+// Admin types
+export type IntegrationProvider = "slack" | "notion" | "codebase" | "google-drive";
+export type IntegrationStatus = "connected" | "disconnected" | "pending";
+
+export interface Integration {
+  id: string;
+  provider: IntegrationProvider;
+  name: string;
+  description: string;
+  logoUrl?: string;
+  status: IntegrationStatus;
+  updatesPerDay?: number;
+  connectedAt?: Date;
+}
+
+export interface DashboardMetric {
+  label: string;
+  value: string | number;
+  description?: string;
+  type: "currency" | "time" | "percentage" | "count";
+}
+
+export interface ProductivityData {
+  automated: number;
+  manual: number;
+}
+
+export interface NudgeTheme {
+  id: string;
+  label: string;
+  category: string;
+}

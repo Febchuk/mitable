@@ -1,7 +1,23 @@
-import { Home, Layers, Users, MessageSquare } from "lucide-react";
+import { Home, Layers, Users, MessageSquare, BarChart3, Plug, Settings as SettingsIcon } from "lucide-react";
 import NavItem from "./NavItem";
+import { useUser } from "../../context/UserContext";
 
 export default function Nav() {
+  const { user } = useUser();
+  const isAdmin = user?.role === "admin";
+
+  if (isAdmin) {
+    // Admin navigation
+    return (
+      <nav className="flex flex-col gap-xs p-md">
+        <NavItem to="/dashboard" icon={BarChart3} label="Dashboard" />
+        <NavItem to="/integrations" icon={Plug} label="Integrations" />
+        <NavItem to="/setup" icon={SettingsIcon} label="Setup" />
+      </nav>
+    );
+  }
+
+  // Employee navigation
   return (
     <nav className="flex flex-col gap-xs p-md">
       <NavItem to="/home" icon={Home} label="Home" />

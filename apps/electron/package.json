@@ -4,7 +4,9 @@
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "VITE_USER_ROLE=employee electron-vite dev",
+    "dev:admin": "VITE_USER_ROLE=admin electron-vite dev",
+    "dev:employee": "VITE_USER_ROLE=employee electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
