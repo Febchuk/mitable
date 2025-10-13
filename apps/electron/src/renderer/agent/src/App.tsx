@@ -11,6 +11,7 @@ declare global {
       setIgnoreMouseEvents: (ignore: boolean) => void;
       resizeWindow: (mode: 'pill' | 'conversation') => void;
       showNudge: (data: any) => void;
+      startGuide: (data: any) => void;
     };
   }
 }
@@ -27,9 +28,85 @@ interface Message {
   };
 }
 
+// Mock guide data for Ticket Billing Escalation workflow
+const BILLING_ESCALATION_GUIDE = {
+  id: "billing-escalation-guide",
+  title: "Agent Interactive Workflow",
+  description: "Step-by-step guide to escalate a billing ticket",
+  steps: [
+    {
+      id: "step-1",
+      stepNumber: 1,
+      instruction: "Click the 'Priority' dropdown in the top toolbar.",
+      targetElement: {
+        label: "Priority Dropdown",
+        boundingBox: { x: 100, y: 50, width: 120, height: 40 },
+      },
+      completed: false,
+    },
+    {
+      id: "step-2",
+      stepNumber: 2,
+      instruction: "Click the 'Assign' button in the top toolbar.",
+      targetElement: {
+        label: "Assign Button",
+        boundingBox: { x: 250, y: 50, width: 100, height: 40 },
+      },
+      completed: false,
+    },
+    {
+      id: "step-3",
+      stepNumber: 3,
+      instruction: "Select 'Billing Team' from the assignment dropdown.",
+      targetElement: {
+        label: "Team Dropdown",
+        boundingBox: { x: 250, y: 100, width: 200, height: 150 },
+      },
+      completed: false,
+    },
+    {
+      id: "step-4",
+      stepNumber: 4,
+      instruction: "Add an escalation note in the comments section.",
+      targetElement: {
+        label: "Comments Field",
+        boundingBox: { x: 50, y: 300, width: 400, height: 100 },
+      },
+      completed: false,
+    },
+    {
+      id: "step-5",
+      stepNumber: 5,
+      instruction: "Click the 'Notify Team Lead' checkbox.",
+      targetElement: {
+        label: "Notify Checkbox",
+        boundingBox: { x: 50, y: 420, width: 200, height: 30 },
+      },
+      completed: false,
+    },
+    {
+      id: "step-6",
+      stepNumber: 6,
+      instruction: "Click 'Save' to complete the escalation.",
+      targetElement: {
+        label: "Save Button",
+        boundingBox: { x: 300, y: 500, width: 100, height: 40 },
+      },
+      completed: false,
+    },
+  ],
+  currentStep: 0,
+  completed: false,
+  createdAt: new Date().toISOString(),
+};
+
 function App() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+
+  const handleCardClick = () => {
+    window.agentAPI.startGuide(BILLING_ESCALATION_GUIDE);
+  };
 
   const handleSubmit = (message: string) => {
     // Add user message
@@ -127,6 +204,7 @@ function App() {
           messages={messages}
           onSubmit={handleSubmit}
           onClose={handleClose}
+          onCardClick={handleCardClick}
         />
       )}
     </div>

@@ -19,9 +19,10 @@ interface ConversationDialogProps {
   messages: Message[];
   onSubmit: (message: string) => void;
   onClose: () => void;
+  onCardClick?: () => void;
 }
 
-export default function ConversationDialog({ messages, onSubmit, onClose }: ConversationDialogProps) {
+export default function ConversationDialog({ messages, onSubmit, onClose, onCardClick }: ConversationDialogProps) {
   return (
     <div className="relative w-full h-[600px] flex flex-col bg-background-secondary rounded-2xl overflow-hidden app-no-drag">
       {/* Close Button */}
@@ -43,6 +44,7 @@ export default function ConversationDialog({ messages, onSubmit, onClose }: Conv
                 title={message.cardData.title}
                 subtitle={message.cardData.subtitle}
                 icon={message.cardData.icon}
+                onClick={onCardClick}
               />
             );
           }

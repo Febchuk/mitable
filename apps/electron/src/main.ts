@@ -183,13 +183,32 @@ function setupIPC() {
 
   // Guide system
   ipcMain.on(IPC_CHANNELS.GUIDE_START, (_event, data) => {
+    // Show and position overlay window
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
+      overlayWindow.show();
     }
+
+    // Position and show guide window
     if (guideWindow && !guideWindow.isDestroyed()) {
+      // Position on left side of screen with some margin
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+      const guideWidth = 400;
+      const guideHeight = 400;
+
+      guideWindow.setBounds({
+        x: 50,
+        y: Math.floor((screenHeight - guideHeight) / 2),
+        width: guideWidth,
+        height: guideHeight,
+      });
+
       guideWindow.webContents.send(IPC_CHANNELS.GUIDE_DATA, data);
       guideWindow.show();
     }
+
+    // Hide nudge window if visible
     if (nudgeWindow && !nudgeWindow.isDestroyed() && nudgeWindow.isVisible()) {
       nudgeWindow.hide();
     }
