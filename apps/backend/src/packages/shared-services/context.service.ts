@@ -47,6 +47,7 @@ export function formatContext(options: ContextOptions): FormattedContext[] {
       // Detect source type
       const isSlackMessage = !!(metadata.channelId || metadata.messageId || metadata.user);
       const isGoogleDrive = metadata.source === 'google-drive';
+      const isNotion = metadata.source === 'notion';
       
       let sourceType = "Document";
       let sourceName = "Unknown";
@@ -68,6 +69,14 @@ export function formatContext(options: ContextOptions): FormattedContext[] {
         }
         // Google Drive: prefer modifiedTime (shows recent edits), fallback to createdTime
         timestamp = metadata.modifiedTime || metadata.createdTime;
+      } else if (isNotion) {
+        sourceType = metadata.pageType === 'database' ? "Notion Database" : "Notion Page";
+        sourceName = metadata.title || "Unknown";
+        if (metadata.lastEditedBy) {
+          sourceName += ` (edited by ${metadata.lastEditedBy})`;
+        }
+        // Notion: prefer lastEditedTime (shows recent edits), fallback to createdTime
+        timestamp = metadata.lastEditedTime || metadata.createdTime;
       } else if (metadata.source) {
         sourceType = metadata.source;
         sourceName = metadata.filename || metadata.fileName || metadata.channel || "Unknown";
@@ -122,6 +131,11 @@ export function buildContextString(contexts: FormattedContext[]): string {
       metadataLines.push(`Storage: Google Drive`);
       if (metadata.fileId) metadataLines.push(`File ID: ${metadata.fileId}`);
       if (metadata.webViewLink) metadataLines.push(`Link: ${metadata.webViewLink}`);
+    } else if (metadata.source === 'notion') {
+      metadataLines.push(`Storage: Notion`);
+      if (metadata.pageId) metadataLines.push(`Page ID: ${metadata.pageId}`);
+      if (metadata.url) metadataLines.push(`Link: ${metadata.url}`);
+      if (metadata.archived) metadataLines.push(`Status: Archived`);
     } else if (metadata.source === 'Slack' || metadata.channelId) {
       metadataLines.push(`Storage: Slack`);
       if (metadata.channelId) metadataLines.push(`Channel: #${metadata.channelId}`);
@@ -132,15 +146,22 @@ export function buildContextString(contexts: FormattedContext[]): string {
     // Ownership
     if (metadata.owner) metadataLines.push(`Owner: ${metadata.owner}`);
     if (metadata.user) metadataLines.push(`Posted by: ${metadata.user}`);
+    if (metadata.createdBy) metadataLines.push(`Created by: ${metadata.createdBy}`);
+    if (metadata.lastEditedBy) metadataLines.push(`Last edited by: ${metadata.lastEditedBy}`);
     
     // Timestamps
     if (metadata.createdTime) {
       const created = new Date(metadata.createdTime * 1000);
-      metadataLines.push(`Uploaded: ${created.toLocaleDateString()} ${created.toLocaleTimeString()}`);
+      const label = metadata.source === 'notion' ? 'Created' : 'Uploaded';
+      metadataLines.push(`${label}: ${created.toLocaleDateString()} ${created.toLocaleTimeString()}`);
     }
     if (metadata.modifiedTime) {
       const modified = new Date(metadata.modifiedTime * 1000);
       metadataLines.push(`Last Modified: ${modified.toLocaleDateString()} ${modified.toLocaleTimeString()}`);
+    }
+    if (metadata.lastEditedTime) {
+      const edited = new Date(metadata.lastEditedTime * 1000);
+      metadataLines.push(`Last Edited: ${edited.toLocaleDateString()} ${edited.toLocaleTimeString()}`);
     }
     if (metadata.createdAt && !metadata.createdTime) {
       const created = new Date(metadata.createdAt * 1000);

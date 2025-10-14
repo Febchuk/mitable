@@ -59,6 +59,13 @@ export async function queryVectors(options: QueryOptions): Promise<PineconeMatch
             { createdTime: { $lte: dateRange.endTimestamp } }
           ]
         },
+        // Notion: lastEditedTime (prefer recent edits)
+        { 
+          $and: [
+            { lastEditedTime: { $gte: dateRange.startTimestamp } },
+            { lastEditedTime: { $lte: dateRange.endTimestamp } }
+          ]
+        },
         // Legacy documents: uploadedAt
         { 
           $and: [

@@ -1,9 +1,10 @@
 export type IntentType = 
-  | "greeting"           // Hi, hello, etc.
-  | "knowledge_query"    // Needs RAG (company info, documents)
-  | "general_question"   // Can answer without context
-  | "clarification"      // Follow-up, asking for more details
-  | "feedback";          // Thanks, acknowledgment
+  | "greeting"              // Hi, hello, etc.
+  | "company"               // About the company: mission, business model, values, strategy
+  | "product"               // Features, roadmap, PRDs, specs
+  | "operations"            // Processes, workflows, how we work, past discussions
+  | "technical"             // Code, architecture, APIs, tech docs
+  | "general";              // General questions, can answer without context
 
 export interface IntentAnalysis {
   type: IntentType;

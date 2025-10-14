@@ -4,6 +4,7 @@ import { queryVectors } from "./packages/shared-services/pinecone.service.js";
 import { formatContext, buildContextString } from "./packages/shared-services/context.service.js";
 import { generateChatCompletion, buildRAGSystemPrompt } from "./packages/shared-services/llm.service.js";
 import { analyzeIntent } from "./packages/shared-services/intent.service.js";
+import { applyTrustRanking } from "./packages/shared-services/trust-ranking.service.js";
 import { parseDateRange } from "./packages/shared-utils/date-parser.js";
 import type { ChatRequest } from "./packages/shared-types/chat.types";
 
@@ -18,6 +19,10 @@ export async function handleChat(req: Request, res: Response) {
       return res.status(400).json({ error: "Message is required" });
     }
 
+    console.log("\n" + "=".repeat(80));
+    console.log("USER QUERY:", message);
+    console.log("=".repeat(80));
+
     const indexName = process.env.PINECONE_INDEX_NAME || "default";
 
     // Step 1: Analyze intent to determine if RAG is needed
@@ -28,14 +33,12 @@ export async function handleChat(req: Request, res: Response) {
     if (!intent.needsContext) {
       console.log(`Intent: ${intent.type}, skipping RAG`);
       
-      let systemPrompt = "You are a helpful AI assistant for Mitable, an onboarding platform.";
+      let systemPrompt = "You are the Mitable Agent, an intelligent assistant for Mitable, an onboarding platform company.";
       
       if (intent.type === "greeting") {
-        systemPrompt += " Respond warmly to greetings.";
-      } else if (intent.type === "feedback") {
-        systemPrompt += " Acknowledge feedback gracefully.";
-      } else if (intent.type === "general_question") {
-        systemPrompt += " Answer general questions helpfully without referencing company-specific context.";
+        systemPrompt += " Respond warmly and professionally to greetings. Introduce yourself as the Mitable Agent and offer to help with company information.";
+      } else if (intent.type === "general") {
+        systemPrompt += " Answer general questions helpfully. Note that for company-specific information about Mitable, the user should ask directly about the company.";
       }
       
       const response = await generateChatCompletion({
@@ -48,6 +51,11 @@ export async function handleChat(req: Request, res: Response) {
           { role: "user", content: message }
         ]
       });
+
+      console.log("\n" + "=".repeat(80));
+      console.log("AI RESPONSE (no RAG):");
+      console.log(response.content);
+      console.log("=".repeat(80) + "\n");
 
       return res.json({
         response: response.content,
@@ -72,36 +80,36 @@ export async function handleChat(req: Request, res: Response) {
 
     // Step 4: Query Pinecone
     console.log("Querying Pinecone index:", indexName);
+    // For date queries, get WAY more results since we want everything from that date
+    const topK = dateRange.type !== "none" ? 100 : 20;
     const matches = await queryVectors({
       embedding,
       indexName,
-      topK: 20, // Temporarily increased to find Google Drive docs
+      topK,
       dateRange
     });
 
     console.log(`Pinecone returned ${matches.length} matches`);
 
-    // Step 5: Format context
-    const useLooseThreshold = dateRange.type !== "none";
-    
-    // Detect if query is asking specifically about Slack
-    const isSlackQuery = /\b(slack|channel|message|conversation|chat|discussed)\b/i.test(message);
-    const boostDocuments = !isSlackQuery; // Don't boost docs if asking about Slack
-    
-    if (isSlackQuery) {
-      console.log("Slack-specific query detected, prioritizing chat messages");
-    }
+    // Step 5: Apply trust-based ranking (skip for date queries)
+    const hasDateFilter = dateRange.type !== "none";
+    const rankedMatches = applyTrustRanking(matches, intent, hasDateFilter);
+
+    // Step 6: Format context
+    // For date queries, skip threshold entirely (we want ALL results from that date)
+    const isDateQuery = dateRange.type === "single-date" || dateRange.type === "date-range";
+    const scoreThreshold = isDateQuery ? 0.0 : 0.2;
     
     const contexts = formatContext({ 
-      matches, 
-      useLooseThreshold,
-      boostDocuments
+      matches: rankedMatches, 
+      scoreThreshold,
+      boostDocuments: false // Trust ranking handles this now
     });
 
     const contextString = buildContextString(contexts);
     console.log(`Formatted ${contexts.length} contexts (${contextString.length} chars)`);
 
-    // Step 6: Generate AI response
+    // Step 7: Generate AI response
     const systemPrompt = buildRAGSystemPrompt(contextString);
     const messages = [
       { role: "system" as const, content: systemPrompt },
@@ -115,6 +123,11 @@ export async function handleChat(req: Request, res: Response) {
     console.log("Calling LLM...");
     const response = await generateChatCompletion({ messages });
     console.log("Response generated successfully");
+
+    console.log("\n" + "=".repeat(80));
+    console.log("AI RESPONSE:");
+    console.log(response.content);
+    console.log("=".repeat(80) + "\n");
 
     // Step 7: Return response
     return res.json({

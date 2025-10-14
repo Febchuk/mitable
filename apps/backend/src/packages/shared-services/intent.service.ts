@@ -1,18 +1,18 @@
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 import type { IntentAnalysis, IntentOptions } from "../shared-types/intent.types";
 
-let openai: OpenAI | null = null;
+let groq: Groq | null = null;
 
-function getOpenAI(): OpenAI {
-  if (!openai) {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY environment variable is required");
+function getGroq(): Groq {
+  if (!groq) {
+    if (!process.env.GROQ_API_KEY) {
+      throw new Error("GROQ_API_KEY environment variable is required");
     }
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+    groq = new Groq({
+      apiKey: process.env.GROQ_API_KEY,
     });
   }
-  return openai;
+  return groq;
 }
 
 /**
@@ -21,33 +21,42 @@ function getOpenAI(): OpenAI {
 export async function analyzeIntent(options: IntentOptions): Promise<IntentAnalysis> {
   const { message, conversationHistory = [] } = options;
   
-  const ai = getOpenAI();
+  const ai = getGroq();
   
-  const systemPrompt = `You are an intent classifier for a company knowledge assistant.
+  const systemPrompt = `You are an intent classifier for a company knowledge assistant named Mitable (an onboarding platform).
 
 Analyze the user's message and classify it into ONE of these categories:
 
-1. **greeting** - Simple greetings, pleasantries (hi, hello, good morning, how are you)
-2. **knowledge_query** - Questions about company info, documents, people, processes, Slack conversations, or internal knowledge
-3. **general_question** - General questions that don't need company context (definitions, explanations, how-to)
-4. **clarification** - Follow-up questions asking for more details or clarification
-5. **feedback** - Thanks, acknowledgments, confirmations (ok, thanks, got it)
+1. **company** - Questions about THE COMPANY: business model, mission, values, strategy, what Mitable does
+2. **product** - Questions about product features, roadmap, PRDs, specs, what we're building
+3. **operations** - Questions about processes, workflows, how we work, past discussions, what happened when, team members
+4. **technical** - Questions about code, architecture, APIs, implementation, engineering
+5. **greeting** - Simple greetings (hi, hello, thanks, bye)
+6. **general** - General knowledge questions that don't need company context (definitions, how-to)
 
-Respond ONLY with valid JSON in this format:
+Rules:
+- If mentions "Mitable", "our company", "we", "us" → company-specific (NOT general)
+- If asks "what happened", "when did", "who said" → operations (includes history)
+- If asks about concepts/definitions without company context → general
+
+Respond ONLY with valid JSON:
 {
-  "type": "greeting|knowledge_query|general_question|clarification|feedback",
+  "type": "company|product|operations|technical|greeting|general",
   "confidence": 0.0-1.0,
   "needsContext": true|false,
   "reasoning": "brief explanation"
 }
 
 Examples:
-- "Hi" → {"type":"greeting","confidence":1.0,"needsContext":false,"reasoning":"Simple greeting"}
-- "What was discussed in engineering channel?" → {"type":"knowledge_query","confidence":0.95,"needsContext":true,"reasoning":"Asking about internal Slack conversations"}
-- "What is machine learning?" → {"type":"general_question","confidence":0.9,"needsContext":false,"reasoning":"General definition, no company context needed"}
-- "Can you elaborate?" → {"type":"clarification","confidence":0.85,"needsContext":true,"reasoning":"Follow-up seeking more details"}`;
+- "What is Mitable's business model?" → {"type":"company","confidence":0.95,"needsContext":true,"reasoning":"Company-specific question"}
+- "What features are in the PRD?" → {"type":"product","confidence":0.95,"needsContext":true,"reasoning":"Product specs"}
+- "What happened on October 7th?" → {"type":"operations","confidence":0.9,"needsContext":true,"reasoning":"Past events query"}
+- "How do we deploy?" → {"type":"operations","confidence":0.9,"needsContext":true,"reasoning":"Company process"}
+- "What's the API endpoint?" → {"type":"technical","confidence":0.95,"needsContext":true,"reasoning":"Technical implementation"}
+- "What is REST API?" → {"type":"general","confidence":0.95,"needsContext":false,"reasoning":"General definition"}
+- "Hi" → {"type":"greeting","confidence":1.0,"needsContext":false,"reasoning":"Greeting"}`;
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+  const messages: any[] = [
     { role: "system", content: systemPrompt },
     ...conversationHistory.slice(-3).map(msg => ({ // Only last 3 for context
       role: msg.role as "user" | "assistant",
@@ -57,10 +66,9 @@ Examples:
   ];
 
   const response = await ai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "llama-3.3-70b-versatile", // Fast model for classification
     messages,
-    temperature: 0.3, // Lower temp for consistent classification
-    max_tokens: 150,
+    temperature: 0.3, // Lower temp for more consistent classification
     response_format: { type: "json_object" }
   });
 
@@ -77,12 +85,12 @@ Examples:
     return analysis;
   } catch (error) {
     console.error("Failed to parse intent response:", content);
-    // Default to knowledge_query to be safe
+    // Default to general to be safe
     return {
-      type: "knowledge_query",
+      type: "general",
       confidence: 0.5,
       needsContext: true,
-      reasoning: "Failed to classify, defaulting to knowledge query"
+      reasoning: "Failed to classify, defaulting to general"
     };
   }
 }
