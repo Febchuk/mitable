@@ -1,8 +1,8 @@
-import { useNudges } from "../../context/NudgesContext";
-import Card from "../ui/Card";
-import Button from "../ui/Button";
-import Avatar from "../ui/Avatar";
-import Badge from "../ui/Badge";
+import { useNudges } from "../../../../context/NudgesContext";
+import Card from "../../../ui/Card";
+import Button from "../../../ui/Button";
+import Avatar from "../../../ui/Avatar";
+import Badge from "../../../ui/Badge";
 import { Check, X, Clock } from "lucide-react";
 
 function formatTimestamp(date: Date): string {

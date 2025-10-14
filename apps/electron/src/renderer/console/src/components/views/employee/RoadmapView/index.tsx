@@ -1,5 +1,5 @@
-import { useRoadmap } from "../../context/RoadmapContext";
-import { Check, Square } from "lucide-react";
+import { useRoadmap } from "../../../../context/RoadmapContext";
+import { Check } from "lucide-react";
 
 export default function RoadmapView() {
   const { weeks, toggleTask } = useRoadmap();

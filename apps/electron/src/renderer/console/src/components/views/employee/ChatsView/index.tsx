@@ -1,6 +1,6 @@
-import { useChats } from "../../context/ChatsContext";
-import Card from "../ui/Card";
-import Badge from "../ui/Badge";
+import { useChats } from "../../../../context/ChatsContext";
+import Card from "../../../ui/Card";
+import Badge from "../../../ui/Badge";
 import { MessageSquare, Clock } from "lucide-react";
 
 function formatTimestamp(date: Date): string {
