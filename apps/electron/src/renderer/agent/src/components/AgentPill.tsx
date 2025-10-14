@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowUp, Circle, Square } from "lucide-react";
 import logoIconSvg from "../../../assets/logo-icon.svg";
-import ToggleSwitch from "../../../components/ui/ToggleSwitch";
+import ToggleSwitch from "../../../components/legacy/ToggleSwitch";
 
 interface AgentPillProps {
   onSubmit: (message: string) => void;
