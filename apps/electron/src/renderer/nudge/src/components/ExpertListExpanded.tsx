@@ -13,7 +13,11 @@ interface ExpertListExpandedProps {
   onEscalate: (expertId: string) => void;
 }
 
-export default function ExpertListExpanded({ experts, onCollapse, onEscalate }: ExpertListExpandedProps) {
+export default function ExpertListExpanded({
+  experts,
+  onCollapse,
+  onEscalate,
+}: ExpertListExpandedProps) {
   // Sort by match score descending
   const sortedExperts = [...experts].sort((a, b) => b.matchScore - a.matchScore);
   const bestMatchId = sortedExperts[0]?.expert.id;

@@ -30,6 +30,7 @@
 ### The Problem
 
 Organizations invest heavily in onboarding new employees, yet:
+
 - **70% of new hires** feel unprepared during their first week
 - **Average time to productivity**: 8-12 weeks for technical roles
 - **Knowledge workers spend 20% of their time** searching for information or finding the right person to ask
@@ -49,14 +50,14 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 
 ### Key Differentiators
 
-| Traditional Solutions | Mitable AI Onboarding Buddy |
-|----------------------|----------------------------|
-| Generic documentation | Contextual to what you're seeing |
-| Manual search | AI understands intent + context |
-| "Read this guide" | "Click here, then select this" |
-| Static onboarding checklist | AI-personalized learning paths |
-| Guess who to ask | Smart colleague matching + nudging |
-| One-time training | Continuous learning companion |
+| Traditional Solutions       | Mitable AI Onboarding Buddy        |
+| --------------------------- | ---------------------------------- |
+| Generic documentation       | Contextual to what you're seeing   |
+| Manual search               | AI understands intent + context    |
+| "Read this guide"           | "Click here, then select this"     |
+| Static onboarding checklist | AI-personalized learning paths     |
+| Guess who to ask            | Smart colleague matching + nudging |
+| One-time training           | Continuous learning companion      |
 
 ### Target Market
 
@@ -100,16 +101,16 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 **Market Category**: AI-Powered Digital Adoption Platform (DAP) for Onboarding
 
 **Positioning Statement**:
-*For growing companies struggling with lengthy onboarding, Mitable is the AI assistant that cuts time-to-productivity in half by providing contextual, visual guidance exactly when employees need help—combining screen awareness, intelligent colleague matching, and personalized learning paths in one seamless desktop experience.*
+_For growing companies struggling with lengthy onboarding, Mitable is the AI assistant that cuts time-to-productivity in half by providing contextual, visual guidance exactly when employees need help—combining screen awareness, intelligent colleague matching, and personalized learning paths in one seamless desktop experience._
 
 ### Competitive Landscape
 
-| Competitor | Category | Limitation | Mitable Advantage |
-|-----------|----------|------------|-------------------|
-| WalkMe, Pendo | Traditional DAP | Requires manual setup per app, no AI understanding | AI-powered context detection, works across all apps |
-| Guru, Notion | Knowledge Base | Static docs, manual search | AI retrieves relevant content based on screen context |
-| Slack, Teams | Communication | Finding right person is manual | Smart colleague matching with expertise mapping |
-| Loom, Scribe | Documentation | Creating guides is time-consuming | Auto-generates guidance from screen analysis |
+| Competitor    | Category        | Limitation                                         | Mitable Advantage                                     |
+| ------------- | --------------- | -------------------------------------------------- | ----------------------------------------------------- |
+| WalkMe, Pendo | Traditional DAP | Requires manual setup per app, no AI understanding | AI-powered context detection, works across all apps   |
+| Guru, Notion  | Knowledge Base  | Static docs, manual search                         | AI retrieves relevant content based on screen context |
+| Slack, Teams  | Communication   | Finding right person is manual                     | Smart colleague matching with expertise mapping       |
+| Loom, Scribe  | Documentation   | Creating guides is time-consuming                  | Auto-generates guidance from screen analysis          |
 
 ---
 
@@ -118,18 +119,21 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 ### Primary Persona: "New Hire Natalie"
 
 **Demographics**:
+
 - Age: 26
 - Role: Customer Success Associate (just hired)
 - Experience: 2 years CS experience, first time using Lorikeet platform
 - Tech comfort: Medium-high
 
 **Goals**:
+
 - Ramp up quickly to handle customer tickets independently
 - Avoid bothering teammates with basic questions
 - Build confidence in using company tools
 - Make a good first impression
 
 **Pain Points**:
+
 - "I don't know what I don't know"
 - "I feel dumb asking the same questions repeatedly"
 - "The documentation is overwhelming and hard to search"
@@ -137,6 +141,7 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 - "I'm not sure who to ask for help with different things"
 
 **Current Workflow (Without Mitable)**:
+
 1. Encounters unfamiliar task (e.g., "How do I escalate this ticket?")
 2. Searches company wiki → Can't find specific answer
 3. Asks in Slack #help channel → Waits 20 minutes for response
@@ -145,6 +150,7 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 6. Total time wasted: 45-60 minutes
 
 **Ideal Workflow (With Mitable)**:
+
 1. Encounters unfamiliar task
 2. Presses Cmd+H → Agent appears showing screen context
 3. Types "How do I escalate this ticket?"
@@ -155,18 +161,21 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 ### Secondary Persona: "Manager Mike"
 
 **Demographics**:
+
 - Age: 35
 - Role: Customer Success Team Lead
 - Experience: 8 years, manages team of 12
 - Responsibility: Onboard 3-4 new hires per quarter
 
 **Goals**:
+
 - Reduce time spent answering repetitive questions
 - Ensure consistent onboarding quality
 - Track new hire progress and identify knowledge gaps
 - Scale onboarding without adding headcount
 
 **Pain Points**:
+
 - "I answer the same questions every week"
 - "I can't track if new hires are actually learning"
 - "Onboarding takes me away from strategic work"
@@ -175,17 +184,20 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 ### Tertiary Persona: "Subject Matter Expert Emma"
 
 **Demographics**:
+
 - Age: 31
 - Role: Senior Solutions Engineer
 - Experience: 5 years, deep product expertise
 - Responsibility: Complex escalations, training
 
 **Goals**:
+
 - Help new team members without constant interruptions
 - Share knowledge efficiently
 - Focus on high-value technical work
 
 **Pain Points**:
+
 - "I get pulled into basic questions that interrupt deep work"
 - "I've explained the same process 20 times"
 - "I want to help but don't have time for constant questions"
@@ -193,23 +205,28 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 ### User Journey Map: Natalie's First Week
 
 #### Day 1: Setup & Overwhelm
+
 **Morning**:
+
 - HR paperwork, IT setup, Mitable installation
 - Mitable shows personalized Week 1 Roadmap with 12 tasks
 - First task: "Complete account setup" → AI guides through profile completion
 
 **Afternoon**:
+
 - Stuck on Slack configuration → Presses Cmd+H
 - AI sees Slack settings screen → Provides step-by-step channel setup guide
 - Completes task ✅ → Roadmap updates automatically
 
 #### Day 2-3: Learning Core Workflows
+
 - Encounters first customer ticket → Uses Mitable to learn ticket workflow
 - AI recognizes Lorikeet interface → Provides contextual guidance on ticket fields
 - Asks follow-up questions in conversation → AI remembers context
 - Marks "Shadow customer interaction" complete on roadmap
 
 #### Day 4-5: Encountering Complexity
+
 - Encounters complex billing dispute → AI doesn't have full context
 - Mitable suggests: "This looks complex. Would you like me to find an expert?"
 - Shows 3 colleagues with billing expertise (Emma, ranked #1)
@@ -217,6 +234,7 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 - Logs interaction for future AI learning
 
 #### Week 2+: Becoming Independent
+
 - Help requests decrease from 15/day to 3/day
 - Uses Mitable primarily for edge cases and complex scenarios
 - Contributes to knowledge base through successful interactions
@@ -283,18 +301,21 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 ### Key Components
 
 #### 1. **Main Console** (Electron Window)
+
 - Persistent desktop window with sidebar navigation
 - Four main sections: Home, Roadmap, Nudges, Chats
 - Always accessible, minimizes to tray
 - Real-time updates via WebSocket
 
 #### 2. **Agent System** (Global Hotkey → Overlay)
+
 - Triggered by Cmd+H (configurable)
 - Captures screen context automatically
 - Lightweight agent widget for question input
 - Transforms into conversation panel or visual overlay
 
 #### 3. **AI Processing Pipeline**
+
 - **Input**: Screenshot + User question + App context
 - **Stage 1**: Gemini Vision UI object detection → UI elements with coordinates
 - **Stage 2**: Multimodal AI intent analysis → User goal + workflow step
@@ -303,6 +324,7 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 - **Output**: Conversational answer + Visual overlay coordinates + Workflow steps
 
 #### 4. **Nudge Matching Engine**
+
 - Analyzes question semantic content
 - Matches to colleague expertise profiles (built from past interactions)
 - Considers availability, response rate, team structure
@@ -310,6 +332,7 @@ Mitable is an intelligent desktop AI assistant that provides **contextual, just-
 - Tracks nudge lifecycle (sent → responded → resolved)
 
 #### 5. **Roadmap System**
+
 - AI generates personalized onboarding roadmap based on role
 - Week-by-week task breakdown with dependencies
 - Each task has: description, steps, source materials, estimated time
@@ -357,6 +380,7 @@ The Main Console is the central hub of Mitable, providing persistent access to a
    - Quick help trigger: "How can I help you today?" with Cmd+H button
 
 2. **Today's Focus** (Smart Recommendations)
+
    ```
    ┌─────────────────────────────────────────────┐
    │ 🎯 Today's Focus                            │
@@ -383,6 +407,7 @@ The Main Console is the central hub of Mitable, providing persistent access to a
    - "View Full Roadmap" - Tertiary link
 
 **UI Specifications**:
+
 - Layout: 2-column grid (70% content, 30% sidebar)
 - Color scheme: Dark mode default (customizable)
 - Typography: Inter font family, 14px base size
@@ -446,6 +471,7 @@ The Main Console is the central hub of Mitable, providing persistent access to a
    - Help button: "Get AI help with this task"
 
 2. **Task Detail Expanded View** (Expands inline below task)
+
    ```
    ┌────────────────────────────────────────────────────────┐
    │ ☐ Shadow customer deployment call             1h     │
@@ -486,6 +512,7 @@ The Main Console is the central hub of Mitable, providing persistent access to a
    - Recommends additional resources proactively
 
 **Interactions**:
+
 - Click task → Expand inline to show details (description, source materials, steps)
 - Click again or click collapse → Hide details
 - Right-click task → Context menu (Mark complete, Get help, Skip, etc.)
@@ -494,6 +521,7 @@ The Main Console is the central hub of Mitable, providing persistent access to a
 - Search tasks by keyword
 
 **Data Model**:
+
 ```typescript
 interface RoadmapTask {
   id: string;
@@ -501,9 +529,9 @@ interface RoadmapTask {
   weekNumber: number;
   title: string;
   description: string;
-  category: 'administrative' | 'technical' | 'social' | 'training' | 'learning' | 'work';
-  status: 'not_started' | 'in_progress' | 'completed' | 'blocked';
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  category: "administrative" | "technical" | "social" | "training" | "learning" | "work";
+  status: "not_started" | "in_progress" | "completed" | "blocked";
+  priority: "low" | "medium" | "high" | "critical";
   estimatedTime: string; // "1h 15m"
   dueDate?: Date;
   dependencies: string[]; // Task IDs that must be completed first
@@ -526,8 +554,15 @@ interface SourceMaterial {
   id: string;
   title: string;
   description?: string;
-  type: 'documentation' | 'video' | 'tutorial' | 'article' | 'internal' | 'external';
-  sourceType: 'Google Docs' | 'Notion' | 'Confluence' | 'Loom' | 'YouTube' | 'Internal' | 'External'; // Where the doc is from
+  type: "documentation" | "video" | "tutorial" | "article" | "internal" | "external";
+  sourceType:
+    | "Google Docs"
+    | "Notion"
+    | "Confluence"
+    | "Loom"
+    | "YouTube"
+    | "Internal"
+    | "External"; // Where the doc is from
   url: string;
   thumbnail?: string;
   duration?: string;
@@ -646,6 +681,7 @@ interface SourceMaterial {
    - Shows top 3 suggestions with confidence scores
 
 3. **Nudge Composition Flow**
+
    ```
    Step 1: AI suggests "This might need an expert"
    Step 2: Shows recommended experts with match scores
@@ -656,6 +692,7 @@ interface SourceMaterial {
    ```
 
 4. **Nudge Template** (AI-generated)
+
    ```
    Hi [Expert Name],
 
@@ -684,6 +721,7 @@ interface SourceMaterial {
    - Badges: "Quick Responder", "Expert Explainer", etc.
 
 **Data Model**:
+
 ```typescript
 interface Nudge {
   id: string;
@@ -697,7 +735,7 @@ interface Nudge {
     windowTitle?: string;
     detectedUIElements?: UIElement[];
   };
-  status: 'pending' | 'in_progress' | 'resolved' | 'no_response';
+  status: "pending" | "in_progress" | "resolved" | "no_response";
   expertMatchScore: number; // 0-100
   conversationThreadId?: string;
   sentAt: Date;
@@ -720,7 +758,7 @@ interface Expert {
   helpfulnessRating: number; // 0-5
   totalNudgesReceived: number;
   totalNudgesResolved: number;
-  availability?: 'available' | 'busy' | 'away';
+  availability?: "available" | "busy" | "away";
 }
 ```
 
@@ -856,6 +894,7 @@ interface Expert {
    - Improves suggestions based on conversation outcomes
 
 **Data Model**:
+
 ```typescript
 interface Conversation {
   id: string;
@@ -881,7 +920,7 @@ interface Conversation {
 interface Message {
   id: string;
   conversationId: string;
-  type: 'user' | 'ai';
+  type: "user" | "ai";
   content: string;
   timestamp: Date;
   metadata?: {
@@ -907,12 +946,14 @@ The core interaction model: contextual help triggered at the moment of need.
 #### 2.1 Activation Flow
 
 **Trigger Options**:
+
 1. **Global Hotkey**: Cmd/Ctrl + H (default, customizable)
 2. **System Tray**: Click icon → "Ask for Help"
 3. **Roadmap Task**: Click "Get AI Help" on any task
 4. **Menu Bar**: Help → Ask AI Assistant
 
 **User Flow**:
+
 ```
 [User encounters problem]
         ↓
@@ -949,6 +990,7 @@ The core interaction model: contextual help triggered at the moment of need.
 #### 2.2 Agent Component
 
 **Visual Design** (Compact Floating Widget - appears at bottom center):
+
 ```
                      ┌─────────────────────────────────────┐
                      │ 🤖  [Ask me anything...]     [→]   │
@@ -957,6 +999,7 @@ The core interaction model: contextual help triggered at the moment of need.
 ```
 
 When activated (Cmd+H pressed):
+
 ```
 ┌────────────────────────────────────────────────────┐
 │ Detected context: Lorikeet Customer Portal  [×]   │
@@ -1000,6 +1043,7 @@ When activated (Cmd+H pressed):
 ```
 
 **Key Features**:
+
 - **Auto-capture**: Screenshot taken when Cmd+H pressed
 - **Context detection**: AI detects app name, window title
 - **Smart positioning**: Appears center-screen, non-blocking
@@ -1008,6 +1052,7 @@ When activated (Cmd+H pressed):
 - **Escape route**: Option to find human expert instead
 
 **Privacy Controls**:
+
 - Visual indicator showing what's captured
 - Option to exclude specific windows/apps (blacklist)
 - "Blur sensitive info" toggle (experimental)
@@ -1021,6 +1066,7 @@ When activated (Cmd+H pressed):
    - Input: Screenshot (PNG, base64)
    - Output: UI elements with bounding boxes
    - Processing time: ~1-2 seconds
+
    ```json
    {
      "elements": [
@@ -1047,15 +1093,12 @@ When activated (Cmd+H pressed):
    - Analysis: What is the user trying to accomplish?
    - Output: User intent + Required workflow steps
    - Processing time: ~1-2 seconds
+
    ```json
    {
      "intent": "escalate_ticket",
      "workflow": "ticket_escalation_to_billing",
-     "requiredActions": [
-       "change_priority",
-       "assign_to_team",
-       "add_escalation_note"
-     ],
+     "requiredActions": ["change_priority", "assign_to_team", "add_escalation_note"],
      "confidence": 0.89
    }
    ```
@@ -1065,6 +1108,7 @@ When activated (Cmd+H pressed):
    - Search: Semantic (pgvector) + Keyword (PostgreSQL FTS)
    - Output: Top 3-5 relevant knowledge chunks
    - Processing time: ~500ms
+
    ```json
    {
      "results": [
@@ -1138,6 +1182,7 @@ When user clicks "Show Me How", visual overlays appear on top of their applicati
    - Current step highlighted
 
 **Visual Design Example**:
+
 ```
 [Your application screen]
                                           ┌──────────────────┐
@@ -1154,6 +1199,7 @@ When user clicks "Show Me How", visual overlays appear on top of their applicati
 ```
 
 **Overlay Controls**:
+
 - **Next Step** button: Advance to next instruction
 - **Previous Step**: Go back
 - **Pause**: Freeze guidance to examine screen
@@ -1161,6 +1207,7 @@ When user clicks "Show Me How", visual overlays appear on top of their applicati
 - **Minimize**: Hide temporarily (press Cmd+H to show again)
 
 **Smart Positioning Algorithm**:
+
 - Avoids covering the target UI element
 - Prefers placing instructions above/right of target
 - If space constrained, automatically repositions
@@ -1168,6 +1215,7 @@ When user clicks "Show Me How", visual overlays appear on top of their applicati
 - DPI scaling handled automatically
 
 **Data Model**:
+
 ```typescript
 interface VisualGuide {
   id: string;
@@ -1188,7 +1236,7 @@ interface GuidanceStep {
   id: string;
   order: number;
   description: string;
-  action: 'click' | 'type' | 'select' | 'navigate' | 'read';
+  action: "click" | "type" | "select" | "navigate" | "read";
   targetElement?: {
     elementId: string;
     boundingBox: BoundingBox;
@@ -1213,7 +1261,7 @@ interface GuidanceStep {
   instructionPosition: {
     x: number;
     y: number;
-    alignment: 'left' | 'right' | 'top' | 'bottom';
+    alignment: "left" | "right" | "top" | "bottom";
   };
 }
 ```
@@ -1229,6 +1277,7 @@ Additional technical details:
 #### 3.1 Expert Discovery & Matching
 
 **Expertise Profile Building**:
+
 - **Manual**: Users can add expertise tags to their profile
 - **Automatic**: AI learns from:
   - Nudge interactions they've successfully resolved
@@ -1238,6 +1287,7 @@ Additional technical details:
   - Calendar events and meeting titles
 
 **Matching Algorithm**:
+
 ```python
 def calculate_expert_match_score(question, expert):
     # Semantic similarity between question and expertise areas
@@ -1262,6 +1312,7 @@ def calculate_expert_match_score(question, expert):
 ```
 
 **Expert Ranking Display**:
+
 ```
 ┌────────────────────────────────────────────────────┐
 │ Recommended Experts                                │
@@ -1292,12 +1343,14 @@ def calculate_expert_match_score(question, expert):
 #### 3.2 Nudge Delivery Channels
 
 **Multi-channel notification**:
+
 1. **In-app** (Mitable desktop notification)
 2. **Slack** (Direct message with context)
 3. **Email** (Fallback if Slack unavailable)
 4. **Mobile push** (Future: Mitable mobile app)
 
 **Slack Integration Example**:
+
 ```
 MitableBot  9:24 AM
 @sarah.chen you have a new nudge from Steve Johnson
@@ -1320,6 +1373,7 @@ Steve asked:
 #### 4.1 AI-Generated Roadmap Creation
 
 **Input Parameters**:
+
 - User role (from HR system or manual input)
 - Department
 - Prior experience level (Junior, Mid, Senior)
@@ -1327,6 +1381,7 @@ Steve asked:
 - Team-specific workflows
 
 **Generation Process**:
+
 ```python
 def generate_onboarding_roadmap(user_profile, organization_id):
     # 1. Retrieve role-specific template
@@ -1358,6 +1413,7 @@ def generate_onboarding_roadmap(user_profile, organization_id):
 ```
 
 **Adaptive Roadmap Adjustment** (Optional Feature - can be enabled per organization):
+
 - If user completes tasks faster than estimated → Accelerate pace
 - If user struggles (many help requests) → Add prerequisite tasks
 - If user skips certain categories → Prompt to confirm or auto-adjust
@@ -1365,6 +1421,7 @@ def generate_onboarding_roadmap(user_profile, organization_id):
 _Note: This feature can be toggled on/off in organization settings. Some teams prefer fixed onboarding paths._
 
 **Example Roadmap Structure for "Customer Success Associate"**:
+
 ```yaml
 Week 1: Welcome & Setup
   Day 1:
@@ -1410,18 +1467,20 @@ Week 4: Full Ownership
 #### 5.1 Conversation Context Persistence
 
 **Context Window**:
+
 - AI maintains full conversation history (up to 10,000 tokens)
 - References past messages: "As I mentioned earlier about escalations..."
 - Cross-conversation learning: "This is similar to the issue you had yesterday with billing."
 
 **Context Metadata Tracking**:
+
 ```typescript
 interface ConversationContext {
   conversationId: string;
   user: {
     id: string;
     role: string;
-    experienceLevel: 'junior' | 'mid' | 'senior';
+    experienceLevel: "junior" | "mid" | "senior";
     onboardingWeek: number;
   };
   appContext: {
@@ -1443,6 +1502,7 @@ interface ConversationContext {
 ```
 
 **AI Response Personalization**:
+
 - Adjusts explanation depth based on user experience level
 - References user's past successful approaches
 - Adapts tone based on user preferences (concise vs. detailed)
@@ -1955,8 +2015,8 @@ POST   /api/v1/analytics/event
 
 ```css
 /* Font Family */
---font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
---font-family-mono: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+--font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+--font-family-mono: "SF Mono", "Monaco", "Inconsolata", monospace;
 
 /* Font Sizes */
 --text-xs: 11px;
@@ -2039,8 +2099,10 @@ POST   /api/v1/analytics/event
 #### Card Component
 
 ```tsx
-<div className="bg-background-secondary border border-border-primary
-  rounded-lg p-6 hover:border-accent-primary transition-all">
+<div
+  className="bg-background-secondary border border-border-primary
+  rounded-lg p-6 hover:border-accent-primary transition-all"
+>
   {/* Card content */}
 </div>
 ```
@@ -2052,25 +2114,46 @@ POST   /api/v1/analytics/event
 ```css
 /* Fade In */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Slide In */
 @keyframes slideInRight {
-  from { transform: translateX(400px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Pulse */
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* Usage */
-.fade-in { animation: fadeIn 0.3s ease-out; }
-.slide-in-right { animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+.slide-in-right {
+  animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
 ```
 
 #### Loading States
@@ -2100,6 +2183,7 @@ POST   /api/v1/analytics/event
 **Goal**: Core help system with basic visual guidance
 
 **Week 1: Desktop App Foundation**
+
 - ✅ Electron project setup
 - ✅ Main window with navigation shell
 - ✅ Global hotkey registration (Cmd+H)
@@ -2107,6 +2191,7 @@ POST   /api/v1/analytics/event
 - ✅ Basic agent UI
 
 **Week 2: AI Integration**
+
 - ✅ Gemini Vision API integration
 - ✅ UI object detection pipeline
 - ✅ Context analysis service
@@ -2114,6 +2199,7 @@ POST   /api/v1/analytics/event
 - ✅ Basic conversation UI
 
 **Week 3: Visual Overlays**
+
 - ✅ Transparent overlay windows
 - ✅ Arrow and highlight components
 - ✅ Coordinate mapping system
@@ -2121,6 +2207,7 @@ POST   /api/v1/analytics/event
 - ✅ Overlay positioning algorithms
 
 **Week 4: Conversation & Polish**
+
 - ✅ Conversation persistence
 - ✅ Chat history UI
 - ✅ Follow-up questions
@@ -2136,6 +2223,7 @@ POST   /api/v1/analytics/event
 **Goal**: Add structured onboarding and human expert discovery
 
 **Week 5: Roadmap Core**
+
 - [ ] Roadmap data models & API
 - [ ] AI roadmap generation service
 - [ ] Roadmap UI (week view, tasks)
@@ -2143,6 +2231,7 @@ POST   /api/v1/analytics/event
 - [ ] Source materials integration
 
 **Week 6: Roadmap Advanced**
+
 - [ ] Task detail drawer
 - [ ] Step-by-step task breakdown
 - [ ] Adaptive roadmap adjustment
@@ -2150,6 +2239,7 @@ POST   /api/v1/analytics/event
 - [ ] Integration with help system
 
 **Week 7: Nudge System**
+
 - [ ] Expert matching algorithm
 - [ ] Nudge composition flow
 - [ ] Nudge delivery (in-app, Slack)
@@ -2157,6 +2247,7 @@ POST   /api/v1/analytics/event
 - [ ] Expert profile building
 
 **Week 8: Integration & Testing**
+
 - [ ] End-to-end testing
 - [ ] Performance optimization
 - [ ] UI polish & animations
@@ -2172,6 +2263,7 @@ POST   /api/v1/analytics/event
 **Goal**: Admin dashboard, analytics, integrations
 
 **Week 9: Admin Dashboard**
+
 - [ ] Organization management
 - [ ] User directory
 - [ ] Knowledge base upload
@@ -2179,6 +2271,7 @@ POST   /api/v1/analytics/event
 - [ ] Usage analytics dashboard
 
 **Week 10: Analytics & Insights**
+
 - [ ] Event tracking system
 - [ ] Metrics calculation
 - [ ] Reporting UI
@@ -2186,6 +2279,7 @@ POST   /api/v1/analytics/event
 - [ ] Data visualization
 
 **Week 11: Integrations**
+
 - [ ] Slack workspace integration
 - [ ] HR system connectors (BambooHR, Workday)
 - [ ] SSO (SAML, OAuth)
@@ -2193,6 +2287,7 @@ POST   /api/v1/analytics/event
 - [ ] API documentation
 
 **Week 12: Security & Compliance**
+
 - [ ] Security audit
 - [ ] Penetration testing fixes
 - [ ] Compliance documentation
@@ -2208,6 +2303,7 @@ POST   /api/v1/analytics/event
 **Goal**: Production readiness, scale testing, launch prep
 
 **Week 13-14: Scale & Performance**
+
 - [ ] Load testing
 - [ ] Database optimization
 - [ ] Caching layer (Redis)
@@ -2215,6 +2311,7 @@ POST   /api/v1/analytics/event
 - [ ] Auto-scaling configuration
 
 **Week 15: Launch Preparation**
+
 - [ ] Documentation
 - [ ] Onboarding flow for new orgs
 - [ ] Pricing & billing integration
@@ -2222,6 +2319,7 @@ POST   /api/v1/analytics/event
 - [ ] Support system setup
 
 **Week 16: Beta Launch**
+
 - [ ] Beta user onboarding (10-20 orgs)
 - [ ] Monitoring & alerting
 - [ ] Rapid iteration on feedback
@@ -2237,17 +2335,20 @@ POST   /api/v1/analytics/event
 ### User Metrics
 
 **Adoption & Engagement**
+
 - **Daily Active Users (DAU)**: Target 75% of new hires use daily in first 30 days
 - **Weekly Active Users (WAU)**: 90%+ in onboarding period
 - **Retention**: 60%+ continue using after onboarding complete
 - **Help Requests per User**: 8-15 per day (Week 1), declining to 2-3 (Week 4)
 
 **Task Completion**
+
 - **Roadmap Completion Rate**: 85%+ of tasks completed on time
 - **Task Success Rate**: 90%+ of AI-guided tasks completed successfully
 - **Average Time per Task**: 30% reduction vs. without Mitable
 
 **Help Quality**
+
 - **Resolution Rate**: 75%+ of help requests resolved without escalation
 - **AI Confidence**: Average confidence score >80%
 - **User Satisfaction**: 4.2+/5.0 average rating on help responses
@@ -2256,18 +2357,21 @@ POST   /api/v1/analytics/event
 ### Business Impact Metrics
 
 **Time & Cost Savings**
+
 - **Time to Productivity**: 40% reduction (8 weeks → 4.8 weeks)
 - **Training Cost Reduction**: $2,500 saved per new hire
 - **Support Ticket Reduction**: 65% fewer "how do I" questions
 - **Trainer Time Saved**: 20 hours per new hire
 
 **Nudge System Performance**
+
 - **Expert Match Accuracy**: 85%+ match score for top recommendation
 - **Average Response Time**: <15 minutes
 - **Resolution Rate**: 80%+ of nudges successfully resolved
 - **Expert Satisfaction**: 4.0+/5.0 rating from experts
 
 **Organizational Learning**
+
 - **Knowledge Base Growth**: 30% increase in documented processes
 - **Knowledge Coverage**: 90%+ of common questions have documented answers
 - **Process Standardization**: 50% increase in consistent approaches
@@ -2275,6 +2379,7 @@ POST   /api/v1/analytics/event
 ### Technical Metrics
 
 **Performance**
+
 - **Help Response Time**: <4 seconds end-to-end
 - **UI Detection Accuracy**: 90%+ for common applications
 - **Coordinate Precision**: <10 pixel deviation
@@ -2282,6 +2387,7 @@ POST   /api/v1/analytics/event
 - **Error Rate**: <0.5% of requests
 
 **AI Quality**
+
 - **Hallucination Rate**: <5% of responses
 - **Source Attribution**: 95%+ responses cite relevant sources
 - **Confidence Calibration**: Confidence score correlates with actual success rate
@@ -2293,12 +2399,14 @@ POST   /api/v1/analytics/event
 ### Target Market Segmentation
 
 **Primary Target**:
+
 - **Company Size**: 50-500 employees
 - **Verticals**: SaaS, Tech, Professional Services
 - **Roles**: Customer Success, Sales, Technical Support
 - **Pain Point**: High onboarding costs, long ramp times
 
 **Initial Design Partners (5-10)**:
+
 - Lorikeet (Agentic CS Platform)
 - 2-3 SaaS companies with active hiring
 - 2-3 customer service organizations
@@ -2306,12 +2414,14 @@ POST   /api/v1/analytics/event
 ### Pricing Strategy
 
 **Free Tier** (Forever)
+
 - Individual users
 - 50 help requests/month
 - Basic roadmap (4 weeks)
 - Community support
 
 **Team Plan** ($15/user/month)
+
 - Unlimited help requests
 - Full roadmap (customizable)
 - Nudge system (unlimited)
@@ -2319,6 +2429,7 @@ POST   /api/v1/analytics/event
 - Email support
 
 **Enterprise** ($25/user/month)
+
 - Everything in Team
 - SSO & advanced security
 - Custom integrations
@@ -2329,18 +2440,21 @@ POST   /api/v1/analytics/event
 ### Launch Plan
 
 **Phase 1: Private Beta (Weeks 1-4)**
+
 - Onboard 5 design partners
 - Weekly feedback sessions
 - Rapid iteration
 - Build case studies
 
 **Phase 2: Public Beta (Weeks 5-8)**
+
 - Open to 50 companies
 - Waitlist for demand generation
 - Product Hunt launch
 - Content marketing (blog, guides)
 
 **Phase 3: General Availability (Week 9+)**
+
 - Public launch
 - Pricing enforcement
 - Sales team hiring
@@ -2349,16 +2463,19 @@ POST   /api/v1/analytics/event
 ### Marketing Channels
 
 **Inbound**
+
 - SEO: "onboarding software", "digital adoption platform"
 - Content: Guides on reducing onboarding time
 - Product-led growth: Free tier with upgrade prompts
 
 **Outbound**
+
 - Targeted LinkedIn outreach to HR/Ops leaders
 - Partnership with HR software companies
 - Conference sponsorships (SaaStr, HR Tech)
 
 **Community**
+
 - LinkedIn thought leadership
 - Twitter/X engagement
 - Reddit (r/humanresources, r/startups)
@@ -2370,6 +2487,7 @@ POST   /api/v1/analytics/event
 ### Technology Stack Summary
 
 **Desktop**
+
 - Electron 28+
 - React 18
 - TypeScript 5.0+
@@ -2378,6 +2496,7 @@ POST   /api/v1/analytics/event
 - Vite (build tool)
 
 **Backend**
+
 - Node.js 20+
 - Express.js
 - PostgreSQL 15 + pgvector
@@ -2385,17 +2504,20 @@ POST   /api/v1/analytics/event
 - TypeScript
 
 **AI & ML**
+
 - Google Gemini 2.5 Flash (Vision + Multimodal)
 - OpenAI text-embedding-3-large
 - LangChain (orchestration)
 
 **Infrastructure**
+
 - Docker containers
 - AWS (ECS, RDS, S3)
 - CloudFront (CDN)
 - CloudWatch (monitoring)
 
 **External Services**
+
 - Slack API
 - SendGrid (email)
 - PostHog (analytics)

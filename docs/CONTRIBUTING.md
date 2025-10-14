@@ -29,6 +29,7 @@ git checkout -b feature/your-feature-name
 ### 2. Make your changes
 
 Edit files in the appropriate workspace:
+
 - `apps/backend/` - Express API
 - `apps/electron/` - Desktop app (5 windows)
 - `packages/shared/` - Shared types and IPC channels
@@ -58,6 +59,7 @@ git push origin feature/your-feature-name
 ## CI Checks (Runs on PR and Merge to Main)
 
 When you open a PR or merge to main, GitHub Actions automatically runs:
+
 - ✅ Type checking
 - ✅ Linting
 - ✅ Format checking

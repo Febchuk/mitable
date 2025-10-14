@@ -29,12 +29,8 @@ export default function ChatsView() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary mb-sm">
-            Conversations
-          </h1>
-          <p className="text-text-secondary">
-            Your ongoing help requests and expert connections
-          </p>
+          <h1 className="text-3xl font-bold text-text-primary mb-sm">Conversations</h1>
+          <p className="text-text-secondary">Your ongoing help requests and expert connections</p>
         </div>
         {unreadCount > 0 && <Badge variant="info">{unreadCount} unread</Badge>}
       </div>
@@ -99,9 +95,7 @@ export default function ChatsView() {
             <div className="w-16 h-16 bg-background-elevated rounded-full flex items-center justify-center mx-auto mb-md">
               <MessageSquare size={32} className="text-text-tertiary" />
             </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-sm">
-              No conversations yet
-            </h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-sm">No conversations yet</h3>
             <p className="text-sm text-text-secondary">
               Start a conversation with an expert by accepting a nudge or asking for help.
             </p>

@@ -53,7 +53,10 @@ export default function DashboardView() {
         </MetricCard>
 
         {/* Top Nudge Themes */}
-        <MetricCard label="Top Nudge Themes" description="Most frequent topics where AI nudges AI-guided onboarding.">
+        <MetricCard
+          label="Top Nudge Themes"
+          description="Most frequent topics where AI nudges AI-guided onboarding."
+        >
           <div className="flex flex-wrap gap-2">
             {nudgeThemes.map((theme) => (
               <span

@@ -46,7 +46,11 @@ const getIntegrationIcon = (provider: Integration["provider"]) => {
   }
 };
 
-export default function IntegrationCard({ integration, onConnect, onDisconnect }: IntegrationCardProps) {
+export default function IntegrationCard({
+  integration,
+  onConnect,
+  onDisconnect,
+}: IntegrationCardProps) {
   const isConnected = integration.status === "connected";
 
   return (

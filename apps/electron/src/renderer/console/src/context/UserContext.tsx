@@ -23,11 +23,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
   };
 
-  return (
-    <UserContext.Provider value={{ user, updateUser }}>
-      {children}
-    </UserContext.Provider>
-  );
+  return <UserContext.Provider value={{ user, updateUser }}>{children}</UserContext.Provider>;
 }
 
 export function useUser() {

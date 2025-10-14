@@ -9,7 +9,7 @@ declare global {
       toggle: () => void;
       showConsole: () => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
-      resizeWindow: (mode: 'pill' | 'conversation') => void;
+      resizeWindow: (mode: "pill" | "conversation") => void;
       showNudge: (data: unknown) => void;
       startGuide: (data: unknown) => void;
     };
@@ -122,7 +122,7 @@ function App() {
     // Expand to conversation mode
     if (!isExpanded) {
       setIsExpanded(true);
-      window.agentAPI.resizeWindow('conversation');
+      window.agentAPI.resizeWindow("conversation");
     }
 
     // Simulate AI response (replace with actual API call)
@@ -130,7 +130,8 @@ function App() {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "You'll need to set the priority to High, then assign it to the Billing Team. The escalation will automatically notify their team lead. Would you like me to show you where those buttons are?",
+        content:
+          "You'll need to set the priority to High, then assign it to the Billing Team. The escalation will automatically notify their team lead. Would you like me to show you where those buttons are?",
         type: "text",
       };
 
@@ -179,7 +180,7 @@ function App() {
   const handleClose = () => {
     setIsExpanded(false);
     setMessages([]);
-    window.agentAPI.resizeWindow('pill');
+    window.agentAPI.resizeWindow("pill");
   };
 
   const handleMouseEnter = () => {

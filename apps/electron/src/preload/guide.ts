@@ -3,7 +3,9 @@ import { IPC_CHANNELS } from "@mitable/shared";
 
 contextBridge.exposeInMainWorld("guideAPI", {
   onGuideData: (callback: (data: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.GUIDE_DATA, (_event: IpcRendererEvent, data: unknown) => callback(data));
+    ipcRenderer.on(IPC_CHANNELS.GUIDE_DATA, (_event: IpcRendererEvent, data: unknown) =>
+      callback(data)
+    );
   },
   nextStep: () => ipcRenderer.send(IPC_CHANNELS.GUIDE_NEXT_STEP),
   updateStep: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_STEP_UPDATE, data),

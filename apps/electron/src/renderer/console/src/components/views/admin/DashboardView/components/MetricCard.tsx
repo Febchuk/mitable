@@ -17,11 +17,7 @@ export default function MetricCard({ label, value, description, children }: Metr
       </div>
 
       {/* Value or Custom Content */}
-      {children ? (
-        children
-      ) : (
-        <div className="text-white font-bold text-4xl">{value}</div>
-      )}
+      {children ? children : <div className="text-white font-bold text-4xl">{value}</div>}
     </div>
   );
 }

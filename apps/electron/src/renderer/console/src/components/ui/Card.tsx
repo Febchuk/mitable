@@ -21,9 +21,7 @@ export default function Card({
     lg: "p-lg",
   };
 
-  const hoverStyles = hover
-    ? "hover:bg-background-elevated cursor-pointer transition-colors"
-    : "";
+  const hoverStyles = hover ? "hover:bg-background-elevated cursor-pointer transition-colors" : "";
 
   return (
     <div

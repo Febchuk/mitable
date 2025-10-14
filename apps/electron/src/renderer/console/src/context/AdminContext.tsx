@@ -52,7 +52,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [savingsMetric] = useState<DashboardMetric>({
     label: "Total Savings",
     value: "$50,000",
-    description: "Cost savings from AI-powered onboarding, helping new employees complete tasks faster and answering questions.",
+    description:
+      "Cost savings from AI-powered onboarding, helping new employees complete tasks faster and answering questions.",
     type: "currency",
   });
 

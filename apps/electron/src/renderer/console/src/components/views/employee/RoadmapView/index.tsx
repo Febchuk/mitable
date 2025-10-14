@@ -17,9 +17,7 @@ export default function RoadmapView() {
     <div className="p-8 space-y-8 app-no-drag">
       {/* Header */}
       <div>
-        <h1 className="text-4xl font-bold text-white">
-          Onboarding Roadmap
-        </h1>
+        <h1 className="text-4xl font-bold text-white">Onboarding Roadmap</h1>
       </div>
 
       {/* Overall Progress */}
@@ -46,11 +44,7 @@ export default function RoadmapView() {
             <div
               key={week.number}
               className={`flex-shrink-0 px-6 py-4 rounded-xl min-w-[140px] ${
-                isWeek1
-                  ? "bg-primary"
-                  : hasProgress
-                    ? "bg-[#4F46E5]"
-                    : "bg-[#374151]"
+                isWeek1 ? "bg-primary" : hasProgress ? "bg-[#4F46E5]" : "bg-[#374151]"
               }`}
             >
               <div className="text-white font-semibold text-lg mb-1">Week {week.number}</div>
@@ -89,9 +83,7 @@ export default function RoadmapView() {
             </div>
 
             {/* Duration */}
-            <div className="flex-shrink-0 text-text-tertiary text-sm">
-              {task.timeEstimate}
-            </div>
+            <div className="flex-shrink-0 text-text-tertiary text-sm">{task.timeEstimate}</div>
           </button>
         ))}
       </div>

@@ -3,7 +3,9 @@ import { IPC_CHANNELS } from "@mitable/shared";
 
 contextBridge.exposeInMainWorld("nudgeAPI", {
   onNudgeShow: (callback: (data: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.NUDGE_SHOW, (_event: IpcRendererEvent, data: unknown) => callback(data));
+    ipcRenderer.on(IPC_CHANNELS.NUDGE_SHOW, (_event: IpcRendererEvent, data: unknown) =>
+      callback(data)
+    );
   },
   accept: (nudgeId: string) => ipcRenderer.send(IPC_CHANNELS.NUDGE_ACCEPT, nudgeId),
   dismiss: (nudgeId: string) => ipcRenderer.send(IPC_CHANNELS.NUDGE_DISMISS, nudgeId),

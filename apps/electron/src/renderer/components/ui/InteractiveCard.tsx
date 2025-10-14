@@ -7,7 +7,12 @@ interface InteractiveCardProps {
   onClick?: () => void;
 }
 
-export default function InteractiveCard({ title, subtitle, icon: Icon, onClick }: InteractiveCardProps) {
+export default function InteractiveCard({
+  title,
+  subtitle,
+  icon: Icon,
+  onClick,
+}: InteractiveCardProps) {
   return (
     <button
       onClick={onClick}

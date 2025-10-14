@@ -1,4 +1,12 @@
-import { Home, Layers, Users, MessageSquare, BarChart3, Plug, Settings as SettingsIcon } from "lucide-react";
+import {
+  Home,
+  Layers,
+  Users,
+  MessageSquare,
+  BarChart3,
+  Plug,
+  Settings as SettingsIcon,
+} from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 

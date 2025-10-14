@@ -29,7 +29,11 @@ const getInitials = (name: string): string => {
   return name.slice(0, 2).toUpperCase();
 };
 
-export default function ExpertAvatar({ expert, isBestMatch = false, size = "md" }: ExpertAvatarProps) {
+export default function ExpertAvatar({
+  expert,
+  isBestMatch = false,
+  size = "md",
+}: ExpertAvatarProps) {
   const sizeClasses = {
     sm: "w-10 h-10 text-sm",
     md: "w-12 h-12 text-base",

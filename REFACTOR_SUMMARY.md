@@ -3,12 +3,14 @@
 ## ✅ Completed Changes
 
 ### 1. Architecture Improvement
+
 **From**: 5 separate Vite dev servers (ports 5173-5177)
 **To**: Single electron-vite dev server (port 5173) serving all windows
 
 ### 2. Package Structure
 
 **Updated `apps/electron/package.json`:**
+
 - ❌ Removed: `tsup`, `concurrently`, `wait-on`, individual renderer configs
 - ✅ Added: `electron-vite`, consolidated React/Vite dependencies
 - ✅ Scripts:
@@ -17,6 +19,7 @@
   - `preview`: `electron-vite preview`
 
 **Updated root `package.json`:**
+
 - ❌ Removed: `apps/electron/src/renderers/*` from workspaces
 - ✅ Kept: Only `apps/*` and `packages/*`
 
@@ -42,21 +45,25 @@ apps/electron/src/
 ### 4. New Configuration Files
 
 **Created `electron.vite.config.ts`:**
+
 - Configures 5 preload entry points
 - Configures 5 renderer entry points (HTML files)
 - Sets up React plugin and path aliases
 - Externalizes dependencies for main/preload
 
 **Created `tailwind.config.js`:**
+
 - Shared Tailwind config for all renderers
 - Custom design system (colors, spacing, typography)
 
 **Created `postcss.config.js`:**
+
 - Tailwind + Autoprefixer processing
 
 ### 5. Main Process Updates
 
 **Updated `src/main.ts`:**
+
 - Development URLs: `http://localhost:5173/{window}`
 - Production paths: `../renderer/{window}.html`
 - Changed environment detection from `process.env.NODE_ENV` to `app.isPackaged`
@@ -66,6 +73,7 @@ apps/electron/src/
 ### 6. Documentation Updates
 
 **README.md:**
+
 - ✅ Updated project structure diagram
 - ✅ Removed port references (5173-5177)
 - ✅ Added electron-vite to tech stack
@@ -73,6 +81,7 @@ apps/electron/src/
 - ✅ Removed .env requirements for Electron
 
 **CLAUDE.md:**
+
 - ✅ Updated Stack section with electron-vite
 - ✅ Updated directory structure
 - ✅ Updated port allocation section
@@ -111,6 +120,7 @@ apps/electron/src/
 ## Next Steps
 
 ### To Test:
+
 ```bash
 # 1. Install dependencies
 npm install
@@ -123,6 +133,7 @@ npm run dev
 ```
 
 ### Expected Output:
+
 - Backend API starts on `http://localhost:3000`
 - electron-vite starts dev server on `http://localhost:5173`
 - Electron app launches with 5 windows
@@ -130,6 +141,7 @@ npm run dev
 - All windows have HMR enabled
 
 ### Verification:
+
 1. Click robot button → Console window opens ✓
 2. Press Cmd+H → Console window opens/focuses ✓
 3. Edit any React component → HMR updates without reload ✓
@@ -140,18 +152,21 @@ npm run dev
 ## Migration Guide for Future Development
 
 ### Adding New Renderer Windows:
+
 1. Add entry in `electron.vite.config.ts` renderer.build.rollupOptions.input
 2. Add preload in `electron.vite.config.ts` preload.build.rollupOptions.input
 3. Create `src/renderer/{window}/` directory with index.html and src/
 4. Update `src/main.ts` to create the new window
 
 ### Styling:
+
 - All renderers share `tailwind.config.js` and `postcss.config.js`
 - Import `../../styles.css` in each renderer's entry file (from `{window}/src/*.tsx`)
 - Design system tokens available globally
 - CSS `@import` must come before `@tailwind` directives
 
 ### Development:
+
 - Single `npm run dev` command
 - Changes to any file trigger HMR
 - No need to restart multiple servers
