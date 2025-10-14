@@ -193,7 +193,7 @@ function setupIPC() {
     if (guideWindow && !guideWindow.isDestroyed()) {
       // Position on left side of screen with some margin
       const primaryDisplay = screen.getPrimaryDisplay();
-      const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+      const { height: screenHeight } = primaryDisplay.bounds;
       const guideWidth = 400;
       const guideHeight = 400;
 
