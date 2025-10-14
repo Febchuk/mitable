@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 
 interface MetricCardProps {
   label: string;
-  value: string | number;
+  value?: string | number;
   description?: string;
   children?: ReactNode;
 }

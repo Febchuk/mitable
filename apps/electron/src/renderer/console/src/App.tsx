@@ -13,7 +13,6 @@ import ChatsView from "./components/views/employee/ChatsView";
 import DashboardView from "./components/views/admin/DashboardView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
-import React from "react";
 
 // Dynamic default route based on user role
 function DefaultRoute() {

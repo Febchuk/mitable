@@ -1,4 +1,4 @@
-import type { Integration } from "../../types";
+import type { Integration } from "../../../../../types";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,9 +59,7 @@ export default function IntegrationCard({
   return (
     <Card className="flex items-start gap-4 p-6">
       {/* Integration Icon */}
-      <div className="flex-shrink-0">
-        {getIntegrationIcon(integration.provider)}
-      </div>
+      <div className="flex-shrink-0">{getIntegrationIcon(integration.provider)}</div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
