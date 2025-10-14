@@ -53,11 +53,7 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  return (
-    <ChatsContext.Provider value={{ chats, markAsRead }}>
-      {children}
-    </ChatsContext.Provider>
-  );
+  return <ChatsContext.Provider value={{ chats, markAsRead }}>{children}</ChatsContext.Provider>;
 }
 
 export function useChats() {

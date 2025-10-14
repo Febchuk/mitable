@@ -145,26 +145,31 @@ No environment variables needed - electron-vite handles dev server configuration
 ## Key Features
 
 ### 1. Just-in-Time Help System
+
 - Press Cmd+H anywhere for contextual help
 - AI analyzes your screen and provides step-by-step guidance
 - Visual overlays with arrows pointing to UI elements
 
 ### 2. Visual Guidance Overlays
+
 - Transparent fullscreen overlay with interactive highlights
 - Arrow pointers with pulse animations
 - Step-by-step instructions with progress tracking
 
 ### 3. Nudge System (Expert Matching)
+
 - AI-powered expert recommendations
 - Match scoring based on expertise, performance, and availability
 - In-app notifications for expert connections
 
 ### 4. Roadmap System
+
 - AI-generated week-by-week onboarding paths
 - Role-specific templates
 - Adaptive adjustment based on progress
 
 ### 5. Admin Dashboard
+
 - **Dashboard**: Analytics and metrics (Total Savings, Regained Productivity, Top Nudge Themes, Time to Productivity)
 - **Integrations**: Connect to Slack, Notion, Codebase, and other services
 - **Setup**: Configuration and organization settings

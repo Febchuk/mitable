@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useUser } from "../../context/UserContext";
+import { useUser } from "../../../../context/UserContext";
 import { ArrowUp } from "lucide-react";
 
 export default function HomeView() {

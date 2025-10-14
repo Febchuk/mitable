@@ -9,7 +9,12 @@ interface ExpertCardProps {
   onEscalate: (expertId: string) => void;
 }
 
-export default function ExpertCard({ expert, matchScore, isBestMatch = false, onEscalate }: ExpertCardProps) {
+export default function ExpertCard({
+  expert,
+  matchScore,
+  isBestMatch = false,
+  onEscalate,
+}: ExpertCardProps) {
   const matchPercentage = Math.round(matchScore * 100);
 
   return (
@@ -21,8 +26,14 @@ export default function ExpertCard({ expert, matchScore, isBestMatch = false, on
       {/* Gold Ribbon for Best Match */}
       {isBestMatch && (
         <div className="absolute top-0 left-4">
-          <svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M0 0H24V32L12 26L0 32V0Z" fill="#F59E0B"/>
+          <svg
+            width="24"
+            height="32"
+            viewBox="0 0 24 32"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M0 0H24V32L12 26L0 32V0Z" fill="#F59E0B" />
           </svg>
         </div>
       )}

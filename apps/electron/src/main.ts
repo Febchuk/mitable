@@ -48,8 +48,8 @@ function createAgentWindow() {
 
 function createConsoleWindow() {
   consoleWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1264,
+    height: 888,
     backgroundColor: "#000000",
     titleBarStyle: "hidden",
     maximizable: false,
@@ -193,7 +193,7 @@ function setupIPC() {
     if (guideWindow && !guideWindow.isDestroyed()) {
       // Position on left side of screen with some margin
       const primaryDisplay = screen.getPrimaryDisplay();
-      const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+      const { height: screenHeight } = primaryDisplay.bounds;
       const guideWidth = 400;
       const guideHeight = 400;
 
@@ -272,9 +272,9 @@ function setupIPC() {
   });
 
   // Agent window resize
-  ipcMain.on(IPC_CHANNELS.AGENT_RESIZE, (_event, mode: 'pill' | 'conversation') => {
+  ipcMain.on(IPC_CHANNELS.AGENT_RESIZE, (_event, mode: "pill" | "conversation") => {
     if (agentWindow && !agentWindow.isDestroyed()) {
-      if (mode === 'pill') {
+      if (mode === "pill") {
         agentWindow.setSize(740, 80, true);
       } else {
         agentWindow.setSize(740, 696, true);

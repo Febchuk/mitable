@@ -19,6 +19,7 @@ Set up the Mitable monorepo following the structure in Electron_Express_monorepo
 Deliverable: Complete monorepo structure with working npm scripts
 
 **Important**: The Electron app uses electron-vite for unified development. Key differences from traditional setups:
+
 - Single dev server on port 5173 (not 5 separate servers)
 - No individual Vite configs per renderer
 - Shared Tailwind/PostCSS configuration
@@ -109,6 +110,7 @@ Build the Help Pill overlay component matching the PRD design:
 Component: apps/electron/src/renderer/agent/src/App.tsx
 
 Features:
+
 1. Floating pill appears center-screen on Cmd+H
 2. Screenshot thumbnail preview
 3. Detected context display (app name, window title)
@@ -120,6 +122,7 @@ Features:
 9. Close button
 
 Styling:
+
 - Dark mode by default
 - Gradient background (gray-800 to gray-900)
 - Rounded corners (radius-lg)
@@ -136,6 +139,7 @@ Create the Gemini Vision service for UI object detection:
 Service: apps/backend/src/services/gemini-vision.service.ts
 
 Functions:
+
 1. detectUIElements(screenshot: base64, windowContext: object)
    - Send screenshot to Gemini 2.5 Flash
    - Prompt: "Detect all UI elements in this screenshot. Return a JSON array with: element type, text content, bounding box {x, y, width, height}, confidence score."
@@ -148,6 +152,7 @@ Functions:
    - Return IntentAnalysis object
 
 Error handling:
+
 - API rate limits
 - Invalid responses
 - Timeout handling (5s max)
@@ -161,6 +166,7 @@ Build the context analysis service:
 Service: apps/backend/src/services/context-analysis.service.ts
 
 Functions:
+
 1. analyzeIntent(question: string, uiElements: UIElement[], appContext: object)
    - Classify user intent (escalate_ticket, change_setting, find_feature, etc.)
    - Map to known workflows
@@ -212,6 +218,7 @@ Create the response generation service with streaming:
 Service: apps/backend/src/services/response-generation.service.ts
 
 Functions:
+
 1. generateResponse(context: PromptContext, stream: boolean)
    - Construct prompt with: question, UI elements, knowledge chunks
    - Call Gemini API with streaming enabled
@@ -228,6 +235,7 @@ Functions:
    - Return VisualGuideConfig
 
 API endpoint: POST /api/v1/help/request
+
 - Accept screenshot + question
 - Stream response chunks via SSE
 - Return full response with visual guide data
@@ -240,6 +248,7 @@ Prompt 3.1: Overlay Window System
 Build the visual overlay system for guidance:
 
 Main overlay (apps/electron/src/renderer/overlay/src/App.tsx):
+
 1. Fullscreen transparent window
 2. Always-on-top, click-through by default
 3. Receives highlight data via IPC
@@ -250,12 +259,14 @@ Main overlay (apps/electron/src/renderer/overlay/src/App.tsx):
    - Progress indicator
 
 Components:
+
 - Arrow (SVG path with animation)
 - Highlight (div with border and glow)
 - StepInstruction (positioned tooltip)
 - ProgressTracker (top-right corner)
 
 Positioning algorithm:
+
 - Calculate arrow start/end from coordinates
 - Auto-position instructions to avoid covering targets
 - Handle multi-monitor scenarios
@@ -268,6 +279,7 @@ Prompt 3.2: Workflow Step Navigation
 Implement step-by-step workflow navigation:
 
 Guide window (apps/electron/src/renderer/guide/src/App.tsx):
+
 1. Side panel showing current step
 2. Step description and action
 3. Navigation controls:
@@ -277,12 +289,14 @@ Guide window (apps/electron/src/renderer/guide/src/App.tsx):
    - Pause button (freeze guidance)
 
 Coordination:
+
 - When step changes, update overlay highlights
 - Send IPC message to overlay with new coordinates
 - Track completion status
 - Save progress to backend
 
 IPC channels:
+
 - guide-start: Initialize workflow
 - guide-update-step: Change current step
 - guide-end: Complete workflow
@@ -296,18 +310,21 @@ Prompt 3.3: Dynamic Click-Through Control
 Implement dynamic click-through for agent and guide windows:
 
 Mechanism:
+
 1. Track mouse position in renderer
 2. Check if mouse is over interactive elements
 3. Send IPC to main process: setIgnoreMouseEvents(ignore: boolean)
 4. Main process updates window click-through state
 
 Implementation for each window:
+
 - Agent window: Click-through except over input/buttons
 - Guide window: Click-through except over navigation controls
 - Nudge window: Click-through except over action buttons
 - Overlay window: Always click-through
 
 Performance optimization:
+
 - Throttle mouse move events (60fps max)
 - Cache element bounds
 - Efficient collision detection
@@ -319,6 +336,7 @@ Prompt 3.4: Overlay Animations & Polish
 Add animations and visual polish to overlays:
 
 Animations:
+
 1. Arrow appearance:
    - Fade-in over 300ms
    - Draw animation (stroke-dasharray)
@@ -335,12 +353,14 @@ Animations:
    - Progress indicator update
 
 Styling:
+
 - Color-coded by step (Blue, Green, Purple)
 - Smooth cubic-bezier easing
 - Drop shadows for depth
 - Semi-transparent backgrounds
 
 Accessibility:
+
 - High contrast mode support
 - Reduced motion option
 - Keyboard navigation
@@ -353,11 +373,13 @@ Prompt 4.1: Conversation Persistence
 Implement conversation management system:
 
 Database schema:
+
 - conversations table (see PRD schema)
 - messages table with type (user/ai)
 - conversation_metadata for context
 
 API endpoints:
+
 - POST /api/v1/conversations (create new)
 - GET /api/v1/conversations (list with pagination)
 - GET /api/v1/conversations/:id (get with messages)
@@ -365,6 +387,7 @@ API endpoints:
 - PATCH /api/v1/conversations/:id (update status/rating)
 
 Service: apps/backend/src/services/conversation.service.ts
+
 - createConversation(userId, initialContext)
 - addMessage(conversationId, type, content, metadata)
 - getConversationWithMessages(conversationId)
@@ -372,6 +395,7 @@ Service: apps/backend/src/services/conversation.service.ts
 - updateConversation(conversationId, updates)
 
 Features:
+
 - Thread management
 - Message ordering
 - Context aggregation
@@ -386,6 +410,7 @@ Build the Chats section in main console:
 Component: apps/electron/src/renderer/console/src/components/ChatsTab.tsx
 
 Features:
+
 1. Conversation list (left panel):
    - Title (auto-generated or user-edited)
    - Last message preview
@@ -414,18 +439,21 @@ Prompt 4.3: Follow-Up Questions
 Implement conversation context for follow-up questions:
 
 Backend:
+
 1. Maintain conversation context window (last 10 messages)
 2. Include context in AI prompts for follow-ups
 3. Reference past messages: "As I mentioned earlier..."
 4. Cross-reference related conversations
 
 Frontend:
+
 1. Follow-up input always visible in conversation detail
 2. Send message with conversation ID
 3. Stream AI response
 4. Update message list in real-time
 
 AI prompt engineering:
+
 - Include conversation history
 - Reference previous answers
 - Maintain consistency
@@ -438,6 +466,7 @@ Prompt 4.4: Error Handling & Edge Cases
 Implement comprehensive error handling:
 
 Backend errors:
+
 1. API errors (500):
    - Log to Sentry
    - Return user-friendly message
@@ -455,6 +484,7 @@ Backend errors:
    - Data validation errors
 
 Frontend errors:
+
 1. Network failures:
    - Offline indicator
    - Retry button
@@ -469,6 +499,7 @@ Frontend errors:
    - Window creation errors (recreate)
 
 Edge cases:
+
 - Multi-monitor edge scenarios
 - Very large screenshots (resize)
 - Rapid successive help requests (debounce)
@@ -516,15 +547,16 @@ Service: apps/backend/src/services/roadmap-generation.service.ts
 Function: generateRoadmap(userProfile, organizationId)
 
 Process:
+
 1. Retrieve role template (if exists)
 2. Query knowledge base for role-relevant content
 3. AI prompt:
-Generate a 4-week onboarding roadmap for:
-Role: {{role}}
-Experience: {{experienceLevel}}
-Department: {{department}}
-Knowledge base: {{relevantDocs}}
-Output format:
+   Generate a 4-week onboarding roadmap for:
+   Role: {{role}}
+   Experience: {{experienceLevel}}
+   Department: {{department}}
+   Knowledge base: {{relevantDocs}}
+   Output format:
 
 Week-by-week breakdown
 5-8 tasks per week
@@ -547,6 +579,7 @@ Build the Roadmap section UI:
 Component: apps/electron/src/renderer/console/src/components/RoadmapTab.tsx
 
 Layout:
+
 1. Progress header:
    - Overall completion percentage
    - Progress bar (animated)
@@ -566,12 +599,14 @@ Layout:
    - Click to open detail drawer
 
 Interactions:
+
 - Click week card to expand/collapse
 - Click task to open detail drawer
 - Drag tasks to reorder (within constraints)
 - Filter by status (Not Started, In Progress, Completed)
 
 Styling:
+
 - Card-based design
 - Smooth transitions
 - Status color coding
@@ -586,6 +621,7 @@ Build the task detail drawer component:
 Component: TaskDetailDrawer.tsx
 
 Slides from right side, contents:
+
 1. Header:
    - Task title
    - Status dropdown
@@ -624,6 +660,7 @@ Prompt 6.1: Task Dependencies Logic
 Implement task dependency system:
 
 Backend:
+
 1. Validate task dependencies on creation:
    - No circular dependencies
    - Dependencies within same roadmap
@@ -638,6 +675,7 @@ Backend:
    - Update week status (all tasks done = complete)
 
 Frontend:
+
 1. Visual dependency indicators:
    - Locked tasks show lock icon
    - Hover shows "Requires: Task X, Y"
@@ -656,6 +694,7 @@ Build adaptive roadmap intelligence:
 Service: apps/backend/src/services/roadmap-adaptation.service.ts
 
 Functions:
+
 1. analyzeProgress(userId, roadmapId)
    - Calculate completion rate vs. expected
    - Analyze help request patterns (struggling topics)
@@ -673,6 +712,7 @@ Functions:
    - Notify user of changes
 
 Background job:
+
 - Run daily for active roadmaps
 - Generate suggestions
 - Require user approval before applying
@@ -684,6 +724,7 @@ Prompt 6.3: Source Materials Integration
 Implement source materials system:
 
 Backend:
+
 1. Source materials repository:
    - CRUD operations
    - Search and filter
@@ -701,6 +742,7 @@ Backend:
    - Auto-tagging
 
 Frontend:
+
 1. Material card component:
    - Thumbnail
    - Title and description
@@ -720,6 +762,7 @@ Prompt 6.4: Integration with Help System
 Connect roadmap tasks with help system:
 
 Features:
+
 1. "Get AI Help" button on each task:
    - Pre-fills question with task context
    - Includes task description in context
@@ -749,6 +792,7 @@ Build the expert matching system:
 Service: apps/backend/src/services/expert-matching.service.ts
 
 Functions:
+
 1. buildExpertProfiles(organizationId)
    - Extract expertise from nudge history (topics resolved)
    - Parse Slack participation (channel keywords)
@@ -771,6 +815,7 @@ Functions:
    - Adjust expertise tags based on successful resolutions
 
 Algorithm:
+
 ```python
 score = (
     semantic_similarity(question, expert_expertise) * 0.4 +
@@ -807,15 +852,15 @@ Auto-drafted message from AI:
 
 
      Hi [Expert],
-     
+
      I'm working on [context from screenshot] and could use your expertise.
-     
+
      Situation: [User question rephrased]
-     
+
      What I've tried: [Prior help attempts if any]
-     
+
      Could you point me in the right direction?
-     
+
      Thanks!
      [User]
 
@@ -2028,19 +2073,19 @@ export let options = {
 
 export default function () {
   // Help request
-  let response = http.post('https://api.mitable.com/v1/help/request', 
+  let response = http.post('https://api.mitable.com/v1/help/request',
     JSON.stringify({
       screenshot: 'base64...',
       question: 'How do I escalate this ticket?',
     }),
     { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${__ENV.API_KEY}` } }
   );
-  
+
   check(response, {
     'status is 200': (r) => r.status === 200,
     'response time < 4s': (r) => r.timings.duration < 4000,
   });
-  
+
   sleep(5);
 }
 Deliverable: Load test results and performance report
@@ -2894,3 +2939,4 @@ When context becomes too large:
 ---
 
 **Note**: These prompts are designed to be comprehensive starting points. Adapt them based on your specific requirements, tech stack variations, and implementation discoveries during development. The agents should be used collaboratively, with human oversight and decision-making throughout the process.
+```

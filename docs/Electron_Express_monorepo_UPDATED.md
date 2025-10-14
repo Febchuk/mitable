@@ -1,4 +1,5 @@
 # Electron + Express Monorepo with electron-vite
+
 ## Multi-Window AI Assistant Architecture
 
 A production-ready monorepo for **Node/Express + Electron + TypeScript + React + Tailwind** with **electron-vite** for unified multi-window development.
@@ -6,26 +7,31 @@ A production-ready monorepo for **Node/Express + Electron + TypeScript + React +
 ## Window Architecture Overview
 
 ### 1. **Agent Window** (Always-on-top floating widget)
+
 - Quick access AI assistant - always visible
 - Compact, draggable, transparent
 - Dynamic click-through when not over UI
 
 ### 2. **Console Window** (Main workspace hub)
+
 - Primary interface for conversations
 - Tabbed interface: Conversations, Nudges, Settings
 - Normal window behavior (minimize, hide, resize)
 
 ### 3. **Overlay Window** (Fullscreen visual feedback)
+
 - Transparent full-screen layer for UI highlights
 - Always click-through, never blocks interactions
 - Shows guidance indicators and annotations
 
 ### 4. **Guide Window** (Step-by-step UI guidance)
+
 - Side panel showing current step instructions
 - Navigation controls (Previous/Next/Complete)
 - Coordinates with Overlay for visual highlights
 
 ### 5. **Nudge Window** (Expert recommendations)
+
 - Shows recommended people to reach out to
 - Match scores and context
 - Action buttons (Contact, Dismiss, Save)
@@ -242,7 +248,7 @@ function createAgentWindow() {
     resizable: false,
     skipTaskbar: true,
     webPreferences: {
-      preload: join(__dirname, "../preload/agent.mjs"),  // .mjs extension
+      preload: join(__dirname, "../preload/agent.mjs"), // .mjs extension
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -309,6 +315,7 @@ app.on("will-quit", () => {
 ```
 
 **Key Points:**
+
 - Use `app.isPackaged` instead of `process.env.NODE_ENV` for environment detection
 - Preload paths reference `.mjs` files (electron-vite output format)
 - Dev URLs point to `http://localhost:5173/{window}` (single dev server)
@@ -480,6 +487,7 @@ npm run dev
 ```
 
 **What happens:**
+
 1. Backend API starts on `http://localhost:3000`
 2. electron-vite starts unified dev server on `http://localhost:5173`
 3. Electron app launches with all 5 windows
@@ -512,6 +520,7 @@ npm run build --workspace=apps/electron
 ### 1. Always-On-Top Windows (Cross-Platform)
 
 **macOS** - Persists in fullscreen and across Mission Control:
+
 ```typescript
 if (process.platform === "darwin") {
   window.setAlwaysOnTop(true, "modal-panel");
@@ -520,6 +529,7 @@ if (process.platform === "darwin") {
 ```
 
 **Windows** - Use numeric z-order levels:
+
 ```typescript
 else {
   window.setAlwaysOnTop(true, "normal", 1);
@@ -550,8 +560,12 @@ ipcMain.on("guide-start", (_event, data) => {
 ### 4. Draggable Frameless Windows
 
 ```css
-.app-drag { -webkit-app-region: drag; }      /* Header is draggable */
-.app-no-drag { -webkit-app-region: no-drag; } /* Buttons/inputs are not */
+.app-drag {
+  -webkit-app-region: drag;
+} /* Header is draggable */
+.app-no-drag {
+  -webkit-app-region: no-drag;
+} /* Buttons/inputs are not */
 ```
 
 ---
@@ -572,21 +586,27 @@ ipcMain.on("guide-start", (_event, data) => {
 ## Common Issues & Solutions
 
 ### Window ordering on macOS
+
 Always reassert `setAlwaysOnTop` on `blur` event - macOS can sometimes drop the level.
 
 ### Click-through not working
+
 Ensure `setIgnoreMouseEvents(true, { forward: true })` includes the `forward` option.
 
 ### Preload scripts not loading
+
 Verify preload paths use `.mjs` extension (electron-vite output format), not `.js`.
 
 ### Environment detection not working
+
 Use `app.isPackaged` instead of `process.env.NODE_ENV` - electron-vite doesn't set NODE_ENV automatically.
 
 ### CSS imports not working
+
 Ensure `@import` statements come **before** `@tailwind` directives in styles.css.
 
 ### Multi-monitor overlays
+
 Must create one overlay window per display using `screen.getAllDisplays()`.
 
 ---

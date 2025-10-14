@@ -23,7 +23,7 @@ export default function ExpertListCollapsed({ experts, onExpand }: ExpertListCol
       <div className="w-full h-full bg-[#1A1A1A] rounded-2xl p-4 flex flex-col items-center">
         {/* Expert Avatars */}
         <div className="flex flex-col gap-4 flex-1 justify-center">
-          {sortedExperts.map((match, index) => (
+          {sortedExperts.map((match, _index) => (
             <div key={match.expert.id} className="relative">
               <ExpertAvatar
                 expert={match.expert}

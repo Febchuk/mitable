@@ -3,6 +3,7 @@
 ## What Was Built
 
 ### 1. Root Configuration
+
 - ✅ `package.json` - npm workspaces with Turborepo
 - ✅ `turbo.json` - Parallel build pipeline configuration
 - ✅ `tsconfig.base.json` - Shared TypeScript configuration
@@ -12,7 +13,9 @@
 - ✅ `README.md` - Complete project documentation
 
 ### 2. Packages/Shared (`packages/shared`)
+
 Complete shared library with:
+
 - ✅ TypeScript types and Zod schemas
 - ✅ IPC channel definitions for Electron
 - ✅ Guide and Nudge data models
@@ -21,6 +24,7 @@ Complete shared library with:
 - ✅ tsup build configuration
 
 **Files created:**
+
 - `package.json` - Build scripts and dependencies
 - `tsconfig.json` - TypeScript config extending base
 - `tsup.config.ts` - Build configuration for ESM output
@@ -31,7 +35,9 @@ Complete shared library with:
 - `src/nudges.ts` - Nudge system types
 
 ### 3. Apps/Backend (`apps/backend`)
+
 Express API server with:
+
 - ✅ Basic Express setup with CORS
 - ✅ Health check endpoint
 - ✅ Placeholder API routes
@@ -39,6 +45,7 @@ Express API server with:
 - ✅ Environment variable configuration
 
 **Files created:**
+
 - `package.json` - Backend dependencies and scripts
 - `tsconfig.json` - Node.js TypeScript config
 - `tsup.config.ts` - Production build config
@@ -47,7 +54,9 @@ Express API server with:
 - `.env.example` - Environment variable template
 
 ### 4. Apps/Electron (`apps/electron`)
+
 Complete 5-window architecture with:
+
 - ✅ Main process with window management
 - ✅ 5 preload scripts (one per window)
 - ✅ 5 React renderer apps with Vite + Tailwind
@@ -56,9 +65,11 @@ Complete 5-window architecture with:
 - ✅ Platform-specific always-on-top logic
 
 **Main Process:**
+
 - `src/main.ts` - Creates all 5 windows, handles IPC, registers shortcuts
 
 **Preload Scripts:**
+
 - `src/preload/agent.ts` - Agent window API
 - `src/preload/console.ts` - Console window API
 - `src/preload/overlay.ts` - Overlay window API
@@ -93,6 +104,7 @@ Complete 5-window architecture with:
    - Connect/Dismiss actions
 
 **Each renderer includes:**
+
 - `package.json` - Vite + React + Tailwind dependencies
 - `vite.config.ts` - Dev server on unique port
 - `tailwind.config.js` - Custom design system
@@ -106,6 +118,7 @@ Complete 5-window architecture with:
 ### 5. Development Scripts
 
 All workspaces have:
+
 - `dev` - Watch mode development
 - `build` - Production build
 - `typecheck` - TypeScript validation
@@ -113,6 +126,7 @@ All workspaces have:
 - `clean` - Remove build artifacts
 
 Root scripts:
+
 - `npm run dev` - Start all services in parallel
 - `npm run build` - Build all workspaces
 - `npm run typecheck` - Check all TypeScript
@@ -123,16 +137,19 @@ Root scripts:
 ## Next Steps
 
 ### 1. Install Dependencies
+
 ```bash
 npm install
 ```
 
 ### 2. Build Shared Package
+
 ```bash
 npm run build --workspace=packages/shared
 ```
 
 ### 3. Set Up Environment Variables
+
 ```bash
 # Backend
 cp apps/backend/.env.example apps/backend/.env
@@ -144,11 +161,13 @@ cp apps/electron/.env.example apps/electron/.env
 ```
 
 ### 4. Start Development
+
 ```bash
 npm run dev
 ```
 
 This will start:
+
 - Backend API on `http://localhost:3000`
 - Agent renderer on `http://localhost:5173`
 - Console renderer on `http://localhost:5174`
@@ -160,6 +179,7 @@ This will start:
 ### 5. Verify Setup
 
 Once running, you should see:
+
 - Floating robot button (Agent window)
 - Clicking it opens the Console window
 - Press Cmd+H to toggle Console window
@@ -167,6 +187,7 @@ Once running, you should see:
 ## Implementation Phases
 
 **✅ Phase 0: Monorepo Setup (COMPLETE)**
+
 - npm workspaces + Turborepo
 - TypeScript + ESLint + Prettier
 - 5-window Electron architecture
@@ -174,6 +195,7 @@ Once running, you should see:
 - Basic React apps for all windows
 
 **🚧 Phase 1: Core Help System (NEXT)**
+
 - Screenshot capture
 - Gemini Vision UI object detection
 - Intent analysis and knowledge retrieval
@@ -181,12 +203,14 @@ Once running, you should see:
 - Visual overlay rendering
 
 **📋 Phase 2: Roadmap & Nudges**
+
 - AI roadmap generation
 - Expert matching algorithm
 - Nudge delivery system
 - Task tracking
 
 **📋 Phase 3: Admin & Analytics**
+
 - Admin dashboard
 - Analytics tracking
 - Integrations (Slack, email)
@@ -202,6 +226,7 @@ Once running, you should see:
 ## Architecture Highlights
 
 ### Always-On-Top Windows (Cross-Platform)
+
 ```typescript
 if (process.platform === "darwin") {
   window.setAlwaysOnTop(true, "modal-panel");
@@ -212,11 +237,13 @@ if (process.platform === "darwin") {
 ```
 
 ### Dynamic Click-Through
+
 ```typescript
 window.agentAPI.setIgnoreMouseEvents(!isOverUI);
 ```
 
 ### IPC Window Coordination
+
 ```typescript
 ipcMain.on(IPC_CHANNELS.GUIDE_START, (_event, data) => {
   overlayWin.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);

@@ -76,7 +76,7 @@ export default {
         spacing: "margin, padding",
       },
       transitionDuration: {
-        "300": "300ms",
+        300: "300ms",
       },
     },
   },

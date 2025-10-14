@@ -26,7 +26,9 @@ export default function ProgressBar({
           <span className="text-xs text-text-secondary">{clampedPercentage}%</span>
         </div>
       )}
-      <div className={`w-full bg-background-elevated rounded-full overflow-hidden ${heightStyles[height]}`}>
+      <div
+        className={`w-full bg-background-elevated rounded-full overflow-hidden ${heightStyles[height]}`}
+      >
         <div
           className="h-full bg-primary transition-all duration-300"
           style={{ width: `${clampedPercentage}%` }}

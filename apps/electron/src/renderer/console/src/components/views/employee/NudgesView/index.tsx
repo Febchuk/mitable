@@ -1,8 +1,8 @@
-import { useNudges } from "../../context/NudgesContext";
-import Card from "../ui/Card";
-import Button from "../ui/Button";
-import Avatar from "../ui/Avatar";
-import Badge from "../ui/Badge";
+import { useNudges } from "../../../../context/NudgesContext";
+import Card from "../../../ui/Card";
+import Button from "../../../ui/Button";
+import Avatar from "../../../ui/Avatar";
+import Badge from "../../../ui/Badge";
 import { Check, X, Clock } from "lucide-react";
 
 function formatTimestamp(date: Date): string {
@@ -41,9 +41,7 @@ export default function NudgesView() {
       {waitingNudges.length > 0 && (
         <div className="space-y-md">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-text-primary">
-              Pending Recommendations
-            </h2>
+            <h2 className="text-xl font-semibold text-text-primary">Pending Recommendations</h2>
             <Badge variant="info">{waitingNudges.length} waiting</Badge>
           </div>
 
@@ -81,11 +79,7 @@ export default function NudgesView() {
                     <Check size={16} className="mr-xs" />
                     Accept
                   </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => dismissNudge(nudge.id)}
-                  >
+                  <Button variant="secondary" size="sm" onClick={() => dismissNudge(nudge.id)}>
                     <X size={16} />
                   </Button>
                 </div>
@@ -99,9 +93,7 @@ export default function NudgesView() {
       {resolvedNudges.length > 0 && (
         <div className="space-y-md">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-text-primary">
-              Completed Connections
-            </h2>
+            <h2 className="text-xl font-semibold text-text-primary">Completed Connections</h2>
             <Badge variant="success">{resolvedNudges.length} resolved</Badge>
           </div>
 
@@ -138,9 +130,7 @@ export default function NudgesView() {
             <div className="w-16 h-16 bg-background-elevated rounded-full flex items-center justify-center mx-auto mb-md">
               <Check size={32} className="text-text-tertiary" />
             </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-sm">
-              All caught up!
-            </h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-sm">All caught up!</h3>
             <p className="text-sm text-text-secondary">
               No pending expert recommendations at the moment.
             </p>

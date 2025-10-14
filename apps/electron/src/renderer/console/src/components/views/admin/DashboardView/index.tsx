@@ -2,7 +2,7 @@ import { useAdmin } from "../../../../context/AdminContext";
 import MetricCard from "./components/MetricCard";
 
 export default function DashboardView() {
-  const { savingsMetric, timeToProductivity, productivityData, nudgeThemes } = useAdmin();
+  const { savingsMetric, timeToProductivity, nudgeThemes } = useAdmin();
 
   return (
     <div className="p-8 space-y-6 app-no-drag">
@@ -53,7 +53,10 @@ export default function DashboardView() {
         </MetricCard>
 
         {/* Top Nudge Themes */}
-        <MetricCard label="Top Nudge Themes" description="Most frequent topics where AI nudges AI-guided onboarding.">
+        <MetricCard
+          label="Top Nudge Themes"
+          description="Most frequent topics where AI nudges AI-guided onboarding."
+        >
           <div className="flex flex-wrap gap-2">
             {nudgeThemes.map((theme) => (
               <span
