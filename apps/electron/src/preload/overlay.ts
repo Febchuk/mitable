@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
-import { IPC_CHANNELS } from "@mitable/shared";
+
+// IPC channel constants (inlined to avoid chunking issues)
+const IPC_CHANNELS = {
+  OVERLAY_HIGHLIGHT_UPDATE: "overlay-highlight-update",
+  OVERLAY_SHOW: "overlay-show",
+  OVERLAY_HIDE: "overlay-hide",
+} as const;
 
 contextBridge.exposeInMainWorld("overlayAPI", {
   onHighlightUpdate: (callback: (data: unknown) => void) => {

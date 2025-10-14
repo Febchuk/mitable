@@ -1,5 +1,14 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { IPC_CHANNELS } from "@mitable/shared";
+
+// IPC channel constants (inlined to avoid chunking issues)
+const IPC_CHANNELS = {
+  AGENT_TOGGLE: "agent-toggle",
+  AGENT_SHOW_CONSOLE: "agent-show-console",
+  SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
+  AGENT_RESIZE: "agent-resize",
+  NUDGE_SHOW: "nudge-show",
+  GUIDE_START: "guide-start",
+} as const;
 
 contextBridge.exposeInMainWorld("agentAPI", {
   toggle: () => ipcRenderer.send(IPC_CHANNELS.AGENT_TOGGLE),
