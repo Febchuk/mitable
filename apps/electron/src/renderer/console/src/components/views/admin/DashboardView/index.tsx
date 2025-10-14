@@ -2,7 +2,7 @@ import { useAdmin } from "../../../../context/AdminContext";
 import MetricCard from "./components/MetricCard";
 
 export default function DashboardView() {
-  const { savingsMetric, timeToProductivity, productivityData, nudgeThemes } = useAdmin();
+  const { savingsMetric, timeToProductivity, nudgeThemes } = useAdmin();
 
   return (
     <div className="p-8 space-y-6 app-no-drag">

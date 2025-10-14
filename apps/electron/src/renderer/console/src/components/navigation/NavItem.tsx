@@ -22,7 +22,7 @@ export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
         } ${isCollapsed ? "justify-center" : ""}`
       }
     >
-      {({ isActive }) => (
+      {({ isActive: _isActive }) => (
         <>
           <Icon size={20} className={isCollapsed ? "" : "flex-shrink-0"} />
           {!isCollapsed && <span className="text-sm font-medium">{label}</span>}

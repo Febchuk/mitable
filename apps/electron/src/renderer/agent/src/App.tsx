@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Workflow, Users } from "lucide-react";
+import { Workflow, LucideIcon } from "lucide-react";
 import AgentPill from "./components/AgentPill";
 import ConversationDialog from "./components/ConversationDialog";
 
@@ -10,8 +10,8 @@ declare global {
       showConsole: () => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
       resizeWindow: (mode: 'pill' | 'conversation') => void;
-      showNudge: (data: any) => void;
-      startGuide: (data: any) => void;
+      showNudge: (data: unknown) => void;
+      startGuide: (data: unknown) => void;
     };
   }
 }
@@ -24,7 +24,7 @@ interface Message {
   cardData?: {
     title: string;
     subtitle: string;
-    icon: any;
+    icon: LucideIcon;
   };
 }
 

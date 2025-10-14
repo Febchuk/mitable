@@ -1,4 +1,4 @@
-import { Code } from "lucide-react";
+import { Code, LucideIcon } from "lucide-react";
 import UserMessage from "../../../components/messages/UserMessage";
 import AIMessage from "../../../components/messages/AIMessage";
 import InteractiveCard from "../../../components/ui/InteractiveCard";
@@ -11,7 +11,7 @@ interface Message {
   cardData?: {
     title: string;
     subtitle: string;
-    icon: any;
+    icon: LucideIcon;
   };
 }
 
@@ -22,7 +22,7 @@ interface ConversationDialogProps {
   onCardClick?: () => void;
 }
 
-export default function ConversationDialog({ messages, onSubmit, onClose, onCardClick }: ConversationDialogProps) {
+export default function ConversationDialog({ messages, onSubmit: _onSubmit, onClose, onCardClick }: ConversationDialogProps) {
   return (
     <div className="relative w-full h-[600px] flex flex-col bg-background-secondary rounded-2xl overflow-hidden app-no-drag">
       {/* Close Button */}
