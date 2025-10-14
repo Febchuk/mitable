@@ -1,9 +1,4 @@
-import {
-  BoundingBoxSchema,
-  UIElementSchema,
-  MessageSchema,
-  UserSchema,
-} from "./types.js";
+import { BoundingBoxSchema, UIElementSchema, MessageSchema, UserSchema } from "./types.js";
 
 describe("Shared Types - Zod Schema Validation", () => {
   describe("BoundingBoxSchema", () => {

@@ -11,11 +11,6 @@ export default {
   },
   setupFilesAfterEnv: ["<rootDir>/jest.setup.cjs"],
   testMatch: ["**/?(*.)+(spec|test).[tj]s?(x)"],
-  collectCoverageFrom: [
-    "src/**/*.{ts,tsx}",
-    "!src/**/*.d.ts",
-    "!src/main.ts",
-    "!src/preload/**/*",
-  ],
+  collectCoverageFrom: ["src/**/*.{ts,tsx}", "!src/**/*.d.ts", "!src/main.ts", "!src/preload/**/*"],
   testPathIgnorePatterns: ["/node_modules/", "/out/", "/dist/"],
 };

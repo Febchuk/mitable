@@ -30,9 +30,7 @@ describe("AgentPill Component", () => {
   it("should clear input after submission", () => {
     render(<AgentPill onSubmit={mockOnSubmit} />);
 
-    const input = screen.getByPlaceholderText(
-      "Ask me anything"
-    ) as HTMLInputElement;
+    const input = screen.getByPlaceholderText("Ask me anything") as HTMLInputElement;
     const submitButton = screen.getByLabelText("Send message");
 
     fireEvent.change(input, { target: { value: "Test message" } });
