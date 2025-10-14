@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { ArrowUp, Circle, Square } from "lucide-react";
+import { ArrowUp, Circle, Square, Type, Mic } from "lucide-react";
 import logoIconSvg from "../../../assets/logo-icon.svg";
-import ToggleSwitch from "../../../components/legacy/ToggleSwitch";
 
 interface AgentPillProps {
   onSubmit: (message: string) => void;
@@ -63,9 +62,38 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
         </form>
       )}
 
-      {/* Toggle Switch */}
-      <div className="mr-3 app-no-drag">
-        <ToggleSwitch mode={inputMode} onChange={handleModeChange} />
+      {/* Mode Toggle (Text/Audio) */}
+      <div className="relative flex items-center bg-muted rounded-full p-1 w-20 h-10 mr-3 app-no-drag">
+        {/* Sliding background indicator */}
+        <div
+          className={`absolute w-9 h-8 bg-primary rounded-full transition-transform duration-200 ease-in-out ${
+            inputMode === "audio" ? "translate-x-10" : "translate-x-0"
+          }`}
+        />
+
+        {/* Text button */}
+        <button
+          onClick={() => handleModeChange("text")}
+          className="relative z-10 w-9 h-8 flex items-center justify-center transition-colors"
+          aria-label="Text mode"
+        >
+          <Type
+            size={16}
+            className={inputMode === "text" ? "text-primary-foreground" : "text-muted-foreground"}
+          />
+        </button>
+
+        {/* Audio button */}
+        <button
+          onClick={() => handleModeChange("audio")}
+          className="relative z-10 w-9 h-8 flex items-center justify-center transition-colors"
+          aria-label="Audio mode"
+        >
+          <Mic
+            size={16}
+            className={inputMode === "audio" ? "text-primary-foreground" : "text-muted-foreground"}
+          />
+        </button>
       </div>
 
       {/* Action Button */}

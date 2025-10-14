@@ -1,6 +1,6 @@
 # Contributing to Mitable
 
-## Quick Start
+## Quick Setup
 
 ```bash
 # Clone and install
@@ -16,14 +16,20 @@ npm run dev:admin      # Admin experience (Dashboard, Integrations, Setup)
 npm run dev:employee   # Employee experience (Home, Roadmap, Nudges, Chats)
 ```
 
-## Contributing Workflow
+## Development Workflow
 
-### 1. Create a branch
+All changes to `main` must go through Pull Requests. Branch protection is enabled.
+
+### 1. Create a feature branch
 
 ```bash
+# Always start from latest main
 git checkout main
 git pull origin main
+
+# Create your branch
 git checkout -b feature/your-feature-name
+# Or: fix/bug-name, refactor/component-name, docs/update-readme
 ```
 
 ### 2. Make your changes
@@ -34,41 +40,89 @@ Edit files in the appropriate workspace:
 - `apps/electron/` - Desktop app (5 windows)
 - `packages/shared/` - Shared types and IPC channels
 
-### 3. Run checks
+### 3. Run CI checks locally
+
+**Before committing**, run the full CI suite locally:
 
 ```bash
-npm run typecheck    # TypeScript type checking
-npm run lint         # ESLint
-npm run format       # Prettier (auto-fixes)
+npm run ci
 ```
 
-### 4. Commit and push
+This runs (in order):
+
+1. ✅ Type checking
+2. ✅ Linting
+3. ✅ Format checking
+4. ✅ Tests (21 tests)
+5. ✅ Build verification
+
+If anything fails, fix it before committing.
+
+### 4. Commit your changes
 
 ```bash
 git add .
-git commit -m "feat: your feature description"
+git commit -m "feat: add visual guidance overlay"
 git push origin feature/your-feature-name
 ```
 
 ### 5. Open a Pull Request
 
 1. Go to GitHub and create a PR from your branch to `main`
-2. Fill in the PR description
-3. Wait for CI checks to pass (automatic)
+2. Fill in the description
+3. Wait for CI checks to pass (required)
+4. Request review #optional
+5. Merge when approved ✅
 
-## CI Checks (Runs on PR and Merge to Main)
+**Note:** You cannot merge until CI passes. This is enforced by branch protection.
 
-When you open a PR or merge to main, GitHub Actions automatically runs:
+## Code Principles
 
-- ✅ Type checking
-- ✅ Linting
-- ✅ Format checking
-- ✅ Build verification
+### Modular Design
 
-View runs in the "Actions" tab on GitHub.
+- Keep components focused and single-purpose
+- Break large files into smaller, reusable modules
+- Each function should do one thing well
 
-## Need Help?
+### Multi-Service Architecture
 
-- Check `README.md` for architecture details
-- See `CLAUDE.md` for development patterns
-- Review `docs/mitable_complete_prd.md` for feature specs
+We use a **loosely coupled architecture** to make it easy to swap services:
+
+- **AI Services**: Gemini Vision → OpenAI → Claude (just update the adapter)
+- **Database**: PostgreSQL → MySQL → MongoDB (abstracted through repository pattern)
+- **Frontend**: React components are independent of data source
+- **Backend**: Express routes → services → repositories (layered)
+
+### Testing
+
+Write tests for new features. Run `npm test` before committing.
+
+## Commit Message Format
+
+Use conventional commits:
+
+```
+type: short description
+
+Examples:
+feat: add expert matching algorithm
+fix: resolve overlay positioning on multi-monitor
+refactor: extract AI service into adapter pattern
+test: add integration tests for roadmap API
+docs: update architecture diagrams
+```
+
+## Available Commands
+
+| Command                | Description                             |
+| ---------------------- | --------------------------------------- |
+| `npm run dev`          | Start all services                      |
+| `npm run dev:admin`    | Run Electron in admin mode              |
+| `npm run dev:employee` | Run Electron in employee mode           |
+| `npm run build`        | Build all workspaces                    |
+| `npm run test`         | Run all tests                           |
+| `npm run ci`           | **Run all CI checks locally**           |
+| `npm run typecheck`    | TypeScript type checking                |
+| `npm run lint`         | ESLint                                  |
+| `npm run format`       | Auto-fix formatting with Prettier       |
+| `npm run format:check` | Check formatting (doesn't modify files) |
