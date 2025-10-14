@@ -1,7 +1,7 @@
 import { Code, LucideIcon } from "lucide-react";
 import UserMessage from "../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../components/domain/messages/AIMessage";
-import InteractiveCard from "../../../components/legacy/InteractiveCard";
+import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 
 interface Message {
   id: string;
@@ -43,14 +43,21 @@ export default function ConversationDialog({
       <div className="flex-1 overflow-y-auto p-4 pt-16">
         {messages.map((message) => {
           if (message.type === "card" && message.cardData) {
+            const Icon = message.cardData.icon;
             return (
-              <InteractiveCard
+              <Card
                 key={message.id}
-                title={message.cardData.title}
-                subtitle={message.cardData.subtitle}
-                icon={message.cardData.icon}
+                className="w-full mb-4 p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors app-no-drag"
                 onClick={onCardClick}
-              />
+              >
+                <div className="text-left">
+                  <CardTitle className="text-base mb-1">{message.cardData.title}</CardTitle>
+                  <CardDescription>{message.cardData.subtitle}</CardDescription>
+                </div>
+                <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0 ml-4">
+                  <Icon size={24} className="text-primary-foreground" />
+                </div>
+              </Card>
             );
           }
 
