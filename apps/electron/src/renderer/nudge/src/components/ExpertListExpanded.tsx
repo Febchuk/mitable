@@ -1,6 +1,6 @@
 import { ExpertProfile } from "@mitable/shared";
 import { ChevronLeft } from "lucide-react";
-import ExpertCard from "../../../components/expert/ExpertCard";
+import ExpertCard from "../../../components/domain/expert/ExpertCard";
 
 interface ExpertMatch {
   expert: ExpertProfile;

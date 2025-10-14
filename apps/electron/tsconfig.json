@@ -4,8 +4,12 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "lib": ["ES2022"],
-    "types": ["node", "electron"]
+    "types": ["node", "electron"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/renderer/*"]
+    }
   },
-  "include": ["src/main.ts", "src/preload/**/*"],
-  "exclude": ["node_modules", "dist", "src/renderers"]
+  "include": ["src/main.ts", "src/preload/**/*", "src/renderer/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

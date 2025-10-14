@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 
 interface MetricCardProps {
   label: string;
@@ -9,15 +10,15 @@ interface MetricCardProps {
 
 export default function MetricCard({ label, value, description, children }: MetricCardProps) {
   return (
-    <div className="bg-[#2A2A2A] rounded-xl p-6 space-y-4">
-      {/* Header */}
-      <div className="space-y-2">
-        <h3 className="text-white font-semibold text-base">{label}</h3>
-        {description && <p className="text-text-secondary text-sm">{description}</p>}
-      </div>
+    <Card>
+      <CardHeader className="space-y-2">
+        <CardTitle className="text-base">{label}</CardTitle>
+        {description && <CardDescription>{description}</CardDescription>}
+      </CardHeader>
 
-      {/* Value or Custom Content */}
-      {children ? children : <div className="text-white font-bold text-4xl">{value}</div>}
-    </div>
+      <CardContent>
+        {children ? children : <div className="text-4xl font-bold">{value}</div>}
+      </CardContent>
+    </Card>
   );
 }

@@ -1,4 +1,7 @@
 import type { Integration } from "../../types";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface IntegrationCardProps {
   integration: Integration;
@@ -54,27 +57,34 @@ export default function IntegrationCard({
   const isConnected = integration.status === "connected";
 
   return (
-    <div className="bg-[#2A2A2A] rounded-xl p-6 flex items-start gap-4 border border-[#3A3A3A]">
+    <Card className="flex items-start gap-4 p-6">
       {/* Integration Icon */}
-      {getIntegrationIcon(integration.provider)}
+      <div className="flex-shrink-0">
+        {getIntegrationIcon(integration.provider)}
+      </div>
 
       {/* Content */}
-      <div className="flex-1">
-        <h3 className="text-white font-semibold text-lg mb-1">{integration.name}</h3>
-        <p className="text-text-secondary text-sm">{integration.description}</p>
+      <div className="flex-1 min-w-0">
+        <CardHeader className="p-0 space-y-1">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-lg">{integration.name}</CardTitle>
+            {isConnected && (
+              <Badge variant="outline" className="text-xs">
+                Connected
+              </Badge>
+            )}
+          </div>
+          <CardDescription>{integration.description}</CardDescription>
+        </CardHeader>
       </div>
 
       {/* Connect Button */}
-      <button
+      <Button
+        variant={isConnected ? "secondary" : "default"}
         onClick={() => (isConnected ? onDisconnect(integration.id) : onConnect(integration.id))}
-        className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
-          isConnected
-            ? "bg-[#3A3A3A] text-text-secondary hover:bg-[#4A4A4A]"
-            : "bg-primary text-white hover:bg-primary-hover"
-        }`}
       >
-        {isConnected ? "Connected" : "Connect"}
-      </button>
-    </div>
+        {isConnected ? "Disconnect" : "Connect"}
+      </Button>
+    </Card>
   );
 }

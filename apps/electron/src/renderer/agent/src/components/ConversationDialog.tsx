@@ -1,7 +1,7 @@
 import { Code, LucideIcon } from "lucide-react";
-import UserMessage from "../../../components/messages/UserMessage";
-import AIMessage from "../../../components/messages/AIMessage";
-import InteractiveCard from "../../../components/ui/InteractiveCard";
+import UserMessage from "../../../components/domain/messages/UserMessage";
+import AIMessage from "../../../components/domain/messages/AIMessage";
+import InteractiveCard from "../../../components/legacy/InteractiveCard";
 
 interface Message {
   id: string;
