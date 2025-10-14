@@ -1,6 +1,10 @@
 import { Router } from "express";
+import { handleChat } from "./chat.js";
 
 export const router = Router();
+
+// Chat endpoint for Pinecone + LLM integration
+router.post("/chat", handleChat);
 
 // Placeholder routes - will be implemented in later phases
 router.get("/conversations", (_req, res) => {

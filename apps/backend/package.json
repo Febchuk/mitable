@@ -12,9 +12,11 @@
   },
   "dependencies": {
     "@mitable/shared": "*",
+    "@pinecone-database/pinecone": "^6.1.2",
     "express": "^4.18.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "openai": "^4.77.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
