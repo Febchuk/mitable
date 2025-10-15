@@ -12,7 +12,6 @@ export default {
     },
     extend: {
       colors: {
-        // ShadCN colors (CSS variables)
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -21,7 +20,6 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
-          // Legacy custom colors (for existing code)
           light: "#818CF8",
           hover: "#4F46E5",
           pressed: "#4338CA",
@@ -50,12 +48,10 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Legacy custom colors (for existing code compatibility)
         "background-primary": "#1A1A1A",
         "background-secondary": "#2A2A2A",
         "background-elevated": "#3A3A3A",
         "integration-card": "#3E3D3D",
-        // Agent pill specific
         agent: {
           pill: "#1A1A1A",
           toggle: {
@@ -69,25 +65,32 @@ export default {
           DEFAULT: "#2A2A2A",
           elevated: "#3A3A3A",
         },
-        // Text palette
         text: {
           primary: "#FFFFFF",
           secondary: "#A1A1A1",
           tertiary: "#6B6B6B",
         },
-        // Status colors
         status: {
           success: "#22C55E",
           warning: "#F59E0B",
           error: "#EF4444",
           info: "#3B82F6",
         },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
-        // Legacy custom radii
         "6px": "6px",
         "10px": "10px",
         "16px": "16px",
@@ -119,12 +122,20 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
+          from: {
+            height: "0",
+          },
+          to: {
+            height: "var(--radix-accordion-content-height)",
+          },
         },
         "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
+          from: {
+            height: "var(--radix-accordion-content-height)",
+          },
+          to: {
+            height: "0",
+          },
         },
       },
       animation: {

@@ -16,7 +16,7 @@ export default function Nav() {
   if (isAdmin) {
     // Admin navigation
     return (
-      <nav className="flex flex-col gap-xs p-md">
+      <nav className="space-y-1 px-2">
         <NavItem to="/dashboard" icon={BarChart3} label="Dashboard" />
         <NavItem to="/people" icon={Users} label="People" />
         <NavItem to="/roadmaps" icon={Layers} label="Roadmaps" />
@@ -27,7 +27,7 @@ export default function Nav() {
 
   // Employee navigation
   return (
-    <nav className="flex flex-col gap-xs p-md">
+    <nav className="space-y-1 px-2">
       <NavItem to="/home" icon={Home} label="Home" />
       <NavItem to="/roadmap" icon={Layers} label="Roadmap" />
       <NavItem to="/nudges" icon={Users} label="Nudges" />

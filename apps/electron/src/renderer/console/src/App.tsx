@@ -1,5 +1,4 @@
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SidebarProvider } from "./context/SidebarContext";
 import { UserProvider, useUser } from "./context/UserContext";
 import { AdminProvider } from "./context/AdminContext";
 import { RoadmapProvider } from "./context/RoadmapContext";
@@ -14,6 +13,7 @@ import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import RoadmapsView from "./components/views/admin/RoadmapsView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
+import SetupView from "./components/views/admin/SetupView";
 
 // Dynamic default route based on user role
 function DefaultRoute() {
@@ -25,33 +25,32 @@ function DefaultRoute() {
 function App() {
   return (
     <HashRouter>
-      <SidebarProvider>
-        <UserProvider>
-          <AdminProvider>
-            <RoadmapProvider>
-              <NudgesProvider>
-                <ChatsProvider>
-                  <Routes>
-                    <Route path="/" element={<ConsoleLayout />}>
-                      <Route index element={<DefaultRoute />} />
-                      {/* Admin Routes */}
-                      <Route path="dashboard" element={<DashboardView />} />
-                      <Route path="people" element={<PeopleView />} />
-                      <Route path="roadmaps" element={<RoadmapsView />} />
-                      <Route path="integrations" element={<IntegrationsView />} />
-                      {/* Employee Routes */}
-                      <Route path="home" element={<HomeView />} />
-                      <Route path="roadmap" element={<RoadmapView />} />
-                      <Route path="nudges" element={<NudgesView />} />
-                      <Route path="chats" element={<ChatsView />} />
-                    </Route>
-                  </Routes>
-                </ChatsProvider>
-              </NudgesProvider>
-            </RoadmapProvider>
-          </AdminProvider>
-        </UserProvider>
-      </SidebarProvider>
+      <UserProvider>
+        <AdminProvider>
+          <RoadmapProvider>
+            <NudgesProvider>
+              <ChatsProvider>
+                <Routes>
+                  <Route path="/" element={<ConsoleLayout />}>
+                    <Route index element={<DefaultRoute />} />
+                    {/* Admin Routes */}
+                    <Route path="dashboard" element={<DashboardView />} />
+                    <Route path="people" element={<PeopleView />} />
+                    <Route path="roadmaps" element={<RoadmapsView />} />
+                    <Route path="integrations" element={<IntegrationsView />} />
+                    <Route path="setup" element={<SetupView />} />
+                    {/* Employee Routes */}
+                    <Route path="home" element={<HomeView />} />
+                    <Route path="roadmap" element={<RoadmapView />} />
+                    <Route path="nudges" element={<NudgesView />} />
+                    <Route path="chats" element={<ChatsView />} />
+                  </Route>
+                </Routes>
+              </ChatsProvider>
+            </NudgesProvider>
+          </RoadmapProvider>
+        </AdminProvider>
+      </UserProvider>
     </HashRouter>
   );
 }

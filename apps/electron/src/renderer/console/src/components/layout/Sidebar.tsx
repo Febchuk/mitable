@@ -1,38 +1,44 @@
 import { Bell, Settings } from "lucide-react";
-import { useSidebar } from "../../context/SidebarContext";
+import { useSidebar } from "@/components/ui/sidebar";
 import Logo from "../navigation/Logo";
 import Nav from "../navigation/Nav";
 
 export default function Sidebar() {
-  const { isCollapsed } = useSidebar();
+  const { open } = useSidebar();
 
   return (
     <aside
-      className={`${
-        isCollapsed ? "w-sidebar-collapsed" : "w-sidebar-expanded"
-      } h-full bg-background-primary flex flex-col transition-width duration-300 app-no-drag`}
+      className={`
+        flex flex-col h-screen bg-[#1A1A1A] text-white
+        transition-all duration-300 ease-in-out
+        ${open ? "w-64" : "w-16"}
+      `}
     >
-      <Logo />
-      <div className="flex-1 overflow-y-auto">
+      {/* Header - Logo */}
+      <div className="flex-shrink-0">
+        <Logo />
+      </div>
+
+      {/* Main Navigation */}
+      <div className="flex-1 overflow-y-auto py-4">
         <Nav />
       </div>
-      {/* Bottom Navigation */}
-      <div className="p-md space-y-xs border-t border-border">
+
+      {/* Footer - Notifications & Settings */}
+      <div className="flex-shrink-0 p-2 space-y-1">
         <button
-          className={`flex items-center gap-md w-full px-md py-sm rounded-md transition-colors text-text-secondary hover:bg-background-elevated hover:text-text-primary ${
-            isCollapsed ? "justify-center" : ""
-          }`}
+          className="flex items-center gap-3 w-full px-3 py-2 rounded-md hover:bg-white/10 transition-colors"
+          title="Notifications"
         >
-          <Bell size={20} />
-          {!isCollapsed && <span className="text-sm font-medium">Notifications</span>}
+          <Bell className="w-5 h-5 flex-shrink-0" />
+          {open && <span className="text-nav-item">Notifications</span>}
         </button>
         <button
-          className={`flex items-center gap-md w-full px-md py-sm rounded-md transition-colors text-text-secondary hover:bg-background-elevated hover:text-text-primary ${
-            isCollapsed ? "justify-center" : ""
-          }`}
+          className="flex items-center gap-3 w-full px-3 py-2 rounded-md hover:bg-white/10 transition-colors"
+          title="Settings"
         >
-          <Settings size={20} />
-          {!isCollapsed && <span className="text-sm font-medium">Settings</span>}
+          <Settings className="w-5 h-5 flex-shrink-0" />
+          {open && <span className="text-nav-item">Settings</span>}
         </button>
       </div>
     </aside>
