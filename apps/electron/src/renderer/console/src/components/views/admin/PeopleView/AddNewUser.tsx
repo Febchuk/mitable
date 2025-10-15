@@ -75,9 +75,7 @@ export default function AddNewUser() {
 
   const handleTemplateToggle = (templateId: string) => {
     setSelectedTemplates((prev) =>
-      prev.includes(templateId)
-        ? prev.filter((id) => id !== templateId)
-        : [...prev, templateId]
+      prev.includes(templateId) ? prev.filter((id) => id !== templateId) : [...prev, templateId]
     );
   };
 
@@ -151,9 +149,7 @@ export default function AddNewUser() {
                   aria-expanded={roleOpen}
                   className="w-full justify-between bg-background-secondary border-transparent text-text-primary hover:bg-background-secondary hover:text-text-primary"
                 >
-                  {role
-                    ? roles.find((r) => r.value === role)?.label
-                    : "Select role"}
+                  {role ? roles.find((r) => r.value === role)?.label : "Select role"}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -207,11 +203,7 @@ export default function AddNewUser() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                />
+                <Calendar mode="single" selected={date} onSelect={setDate} />
               </PopoverContent>
             </Popover>
           </div>
@@ -297,9 +289,7 @@ export default function AddNewUser() {
                 className="mt-1"
               />
               <div className="flex-1">
-                <p className="text-text-primary font-semibold">
-                  {template.title}
-                </p>
+                <p className="text-text-primary font-semibold">{template.title}</p>
                 <p className="text-sm text-primary mt-1">
                   {template.tasks} tasks • {template.duration}
                 </p>
@@ -333,7 +323,10 @@ export default function AddNewUser() {
               onCheckedChange={(checked) => setWelcomeEmail(checked as boolean)}
             />
             <div className="flex-1">
-              <Label htmlFor="welcomeEmail" className="text-text-primary font-medium cursor-pointer">
+              <Label
+                htmlFor="welcomeEmail"
+                className="text-text-primary font-medium cursor-pointer"
+              >
                 Send welcome email on start date
               </Label>
               <p className="text-sm text-text-secondary mt-1">
@@ -350,7 +343,10 @@ export default function AddNewUser() {
               onCheckedChange={(checked) => setNotifyManager(checked as boolean)}
             />
             <div className="flex-1">
-              <Label htmlFor="notifyManager" className="text-text-primary font-medium cursor-pointer">
+              <Label
+                htmlFor="notifyManager"
+                className="text-text-primary font-medium cursor-pointer"
+              >
                 Notify manager
               </Label>
               <p className="text-sm text-text-secondary mt-1">
@@ -370,9 +366,7 @@ export default function AddNewUser() {
         >
           Cancel
         </Button>
-        <Button className="bg-primary text-white hover:bg-primary/90">
-          + Add New Hire
-        </Button>
+        <Button className="bg-primary text-white hover:bg-primary/90">+ Add New Hire</Button>
       </div>
     </div>
   );
