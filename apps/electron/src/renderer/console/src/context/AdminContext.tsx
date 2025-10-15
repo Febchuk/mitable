@@ -3,7 +3,7 @@ import type { Integration, DashboardMetric, ProductivityData, NudgeTheme } from 
 
 interface AdminContextType {
   integrations: Integration[];
-  connectIntegration: (id: string) => void;
+  connectIntegration: (id: string, token?: string) => void;
   disconnectIntegration: (id: string) => void;
   configureIntegration: (id: string) => void;
   syncIntegration: (id: string) => void;
@@ -83,7 +83,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     { id: "6", label: "Ticket debugging", category: "support" },
   ]);
 
-  const connectIntegration = (id: string) => {
+  const connectIntegration = (id: string, token?: string) => {
+    if (token) {
+      console.log(`Connecting integration ${id} with token:`, token);
+      // TODO: Send token to backend API for validation and storage
+    }
     setIntegrations((prev) =>
       prev.map((integration) =>
         integration.id === id

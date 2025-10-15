@@ -18,6 +18,7 @@ interface IntegrationCardProps {
   onConfigure?: (id: string) => void;
   onSync?: (id: string) => void;
   onViewDetails?: (id: string) => void;
+  onCustomConnect?: () => void;
   position?: "first" | "middle" | "last" | "only";
 }
 
@@ -28,6 +29,7 @@ export default function IntegrationCard({
   onConfigure,
   onSync,
   onViewDetails,
+  onCustomConnect,
   position = "only",
 }: IntegrationCardProps) {
   const isConnected = integration.status === "connected";
@@ -102,7 +104,7 @@ export default function IntegrationCard({
       ) : (
         <Button
           variant="default"
-          onClick={() => onConnect(integration.id)}
+          onClick={() => (onCustomConnect ? onCustomConnect() : onConnect(integration.id))}
           className="bg-primary hover:bg-primary/90 gap-2"
         >
           <Link className="w-4 h-4" />
