@@ -165,7 +165,9 @@ export default function PersonDetail() {
           </div>
           <div className="space-y-2">
             <p className="text-5xl font-bold text-status-warning">{person.metrics.overdueTasks}</p>
-            <p className="text-sm text-text-secondary">{person.metrics.overdueTasks} tasks overdue</p>
+            <p className="text-sm text-text-secondary">
+              {person.metrics.overdueTasks} tasks overdue
+            </p>
           </div>
         </div>
       </div>
@@ -196,10 +198,7 @@ export default function PersonDetail() {
               <p className="text-sm text-text-secondary">
                 {roadmap.tasks} tasks • {roadmap.description}
               </p>
-              <Progress
-                value={roadmap.completion}
-                className="h-2 bg-border-subtle"
-              />
+              <Progress value={roadmap.completion} className="h-2 bg-border-subtle" />
             </div>
           ))}
         </div>
@@ -249,7 +248,10 @@ export default function PersonDetail() {
 
           <div className="space-y-3">
             {person.nudgeThemes.map((theme, index) => (
-              <div key={index} className="bg-background-secondary rounded-lg border border-border-subtle p-4 space-y-2">
+              <div
+                key={index}
+                className="bg-background-secondary rounded-lg border border-border-subtle p-4 space-y-2"
+              >
                 <h3 className="text-text-primary font-semibold">{theme.theme}</h3>
                 <p className="text-sm text-text-secondary">{theme.count} times</p>
                 <p className="text-xs text-text-secondary">
