@@ -18,13 +18,23 @@ export default function IntegrationsView() {
     );
   });
 
-  // Split into connected and available
+  // Detect if user is actively searching
+  const isSearching = searchQuery.trim() !== "";
+
+  // Split into connected and available (for non-search view)
   const connectedIntegrations = filteredIntegrations.filter(
     (integration) => integration.status === "connected"
   );
   const availableIntegrations = filteredIntegrations.filter(
     (integration) => integration.status !== "connected"
   );
+
+  // Sort integrations for search view (connected first)
+  const sortedIntegrations = [...filteredIntegrations].sort((a, b) => {
+    if (a.status === "connected" && b.status !== "connected") return -1;
+    if (a.status !== "connected" && b.status === "connected") return 1;
+    return 0;
+  });
 
   // Helper function to determine card position
   const getCardPosition = (index: number, totalLength: number): "first" | "middle" | "last" | "only" => {
@@ -51,7 +61,7 @@ export default function IntegrationsView() {
             placeholder="Search integrations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-[#2a2a2a] border-border"
+            className="pl-10 bg-[#2a2a2a] border-border text-white focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0"
           />
         </div>
 
@@ -71,53 +81,71 @@ export default function IntegrationsView() {
         </Button>
       </div>
 
-      {/* Connected Integrations Section */}
-      <div className="space-y-4 max-w-5xl">
-        <h2 className="text-2xl font-semibold text-white">Connected Integrations</h2>
-        {connectedIntegrations.length > 0 ? (
-          <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
-            {connectedIntegrations.map((integration, index) => (
-              <IntegrationCard
-                key={integration.id}
-                integration={integration}
-                onConnect={connectIntegration}
-                onDisconnect={disconnectIntegration}
-                position={getCardPosition(index, connectedIntegrations.length)}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-center py-8">No connected integrations</p>
-        )}
-      </div>
-
-      {/* Available Integrations Section */}
-      <div className="space-y-4 max-w-5xl">
-        <h2 className="text-2xl font-semibold text-white">Available Integrations</h2>
-        {availableIntegrations.length > 0 ? (
-          <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
-            {availableIntegrations.map((integration, index) => (
-              <IntegrationCard
-                key={integration.id}
-                integration={integration}
-                onConnect={connectIntegration}
-                onDisconnect={disconnectIntegration}
-                position={getCardPosition(index, availableIntegrations.length)}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-center py-8">No more available integrations</p>
-        )}
-      </div>
-
-      {/* No results message */}
-      {filteredIntegrations.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">
-            No integrations found matching "{searchQuery}"
-          </p>
+      {/* Search Results View - Consolidated List */}
+      {isSearching ? (
+        <div className="space-y-4 max-w-5xl">
+          {sortedIntegrations.length > 0 ? (
+            <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+              {sortedIntegrations.map((integration, index) => (
+                <IntegrationCard
+                  key={integration.id}
+                  integration={integration}
+                  onConnect={connectIntegration}
+                  onDisconnect={disconnectIntegration}
+                  position={getCardPosition(index, sortedIntegrations.length)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                No integrations found matching "{searchQuery}"
+              </p>
+            </div>
+          )}
         </div>
+      ) : (
+        <>
+          {/* Connected Integrations Section */}
+          <div className="space-y-4 max-w-5xl">
+            <h2 className="text-2xl font-semibold text-white">Connected Integrations</h2>
+            {connectedIntegrations.length > 0 ? (
+              <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+                {connectedIntegrations.map((integration, index) => (
+                  <IntegrationCard
+                    key={integration.id}
+                    integration={integration}
+                    onConnect={connectIntegration}
+                    onDisconnect={disconnectIntegration}
+                    position={getCardPosition(index, connectedIntegrations.length)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">No connected integrations</p>
+            )}
+          </div>
+
+          {/* Available Integrations Section */}
+          <div className="space-y-4 max-w-5xl">
+            <h2 className="text-2xl font-semibold text-white">Available Integrations</h2>
+            {availableIntegrations.length > 0 ? (
+              <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+                {availableIntegrations.map((integration, index) => (
+                  <IntegrationCard
+                    key={integration.id}
+                    integration={integration}
+                    onConnect={connectIntegration}
+                    onDisconnect={disconnectIntegration}
+                    position={getCardPosition(index, availableIntegrations.length)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">No more available integrations</p>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
