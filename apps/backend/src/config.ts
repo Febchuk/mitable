@@ -38,10 +38,7 @@ export function validateConfig() {
   const missing = required.filter((item) => !item.value);
 
   if (missing.length > 0) {
-    console.warn(
-      "⚠️  Missing environment variables:",
-      missing.map((item) => item.key).join(", ")
-    );
+    console.warn("⚠️  Missing environment variables:", missing.map((item) => item.key).join(", "));
     console.warn("⚠️  Vector database features will be disabled");
   }
 
