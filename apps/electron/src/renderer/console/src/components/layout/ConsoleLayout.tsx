@@ -1,14 +1,14 @@
 import { Outlet } from "react-router-dom";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import Sidebar from "./Sidebar";
-import MainContent from "./MainContent";
 
 export default function ConsoleLayout() {
   return (
-    <div className="w-full h-full flex bg-background-primary">
+    <SidebarProvider>
       <Sidebar />
-      <MainContent>
+      <SidebarInset className="bg-background-secondary">
         <Outlet />
-      </MainContent>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

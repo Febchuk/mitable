@@ -31,6 +31,14 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
@@ -58,6 +66,14 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -79,6 +95,61 @@
   #root {
     width: 100vw;
     height: 100vh;
+  }
+}
+
+/* Typography system */
+@layer components {
+  /* Headings */
+  .text-heading-1 {
+    @apply text-4xl font-bold;
+  }
+
+  .text-heading-2 {
+    @apply text-3xl font-bold;
+  }
+
+  .text-heading-3 {
+    @apply text-2xl font-semibold;
+  }
+
+  .text-heading-4 {
+    @apply text-xl font-semibold;
+  }
+
+  /* Body text */
+  .text-body-lg {
+    @apply text-lg font-normal;
+  }
+
+  .text-body {
+    @apply text-base font-normal;
+  }
+
+  .text-body-sm {
+    @apply text-sm font-normal;
+  }
+
+  /* Navigation */
+  .text-nav-item {
+    @apply text-xl font-medium;
+  }
+
+  .text-nav-label {
+    @apply text-base font-medium;
+  }
+
+  /* UI elements */
+  .text-button {
+    @apply text-sm font-semibold;
+  }
+
+  .text-caption {
+    @apply text-xs font-normal;
+  }
+
+  .text-label {
+    @apply text-sm font-medium;
   }
 }
 
