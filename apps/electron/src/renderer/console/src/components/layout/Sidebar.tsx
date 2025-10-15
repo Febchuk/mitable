@@ -1,5 +1,5 @@
 import { Bell, Settings } from "lucide-react";
-import { useSidebar } from "@/components/ui/sidebar";
+import { useSidebar } from "../../context/SidebarContext";
 import Logo from "../navigation/Logo";
 import Nav from "../navigation/Nav";
 

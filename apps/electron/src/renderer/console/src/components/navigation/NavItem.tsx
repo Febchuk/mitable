@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { LucideIcon } from "lucide-react";
-import { useSidebar } from "@/components/ui/sidebar";
+import { useSidebar } from "../../context/SidebarContext";
 
 interface NavItemProps {
   to: string;
