@@ -15,7 +15,7 @@ export default function HomeView() {
   };
 
   return (
-    <div className="h-full w-full flex items-center justify-center">
+    <div className="h-screen w-full flex items-center justify-center">
       <div className="max-w-2xl w-full px-lg app-no-drag">
         {/* Welcome Heading */}
         <h1 className="text-5xl font-semibold text-center mb-xl">
