@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAdmin } from "../../../../context/AdminContext";
 import IntegrationCard from "./components/IntegrationCard";
+import SlackConnectDialog from "./components/SlackConnectDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Filter, Plus } from "lucide-react";
@@ -15,6 +16,16 @@ export default function IntegrationsView() {
     viewIntegrationDetails,
   } = useAdmin();
   const [searchQuery, setSearchQuery] = useState("");
+  const [slackDialogOpen, setSlackDialogOpen] = useState(false);
+
+  const handleSlackConnect = () => {
+    setSlackDialogOpen(true);
+  };
+
+  const handleSlackConnectWithToken = (token: string) => {
+    connectIntegration("slack", token);
+    setSlackDialogOpen(false);
+  };
 
   // Filter integrations based on search query
   const filteredIntegrations = integrations.filter((integration) => {
@@ -111,6 +122,9 @@ export default function IntegrationsView() {
                   onConfigure={configureIntegration}
                   onSync={syncIntegration}
                   onViewDetails={viewIntegrationDetails}
+                  onCustomConnect={
+                    integration.provider === "slack" ? handleSlackConnect : undefined
+                  }
                   position={getCardPosition(index, sortedIntegrations.length)}
                 />
               ))}
@@ -139,6 +153,9 @@ export default function IntegrationsView() {
                     onConfigure={configureIntegration}
                     onSync={syncIntegration}
                     onViewDetails={viewIntegrationDetails}
+                    onCustomConnect={
+                      integration.provider === "slack" ? handleSlackConnect : undefined
+                    }
                     position={getCardPosition(index, connectedIntegrations.length)}
                   />
                 ))}
@@ -162,6 +179,9 @@ export default function IntegrationsView() {
                     onConfigure={configureIntegration}
                     onSync={syncIntegration}
                     onViewDetails={viewIntegrationDetails}
+                    onCustomConnect={
+                      integration.provider === "slack" ? handleSlackConnect : undefined
+                    }
                     position={getCardPosition(index, availableIntegrations.length)}
                   />
                 ))}
@@ -174,6 +194,13 @@ export default function IntegrationsView() {
           </div>
         </>
       )}
+
+      {/* Slack Connect Dialog */}
+      <SlackConnectDialog
+        open={slackDialogOpen}
+        onOpenChange={setSlackDialogOpen}
+        onConnect={handleSlackConnectWithToken}
+      />
     </div>
   );
 }
