@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Search, Filter, Plus } from "lucide-react";
 
 export default function IntegrationsView() {
-  const { integrations, connectIntegration, disconnectIntegration } = useAdmin();
+  const {
+    integrations,
+    connectIntegration,
+    disconnectIntegration,
+    configureIntegration,
+    syncIntegration,
+    viewIntegrationDetails,
+  } = useAdmin();
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter integrations based on search query
@@ -37,7 +44,10 @@ export default function IntegrationsView() {
   });
 
   // Helper function to determine card position
-  const getCardPosition = (index: number, totalLength: number): "first" | "middle" | "last" | "only" => {
+  const getCardPosition = (
+    index: number,
+    totalLength: number
+  ): "first" | "middle" | "last" | "only" => {
     if (totalLength === 1) return "only";
     if (index === 0) return "first";
     if (index === totalLength - 1) return "last";
@@ -92,6 +102,9 @@ export default function IntegrationsView() {
                   integration={integration}
                   onConnect={connectIntegration}
                   onDisconnect={disconnectIntegration}
+                  onConfigure={configureIntegration}
+                  onSync={syncIntegration}
+                  onViewDetails={viewIntegrationDetails}
                   position={getCardPosition(index, sortedIntegrations.length)}
                 />
               ))}
@@ -117,6 +130,9 @@ export default function IntegrationsView() {
                     integration={integration}
                     onConnect={connectIntegration}
                     onDisconnect={disconnectIntegration}
+                    onConfigure={configureIntegration}
+                    onSync={syncIntegration}
+                    onViewDetails={viewIntegrationDetails}
                     position={getCardPosition(index, connectedIntegrations.length)}
                   />
                 ))}
@@ -137,12 +153,17 @@ export default function IntegrationsView() {
                     integration={integration}
                     onConnect={connectIntegration}
                     onDisconnect={disconnectIntegration}
+                    onConfigure={configureIntegration}
+                    onSync={syncIntegration}
+                    onViewDetails={viewIntegrationDetails}
                     position={getCardPosition(index, availableIntegrations.length)}
                   />
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-8">No more available integrations</p>
+              <p className="text-muted-foreground text-center py-8">
+                No more available integrations
+              </p>
             )}
           </div>
         </>

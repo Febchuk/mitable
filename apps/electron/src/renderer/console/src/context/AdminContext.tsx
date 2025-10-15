@@ -5,6 +5,9 @@ interface AdminContextType {
   integrations: Integration[];
   connectIntegration: (id: string) => void;
   disconnectIntegration: (id: string) => void;
+  configureIntegration: (id: string) => void;
+  syncIntegration: (id: string) => void;
+  viewIntegrationDetails: (id: string) => void;
   savingsMetric: DashboardMetric;
   timeToProductivity: DashboardMetric;
   productivityData: ProductivityData;
@@ -100,12 +103,33 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const configureIntegration = (id: string) => {
+    // Placeholder for configuration modal/flow
+    console.log("Configure integration:", id);
+    // TODO: Open configuration modal or settings panel
+  };
+
+  const syncIntegration = (id: string) => {
+    // Placeholder for sync trigger
+    console.log("Sync integration:", id);
+    // TODO: Trigger sync API call
+  };
+
+  const viewIntegrationDetails = (id: string) => {
+    // Placeholder for details view
+    console.log("View integration details:", id);
+    // TODO: Open details panel or modal
+  };
+
   return (
     <AdminContext.Provider
       value={{
         integrations,
         connectIntegration,
         disconnectIntegration,
+        configureIntegration,
+        syncIntegration,
+        viewIntegrationDetails,
         savingsMetric,
         timeToProductivity,
         productivityData,

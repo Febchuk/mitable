@@ -1,14 +1,23 @@
 import type { Integration } from "../../../../../types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Check, Link } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Check, Link, ChevronDown, Settings, RefreshCw, Info, LogOut } from "lucide-react";
 import { getIntegrationIcon } from "@/components/icons/integrations";
 
 interface IntegrationCardProps {
   integration: Integration;
   onConnect: (id: string) => void;
   onDisconnect: (id: string) => void;
+  onConfigure?: (id: string) => void;
+  onSync?: (id: string) => void;
+  onViewDetails?: (id: string) => void;
   position?: "first" | "middle" | "last" | "only";
 }
 
@@ -16,6 +25,9 @@ export default function IntegrationCard({
   integration,
   onConnect,
   onDisconnect,
+  onConfigure,
+  onSync,
+  onViewDetails,
   position = "only",
 }: IntegrationCardProps) {
   const isConnected = integration.status === "connected";
@@ -32,7 +44,9 @@ export default function IntegrationCard({
   const IconComponent = getIntegrationIcon(integration.provider);
 
   return (
-    <Card className={`flex items-center gap-4 p-6 bg-integration-card border-0 ${radiusClasses[position]}`}>
+    <Card
+      className={`flex items-center gap-4 p-6 bg-integration-card border-0 ${radiusClasses[position]}`}
+    >
       {/* Integration Icon */}
       <div className="flex-shrink-0">
         <IconComponent />
@@ -42,35 +56,59 @@ export default function IntegrationCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <h3 className="text-lg font-semibold text-white">{integration.name}</h3>
-          {isConnected && (
-            <Badge className="bg-green-600/20 text-green-400 border-green-600/30 hover:bg-green-600/20">
-              <Check className="w-3 h-3 mr-1" />
-              Connected
-            </Badge>
-          )}
         </div>
         <p className="text-sm text-muted-foreground">{integration.description}</p>
       </div>
 
       {/* Action Button */}
-      <Button
-        variant={isConnected ? "secondary" : "default"}
-        onClick={() => (isConnected ? onDisconnect(integration.id) : onConnect(integration.id))}
-        className={
-          isConnected
-            ? ""
-            : "bg-primary hover:bg-primary/90"
-        }
-      >
-        {isConnected ? (
-          "Disconnect"
-        ) : (
-          <>
-            <Link className="w-4 h-4 mr-2" />
-            Connect
-          </>
-        )}
-      </Button>
+      {isConnected ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="bg-status-success hover:bg-status-success/90 text-white gap-2">
+              <Check className="w-4 h-4" />
+              Connected
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {onConfigure && (
+              <DropdownMenuItem onClick={() => onConfigure(integration.id)}>
+                <Settings className="w-4 h-4" />
+                Configure
+              </DropdownMenuItem>
+            )}
+            {onSync && (
+              <DropdownMenuItem onClick={() => onSync(integration.id)}>
+                <RefreshCw className="w-4 h-4" />
+                Sync Now
+              </DropdownMenuItem>
+            )}
+            {onViewDetails && (
+              <DropdownMenuItem onClick={() => onViewDetails(integration.id)}>
+                <Info className="w-4 h-4" />
+                View Details
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onDisconnect(integration.id)}
+              className="text-destructive focus:text-destructive"
+            >
+              <LogOut className="w-4 h-4" />
+              Disconnect
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Button
+          variant="default"
+          onClick={() => onConnect(integration.id)}
+          className="bg-primary hover:bg-primary/90 gap-2"
+        >
+          <Link className="w-4 h-4" />
+          Connect
+        </Button>
+      )}
     </Card>
   );
 }
