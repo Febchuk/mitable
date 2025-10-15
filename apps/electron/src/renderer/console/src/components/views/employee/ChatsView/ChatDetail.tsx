@@ -96,7 +96,7 @@ export default function ChatDetail() {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-8 py-4 app-no-drag">
+      <div className="flex-1 overflow-y-auto px-8 py-4 app-no-drag custom-scrollbar">
         {chat.messages.map((message) => {
           // Render workflow or experts cards
           if ((message.type === "workflow" || message.type === "experts") && message.cardData) {

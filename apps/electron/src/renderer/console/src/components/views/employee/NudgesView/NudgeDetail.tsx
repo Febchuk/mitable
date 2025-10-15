@@ -93,7 +93,9 @@ export default function NudgeDetail() {
               >
                 {nudge.status === "resolved" ? "Resolved" : "Waiting"}
               </Badge>
-              <span className="text-text-secondary text-sm">{formatTimestamp(nudge.timestamp)}</span>
+              <span className="text-text-secondary text-sm">
+                {formatTimestamp(nudge.timestamp)}
+              </span>
             </div>
           </div>
         </div>

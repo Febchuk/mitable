@@ -22,25 +22,29 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
         {
           id: "1-1",
           role: "user",
-          content: "I'm trying to set up React Router in my project but I'm getting a blank page. Can you help?",
+          content:
+            "I'm trying to set up React Router in my project but I'm getting a blank page. Can you help?",
           timestamp: new Date(Date.now() - 1000 * 60 * 60),
         },
         {
           id: "1-2",
           role: "assistant",
-          content: "I can help with that! The blank page usually means the routes aren't configured correctly. Can you share your router setup?",
+          content:
+            "I can help with that! The blank page usually means the routes aren't configured correctly. Can you share your router setup?",
           timestamp: new Date(Date.now() - 1000 * 60 * 50),
         },
         {
           id: "1-3",
           role: "user",
-          content: "Here's my App.tsx - I have BrowserRouter wrapping everything but none of my routes are showing up.",
+          content:
+            "Here's my App.tsx - I have BrowserRouter wrapping everything but none of my routes are showing up.",
           timestamp: new Date(Date.now() - 1000 * 60 * 40),
         },
         {
           id: "1-4",
           role: "assistant",
-          content: "I see the issue! You need to use HashRouter instead of BrowserRouter for Electron apps. BrowserRouter uses the HTML5 history API which doesn't work well with the file:// protocol that Electron uses.",
+          content:
+            "I see the issue! You need to use HashRouter instead of BrowserRouter for Electron apps. BrowserRouter uses the HTML5 history API which doesn't work well with the file:// protocol that Electron uses.",
           timestamp: new Date(Date.now() - 1000 * 60 * 30),
         },
         {
@@ -52,13 +56,15 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
         {
           id: "1-6",
           role: "user",
-          content: "Actually, I have another question - how do I handle ticket escalation in our system?",
+          content:
+            "Actually, I have another question - how do I handle ticket escalation in our system?",
           timestamp: new Date(Date.now() - 1000 * 60 * 10),
         },
         {
           id: "1-7",
           role: "assistant",
-          content: "I can show you how to escalate a ticket. Would you like an interactive walkthrough?",
+          content:
+            "I can show you how to escalate a ticket. Would you like an interactive walkthrough?",
           timestamp: new Date(Date.now() - 1000 * 60 * 9),
         },
         {
@@ -121,7 +127,8 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
         {
           id: "2-2",
           role: "assistant",
-          content: "Great progress! Week 2 focuses on learning our internal tools. You should have access to the 'Internal Tools Overview' task in your roadmap. Would you like me to walk you through it?",
+          content:
+            "Great progress! Week 2 focuses on learning our internal tools. You should have access to the 'Internal Tools Overview' task in your roadmap. Would you like me to walk you through it?",
           timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2 + 1000 * 60 * 5),
         },
       ],
@@ -142,7 +149,8 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
         {
           id: "3-2",
           role: "assistant",
-          content: "Let me show you our deployment process. We use GitHub Actions for CI/CD. When you push to main, it automatically runs tests and deploys to staging.",
+          content:
+            "Let me show you our deployment process. We use GitHub Actions for CI/CD. When you push to main, it automatically runs tests and deploys to staging.",
           timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
         },
       ],
@@ -157,13 +165,15 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
         {
           id: "4-1",
           role: "user",
-          content: "Where can I find documentation for our design system? I'm building a new feature.",
+          content:
+            "Where can I find documentation for our design system? I'm building a new feature.",
           timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 - 1000 * 60 * 30),
         },
         {
           id: "4-2",
           role: "assistant",
-          content: "Here's the Figma link to our component library: [link]. You'll find all our design tokens, components, and usage guidelines there.",
+          content:
+            "Here's the Figma link to our component library: [link]. You'll find all our design tokens, components, and usage guidelines there.",
           timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
         },
       ],
@@ -184,7 +194,8 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
         {
           id: "5-2",
           role: "assistant",
-          content: "Our services communicate via gRPC and use Protocol Buffers for serialization. Each service has its own database and they share data through well-defined APIs.",
+          content:
+            "Our services communicate via gRPC and use Protocol Buffers for serialization. Each service has its own database and they share data through well-defined APIs.",
           timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
         },
       ],
