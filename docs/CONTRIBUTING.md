@@ -126,3 +126,36 @@ docs: update architecture diagrams
 | `npm run lint`         | ESLint                                  |
 | `npm run format`       | Auto-fix formatting with Prettier       |
 | `npm run format:check` | Check formatting (doesn't modify files) |
+
+## Avoid Origin/Main Out-of-sync
+
+# 1. Start new work - always create a branch
+
+git checkout main
+git pull origin main # Sync with remote first!
+git checkout -b feature/your-feature-name
+
+# 2. Make changes and commit
+
+git add .
+git commit -m "your changes"
+
+# 3. Push your feature branch
+
+git push origin feature/your-feature-name
+
+# 4. Create Pull Request on GitHub
+
+# - Review changes
+
+# - Merge via GitHub UI
+
+# 5. Update your local main
+
+git checkout main
+git pull origin main
+
+# 6. Delete the feature branch (optional)
+
+git branch -d feature/your-feature-name
+git push origin --delete feature/your-feature-name

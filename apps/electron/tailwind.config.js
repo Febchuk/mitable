@@ -51,6 +51,7 @@ export default {
         "background-primary": "#1A1A1A",
         "background-secondary": "#2A2A2A",
         "background-elevated": "#3A3A3A",
+        "border-subtle": "#4A4A4A",
         "integration-card": "#3E3D3D",
         agent: {
           pill: "#1A1A1A",

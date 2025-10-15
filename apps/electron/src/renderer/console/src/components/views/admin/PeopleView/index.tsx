@@ -1,4 +1,17 @@
+import { useNavigate } from "react-router-dom";
 import { Search, Filter, Plus } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 
 interface Employee {
   id: string;
@@ -45,117 +58,102 @@ const mockEmployees: Employee[] = [
 ];
 
 export default function PeopleView() {
+  const navigate = useNavigate();
+
   return (
-    <div className="p-8">
+    <div className="p-8 space-y-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-text-primary mb-6">People</h1>
+      <div className="space-y-6">
+        <h1 className="text-4xl font-bold text-text-primary">People</h1>
 
         {/* Search and Actions Bar */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4">
           {/* Search Input */}
           <div className="flex-1 relative">
             <Search
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none"
               size={20}
             />
-            <input
-              type="text"
+            <Input
               placeholder="Search people..."
-              className="w-full bg-background-elevated text-text-primary placeholder-text-secondary pl-12 pr-4 py-3 rounded-lg border border-transparent focus:border-primary focus:outline-none"
+              className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
             />
           </div>
 
           {/* Filter Button */}
-          <button className="flex items-center gap-2 px-4 py-3 bg-background-elevated text-text-secondary hover:text-text-primary rounded-lg transition-colors">
+          <Button
+            variant="outline"
+            className="gap-2 bg-background-elevated border-transparent text-text-secondary hover:text-text-primary hover:bg-background-elevated/80"
+          >
             <Filter size={20} />
             <span className="font-medium">Filter</span>
-          </button>
+          </Button>
 
           {/* Add New User Button */}
-          <button className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:opacity-90 transition-opacity">
+          <Button
+            className="gap-2 bg-primary text-white hover:bg-primary/90"
+            onClick={() => navigate("/people/new")}
+          >
             <Plus size={20} />
             <span>Add New User</span>
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-background-elevated rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-6 py-4">
+      <div className="bg-background-elevated rounded-lg border border-border-subtle overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-background-primary/50 bg-background-secondary border-border-subtle">
+              <TableHead className="text-text-secondary uppercase tracking-wider font-semibold text-xs">
                 Name
-              </th>
-              <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-6 py-4">
+              </TableHead>
+              <TableHead className="text-text-secondary uppercase tracking-wider font-semibold text-xs">
                 Role
-              </th>
-              <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-6 py-4">
+              </TableHead>
+              <TableHead className="text-text-secondary uppercase tracking-wider font-semibold text-xs">
                 Start Date
-              </th>
-              <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-6 py-4">
+              </TableHead>
+              <TableHead className="text-text-secondary uppercase tracking-wider font-semibold text-xs">
                 Status
-              </th>
-              <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-6 py-4">
+              </TableHead>
+              <TableHead className="text-text-secondary uppercase tracking-wider font-semibold text-xs">
                 Progress
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {mockEmployees.map((employee) => (
-              <tr
+              <TableRow
                 key={employee.id}
-                className="border-b border-border last:border-b-0 hover:bg-background-primary transition-colors"
+                className="border-border-subtle hover:bg-background-primary/50"
               >
-                {/* Name */}
-                <td className="px-6 py-4">
-                  <span className="text-text-primary font-medium">{employee.name}</span>
-                </td>
-
-                {/* Role */}
-                <td className="px-6 py-4">
-                  <span className="text-text-secondary">{employee.role}</span>
-                </td>
-
-                {/* Start Date */}
-                <td className="px-6 py-4">
-                  <span className="text-text-secondary">{employee.startDate}</span>
-                </td>
-
-                {/* Status Badge */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+                <TableCell className="font-medium text-text-primary">{employee.name}</TableCell>
+                <TableCell className="text-text-secondary">{employee.role}</TableCell>
+                <TableCell className="text-text-secondary">{employee.startDate}</TableCell>
+                <TableCell>
+                  <Badge
+                    className={
                       employee.status === "Onboarding"
-                        ? "bg-status-warning/20 text-status-warning"
-                        : "bg-status-success/20 text-status-success"
-                    }`}
+                        ? "bg-status-warning/20 text-status-warning border-transparent hover:bg-status-warning/20"
+                        : "bg-status-success/20 text-status-success border-transparent hover:bg-status-success/20"
+                    }
                   >
                     {employee.status}
-                  </span>
-                </td>
-
-                {/* Progress */}
-                <td className="px-6 py-4">
+                  </Badge>
+                </TableCell>
+                <TableCell>
                   <div className="flex items-center gap-3">
-                    {/* Progress Bar */}
-                    <div className="flex-1 h-2 bg-background-primary rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${employee.progress}%` }}
-                      />
-                    </div>
-                    {/* Percentage */}
+                    <Progress value={employee.progress} className="flex-1 h-2 bg-border-subtle" />
                     <span className="text-text-secondary text-sm font-medium w-12 text-right">
                       {employee.progress}%
                     </span>
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
