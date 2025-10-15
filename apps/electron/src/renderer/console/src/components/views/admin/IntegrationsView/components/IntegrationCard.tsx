@@ -1,88 +1,114 @@
 import type { Integration } from "../../../../../types";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Check, Link, ChevronDown, Settings, RefreshCw, Info, LogOut } from "lucide-react";
+import { getIntegrationIcon } from "@/components/icons/integrations";
 
 interface IntegrationCardProps {
   integration: Integration;
   onConnect: (id: string) => void;
   onDisconnect: (id: string) => void;
+  onConfigure?: (id: string) => void;
+  onSync?: (id: string) => void;
+  onViewDetails?: (id: string) => void;
+  position?: "first" | "middle" | "last" | "only";
 }
-
-// Placeholder icon components
-const SlackIcon = () => (
-  <div className="w-12 h-12 bg-[#4A154B] rounded-lg flex items-center justify-center text-white font-bold text-xl">
-    S
-  </div>
-);
-
-const NotionIcon = () => (
-  <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-black font-bold text-xl">
-    N
-  </div>
-);
-
-const CodebaseIcon = () => (
-  <div className="w-12 h-12 bg-[#2B7EE3] rounded-lg flex items-center justify-center text-white font-bold text-xl">
-    C
-  </div>
-);
-
-const GoogleDriveIcon = () => (
-  <div className="w-12 h-12 bg-[#4285F4] rounded-lg flex items-center justify-center text-white font-bold text-xl">
-    G
-  </div>
-);
-
-const getIntegrationIcon = (provider: Integration["provider"]) => {
-  switch (provider) {
-    case "slack":
-      return <SlackIcon />;
-    case "notion":
-      return <NotionIcon />;
-    case "codebase":
-      return <CodebaseIcon />;
-    case "google-drive":
-      return <GoogleDriveIcon />;
-    default:
-      return <SlackIcon />;
-  }
-};
 
 export default function IntegrationCard({
   integration,
   onConnect,
   onDisconnect,
+  onConfigure,
+  onSync,
+  onViewDetails,
+  position = "only",
 }: IntegrationCardProps) {
   const isConnected = integration.status === "connected";
 
+  // Apply conditional border radius based on position
+  const radiusClasses = {
+    first: "rounded-t-lg rounded-b-none",
+    middle: "rounded-none",
+    last: "rounded-b-lg rounded-t-none",
+    only: "rounded-lg",
+  };
+
+  // Get the appropriate icon component
+  const IconComponent = getIntegrationIcon(integration.provider);
+
   return (
-    <Card className="flex items-start gap-4 p-6">
+    <Card
+      className={`flex items-center gap-4 p-6 bg-integration-card border-0 ${radiusClasses[position]}`}
+    >
       {/* Integration Icon */}
-      <div className="flex-shrink-0">{getIntegrationIcon(integration.provider)}</div>
+      <div className="flex-shrink-0">
+        <IconComponent />
+      </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <CardHeader className="p-0 space-y-1">
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-lg">{integration.name}</CardTitle>
-            {isConnected && (
-              <Badge variant="outline" className="text-xs">
-                Connected
-              </Badge>
-            )}
-          </div>
-          <CardDescription>{integration.description}</CardDescription>
-        </CardHeader>
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="text-lg font-semibold text-white">{integration.name}</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">{integration.description}</p>
       </div>
 
-      {/* Connect Button */}
-      <Button
-        variant={isConnected ? "secondary" : "default"}
-        onClick={() => (isConnected ? onDisconnect(integration.id) : onConnect(integration.id))}
-      >
-        {isConnected ? "Disconnect" : "Connect"}
-      </Button>
+      {/* Action Button */}
+      {isConnected ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="bg-status-success hover:bg-status-success/90 text-white gap-2">
+              <Check className="w-4 h-4" />
+              Connected
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {onConfigure && (
+              <DropdownMenuItem onClick={() => onConfigure(integration.id)}>
+                <Settings className="w-4 h-4" />
+                Configure
+              </DropdownMenuItem>
+            )}
+            {onSync && (
+              <DropdownMenuItem onClick={() => onSync(integration.id)}>
+                <RefreshCw className="w-4 h-4" />
+                Sync Now
+              </DropdownMenuItem>
+            )}
+            {onViewDetails && (
+              <DropdownMenuItem onClick={() => onViewDetails(integration.id)}>
+                <Info className="w-4 h-4" />
+                View Details
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onDisconnect(integration.id)}
+              className="text-destructive focus:text-destructive"
+            >
+              <LogOut className="w-4 h-4" />
+              Disconnect
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Button
+          variant="default"
+          onClick={() => onConnect(integration.id)}
+          className="bg-primary hover:bg-primary/90 gap-2"
+        >
+          <Link className="w-4 h-4" />
+          Connect
+        </Button>
+      )}
     </Card>
   );
 }
