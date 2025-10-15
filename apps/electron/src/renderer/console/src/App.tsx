@@ -10,6 +10,8 @@ import RoadmapView from "./components/views/employee/RoadmapView";
 import NudgesView from "./components/views/employee/NudgesView";
 import ChatsView from "./components/views/employee/ChatsView";
 import DashboardView from "./components/views/admin/DashboardView";
+import PeopleView from "./components/views/admin/PeopleView";
+import RoadmapsView from "./components/views/admin/RoadmapsView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
 
@@ -33,6 +35,8 @@ function App() {
                     <Route index element={<DefaultRoute />} />
                     {/* Admin Routes */}
                     <Route path="dashboard" element={<DashboardView />} />
+                    <Route path="people" element={<PeopleView />} />
+                    <Route path="roadmaps" element={<RoadmapsView />} />
                     <Route path="integrations" element={<IntegrationsView />} />
                     <Route path="setup" element={<SetupView />} />
                     {/* Employee Routes */}
