@@ -51,7 +51,8 @@ function createConsoleWindow() {
     width: 1264,
     height: 888,
     backgroundColor: "#000000",
-    titleBarStyle: "hidden",
+    // Hidden title bar on macOS for native traffic lights, default frame on Windows
+    titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
     maximizable: false,
     webPreferences: {
       preload: join(__dirname, "../preload/console.cjs"),
@@ -59,6 +60,11 @@ function createConsoleWindow() {
       nodeIntegration: false,
     },
   });
+
+  // Remove menu bar on Windows (keep on macOS for native experience)
+  if (process.platform !== "darwin") {
+    consoleWindow.setMenu(null);
+  }
 
   if (!app.isPackaged) {
     consoleWindow.loadURL("http://localhost:5173/console/index.html");
