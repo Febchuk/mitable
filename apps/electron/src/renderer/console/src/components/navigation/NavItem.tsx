@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { LucideIcon } from "lucide-react";
-import { useSidebar } from "../../context/SidebarContext";
+import { useSidebar } from "@/components/ui/sidebar";
 
 interface NavItemProps {
   to: string;
@@ -9,25 +9,20 @@ interface NavItemProps {
 }
 
 export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
-  const { isCollapsed } = useSidebar();
+  const { open } = useSidebar();
 
   return (
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `flex items-center gap-md px-md py-sm rounded-md transition-colors ${
-          isActive
-            ? "bg-white text-black"
-            : "text-text-secondary hover:bg-background-elevated hover:text-text-primary"
-        } ${isCollapsed ? "justify-center" : ""}`
+        `flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+          isActive ? "bg-white text-black hover:bg-white/90 hover:text-black" : "hover:bg-white/10"
+        }`
       }
+      title={label}
     >
-      {({ isActive: _isActive }) => (
-        <>
-          <Icon size={20} className={isCollapsed ? "" : "flex-shrink-0"} />
-          {!isCollapsed && <span className="text-sm font-medium">{label}</span>}
-        </>
-      )}
+      <Icon className="w-5 h-5 flex-shrink-0" />
+      {open && <span className="text-nav-item">{label}</span>}
     </NavLink>
   );
 }
