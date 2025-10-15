@@ -5,7 +5,6 @@ import {
   MessageSquare,
   BarChart3,
   Plug,
-  Settings as SettingsIcon,
 } from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
@@ -19,8 +18,9 @@ export default function Nav() {
     return (
       <nav className="flex flex-col gap-xs p-md">
         <NavItem to="/dashboard" icon={BarChart3} label="Dashboard" />
+        <NavItem to="/people" icon={Users} label="People" />
+        <NavItem to="/roadmaps" icon={Layers} label="Roadmaps" />
         <NavItem to="/integrations" icon={Plug} label="Integrations" />
-        <NavItem to="/setup" icon={SettingsIcon} label="Setup" />
       </nav>
     );
   }
