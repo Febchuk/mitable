@@ -11,7 +11,7 @@ export default function UserMessage({ content }: UserMessageProps) {
       </div>
 
       {/* Message Bubble */}
-      <div className="bg-agent-bubble text-text-primary px-4 py-3 rounded-lg max-w-[600px]">
+      <div className="bg-[#1A1A1A] text-text-primary px-4 py-3 rounded-lg max-w-[600px]">
         <p className="text-sm leading-relaxed">{content}</p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useChats } from "../../../../context/ChatsContext";
 import { Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ function formatTimestamp(date: Date): string {
 
 export default function ChatsView() {
   const { chats } = useChats();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter chats based on search query
@@ -39,7 +41,10 @@ export default function ChatsView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-4xl font-bold text-text-primary">Your chat history</h1>
-        <Button className="gap-2 bg-primary text-white hover:bg-primary/90">
+        <Button
+          onClick={() => navigate("/chats/new")}
+          className="gap-2 bg-primary text-white hover:bg-primary/90"
+        >
           <Plus size={20} />
           <span>New Chat</span>
         </Button>
@@ -64,6 +69,7 @@ export default function ChatsView() {
         {filteredChats.map((chat) => (
           <div
             key={chat.id}
+            onClick={() => navigate(`/chats/${chat.id}`)}
             className="bg-background-elevated rounded-lg border border-border-subtle p-6 hover:bg-background-elevated/80 transition-colors cursor-pointer"
           >
             <h3 className="text-text-primary text-lg mb-1">{chat.title}</h3>
