@@ -54,6 +54,7 @@ export default {
         "background-primary": "#1A1A1A",
         "background-secondary": "#2A2A2A",
         "background-elevated": "#3A3A3A",
+        "integration-card": "#3E3D3D",
         // Agent pill specific
         agent: {
           pill: "#1A1A1A",

@@ -1,8 +1,38 @@
+import { useState } from "react";
 import { useAdmin } from "../../../../context/AdminContext";
 import IntegrationCard from "./components/IntegrationCard";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, Filter, Plus } from "lucide-react";
 
 export default function IntegrationsView() {
   const { integrations, connectIntegration, disconnectIntegration } = useAdmin();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter integrations based on search query
+  const filteredIntegrations = integrations.filter((integration) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      integration.name.toLowerCase().includes(query) ||
+      integration.description.toLowerCase().includes(query)
+    );
+  });
+
+  // Split into connected and available
+  const connectedIntegrations = filteredIntegrations.filter(
+    (integration) => integration.status === "connected"
+  );
+  const availableIntegrations = filteredIntegrations.filter(
+    (integration) => integration.status !== "connected"
+  );
+
+  // Helper function to determine card position
+  const getCardPosition = (index: number, totalLength: number): "first" | "middle" | "last" | "only" => {
+    if (totalLength === 1) return "only";
+    if (index === 0) return "first";
+    if (index === totalLength - 1) return "last";
+    return "middle";
+  };
 
   return (
     <div className="p-8 space-y-6 app-no-drag">
@@ -11,17 +41,84 @@ export default function IntegrationsView() {
         <h1 className="text-4xl font-bold text-white">Integrations</h1>
       </div>
 
-      {/* Integration Cards */}
-      <div className="space-y-4 max-w-3xl">
-        {integrations.map((integration) => (
-          <IntegrationCard
-            key={integration.id}
-            integration={integration}
-            onConnect={connectIntegration}
-            onDisconnect={disconnectIntegration}
+      {/* Toolbar */}
+      <div className="flex items-center gap-4 max-w-5xl">
+        {/* Search Bar */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search integrations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 bg-[#2a2a2a] border-border"
           />
-        ))}
+        </div>
+
+        {/* Filter Button */}
+        <Button variant="secondary" className="gap-2">
+          <Filter className="w-4 h-4" />
+          Filter
+        </Button>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Add Custom Integration Button */}
+        <Button className="gap-2 bg-primary hover:bg-primary/90">
+          <Plus className="w-4 h-4" />
+          Add Custom Integration
+        </Button>
       </div>
+
+      {/* Connected Integrations Section */}
+      <div className="space-y-4 max-w-5xl">
+        <h2 className="text-2xl font-semibold text-white">Connected Integrations</h2>
+        {connectedIntegrations.length > 0 ? (
+          <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+            {connectedIntegrations.map((integration, index) => (
+              <IntegrationCard
+                key={integration.id}
+                integration={integration}
+                onConnect={connectIntegration}
+                onDisconnect={disconnectIntegration}
+                position={getCardPosition(index, connectedIntegrations.length)}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-center py-8">No connected integrations</p>
+        )}
+      </div>
+
+      {/* Available Integrations Section */}
+      <div className="space-y-4 max-w-5xl">
+        <h2 className="text-2xl font-semibold text-white">Available Integrations</h2>
+        {availableIntegrations.length > 0 ? (
+          <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+            {availableIntegrations.map((integration, index) => (
+              <IntegrationCard
+                key={integration.id}
+                integration={integration}
+                onConnect={connectIntegration}
+                onDisconnect={disconnectIntegration}
+                position={getCardPosition(index, availableIntegrations.length)}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-center py-8">No more available integrations</p>
+        )}
+      </div>
+
+      {/* No results message */}
+      {filteredIntegrations.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">
+            No integrations found matching "{searchQuery}"
+          </p>
+        </div>
+      )}
     </div>
   );
 }
