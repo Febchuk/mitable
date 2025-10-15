@@ -126,7 +126,8 @@ export default function PeopleView() {
             {mockEmployees.map((employee) => (
               <TableRow
                 key={employee.id}
-                className="border-border-subtle hover:bg-background-primary/50"
+                className="border-border-subtle hover:bg-background-primary/50 cursor-pointer"
+                onClick={() => navigate(`/people/${employee.id}`)}
               >
                 <TableCell className="font-medium text-text-primary">{employee.name}</TableCell>
                 <TableCell className="text-text-secondary">{employee.role}</TableCell>

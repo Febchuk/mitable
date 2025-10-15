@@ -12,6 +12,7 @@ import ChatsView from "./components/views/employee/ChatsView";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
+import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
 import RoadmapsView from "./components/views/admin/RoadmapsView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
@@ -38,6 +39,7 @@ function App() {
                     <Route path="dashboard" element={<DashboardView />} />
                     <Route path="people" element={<PeopleView />} />
                     <Route path="people/new" element={<AddNewUser />} />
+                    <Route path="people/:id" element={<PersonDetail />} />
                     <Route path="roadmaps" element={<RoadmapsView />} />
                     <Route path="integrations" element={<IntegrationsView />} />
                     <Route path="setup" element={<SetupView />} />
