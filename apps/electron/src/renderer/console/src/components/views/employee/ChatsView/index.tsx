@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { useChats } from "../../../../context/ChatsContext";
-import Card from "../../../ui/Card";
-import Badge from "../../../ui/Badge";
-import { MessageSquare, Clock } from "lucide-react";
+import { Search, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 function formatTimestamp(date: Date): string {
   const now = new Date();
@@ -9,98 +10,75 @@ function formatTimestamp(date: Date): string {
   const diffMins = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffYears = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365));
 
-  if (diffMins < 60) {
-    return `${diffMins}m ago`;
+  if (diffMins < 1) {
+    return "Last message just now";
+  } else if (diffMins < 60) {
+    return `Last message ${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
   } else if (diffHours < 24) {
-    return `${diffHours}h ago`;
+    return `Last message ${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  } else if (diffDays < 365) {
+    return `Last message ${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
   } else {
-    return `${diffDays}d ago`;
+    return `Last message ${diffYears} year${diffYears > 1 ? "s" : ""} ago`;
   }
 }
 
 export default function ChatsView() {
-  const { chats, markAsRead } = useChats();
+  const { chats } = useChats();
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const unreadCount = chats.filter((c) => c.unread).length;
+  // Filter chats based on search query
+  const filteredChats = chats.filter((chat) =>
+    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div className="p-2xl space-y-xl max-w-4xl app-no-drag">
+    <div className="p-8 space-y-6 app-no-drag">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-text-primary mb-sm">Conversations</h1>
-          <p className="text-text-secondary">Your ongoing help requests and expert connections</p>
-        </div>
-        {unreadCount > 0 && <Badge variant="info">{unreadCount} unread</Badge>}
+      <div className="flex items-center justify-between">
+        <h1 className="text-4xl font-bold text-text-primary">Your chat history</h1>
+        <Button className="gap-2 bg-primary text-white hover:bg-primary/90">
+          <Plus size={20} />
+          <span>New Chat</span>
+        </Button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <Search
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none"
+          size={20}
+        />
+        <Input
+          placeholder="Search your chats..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
+        />
       </div>
 
       {/* Chat List */}
-      <div className="space-y-md">
-        {chats.map((chat) => (
-          <Card
+      <div className="space-y-3">
+        {filteredChats.map((chat) => (
+          <div
             key={chat.id}
-            hover
-            onClick={() => markAsRead(chat.id)}
-            className={`cursor-pointer ${chat.unread ? "border-primary" : ""}`}
+            className="bg-background-elevated rounded-lg border border-border-subtle p-6 hover:bg-background-elevated/80 transition-colors cursor-pointer"
           >
-            <div className="flex items-start gap-md">
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  chat.unread ? "bg-primary" : "bg-background-elevated"
-                }`}
-              >
-                <MessageSquare
-                  size={20}
-                  className={chat.unread ? "text-white" : "text-text-tertiary"}
-                />
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-md mb-xs">
-                  <h3
-                    className={`text-base font-semibold ${
-                      chat.unread ? "text-text-primary" : "text-text-secondary"
-                    }`}
-                  >
-                    {chat.title}
-                  </h3>
-                  <div className="flex items-center gap-xs text-text-tertiary flex-shrink-0">
-                    <Clock size={14} />
-                    <span className="text-xs">{formatTimestamp(chat.timestamp)}</span>
-                  </div>
-                </div>
-
-                <p
-                  className={`text-sm truncate ${
-                    chat.unread ? "text-text-primary" : "text-text-tertiary"
-                  }`}
-                >
-                  {chat.lastMessage}
-                </p>
-              </div>
-
-              {chat.unread && (
-                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />
-              )}
-            </div>
-          </Card>
+            <h3 className="text-text-primary text-lg mb-1">{chat.title}</h3>
+            <p className="text-text-secondary text-sm">{formatTimestamp(chat.timestamp)}</p>
+          </div>
         ))}
       </div>
 
       {/* Empty State */}
-      {chats.length === 0 && (
-        <Card padding="lg">
-          <div className="text-center py-2xl">
-            <div className="w-16 h-16 bg-background-elevated rounded-full flex items-center justify-center mx-auto mb-md">
-              <MessageSquare size={32} className="text-text-tertiary" />
-            </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-sm">No conversations yet</h3>
-            <p className="text-sm text-text-secondary">
-              Start a conversation with an expert by accepting a nudge or asking for help.
-            </p>
-          </div>
-        </Card>
+      {filteredChats.length === 0 && (
+        <div className="bg-background-elevated rounded-lg border border-border-subtle p-12">
+          <p className="text-text-secondary text-center">
+            {searchQuery ? `No chats found matching "${searchQuery}"` : "No conversations yet"}
+          </p>
+        </div>
       )}
     </div>
   );

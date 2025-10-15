@@ -7,6 +7,7 @@ import { ChatsProvider } from "./context/ChatsContext";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
 import HomeView from "./components/views/employee/HomeView";
 import RoadmapView from "./components/views/employee/RoadmapView";
+import RoadmapTaskDetail from "./components/views/employee/RoadmapView/RoadmapTaskDetail";
 import NudgesView from "./components/views/employee/NudgesView";
 import ChatsView from "./components/views/employee/ChatsView";
 import DashboardView from "./components/views/admin/DashboardView";
@@ -48,6 +49,7 @@ function App() {
                     {/* Employee Routes */}
                     <Route path="home" element={<HomeView />} />
                     <Route path="roadmap" element={<RoadmapView />} />
+                    <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
                     <Route path="nudges" element={<NudgesView />} />
                     <Route path="chats" element={<ChatsView />} />
                   </Route>

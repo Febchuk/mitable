@@ -53,6 +53,7 @@ export default {
         "background-elevated": "#3A3A3A",
         "border-subtle": "#4A4A4A",
         "integration-card": "#3E3D3D",
+        "week-inactive": "#292945",
         agent: {
           pill: "#1A1A1A",
           toggle: {

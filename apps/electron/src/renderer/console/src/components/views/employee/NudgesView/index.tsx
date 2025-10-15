@@ -1,141 +1,125 @@
+import { useState } from "react";
 import { useNudges } from "../../../../context/NudgesContext";
-import Card from "../../../ui/Card";
-import Button from "../../../ui/Button";
-import Avatar from "../../../ui/Avatar";
-import Badge from "../../../ui/Badge";
-import { Check, X, Clock } from "lucide-react";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
+}
 
 function formatTimestamp(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffMins < 60) {
-    return `${diffMins}m ago`;
-  } else if (diffHours < 24) {
+  if (diffHours < 24) {
     return `${diffHours}h ago`;
-  } else {
+  } else if (diffDays === 1) {
+    return "Yesterday";
+  } else if (diffDays < 7) {
     return `${diffDays}d ago`;
+  } else {
+    const diffWeeks = Math.floor(diffDays / 7);
+    return `${diffWeeks}w ago`;
   }
 }
 
 export default function NudgesView() {
-  const { nudges, acceptNudge, dismissNudge } = useNudges();
+  const { nudges } = useNudges();
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const waitingNudges = nudges.filter((n) => n.status === "waiting");
-  const resolvedNudges = nudges.filter((n) => n.status === "resolved");
+  // Filter nudges based on search query
+  const filteredNudges = nudges.filter(
+    (nudge) =>
+      nudge.expertName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      nudge.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div className="p-2xl space-y-xl max-w-6xl app-no-drag">
+    <div className="p-8 space-y-6 app-no-drag">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary mb-sm">Expert Nudges</h1>
-        <p className="text-text-secondary">
-          Connect with colleagues who can help accelerate your onboarding
-        </p>
+      <h1 className="text-4xl font-bold text-text-primary">Your nudge history</h1>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <Search
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none"
+          size={20}
+        />
+        <Input
+          placeholder="Search your escalations..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
+        />
       </div>
 
-      {/* Waiting Nudges */}
-      {waitingNudges.length > 0 && (
-        <div className="space-y-md">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-text-primary">Pending Recommendations</h2>
-            <Badge variant="info">{waitingNudges.length} waiting</Badge>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-            {waitingNudges.map((nudge) => (
-              <Card key={nudge.id} padding="lg">
-                <div className="flex items-start gap-md mb-md">
-                  <Avatar
-                    name={nudge.expertName}
-                    imageUrl={nudge.avatarUrl}
-                    size="lg"
-                    online={nudge.online}
-                  />
-                  <div className="flex-1">
-                    <h3 className="text-base font-semibold text-text-primary">
-                      {nudge.expertName}
-                    </h3>
-                    <p className="text-sm text-text-secondary">{nudge.expertRole}</p>
-                  </div>
-                  <div className="flex items-center gap-xs text-text-tertiary">
-                    <Clock size={14} />
-                    <span className="text-xs">{formatTimestamp(nudge.timestamp)}</span>
-                  </div>
+      {/* Nudges Grid */}
+      <div className="grid grid-cols-2 gap-6">
+        {filteredNudges.map((nudge) => (
+          <div
+            key={nudge.id}
+            className="bg-background-elevated rounded-lg border border-border-subtle p-6 hover:bg-background-elevated/80 transition-colors cursor-pointer space-y-4"
+          >
+            {/* Top: Avatar + Name + Role */}
+            <div className="flex items-start gap-3">
+              {/* Avatar with initials and online indicator */}
+              <div className="relative flex-shrink-0">
+                <div className="w-12 h-12 rounded-full bg-text-tertiary/20 flex items-center justify-center">
+                  <span className="text-white font-semibold text-sm">
+                    {getInitials(nudge.expertName)}
+                  </span>
                 </div>
+                {/* Online indicator dot */}
+                <div
+                  className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background-elevated ${
+                    nudge.online ? "bg-status-success" : "bg-status-error"
+                  }`}
+                />
+              </div>
 
-                <p className="text-sm text-text-primary mb-lg">{nudge.description}</p>
+              {/* Expert info */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-text-primary font-semibold text-base">{nudge.expertName}</h3>
+                <p className="text-text-secondary text-sm">{nudge.expertRole}</p>
+              </div>
+            </div>
 
-                <div className="flex gap-sm">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    fullWidth
-                    onClick={() => acceptNudge(nudge.id)}
-                  >
-                    <Check size={16} className="mr-xs" />
-                    Accept
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => dismissNudge(nudge.id)}>
-                    <X size={16} />
-                  </Button>
-                </div>
-              </Card>
-            ))}
+            {/* Description */}
+            <p className="text-text-primary text-sm leading-relaxed">{nudge.description}</p>
+
+            {/* Bottom: Timestamp + Status Badge */}
+            <div className="flex items-center justify-between">
+              <span className="text-text-secondary text-sm">
+                {formatTimestamp(nudge.timestamp)}
+              </span>
+              <Badge
+                className={
+                  nudge.status === "resolved"
+                    ? "bg-status-success/20 text-status-success border-transparent hover:bg-status-success/20"
+                    : "bg-status-warning/20 text-status-warning border-transparent hover:bg-status-warning/20"
+                }
+              >
+                {nudge.status === "resolved" ? "Resolved" : "Waiting"}
+              </Badge>
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Resolved Nudges */}
-      {resolvedNudges.length > 0 && (
-        <div className="space-y-md">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-text-primary">Completed Connections</h2>
-            <Badge variant="success">{resolvedNudges.length} resolved</Badge>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-            {resolvedNudges.map((nudge) => (
-              <Card key={nudge.id} padding="lg" className="opacity-60">
-                <div className="flex items-start gap-md mb-md">
-                  <Avatar
-                    name={nudge.expertName}
-                    imageUrl={nudge.avatarUrl}
-                    size="lg"
-                    online={nudge.online}
-                  />
-                  <div className="flex-1">
-                    <h3 className="text-base font-semibold text-text-primary">
-                      {nudge.expertName}
-                    </h3>
-                    <p className="text-sm text-text-secondary">{nudge.expertRole}</p>
-                  </div>
-                  <Badge variant="success">Completed</Badge>
-                </div>
-
-                <p className="text-sm text-text-primary">{nudge.description}</p>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
 
       {/* Empty State */}
-      {nudges.length === 0 && (
-        <Card padding="lg">
-          <div className="text-center py-2xl">
-            <div className="w-16 h-16 bg-background-elevated rounded-full flex items-center justify-center mx-auto mb-md">
-              <Check size={32} className="text-text-tertiary" />
-            </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-sm">All caught up!</h3>
-            <p className="text-sm text-text-secondary">
-              No pending expert recommendations at the moment.
-            </p>
-          </div>
-        </Card>
+      {filteredNudges.length === 0 && (
+        <div className="bg-background-elevated rounded-lg border border-border-subtle p-12">
+          <p className="text-text-secondary text-center">
+            {searchQuery ? `No nudges found matching "${searchQuery}"` : "No nudges yet"}
+          </p>
+        </div>
       )}
     </div>
   );

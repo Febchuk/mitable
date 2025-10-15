@@ -14,41 +14,55 @@ export function NudgesProvider({ children }: { children: ReactNode }) {
     {
       id: "1",
       expertName: "Sarah Chen",
-      expertRole: "Senior Frontend Engineer",
-      description:
-        "I noticed you're working on the authentication flow. I've built similar systems before and would be happy to share some best practices.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      status: "waiting",
+      expertRole: "Senior Billing Specialist",
+      description: "Billing dispute over $450 premium feature change.",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+      status: "resolved",
       online: true,
     },
     {
       id: "2",
-      expertName: "Marcus Johnson",
-      expertRole: "DevOps Lead",
-      description:
-        "I see you're setting up CI/CD pipelines. Let me walk you through our deployment process and tooling.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      status: "waiting",
+      expertName: "Mike Rodriguez",
+      expertRole: "Customer Success Lead",
+      description: "De-escalation strategy for angry customer threatening legal action.",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
+      status: "resolved",
       online: true,
     },
     {
       id: "3",
-      expertName: "Emily Rodriguez",
-      expertRole: "Product Designer",
-      description:
-        "Welcome to the team! I'd love to give you a tour of our design system and Figma workspace.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
+      expertName: "Lisa Park",
+      expertRole: "Operations Manager",
+      description: "Late cancellation fee waiver approval process.",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago (Yesterday)
       status: "resolved",
-      online: false,
+      online: true,
     },
     {
       id: "4",
-      expertName: "David Kim",
-      expertRole: "Backend Architect",
-      description:
-        "I can help you understand our microservices architecture and how the services communicate.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
+      expertName: "James Wilson",
+      expertRole: "Technical Support Lead",
+      description: "Account merge system error 4402 - known bug?",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
       status: "waiting",
+      online: false,
+    },
+    {
+      id: "5",
+      expertName: "Tatsunosuke Hanano",
+      expertRole: "Product Specialist",
+      description: "How to use new refund dashboard for international customers.",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4), // 4 days ago
+      status: "waiting",
+      online: true,
+    },
+    {
+      id: "6",
+      expertName: "David Martinez",
+      expertRole: "Compliance Manager",
+      description: "GDPR data deletion request - proper handling procedure",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7), // 1 week ago
+      status: "resolved",
       online: false,
     },
   ]);
