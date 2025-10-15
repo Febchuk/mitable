@@ -64,21 +64,27 @@ export default function IntegrationsView() {
       {/* Toolbar */}
       <div className="flex items-center gap-4 max-w-5xl">
         {/* Search Bar */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="flex-1 relative">
+          <Search
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none"
+            size={20}
+          />
           <Input
             type="text"
             placeholder="Search integrations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-[#2a2a2a] border-border text-white focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
           />
         </div>
 
         {/* Filter Button */}
-        <Button variant="secondary" className="gap-2">
-          <Filter className="w-4 h-4" />
-          Filter
+        <Button
+          variant="outline"
+          className="gap-2 bg-background-elevated border-transparent text-text-secondary hover:text-text-primary hover:bg-background-elevated/80"
+        >
+          <Filter size={20} />
+          <span className="font-medium">Filter</span>
         </Button>
 
         {/* Spacer */}
@@ -95,7 +101,7 @@ export default function IntegrationsView() {
       {isSearching ? (
         <div className="space-y-4 max-w-5xl">
           {sortedIntegrations.length > 0 ? (
-            <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+            <div className="bg-background-elevated rounded-lg border border-border-subtle overflow-hidden divide-y divide-border-subtle">
               {sortedIntegrations.map((integration, index) => (
                 <IntegrationCard
                   key={integration.id}
@@ -123,7 +129,7 @@ export default function IntegrationsView() {
           <div className="space-y-4 max-w-5xl">
             <h2 className="text-2xl font-semibold text-white">Connected Integrations</h2>
             {connectedIntegrations.length > 0 ? (
-              <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+              <div className="bg-background-elevated rounded-lg border border-border-subtle overflow-hidden divide-y divide-border-subtle">
                 {connectedIntegrations.map((integration, index) => (
                   <IntegrationCard
                     key={integration.id}
@@ -146,7 +152,7 @@ export default function IntegrationsView() {
           <div className="space-y-4 max-w-5xl">
             <h2 className="text-2xl font-semibold text-white">Available Integrations</h2>
             {availableIntegrations.length > 0 ? (
-              <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+              <div className="bg-background-elevated rounded-lg border border-border-subtle overflow-hidden divide-y divide-border-subtle">
                 {availableIntegrations.map((integration, index) => (
                   <IntegrationCard
                     key={integration.id}
