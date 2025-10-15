@@ -1,10 +1,10 @@
 import { PanelLeft } from "lucide-react";
-import { useSidebar } from "@/components/ui/sidebar";
+import { useSidebar } from "../../context/SidebarContext";
 import { useUser } from "../../context/UserContext";
 import logoIconSvg from "../../../../assets/logo-icon.svg";
 
 export default function Logo() {
-  const { open, toggleSidebar } = useSidebar();
+  const { open, toggle } = useSidebar();
   const { user } = useUser();
 
   return (
@@ -26,7 +26,7 @@ export default function Logo() {
             )}
           </div>
           <button
-            onClick={toggleSidebar}
+            onClick={toggle}
             className="p-1 rounded-md hover:bg-white/10 transition-colors"
             aria-label="Toggle sidebar"
           >
@@ -37,7 +37,7 @@ export default function Logo() {
         <div className="relative">
           <img src={logoIconSvg} alt="Mitable Logo" className="w-8 h-8" />
           <button
-            onClick={toggleSidebar}
+            onClick={toggle}
             className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto bg-[#1A1A1A] rounded-md transition-all"
             aria-label="Expand sidebar"
           >
