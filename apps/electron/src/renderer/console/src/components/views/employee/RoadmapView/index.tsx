@@ -15,7 +15,7 @@ export default function RoadmapView() {
   const overallProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   return (
-    <div className="p-8 space-y-8 app-no-drag">
+    <div className="p-8 space-y-6 app-no-drag">
       {/* Header */}
       <div>
         <h1 className="text-4xl font-bold text-text-primary">Onboarding Roadmap</h1>
@@ -52,12 +52,12 @@ export default function RoadmapView() {
 
           {/* Task Lists for each week */}
           {weeks.map((week) => (
-            <TabsContent key={week.number} value={`week-${week.number}`} className="space-y-3 mt-6">
+            <TabsContent key={week.number} value={`week-${week.number}`} className="space-y-4 mt-6">
               {week.tasks.length > 0 ? (
                 week.tasks.map((task) => (
                   <div
                     key={task.id}
-                    className="flex items-center gap-4 p-4 bg-background-elevated rounded-lg hover:bg-background-elevated/80 transition-colors"
+                    className="flex items-center gap-4 p-6 bg-background-elevated rounded-lg border border-border-subtle hover:bg-background-elevated/80 transition-colors"
                   >
                     {/* Checkbox */}
                     <Checkbox

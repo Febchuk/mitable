@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useNudges } from "../../../../context/NudgesContext";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ function formatTimestamp(date: Date): string {
 
 export default function NudgesView() {
   const { nudges } = useNudges();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter nudges based on search query
@@ -65,6 +67,7 @@ export default function NudgesView() {
         {filteredNudges.map((nudge) => (
           <div
             key={nudge.id}
+            onClick={() => navigate(`/nudges/${nudge.id}`)}
             className="bg-background-elevated rounded-lg border border-border-subtle p-6 hover:bg-background-elevated/80 transition-colors cursor-pointer space-y-4"
           >
             {/* Top: Avatar + Name + Role */}

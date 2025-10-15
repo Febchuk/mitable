@@ -27,6 +27,7 @@ export interface Nudge {
   expertRole: string;
   avatarUrl?: string;
   description: string;
+  context?: string;
   timestamp: Date;
   status: NudgeStatus;
   matchScore?: number;

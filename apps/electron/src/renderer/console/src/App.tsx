@@ -9,6 +9,7 @@ import HomeView from "./components/views/employee/HomeView";
 import RoadmapView from "./components/views/employee/RoadmapView";
 import RoadmapTaskDetail from "./components/views/employee/RoadmapView/RoadmapTaskDetail";
 import NudgesView from "./components/views/employee/NudgesView";
+import NudgeDetail from "./components/views/employee/NudgesView/NudgeDetail";
 import ChatsView from "./components/views/employee/ChatsView";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
@@ -51,6 +52,7 @@ function App() {
                     <Route path="roadmap" element={<RoadmapView />} />
                     <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
                     <Route path="nudges" element={<NudgesView />} />
+                    <Route path="nudges/:nudgeId" element={<NudgeDetail />} />
                     <Route path="chats" element={<ChatsView />} />
                   </Route>
                 </Routes>
