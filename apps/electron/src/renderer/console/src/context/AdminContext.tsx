@@ -35,9 +35,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     },
     {
       id: "3",
-      provider: "codebase",
-      name: "Codebase",
-      description: "Plug into your codebase. Updates once a day.",
+      provider: "github",
+      name: "GitHub",
+      description: "Connect your repositories and pull requests. Updates once a day.",
       status: "disconnected",
       updatesPerDay: 1,
     },
