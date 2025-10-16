@@ -5,6 +5,7 @@ import { RoadmapProvider } from "./context/RoadmapContext";
 import { NudgesProvider } from "./context/NudgesContext";
 import { ChatsProvider } from "./context/ChatsContext";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
+import LoginPage from "./pages/LoginPage";
 import HomeView from "./components/views/employee/HomeView";
 import RoadmapView from "./components/views/employee/RoadmapView";
 import RoadmapTaskDetail from "./components/views/employee/RoadmapView/RoadmapTaskDetail";
@@ -17,8 +18,8 @@ import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
 import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
-import RoadmapsView from "./components/views/admin/RoadmapsView";
-import CreateRoadmap from "./components/views/admin/RoadmapsView/CreateRoadmap";
+import TemplatesView from "./components/views/admin/TemplatesView";
+import CreateTemplate from "./components/views/admin/TemplatesView/CreateTemplate";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
 
@@ -27,6 +28,28 @@ function DefaultRoute() {
   const { user } = useUser();
   const defaultPath = user?.role === "admin" ? "/dashboard" : "/home";
   return <Navigate to={defaultPath} replace />;
+}
+
+// Protected route wrapper - redirects to login if not authenticated
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useUser();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function App() {
@@ -38,15 +61,26 @@ function App() {
             <NudgesProvider>
               <ChatsProvider>
                 <Routes>
-                  <Route path="/" element={<ConsoleLayout />}>
+                  {/* Public route */}
+                  <Route path="/login" element={<LoginPage />} />
+
+                  {/* Protected routes */}
+                  <Route
+                    path="/"
+                    element={
+                      <ProtectedRoute>
+                        <ConsoleLayout />
+                      </ProtectedRoute>
+                    }
+                  >
                     <Route index element={<DefaultRoute />} />
                     {/* Admin Routes */}
                     <Route path="dashboard" element={<DashboardView />} />
                     <Route path="people" element={<PeopleView />} />
                     <Route path="people/new" element={<AddNewUser />} />
                     <Route path="people/:id" element={<PersonDetail />} />
-                    <Route path="roadmaps" element={<RoadmapsView />} />
-                    <Route path="roadmaps/new" element={<CreateRoadmap />} />
+                    <Route path="templates" element={<TemplatesView />} />
+                    <Route path="templates/new" element={<CreateTemplate />} />
                     <Route path="integrations" element={<IntegrationsView />} />
                     <Route path="setup" element={<SetupView />} />
                     {/* Employee Routes */}

@@ -197,7 +197,7 @@ Implement hybrid search for knowledge retrieval:
 2. Hybrid search service (apps/backend/src/services/knowledge-search.service.ts):
    - semanticSearch(query: string, limit: number)
      - Generate embedding for query
-     - pgvector cosine similarity search
+     - Pinecone vector similarity search
    - keywordSearch(query: string, limit: number)
      - PostgreSQL full-text search
    - hybridSearch(query: string, limit: number)
@@ -205,9 +205,9 @@ Implement hybrid search for knowledge retrieval:
      - Rank by relevance score
      - Deduplicate results
 
-3. Database setup:
-   - Add pgvector extension
-   - Create indexes for vector and FTS
+3. Vector and database setup:
+   - Configure Pinecone index (1536 dimensions)
+   - Create PostgreSQL FTS indexes
 
 Deliverable: Working hybrid search with <500ms latency
 Prompt 2.4: Response Generation with Streaming

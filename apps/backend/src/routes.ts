@@ -1,20 +1,44 @@
 import { Router } from "express";
+import { authRouter } from "./routes/auth.js";
+import { requireAuth, optionalAuth } from "./middleware/auth.js";
+import roadmapsRouter from "./routes/roadmaps";
+import nudgesRouter from "./routes/nudges";
+import conversationsRouter from "./routes/conversations";
+import adminRouter from "./routes/admin";
 
 export const router = Router();
 
-// Placeholder routes - will be implemented in later phases
-router.get("/conversations", (_req, res) => {
-  res.json({ conversations: [] });
+// Auth routes (public)
+router.use("/auth", authRouter);
+
+// Public route example
+router.get("/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    message: "Mitable Backend API is running",
+  });
 });
 
-router.post("/help", (_req, res) => {
-  res.json({ message: "Help endpoint - to be implemented" });
+// Mount route modules (these already have auth middleware built-in)
+router.use("/roadmaps", roadmapsRouter);
+router.use("/nudges", nudgesRouter);
+router.use("/conversations", conversationsRouter);
+router.use("/admin", adminRouter);
+
+// Protected routes - require authentication
+router.post("/help", requireAuth, (req, res) => {
+  res.json({
+    message: "Help endpoint - to be implemented",
+    userId: req.userId,
+  });
 });
 
-router.get("/roadmaps", (_req, res) => {
-  res.json({ roadmaps: [] });
-});
-
-router.get("/nudges", (_req, res) => {
-  res.json({ nudges: [] });
+// Optional auth route example - works for both authenticated and anonymous users
+router.get("/public-data", optionalAuth, (req, res) => {
+  res.json({
+    data: "This endpoint works for both authenticated and anonymous users",
+    isAuthenticated: !!req.user,
+    userId: req.userId || null,
+  });
 });

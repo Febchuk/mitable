@@ -1,0 +1,1 @@
+ALTER TABLE "roadmap_templates" ADD COLUMN "color" varchar(7);

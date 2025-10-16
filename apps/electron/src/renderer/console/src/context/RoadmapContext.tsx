@@ -1,97 +1,65 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { Week } from "../types";
+import { fetchRoadmap, toggleTaskCompletion } from "../services/roadmapService";
+import { useUser } from "./UserContext";
 
 interface RoadmapContextType {
   weeks: Week[];
   currentWeek: number;
   setCurrentWeek: (week: number) => void;
   toggleTask: (taskId: string) => void;
+  loading: boolean;
+  error: string | null;
 }
 
 const RoadmapContext = createContext<RoadmapContextType | undefined>(undefined);
 
 export function RoadmapProvider({ children }: { children: ReactNode }) {
+  const { user } = useUser();
   const [currentWeek, setCurrentWeek] = useState(1);
-  const [weeks, setWeeks] = useState<Week[]>([
-    {
-      number: 1,
-      percentage: 71,
-      tasks: [
-        {
-          id: "1-1",
-          title: "Set up development environment",
-          timeEstimate: "1 hour",
-          completed: true,
-          week: 1,
-        },
-        {
-          id: "1-2",
-          title: "Get access to GitHub, AWS and internal tools",
-          timeEstimate: "2 hours",
-          completed: true,
-          week: 1,
-        },
-        {
-          id: "1-3",
-          title: "Review Lorikeet Architecture Overview",
-          timeEstimate: "1.5 hours",
-          completed: true,
-          week: 1,
-        },
-        {
-          id: "1-4",
-          title: "Clone repositories and run local setup",
-          timeEstimate: "1h 15m",
-          completed: true,
-          isActive: true,
-          week: 1,
-        },
-        {
-          id: "1-5",
-          title: "Complete security and compliance training",
-          timeEstimate: "1 hour",
-          completed: true,
-          week: 1,
-        },
-        {
-          id: "1-6",
-          title: "Shadow a customer deployment call",
-          timeEstimate: "1 hour",
-          completed: false,
-          week: 1,
-        },
-        {
-          id: "1-7",
-          title: "Integrate Lorikeet API with test customer",
-          timeEstimate: "1 hour",
-          completed: false,
-          week: 1,
-        },
-      ],
-    },
-    {
-      number: 2,
-      percentage: 20,
-      tasks: [],
-    },
-    {
-      number: 3,
-      percentage: 0,
-      tasks: [],
-    },
-    {
-      number: 4,
-      percentage: 0,
-      tasks: [],
-    },
-    {
-      number: 5,
-      percentage: 0,
-      tasks: [],
-    },
-  ]);
+  const [weeks, setWeeks] = useState<Week[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const toggleTask = (taskId: string) => {
+  // Fetch roadmap data when user is authenticated
+  useEffect(() => {
+    async function loadRoadmap() {
+      if (!user) {
+        // User not authenticated, skip fetching
+        setWeeks([]);
+        setCurrentWeek(1);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await fetchRoadmap();
+        setWeeks(data.weeks);
+        setCurrentWeek(data.currentWeek);
+      } catch (err) {
+        console.error("Failed to fetch roadmap:", err);
+        setError(err instanceof Error ? err.message : "Failed to load roadmap");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadRoadmap();
+  }, [user]);
+
+  const toggleTask = async (taskId: string) => {
+    // Find the task to get its current completion status
+    let currentCompleted = false;
+    for (const week of weeks) {
+      const task = week.tasks.find((t) => t.id === taskId);
+      if (task) {
+        currentCompleted = task.completed;
+        break;
+      }
+    }
+
+    // Optimistically update the UI
     setWeeks((prevWeeks) =>
       prevWeeks.map((week) => {
         // Update the task's completed status
@@ -111,10 +79,39 @@ export function RoadmapProvider({ children }: { children: ReactNode }) {
         };
       })
     );
+
+    // Make API call to persist the change
+    try {
+      await toggleTaskCompletion(taskId, !currentCompleted);
+    } catch (err) {
+      console.error("Failed to toggle task:", err);
+      // Revert the optimistic update on error
+      setWeeks((prevWeeks) =>
+        prevWeeks.map((week) => {
+          const revertedTasks = week.tasks.map((task) =>
+            task.id === taskId ? { ...task, completed: currentCompleted } : task
+          );
+
+          const completedCount = revertedTasks.filter((t) => t.completed).length;
+          const totalCount = revertedTasks.length;
+          const newPercentage =
+            totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+          return {
+            ...week,
+            tasks: revertedTasks,
+            percentage: newPercentage,
+          };
+        })
+      );
+      setError(err instanceof Error ? err.message : "Failed to update task");
+    }
   };
 
   return (
-    <RoadmapContext.Provider value={{ weeks, currentWeek, setCurrentWeek, toggleTask }}>
+    <RoadmapContext.Provider
+      value={{ weeks, currentWeek, setCurrentWeek, toggleTask, loading, error }}
+    >
       {children}
     </RoadmapContext.Provider>
   );
