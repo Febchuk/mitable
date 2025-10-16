@@ -18,6 +18,11 @@ export const config = {
     indexName: (process.env.PINECONE_INDEX_NAME || "mitable-embeddings").trim(),
   },
 
+  // Vector Configuration
+  // IMPORTANT: This must match your Pinecone index dimension configuration
+  // Changing the embedding model requires recreating the Pinecone index with matching dimensions
+  vectorDimensions: 1536,
+
   // Gemini Configuration
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || "",
@@ -38,9 +43,27 @@ export function validateConfig() {
   const missing = required.filter((item) => !item.value);
 
   if (missing.length > 0) {
-    console.warn("⚠️  Missing environment variables:", missing.map((item) => item.key).join(", "));
-    console.warn("⚠️  Vector database features will be disabled");
+    const missingKeys = missing.map((item) => item.key).join(", ");
+    throw new Error(
+      `Missing required environment variables: ${missingKeys}. ` +
+      `Please check your .env file and ensure all required keys are set.`
+    );
   }
 
-  return missing.length === 0;
+  return true;
+}
+
+/**
+ * Validate that embedding model dimensions match Pinecone index dimensions
+ * Must be called after embedding service is initialized
+ */
+export function validateVectorDimensions(embeddingDimensions: number) {
+  if (embeddingDimensions !== config.vectorDimensions) {
+    throw new Error(
+      `Embedding model dimension mismatch! ` +
+      `Embedding model "${config.openai.embeddingModel}" produces ${embeddingDimensions}D vectors, ` +
+      `but Pinecone index is configured for ${config.vectorDimensions}D vectors. ` +
+      `Either change the embedding model or recreate the Pinecone index with matching dimensions.`
+    );
+  }
 }

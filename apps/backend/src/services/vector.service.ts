@@ -3,11 +3,14 @@ import { config } from "../config.js";
 
 /**
  * Vector metadata structure
+ * TODO: Replace index signature with specific typed fields as requirements grow
+ * to maintain type safety across the application
  */
 export interface VectorMetadata {
   text: string;
   source?: string;
   timestamp?: number;
+  // TODO: Remove this index signature and add specific typed fields
   [key: string]: any;
 }
 
@@ -39,6 +42,18 @@ class VectorService {
   private initialized: boolean = false;
 
   constructor() {
+    if (!config.pinecone.apiKey) {
+      throw new Error(
+        "PINECONE_API_KEY is not configured. Please set it in your .env file."
+      );
+    }
+
+    if (!config.pinecone.indexName) {
+      throw new Error(
+        "PINECONE_INDEX_NAME is not configured. Please set it in your .env file."
+      );
+    }
+
     this.client = new Pinecone({
       apiKey: config.pinecone.apiKey,
     });
@@ -46,53 +61,11 @@ class VectorService {
   }
 
   /**
-   * Initialize Pinecone index (create if doesn't exist)
-   * @param dimension - Vector dimension (default: 1536 for OpenAI embeddings)
-   * @param metric - Distance metric (default: cosine)
-   * @param region - AWS region for serverless index (default: us-east-1)
-   * @param skipCreation - If true, only verify connection, don't create index
+   * Initialize the vector service
+   * Note: Assumes the Pinecone index already exists and is configured remotely
    */
-  async initialize(
-    dimension: number = 1536,
-    metric: "cosine" | "euclidean" | "dotproduct" = "cosine",
-    region: string = "us-east-1",
-    skipCreation: boolean = false
-  ) {
-    try {
-      if (skipCreation) {
-        // Just mark as initialized - assume index exists
-        console.log(`✅ Using existing Pinecone index: ${this.indexName}`);
-        this.initialized = true;
-        return;
-      }
-
-      // Check if index exists
-      const indexes = await this.client.listIndexes();
-      const indexExists = indexes.indexes?.some((idx) => idx.name === this.indexName);
-
-      if (!indexExists) {
-        console.log(`📊 Creating Pinecone index: ${this.indexName}`);
-        await this.client.createIndex({
-          name: this.indexName,
-          dimension,
-          metric,
-          spec: {
-            serverless: {
-              cloud: "aws",
-              region: region,
-            },
-          },
-        });
-        console.log(`✅ Pinecone index created: ${this.indexName}`);
-      } else {
-        console.log(`✅ Pinecone index already exists: ${this.indexName}`);
-      }
-
-      this.initialized = true;
-    } catch (error) {
-      console.error("Error initializing Pinecone:", error);
-      throw new Error("Failed to initialize vector database");
-    }
+  initialize() {
+    this.initialized = true;
   }
 
   /**
@@ -110,8 +83,7 @@ class VectorService {
       await index.namespace(namespace || "").upsert(vectors);
       console.log(`✅ Upserted ${vectors.length} vectors to Pinecone`);
     } catch (error) {
-      console.error("Error upserting vectors:", error);
-      throw new Error("Failed to upsert vectors");
+      throw new Error("Failed to upsert vectors", { cause: error });
     }
   }
 
@@ -150,8 +122,7 @@ class VectorService {
         })) || []
       );
     } catch (error) {
-      console.error("Error querying vectors:", error);
-      throw new Error("Failed to query vectors");
+      throw new Error("Failed to query vectors", { cause: error });
     }
   }
 
@@ -170,8 +141,7 @@ class VectorService {
       await index.namespace(namespace || "").deleteMany(ids);
       console.log(`✅ Deleted ${ids.length} vectors from Pinecone`);
     } catch (error) {
-      console.error("Error deleting vectors:", error);
-      throw new Error("Failed to delete vectors");
+      throw new Error("Failed to delete vectors", { cause: error });
     }
   }
 
@@ -189,8 +159,7 @@ class VectorService {
       await index.namespace(namespace).deleteAll();
       console.log(`✅ Cleared namespace: ${namespace}`);
     } catch (error) {
-      console.error("Error clearing namespace:", error);
-      throw new Error("Failed to clear namespace");
+      throw new Error("Failed to clear namespace", { cause: error });
     }
   }
 
@@ -206,8 +175,7 @@ class VectorService {
       const index = this.client.index(this.indexName);
       return await index.describeIndexStats();
     } catch (error) {
-      console.error("Error getting index stats:", error);
-      throw new Error("Failed to get index stats");
+      throw new Error("Failed to get index stats", { cause: error });
     }
   }
 }
