@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";

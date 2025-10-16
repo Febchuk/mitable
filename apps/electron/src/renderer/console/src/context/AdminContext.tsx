@@ -6,7 +6,7 @@ import {
   fetchTemplates,
   type User,
   type Template,
-  type Integration
+  type Integration,
 } from "../services/adminService";
 import { useUser } from "./UserContext";
 

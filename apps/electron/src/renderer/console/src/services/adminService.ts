@@ -26,7 +26,7 @@ export interface Template {
 
 export interface Integration {
   id: string;
-  provider: string;
+  provider: "slack" | "notion" | "github" | "google-drive";
   name: string;
   description: string;
   status: "connected" | "disconnected";

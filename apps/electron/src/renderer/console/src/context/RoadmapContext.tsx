@@ -94,7 +94,8 @@ export function RoadmapProvider({ children }: { children: ReactNode }) {
 
           const completedCount = revertedTasks.filter((t) => t.completed).length;
           const totalCount = revertedTasks.length;
-          const newPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+          const newPercentage =
+            totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
           return {
             ...week,
@@ -108,7 +109,9 @@ export function RoadmapProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <RoadmapContext.Provider value={{ weeks, currentWeek, setCurrentWeek, toggleTask, loading, error }}>
+    <RoadmapContext.Provider
+      value={{ weeks, currentWeek, setCurrentWeek, toggleTask, loading, error }}
+    >
       {children}
     </RoadmapContext.Provider>
   );

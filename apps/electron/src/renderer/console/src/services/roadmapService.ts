@@ -4,7 +4,7 @@ export interface RoadmapTask {
   id: string;
   title: string;
   description?: string;
-  timeEstimate?: string;
+  timeEstimate: string;
   completed: boolean;
   completedAt?: Date | null;
   week: number;
@@ -37,7 +37,10 @@ export async function fetchRoadmap(): Promise<RoadmapResponse> {
 export async function toggleTaskCompletion(
   taskId: string,
   completed: boolean
-): Promise<{ success: boolean; task: { id: string; completed: boolean; completedAt: Date | null } }> {
+): Promise<{
+  success: boolean;
+  task: { id: string; completed: boolean; completedAt: Date | null };
+}> {
   return apiRequest(`/roadmaps/tasks/${taskId}`, {
     method: "PATCH",
     body: JSON.stringify({ completed }),

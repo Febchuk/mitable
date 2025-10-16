@@ -5,11 +5,7 @@ import { supabase } from "../lib/supabase";
  * Middleware to require authentication
  * Validates JWT token and attaches user info to request
  */
-export async function requireAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const authHeader = req.headers.authorization;
 
@@ -57,7 +53,7 @@ export async function requireAuth(
  */
 export async function optionalAuth(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> {
   try {

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
@@ -130,117 +130,125 @@ router.post("/:nudgeId/accept", requireAuth, async (req: Request, res: Response)
  * POST /api/nudges/:nudgeId/dismiss
  * Dismiss a nudge
  */
-router.post("/:nudgeId/dismiss", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const userId = req.userId!;
-  const { nudgeId } = req.params;
+router.post(
+  "/:nudgeId/dismiss",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { nudgeId } = req.params;
 
-  try {
-    // Verify nudge belongs to user
-    const [nudge] = await db
-      .select()
-      .from(schema.nudges)
-      .where(eq(schema.nudges.id, nudgeId))
-      .limit(1);
+    try {
+      // Verify nudge belongs to user
+      const [nudge] = await db
+        .select()
+        .from(schema.nudges)
+        .where(eq(schema.nudges.id, nudgeId))
+        .limit(1);
 
-    if (!nudge) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "Nudge not found",
+      if (!nudge) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Nudge not found",
+        });
+        return;
+      }
+
+      if (nudge.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to modify this nudge",
+        });
+        return;
+      }
+
+      // Update nudge to declined
+      const [updatedNudge] = await db
+        .update(schema.nudges)
+        .set({
+          status: "declined",
+        })
+        .where(eq(schema.nudges.id, nudgeId))
+        .returning({
+          id: schema.nudges.id,
+          status: schema.nudges.status,
+        });
+
+      res.json({
+        success: true,
+        nudge: updatedNudge,
       });
-      return;
+    } catch (error) {
+      console.error("Error dismissing nudge:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to dismiss nudge",
+      });
     }
-
-    if (nudge.userId !== userId) {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "You do not have permission to modify this nudge",
-      });
-      return;
-    }
-
-    // Update nudge to declined
-    const [updatedNudge] = await db
-      .update(schema.nudges)
-      .set({
-        status: "declined",
-      })
-      .where(eq(schema.nudges.id, nudgeId))
-      .returning({
-        id: schema.nudges.id,
-        status: schema.nudges.status,
-      });
-
-    res.json({
-      success: true,
-      nudge: updatedNudge,
-    });
-  } catch (error) {
-    console.error("Error dismissing nudge:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: error instanceof Error ? error.message : "Failed to dismiss nudge",
-    });
   }
-});
+);
 
 /**
  * POST /api/nudges/:nudgeId/resolve
  * Resolve a nudge
  */
-router.post("/:nudgeId/resolve", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const userId = req.userId!;
-  const { nudgeId } = req.params;
+router.post(
+  "/:nudgeId/resolve",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { nudgeId } = req.params;
 
-  try {
-    // Verify nudge belongs to user
-    const [nudge] = await db
-      .select()
-      .from(schema.nudges)
-      .where(eq(schema.nudges.id, nudgeId))
-      .limit(1);
+    try {
+      // Verify nudge belongs to user
+      const [nudge] = await db
+        .select()
+        .from(schema.nudges)
+        .where(eq(schema.nudges.id, nudgeId))
+        .limit(1);
 
-    if (!nudge) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "Nudge not found",
+      if (!nudge) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Nudge not found",
+        });
+        return;
+      }
+
+      if (nudge.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to modify this nudge",
+        });
+        return;
+      }
+
+      // Update nudge to resolved
+      const resolvedAt = new Date();
+      const [updatedNudge] = await db
+        .update(schema.nudges)
+        .set({
+          status: "resolved",
+          resolvedAt,
+        })
+        .where(eq(schema.nudges.id, nudgeId))
+        .returning({
+          id: schema.nudges.id,
+          status: schema.nudges.status,
+          resolvedAt: schema.nudges.resolvedAt,
+        });
+
+      res.json({
+        success: true,
+        nudge: updatedNudge,
       });
-      return;
+    } catch (error) {
+      console.error("Error resolving nudge:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to resolve nudge",
+      });
     }
-
-    if (nudge.userId !== userId) {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "You do not have permission to modify this nudge",
-      });
-      return;
-    }
-
-    // Update nudge to resolved
-    const resolvedAt = new Date();
-    const [updatedNudge] = await db
-      .update(schema.nudges)
-      .set({
-        status: "resolved",
-        resolvedAt,
-      })
-      .where(eq(schema.nudges.id, nudgeId))
-      .returning({
-        id: schema.nudges.id,
-        status: schema.nudges.status,
-        resolvedAt: schema.nudges.resolvedAt,
-      });
-
-    res.json({
-      success: true,
-      nudge: updatedNudge,
-    });
-  } catch (error) {
-    console.error("Error resolving nudge:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: error instanceof Error ? error.message : "Failed to resolve nudge",
-    });
   }
-});
+);
 
 export default router;

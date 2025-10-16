@@ -218,7 +218,10 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
       .orderBy(desc(schema.integrations.createdAt));
 
     // Transform to frontend format with display names and descriptions
-    const integrationMap: Record<string, { name: string; description: string; updatesPerDay: number }> = {
+    const integrationMap: Record<
+      string,
+      { name: string; description: string; updatesPerDay: number }
+    > = {
       slack: {
         name: "Slack",
         description: "Get channel and DM message data. Updates four times a day.",

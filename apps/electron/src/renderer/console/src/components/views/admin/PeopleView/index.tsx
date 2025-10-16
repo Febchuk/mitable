@@ -14,15 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useAdmin } from "@/console/src/context/AdminContext";
 
-interface Employee {
-  id: string;
-  name: string;
-  role: string;
-  startDate: string;
-  status: "Onboarding" | "Active";
-  progress: number;
-}
-
 export default function PeopleView() {
   const navigate = useNavigate();
   const { users, loading, error } = useAdmin();
