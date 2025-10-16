@@ -21,9 +21,7 @@ class EmbeddingService {
 
   constructor() {
     if (!config.openai.apiKey) {
-      throw new Error(
-        "OPENAI_API_KEY is not configured. Please set it in your .env file."
-      );
+      throw new Error("OPENAI_API_KEY is not configured. Please set it in your .env file.");
     }
 
     this.model = config.openai.embeddingModel;
@@ -32,7 +30,7 @@ class EmbeddingService {
     if (!MODEL_DIMENSIONS[this.model]) {
       throw new Error(
         `Unsupported embedding model: ${this.model}. ` +
-        `Supported models: ${Object.keys(MODEL_DIMENSIONS).join(", ")}`
+          `Supported models: ${Object.keys(MODEL_DIMENSIONS).join(", ")}`
       );
     }
 
@@ -69,7 +67,7 @@ class EmbeddingService {
    * - Max 2048 inputs per request
    * - Each input max 8192 tokens
    * - Total request limit ~300K tokens
-   * 
+   *
    * @param texts - Array of texts to embed
    * @param chunkSize - Maximum number of texts per batch (default: 2048)
    * @returns Promise resolving to array of embedding vectors
@@ -96,10 +94,10 @@ class EmbeddingService {
 
     // For large batches, chunk and process sequentially
     const allEmbeddings: number[][] = [];
-    
+
     for (let i = 0; i < texts.length; i += chunkSize) {
       const chunk = texts.slice(i, i + chunkSize);
-      
+
       try {
         const response = await this.client.embeddings.create({
           model: this.model,
@@ -129,7 +127,7 @@ class EmbeddingService {
     if (!dimensions) {
       throw new Error(
         `Unknown embedding model: ${this.model}. ` +
-        `Supported models: ${Object.keys(MODEL_DIMENSIONS).join(", ")}`
+          `Supported models: ${Object.keys(MODEL_DIMENSIONS).join(", ")}`
       );
     }
     return dimensions;

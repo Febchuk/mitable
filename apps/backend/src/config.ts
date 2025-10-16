@@ -64,7 +64,7 @@ export function validateConfig() {
     const missingKeys = missing.map((item) => item.key).join(", ");
     throw new Error(
       `Missing required environment variables: ${missingKeys}. ` +
-      `Please check your .env file and ensure all required keys are set.`
+        `Please check your .env file and ensure all required keys are set.`
     );
   }
 
@@ -79,9 +79,9 @@ export function validateVectorDimensions(embeddingDimensions: number) {
   if (embeddingDimensions !== config.vectorDimensions) {
     throw new Error(
       `Embedding model dimension mismatch! ` +
-      `Embedding model "${config.openai.embeddingModel}" produces ${embeddingDimensions}D vectors, ` +
-      `but Pinecone index is configured for ${config.vectorDimensions}D vectors. ` +
-      `Either change the embedding model or recreate the Pinecone index with matching dimensions.`
+        `Embedding model "${config.openai.embeddingModel}" produces ${embeddingDimensions}D vectors, ` +
+        `but Pinecone index is configured for ${config.vectorDimensions}D vectors. ` +
+        `Either change the embedding model or recreate the Pinecone index with matching dimensions.`
     );
   }
 }

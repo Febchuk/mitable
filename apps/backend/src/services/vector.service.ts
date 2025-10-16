@@ -43,15 +43,11 @@ class VectorService {
 
   constructor() {
     if (!config.pinecone.apiKey) {
-      throw new Error(
-        "PINECONE_API_KEY is not configured. Please set it in your .env file."
-      );
+      throw new Error("PINECONE_API_KEY is not configured. Please set it in your .env file.");
     }
 
     if (!config.pinecone.indexName) {
-      throw new Error(
-        "PINECONE_INDEX_NAME is not configured. Please set it in your .env file."
-      );
+      throw new Error("PINECONE_INDEX_NAME is not configured. Please set it in your .env file.");
     }
 
     this.client = new Pinecone({
