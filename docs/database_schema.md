@@ -3,6 +3,7 @@
 Complete PostgreSQL schema for Mitable AI Onboarding Buddy.
 
 ## Table of Contents
+
 - [Entity Relationship Overview](#entity-relationship-overview)
 - [Core Tables](#core-tables)
 - [Expert System Tables](#expert-system-tables)
@@ -61,6 +62,7 @@ CREATE INDEX idx_organizations_domain ON organizations(domain);
 ```
 
 **Example:**
+
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -101,6 +103,7 @@ CREATE INDEX idx_users_role ON users(role);
 ```
 
 **Example:**
+
 ```json
 {
   "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -145,6 +148,7 @@ CREATE INDEX idx_integrations_status ON integrations(status);
 **Metadata Examples:**
 
 Slack:
+
 ```json
 {
   "workspace_name": "Acme Workspace",
@@ -154,6 +158,7 @@ Slack:
 ```
 
 Notion:
+
 ```json
 {
   "workspace_id": "abc123",
@@ -235,6 +240,7 @@ CREATE INDEX idx_expert_topics_confidence ON expert_topics(confidence_score DESC
 ```
 
 **Example:**
+
 ```json
 {
   "user_id": "expert-123",
@@ -303,11 +309,12 @@ CREATE INDEX idx_nudges_status ON nudges(status);
 ```
 
 **match_reasons Example:**
+
 ```json
 [
-  {"reason": "expertise_match", "score": 0.85, "detail": "Expert in React Hooks"},
-  {"reason": "high_response_rate", "score": 0.95, "detail": "95% response rate"},
-  {"reason": "availability", "score": 0.80, "detail": "Currently active"}
+  { "reason": "expertise_match", "score": 0.85, "detail": "Expert in React Hooks" },
+  { "reason": "high_response_rate", "score": 0.95, "detail": "95% response rate" },
+  { "reason": "availability", "score": 0.8, "detail": "Currently active" }
 ]
 ```
 
@@ -356,6 +363,7 @@ CREATE INDEX idx_messages_created ON messages(created_at DESC);
 ```
 
 **sources Example (RAG citations):**
+
 ```json
 [
   {
@@ -424,6 +432,7 @@ CREATE INDEX idx_roadmap_tasks_completed ON roadmap_tasks(completed);
 ```
 
 **dependencies Example:**
+
 ```json
 ["task-uuid-1", "task-uuid-2"]
 ```
@@ -495,6 +504,7 @@ CREATE INDEX idx_analytics_events_created ON analytics_events(created_at DESC);
 **Event Examples:**
 
 Help requested:
+
 ```json
 {
   "event_type": "help_requested",
@@ -507,6 +517,7 @@ Help requested:
 ```
 
 Task completed:
+
 ```json
 {
   "event_type": "task_completed",
@@ -594,6 +605,7 @@ apps/backend/src/db/migrations/
 ```
 
 Each migration should:
+
 1. Start with `BEGIN;`
 2. Use `IF NOT EXISTS` for idempotency
 3. End with `COMMIT;`

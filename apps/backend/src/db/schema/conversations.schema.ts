@@ -1,31 +1,31 @@
-import { pgTable, uuid, varchar, text, jsonb, timestamp } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
-import { users } from './users.schema';
+import { pgTable, uuid, varchar, text, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { users } from "./users.schema";
 
 // Conversations
-export const conversations = pgTable('conversations', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id')
+export const conversations = pgTable("conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
     .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  title: varchar('title', { length: 255 }), // Auto-generated from first message
-  contextType: varchar('context_type', { length: 50 }), // 'general' | 'help_request' | 'workflow'
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }), // Auto-generated from first message
+  contextType: varchar("context_type", { length: 50 }), // 'general' | 'help_request' | 'workflow'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Messages
-export const messages = pgTable('messages', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  conversationId: uuid('conversation_id')
+export const messages = pgTable("messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id")
     .notNull()
-    .references(() => conversations.id, { onDelete: 'cascade' }),
-  role: varchar('role', { length: 50 }).notNull(), // 'user' | 'assistant'
-  content: text('content').notNull(),
-  messageType: varchar('message_type', { length: 50 }).default('text'), // 'text' | 'workflow' | 'experts'
-  cardData: jsonb('card_data'), // Optional metadata for special message types
-  sources: jsonb('sources').default('[]'), // Array of citation objects for RAG
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 50 }).notNull(), // 'user' | 'assistant'
+  content: text("content").notNull(),
+  messageType: varchar("message_type", { length: 50 }).default("text"), // 'text' | 'workflow' | 'experts'
+  cardData: jsonb("card_data"), // Optional metadata for special message types
+  sources: jsonb("sources").default("[]"), // Array of citation objects for RAG
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Relations

@@ -10,6 +10,7 @@ We will use **Drizzle ORM** for the Mitable backend PostgreSQL database layer.
 ## Context
 
 Mitable's backend requires:
+
 - PostgreSQL database via Supabase
 - Complex queries for RAG system
 - Type safety for production reliability
@@ -52,17 +53,20 @@ Use **Drizzle ORM** as the database abstraction layer.
 ### Why Not Alternatives?
 
 **Raw SQL (pg library only):**
+
 - ❌ No type safety → runtime errors
 - ❌ Manual migration management
 - ❌ Too much boilerplate for 50+ tables
 
 **Prisma:**
+
 - ❌ Hides SQL too much (bad for complex queries)
 - ❌ Heavy runtime overhead
 - ❌ Generated client is large
 - ❌ Less flexibility for custom analytics
 
 **Kysely:**
+
 - ⚠️ Good alternative, but no built-in migrations
 - ⚠️ Manual type definitions
 
@@ -80,16 +84,17 @@ npm install -D pg @types/pg
 ### Configuration
 
 **drizzle.config.ts:**
+
 ```typescript
-import { defineConfig } from 'drizzle-kit';
-import dotenv from 'dotenv';
+import { defineConfig } from "drizzle-kit";
+import dotenv from "dotenv";
 
 dotenv.config();
 
 export default defineConfig({
-  schema: './src/db/schema/index.ts',
-  out: './src/db/migrations',
-  dialect: 'postgresql',
+  schema: "./src/db/schema/index.ts",
+  out: "./src/db/migrations",
+  dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL!,
   },
@@ -125,26 +130,27 @@ apps/backend/src/
 ### Example Schema
 
 **apps/backend/src/db/schema/users.schema.ts:**
-```typescript
-import { pgTable, uuid, varchar, timestamp, integer } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
-import { organizations } from './organizations.schema.js';
 
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  organizationId: uuid('organization_id')
+```typescript
+import { pgTable, uuid, varchar, timestamp, integer } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { organizations } from "./organizations.schema.js";
+
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
     .notNull()
-    .references(() => organizations.id, { onDelete: 'cascade' }),
-  email: varchar('email', { length: 255 }).notNull().unique(),
-  firstName: varchar('first_name', { length: 100 }),
-  lastName: varchar('last_name', { length: 100 }),
-  role: varchar('role', { length: 50 }).notNull(),
-  avatarUrl: varchar('avatar_url', { length: 500 }),
-  currentWeek: integer('current_week').default(1),
-  startDate: timestamp('start_date'),
-  status: varchar('status', { length: 50 }).default('active'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
+  role: varchar("role", { length: 50 }).notNull(),
+  avatarUrl: varchar("avatar_url", { length: 500 }),
+  currentWeek: integer("current_week").default(1),
+  startDate: timestamp("start_date"),
+  status: varchar("status", { length: 50 }).default("active"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Define relations for type-safe joins
@@ -166,49 +172,36 @@ export type NewUser = typeof users.$inferInsert;
 ### Example Repository
 
 **apps/backend/src/db/repositories/user.repository.ts:**
+
 ```typescript
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq, and } from 'drizzle-orm';
-import { pool } from '../client.js';
-import { users, type User, type NewUser } from '../schema/users.schema.js';
+import { drizzle } from "drizzle-orm/node-postgres";
+import { eq, and } from "drizzle-orm";
+import { pool } from "../client.js";
+import { users, type User, type NewUser } from "../schema/users.schema.js";
 
 const db = drizzle(pool);
 
 export class UserRepository {
   async findById(id: string): Promise<User | undefined> {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
 
     return result[0];
   }
 
   async findByEmail(email: string): Promise<User | undefined> {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     return result[0];
   }
 
   async create(data: NewUser): Promise<User> {
-    const result = await db
-      .insert(users)
-      .values(data)
-      .returning();
+    const result = await db.insert(users).values(data).returning();
 
     return result[0];
   }
 
   async findByOrganization(organizationId: string): Promise<User[]> {
-    return await db
-      .select()
-      .from(users)
-      .where(eq(users.organizationId, organizationId));
+    return await db.select().from(users).where(eq(users.organizationId, organizationId));
   }
 
   // Complex query example (expert matching)
@@ -234,16 +227,19 @@ export const userRepository = new UserRepository();
 ### Migration Workflow
 
 **Generate migration:**
+
 ```bash
 npm run db:generate
 ```
 
 **Apply migration:**
+
 ```bash
 npm run db:migrate
 ```
 
 **Add to package.json:**
+
 ```json
 {
   "scripts": {
@@ -287,6 +283,7 @@ If we had started with raw SQL, migration path would be:
 ## Monitoring
 
 We will monitor:
+
 - Query performance (ensure no regressions)
 - Bundle size (keep under 500KB total)
 - Developer velocity (should improve)
@@ -296,6 +293,7 @@ We will monitor:
 Review this decision after Phase 2 (Slack ingestion) is complete.
 
 If Drizzle causes issues, we can:
+
 - Drop to raw SQL for specific queries
 - Evaluate switching to Kysely
 - Stay with Drizzle but use more raw SQL

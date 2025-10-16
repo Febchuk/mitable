@@ -3,6 +3,7 @@
 Complete guide for setting up Supabase as the PostgreSQL database for Mitable AI.
 
 ## Table of Contents
+
 - [Quick Start (5 minutes)](#quick-start-5-minutes)
 - [Detailed Setup](#detailed-setup)
 - [Local Development](#local-development)
@@ -36,6 +37,7 @@ Once project is ready:
 3. Copy the **Connection pooling** string (recommended for production)
 
 You'll see something like:
+
 ```
 postgresql://postgres.xxxxxxxxxxxx:[YOUR-PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
 ```
@@ -77,9 +79,9 @@ npm install pg
 Create `apps/backend/src/db/client.ts`:
 
 ```typescript
-import pkg from 'pg';
+import pkg from "pg";
 const { Pool } = pkg;
-import { config } from '../config.js';
+import { config } from "../config.js";
 
 export const pool = new Pool({
   connectionString: config.database.url,
@@ -92,18 +94,19 @@ export const pool = new Pool({
 export async function testConnection() {
   try {
     const client = await pool.connect();
-    const result = await client.query('SELECT NOW()');
-    console.log('✅ Database connected:', result.rows[0]);
+    const result = await client.query("SELECT NOW()");
+    console.log("✅ Database connected:", result.rows[0]);
     client.release();
     return true;
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
+    console.error("❌ Database connection failed:", error);
     return false;
   }
 }
 ```
 
 Run test:
+
 ```bash
 node -e "require('./out/db/client.js').testConnection()"
 ```
@@ -131,6 +134,7 @@ For production-grade setup:
    - Use for live users
 
 Store connection strings in separate `.env` files:
+
 - `.env.development`
 - `.env.staging`
 - `.env.production`
@@ -138,18 +142,22 @@ Store connection strings in separate `.env` files:
 ### Connection Pooling vs Direct Connection
 
 **Connection Pooling (Recommended for App)**
+
 ```
 postgresql://postgres.xxx:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
 ```
+
 - ✅ Use in your Express app
 - ✅ Better performance under load
 - ✅ Prevents connection exhaustion
 - Port: `6543`
 
 **Direct Connection (For Migrations)**
+
 ```
 postgresql://postgres.xxx:[PASSWORD]@db.xxx.supabase.co:5432/postgres
 ```
+
 - ✅ Use for running migrations
 - ✅ Use for admin operations
 - ⚠️ Limited connections (avoid in app)
@@ -164,11 +172,13 @@ postgresql://postgres.xxx:[PASSWORD]@db.xxx.supabase.co:5432/postgres
 Easiest option - just use your `mitable-dev` project on Supabase.
 
 **Pros:**
+
 - No local setup needed
 - Accessible from any machine
 - Same environment as production
 
 **Cons:**
+
 - Requires internet connection
 - Slower than localhost
 
@@ -177,8 +187,9 @@ Easiest option - just use your `mitable-dev` project on Supabase.
 Run PostgreSQL locally, push to Supabase for production.
 
 **docker-compose.yml:**
+
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   postgres:
@@ -203,11 +214,13 @@ volumes:
 ```
 
 **Start local database:**
+
 ```bash
 docker-compose up -d
 ```
 
 **Local .env:**
+
 ```bash
 DATABASE_URL="postgresql://postgres:dev_password@localhost:5432/mitable"
 ```
@@ -217,27 +230,32 @@ DATABASE_URL="postgresql://postgres:dev_password@localhost:5432/mitable"
 Run entire Supabase stack locally (PostgreSQL + Auth + Storage + APIs).
 
 **Install CLI:**
+
 ```bash
 npm install -g supabase
 ```
 
 **Initialize:**
+
 ```bash
 cd apps/backend
 supabase init
 ```
 
 **Start local Supabase:**
+
 ```bash
 supabase start
 ```
 
 You'll get local URLs:
+
 - API URL: `http://localhost:54321`
 - Database URL: `postgresql://postgres:postgres@localhost:54322/postgres`
 - Studio URL: `http://localhost:54323` (GUI for database)
 
 **Stop:**
+
 ```bash
 supabase stop
 ```
@@ -260,24 +278,25 @@ apps/backend/src/db/migrations/
 ### Create Migration Runner
 
 **apps/backend/src/db/migrate.ts:**
+
 ```typescript
-import { pool } from './client.js';
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { pool } from "./client.js";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function runMigrations() {
-  const migrationsDir = path.join(__dirname, 'migrations');
+  const migrationsDir = path.join(__dirname, "migrations");
   const files = await fs.readdir(migrationsDir);
-  const sqlFiles = files.filter(f => f.endsWith('.sql')).sort();
+  const sqlFiles = files.filter((f) => f.endsWith(".sql")).sort();
 
   console.log(`📁 Found ${sqlFiles.length} migration files`);
 
   for (const file of sqlFiles) {
     console.log(`⏳ Running migration: ${file}`);
-    const sql = await fs.readFile(path.join(migrationsDir, file), 'utf-8');
+    const sql = await fs.readFile(path.join(migrationsDir, file), "utf-8");
 
     try {
       await pool.query(sql);
@@ -288,7 +307,7 @@ async function runMigrations() {
     }
   }
 
-  console.log('🎉 All migrations completed!');
+  console.log("🎉 All migrations completed!");
   await pool.end();
 }
 
@@ -298,6 +317,7 @@ runMigrations().catch(console.error);
 ### Run Migrations
 
 **Add to package.json:**
+
 ```json
 {
   "scripts": {
@@ -307,6 +327,7 @@ runMigrations().catch(console.error);
 ```
 
 **Execute:**
+
 ```bash
 npm run build
 npm run migrate
@@ -315,6 +336,7 @@ npm run migrate
 ### Migration Best Practices
 
 1. **Always use transactions:**
+
    ```sql
    BEGIN;
 
@@ -325,6 +347,7 @@ npm run migrate
    ```
 
 2. **Make migrations idempotent:**
+
    ```sql
    CREATE TABLE IF NOT EXISTS users (...);
    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -347,6 +370,7 @@ In Supabase Dashboard → **Settings** → **Database**:
    - Max connections: 15 (free tier) / 100+ (pro)
 
 2. **Extensions**: Enable required extensions
+
    ```sql
    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
    CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- For fuzzy text search
@@ -361,6 +385,7 @@ In Supabase Dashboard → **Settings** → **Database**:
    - Create policies for multi-tenant isolation
 
    Example:
+
    ```sql
    ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
@@ -381,6 +406,7 @@ In Supabase Dashboard → **Settings** → **Database**:
 1. **Indexes**: See `database_schema.md` for critical indexes
 
 2. **Connection Pooling**:
+
    ```typescript
    const pool = new Pool({
      connectionString: config.database.url,
@@ -415,16 +441,21 @@ In Supabase Dashboard → **Settings** → **Database**:
 ### Connection Issues
 
 **Error: `password authentication failed`**
+
 - Double-check password in connection string
 - Regenerate password in Supabase dashboard if needed
 
 **Error: `SSL SYSCALL error: EOF detected`**
+
 - Add SSL config to your pool:
   ```typescript
-  ssl: { rejectUnauthorized: false }
+  ssl: {
+    rejectUnauthorized: false;
+  }
   ```
 
 **Error: `too many connections`**
+
 - Use connection pooling URL (port 6543)
 - Reduce `max` in Pool config
 - Upgrade Supabase plan
@@ -432,16 +463,19 @@ In Supabase Dashboard → **Settings** → **Database**:
 ### Migration Issues
 
 **Error: `relation already exists`**
+
 - Use `CREATE TABLE IF NOT EXISTS`
 - Or drop table first: `DROP TABLE IF EXISTS table_name;`
 
 **Migration runs but changes don't appear**
+
 - Ensure you're connected to correct database
 - Check `DATABASE_URL` matches your Supabase project
 
 ### Performance Issues
 
 **Slow queries**
+
 ```sql
 -- Check slow queries
 SELECT
@@ -455,6 +489,7 @@ LIMIT 10;
 ```
 
 **High connection count**
+
 ```sql
 -- Check active connections
 SELECT count(*) FROM pg_stat_activity;

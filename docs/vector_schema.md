@@ -3,6 +3,7 @@
 Complete documentation for Pinecone vector database structure, metadata schemas, and query patterns.
 
 ## Table of Contents
+
 - [Overview](#overview)
 - [Index Configuration](#index-configuration)
 - [Namespace Structure](#namespace-structure)
@@ -19,11 +20,13 @@ Complete documentation for Pinecone vector database structure, metadata schemas,
 Mitable uses Pinecone to store vector embeddings for semantic search in RAG (Retrieval-Augmented Generation) responses.
 
 **Key Decisions:**
+
 - **Model**: OpenAI `text-embedding-3-small` (1536 dimensions)
 - **Metric**: Cosine similarity
 - **Storage**: Organized by namespaces per integration type
 
 **Architecture:**
+
 ```
 PostgreSQL (Supabase)      Pinecone
      ↓                        ↓
@@ -41,6 +44,7 @@ Messages/Docs      →    Vector Embeddings + Metadata
 **Index Name**: `mitable-embeddings`
 
 **Configuration:**
+
 ```typescript
 {
   name: "mitable-embeddings",
@@ -85,6 +89,7 @@ mitable-embeddings (index)
 Format: `{integration-type}-{data-type}`
 
 Examples:
+
 - `slack-messages`
 - `notion-pages`
 - `github-issues`
@@ -101,15 +106,15 @@ Each vector stores metadata to identify the source document and enable filtering
 ```typescript
 interface BaseMetadata {
   // Required
-  text: string;                    // Original text (for display)
-  source_type: string;              // 'slack' | 'notion' | 'github' | 'google-drive'
-  organization_id: string;          // UUID from PostgreSQL
-  created_at: number;               // Unix timestamp
+  text: string; // Original text (for display)
+  source_type: string; // 'slack' | 'notion' | 'github' | 'google-drive'
+  organization_id: string; // UUID from PostgreSQL
+  created_at: number; // Unix timestamp
 
   // Optional
-  author_id?: string;               // User UUID who created
-  author_name?: string;             // Display name
-  tags?: string[];                  // Searchable tags
+  author_id?: string; // User UUID who created
+  author_name?: string; // Display name
+  tags?: string[]; // Searchable tags
 }
 ```
 
@@ -119,26 +124,27 @@ interface BaseMetadata {
 
 ```typescript
 interface SlackMessageMetadata extends BaseMetadata {
-  source_type: 'slack';
+  source_type: "slack";
 
   // Slack-specific
-  integration_id: string;           // UUID from integrations table
-  channel_id: string;               // Slack channel ID (e.g., "C01ABC123")
-  channel_name: string;             // Display name (e.g., "#engineering")
-  message_ts: string;               // Slack message timestamp
-  thread_ts?: string;               // Thread timestamp (if in thread)
-  user_id: string;                  // Slack user ID
-  user_name: string;                // Slack display name
-  permalink: string;                // Deep link to message
+  integration_id: string; // UUID from integrations table
+  channel_id: string; // Slack channel ID (e.g., "C01ABC123")
+  channel_name: string; // Display name (e.g., "#engineering")
+  message_ts: string; // Slack message timestamp
+  thread_ts?: string; // Thread timestamp (if in thread)
+  user_id: string; // Slack user ID
+  user_name: string; // Slack display name
+  permalink: string; // Deep link to message
 
   // Content metadata
   has_attachments: boolean;
-  reactions?: string[];             // Emoji reactions
+  reactions?: string[]; // Emoji reactions
   is_pinned: boolean;
 }
 ```
 
 **Example:**
+
 ```json
 {
   "text": "To deploy the app, run npm run build then npm run start. Make sure env vars are set.",
@@ -165,25 +171,26 @@ interface SlackMessageMetadata extends BaseMetadata {
 
 ```typescript
 interface NotionPageMetadata extends BaseMetadata {
-  source_type: 'notion';
+  source_type: "notion";
 
   // Notion-specific
   integration_id: string;
-  page_id: string;                  // Notion page UUID
+  page_id: string; // Notion page UUID
   page_title: string;
-  parent_id?: string;               // Parent page/database ID
+  parent_id?: string; // Parent page/database ID
   parent_title?: string;
   workspace_id: string;
 
   // Content metadata
-  page_url: string;                 // Notion page URL
-  last_edited_time: number;         // Unix timestamp
-  chunk_index: number;              // If page split into chunks
+  page_url: string; // Notion page URL
+  last_edited_time: number; // Unix timestamp
+  chunk_index: number; // If page split into chunks
   total_chunks: number;
 }
 ```
 
 **Example:**
+
 ```json
 {
   "text": "Our deployment process uses GitHub Actions. First, create a PR...",
@@ -210,19 +217,19 @@ interface NotionPageMetadata extends BaseMetadata {
 
 ```typescript
 interface GitHubIssueMetadata extends BaseMetadata {
-  source_type: 'github';
+  source_type: "github";
 
   // GitHub-specific
   integration_id: string;
-  repo_full_name: string;           // e.g., "acme/frontend"
+  repo_full_name: string; // e.g., "acme/frontend"
   issue_number: number;
-  issue_type: 'issue' | 'pr';
+  issue_type: "issue" | "pr";
   title: string;
-  state: 'open' | 'closed';
+  state: "open" | "closed";
   labels: string[];
 
   // Content metadata
-  html_url: string;                 // GitHub URL
+  html_url: string; // GitHub URL
   comments_count: number;
   created_at: number;
   updated_at: number;
@@ -231,6 +238,7 @@ interface GitHubIssueMetadata extends BaseMetadata {
 ```
 
 **Example:**
+
 ```json
 {
   "text": "Bug: Deployment fails when env vars missing. Solution: Add validation step...",
@@ -259,25 +267,26 @@ interface GitHubIssueMetadata extends BaseMetadata {
 
 ```typescript
 interface GitHubCodeMetadata extends BaseMetadata {
-  source_type: 'github';
+  source_type: "github";
 
   // GitHub-specific
   integration_id: string;
   repo_full_name: string;
-  file_path: string;                // e.g., "src/services/auth.ts"
-  language: string;                 // Programming language
+  file_path: string; // e.g., "src/services/auth.ts"
+  language: string; // Programming language
   branch: string;
 
   // Content metadata
-  function_name?: string;           // If specific function
-  class_name?: string;              // If specific class
+  function_name?: string; // If specific function
+  class_name?: string; // If specific class
   line_start: number;
   line_end: number;
-  blob_url: string;                 // GitHub file URL
+  blob_url: string; // GitHub file URL
 }
 ```
 
 **Example:**
+
 ```json
 {
   "text": "export async function authenticateUser(token: string) { ... }",
@@ -304,18 +313,18 @@ interface GitHubCodeMetadata extends BaseMetadata {
 
 ```typescript
 interface GoogleDriveDocMetadata extends BaseMetadata {
-  source_type: 'google-drive';
+  source_type: "google-drive";
 
   // Google Drive-specific
   integration_id: string;
-  file_id: string;                  // Google Drive file ID
+  file_id: string; // Google Drive file ID
   file_name: string;
-  mime_type: string;                // e.g., "application/vnd.google-apps.document"
+  mime_type: string; // e.g., "application/vnd.google-apps.document"
   folder_id?: string;
   folder_name?: string;
 
   // Content metadata
-  web_view_link: string;            // Google Drive URL
+  web_view_link: string; // Google Drive URL
   last_modified_time: number;
   chunk_index: number;
   total_chunks: number;
@@ -323,6 +332,7 @@ interface GoogleDriveDocMetadata extends BaseMetadata {
 ```
 
 **Example:**
+
 ```json
 {
   "text": "Onboarding checklist: 1. Set up laptop, 2. Access Slack...",
@@ -351,22 +361,23 @@ Used for semantic matching of experts to questions.
 
 ```typescript
 interface ExpertProfileMetadata extends BaseMetadata {
-  source_type: 'expert';
+  source_type: "expert";
 
   // Expert-specific
-  user_id: string;                  // UUID from users table
-  expertise_areas: string[];        // ["React", "TypeScript", "Deployment"]
-  confidence_scores: number[];      // [0.92, 0.88, 0.75] - matches expertise_areas
+  user_id: string; // UUID from users table
+  expertise_areas: string[]; // ["React", "TypeScript", "Deployment"]
+  confidence_scores: number[]; // [0.92, 0.88, 0.75] - matches expertise_areas
 
   // Performance metrics
-  response_rate: number;            // 0.0 to 1.0
-  helpfulness_score: number;        // 0.0 to 5.0
+  response_rate: number; // 0.0 to 1.0
+  helpfulness_score: number; // 0.0 to 5.0
   avg_response_time_hours: number;
   total_interactions: number;
 }
 ```
 
 **Example:**
+
 ```json
 {
   "text": "Expert in React, TypeScript, and deployment. Strong background in frontend architecture and CI/CD pipelines.",
@@ -375,7 +386,7 @@ interface ExpertProfileMetadata extends BaseMetadata {
   "user_id": "user-456",
   "author_name": "Jane Doe",
   "expertise_areas": ["React", "TypeScript", "Deployment", "CI/CD"],
-  "confidence_scores": [0.92, 0.88, 0.85, 0.80],
+  "confidence_scores": [0.92, 0.88, 0.85, 0.8],
   "response_rate": 0.95,
   "helpfulness_score": 4.7,
   "avg_response_time_hours": 2.5,
@@ -394,22 +405,23 @@ Previously asked questions for deduplication and similar question matching.
 
 ```typescript
 interface QuestionMetadata extends BaseMetadata {
-  source_type: 'question';
+  source_type: "question";
 
   // Question-specific
-  conversation_id: string;          // UUID from conversations table
+  conversation_id: string; // UUID from conversations table
   user_id: string;
-  topic?: string;                   // Inferred topic
+  topic?: string; // Inferred topic
 
   // Resolution metadata
   was_resolved: boolean;
   resolution_time_seconds?: number;
-  expert_id?: string;               // If answered by expert
-  confidence_score: number;         // How confident AI was in answer
+  expert_id?: string; // If answered by expert
+  confidence_score: number; // How confident AI was in answer
 }
 ```
 
 **Example:**
+
 ```json
 {
   "text": "How do I deploy the backend to production?",
@@ -453,20 +465,24 @@ Store Sync Metadata (PostgreSQL sync_logs)
 **Max chunk size**: 1000 characters (optimal for embeddings)
 
 **Slack Messages:**
+
 - No chunking (messages are already short)
 - Threads: Concatenate thread messages
 
 **Notion Pages:**
+
 - Split by headers/sections
 - Max 1000 chars per chunk
 - Preserve context (overlap 100 chars)
 
 **GitHub:**
+
 - Issues: Chunk if >1000 chars
 - Code: Split by functions/classes
 - Comments: Group by thread
 
 **Google Drive:**
+
 - Split by paragraphs
 - Max 1000 chars per chunk
 - Preserve headings in metadata
@@ -583,21 +599,23 @@ if (similarQuestions[0].score > 0.9) {
 
 ### Ingestion Schedule
 
-| Integration | Frequency | Method |
-|-------------|-----------|--------|
-| Slack | 4x/day (every 6 hours) | Incremental sync |
-| Notion | 4x/day | Full re-index weekly, incremental daily |
-| GitHub | 1x/day | Incremental (webhooks in future) |
-| Google Drive | 1x/day | Incremental |
+| Integration  | Frequency              | Method                                  |
+| ------------ | ---------------------- | --------------------------------------- |
+| Slack        | 4x/day (every 6 hours) | Incremental sync                        |
+| Notion       | 4x/day                 | Full re-index weekly, incremental daily |
+| GitHub       | 1x/day                 | Incremental (webhooks in future)        |
+| Google Drive | 1x/day                 | Incremental                             |
 
 ### Updates
 
 **Modified documents:**
+
 - Delete old vector: `vectorService.deleteVectors([vectorId])`
 - Re-embed updated text
 - Upsert new vector with same ID (overwrites)
 
 **Deleted documents:**
+
 - Delete from Pinecone: `vectorService.deleteVectors([vectorId])`
 - Keep metadata in PostgreSQL with `deleted_at` timestamp
 
@@ -617,14 +635,14 @@ Embed and upsert in batches:
 
 ```typescript
 // Batch embed (OpenAI allows up to 2048 inputs)
-const texts = messages.map(m => m.text);
+const texts = messages.map((m) => m.text);
 const embeddings = await embeddingService.embedTexts(texts); // Batch call
 
 // Batch upsert (Pinecone recommends 100-1000 vectors per batch)
 const vectors = embeddings.map((emb, i) => ({
   id: messages[i].id,
   values: emb,
-  metadata: messages[i].metadata
+  metadata: messages[i].metadata,
 }));
 
 await vectorService.upsertVectors(vectors, namespace);
@@ -638,12 +656,15 @@ await vectorService.upsertVectors(vectors, namespace);
 ### Filtering
 
 Always filter by `organization_id` for:
+
 - Data isolation (multi-tenancy)
 - Reduced search space (faster queries)
 
 ```typescript
 filter: {
-  organization_id: { $eq: userOrgId }
+  organization_id: {
+    $eq: userOrgId;
+  }
 }
 ```
 

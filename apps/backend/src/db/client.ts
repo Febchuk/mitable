@@ -1,8 +1,8 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import pkg from 'pg';
+import { drizzle } from "drizzle-orm/node-postgres";
+import pkg from "pg";
 const { Pool } = pkg;
-import { config } from '../config';
-import * as schema from './schema/index';
+import { config } from "../config";
+import * as schema from "./schema/index";
 
 // Create PostgreSQL connection pool
 export const pool = new Pool({
@@ -22,19 +22,19 @@ export const db = drizzle(pool, { schema });
 export async function testConnection() {
   try {
     const client = await pool.connect();
-    const result = await client.query('SELECT NOW()');
-    console.log('✅ Database connected:', result.rows[0].now);
+    const result = await client.query("SELECT NOW()");
+    console.log("✅ Database connected:", result.rows[0].now);
     client.release();
     return true;
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
+    console.error("❌ Database connection failed:", error);
     return false;
   }
 }
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
+process.on("SIGINT", async () => {
   await pool.end();
-  console.log('Database pool closed');
+  console.log("Database pool closed");
   process.exit(0);
 });
