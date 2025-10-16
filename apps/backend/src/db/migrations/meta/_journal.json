@@ -15,6 +15,13 @@
       "when": 1760598974181,
       "tag": "0001_curvy_nicolaos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1760620000000,
+      "tag": "0002_auth_trigger",
+      "breakpoints": true
     }
   ]
 }

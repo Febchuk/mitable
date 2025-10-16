@@ -2,6 +2,8 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { reset } from "drizzle-seed";
 import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
+import { eq } from "drizzle-orm";
 import * as schema from "./schema/index";
 
 dotenv.config();
@@ -13,6 +15,21 @@ const pool = new Pool({
 });
 
 const db = drizzle(pool, { schema });
+
+// Supabase client for creating auth users
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
+);
+
+// Standard password for all test accounts
+const TEST_PASSWORD = "Password123!";
 
 // ============================================
 // Seed Functions
@@ -44,209 +61,249 @@ async function seedOrganization() {
 async function seedUsers(organizationId: string) {
   console.log("👥 Seeding users...");
 
-  const users = await db
-    .insert(schema.users)
-    .values([
-      // Admin Users
-      {
-        organizationId,
-        email: "sarah@lorikeet.ai",
-        firstName: "Sarah",
-        lastName: "Chen",
-        role: "admin",
-        avatarUrl: "https://i.pravatar.cc/150?img=1",
-        currentWeek: null,
-        startDate: null,
-        status: "active",
-      },
-      {
-        organizationId,
-        email: "marcus@lorikeet.ai",
-        firstName: "Marcus",
-        lastName: "Johnson",
-        role: "admin",
-        avatarUrl: "https://i.pravatar.cc/150?img=12",
-        currentWeek: null,
-        startDate: null,
-        status: "active",
-      },
-      {
-        organizationId,
-        email: "david@lorikeet.ai",
-        firstName: "David",
-        lastName: "Kim",
-        role: "admin",
-        avatarUrl: "https://i.pravatar.cc/150?img=13",
-        currentWeek: null,
-        startDate: null,
-        status: "active",
-      },
-      // AI/ML Engineers
-      {
-        organizationId,
-        email: "emily@lorikeet.ai",
-        firstName: "Emily",
-        lastName: "Rodriguez",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=5",
-        currentWeek: 3,
-        startDate: "2024-09-15",
-        status: "active",
-      },
-      {
-        organizationId,
-        email: "alex@lorikeet.ai",
-        firstName: "Alex",
-        lastName: "Thompson",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=14",
-        currentWeek: 1,
-        startDate: "2024-10-01",
-        status: "active",
-      },
-      {
-        organizationId,
-        email: "jordan@lorikeet.ai",
-        firstName: "Jordan",
-        lastName: "Lee",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=25",
-        currentWeek: 5,
-        startDate: "2024-08-01",
-        status: "active",
-      },
-      // Backend Engineers
-      {
-        organizationId,
-        email: "priya@lorikeet.ai",
-        firstName: "Priya",
-        lastName: "Patel",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=30",
-        currentWeek: 2,
-        startDate: "2024-09-22",
-        status: "active",
-      },
-      {
-        organizationId,
-        email: "carlos@lorikeet.ai",
-        firstName: "Carlos",
-        lastName: "Martinez",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=33",
-        currentWeek: 4,
-        startDate: "2024-08-15",
-        status: "active",
-      },
-      // Frontend Engineers
-      {
-        organizationId,
-        email: "jessica@lorikeet.ai",
-        firstName: "Jessica",
-        lastName: "Wu",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=9",
-        currentWeek: 3,
-        startDate: "2024-09-10",
-        status: "active",
-      },
-      {
-        organizationId,
-        email: "miguel@lorikeet.ai",
-        firstName: "Miguel",
-        lastName: "Santos",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=15",
-        currentWeek: 1,
-        startDate: "2024-10-05",
-        status: "active",
-      },
-      // Product Managers
-      {
-        organizationId,
-        email: "rachel@lorikeet.ai",
-        firstName: "Rachel",
-        lastName: "Green",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=24",
-        currentWeek: 2,
-        startDate: "2024-09-20",
-        status: "active",
-      },
-      {
-        organizationId,
-        email: "james@lorikeet.ai",
-        firstName: "James",
-        lastName: "Wilson",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=17",
-        currentWeek: 4,
-        startDate: "2024-08-20",
-        status: "active",
-      },
-      // Customer Success
-      {
-        organizationId,
-        email: "sophie@lorikeet.ai",
-        firstName: "Sophie",
-        lastName: "Anderson",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=23",
-        currentWeek: 2,
-        startDate: "2024-09-25",
-        status: "active",
-      },
-      {
-        organizationId,
-        email: "daniel@lorikeet.ai",
-        firstName: "Daniel",
-        lastName: "Brown",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=18",
-        currentWeek: 3,
-        startDate: "2024-09-05",
-        status: "active",
-      },
-      // Sales
-      {
-        organizationId,
-        email: "olivia@lorikeet.ai",
-        firstName: "Olivia",
-        lastName: "Davis",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=10",
-        currentWeek: 1,
-        startDate: "2024-10-08",
-        status: "active",
-      },
-      // Design
-      {
-        organizationId,
-        email: "ethan@lorikeet.ai",
-        firstName: "Ethan",
-        lastName: "Miller",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=16",
-        currentWeek: 2,
-        startDate: "2024-09-18",
-        status: "active",
-      },
-      // DevOps
-      {
-        organizationId,
-        email: "maya@lorikeet.ai",
-        firstName: "Maya",
-        lastName: "Johnson",
-        role: "employee",
-        avatarUrl: "https://i.pravatar.cc/150?img=20",
-        currentWeek: 3,
-        startDate: "2024-09-12",
-        status: "active",
-      },
-    ])
-    .returning();
+  // Define user data
+  const userData = [
+    // Admin Users
+    {
+      email: "sarah@lorikeet.ai",
+      firstName: "Sarah",
+      lastName: "Chen",
+      role: "admin",
+      avatarUrl: "https://i.pravatar.cc/150?img=1",
+      currentWeek: null,
+      startDate: null,
+      status: "active",
+    },
+    {
+      email: "marcus@lorikeet.ai",
+      firstName: "Marcus",
+      lastName: "Johnson",
+      role: "admin",
+      avatarUrl: "https://i.pravatar.cc/150?img=12",
+      currentWeek: null,
+      startDate: null,
+      status: "active",
+    },
+    {
+      email: "david@lorikeet.ai",
+      firstName: "David",
+      lastName: "Kim",
+      role: "admin",
+      avatarUrl: "https://i.pravatar.cc/150?img=13",
+      currentWeek: null,
+      startDate: null,
+      status: "active",
+    },
+    // AI/ML Engineers
+    {
+      email: "emily@lorikeet.ai",
+      firstName: "Emily",
+      lastName: "Rodriguez",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=5",
+      currentWeek: 3,
+      startDate: "2024-09-15",
+      status: "active",
+    },
+    {
+      email: "alex@lorikeet.ai",
+      firstName: "Alex",
+      lastName: "Thompson",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=14",
+      currentWeek: 1,
+      startDate: "2024-10-01",
+      status: "active",
+    },
+    {
+      email: "jordan@lorikeet.ai",
+      firstName: "Jordan",
+      lastName: "Lee",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=25",
+      currentWeek: 5,
+      startDate: "2024-08-01",
+      status: "active",
+    },
+    // Backend Engineers
+    {
+      email: "priya@lorikeet.ai",
+      firstName: "Priya",
+      lastName: "Patel",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=30",
+      currentWeek: 2,
+      startDate: "2024-09-22",
+      status: "active",
+    },
+    {
+      email: "carlos@lorikeet.ai",
+      firstName: "Carlos",
+      lastName: "Martinez",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=33",
+      currentWeek: 4,
+      startDate: "2024-08-15",
+      status: "active",
+    },
+    // Frontend Engineers
+    {
+      email: "jessica@lorikeet.ai",
+      firstName: "Jessica",
+      lastName: "Wu",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=9",
+      currentWeek: 3,
+      startDate: "2024-09-10",
+      status: "active",
+    },
+    {
+      email: "miguel@lorikeet.ai",
+      firstName: "Miguel",
+      lastName: "Santos",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=15",
+      currentWeek: 1,
+      startDate: "2024-10-05",
+      status: "active",
+    },
+    // Product Managers
+    {
+      email: "rachel@lorikeet.ai",
+      firstName: "Rachel",
+      lastName: "Green",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=24",
+      currentWeek: 2,
+      startDate: "2024-09-20",
+      status: "active",
+    },
+    {
+      email: "james@lorikeet.ai",
+      firstName: "James",
+      lastName: "Wilson",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=17",
+      currentWeek: 4,
+      startDate: "2024-08-20",
+      status: "active",
+    },
+    // Customer Success
+    {
+      email: "sophie@lorikeet.ai",
+      firstName: "Sophie",
+      lastName: "Anderson",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=23",
+      currentWeek: 2,
+      startDate: "2024-09-25",
+      status: "active",
+    },
+    {
+      email: "daniel@lorikeet.ai",
+      firstName: "Daniel",
+      lastName: "Brown",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=18",
+      currentWeek: 3,
+      startDate: "2024-09-05",
+      status: "active",
+    },
+    // Sales
+    {
+      email: "olivia@lorikeet.ai",
+      firstName: "Olivia",
+      lastName: "Davis",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=10",
+      currentWeek: 1,
+      startDate: "2024-10-08",
+      status: "active",
+    },
+    // Design
+    {
+      email: "ethan@lorikeet.ai",
+      firstName: "Ethan",
+      lastName: "Miller",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=16",
+      currentWeek: 2,
+      startDate: "2024-09-18",
+      status: "active",
+    },
+    // DevOps
+    {
+      email: "maya@lorikeet.ai",
+      firstName: "Maya",
+      lastName: "Johnson",
+      role: "employee",
+      avatarUrl: "https://i.pravatar.cc/150?img=20",
+      currentWeek: 3,
+      startDate: "2024-09-12",
+      status: "active",
+    },
+  ];
 
-  console.log(`✅ Created ${users.length} users`);
+  // Create Supabase Auth users (database profiles will be created by trigger)
+  const users = [];
+
+  for (const user of userData) {
+    console.log(`Creating auth user for ${user.email}...`);
+
+    // Create user in Supabase Auth
+    // The database trigger will automatically create the user profile
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: user.email,
+      password: TEST_PASSWORD,
+      email_confirm: true, // Auto-confirm email for test accounts
+      user_metadata: {
+        first_name: user.firstName,
+        last_name: user.lastName,
+        organization_id: organizationId,
+      },
+    });
+
+    if (authError) {
+      console.error(`Failed to create auth user for ${user.email}:`, authError);
+      continue;
+    }
+
+    if (!authData.user) {
+      console.error(`No user data returned for ${user.email}`);
+      continue;
+    }
+
+    // Wait a moment for the trigger to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Query the created user profile (created by trigger)
+    const [dbUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, authData.user.id))
+      .limit(1);
+
+    if (dbUser) {
+      // Update additional fields that the trigger doesn't set
+      const [updatedUser] = await db
+        .update(schema.users)
+        .set({
+          role: user.role as "admin" | "employee",
+          avatarUrl: user.avatarUrl,
+          currentWeek: user.currentWeek,
+          startDate: user.startDate,
+        })
+        .where(eq(schema.users.id, authData.user.id))
+        .returning();
+
+      users.push(updatedUser);
+    } else {
+      console.error(`User profile not found for ${user.email} after trigger`);
+    }
+  }
+
+  console.log(`✅ Created ${users.length} users with Supabase Auth accounts`);
+  console.log(`🔑 All accounts use password: ${TEST_PASSWORD}`);
   return users;
 }
 
@@ -1154,8 +1211,21 @@ async function seed() {
   try {
     console.log("🌱 Starting database seed for Lorikeet...\n");
 
-    // Clear all tables first (idempotent seeding)
-    console.log("🧹 Clearing existing data...");
+    // Clear Supabase Auth users first
+    console.log("🧹 Clearing Supabase Auth users...");
+    const { data: { users: authUsers }, error: listError } = await supabase.auth.admin.listUsers();
+
+    if (listError) {
+      console.error("Error listing auth users:", listError);
+    } else if (authUsers && authUsers.length > 0) {
+      for (const user of authUsers) {
+        await supabase.auth.admin.deleteUser(user.id);
+      }
+      console.log(`✅ Deleted ${authUsers.length} Supabase Auth users`);
+    }
+
+    // Clear all database tables (idempotent seeding)
+    console.log("🧹 Clearing database tables...");
     await reset(db, schema);
     console.log("✅ Database cleared\n");
 

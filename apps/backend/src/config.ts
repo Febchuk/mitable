@@ -12,6 +12,13 @@ export const config = {
     directUrl: process.env.DIRECT_URL || process.env.DATABASE_URL || "",
   },
 
+  // Supabase Configuration
+  supabase: {
+    url: (process.env.SUPABASE_URL || "").trim(),
+    anonKey: (process.env.SUPABASE_ANON_KEY || "").trim(),
+    serviceRoleKey: (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim(),
+  },
+
   // OpenAI Configuration
   openai: {
     apiKey: (process.env.OPENAI_API_KEY || "").trim(),
@@ -37,6 +44,8 @@ export const config = {
 export function validateConfig() {
   const required = [
     { key: "DATABASE_URL", value: config.database.url },
+    { key: "SUPABASE_URL", value: config.supabase.url },
+    { key: "SUPABASE_ANON_KEY", value: config.supabase.anonKey },
     { key: "OPENAI_API_KEY", value: config.openai.apiKey },
     { key: "PINECONE_API_KEY", value: config.pinecone.apiKey },
     { key: "GEMINI_API_KEY", value: config.gemini.apiKey },

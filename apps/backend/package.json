@@ -19,6 +19,7 @@
   "dependencies": {
     "@mitable/shared": "*",
     "@pinecone-database/pinecone": "^6.1.2",
+    "@supabase/supabase-js": "^2.75.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.44.6",

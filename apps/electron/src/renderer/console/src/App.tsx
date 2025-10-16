@@ -5,6 +5,7 @@ import { RoadmapProvider } from "./context/RoadmapContext";
 import { NudgesProvider } from "./context/NudgesContext";
 import { ChatsProvider } from "./context/ChatsContext";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
+import LoginPage from "./pages/LoginPage";
 import HomeView from "./components/views/employee/HomeView";
 import RoadmapView from "./components/views/employee/RoadmapView";
 import RoadmapTaskDetail from "./components/views/employee/RoadmapView/RoadmapTaskDetail";
@@ -29,6 +30,28 @@ function DefaultRoute() {
   return <Navigate to={defaultPath} replace />;
 }
 
+// Protected route wrapper - redirects to login if not authenticated
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useUser();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <HashRouter>
@@ -38,7 +61,18 @@ function App() {
             <NudgesProvider>
               <ChatsProvider>
                 <Routes>
-                  <Route path="/" element={<ConsoleLayout />}>
+                  {/* Public route */}
+                  <Route path="/login" element={<LoginPage />} />
+
+                  {/* Protected routes */}
+                  <Route
+                    path="/"
+                    element={
+                      <ProtectedRoute>
+                        <ConsoleLayout />
+                      </ProtectedRoute>
+                    }
+                  >
                     <Route index element={<DefaultRoute />} />
                     {/* Admin Routes */}
                     <Route path="dashboard" element={<DashboardView />} />
