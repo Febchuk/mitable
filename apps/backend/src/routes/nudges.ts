@@ -7,8 +7,31 @@ import { requireAuth } from "../middleware/auth";
 const router = Router();
 
 /**
- * GET /api/nudges
- * Fetch all active nudges for the user
+ * @openapi
+ * /nudges:
+ *   get:
+ *     tags:
+ *       - Nudges
+ *     summary: Get all expert nudges
+ *     description: Retrieve all nudges for the authenticated user with expert information and match scores
+ *     responses:
+ *       200:
+ *         description: Nudges retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 nudges:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Nudge'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;
@@ -67,8 +90,54 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 /**
- * POST /api/nudges/:nudgeId/accept
- * Accept a nudge
+ * @openapi
+ * /nudges/{nudgeId}/accept:
+ *   post:
+ *     tags:
+ *       - Nudges
+ *     summary: Accept an expert nudge
+ *     description: Accept a nudge recommendation to connect with an expert. Updates status to 'accepted' and sets timestamp.
+ *     parameters:
+ *       - in: path
+ *         name: nudgeId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the nudge to accept
+ *     responses:
+ *       200:
+ *         description: Nudge accepted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 nudge:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     status:
+ *                       type: string
+ *                       example: accepted
+ *                     acceptedAt:
+ *                       type: string
+ *                       format: date-time
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.post("/:nudgeId/accept", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;
@@ -127,8 +196,51 @@ router.post("/:nudgeId/accept", requireAuth, async (req: Request, res: Response)
 });
 
 /**
- * POST /api/nudges/:nudgeId/dismiss
- * Dismiss a nudge
+ * @openapi
+ * /nudges/{nudgeId}/dismiss:
+ *   post:
+ *     tags:
+ *       - Nudges
+ *     summary: Dismiss an expert nudge
+ *     description: Decline a nudge recommendation. Updates status to 'declined'.
+ *     parameters:
+ *       - in: path
+ *         name: nudgeId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the nudge to dismiss
+ *     responses:
+ *       200:
+ *         description: Nudge dismissed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 nudge:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     status:
+ *                       type: string
+ *                       example: declined
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.post(
   "/:nudgeId/dismiss",
@@ -188,8 +300,54 @@ router.post(
 );
 
 /**
- * POST /api/nudges/:nudgeId/resolve
- * Resolve a nudge
+ * @openapi
+ * /nudges/{nudgeId}/resolve:
+ *   post:
+ *     tags:
+ *       - Nudges
+ *     summary: Resolve an expert nudge
+ *     description: Mark a nudge as resolved after the help is complete. Updates status to 'resolved' and sets resolution timestamp.
+ *     parameters:
+ *       - in: path
+ *         name: nudgeId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the nudge to resolve
+ *     responses:
+ *       200:
+ *         description: Nudge resolved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 nudge:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     status:
+ *                       type: string
+ *                       example: resolved
+ *                     resolvedAt:
+ *                       type: string
+ *                       format: date-time
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.post(
   "/:nudgeId/resolve",

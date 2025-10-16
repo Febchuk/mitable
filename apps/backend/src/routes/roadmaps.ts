@@ -7,8 +7,55 @@ import { requireAuth } from "../middleware/auth";
 const router = Router();
 
 /**
- * GET /api/roadmaps
- * Fetch the user's roadmap with all weeks and tasks
+ * @openapi
+ * /roadmaps:
+ *   get:
+ *     tags:
+ *       - Roadmaps
+ *     summary: Get user's onboarding roadmap
+ *     description: Retrieve the authenticated user's complete roadmap including all weeks, tasks, and completion progress
+ *     responses:
+ *       200:
+ *         description: Roadmap retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 weeks:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       number:
+ *                         type: integer
+ *                         example: 1
+ *                       percentage:
+ *                         type: integer
+ *                         description: Week completion percentage (0-100)
+ *                         example: 80
+ *                       tasks:
+ *                         type: array
+ *                         items:
+ *                           $ref: '#/components/schemas/RoadmapTask'
+ *                 currentWeek:
+ *                   type: integer
+ *                   description: Current week number in roadmap
+ *                   example: 2
+ *                 totalWeeks:
+ *                   type: integer
+ *                   description: Total weeks in roadmap
+ *                   example: 12
+ *                 status:
+ *                   type: string
+ *                   enum: [active, no_roadmap]
+ *                   example: active
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;
@@ -99,8 +146,69 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 /**
- * PATCH /api/roadmaps/tasks/:taskId
- * Toggle a task's completion status
+ * @openapi
+ * /roadmaps/tasks/{taskId}:
+ *   patch:
+ *     tags:
+ *       - Roadmaps
+ *     summary: Update task completion status
+ *     description: Toggle a roadmap task's completion status. Only the task owner can update their tasks.
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the task to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - completed
+ *             properties:
+ *               completed:
+ *                 type: boolean
+ *                 description: New completion status
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: Task updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 task:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     completed:
+ *                       type: boolean
+ *                     completedAt:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.patch("/tasks/:taskId", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;

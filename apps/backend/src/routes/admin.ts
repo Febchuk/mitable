@@ -25,8 +25,127 @@ function formatTimestamp(date: Date): string {
 }
 
 /**
- * GET /api/admin/users/:id
- * Fetch detailed information for a single user
+ * @openapi
+ * /admin/users/{id}:
+ *   get:
+ *     tags:
+ *       - Admin - People Management
+ *     summary: Get detailed user information
+ *     description: Retrieve comprehensive user profile including roadmaps, conversations, nudges, and activity data. Admin access required.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the user to retrieve
+ *     responses:
+ *       200:
+ *         description: User details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     startDate:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                       enum: [Active, Onboarding]
+ *                     progress:
+ *                       type: integer
+ *                       description: Overall completion percentage
+ *                     manager:
+ *                       type: string
+ *                       nullable: true
+ *                     metrics:
+ *                       type: object
+ *                       properties:
+ *                         totalTasks:
+ *                           type: integer
+ *                         completedTasks:
+ *                           type: integer
+ *                         overdueTasks:
+ *                           type: integer
+ *                     assignedRoadmaps:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           title:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           tasks:
+ *                             type: integer
+ *                           completion:
+ *                             type: integer
+ *                     conversations:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           timestamp:
+ *                             type: string
+ *                           question:
+ *                             type: string
+ *                           status:
+ *                             type: string
+ *                             enum: [resolved, nudge]
+ *                     nudgeThemes:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           theme:
+ *                             type: string
+ *                           count:
+ *                             type: integer
+ *                           nudges:
+ *                             type: array
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 name:
+ *                                   type: string
+ *                                 count:
+ *                                   type: integer
+ *                     activityData:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           date:
+ *                             type: string
+ *                           hours:
+ *                             type: number
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -262,8 +381,57 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
 });
 
 /**
- * GET /api/admin/users
- * Fetch all users with their onboarding progress
+ * @openapi
+ * /admin/users:
+ *   get:
+ *     tags:
+ *       - Admin - People Management
+ *     summary: Get all users in organization
+ *     description: Retrieve list of all employees with onboarding progress and status. Admin access required.
+ *     responses:
+ *       200:
+ *         description: Users retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       name:
+ *                         type: string
+ *                         example: John Doe
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                       role:
+ *                         type: string
+ *                       startDate:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                         enum: [Active, Onboarding]
+ *                         description: Calculated based on completion (100% = Active)
+ *                       progress:
+ *                         type: integer
+ *                         description: Overall completion percentage (0-100)
+ *                       avatarUrl:
+ *                         type: string
+ *                         nullable: true
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -345,8 +513,33 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
 });
 
 /**
- * GET /api/admin/templates
- * Fetch all roadmap templates with usage statistics
+ * @openapi
+ * /admin/templates:
+ *   get:
+ *     tags:
+ *       - Admin - Templates
+ *     summary: Get all roadmap templates
+ *     description: Retrieve all onboarding roadmap templates with usage statistics and task counts. Admin access required.
+ *     responses:
+ *       200:
+ *         description: Templates retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 templates:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Template'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/templates", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -427,8 +620,60 @@ router.get("/templates", requireAuth, async (req: Request, res: Response): Promi
 });
 
 /**
- * GET /api/admin/integrations
- * Fetch all integrations for the user's organization
+ * @openapi
+ * /admin/integrations:
+ *   get:
+ *     tags:
+ *       - Admin - Integrations
+ *     summary: Get all integrations
+ *     description: Retrieve all third-party integrations configured for the organization. Admin access required.
+ *     responses:
+ *       200:
+ *         description: Integrations retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 integrations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       provider:
+ *                         type: string
+ *                         enum: [slack, notion, github, google-drive]
+ *                         example: slack
+ *                       name:
+ *                         type: string
+ *                         example: Slack
+ *                       description:
+ *                         type: string
+ *                         example: Get channel and DM message data. Updates four times a day.
+ *                       status:
+ *                         type: string
+ *                         enum: [connected, disconnected, pending, error]
+ *                         example: connected
+ *                       updatesPerDay:
+ *                         type: integer
+ *                         example: 4
+ *                       connectedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/integrations", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {

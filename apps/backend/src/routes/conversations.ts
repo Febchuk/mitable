@@ -7,8 +7,50 @@ import { requireAuth } from "../middleware/auth";
 const router = Router();
 
 /**
- * GET /api/conversations
- * Fetch all conversations for the user
+ * @openapi
+ * /conversations:
+ *   get:
+ *     tags:
+ *       - Conversations
+ *     summary: Get all conversations
+ *     description: Retrieve all conversations for the authenticated user, including all messages and last message preview
+ *     responses:
+ *       200:
+ *         description: Conversations retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 conversations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       title:
+ *                         type: string
+ *                         example: How to set up my dev environment?
+ *                       lastMessage:
+ *                         type: string
+ *                         description: Preview of the last message
+ *                       timestamp:
+ *                         type: string
+ *                         format: date-time
+ *                       unread:
+ *                         type: boolean
+ *                       messages:
+ *                         type: array
+ *                         items:
+ *                           $ref: '#/components/schemas/Message'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;
@@ -78,8 +120,43 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 /**
- * GET /api/conversations/:conversationId/messages
- * Fetch messages for a specific conversation
+ * @openapi
+ * /conversations/{conversationId}/messages:
+ *   get:
+ *     tags:
+ *       - Conversations
+ *     summary: Get conversation messages
+ *     description: Retrieve all messages for a specific conversation. Verifies conversation ownership.
+ *     parameters:
+ *       - in: path
+ *         name: conversationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the conversation
+ *     responses:
+ *       200:
+ *         description: Messages retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 messages:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Message'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get(
   "/:conversationId/messages",
@@ -157,8 +234,52 @@ router.get(
 );
 
 /**
- * POST /api/conversations
- * Create a new conversation
+ * @openapi
+ * /conversations:
+ *   post:
+ *     tags:
+ *       - Conversations
+ *     summary: Create a new conversation
+ *     description: Start a new conversation with an optional initial message
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Conversation title
+ *                 example: Setting up development environment
+ *               contextType:
+ *                 type: string
+ *                 enum: [help_request, general, expert]
+ *                 default: general
+ *                 example: help_request
+ *               initialMessage:
+ *                 type: string
+ *                 description: Optional first message to add to the conversation
+ *                 example: I need help setting up my local development environment
+ *     responses:
+ *       200:
+ *         description: Conversation created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 conversation:
+ *                   $ref: '#/components/schemas/Conversation'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.post("/", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.user?.id || req.userId;
@@ -211,8 +332,84 @@ router.post("/", requireAuth, async (req: Request, res: Response): Promise<void>
 });
 
 /**
- * POST /api/conversations/:conversationId/messages
- * Send a message in a conversation
+ * @openapi
+ * /conversations/{conversationId}/messages:
+ *   post:
+ *     tags:
+ *       - Conversations
+ *     summary: Send a message in conversation
+ *     description: Add a new message to an existing conversation. Supports user and assistant messages with optional metadata.
+ *     parameters:
+ *       - in: path
+ *         name: conversationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the conversation
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - role
+ *               - content
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [user, assistant]
+ *                 example: user
+ *               content:
+ *                 type: string
+ *                 description: Message content
+ *                 example: How do I install Node.js?
+ *               messageType:
+ *                 type: string
+ *                 enum: [text, screenshot, visual_guidance]
+ *                 default: text
+ *               cardData:
+ *                 type: object
+ *                 description: Optional structured data for card displays
+ *                 nullable: true
+ *               sources:
+ *                 type: array
+ *                 description: Optional sources/references for the message
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     title:
+ *                       type: string
+ *                     url:
+ *                       type: string
+ *                     relevanceScore:
+ *                       type: number
+ *     responses:
+ *       200:
+ *         description: Message sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   $ref: '#/components/schemas/Message'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.post(
   "/:conversationId/messages",
