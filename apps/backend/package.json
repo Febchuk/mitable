@@ -13,7 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
     "@mitable/shared": "*",
@@ -34,6 +35,7 @@
     "@types/pg": "^8.11.10",
     "@types/supertest": "^6.0.3",
     "drizzle-kit": "^0.31.5",
+    "drizzle-seed": "^0.3.1",
     "supertest": "^7.1.4",
     "tsup": "^8.0.2",
     "tsx": "^4.7.1",
