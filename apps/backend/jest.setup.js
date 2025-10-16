@@ -15,4 +15,3 @@ process.env.PINECONE_API_KEY = "test-pinecone-key";
 process.env.PINECONE_INDEX_NAME = "test-index";
 process.env.GEMINI_API_KEY = "test-gemini-key";
 process.env.JWT_SECRET = "test-jwt-secret";
-
