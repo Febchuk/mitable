@@ -80,8 +80,8 @@ export interface Template {
   icon?: string;
   roleTags: string[];
   totalWeeks: number;
-  tasks?: number;  // Computed field for UI
-  usedCount?: number;  // Computed field for UI
+  tasks?: number; // Computed field for UI
+  usedCount?: number; // Computed field for UI
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -111,9 +111,9 @@ export interface UserTemplateAssignment {
 }
 
 export interface UserRoadmapTask extends Task {
-  templateId?: string;        // null if custom task
-  templateTaskId?: string;    // original template task reference
-  isCustom: boolean;          // true if manually added by admin
+  templateId?: string; // null if custom task
+  templateTaskId?: string; // original template task reference
+  isCustom: boolean; // true if manually added by admin
 }
 
 // Status badge variants

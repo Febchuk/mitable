@@ -101,10 +101,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
 
     const response = await authService.refreshToken(refreshToken);
-    authService.saveTokens(
-      response.session.access_token,
-      response.session.refresh_token
-    );
+    authService.saveTokens(response.session.access_token, response.session.refresh_token);
   };
 
   return (

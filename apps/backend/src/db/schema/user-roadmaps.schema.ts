@@ -1,12 +1,4 @@
-import {
-  pgTable,
-  uuid,
-  varchar,
-  text,
-  integer,
-  timestamp,
-  boolean,
-} from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "./users.schema";
 import { roadmapTemplates } from "./roadmap-templates.schema";
@@ -47,19 +39,16 @@ export const userRoadmapTasks = pgTable("user_roadmap_tasks", {
 });
 
 // Relations
-export const userTemplateAssignmentsRelations = relations(
-  userTemplateAssignments,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [userTemplateAssignments.userId],
-      references: [users.id],
-    }),
-    template: one(roadmapTemplates, {
-      fields: [userTemplateAssignments.templateId],
-      references: [roadmapTemplates.id],
-    }),
-  })
-);
+export const userTemplateAssignmentsRelations = relations(userTemplateAssignments, ({ one }) => ({
+  user: one(users, {
+    fields: [userTemplateAssignments.userId],
+    references: [users.id],
+  }),
+  template: one(roadmapTemplates, {
+    fields: [userTemplateAssignments.templateId],
+    references: [roadmapTemplates.id],
+  }),
+}));
 
 export const userRoadmapTasksRelations = relations(userRoadmapTasks, ({ one }) => ({
   user: one(users, {

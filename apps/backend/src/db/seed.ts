@@ -17,16 +17,12 @@ const pool = new Pool({
 const db = drizzle(pool, { schema });
 
 // Supabase client for creating auth users
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
 
 // Standard password for all test accounts
 const TEST_PASSWORD = "Password123!";
@@ -274,7 +270,7 @@ async function seedUsers(organizationId: string) {
     }
 
     // Wait a moment for the trigger to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Query the created user profile (created by trigger)
     const [dbUser] = await db
@@ -575,8 +571,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 1,
       orderIndex: 3,
       title: "Complete LangChain basics tutorial",
-      description:
-        "Work through LangChain documentation to understand chains, agents, and memory",
+      description: "Work through LangChain documentation to understand chains, agents, and memory",
       timeEstimate: "6 hours",
     },
     {
@@ -584,8 +579,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 1,
       title: "Build your first simple agent",
-      description:
-        "Create a basic customer service agent using our framework and test it locally",
+      description: "Create a basic customer service agent using our framework and test it locally",
       timeEstimate: "1 day",
     },
     {
@@ -602,8 +596,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 3,
       title: "Understand RAG pipeline architecture",
-      description:
-        "Deep dive into our Retrieval-Augmented Generation system with Pinecone",
+      description: "Deep dive into our Retrieval-Augmented Generation system with Pinecone",
       timeEstimate: "6 hours",
     },
     {
@@ -685,8 +678,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 1,
       orderIndex: 1,
       title: "Complete development setup",
-      description:
-        "Set up your local environment with all required tools and dependencies",
+      description: "Set up your local environment with all required tools and dependencies",
       timeEstimate: "2 hours",
     },
     {
@@ -711,8 +703,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 1,
       title: "Fix a good first issue",
-      description:
-        "Pick up a 'good first issue' from GitHub and submit your first PR",
+      description: "Pick up a 'good first issue' from GitHub and submit your first PR",
       timeEstimate: "1 day",
     },
     {
@@ -720,8 +711,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 2,
       title: "Learn our CI/CD pipeline",
-      description:
-        "Understand how code moves from PR to staging to production",
+      description: "Understand how code moves from PR to staging to production",
       timeEstimate: "2 hours",
     },
     {
@@ -729,8 +719,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 3,
       orderIndex: 1,
       title: "Pair program with a senior engineer",
-      description:
-        "Schedule a 2-hour pairing session to learn team coding practices",
+      description: "Schedule a 2-hour pairing session to learn team coding practices",
       timeEstimate: "2 hours",
     },
     {
@@ -738,8 +727,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 3,
       orderIndex: 2,
       title: "Write comprehensive tests",
-      description:
-        "Add unit and integration tests for your feature",
+      description: "Add unit and integration tests for your feature",
       timeEstimate: "4 hours",
     },
     {
@@ -747,8 +735,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 4,
       orderIndex: 1,
       title: "Deploy a feature to production",
-      description:
-        "Ship your first feature all the way to production with monitoring",
+      description: "Ship your first feature all the way to production with monitoring",
       timeEstimate: "2 days",
     },
   ]);
@@ -774,8 +761,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 1,
       orderIndex: 1,
       title: "Deep dive on product vision",
-      description:
-        "Meet with VP of Product to understand our product strategy and roadmap",
+      description: "Meet with VP of Product to understand our product strategy and roadmap",
       timeEstimate: "2 hours",
     },
     {
@@ -783,8 +769,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 1,
       orderIndex: 2,
       title: "Study customer workflows",
-      description:
-        "Shadow customer success team and watch customer demos to understand user needs",
+      description: "Shadow customer success team and watch customer demos to understand user needs",
       timeEstimate: "1 day",
     },
     {
@@ -792,8 +777,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 1,
       title: "Review analytics dashboards",
-      description:
-        "Get access to Amplitude and review key product metrics",
+      description: "Get access to Amplitude and review key product metrics",
       timeEstimate: "3 hours",
     },
     {
@@ -801,8 +785,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 2,
       title: "Conduct user interviews",
-      description:
-        "Interview 3-5 customers to understand pain points and feature requests",
+      description: "Interview 3-5 customers to understand pain points and feature requests",
       timeEstimate: "1 day",
     },
     {
@@ -810,8 +793,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 3,
       orderIndex: 1,
       title: "Write your first PRD",
-      description:
-        "Draft a Product Requirements Document for a small feature",
+      description: "Draft a Product Requirements Document for a small feature",
       timeEstimate: "1 day",
     },
     {
@@ -819,8 +801,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 3,
       orderIndex: 2,
       title: "Present at product review",
-      description:
-        "Present your feature proposal at weekly product review meeting",
+      description: "Present your feature proposal at weekly product review meeting",
       timeEstimate: "3 hours",
     },
     {
@@ -828,8 +809,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 4,
       orderIndex: 1,
       title: "Prioritize feature backlog",
-      description:
-        "Work with engineering to prioritize and estimate upcoming features",
+      description: "Work with engineering to prioritize and estimate upcoming features",
       timeEstimate: "4 hours",
     },
     {
@@ -837,8 +817,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 4,
       orderIndex: 2,
       title: "Ship your first feature",
-      description:
-        "See your first feature through from conception to launch",
+      description: "See your first feature through from conception to launch",
       timeEstimate: "2 days",
     },
   ]);
@@ -864,8 +843,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 1,
       orderIndex: 1,
       title: "Complete platform training",
-      description:
-        "Go through comprehensive platform training to understand all features",
+      description: "Go through comprehensive platform training to understand all features",
       timeEstimate: "1 day",
     },
     {
@@ -873,8 +851,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 1,
       orderIndex: 2,
       title: "Shadow senior CS team member",
-      description:
-        "Shadow customer calls and support tickets to learn best practices",
+      description: "Shadow customer calls and support tickets to learn best practices",
       timeEstimate: "1 day",
     },
     {
@@ -882,8 +859,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 1,
       title: "Learn escalation procedures",
-      description:
-        "Understand when and how to escalate customer issues to engineering",
+      description: "Understand when and how to escalate customer issues to engineering",
       timeEstimate: "2 hours",
     },
     {
@@ -891,8 +867,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 2,
       title: "Handle your first support tickets",
-      description:
-        "Respond to 5-10 customer support tickets with supervisor review",
+      description: "Respond to 5-10 customer support tickets with supervisor review",
       timeEstimate: "1 day",
     },
     {
@@ -900,8 +875,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 3,
       orderIndex: 1,
       title: "Conduct customer onboarding call",
-      description:
-        "Lead your first customer onboarding call with a new customer",
+      description: "Lead your first customer onboarding call with a new customer",
       timeEstimate: "2 hours",
     },
     {
@@ -909,8 +883,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 3,
       orderIndex: 2,
       title: "Document customer feedback",
-      description:
-        "Compile customer feedback and share insights with product team",
+      description: "Compile customer feedback and share insights with product team",
       timeEstimate: "3 hours",
     },
   ]);
@@ -936,8 +909,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 1,
       orderIndex: 1,
       title: "Master the product demo",
-      description:
-        "Learn to deliver compelling product demos for different customer personas",
+      description: "Learn to deliver compelling product demos for different customer personas",
       timeEstimate: "1 day",
     },
     {
@@ -945,8 +917,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 1,
       orderIndex: 2,
       title: "Study sales playbook",
-      description:
-        "Review enterprise sales methodology and qualification criteria",
+      description: "Review enterprise sales methodology and qualification criteria",
       timeEstimate: "4 hours",
     },
     {
@@ -954,8 +925,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 1,
       title: "Shadow experienced AE on calls",
-      description:
-        "Join 5-10 sales calls to learn discovery questions and objection handling",
+      description: "Join 5-10 sales calls to learn discovery questions and objection handling",
       timeEstimate: "2 days",
     },
     {
@@ -963,8 +933,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 2,
       title: "Learn technical objection handling",
-      description:
-        "Understand how to address common technical concerns from prospects",
+      description: "Understand how to address common technical concerns from prospects",
       timeEstimate: "3 hours",
     },
     {
@@ -972,8 +941,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 3,
       orderIndex: 1,
       title: "Lead your first demo",
-      description:
-        "Deliver a full product demo to a qualified prospect",
+      description: "Deliver a full product demo to a qualified prospect",
       timeEstimate: "2 hours",
     },
     {
@@ -981,8 +949,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 3,
       orderIndex: 2,
       title: "Close your first deal",
-      description:
-        "Navigate a full sales cycle from discovery to close",
+      description: "Navigate a full sales cycle from discovery to close",
       timeEstimate: "2 weeks",
     },
   ]);
@@ -993,8 +960,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
     .values({
       organizationId,
       title: "Product Design Onboarding",
-      description:
-        "Design onboarding covering design system, AI UX patterns, and design workflow",
+      description: "Design onboarding covering design system, AI UX patterns, and design workflow",
       icon: "Palette",
       color: "#ec4899",
       roleTags: ["Product Designer", "Design"],
@@ -1008,8 +974,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 1,
       orderIndex: 1,
       title: "Study the design system",
-      description:
-        "Review our complete design system including components, colors, and spacing",
+      description: "Review our complete design system including components, colors, and spacing",
       timeEstimate: "4 hours",
     },
     {
@@ -1017,8 +982,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 1,
       orderIndex: 2,
       title: "Set up Figma workspace",
-      description:
-        "Get access to Figma and familiarize yourself with our component library",
+      description: "Get access to Figma and familiarize yourself with our component library",
       timeEstimate: "2 hours",
     },
     {
@@ -1026,8 +990,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 1,
       title: "Learn AI UX patterns",
-      description:
-        "Study best practices for designing AI-powered conversational interfaces",
+      description: "Study best practices for designing AI-powered conversational interfaces",
       timeEstimate: "6 hours",
     },
     {
@@ -1035,8 +998,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 2,
       orderIndex: 2,
       title: "Design a small feature",
-      description:
-        "Design mockups for a minor feature improvement with design review",
+      description: "Design mockups for a minor feature improvement with design review",
       timeEstimate: "1 day",
     },
     {
@@ -1044,8 +1006,7 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 3,
       orderIndex: 1,
       title: "Conduct user testing",
-      description:
-        "Run usability tests with 3-5 users and synthesize findings",
+      description: "Run usability tests with 3-5 users and synthesize findings",
       timeEstimate: "1 day",
     },
     {
@@ -1053,13 +1014,19 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
       weekNumber: 3,
       orderIndex: 2,
       title: "Ship your first design",
-      description:
-        "Work with engineering to implement and ship your first design",
+      description: "Work with engineering to implement and ship your first design",
       timeEstimate: "2 days",
     },
   ]);
 
-  const templates = [aiTemplate, engTemplate, productTemplate, csTemplate, salesTemplate, designTemplate];
+  const templates = [
+    aiTemplate,
+    engTemplate,
+    productTemplate,
+    csTemplate,
+    salesTemplate,
+    designTemplate,
+  ];
   console.log(`✅ Created ${templates.length} templates with tasks`);
   return templates;
 }
@@ -1213,7 +1180,10 @@ async function seed() {
 
     // Clear Supabase Auth users first
     console.log("🧹 Clearing Supabase Auth users...");
-    const { data: { users: authUsers }, error: listError } = await supabase.auth.admin.listUsers();
+    const {
+      data: { users: authUsers },
+      error: listError,
+    } = await supabase.auth.admin.listUsers();
 
     if (listError) {
       console.error("Error listing auth users:", listError);
@@ -1239,7 +1209,9 @@ async function seed() {
 
     console.log("\n📊 Seed Summary:");
     console.log(`  - Organization: ${organization.name}`);
-    console.log(`  - Users: ${users.length} (${users.filter(u => u.role === 'admin').length} admins, ${users.filter(u => u.role === 'employee').length} employees)`);
+    console.log(
+      `  - Users: ${users.length} (${users.filter((u) => u.role === "admin").length} admins, ${users.filter((u) => u.role === "employee").length} employees)`
+    );
     console.log(`  - Source Materials: ${materials.length}`);
     console.log(`  - Templates: ${templates.length}`);
     console.log(`  - User Assignments: ${assignments.length}`);

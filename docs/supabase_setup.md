@@ -272,8 +272,8 @@ This project uses **Drizzle Kit** for schema management and migrations. Drizzle 
 
 ```typescript
 export default defineConfig({
-  schema: "./src/db/schema/index.ts",  // Your TypeScript schema
-  out: "./src/db/migrations",           // Generated SQL migrations
+  schema: "./src/db/schema/index.ts", // Your TypeScript schema
+  out: "./src/db/migrations", // Generated SQL migrations
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL!,
@@ -291,7 +291,9 @@ Edit your schema files in `apps/backend/src/db/schema/`:
 // Example: Add a new field to templates
 export const roadmapTemplates = pgTable("roadmap_templates", {
   id: uuid("id").primaryKey().defaultRandom(),
-  organizationId: uuid("organization_id").notNull().references(() => organizations.id),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id),
   title: varchar("title", { length: 255 }).notNull(),
   // Add new field
   color: varchar("color", { length: 7 }), // New field for template color
@@ -307,11 +309,13 @@ npm run db:generate
 ```
 
 This command:
+
 - Compares your schema files with the current database state
 - Generates SQL migration file in `src/db/migrations/`
 - Creates migration metadata in `src/db/migrations/meta/`
 
 **Output:**
+
 ```
 [✓] Your SQL migration file ➜ src/db/migrations/0001_add_template_color.sql
 ```
@@ -356,12 +360,12 @@ npm run db:studio
 
 ### Quick Reference: When to Use Each Command
 
-| Command | When to Use | Production Safe? |
-|---------|-------------|------------------|
-| `db:generate` | After changing schema files | ✅ Yes - creates migration files |
-| `db:migrate` | Apply pending migrations | ✅ Yes - runs migration files |
-| `db:push` | Rapid prototyping (no migration files) | ⚠️ Dev only - doesn't create migration history |
-| `db:studio` | Visual database exploration | ✅ Yes - read-only by default |
+| Command       | When to Use                            | Production Safe?                               |
+| ------------- | -------------------------------------- | ---------------------------------------------- |
+| `db:generate` | After changing schema files            | ✅ Yes - creates migration files               |
+| `db:migrate`  | Apply pending migrations               | ✅ Yes - runs migration files                  |
+| `db:push`     | Rapid prototyping (no migration files) | ⚠️ Dev only - doesn't create migration history |
+| `db:studio`   | Visual database exploration            | ✅ Yes - read-only by default                  |
 
 ### Migration File Structure
 

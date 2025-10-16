@@ -266,8 +266,8 @@ export default function AddNewUser() {
             Onboarding Roadmap <span className="text-red-500">*</span>
           </h2>
           <p className="text-sm text-text-secondary">
-            Select one or more templates. They'll be combined into this person's complete
-            onboarding plan.
+            Select one or more templates. They'll be combined into this person's complete onboarding
+            plan.
           </p>
         </div>
 
@@ -287,7 +287,8 @@ export default function AddNewUser() {
               <div className="flex-1">
                 <p className="text-text-primary font-semibold">{template.title}</p>
                 <p className="text-sm text-primary mt-1">
-                  {template.tasks} tasks • {template.totalWeeks} {template.totalWeeks === 1 ? "week" : "weeks"}
+                  {template.tasks} tasks • {template.totalWeeks}{" "}
+                  {template.totalWeeks === 1 ? "week" : "weeks"}
                 </p>
                 <p className="text-sm text-text-secondary mt-1">{template.description}</p>
               </div>

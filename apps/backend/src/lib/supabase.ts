@@ -26,13 +26,9 @@ export const supabaseAdmin = createClient(
  * Use this client for operations that respect Row Level Security (RLS).
  * This is safer for most operations.
  */
-export const supabase = createClient(
-  config.supabase.url,
-  config.supabase.anonKey,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
+export const supabase = createClient(config.supabase.url, config.supabase.anonKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});

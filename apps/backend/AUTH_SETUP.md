@@ -7,15 +7,19 @@ Mitable backend now has a complete authentication system using **Supabase Auth**
 ## What Was Implemented
 
 ### 1. **Supabase Client** (`src/lib/supabase.ts`)
+
 - Admin client for elevated operations
 - Standard client for RLS-respecting operations
 
 ### 2. **Auth Middleware** (`src/middleware/auth.ts`)
+
 - `requireAuth` - Blocks unauthenticated requests (401)
 - `optionalAuth` - Allows both authenticated and anonymous requests
 
 ### 3. **Auth Routes** (`src/routes/auth.ts`)
+
 All routes under `/api/auth`:
+
 - `POST /auth/signup` - Create new user account
 - `POST /auth/login` - Sign in with email/password
 - `POST /auth/logout` - Sign out current user
@@ -23,11 +27,14 @@ All routes under `/api/auth`:
 - `POST /auth/refresh` - Refresh access token
 
 ### 4. **Database Trigger** (Migration `0002_auth_trigger.sql`)
+
 - Automatically creates user profile in `users` table when signing up
 - Syncs Supabase Auth users with your database
 
 ### 5. **Protected Routes** (`src/routes.ts`)
+
 Examples of protected and public routes:
+
 - Protected: `/api/conversations`, `/api/help`, `/api/roadmaps`, `/api/nudges`
 - Optional auth: `/api/public-data`
 
@@ -72,6 +79,7 @@ Content-Type: application/json
 ```
 
 Response includes:
+
 ```json
 {
   "user": { ... },
@@ -118,11 +126,13 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 ## Testing
 
 1. **Start the server:**
+
 ```bash
 npm run dev
 ```
 
 2. **Test with curl or Postman:**
+
 ```bash
 # Signup
 curl -X POST http://localhost:3000/api/auth/signup \

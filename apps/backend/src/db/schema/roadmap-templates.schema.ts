@@ -68,30 +68,24 @@ export const roadmapTemplatesRelations = relations(roadmapTemplates, ({ one, man
   tasks: many(roadmapTemplateTasks),
 }));
 
-export const roadmapTemplateTasksRelations = relations(
-  roadmapTemplateTasks,
-  ({ one, many }) => ({
-    template: one(roadmapTemplates, {
-      fields: [roadmapTemplateTasks.templateId],
-      references: [roadmapTemplates.id],
-    }),
-    sources: many(roadmapTemplateSources),
-  })
-);
+export const roadmapTemplateTasksRelations = relations(roadmapTemplateTasks, ({ one, many }) => ({
+  template: one(roadmapTemplates, {
+    fields: [roadmapTemplateTasks.templateId],
+    references: [roadmapTemplates.id],
+  }),
+  sources: many(roadmapTemplateSources),
+}));
 
-export const roadmapTemplateSourcesRelations = relations(
-  roadmapTemplateSources,
-  ({ one }) => ({
-    templateTask: one(roadmapTemplateTasks, {
-      fields: [roadmapTemplateSources.templateTaskId],
-      references: [roadmapTemplateTasks.id],
-    }),
-    source: one(sourceMaterials, {
-      fields: [roadmapTemplateSources.sourceId],
-      references: [sourceMaterials.id],
-    }),
-  })
-);
+export const roadmapTemplateSourcesRelations = relations(roadmapTemplateSources, ({ one }) => ({
+  templateTask: one(roadmapTemplateTasks, {
+    fields: [roadmapTemplateSources.templateTaskId],
+    references: [roadmapTemplateTasks.id],
+  }),
+  source: one(sourceMaterials, {
+    fields: [roadmapTemplateSources.sourceId],
+    references: [sourceMaterials.id],
+  }),
+}));
 
 // Export types
 export type RoadmapTemplate = typeof roadmapTemplates.$inferSelect;

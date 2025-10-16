@@ -25,23 +25,26 @@
 ## Overview
 
 ### Problem Statement
+
 The word "roadmap" is currently overloaded:
+
 - **Admin side:** Creating reusable onboarding plans (should be "templates")
 - **Employee side:** User's personalized onboarding journey (should remain "roadmap")
 - **Database:** `roadmaps` table is user-specific (1:1 with user), but admin UI treats them as reusable templates
 
 ### Solution
+
 Separate **Templates** (admin-created reusable plans) from **Roadmaps** (user-specific journeys) using a **Copy on Assignment** architecture.
 
 ### Key Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| **Data Model** | Option A: Copy on Assignment | Users can customize without affecting templates |
-| **Multiple Templates** | Yes, with intelligent consolidation | Merge tasks and redistribute across balanced timeline |
-| **User Customization** | Full (add/remove/modify tasks) | Admins need flexibility to tailor per individual |
-| **Backend Naming** | `roadmap_templates` | Explicit namespace, follows `user_roadmaps` pattern |
-| **Frontend Naming** | "Templates" (admin), "Roadmap" (employee) | Clean, contextual |
+| Decision               | Choice                                    | Rationale                                             |
+| ---------------------- | ----------------------------------------- | ----------------------------------------------------- |
+| **Data Model**         | Option A: Copy on Assignment              | Users can customize without affecting templates       |
+| **Multiple Templates** | Yes, with intelligent consolidation       | Merge tasks and redistribute across balanced timeline |
+| **User Customization** | Full (add/remove/modify tasks)            | Admins need flexibility to tailor per individual      |
+| **Backend Naming**     | `roadmap_templates`                       | Explicit namespace, follows `user_roadmaps` pattern   |
+| **Frontend Naming**    | "Templates" (admin), "Roadmap" (employee) | Clean, contextual                                     |
 
 ---
 
@@ -50,10 +53,12 @@ Separate **Templates** (admin-created reusable plans) from **Roadmaps** (user-sp
 ### Backend (Database Layer)
 
 **Schema Files:**
+
 - `apps/backend/src/db/schema/roadmap-templates.schema.ts`
 - `apps/backend/src/db/schema/user-roadmaps.schema.ts`
 
 **Table Names:**
+
 - `roadmap_templates` - Admin-created templates
 - `roadmap_template_tasks` - Tasks belonging to templates
 - `roadmap_template_sources` - Many-to-many link to source_materials
@@ -61,6 +66,7 @@ Separate **Templates** (admin-created reusable plans) from **Roadmaps** (user-sp
 - `user_roadmap_tasks` - User's actual tasks (copied from templates)
 
 **Type Exports:**
+
 ```typescript
 // From roadmap-templates.schema.ts
 export type RoadmapTemplate = typeof roadmapTemplates.$inferSelect;
@@ -75,14 +81,17 @@ export type UserRoadmapTask = typeof userRoadmapTasks.$inferSelect;
 ### Frontend (UI Layer)
 
 **Component Names:**
+
 - `TemplatesView/` (admin)
 - `RoadmapView/` (employee - unchanged)
 
 **UI Labels:**
+
 - Admin: "Templates", "Create Template", "Assign Templates"
 - Employee: "Roadmap", "My Roadmap"
 
 **TypeScript Types:**
+
 ```typescript
 // Simple names since context is clear
 interface Template { ... }
@@ -168,30 +177,24 @@ export const roadmapTemplatesRelations = relations(roadmapTemplates, ({ one, man
   tasks: many(roadmapTemplateTasks),
 }));
 
-export const roadmapTemplateTasksRelations = relations(
-  roadmapTemplateTasks,
-  ({ one, many }) => ({
-    template: one(roadmapTemplates, {
-      fields: [roadmapTemplateTasks.templateId],
-      references: [roadmapTemplates.id],
-    }),
-    sources: many(roadmapTemplateSources),
-  })
-);
+export const roadmapTemplateTasksRelations = relations(roadmapTemplateTasks, ({ one, many }) => ({
+  template: one(roadmapTemplates, {
+    fields: [roadmapTemplateTasks.templateId],
+    references: [roadmapTemplates.id],
+  }),
+  sources: many(roadmapTemplateSources),
+}));
 
-export const roadmapTemplateSourcesRelations = relations(
-  roadmapTemplateSources,
-  ({ one }) => ({
-    templateTask: one(roadmapTemplateTasks, {
-      fields: [roadmapTemplateSources.templateTaskId],
-      references: [roadmapTemplateTasks.id],
-    }),
-    source: one(sourceMaterials, {
-      fields: [roadmapTemplateSources.sourceId],
-      references: [sourceMaterials.id],
-    }),
-  })
-);
+export const roadmapTemplateSourcesRelations = relations(roadmapTemplateSources, ({ one }) => ({
+  templateTask: one(roadmapTemplateTasks, {
+    fields: [roadmapTemplateSources.templateTaskId],
+    references: [roadmapTemplateTasks.id],
+  }),
+  source: one(sourceMaterials, {
+    fields: [roadmapTemplateSources.sourceId],
+    references: [sourceMaterials.id],
+  }),
+}));
 
 // Export types
 export type RoadmapTemplate = typeof roadmapTemplates.$inferSelect;
@@ -207,15 +210,7 @@ export type NewRoadmapTemplateSource = typeof roadmapTemplateSources.$inferInser
 **File:** `apps/backend/src/db/schema/user-roadmaps.schema.ts`
 
 ```typescript
-import {
-  pgTable,
-  uuid,
-  varchar,
-  text,
-  integer,
-  timestamp,
-  boolean,
-} from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "./users.schema";
 import { roadmapTemplates } from "./roadmap-templates.schema";
@@ -256,19 +251,16 @@ export const userRoadmapTasks = pgTable("user_roadmap_tasks", {
 });
 
 // Relations
-export const userTemplateAssignmentsRelations = relations(
-  userTemplateAssignments,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [userTemplateAssignments.userId],
-      references: [users.id],
-    }),
-    template: one(roadmapTemplates, {
-      fields: [userTemplateAssignments.templateId],
-      references: [roadmapTemplates.id],
-    }),
-  })
-);
+export const userTemplateAssignmentsRelations = relations(userTemplateAssignments, ({ one }) => ({
+  user: one(users, {
+    fields: [userTemplateAssignments.userId],
+    references: [users.id],
+  }),
+  template: one(roadmapTemplates, {
+    fields: [userTemplateAssignments.templateId],
+    references: [roadmapTemplates.id],
+  }),
+}));
 
 export const userRoadmapTasksRelations = relations(userRoadmapTasks, ({ one }) => ({
   user: one(users, {
@@ -330,8 +322,8 @@ export interface Template {
   icon?: string;
   roleTags: string[];
   totalWeeks: number;
-  tasks?: number;  // Computed field for UI
-  usedCount?: number;  // Computed field for UI
+  tasks?: number; // Computed field for UI
+  usedCount?: number; // Computed field for UI
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -361,9 +353,9 @@ export interface UserTemplateAssignment {
 }
 
 export interface UserRoadmapTask extends Task {
-  templateId?: string;        // null if custom task
-  templateTaskId?: string;    // original template task reference
-  isCustom: boolean;          // true if manually added by admin
+  templateId?: string; // null if custom task
+  templateTaskId?: string; // original template task reference
+  isCustom: boolean; // true if manually added by admin
 }
 
 // Keep existing Week, Task types for backward compatibility
@@ -385,6 +377,7 @@ RoadmapsView/ → TemplatesView/
 ### Component Updates Summary
 
 **TemplatesView/index.tsx:**
+
 - Rename component: `RoadmapsView` → `TemplatesView`
 - Update heading: "Roadmaps" → "Templates"
 - Update search placeholder: "Search templates..."
@@ -394,6 +387,7 @@ RoadmapsView/ → TemplatesView/
 - Use `Template` type from types
 
 **CreateTemplate.tsx:**
+
 - Rename component: `CreateRoadmap` → `CreateTemplate`
 - Update heading: "Create Template"
 - Update navigation: `/templates`
@@ -401,6 +395,7 @@ RoadmapsView/ → TemplatesView/
 - Update button: "Import & Generate Template"
 
 **AddNewUser.tsx:**
+
 - Import `Template` type
 - Rename: `RoadmapTemplate` → use `Template` type
 - Rename: `roadmapTemplates` → `templates`
@@ -408,6 +403,7 @@ RoadmapsView/ → TemplatesView/
 - Keep user-facing labels as "Onboarding Roadmap"
 
 **PersonDetail.tsx:**
+
 - Rename: `assignedRoadmaps` → `assignedTemplates`
 - Keep heading as "Assigned Roadmaps" (user context)
 - Update variable references
@@ -451,14 +447,16 @@ RoadmapsView/ → TemplatesView/
 ### CLAUDE.md
 
 **Database Schema section:**
+
 ```markdown
 -- Onboarding
-roadmap_templates, roadmap_template_tasks, roadmap_template_sources  -- Admin-created templates
-user_roadmap_tasks, user_template_assignments                        -- User-specific roadmaps
-source_materials                                                      -- Learning resources
+roadmap_templates, roadmap_template_tasks, roadmap_template_sources -- Admin-created templates
+user_roadmap_tasks, user_template_assignments -- User-specific roadmaps
+source_materials -- Learning resources
 ```
 
 **Add new section:**
+
 ```markdown
 ## Template Assignment Flow
 
@@ -479,6 +477,7 @@ Mitable uses a **Copy on Assignment** pattern for roadmap templates:
 ### Database Migration
 
 Create migration file to:
+
 1. Create new template tables
 2. Create user roadmap tables
 3. Add indexes
@@ -492,6 +491,7 @@ Migration will be generated after schema changes are complete using Drizzle.
 ## Implementation Checklist
 
 ### Phase 1: Database ✅
+
 - [ ] Create `roadmap-templates.schema.ts`
 - [ ] Create `user-roadmaps.schema.ts`
 - [ ] Update `schema/index.ts`
@@ -499,10 +499,12 @@ Migration will be generated after schema changes are complete using Drizzle.
 - [ ] Generate and run migration
 
 ### Phase 2: Frontend Types ✅
+
 - [ ] Add Template interfaces to `types/index.ts`
 - [ ] Run typecheck
 
 ### Phase 3: Admin UI ✅
+
 - [ ] Rename directory and files
 - [ ] Update `TemplatesView/index.tsx`
 - [ ] Update `CreateTemplate.tsx`
@@ -510,14 +512,17 @@ Migration will be generated after schema changes are complete using Drizzle.
 - [ ] Update `PersonDetail.tsx`
 
 ### Phase 4: Navigation ✅
+
 - [ ] Update `Nav.tsx`
 - [ ] Update `App.tsx`
 
 ### Phase 5: Documentation ✅
+
 - [ ] Update `CLAUDE.md`
 - [ ] Create this plan document
 
 ### Phase 6: Testing ✅
+
 - [ ] Run TypeScript typecheck
 - [ ] Manual UI testing
 - [ ] Build verification
@@ -529,6 +534,7 @@ Migration will be generated after schema changes are complete using Drizzle.
 ### Manual Testing Checklist
 
 **Admin Flow:**
+
 - [ ] Navigate to /templates
 - [ ] View template library
 - [ ] Click "Create Template"
@@ -539,6 +545,7 @@ Migration will be generated after schema changes are complete using Drizzle.
 - [ ] Verify "Assigned Roadmaps" section
 
 **Employee Flow:**
+
 - [ ] Navigate to /roadmap
 - [ ] Verify roadmap still works
 - [ ] Check task detail view
@@ -548,27 +555,29 @@ Migration will be generated after schema changes are complete using Drizzle.
 ## Rollback Plan
 
 ### Git Revert
+
 ```bash
 git log --oneline
 git revert <commit-hash>
 ```
 
 ### Database Rollback
+
 Keep old tables temporarily, drop after validation period.
 
 ---
 
 ## Timeline
 
-| Phase | Duration | Status |
-|-------|----------|--------|
-| Phase 1: Database | 2-3 hours | Not Started |
-| Phase 2: Types | 30 min | Not Started |
-| Phase 3: Admin UI | 2-3 hours | Not Started |
-| Phase 4: Navigation | 30 min | Not Started |
-| Phase 5: Documentation | 1 hour | In Progress |
-| Phase 6: Testing | 1 hour | Not Started |
-| **Total** | **7-9 hours** | |
+| Phase                  | Duration      | Status      |
+| ---------------------- | ------------- | ----------- |
+| Phase 1: Database      | 2-3 hours     | Not Started |
+| Phase 2: Types         | 30 min        | Not Started |
+| Phase 3: Admin UI      | 2-3 hours     | Not Started |
+| Phase 4: Navigation    | 30 min        | Not Started |
+| Phase 5: Documentation | 1 hour        | In Progress |
+| Phase 6: Testing       | 1 hour        | Not Started |
+| **Total**              | **7-9 hours** |             |
 
 ---
 

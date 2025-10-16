@@ -4,6 +4,7 @@ import { User } from "@supabase/supabase-js";
 
 // Extend Express Request to include user
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       user?: User;
@@ -21,11 +22,7 @@ declare global {
  * SECURITY NOTE: Always use getUser() not getSession() on the server
  * getUser() validates the token with the Supabase Auth server every time
  */
-export async function requireAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
