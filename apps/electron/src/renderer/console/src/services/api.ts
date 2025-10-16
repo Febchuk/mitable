@@ -2,24 +2,15 @@
  * Base API configuration and utilities
  */
 
-import { supabase } from "../lib/supabase";
+import { authService } from "./authService";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 /**
- * Get the authentication token from Supabase session
+ * Get the authentication token from localStorage
  */
 export async function getAuthToken(): Promise<string | null> {
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    return session?.access_token || null;
-  } catch (error) {
-    console.error("Error getting auth token:", error);
-    return null;
-  }
+  return authService.getAccessToken();
 }
 
 /**
@@ -40,7 +31,7 @@ export async function apiRequest<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
     ...options,
     headers,
   });

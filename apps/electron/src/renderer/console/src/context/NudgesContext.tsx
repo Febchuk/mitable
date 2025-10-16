@@ -5,7 +5,7 @@ import {
   acceptNudge as acceptNudgeAPI,
   dismissNudge as dismissNudgeAPI,
 } from "../services/nudgesService";
-import { supabase } from "../lib/supabase";
+import { useUser } from "./UserContext";
 
 interface NudgesContextType {
   nudges: Nudge[];
@@ -18,6 +18,7 @@ interface NudgesContextType {
 const NudgesContext = createContext<NudgesContextType | undefined>(undefined);
 
 export function NudgesProvider({ children }: { children: ReactNode }) {
+  const { user } = useUser();
   const [nudges, setNudges] = useState<Nudge[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,22 +26,27 @@ export function NudgesProvider({ children }: { children: ReactNode }) {
   // Fetch nudges when user is authenticated
   useEffect(() => {
     async function loadNudges() {
+      if (!user) {
+        // User not authenticated, skip fetching
+        setNudges([]);
+        return;
+      }
+
       try {
-        // Check if user is authenticated
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          // User not authenticated, skip fetching
-          setLoading(false);
-          return;
-        }
-
         setLoading(true);
         setError(null);
         const data = await fetchNudges();
-        setNudges(data.nudges);
+
+        // Parse date strings to Date objects and cast status
+        const nudgesWithDates = data.nudges.map((nudge) => ({
+          ...nudge,
+          timestamp: new Date(nudge.timestamp),
+          acceptedAt: nudge.acceptedAt ? new Date(nudge.acceptedAt) : null,
+          resolvedAt: nudge.resolvedAt ? new Date(nudge.resolvedAt) : null,
+          status: nudge.status as "waiting" | "accepted" | "declined" | "resolved",
+        }));
+
+        setNudges(nudgesWithDates);
       } catch (err) {
         console.error("Failed to fetch nudges:", err);
         setError(err instanceof Error ? err.message : "Failed to load nudges");
@@ -50,22 +56,7 @@ export function NudgesProvider({ children }: { children: ReactNode }) {
     }
 
     loadNudges();
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        loadNudges();
-      } else {
-        setNudges([]);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+  }, [user]);
 
   const acceptNudge = async (nudgeId: string) => {
     // Optimistically update UI

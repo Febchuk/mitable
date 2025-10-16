@@ -8,7 +8,7 @@ export interface Nudge {
   description: string;
   context: string;
   timestamp: Date;
-  status: string;
+  status: "waiting" | "accepted" | "declined" | "resolved";
   matchScore?: number;
   matchReasons?: string[];
   deliveryChannel?: string | null;

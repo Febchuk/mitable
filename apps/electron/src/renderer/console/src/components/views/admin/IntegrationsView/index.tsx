@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAdmin } from "../../../../context/AdminContext";
+import { useAdmin } from "@/console/src/context/AdminContext";
 import IntegrationCard from "./components/IntegrationCard";
 import SlackConnectDialog from "./components/SlackConnectDialog";
 import { Input } from "@/components/ui/input";

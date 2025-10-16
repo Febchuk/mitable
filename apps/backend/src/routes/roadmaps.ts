@@ -1,141 +1,129 @@
 import { Router, Request, Response } from "express";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { roadmaps, roadmapTasks } from "../db/schema/roadmaps.schema";
-import { eq, and } from "drizzle-orm";
+import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
 /**
  * GET /api/roadmaps
- * Fetch the authenticated user's roadmap with all tasks grouped by week
+ * Fetch the user's roadmap with all weeks and tasks
  */
 router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+
   try {
-    const userId = req.userId!;
+    // Get all tasks for the user
+    const tasks = await db
+      .select({
+        id: schema.userRoadmapTasks.id,
+        weekNumber: schema.userRoadmapTasks.weekNumber,
+        title: schema.userRoadmapTasks.title,
+        description: schema.userRoadmapTasks.description,
+        timeEstimate: schema.userRoadmapTasks.timeEstimate,
+        orderIndex: schema.userRoadmapTasks.orderIndex,
+        completed: schema.userRoadmapTasks.completed,
+        completedAt: schema.userRoadmapTasks.completedAt,
+      })
+      .from(schema.userRoadmapTasks)
+      .where(eq(schema.userRoadmapTasks.userId, userId))
+      .orderBy(schema.userRoadmapTasks.weekNumber, schema.userRoadmapTasks.orderIndex);
 
-    // Fetch user's roadmap
-    const userRoadmaps = await db
-      .select()
-      .from(roadmaps)
-      .where(eq(roadmaps.userId, userId));
-
-    if (userRoadmaps.length === 0) {
-      res.json({ weeks: [], currentWeek: 1, totalWeeks: 12 });
+    if (tasks.length === 0) {
+      res.json({
+        weeks: [],
+        currentWeek: 1,
+        totalWeeks: 0,
+        status: "no_roadmap",
+      });
       return;
     }
 
-    const roadmap = userRoadmaps[0];
-
-    // Fetch all tasks for this roadmap
-    const tasks = await db
-      .select()
-      .from(roadmapTasks)
-      .where(eq(roadmapTasks.roadmapId, roadmap.id))
-      .orderBy(roadmapTasks.weekNumber, roadmapTasks.orderIndex);
-
-    // Group tasks by week
+    // Group tasks by week and calculate progress
     const weekMap = new Map<number, any[]>();
+    let maxWeek = 0;
 
-    for (const task of tasks) {
-      if (!weekMap.has(task.weekNumber)) {
-        weekMap.set(task.weekNumber, []);
+    tasks.forEach((task) => {
+      const weekNum = task.weekNumber;
+      maxWeek = Math.max(maxWeek, weekNum);
+
+      if (!weekMap.has(weekNum)) {
+        weekMap.set(weekNum, []);
       }
 
-      weekMap.get(task.weekNumber)!.push({
+      weekMap.get(weekNum)!.push({
         id: task.id,
         title: task.title,
-        description: task.description,
+        description: task.description || undefined,
         timeEstimate: task.timeEstimate || undefined,
         completed: task.completed || false,
-        completedAt: task.completedAt,
+        completedAt: task.completedAt || null,
         week: task.weekNumber,
-        orderIndex: task.orderIndex,
+        orderIndex: task.orderIndex || 0,
       });
-    }
+    });
 
-    // Calculate completion percentage for each week
-    const weeks = [];
-    for (let weekNum = 1; weekNum <= roadmap.totalWeeks; weekNum++) {
+    // Build weeks array with completion percentages
+    const weeks = Array.from({ length: maxWeek }, (_, i) => {
+      const weekNum = i + 1;
       const weekTasks = weekMap.get(weekNum) || [];
       const completedCount = weekTasks.filter((t) => t.completed).length;
-      const percentage = weekTasks.length > 0
-        ? Math.round((completedCount / weekTasks.length) * 100)
-        : 0;
+      const totalCount = weekTasks.length;
+      const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-      weeks.push({
+      return {
         number: weekNum,
         percentage,
         tasks: weekTasks,
-      });
-    }
+      };
+    });
+
+    // Determine current week (first incomplete week, or last week if all complete)
+    let currentWeek = weeks.findIndex((w) => w.percentage < 100) + 1;
+    if (currentWeek === 0) currentWeek = maxWeek; // All complete, show last week
 
     res.json({
       weeks,
-      currentWeek: roadmap.currentWeek,
-      totalWeeks: roadmap.totalWeeks,
-      status: roadmap.status,
+      currentWeek,
+      totalWeeks: maxWeek,
+      status: "active",
     });
   } catch (error) {
     console.error("Error fetching roadmap:", error);
     res.status(500).json({
       error: "Internal Server Error",
-      message: "Failed to fetch roadmap",
+      message: error instanceof Error ? error.message : "Failed to fetch roadmap",
     });
   }
 });
 
 /**
  * PATCH /api/roadmaps/tasks/:taskId
- * Toggle task completion status
+ * Toggle a task's completion status
  */
 router.patch("/tasks/:taskId", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { taskId } = req.params;
+  const { completed } = req.body;
+
+  if (typeof completed !== "boolean") {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "completed field must be a boolean",
+    });
+    return;
+  }
+
   try {
-    const userId = req.userId!;
-    const { taskId } = req.params;
-    const { completed } = req.body;
-
-    if (typeof completed !== "boolean") {
-      res.status(400).json({
-        error: "Bad Request",
-        message: "completed field must be a boolean",
-      });
-      return;
-    }
-
-    // Verify the task belongs to the user's roadmap
-    const userRoadmaps = await db
+    // Verify task belongs to user
+    const [task] = await db
       .select()
-      .from(roadmaps)
-      .where(eq(roadmaps.userId, userId));
+      .from(schema.userRoadmapTasks)
+      .where(eq(schema.userRoadmapTasks.id, taskId))
+      .limit(1);
 
-    if (userRoadmaps.length === 0) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "Roadmap not found",
-      });
-      return;
-    }
-
-    const roadmap = userRoadmaps[0];
-
-    // Update the task
-    const updatedTasks = await db
-      .update(roadmapTasks)
-      .set({
-        completed,
-        completedAt: completed ? new Date() : null,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(roadmapTasks.id, taskId),
-          eq(roadmapTasks.roadmapId, roadmap.id)
-        )
-      )
-      .returning();
-
-    if (updatedTasks.length === 0) {
+    if (!task) {
       res.status(404).json({
         error: "Not Found",
         message: "Task not found",
@@ -143,19 +131,38 @@ router.patch("/tasks/:taskId", requireAuth, async (req: Request, res: Response):
       return;
     }
 
+    if (task.userId !== userId) {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "You do not have permission to modify this task",
+      });
+      return;
+    }
+
+    // Update task completion status
+    const [updatedTask] = await db
+      .update(schema.userRoadmapTasks)
+      .set({
+        completed,
+        completedAt: completed ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.userRoadmapTasks.id, taskId))
+      .returning({
+        id: schema.userRoadmapTasks.id,
+        completed: schema.userRoadmapTasks.completed,
+        completedAt: schema.userRoadmapTasks.completedAt,
+      });
+
     res.json({
       success: true,
-      task: {
-        id: updatedTasks[0].id,
-        completed: updatedTasks[0].completed,
-        completedAt: updatedTasks[0].completedAt,
-      },
+      task: updatedTask,
     });
   } catch (error) {
-    console.error("Error updating task:", error);
+    console.error("Error toggling task completion:", error);
     res.status(500).json({
       error: "Internal Server Error",
-      message: "Failed to update task",
+      message: error instanceof Error ? error.message : "Failed to update task",
     });
   }
 });

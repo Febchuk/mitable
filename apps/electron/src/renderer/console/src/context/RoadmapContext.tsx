@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { Week } from "../types";
 import { fetchRoadmap, toggleTaskCompletion } from "../services/roadmapService";
-import { supabase } from "../lib/supabase";
+import { useUser } from "./UserContext";
 
 interface RoadmapContextType {
   weeks: Week[];
@@ -15,6 +15,7 @@ interface RoadmapContextType {
 const RoadmapContext = createContext<RoadmapContextType | undefined>(undefined);
 
 export function RoadmapProvider({ children }: { children: ReactNode }) {
+  const { user } = useUser();
   const [currentWeek, setCurrentWeek] = useState(1);
   const [weeks, setWeeks] = useState<Week[]>([]);
   const [loading, setLoading] = useState(false);
@@ -23,18 +24,14 @@ export function RoadmapProvider({ children }: { children: ReactNode }) {
   // Fetch roadmap data when user is authenticated
   useEffect(() => {
     async function loadRoadmap() {
+      if (!user) {
+        // User not authenticated, skip fetching
+        setWeeks([]);
+        setCurrentWeek(1);
+        return;
+      }
+
       try {
-        // Check if user is authenticated
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          // User not authenticated, skip fetching
-          setLoading(false);
-          return;
-        }
-
         setLoading(true);
         setError(null);
         const data = await fetchRoadmap();
@@ -49,23 +46,7 @@ export function RoadmapProvider({ children }: { children: ReactNode }) {
     }
 
     loadRoadmap();
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        loadRoadmap();
-      } else {
-        setWeeks([]);
-        setCurrentWeek(1);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+  }, [user]);
 
   const toggleTask = async (taskId: string) => {
     // Find the task to get its current completion status

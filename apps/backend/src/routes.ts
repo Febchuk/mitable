@@ -4,6 +4,7 @@ import { requireAuth, optionalAuth } from "./middleware/auth.js";
 import roadmapsRouter from "./routes/roadmaps";
 import nudgesRouter from "./routes/nudges";
 import conversationsRouter from "./routes/conversations";
+import adminRouter from "./routes/admin";
 
 export const router = Router();
 
@@ -23,6 +24,7 @@ router.get("/health", (_req, res) => {
 router.use("/roadmaps", roadmapsRouter);
 router.use("/nudges", nudgesRouter);
 router.use("/conversations", conversationsRouter);
+router.use("/admin", adminRouter);
 
 // Protected routes - require authentication
 router.post("/help", requireAuth, (req, res) => {

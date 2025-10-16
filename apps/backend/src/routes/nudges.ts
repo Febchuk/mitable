@@ -1,96 +1,88 @@
 import { Router, Request, Response } from "express";
+import { eq, and, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { nudges } from "../db/schema/experts.schema";
-import { users } from "../db/schema/users.schema";
-import { eq, and } from "drizzle-orm";
+import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
 /**
  * GET /api/nudges
- * Fetch the authenticated user's active nudges with expert information
+ * Fetch all active nudges for the user
  */
 router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+
   try {
-    const userId = req.userId!;
-
-    // Fetch nudges for the user with expert information
-    const userNudges = await db
+    // Get nudges with expert information
+    const nudgesData = await db
       .select({
-        id: nudges.id,
-        context: nudges.context,
-        question: nudges.question,
-        matchScore: nudges.matchScore,
-        matchReasons: nudges.matchReasons,
-        status: nudges.status,
-        deliveryChannel: nudges.deliveryChannel,
-        deliveredAt: nudges.deliveredAt,
-        acceptedAt: nudges.acceptedAt,
-        resolvedAt: nudges.resolvedAt,
-        createdAt: nudges.createdAt,
-        expertId: users.id,
-        expertFirstName: users.firstName,
-        expertLastName: users.lastName,
-        expertEmail: users.email,
-        expertRole: users.role,
-        expertAvatar: users.avatarUrl,
+        id: schema.nudges.id,
+        context: schema.nudges.context,
+        question: schema.nudges.question,
+        status: schema.nudges.status,
+        matchScore: schema.nudges.matchScore,
+        matchReasons: schema.nudges.matchReasons,
+        deliveryChannel: schema.nudges.deliveryChannel,
+        acceptedAt: schema.nudges.acceptedAt,
+        resolvedAt: schema.nudges.resolvedAt,
+        createdAt: schema.nudges.createdAt,
+        expertId: schema.nudges.expertId,
+        expertFirstName: schema.users.firstName,
+        expertLastName: schema.users.lastName,
+        expertRole: schema.users.role,
+        expertAvatar: schema.users.avatarUrl,
+        expertStatus: schema.users.status,
       })
-      .from(nudges)
-      .innerJoin(users, eq(nudges.expertId, users.id))
-      .where(eq(nudges.userId, userId))
-      .orderBy(nudges.createdAt);
+      .from(schema.nudges)
+      .innerJoin(schema.users, eq(schema.nudges.expertId, schema.users.id))
+      .where(eq(schema.nudges.userId, userId))
+      .orderBy(sql`${schema.nudges.createdAt} DESC`);
 
-    // Format response to match frontend Nudge interface
-    const formattedNudges = userNudges.map((nudge) => ({
+    const nudges = nudgesData.map((nudge) => ({
       id: nudge.id,
-      expertName: `${nudge.expertFirstName || ""} ${nudge.expertLastName || ""}`.trim() || "Expert",
-      expertRole: nudge.expertRole || "Expert",
+      expertName: `${nudge.expertFirstName} ${nudge.expertLastName}`,
+      expertRole: nudge.expertRole || "Team Member",
       expertAvatar: nudge.expertAvatar,
-      description: nudge.question || "",
+      description: nudge.question || "Can help with your question",
       context: nudge.context || "",
       timestamp: nudge.createdAt,
       status: nudge.status || "waiting",
       matchScore: nudge.matchScore ? parseFloat(nudge.matchScore) : undefined,
-      matchReasons: nudge.matchReasons as string[] | undefined,
+      matchReasons: (nudge.matchReasons as string[]) || [],
       deliveryChannel: nudge.deliveryChannel,
       acceptedAt: nudge.acceptedAt,
       resolvedAt: nudge.resolvedAt,
-      // Note: We don't have real-time online status, so we'll default to false
-      // This could be enhanced with presence tracking later
-      online: false,
+      online: nudge.expertStatus === "Active",
     }));
 
-    res.json({ nudges: formattedNudges });
+    res.json({ nudges });
   } catch (error) {
     console.error("Error fetching nudges:", error);
     res.status(500).json({
       error: "Internal Server Error",
-      message: "Failed to fetch nudges",
+      message: error instanceof Error ? error.message : "Failed to fetch nudges",
     });
   }
 });
 
 /**
- * POST /api/nudges/:id/accept
- * Accept a nudge (mark as accepted)
+ * POST /api/nudges/:nudgeId/accept
+ * Accept a nudge
  */
-router.post("/:id/accept", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/:nudgeId/accept", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { nudgeId } = req.params;
+
   try {
-    const userId = req.userId!;
-    const { id } = req.params;
+    // Verify nudge belongs to user
+    const [nudge] = await db
+      .select()
+      .from(schema.nudges)
+      .where(eq(schema.nudges.id, nudgeId))
+      .limit(1);
 
-    // Update the nudge status to 'accepted'
-    const updatedNudges = await db
-      .update(nudges)
-      .set({
-        status: "accepted",
-        acceptedAt: new Date(),
-      })
-      .where(and(eq(nudges.id, id), eq(nudges.userId, userId)))
-      .returning();
-
-    if (updatedNudges.length === 0) {
+    if (!nudge) {
       res.status(404).json({
         error: "Not Found",
         message: "Nudge not found",
@@ -98,42 +90,59 @@ router.post("/:id/accept", requireAuth, async (req: Request, res: Response): Pro
       return;
     }
 
+    if (nudge.userId !== userId) {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "You do not have permission to modify this nudge",
+      });
+      return;
+    }
+
+    // Update nudge to accepted
+    const acceptedAt = new Date();
+    const [updatedNudge] = await db
+      .update(schema.nudges)
+      .set({
+        status: "accepted",
+        acceptedAt,
+      })
+      .where(eq(schema.nudges.id, nudgeId))
+      .returning({
+        id: schema.nudges.id,
+        status: schema.nudges.status,
+        acceptedAt: schema.nudges.acceptedAt,
+      });
+
     res.json({
       success: true,
-      nudge: {
-        id: updatedNudges[0].id,
-        status: updatedNudges[0].status,
-        acceptedAt: updatedNudges[0].acceptedAt,
-      },
+      nudge: updatedNudge,
     });
   } catch (error) {
     console.error("Error accepting nudge:", error);
     res.status(500).json({
       error: "Internal Server Error",
-      message: "Failed to accept nudge",
+      message: error instanceof Error ? error.message : "Failed to accept nudge",
     });
   }
 });
 
 /**
- * POST /api/nudges/:id/dismiss
- * Dismiss a nudge (mark as declined)
+ * POST /api/nudges/:nudgeId/dismiss
+ * Dismiss a nudge
  */
-router.post("/:id/dismiss", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/:nudgeId/dismiss", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { nudgeId } = req.params;
+
   try {
-    const userId = req.userId!;
-    const { id } = req.params;
+    // Verify nudge belongs to user
+    const [nudge] = await db
+      .select()
+      .from(schema.nudges)
+      .where(eq(schema.nudges.id, nudgeId))
+      .limit(1);
 
-    // Update the nudge status to 'declined'
-    const updatedNudges = await db
-      .update(nudges)
-      .set({
-        status: "declined",
-      })
-      .where(and(eq(nudges.id, id), eq(nudges.userId, userId)))
-      .returning();
-
-    if (updatedNudges.length === 0) {
+    if (!nudge) {
       res.status(404).json({
         error: "Not Found",
         message: "Nudge not found",
@@ -141,42 +150,56 @@ router.post("/:id/dismiss", requireAuth, async (req: Request, res: Response): Pr
       return;
     }
 
+    if (nudge.userId !== userId) {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "You do not have permission to modify this nudge",
+      });
+      return;
+    }
+
+    // Update nudge to declined
+    const [updatedNudge] = await db
+      .update(schema.nudges)
+      .set({
+        status: "declined",
+      })
+      .where(eq(schema.nudges.id, nudgeId))
+      .returning({
+        id: schema.nudges.id,
+        status: schema.nudges.status,
+      });
+
     res.json({
       success: true,
-      nudge: {
-        id: updatedNudges[0].id,
-        status: updatedNudges[0].status,
-      },
+      nudge: updatedNudge,
     });
   } catch (error) {
     console.error("Error dismissing nudge:", error);
     res.status(500).json({
       error: "Internal Server Error",
-      message: "Failed to dismiss nudge",
+      message: error instanceof Error ? error.message : "Failed to dismiss nudge",
     });
   }
 });
 
 /**
- * POST /api/nudges/:id/resolve
- * Resolve a nudge (mark as resolved)
+ * POST /api/nudges/:nudgeId/resolve
+ * Resolve a nudge
  */
-router.post("/:id/resolve", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/:nudgeId/resolve", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { nudgeId } = req.params;
+
   try {
-    const userId = req.userId!;
-    const { id } = req.params;
+    // Verify nudge belongs to user
+    const [nudge] = await db
+      .select()
+      .from(schema.nudges)
+      .where(eq(schema.nudges.id, nudgeId))
+      .limit(1);
 
-    // Update the nudge status to 'resolved'
-    const updatedNudges = await db
-      .update(nudges)
-      .set({
-        status: "resolved",
-        resolvedAt: new Date(),
-      })
-      .where(and(eq(nudges.id, id), eq(nudges.userId, userId)))
-      .returning();
-
-    if (updatedNudges.length === 0) {
+    if (!nudge) {
       res.status(404).json({
         error: "Not Found",
         message: "Nudge not found",
@@ -184,19 +207,38 @@ router.post("/:id/resolve", requireAuth, async (req: Request, res: Response): Pr
       return;
     }
 
+    if (nudge.userId !== userId) {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "You do not have permission to modify this nudge",
+      });
+      return;
+    }
+
+    // Update nudge to resolved
+    const resolvedAt = new Date();
+    const [updatedNudge] = await db
+      .update(schema.nudges)
+      .set({
+        status: "resolved",
+        resolvedAt,
+      })
+      .where(eq(schema.nudges.id, nudgeId))
+      .returning({
+        id: schema.nudges.id,
+        status: schema.nudges.status,
+        resolvedAt: schema.nudges.resolvedAt,
+      });
+
     res.json({
       success: true,
-      nudge: {
-        id: updatedNudges[0].id,
-        status: updatedNudges[0].status,
-        resolvedAt: updatedNudges[0].resolvedAt,
-      },
+      nudge: updatedNudge,
     });
   } catch (error) {
     console.error("Error resolving nudge:", error);
     res.status(500).json({
       error: "Internal Server Error",
-      message: "Failed to resolve nudge",
+      message: error instanceof Error ? error.message : "Failed to resolve nudge",
     });
   }
 });

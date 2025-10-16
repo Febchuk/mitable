@@ -1,8 +1,21 @@
-import { createContext, useContext, useState, ReactNode } from "react";
-import type { Integration, DashboardMetric, ProductivityData, NudgeTheme } from "../types";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import type { DashboardMetric, ProductivityData, NudgeTheme } from "../types";
+import {
+  fetchIntegrations,
+  fetchUsers,
+  fetchTemplates,
+  type User,
+  type Template,
+  type Integration
+} from "../services/adminService";
+import { useUser } from "./UserContext";
 
 interface AdminContextType {
   integrations: Integration[];
+  users: User[];
+  templates: Template[];
+  loading: boolean;
+  error: string | null;
   connectIntegration: (id: string, token?: string) => void;
   disconnectIntegration: (id: string) => void;
   configureIntegration: (id: string) => void;
@@ -12,47 +25,18 @@ interface AdminContextType {
   timeToProductivity: DashboardMetric;
   productivityData: ProductivityData;
   nudgeThemes: NudgeTheme[];
+  refetchData: () => void;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export function AdminProvider({ children }: { children: ReactNode }) {
-  const [integrations, setIntegrations] = useState<Integration[]>([
-    {
-      id: "1",
-      provider: "slack",
-      name: "Slack",
-      description: "Get channel and DM message data. Updates four times a day.",
-      status: "connected",
-      updatesPerDay: 4,
-      connectedAt: new Date(),
-    },
-    {
-      id: "2",
-      provider: "notion",
-      name: "Notion",
-      description: "Get page and database data. Updates four times a day.",
-      status: "connected",
-      updatesPerDay: 4,
-      connectedAt: new Date(),
-    },
-    {
-      id: "3",
-      provider: "github",
-      name: "GitHub",
-      description: "Connect your repositories and pull requests. Updates once a day.",
-      status: "disconnected",
-      updatesPerDay: 1,
-    },
-    {
-      id: "4",
-      provider: "google-drive",
-      name: "Google Drive",
-      description: "Access your files and documents. Updates once a day.",
-      status: "disconnected",
-      updatesPerDay: 1,
-    },
-  ]);
+  const { user } = useUser();
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [savingsMetric] = useState<DashboardMetric>({
     label: "Total Savings",
@@ -82,6 +66,43 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     { id: "5", label: "Ticket debugging", category: "support" },
     { id: "6", label: "Ticket debugging", category: "support" },
   ]);
+
+  // Fetch admin data from APIs
+  const fetchAdminData = async () => {
+    if (!user || user.role !== "admin") return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Fetch all admin data in parallel
+      const [integrationsData, usersData, templatesData] = await Promise.all([
+        fetchIntegrations().catch(() => []),
+        fetchUsers().catch(() => []),
+        fetchTemplates().catch(() => []),
+      ]);
+
+      setIntegrations(integrationsData);
+      setUsers(usersData);
+      setTemplates(templatesData);
+    } catch (err) {
+      console.error("Error fetching admin data:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch admin data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch data when user logs in (only for admin users)
+  useEffect(() => {
+    if (user && user.role === "admin") {
+      fetchAdminData();
+    }
+  }, [user]);
+
+  const refetchData = () => {
+    fetchAdminData();
+  };
 
   const connectIntegration = (id: string, token?: string) => {
     if (token) {
@@ -129,6 +150,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     <AdminContext.Provider
       value={{
         integrations,
+        users,
+        templates,
+        loading,
+        error,
         connectIntegration,
         disconnectIntegration,
         configureIntegration,
@@ -138,6 +163,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         timeToProductivity,
         productivityData,
         nudgeThemes,
+        refetchData,
       }}
     >
       {children}

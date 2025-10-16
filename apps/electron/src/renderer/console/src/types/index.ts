@@ -19,7 +19,7 @@ export interface Task {
 }
 
 // Nudge types
-export type NudgeStatus = "waiting" | "resolved";
+export type NudgeStatus = "waiting" | "accepted" | "declined" | "resolved";
 
 export interface Nudge {
   id: string;

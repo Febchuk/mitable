@@ -5,7 +5,7 @@ import {
   createConversation,
   sendMessage as sendMessageAPI,
 } from "../services/chatsService";
-import { supabase } from "../lib/supabase";
+import { useUser } from "./UserContext";
 
 interface ChatsContextType {
   chats: Chat[];
@@ -19,6 +19,7 @@ interface ChatsContextType {
 const ChatsContext = createContext<ChatsContextType | undefined>(undefined);
 
 export function ChatsProvider({ children }: { children: ReactNode }) {
+  const { user } = useUser();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,22 +27,28 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
   // Fetch conversations when user is authenticated
   useEffect(() => {
     async function loadConversations() {
+      if (!user) {
+        // User not authenticated, skip fetching
+        setChats([]);
+        return;
+      }
+
       try {
-        // Check if user is authenticated
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          // User not authenticated, skip fetching
-          setLoading(false);
-          return;
-        }
-
         setLoading(true);
         setError(null);
         const data = await fetchConversations();
-        setChats(data.conversations);
+
+        // Parse date strings to Date objects
+        const conversationsWithDates = data.conversations.map((chat) => ({
+          ...chat,
+          timestamp: new Date(chat.timestamp),
+          messages: chat.messages.map((msg) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp),
+          })),
+        }));
+
+        setChats(conversationsWithDates);
       } catch (err) {
         console.error("Failed to fetch conversations:", err);
         setError(err instanceof Error ? err.message : "Failed to load conversations");
@@ -51,22 +58,7 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
     }
 
     loadConversations();
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        loadConversations();
-      } else {
-        setChats([]);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+  }, [user]);
 
   const markAsRead = (chatId: string) => {
     setChats((prev) =>
