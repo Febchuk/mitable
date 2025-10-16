@@ -34,6 +34,51 @@ export interface Integration {
   connectedAt?: Date;
 }
 
+export interface UserRoadmapInstance {
+  id: string;
+  title: string;
+  tasks: number;
+  completion: number;
+  description: string;
+}
+
+export interface Conversation {
+  id: string;
+  timestamp: string;
+  question: string;
+  status: "resolved" | "nudge";
+}
+
+export interface NudgeTheme {
+  theme: string;
+  count: number;
+  nudges: Array<{ name: string; count: number }>;
+}
+
+export interface ActivityData {
+  date: string;
+  hours: number;
+}
+
+export interface UserDetail {
+  id: string;
+  name: string;
+  role: string;
+  startDate: string;
+  status: "Onboarding" | "Active";
+  progress: number;
+  manager: { name: string; id: string } | null;
+  metrics: {
+    totalTasks: number;
+    completedTasks: number;
+    overdueTasks: number;
+  };
+  assignedRoadmaps: UserRoadmapInstance[];
+  conversations: Conversation[];
+  nudgeThemes: NudgeTheme[];
+  activityData: ActivityData[];
+}
+
 /**
  * Fetch all users (admin only)
  */
@@ -69,6 +114,19 @@ export async function fetchIntegrations(): Promise<Integration[]> {
     return response.integrations;
   } catch (error) {
     console.error("Error fetching integrations:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch detailed information for a single user (admin only)
+ */
+export async function fetchUserDetail(userId: string): Promise<UserDetail> {
+  try {
+    const response = await apiRequest<{ user: UserDetail }>(`/admin/users/${userId}`);
+    return response.user;
+  } catch (error) {
+    console.error("Error fetching user detail:", error);
     throw error;
   }
 }

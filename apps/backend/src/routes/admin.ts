@@ -1,10 +1,265 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, sql, count, desc } from "drizzle-orm";
+import { eq, sql, count, desc, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
+
+// Helper function to format timestamps
+function formatTimestamp(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffHours < 1) {
+    return "Less than an hour ago";
+  } else if (diffHours < 24) {
+    return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  } else if (diffDays === 1) {
+    return "1 day ago";
+  } else {
+    return `${diffDays} days ago`;
+  }
+}
+
+/**
+ * GET /api/admin/users/:id
+ * Fetch detailed information for a single user
+ */
+router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const targetUserId = req.params.id;
+
+    // Verify user is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "Admin access required",
+      });
+      return;
+    }
+
+    // Fetch target user
+    const [user] = await db
+      .select({
+        id: schema.users.id,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        email: schema.users.email,
+        role: schema.users.role,
+        startDate: schema.users.startDate,
+        status: schema.users.status,
+        avatarUrl: schema.users.avatarUrl,
+        currentWeek: schema.users.currentWeek,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, targetUserId))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "User not found",
+      });
+      return;
+    }
+
+    // Get assigned roadmap templates with completion stats
+    const assignedRoadmaps = await db
+      .select({
+        templateId: schema.userTemplateAssignments.templateId,
+        templateTitle: schema.roadmapTemplates.title,
+        templateDescription: schema.roadmapTemplates.description,
+        assignedAt: schema.userTemplateAssignments.assignedAt,
+      })
+      .from(schema.userTemplateAssignments)
+      .innerJoin(
+        schema.roadmapTemplates,
+        eq(schema.userTemplateAssignments.templateId, schema.roadmapTemplates.id)
+      )
+      .where(eq(schema.userTemplateAssignments.userId, targetUserId));
+
+    // For each roadmap, calculate completion
+    const roadmapsWithStats = await Promise.all(
+      assignedRoadmaps.map(async (roadmap) => {
+        const [taskStats] = await db
+          .select({
+            total: count(),
+            completed: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
+          })
+          .from(schema.userRoadmapTasks)
+          .where(
+            and(
+              eq(schema.userRoadmapTasks.userId, targetUserId),
+              eq(schema.userRoadmapTasks.templateId, roadmap.templateId)
+            )
+          );
+
+        const totalTasks = Number(taskStats?.total || 0);
+        const completedTasks = Number(taskStats?.completed || 0);
+        const completion = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+        return {
+          id: roadmap.templateId,
+          title: roadmap.templateTitle,
+          description: roadmap.templateDescription || "",
+          tasks: totalTasks,
+          completion,
+        };
+      })
+    );
+
+    // Get recent conversations (last 5)
+    const recentConversations = await db
+      .select({
+        id: schema.conversations.id,
+        title: schema.conversations.title,
+        contextType: schema.conversations.contextType,
+        createdAt: schema.conversations.createdAt,
+      })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.userId, targetUserId))
+      .orderBy(desc(schema.conversations.createdAt))
+      .limit(5);
+
+    // For each conversation, check if it resulted in a nudge
+    const conversationsWithStatus = await Promise.all(
+      recentConversations.map(async (conv) => {
+        // Check if this conversation led to a nudge (within 1 hour)
+        const oneHourLater = new Date(conv.createdAt.getTime() + 60 * 60 * 1000);
+        const [nudgeCount] = await db
+          .select({ count: count() })
+          .from(schema.nudges)
+          .where(
+            and(
+              eq(schema.nudges.userId, targetUserId),
+              gte(schema.nudges.createdAt, conv.createdAt),
+              lte(schema.nudges.createdAt, oneHourLater)
+            )
+          );
+
+        const hasNudge = Number(nudgeCount?.count || 0) > 0;
+
+        return {
+          id: conv.id,
+          timestamp: formatTimestamp(conv.createdAt),
+          question: conv.title || "Untitled conversation",
+          status: hasNudge ? ("nudge" as const) : ("resolved" as const),
+        };
+      })
+    );
+
+    // Get common nudge themes (group by question topics)
+    const userNudges = await db
+      .select({
+        question: schema.nudges.question,
+        expertId: schema.nudges.expertId,
+        expertFirstName: schema.users.firstName,
+        expertLastName: schema.users.lastName,
+        createdAt: schema.nudges.createdAt,
+      })
+      .from(schema.nudges)
+      .leftJoin(schema.users, eq(schema.nudges.expertId, schema.users.id))
+      .where(eq(schema.nudges.userId, targetUserId))
+      .orderBy(desc(schema.nudges.createdAt));
+
+    // Group nudges by theme (simplified - just use question as theme for now)
+    const nudgeThemeMap = new Map<
+      string,
+      { count: number; nudges: Map<string, { name: string; count: number }> }
+    >();
+
+    userNudges.forEach((nudge) => {
+      const theme = nudge.question || "General question";
+      const expertName = nudge.expertFirstName && nudge.expertLastName
+        ? `${nudge.expertFirstName} ${nudge.expertLastName}`
+        : "Unknown Expert";
+
+      if (!nudgeThemeMap.has(theme)) {
+        nudgeThemeMap.set(theme, {
+          count: 0,
+          nudges: new Map(),
+        });
+      }
+
+      const themeData = nudgeThemeMap.get(theme)!;
+      themeData.count++;
+
+      if (!themeData.nudges.has(expertName)) {
+        themeData.nudges.set(expertName, { name: expertName, count: 0 });
+      }
+      themeData.nudges.get(expertName)!.count++;
+    });
+
+    // Convert to array format
+    const nudgeThemes = Array.from(nudgeThemeMap.entries())
+      .map(([theme, data]) => ({
+        theme,
+        count: data.count,
+        nudges: Array.from(data.nudges.values()),
+      }))
+      .slice(0, 5); // Top 5 themes
+
+    // Calculate task metrics
+    const [taskMetrics] = await db
+      .select({
+        totalTasks: count(),
+        completedTasks: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
+        overdueTasks: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = false)`,
+      })
+      .from(schema.userRoadmapTasks)
+      .where(eq(schema.userRoadmapTasks.userId, targetUserId));
+
+    const totalTasks = Number(taskMetrics?.totalTasks || 0);
+    const completedTasks = Number(taskMetrics?.completedTasks || 0);
+    const overdueTasks = Number(taskMetrics?.overdueTasks || 0);
+    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    // Activity data (simplified - can be enhanced with actual analytics later)
+    const activityData = [
+      { date: "Oct 13", hours: 0 },
+      { date: "Yesterday", hours: 0 },
+      { date: "Today", hours: 0 },
+    ];
+
+    // Format response
+    const userDetail = {
+      id: user.id,
+      name: `${user.firstName} ${user.lastName}`,
+      role: user.role,
+      startDate: user.startDate || "N/A",
+      status: progress === 100 ? "Active" : "Onboarding",
+      progress,
+      manager: null, // TODO: Add manager relationship to schema
+      metrics: {
+        totalTasks,
+        completedTasks,
+        overdueTasks,
+      },
+      assignedRoadmaps: roadmapsWithStats,
+      conversations: conversationsWithStatus,
+      nudgeThemes,
+      activityData,
+    };
+
+    res.json({ user: userDetail });
+  } catch (error) {
+    console.error("Error fetching user detail:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to fetch user details",
+    });
+  }
+});
 
 /**
  * GET /api/admin/users
