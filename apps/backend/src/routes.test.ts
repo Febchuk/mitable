@@ -1,8 +1,8 @@
+// Mock Supabase client before any imports
+jest.mock("./lib/supabase.js");
+
 import request from "supertest";
 import { app } from "./app.js";
-
-// Mock Supabase client
-jest.mock("./lib/supabase.js");
 
 describe("Backend API Routes", () => {
   describe("GET /health", () => {
