@@ -17,8 +17,8 @@ import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
 import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
-import RoadmapsView from "./components/views/admin/RoadmapsView";
-import CreateRoadmap from "./components/views/admin/RoadmapsView/CreateRoadmap";
+import TemplatesView from "./components/views/admin/TemplatesView";
+import CreateTemplate from "./components/views/admin/TemplatesView/CreateTemplate";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
 
@@ -45,8 +45,8 @@ function App() {
                     <Route path="people" element={<PeopleView />} />
                     <Route path="people/new" element={<AddNewUser />} />
                     <Route path="people/:id" element={<PersonDetail />} />
-                    <Route path="roadmaps" element={<RoadmapsView />} />
-                    <Route path="roadmaps/new" element={<CreateRoadmap />} />
+                    <Route path="templates" element={<TemplatesView />} />
+                    <Route path="templates/new" element={<CreateTemplate />} />
                     <Route path="integrations" element={<IntegrationsView />} />
                     <Route path="setup" element={<SetupView />} />
                     {/* Employee Routes */}

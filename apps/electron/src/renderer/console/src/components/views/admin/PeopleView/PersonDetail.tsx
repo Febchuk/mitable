@@ -6,6 +6,15 @@ import { Progress } from "@/components/ui/progress";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
+// User roadmap instance (created from template, personalized for this user)
+interface UserRoadmapInstance {
+  id: string;
+  title: string;
+  tasks: number;
+  completion: number; // User-specific completion percentage
+  description: string;
+}
+
 // Mock data for the selected person
 const mockPersonData = {
   "1": {
@@ -36,7 +45,7 @@ const mockPersonData = {
         completion: 100,
         description: "Company culture, tools, policies, team intros",
       },
-    ],
+    ] as UserRoadmapInstance[],
     conversations: [
       {
         id: "1",

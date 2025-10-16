@@ -4,5 +4,7 @@ export * from "./users.schema";
 export * from "./integrations.schema";
 export * from "./experts.schema";
 export * from "./conversations.schema";
-export * from "./roadmaps.schema";
+export * from "./source-materials.schema";
+export * from "./roadmap-templates.schema";
+export * from "./user-roadmaps.schema";
 export * from "./analytics.schema";

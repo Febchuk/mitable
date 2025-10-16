@@ -264,73 +264,129 @@ supabase stop
 
 ## Running Migrations
 
+This project uses **Drizzle Kit** for schema management and migrations. Drizzle automatically generates SQL migrations from your TypeScript schema files.
+
+### Drizzle Kit Migration Workflow
+
+**Configuration** (already set up in `drizzle.config.ts`):
+
+```typescript
+export default defineConfig({
+  schema: "./src/db/schema/index.ts",  // Your TypeScript schema
+  out: "./src/db/migrations",           // Generated SQL migrations
+  dialect: "postgresql",
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+});
+```
+
+### Step-by-Step Migration Process
+
+#### 1. Make Schema Changes
+
+Edit your schema files in `apps/backend/src/db/schema/`:
+
+```typescript
+// Example: Add a new field to templates
+export const roadmapTemplates = pgTable("roadmap_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  // Add new field
+  color: varchar("color", { length: 7 }), // New field for template color
+  // ... rest of fields
+});
+```
+
+#### 2. Generate Migration
+
+```bash
+cd apps/backend
+npm run db:generate
+```
+
+This command:
+- Compares your schema files with the current database state
+- Generates SQL migration file in `src/db/migrations/`
+- Creates migration metadata in `src/db/migrations/meta/`
+
+**Output:**
+```
+[✓] Your SQL migration file ➜ src/db/migrations/0001_add_template_color.sql
+```
+
+#### 3. Review Generated SQL
+
+Always review the generated SQL before applying:
+
+```bash
+cat src/db/migrations/0001_add_template_color.sql
+```
+
+```sql
+ALTER TABLE "roadmap_templates" ADD COLUMN "color" varchar(7);
+```
+
+#### 4. Apply Migration
+
+```bash
+npm run db:migrate
+```
+
+This applies pending migrations to your database.
+
+**Note:** Use `DATABASE_URL` (direct connection) in `.env` for migrations, not the pooled URL.
+
+### Available Commands
+
+```bash
+# Generate migration from schema changes
+npm run db:generate
+
+# Apply migrations to database
+npm run db:migrate
+
+# Push schema directly (skip migration files - dev only)
+npm run db:push
+
+# Open Drizzle Studio (visual database explorer)
+npm run db:studio
+```
+
+### Quick Reference: When to Use Each Command
+
+| Command | When to Use | Production Safe? |
+|---------|-------------|------------------|
+| `db:generate` | After changing schema files | ✅ Yes - creates migration files |
+| `db:migrate` | Apply pending migrations | ✅ Yes - runs migration files |
+| `db:push` | Rapid prototyping (no migration files) | ⚠️ Dev only - doesn't create migration history |
+| `db:studio` | Visual database exploration | ✅ Yes - read-only by default |
+
 ### Migration File Structure
+
+After running migrations, your directory will look like:
 
 ```
 apps/backend/src/db/migrations/
-├── 001_initial_schema.sql
-├── 002_expert_system.sql
-├── 003_roadmap_system.sql
-├── 004_analytics.sql
-└── README.md
+├── 0000_rapid_black_panther.sql      # Initial schema (generated from current state)
+├── 0001_add_template_color.sql       # Your first change
+├── 0002_add_user_preferences.sql     # Your second change
+└── meta/
+    ├── _journal.json                  # Migration history
+    └── 0000_snapshot.json             # Schema snapshots
 ```
 
-### Create Migration Runner
+### Manual SQL Migrations (Advanced)
 
-**apps/backend/src/db/migrate.ts:**
-
-```typescript
-import { pool } from "./client.js";
-import fs from "fs/promises";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-async function runMigrations() {
-  const migrationsDir = path.join(__dirname, "migrations");
-  const files = await fs.readdir(migrationsDir);
-  const sqlFiles = files.filter((f) => f.endsWith(".sql")).sort();
-
-  console.log(`📁 Found ${sqlFiles.length} migration files`);
-
-  for (const file of sqlFiles) {
-    console.log(`⏳ Running migration: ${file}`);
-    const sql = await fs.readFile(path.join(migrationsDir, file), "utf-8");
-
-    try {
-      await pool.query(sql);
-      console.log(`✅ Completed: ${file}`);
-    } catch (error) {
-      console.error(`❌ Failed: ${file}`, error);
-      throw error;
-    }
-  }
-
-  console.log("🎉 All migrations completed!");
-  await pool.end();
-}
-
-runMigrations().catch(console.error);
-```
-
-### Run Migrations
-
-**Add to package.json:**
-
-```json
-{
-  "scripts": {
-    "migrate": "node out/db/migrate.js"
-  }
-}
-```
-
-**Execute:**
+If you need to write custom SQL that Drizzle can't generate automatically, you can create a migration file manually:
 
 ```bash
-npm run build
-npm run migrate
+# Create empty migration file
+npm run db:generate -- --custom --name=custom_indexes
+
+# Edit the file and add your SQL
+# Then apply with npm run db:migrate
 ```
 
 ### Migration Best Practices

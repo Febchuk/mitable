@@ -12,7 +12,7 @@ export default function Nav() {
       <nav className="space-y-1 px-2">
         <NavItem to="/dashboard" icon={BarChart3} label="Dashboard" />
         <NavItem to="/people" icon={Users} label="People" />
-        <NavItem to="/roadmaps" icon={Layers} label="Roadmaps" />
+        <NavItem to="/templates" icon={Layers} label="Templates" />
         <NavItem to="/integrations" icon={Plug} label="Integrations" />
       </nav>
     );
