@@ -1,6 +1,9 @@
 import request from "supertest";
 import { app } from "./app.js";
 
+// Mock Supabase client
+jest.mock("./lib/supabase.js");
+
 describe("Backend API Routes", () => {
   describe("GET /health", () => {
     it("should return 200 with status ok", async () => {
