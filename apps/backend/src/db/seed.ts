@@ -1170,6 +1170,955 @@ async function seedUserTasks(users: schema.User[], templates: schema.RoadmapTemp
   return result;
 }
 
+async function seedExpertProfiles(users: schema.User[]) {
+  console.log("🎓 Seeding expert profiles...");
+
+  const experts = [
+    {
+      email: "sarah@lorikeet.ai",
+      bio: "Principal Engineer with 8+ years in AI/ML. Led the design of our multi-agent orchestration system. Passionate about making LLMs production-ready.",
+      topics: ["LLM Integration", "Agent Architecture", "Python", "LangChain", "RAG Systems"],
+      responseRate: 0.95,
+      avgResponseTime: 2.5,
+      helpfulnessScore: 4.8,
+    },
+    {
+      email: "marcus@lorikeet.ai",
+      bio: "VP of Engineering. Previously scaled infrastructure at Stripe. Expert in distributed systems and backend architecture.",
+      topics: ["System Design", "Backend Engineering", "PostgreSQL", "API Design", "DevOps"],
+      responseRate: 0.88,
+      avgResponseTime: 4.2,
+      helpfulnessScore: 4.6,
+    },
+    {
+      email: "jordan@lorikeet.ai",
+      bio: "Senior ML Engineer specializing in production ML systems. Built our RAG pipeline and vector search infrastructure.",
+      topics: ["RAG", "Vector Databases", "Embeddings", "Pinecone", "Machine Learning"],
+      responseRate: 0.92,
+      avgResponseTime: 3.1,
+      helpfulnessScore: 4.9,
+    },
+    {
+      email: "jessica@lorikeet.ai",
+      bio: "Lead Frontend Engineer. Created our design system and component library. Expert in React and modern web development.",
+      topics: ["React", "TypeScript", "Frontend Architecture", "Design Systems", "UI/UX"],
+      responseRate: 0.9,
+      avgResponseTime: 3.8,
+      helpfulnessScore: 4.7,
+    },
+    {
+      email: "carlos@lorikeet.ai",
+      bio: "Staff Backend Engineer. Built core API infrastructure and data pipelines. Deep expertise in Node.js and PostgreSQL.",
+      topics: [
+        "Node.js",
+        "Express",
+        "Database Design",
+        "API Development",
+        "Performance Optimization",
+      ],
+      responseRate: 0.87,
+      avgResponseTime: 4.5,
+      helpfulnessScore: 4.5,
+    },
+  ];
+
+  const expertProfiles = [];
+  const expertTopics = [];
+
+  for (const expertData of experts) {
+    const user = users.find((u) => u.email === expertData.email);
+    if (!user) continue;
+
+    // Create expert profile
+    const [profile] = await db
+      .insert(schema.expertProfiles)
+      .values({
+        userId: user.id,
+        responseRate: expertData.responseRate.toString(),
+        avgResponseTime: `${expertData.avgResponseTime} hours`, // Convert to PostgreSQL interval
+        helpfulnessScore: expertData.helpfulnessScore.toString(),
+        totalInteractions: Math.floor(Math.random() * 50) + 20, // 20-70 interactions
+      })
+      .returning();
+
+    expertProfiles.push(profile);
+
+    // Create expert topics
+    for (const topic of expertData.topics) {
+      expertTopics.push({
+        userId: profile.userId,
+        topic: topic,
+      });
+    }
+  }
+
+  // Insert all topics in batch
+  if (expertTopics.length > 0) {
+    await db.insert(schema.expertTopics).values(expertTopics);
+  }
+
+  console.log(
+    `✅ Created ${expertProfiles.length} expert profiles with ${expertTopics.length} topics`
+  );
+  return expertProfiles;
+}
+
+async function seedNudges(users: schema.User[], experts: schema.ExpertProfile[]) {
+  console.log("💡 Seeding nudges...");
+
+  const nudges = [];
+
+  // Helper to get expert by email
+  const getExpert = (email: string) => {
+    const user = users.find((u) => u.email === email);
+    return experts.find((e) => e.userId === user?.id);
+  };
+
+  // Emily's nudges (AI/ML Engineer, Week 3)
+  const emily = users.find((u) => u.email === "emily@lorikeet.ai");
+  const sarah = getExpert("sarah@lorikeet.ai");
+  const jordan = getExpert("jordan@lorikeet.ai");
+
+  if (emily && sarah) {
+    nudges.push({
+      userId: emily.id,
+      expertId: sarah.userId,
+      context: "Emily is implementing multi-agent orchestration for Week 3",
+      question:
+        "I'm working on the multi-agent orchestration task and struggling with how agents should communicate. Could you share some insights on the message passing architecture?",
+      matchScore: "0.94",
+      matchReasons: [
+        "Expert in Agent Architecture",
+        "Led multi-agent system design",
+        "High helpfulness (4.8/5)",
+        "Available this week",
+      ],
+      status: "waiting",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+    });
+  }
+
+  if (emily && jordan) {
+    nudges.push({
+      userId: emily.id,
+      expertId: jordan.userId,
+      context: "Emily needs help with RAG pipeline implementation",
+      question:
+        "I'm trying to understand our RAG pipeline better. What's the best way to optimize embedding generation and retrieval for production?",
+      matchScore: "0.91",
+      matchReasons: [
+        "Built the RAG pipeline",
+        "Expert in Vector Databases",
+        "Excellent rating (4.9/5)",
+      ],
+      status: "accepted",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+    });
+  }
+
+  // Alex's nudges (AI/ML Engineer, Week 1)
+  const alex = users.find((u) => u.email === "alex@lorikeet.ai");
+  if (alex && sarah) {
+    nudges.push({
+      userId: alex.id,
+      expertId: sarah.userId,
+      context: "Alex is setting up dev environment for the first time",
+      question:
+        "I'm stuck on the LangChain setup. The agent chains aren't working as expected. Any tips for debugging chain execution?",
+      matchScore: "0.89",
+      matchReasons: [
+        "LangChain expert",
+        "Helped 15+ engineers with setup",
+        "Fast response time (2.5h avg)",
+      ],
+      status: "waiting",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
+    });
+  }
+
+  // Priya's nudges (Backend Engineer, Week 2)
+  const priya = users.find((u) => u.email === "priya@lorikeet.ai");
+  const marcus = getExpert("marcus@lorikeet.ai");
+  const carlosExpert = getExpert("carlos@lorikeet.ai");
+
+  if (priya && marcus) {
+    nudges.push({
+      userId: priya.id,
+      expertId: marcus.userId,
+      context: "Priya is learning about system design and API architecture",
+      question:
+        "I'm designing my first API endpoint. What are the key principles I should follow for our REST API design?",
+      matchScore: "0.92",
+      matchReasons: ["API Design expert", "VP of Engineering", "Scaled infrastructure at Stripe"],
+      status: "resolved",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+      resolvedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+    });
+  }
+
+  if (priya && carlosExpert) {
+    nudges.push({
+      userId: priya.id,
+      expertId: carlosExpert.userId,
+      context: "Priya needs help with PostgreSQL query optimization",
+      question:
+        "I wrote a query but it's really slow. How do I optimize PostgreSQL queries and when should I add indexes?",
+      matchScore: "0.88",
+      matchReasons: ["Database Design expert", "PostgreSQL specialist", "Performance Optimization"],
+      status: "waiting",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
+    });
+  }
+
+  // Jessica's nudges (Frontend Engineer, Week 3)
+  const jessicaExpert = getExpert("jessica@lorikeet.ai");
+
+  // Miguel's nudges (Frontend Engineer, Week 1)
+  const miguel = users.find((u) => u.email === "miguel@lorikeet.ai");
+  if (miguel && jessicaExpert) {
+    nudges.push({
+      userId: miguel.id,
+      expertId: jessicaExpert.userId,
+      context: "Miguel is learning React and component architecture",
+      question:
+        "I'm new to React and our codebase. What's the best way to understand the component structure and state management patterns we use?",
+      matchScore: "0.93",
+      matchReasons: [
+        "Created the design system",
+        "React expert",
+        "Frontend Architecture specialist",
+      ],
+      status: "accepted",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 12 * 60 * 60 * 1000), // 12 hours ago
+    });
+  }
+
+  // Rachel's nudges (Product Manager, Week 2)
+  const rachel = users.find((u) => u.email === "rachel@lorikeet.ai");
+  if (rachel && sarah) {
+    nudges.push({
+      userId: rachel.id,
+      expertId: sarah.userId,
+      context: "Rachel is writing her first PRD and needs technical validation",
+      question:
+        "I'm writing a PRD for a new AI feature. Could you help me understand what's technically feasible with our current LLM infrastructure?",
+      matchScore: "0.87",
+      matchReasons: ["AI/ML technical leader", "8+ years experience", "Product-minded engineer"],
+      status: "waiting",
+      deliveryChannel: "slack",
+      deliveredAt: new Date(Date.now() - 8 * 60 * 60 * 1000), // 8 hours ago
+    });
+  }
+
+  // James's nudges (Product Manager, Week 4)
+  const james = users.find((u) => u.email === "james@lorikeet.ai");
+  if (james && jordan) {
+    nudges.push({
+      userId: james.id,
+      expertId: jordan.userId,
+      context: "James is prioritizing ML features and needs input",
+      question:
+        "We're considering improvements to our RAG system. What would have the biggest impact on retrieval quality?",
+      matchScore: "0.90",
+      matchReasons: ["Built RAG pipeline", "Production ML expert", "Excellent rating (4.9/5)"],
+      status: "resolved",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+      resolvedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), // 4 days ago
+    });
+  }
+
+  // Sophie's nudges (Customer Success, Week 2)
+  const sophie = users.find((u) => u.email === "sophie@lorikeet.ai");
+  if (sophie && sarah) {
+    nudges.push({
+      userId: sophie.id,
+      expertId: sarah.userId,
+      context: "Sophie needs to explain technical concepts to customers",
+      question:
+        "A customer asked how our agent system handles context. How can I explain this in simple terms?",
+      matchScore: "0.85",
+      matchReasons: [
+        "Agent system architect",
+        "Great at explaining complex topics",
+        "High helpfulness score",
+      ],
+      status: "waiting",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
+    });
+  }
+
+  // Daniel's nudges (Customer Success, Week 3)
+  const daniel = users.find((u) => u.email === "daniel@lorikeet.ai");
+  if (daniel && marcus) {
+    nudges.push({
+      userId: daniel.id,
+      expertId: marcus.userId,
+      context: "Daniel needs to troubleshoot customer issue",
+      question:
+        "Customer is experiencing API rate limiting. What are our rate limits and how can they optimize their API usage?",
+      matchScore: "0.88",
+      matchReasons: ["API infrastructure expert", "VP of Engineering", "Scaled systems at Stripe"],
+      status: "accepted",
+      deliveryChannel: "slack",
+      deliveredAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+    });
+  }
+
+  // Olivia's nudges (Sales, Week 1)
+  const olivia = users.find((u) => u.email === "olivia@lorikeet.ai");
+  if (olivia && sarah) {
+    nudges.push({
+      userId: olivia.id,
+      expertId: sarah.userId,
+      context: "Olivia needs help with technical objections during demos",
+      question:
+        "Prospect asked about data privacy in our LLM system. What security measures do we have in place?",
+      matchScore: "0.84",
+      matchReasons: [
+        "Technical leader",
+        "Experience with enterprise customers",
+        "Security conscious",
+      ],
+      status: "waiting",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+    });
+  }
+
+  // Ethan's nudges (Design, Week 2)
+  const ethan = users.find((u) => u.email === "ethan@lorikeet.ai");
+  if (ethan && jessicaExpert) {
+    nudges.push({
+      userId: ethan.id,
+      expertId: jessicaExpert.userId,
+      context: "Ethan is learning the design system and component library",
+      question:
+        "I'm designing a new feature. What components from our design system should I use for chat interfaces?",
+      matchScore: "0.95",
+      matchReasons: ["Created design system", "Component library expert", "UI/UX specialist"],
+      status: "resolved",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), // 4 days ago
+      resolvedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+    });
+  }
+
+  // Maya's nudges (DevOps, Week 3)
+  const maya = users.find((u) => u.email === "maya@lorikeet.ai");
+  if (maya && marcus) {
+    nudges.push({
+      userId: maya.id,
+      expertId: marcus.userId,
+      context: "Maya is learning deployment and monitoring",
+      question:
+        "I'm setting up monitoring for a new service. What metrics should I track and what alerts should I configure?",
+      matchScore: "0.90",
+      matchReasons: ["DevOps expert", "Scaled infrastructure", "Monitoring & observability"],
+      status: "waiting",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
+    });
+  }
+
+  // Carlos's nudges (Backend Engineer, Week 4)
+  const carlosUser = users.find((u) => u.email === "carlos@lorikeet.ai");
+  if (carlosUser && marcus) {
+    nudges.push({
+      userId: carlosUser.id,
+      expertId: marcus.userId,
+      context: "Carlos is architecting a complex feature",
+      question:
+        "I'm designing a distributed task queue. What are the tradeoffs between different message queue solutions?",
+      matchScore: "0.91",
+      matchReasons: [
+        "Distributed systems expert",
+        "Backend architecture specialist",
+        "Stripe experience",
+      ],
+      status: "accepted",
+      deliveryChannel: "in_app",
+      deliveredAt: new Date(Date.now() - 18 * 60 * 60 * 1000), // 18 hours ago
+    });
+  }
+
+  const result = await db.insert(schema.nudges).values(nudges).returning();
+  console.log(`✅ Created ${result.length} nudges`);
+  return result;
+}
+
+async function seedConversations(users: schema.User[]) {
+  console.log("💬 Seeding conversations...");
+
+  const conversations = [];
+  const messages = [];
+
+  // Emily's conversations (AI/ML Engineer, Week 3)
+  const emily = users.find((u) => u.email === "emily@lorikeet.ai");
+  if (emily) {
+    // Conversation 1: LangChain debugging
+    const conv1Id = crypto.randomUUID();
+    conversations.push({
+      id: conv1Id,
+      userId: emily.id,
+      title: "LangChain chain execution debugging",
+      contextType: "help_request",
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+      updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: conv1Id,
+        role: "user",
+        content:
+          "My LangChain agent is throwing an error when I try to execute a chain with memory. The error says 'Memory not properly initialized'. How do I fix this?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: conv1Id,
+        role: "assistant",
+        content:
+          "This error typically occurs when the memory object isn't passed correctly to the chain. Here's how to fix it:\n\n1. Initialize memory before creating the chain:\n```python\nfrom langchain.memory import ConversationBufferMemory\nmemory = ConversationBufferMemory()\n```\n\n2. Pass memory to the chain:\n```python\nchain = ConversationChain(\n    llm=llm,\n    memory=memory,\n    verbose=True\n)\n```\n\n3. Make sure you're using the same memory instance across calls.\n\nCheck our Agent Context Management docs for more details on memory patterns.",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 2 * 60 * 1000),
+      }
+    );
+
+    // Conversation 2: RAG optimization
+    const conv2Id = crypto.randomUUID();
+    conversations.push({
+      id: conv2Id,
+      userId: emily.id,
+      title: "RAG retrieval optimization",
+      contextType: "general",
+      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+      updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: conv2Id,
+        role: "user",
+        content:
+          "What's the best way to optimize our RAG retrieval? I'm seeing slow response times.",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: conv2Id,
+        role: "assistant",
+        content:
+          "Great question! Here are the key optimization strategies:\n\n**1. Chunk Size Optimization**\n- Experiment with chunk sizes (512, 1024, 2048 tokens)\n- Smaller chunks = better precision, larger = more context\n\n**2. Embedding Quality**\n- Use our text-embedding-3-large model (1536 dimensions)\n- Consider metadata filtering to reduce search space\n\n**3. Retrieval Strategy**\n- Use hybrid search (semantic + keyword)\n- Implement re-ranking for better results\n- Cache frequent queries\n\n**4. Index Optimization**\n- Use Pinecone's pod-based indexing\n- Set appropriate similarity metric (cosine for our use case)\n\nCheck the RAG Pipeline Architecture doc for implementation details.",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000 + 3 * 60 * 1000),
+      }
+    );
+  }
+
+  // Alex's conversations (AI/ML Engineer, Week 1)
+  const alex = users.find((u) => u.email === "alex@lorikeet.ai");
+  if (alex) {
+    const convId = crypto.randomUUID();
+    conversations.push({
+      id: convId,
+      userId: alex.id,
+      title: "Setting up local development environment",
+      contextType: "help_request",
+      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "I'm having trouble getting the development environment running. Docker containers keep failing. What am I doing wrong?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Let's troubleshoot your Docker setup:\n\n1. **Check Docker is running**: `docker ps`\n2. **Verify Docker Compose version**: We need v2.x+\n3. **Clear old containers**: `docker-compose down -v`\n4. **Rebuild**: `docker-compose up --build`\n\n**Common issues:**\n- Port conflicts (3000, 5432 already in use)\n- Insufficient memory allocated to Docker\n- Missing .env file\n\nCheck the Codebase Setup Guide for the complete setup checklist. If still stuck, share the error logs!",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "user",
+        content: "Thanks! It was a port conflict. All working now!",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000),
+      }
+    );
+  }
+
+  // Priya's conversations (Backend Engineer, Week 2)
+  const priya = users.find((u) => u.email === "priya@lorikeet.ai");
+  if (priya) {
+    // Conversation 1: API design
+    const conv1Id = crypto.randomUUID();
+    conversations.push({
+      id: conv1Id,
+      userId: priya.id,
+      title: "REST API design best practices",
+      contextType: "general",
+      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+      updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: conv1Id,
+        role: "user",
+        content:
+          "I'm designing my first API endpoint. What are the key REST API principles I should follow?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: conv1Id,
+        role: "assistant",
+        content:
+          "Here are our API design principles:\n\n**1. Resource Naming**\n- Use nouns, not verbs: `/users` not `/getUsers`\n- Plural for collections: `/conversations`\n- Use kebab-case: `/user-profiles`\n\n**2. HTTP Methods**\n- GET: Read resources\n- POST: Create resources\n- PUT/PATCH: Update resources\n- DELETE: Remove resources\n\n**3. Response Structure**\n- Consistent error format\n- Include pagination metadata\n- Use appropriate status codes (200, 201, 400, 404, 500)\n\n**4. Versioning**\n- Use `/api/v1/` prefix\n- Never break backwards compatibility\n\n**5. Security**\n- Always require authentication\n- Validate and sanitize input\n- Rate limiting\n\nCheck the API Reference Documentation for examples!",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 10 * 60 * 1000),
+      }
+    );
+
+    // Conversation 2: Database queries
+    const conv2Id = crypto.randomUUID();
+    conversations.push({
+      id: conv2Id,
+      userId: priya.id,
+      title: "PostgreSQL query optimization",
+      contextType: "help_request",
+      createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
+      updatedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: conv2Id,
+        role: "user",
+        content: "My query is taking 5 seconds to return results. How do I make it faster?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: conv2Id,
+        role: "assistant",
+        content:
+          "Let's optimize that query! Here's the process:\n\n**1. Use EXPLAIN ANALYZE**\n```sql\nEXPLAIN ANALYZE\nSELECT * FROM conversations WHERE user_id = '...';\n```\nThis shows you the query plan and execution time.\n\n**2. Add Indexes**\n- Index foreign keys: `CREATE INDEX idx_conversations_user_id ON conversations(user_id);`\n- Index commonly queried columns\n- Composite indexes for multi-column queries\n\n**3. Optimize Query Structure**\n- Use `SELECT` specific columns, not `SELECT *`\n- Add `LIMIT` for pagination\n- Use JOINs efficiently\n\n**4. Check for N+1 Queries**\n- Use Drizzle's `.with()` for eager loading\n\nShare your query and EXPLAIN output for specific advice!",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000 + 4 * 60 * 1000),
+      }
+    );
+  }
+
+  // Miguel's conversations (Frontend Engineer, Week 1)
+  const miguel = users.find((u) => u.email === "miguel@lorikeet.ai");
+  if (miguel) {
+    const convId = crypto.randomUUID();
+    conversations.push({
+      id: convId,
+      userId: miguel.id,
+      title: "React component patterns",
+      contextType: "general",
+      createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000), // 12 hours ago
+      updatedAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "What React patterns do we use for state management? I see Context API in some places and props drilling in others.",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Great observation! Here's our state management strategy:\n\n**1. Local State** (useState)\n- UI state (dropdowns, modals)\n- Form inputs\n- Component-specific data\n\n**2. Context API** (useContext)\n- Authentication state\n- Theme/settings\n- Data shared across multiple components\n- We have: AuthContext, RoadmapContext, NudgesContext\n\n**3. Server State** (React Query)\n- API data fetching\n- Caching and revalidation\n- (We're migrating to this pattern)\n\n**When to use what:**\n- Single component → useState\n- Multiple related components → lift state up or Context\n- Cross-cutting concerns → Context\n- API data → Context with fetch logic\n\n**Anti-patterns to avoid:**\n- Don't put everything in Context\n- Don't prop drill more than 2-3 levels\n- Avoid derived state when possible",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000 + 6 * 60 * 1000),
+      }
+    );
+  }
+
+  // Rachel's conversations (Product Manager, Week 2)
+  const rachel = users.find((u) => u.email === "rachel@lorikeet.ai");
+  if (rachel) {
+    const convId = crypto.randomUUID();
+    conversations.push({
+      id: convId,
+      userId: rachel.id,
+      title: "Understanding AI capabilities for PRD",
+      contextType: "general",
+      createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000), // 8 hours ago
+      updatedAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "I'm writing a PRD for an AI feature that summarizes customer conversations. What's technically feasible with our current LLM setup?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Great feature idea! Here's what we can do:\n\n**Current Capabilities:**\n- Multi-turn conversation summarization ✅\n- Key points extraction ✅\n- Sentiment analysis ✅\n- Action items detection ✅\n- Custom summary formats ✅\n\n**Technical Constraints:**\n- Context window: 128k tokens (GPT-4) or 200k (Claude)\n- Response time: 2-5 seconds typical\n- Cost: ~$0.01-0.03 per summary\n\n**Implementation Approach:**\n1. Use our existing LLM pipeline\n2. Create custom prompt template for summaries\n3. Add streaming for real-time updates\n4. Cache summaries to avoid re-generation\n\n**Considerations for PRD:**\n- Define summary length (brief/detailed/comprehensive)\n- Specify trigger points (end of conversation, manual, scheduled)\n- Handle multi-language conversations?\n- Privacy: what data can be summarized?\n\nHappy to review your PRD draft!",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000 + 8 * 60 * 1000),
+      }
+    );
+  }
+
+  // Sophie's conversations (Customer Success, Week 2)
+  const sophie = users.find((u) => u.email === "sophie@lorikeet.ai");
+  if (sophie) {
+    const convId = crypto.randomUUID();
+    conversations.push({
+      id: convId,
+      userId: sophie.id,
+      title: "Explaining agent context to customers",
+      contextType: "help_request",
+      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
+      updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "Customer asked how our agents remember conversation history. How do I explain this in non-technical terms?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Here's a customer-friendly explanation:\n\n**Simple Analogy:**\n\"Think of our AI agents like having a conversation with a colleague who takes detailed notes. They remember:\n- What you talked about previously\n- Important context from your account\n- Your preferences and past interactions\n\nThis 'memory' helps them give relevant, personalized responses without you having to repeat information.\"\n\n**Technical Details (if they ask):**\n- We store conversation history for 30 days\n- Agents can access the last 50 messages in a conversation\n- We use embeddings to find relevant past conversations\n- Context is refreshed at the start of each interaction\n\n**Privacy Reassurance:**\n- All data is encrypted\n- Only authorized agents access conversation history\n- Customers can request deletion anytime\n- No data shared across organizations\n\n**Key Benefits to Emphasize:**\n- No need to repeat information\n- Faster resolution times\n- Consistent experience across sessions\n- Agents provide context-aware suggestions\n\nUse the Agent Context Management doc as a reference!",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000 + 5 * 60 * 1000),
+      }
+    );
+  }
+
+  // Daniel's conversations (Customer Success, Week 3)
+  const daniel = users.find((u) => u.email === "daniel@lorikeet.ai");
+  if (daniel) {
+    const convId = crypto.randomUUID();
+    conversations.push({
+      id: convId,
+      userId: daniel.id,
+      title: "API rate limiting troubleshooting",
+      contextType: "help_request",
+      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "Enterprise customer is hitting rate limits. What are our limits and how can they optimize?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Here's the rate limit information:\n\n**Current Limits (Enterprise tier):**\n- API requests: 10,000/hour, 100,000/day\n- Concurrent connections: 100\n- Message rate: 500/minute per agent\n- Burst allowance: 2x limit for 1 minute\n\n**Optimization Strategies:**\n\n1. **Batch Requests**\n   - Group multiple operations into single API calls\n   - Use bulk endpoints when available\n\n2. **Caching**\n   - Cache responses for frequently accessed data\n   - Use ETags for conditional requests\n\n3. **Webhook Instead of Polling**\n   - Subscribe to webhooks for real-time updates\n   - Reduces unnecessary API calls\n\n4. **Retry Strategy**\n   - Implement exponential backoff\n   - Respect Retry-After headers\n\n5. **Request Optimization**\n   - Only request needed fields\n   - Use pagination efficiently\n\n**Response Headers:**\n- `X-RateLimit-Limit`: Total allowed\n- `X-RateLimit-Remaining`: Remaining in window\n- `X-RateLimit-Reset`: Unix timestamp of reset\n\n**If They Need More:**\n- We can upgrade to Custom tier (higher limits)\n- Contact sales for custom quotas\n\nShould I escalate this to engineering for a custom quota?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 15 * 60 * 1000),
+      }
+    );
+  }
+
+  // Olivia's conversations (Sales, Week 1)
+  const olivia = users.find((u) => u.email === "olivia@lorikeet.ai");
+  if (olivia) {
+    const convId = crypto.randomUUID();
+    conversations.push({
+      id: convId,
+      userId: olivia.id,
+      title: "Security and data privacy for enterprise prospects",
+      contextType: "general",
+      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+      updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "Prospect is concerned about data privacy and security in our LLM system. What can I tell them?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Here are our key security and privacy features:\n\n**Data Encryption:**\n- End-to-end encryption in transit (TLS 1.3)\n- Encryption at rest (AES-256)\n- Encrypted backups\n\n**Data Privacy:**\n- No training on customer data - we use only pre-trained models\n- Data isolation - each customer's data in separate namespace\n- Zero data retention on LLM provider side\n- GDPR and SOC 2 Type II compliant\n\n**Access Controls:**\n- Role-based access control (RBAC)\n- Multi-factor authentication (MFA)\n- SSO with SAML 2.0\n- Detailed audit logs\n\n**Infrastructure Security:**\n- Private VPC deployment available\n- DDoS protection\n- Regular penetration testing\n- Bug bounty program\n\n**LLM-Specific Security:**\n- Prompt injection protection\n- PII detection and masking\n- Content filtering\n- Rate limiting and abuse prevention\n\n**Compliance:**\n- SOC 2 Type II certified\n- GDPR compliant\n- HIPAA available (Enterprise+)\n- Data residency options (US, EU, APAC)\n\n**Key Differentiators:**\n- Self-hosted option for maximum control\n- Bring-your-own-key (BYOK) encryption\n- Real-time security monitoring\n\nWe also have a detailed security whitepaper I can send them!",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000 + 10 * 60 * 1000),
+      }
+    );
+  }
+
+  // Ethan's conversations (Design, Week 2)
+  const ethan = users.find((u) => u.email === "ethan@lorikeet.ai");
+  if (ethan) {
+    const convId = crypto.randomUUID();
+    conversations.push({
+      id: convId,
+      userId: ethan.id,
+      title: "Design system components for chat UI",
+      contextType: "general",
+      createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), // 4 days ago
+      updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // updated 3 days ago
+    });
+    messages.push(
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "I'm designing a new chat interface. What components should I use from our design system?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Great question! Here are the key components for chat interfaces:\n\n**Core Components:**\n\n1. **Message Bubble** (`MessageBubble.tsx`)\n   - User vs Assistant variants\n   - Timestamp display\n   - Status indicators (sending, sent, error)\n\n2. **Message Input** (`MessageInput.tsx`)\n   - Auto-resizing textarea\n   - Send button\n   - File attachment support\n   - Emoji picker integration\n\n3. **Conversation List** (`ConversationList.tsx`)\n   - Virtualized for performance\n   - Unread indicators\n   - Search/filter built-in\n\n4. **Typing Indicator** (`TypingIndicator.tsx`)\n   - Animated dots\n   - Shows when assistant is generating\n\n5. **Message Actions** (`MessageActions.tsx`)\n   - Copy, edit, delete\n   - Thumbs up/down feedback\n\n**Layout Components:**\n- `ChatContainer`: Main chat layout\n- `ChatHeader`: Conversation title, actions\n- `MessageList`: Scrollable message area\n- `ChatFooter`: Input area\n\n**Patterns to Follow:**\n- Use our spacing scale (8px grid)\n- Follow color tokens (bg-primary, text-secondary)\n- Implement accessibility (ARIA labels, keyboard nav)\n- Add smooth animations (message fade-in, scroll)\n\n**Figma Resources:**\n- Chat UI Kit in our component library\n- See Dashboard → Messages tab for examples\n\nCheck the Lorikeet Design System docs for implementation details!",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 + 15 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "user",
+        content: "Perfect! Should I use the existing MessageBubble or create a new variant?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          'Use the existing `MessageBubble` component - it\'s already flexible!\n\n**Current Variants:**\n- `variant="user"` - Right-aligned, blue background\n- `variant="assistant"` - Left-aligned, gray background\n- `variant="system"` - Centered, lighter styling\n\n**Customization Props:**\n```tsx\n<MessageBubble\n  variant="assistant"\n  showAvatar={true}\n  showTimestamp={true}\n  status="sent" // sending | sent | error\n  onAction={(action) => {}} // copy, edit, delete\n>\n  {content}\n</MessageBubble>\n```\n\n**When to Create New Variant:**\n- Only if you need fundamentally different styling\n- Document it in Storybook\n- Get design review first\n\nFor your use case, the existing component should work perfectly with props customization!',
+        messageType: "text",
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000),
+      }
+    );
+  }
+
+  // Maya's conversations (DevOps, Week 3)
+  const maya = users.find((u) => u.email === "maya@lorikeet.ai");
+  if (maya) {
+    const convId = crypto.randomUUID();
+    conversations.push({
+      id: convId,
+      userId: maya.id,
+      title: "Monitoring and alerting best practices",
+      contextType: "general",
+      createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
+      updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+    });
+    messages.push(
+      {
+        conversationId: convId,
+        role: "user",
+        content: "I'm setting up monitoring for a new service. What metrics should I track?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Here's our standard monitoring setup:\n\n**RED Metrics (Must Have):**\n- **Rate**: Requests per second\n- **Errors**: Error rate (4xx, 5xx)\n- **Duration**: Response time (p50, p95, p99)\n\n**System Metrics:**\n- CPU usage\n- Memory usage\n- Disk I/O\n- Network throughput\n\n**Application Metrics:**\n- Database query performance\n- Cache hit rate\n- Queue depth\n- Active connections\n\n**Business Metrics:**\n- API calls by endpoint\n- Feature usage\n- User activity\n\n**Alert Thresholds:**\n\n**Critical (PagerDuty):**\n- Error rate > 5%\n- P95 latency > 2s\n- CPU > 80% for 5 min\n- Memory > 90%\n\n**Warning (Slack):**\n- Error rate > 1%\n- P95 latency > 1s\n- CPU > 60% for 10 min\n\n**DataDog Setup:**\n```yaml\n# datadog.yaml\nmetrics:\n  - service.request.rate\n  - service.request.duration\n  - service.error.rate\n  - system.cpu.usage\n  - system.memory.usage\n```\n\n**Dashboard Sections:**\n1. Overview (traffic, errors, latency)\n2. System Resources\n3. Database Performance\n4. External Dependencies\n5. Custom Business Metrics\n\nCheck the Monitoring & Observability doc for DataDog dashboard templates!",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000 + 7 * 60 * 1000),
+      }
+    );
+  }
+
+  // Carlos's conversations (Backend Engineer, Week 4)
+  const carlosUser = users.find((u) => u.email === "carlos@lorikeet.ai");
+  if (carlosUser) {
+    const convId = crypto.randomUUID();
+    conversations.push({
+      id: convId,
+      userId: carlosUser.id,
+      title: "Message queue architecture decisions",
+      contextType: "general",
+      createdAt: new Date(Date.now() - 18 * 60 * 60 * 1000), // 18 hours ago
+      updatedAt: new Date(Date.now() - 14 * 60 * 60 * 1000), // updated 14 hours ago
+    });
+    messages.push(
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "I'm designing a distributed task queue. What are the tradeoffs between RabbitMQ, Redis, and SQS?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 18 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Great question! Here's a comparison:\n\n**RabbitMQ**\n✅ Pros:\n- Advanced routing (exchanges, bindings)\n- High reliability (persistent queues)\n- Strong ordering guarantees\n- Dead letter queues\n- Management UI\n\n❌ Cons:\n- Higher operational overhead\n- More complex setup\n- Need to manage clustering\n\n**Redis (with Bull/BullMQ)**\n✅ Pros:\n- Extremely fast\n- Simple to set up\n- Good Node.js libraries\n- Built-in retry logic\n- Job prioritization\n\n❌ Cons:\n- Persistence is optional (risk of data loss)\n- Not designed for queues (but works well)\n- Limited scalability vs dedicated queue\n\n**AWS SQS**\n✅ Pros:\n- Fully managed (no ops)\n- Infinite scalability\n- Pay per use\n- Integrated with AWS ecosystem\n\n❌ Cons:\n- No ordering in standard queues\n- FIFO has throughput limits\n- Vendor lock-in\n- Higher latency vs self-hosted\n\n**My Recommendation:**\n\nFor your use case, I'd suggest:\n\n1. **Start with Redis + BullMQ** if:\n   - You already use Redis\n   - Need fast job processing\n   - Can tolerate potential data loss\n   - Want simple setup\n\n2. **Use RabbitMQ** if:\n   - Need complex routing\n   - Require strict guarantees\n   - Have ops team to manage it\n\n3. **Use SQS** if:\n   - Running on AWS\n   - Want zero operations\n   - Can handle higher latency\n\n**Our Stack:**\nWe use Redis + BullMQ for most background jobs (email, analytics) and SQS for critical workflows (billing, data pipeline).\n\nWant to discuss your specific requirements?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 18 * 60 * 60 * 1000 + 20 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "This is for processing AI agent tasks - need reliability and can handle some latency. Sounds like SQS might be best?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 14 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Yes, SQS is perfect for that use case! Here's why:\n\n**For AI Agent Tasks:**\n\n✅ **Reliability** - SQS guarantees at-least-once delivery\n✅ **Scalability** - Handle thousands of concurrent agent tasks\n✅ **Latency tolerance** - AI processing takes seconds anyway\n✅ **Cost-effective** - Pay only for what you use\n✅ **Dead letter queues** - Handle failed agent tasks gracefully\n\n**Implementation Tips:**\n\n1. **Use FIFO Queue** if order matters:\n```typescript\nconst params = {\n  QueueUrl: process.env.AGENT_QUEUE_URL,\n  MessageBody: JSON.stringify(agentTask),\n  MessageGroupId: task.userId, // Group by user\n  MessageDeduplicationId: task.id // Prevent duplicates\n};\n```\n\n2. **Set appropriate visibility timeout**:\n- AI tasks take 30-120s\n- Set timeout to 5 minutes\n- Implement heartbeat for long tasks\n\n3. **Add retry logic**:\n```typescript\nMaximumReceives: 3 // Retry 3 times\ndeadLetterTargetArn: dlqArn // Then send to DLQ\n```\n\n4. **Monitor with CloudWatch**:\n- ApproximateNumberOfMessages\n- ApproximateAgeOfOldestMessage\n- NumberOfMessagesSent/Received\n\n**Sample Architecture:**\n```\nAPI → SQS FIFO Queue → Lambda/ECS Workers → AI Service\n                 ↓\n          DLQ (Failed tasks)\n```\n\nWant help setting up the infrastructure code?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 14 * 60 * 60 * 1000 + 15 * 60 * 1000),
+      }
+    );
+  }
+
+  // James's conversations (Product Manager, Week 4)
+  const james = users.find((u) => u.email === "james@lorikeet.ai");
+  if (james) {
+    const convId = crypto.randomUUID();
+    conversations.push({
+      id: convId,
+      userId: james.id,
+      title: "RAG system improvements",
+      contextType: "general",
+      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+      updatedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), // updated 4 days ago
+    });
+    messages.push(
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "We're prioritizing RAG improvements. What would have the biggest impact on retrieval quality?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Based on user feedback and metrics, here are the highest-impact improvements:\n\n**1. Hybrid Search (High Impact, Medium Effort)**\nCombine semantic + keyword search:\n- Semantic: Great for conceptual matches\n- Keyword: Essential for exact terms, codes, names\n- Hybrid: Best of both worlds\n\nExpected: +25% retrieval accuracy\nEffort: 2-3 weeks\n\n**2. Re-ranking (Very High Impact, Low Effort)**\nAdd cross-encoder re-ranking:\n- Take top 20 semantic results\n- Re-rank with more powerful model\n- Return top 5\n\nExpected: +30% relevance\nEffort: 1 week\n\n**3. Query Enhancement (Medium Impact, Low Effort)**\nImprove queries before retrieval:\n- Expand acronyms\n- Add context from conversation\n- Generate multiple query variants\n\nExpected: +15% recall\nEffort: 1 week\n\n**4. Chunk Optimization (Medium Impact, Medium Effort)**\nSmarter chunking strategy:\n- Semantic chunking (split at topic boundaries)\n- Overlapping chunks\n- Maintain context headers\n\nExpected: +20% context quality\nEffort: 2 weeks\n\n**5. Metadata Filtering (High Impact, Low Effort)**\nAdd rich metadata:\n- Document type, recency, source\n- User role, team, permissions\n- Pre-filter before semantic search\n\nExpected: +35% precision\nEffort: 1-2 weeks\n\n**Recommended Prioritization:**\n1. Metadata Filtering (quick win)\n2. Re-ranking (biggest impact per effort)\n3. Hybrid Search (foundational improvement)\n4. Query Enhancement\n5. Chunk Optimization\n\n**Combined Impact:**\nImplementing top 3 could improve overall RAG quality by 60-80%!\n\nWant me to draft a technical spec for these improvements?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "user",
+        content:
+          "This is super helpful! Let's prioritize re-ranking and metadata filtering for next sprint. Can you work with Emily and Jordan on the implementation?",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+      },
+      {
+        conversationId: convId,
+        role: "assistant",
+        content:
+          "Perfect choice - those two will give us the best ROI!\n\n**Next Steps:**\n\n1. **Technical Spec** (This week)\n   - I'll draft detailed spec for both improvements\n   - Include API changes, data requirements, metrics\n   - Share for review by EOW\n\n2. **Team Sync** (Next Monday)\n   - Meeting with Emily (implementation) and Jordan (RAG expertise)\n   - Discuss approach and timeline\n   - Identify any blockers\n\n3. **Sprint Planning** (Next Wednesday)\n   - Break down into tickets\n   - Estimate effort\n   - Set success metrics\n\n**Success Metrics:**\n- Retrieval accuracy: Baseline 65% → Target 85%\n- User satisfaction: Track thumbs up/down\n- Response quality: GPT-4 as a judge\n- Latency: Keep under 500ms\n\n**Risks:**\n- Re-ranking adds ~200ms latency (acceptable)\n- Metadata schema changes (need migration)\n- May need Pinecone namespace updates\n\nI'll loop in Emily and Jordan today and get the spec started!",
+        messageType: "text",
+        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000),
+      }
+    );
+  }
+
+  // Insert conversations and messages
+  if (conversations.length > 0) {
+    await db.insert(schema.conversations).values(conversations);
+  }
+  if (messages.length > 0) {
+    await db.insert(schema.messages).values(messages);
+  }
+
+  console.log(`✅ Created ${conversations.length} conversations with ${messages.length} messages`);
+  return { conversations, messages };
+}
+
+async function seedIntegrations(organizationId: string) {
+  console.log("🔌 Seeding integrations...");
+
+  const integrations = await db
+    .insert(schema.integrations)
+    .values([
+      {
+        organizationId,
+        provider: "slack",
+        status: "connected",
+        syncFrequency: "6 hours",
+        lastSyncedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        metadata: {
+          workspace: "lorikeet-team",
+          channels: ["#general", "#engineering", "#design"],
+        },
+      },
+      {
+        organizationId,
+        provider: "notion",
+        status: "connected",
+        syncFrequency: "6 hours",
+        lastSyncedAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
+        metadata: {
+          workspace: "Lorikeet Team",
+          pages: 156,
+        },
+      },
+      {
+        organizationId,
+        provider: "github",
+        status: "disconnected",
+        syncFrequency: "24 hours",
+        metadata: {
+          organization: "lorikeet-ai",
+        },
+      },
+      {
+        organizationId,
+        provider: "google-drive",
+        status: "disconnected",
+        syncFrequency: "24 hours",
+        metadata: {},
+      },
+    ])
+    .returning();
+
+  console.log(`✅ Created ${integrations.length} integrations`);
+  return integrations;
+}
+
 // ============================================
 // Main Seed Function
 // ============================================
@@ -1206,6 +2155,10 @@ async function seed() {
     const templates = await seedTemplates(organization.id, materials);
     const assignments = await seedUserAssignments(users, templates);
     const userTasks = await seedUserTasks(users, templates);
+    const experts = await seedExpertProfiles(users);
+    const nudges = await seedNudges(users, experts);
+    const { conversations, messages } = await seedConversations(users);
+    const integrations = await seedIntegrations(organization.id);
 
     console.log("\n📊 Seed Summary:");
     console.log(`  - Organization: ${organization.name}`);
@@ -1216,6 +2169,11 @@ async function seed() {
     console.log(`  - Templates: ${templates.length}`);
     console.log(`  - User Assignments: ${assignments.length}`);
     console.log(`  - User Tasks: ${userTasks.length}`);
+    console.log(`  - Expert Profiles: ${experts.length}`);
+    console.log(`  - Nudges: ${nudges.length}`);
+    console.log(`  - Conversations: ${conversations.length}`);
+    console.log(`  - Messages: ${messages.length}`);
+    console.log(`  - Integrations: ${integrations.length}`);
 
     console.log("\n🎉 Database seeded successfully!");
   } catch (error) {

@@ -1,30 +1,12 @@
 import { Request, Response, NextFunction } from "express";
-import { supabase } from "../lib/supabase.js";
-import { User } from "@supabase/supabase-js";
-
-// Extend Express Request to include user
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace Express {
-    interface Request {
-      user?: User;
-      userId?: string;
-    }
-  }
-}
+import { supabase } from "../lib/supabase";
 
 /**
- * Required Authentication Middleware
- *
- * Verifies the JWT token from the Authorization header and attaches the user to req.user
- * Returns 401 if token is missing or invalid
- *
- * SECURITY NOTE: Always use getUser() not getSession() on the server
- * getUser() validates the token with the Supabase Auth server every time
+ * Middleware to require authentication
+ * Validates JWT token and attaches user info to request
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Extract token from Authorization header
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -37,8 +19,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-    // Verify token with Supabase Auth server
-    // IMPORTANT: Always use getUser() for server-side validation
+    // Verify the token with Supabase
     const {
       data: { user },
       error,
@@ -52,7 +33,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return;
     }
 
-    // Attach user to request
+    // Attach user info to request
     req.user = user;
     req.userId = user.id;
 
@@ -61,16 +42,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     console.error("Auth middleware error:", error);
     res.status(500).json({
       error: "Internal Server Error",
-      message: "Authentication verification failed",
+      message: "Authentication failed",
     });
   }
 }
 
 /**
- * Optional Authentication Middleware
- *
- * Attempts to verify the JWT token but doesn't fail if token is missing
- * Useful for routes that have different behavior for authenticated vs anonymous users
+ * Optional auth middleware - doesn't fail if no token
+ * Used for endpoints that work with or without authentication
  */
 export async function optionalAuth(
   req: Request,
@@ -80,24 +59,26 @@ export async function optionalAuth(
   try {
     const authHeader = req.headers.authorization;
 
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.substring(7);
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser(token);
-
-      if (user) {
-        req.user = user;
-        req.userId = user.id;
-      }
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      // No auth header, continue without user
+      next();
+      return;
     }
 
-    // Continue regardless of auth status
+    const token = authHeader.substring(7);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser(token);
+
+    if (user) {
+      req.user = user;
+      req.userId = user.id;
+    }
+
     next();
   } catch (error) {
-    // Log error but continue
-    console.error("Optional auth middleware error:", error);
+    // If optional auth fails, just continue without user
     next();
   }
 }

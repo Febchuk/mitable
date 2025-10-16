@@ -9,89 +9,35 @@ import {
   Phone,
   MessageCircle,
   Building,
+  Bot,
+  Lightbulb,
+  Users,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { Template } from "../../../../types";
+import { useAdmin } from "@/console/src/context/AdminContext";
 
-interface MockTemplate extends Omit<Template, "icon"> {
-  icon: LucideIcon;
-}
-
-const mockTemplates: MockTemplate[] = [
-  {
-    id: "1",
-    organizationId: "org-1",
-    title: "Engineering Onboarding",
-    tasks: 12,
-    usedCount: 8,
-    totalWeeks: 4,
-    description: "Complete technical setup, codebase introduction, and first feature deployment",
-    icon: Settings,
-    roleTags: ["Software Engineer", "Frontend"],
-  },
-  {
-    id: "2",
-    organizationId: "org-1",
-    title: "Design Onboarding",
-    tasks: 10,
-    usedCount: 3,
-    totalWeeks: 3,
-    description: "Figma setup, design system review, and first design critique",
-    icon: Palette,
-    roleTags: ["Product Designer", "UI/UX"],
-  },
-  {
-    id: "3",
-    organizationId: "org-1",
-    title: "Marketing Onboarding",
-    tasks: 9,
-    usedCount: 5,
-    totalWeeks: 3,
-    description: "Marketing tools setup, brand guidelines review, first campaign",
-    icon: Megaphone,
-    roleTags: ["Marketing Manager"],
-  },
-  {
-    id: "4",
-    organizationId: "org-1",
-    title: "Sales Onboarding",
-    tasks: 11,
-    usedCount: 6,
-    totalWeeks: 4,
-    description: "CRM training, sales process overview, shadow calls",
-    icon: Phone,
-    roleTags: ["Sales Representative"],
-  },
-  {
-    id: "5",
-    organizationId: "org-1",
-    title: "Customer Success Onboarding",
-    tasks: 8,
-    usedCount: 4,
-    totalWeeks: 3,
-    description:
-      "Support platform training, customer communication best practices, and escalation procedures",
-    icon: MessageCircle,
-    roleTags: ["Customer Success", "Support"],
-  },
-  {
-    id: "6",
-    organizationId: "org-1",
-    title: "Product Management Onboarding",
-    tasks: 14,
-    usedCount: 2,
-    totalWeeks: 5,
-    description: "Product strategy overview, roadmap planning, stakeholder management essentials",
-    icon: Building,
-    roleTags: ["Product Manager"],
-  },
-];
+// Map icon names to Lucide components
+const iconMap: Record<string, LucideIcon> = {
+  Bot,
+  Code: Settings,
+  Lightbulb,
+  Users,
+  TrendingUp,
+  Palette,
+  Settings,
+  Megaphone,
+  Phone,
+  MessageCircle,
+  Building,
+};
 
 export default function TemplatesView() {
   const navigate = useNavigate();
+  const { templates, loading, error } = useAdmin();
 
   return (
     <div className="p-8 space-y-6">
@@ -135,43 +81,55 @@ export default function TemplatesView() {
 
       {/* Templates Grid */}
       <div className="grid grid-cols-2 gap-6">
-        {mockTemplates.map((template) => {
-          const IconComponent = template.icon;
-          return (
-            <div
-              key={template.id}
-              className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4 hover:border-border-subtle/80 transition-colors cursor-pointer"
-            >
-              {/* Icon */}
-              <div className="w-12 h-12 rounded-full bg-background-secondary flex items-center justify-center">
-                <IconComponent size={24} className="text-text-secondary" />
-              </div>
+        {loading ? (
+          <div className="col-span-2 text-center text-text-secondary py-12">
+            Loading templates...
+          </div>
+        ) : error ? (
+          <div className="col-span-2 text-center text-status-error py-12">Error: {error}</div>
+        ) : templates.length === 0 ? (
+          <div className="col-span-2 text-center text-text-secondary py-12">No templates found</div>
+        ) : (
+          templates.map((template) => {
+            const IconComponent = iconMap[template.icon] || Settings;
+            return (
+              <div
+                key={template.id}
+                className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4 hover:border-border-subtle/80 transition-colors cursor-pointer"
+              >
+                {/* Icon */}
+                <div className="w-12 h-12 rounded-full bg-background-secondary flex items-center justify-center">
+                  <IconComponent size={24} className="text-text-secondary" />
+                </div>
 
-              {/* Title and Stats */}
-              <div className="space-y-2">
-                <h3 className="text-xl font-semibold text-text-primary">{template.title}</h3>
-                <p className="text-sm text-text-secondary">
-                  {template.tasks} tasks • Used {template.usedCount} times
+                {/* Title and Stats */}
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold text-text-primary">{template.title}</h3>
+                  <p className="text-sm text-text-secondary">
+                    {template.tasks} tasks • Used {template.usedCount} times
+                  </p>
+                </div>
+
+                {/* Description */}
+                <p className="text-text-secondary text-sm leading-relaxed">
+                  {template.description}
                 </p>
-              </div>
 
-              {/* Description */}
-              <p className="text-text-secondary text-sm leading-relaxed">{template.description}</p>
-
-              {/* Role Tags */}
-              <div className="flex flex-wrap gap-2">
-                {template.roleTags.map((role, index) => (
-                  <Badge
-                    key={index}
-                    className="bg-background-secondary text-text-secondary border-transparent hover:bg-background-secondary"
-                  >
-                    {role}
-                  </Badge>
-                ))}
+                {/* Role Tags */}
+                <div className="flex flex-wrap gap-2">
+                  {template.roleTags?.map((role, index) => (
+                    <Badge
+                      key={index}
+                      className="bg-background-secondary text-text-secondary border-transparent hover:bg-background-secondary"
+                    >
+                      {role}
+                    </Badge>
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
   );

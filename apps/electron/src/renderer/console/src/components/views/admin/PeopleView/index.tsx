@@ -12,53 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-
-interface Employee {
-  id: string;
-  name: string;
-  role: string;
-  startDate: string;
-  status: "Onboarding" | "Active";
-  progress: number;
-}
-
-const mockEmployees: Employee[] = [
-  {
-    id: "1",
-    name: "Sarah Chen",
-    role: "Software Engineer",
-    startDate: "Oct 1, 2025",
-    status: "Onboarding",
-    progress: 60,
-  },
-  {
-    id: "2",
-    name: "Marcus Johnson",
-    role: "Product Designer",
-    startDate: "Sep 15, 2025",
-    status: "Active",
-    progress: 100,
-  },
-  {
-    id: "3",
-    name: "Emily Rodriguez",
-    role: "Marketing Manager",
-    startDate: "Oct 8, 2025",
-    status: "Onboarding",
-    progress: 35,
-  },
-  {
-    id: "4",
-    name: "David Kim",
-    role: "Software Engineer",
-    startDate: "Sep 1, 2025",
-    status: "Active",
-    progress: 100,
-  },
-];
+import { useAdmin } from "@/console/src/context/AdminContext";
 
 export default function PeopleView() {
   const navigate = useNavigate();
+  const { users, loading, error } = useAdmin();
 
   return (
     <div className="p-8 space-y-6">
@@ -123,36 +81,56 @@ export default function PeopleView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockEmployees.map((employee) => (
-              <TableRow
-                key={employee.id}
-                className="border-border-subtle hover:bg-background-primary/50 cursor-pointer"
-                onClick={() => navigate(`/people/${employee.id}`)}
-              >
-                <TableCell className="font-medium text-text-primary">{employee.name}</TableCell>
-                <TableCell className="text-text-secondary">{employee.role}</TableCell>
-                <TableCell className="text-text-secondary">{employee.startDate}</TableCell>
-                <TableCell>
-                  <Badge
-                    className={
-                      employee.status === "Onboarding"
-                        ? "bg-status-warning/20 text-status-warning border-transparent hover:bg-status-warning/20"
-                        : "bg-status-success/20 text-status-success border-transparent hover:bg-status-success/20"
-                    }
-                  >
-                    {employee.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Progress value={employee.progress} className="flex-1 h-2 bg-border-subtle" />
-                    <span className="text-text-secondary text-sm font-medium w-12 text-right">
-                      {employee.progress}%
-                    </span>
-                  </div>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-text-secondary py-8">
+                  Loading users...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-status-error py-8">
+                  Error: {error}
+                </TableCell>
+              </TableRow>
+            ) : users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-text-secondary py-8">
+                  No users found
+                </TableCell>
+              </TableRow>
+            ) : (
+              users.map((employee) => (
+                <TableRow
+                  key={employee.id}
+                  className="border-border-subtle hover:bg-background-primary/50 cursor-pointer"
+                  onClick={() => navigate(`/people/${employee.id}`)}
+                >
+                  <TableCell className="font-medium text-text-primary">{employee.name}</TableCell>
+                  <TableCell className="text-text-secondary">{employee.role}</TableCell>
+                  <TableCell className="text-text-secondary">{employee.startDate}</TableCell>
+                  <TableCell>
+                    <Badge
+                      className={
+                        employee.status === "Onboarding"
+                          ? "bg-status-warning/20 text-status-warning border-transparent hover:bg-status-warning/20"
+                          : "bg-status-success/20 text-status-success border-transparent hover:bg-status-success/20"
+                      }
+                    >
+                      {employee.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Progress value={employee.progress} className="flex-1 h-2 bg-border-subtle" />
+                      <span className="text-text-secondary text-sm font-medium w-12 text-right">
+                        {employee.progress}%
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

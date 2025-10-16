@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { authRouter } from "./routes/auth.js";
 import { requireAuth, optionalAuth } from "./middleware/auth.js";
+import roadmapsRouter from "./routes/roadmaps";
+import nudgesRouter from "./routes/nudges";
+import conversationsRouter from "./routes/conversations";
+import adminRouter from "./routes/admin";
 
 export const router = Router();
 
@@ -16,35 +20,17 @@ router.get("/health", (_req, res) => {
   });
 });
 
-// Protected routes - require authentication
-router.get("/conversations", requireAuth, (req, res) => {
-  res.json({
-    conversations: [],
-    userId: req.userId,
-    message: "This is a protected route - user must be authenticated",
-  });
-});
+// Mount route modules (these already have auth middleware built-in)
+router.use("/roadmaps", roadmapsRouter);
+router.use("/nudges", nudgesRouter);
+router.use("/conversations", conversationsRouter);
+router.use("/admin", adminRouter);
 
+// Protected routes - require authentication
 router.post("/help", requireAuth, (req, res) => {
   res.json({
     message: "Help endpoint - to be implemented",
     userId: req.userId,
-  });
-});
-
-router.get("/roadmaps", requireAuth, (req, res) => {
-  res.json({
-    roadmaps: [],
-    userId: req.userId,
-    message: "Fetch user-specific roadmaps",
-  });
-});
-
-router.get("/nudges", requireAuth, (req, res) => {
-  res.json({
-    nudges: [],
-    userId: req.userId,
-    message: "Fetch user-specific nudges",
   });
 });
 
