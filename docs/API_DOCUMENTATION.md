@@ -1458,11 +1458,17 @@ Get all users in the organization.
 **Headers**: Authorization required (admin role)
 
 **Query Parameters**:
-- `search` (optional): Search by name or email
-- `role` (optional): Filter by role (admin, employee)
-- `status` (optional): Filter by onboarding status
-- `limit` (optional): Number of users (default: 50)
-- `offset` (optional): Pagination offset
+- `search` (optional): Search by name or email *(not yet implemented)*
+- `role` (optional): Filter by role (admin, employee) *(not yet implemented)*
+- `status` (optional): Filter by onboarding status *(not yet implemented)*
+- `limit` (optional): Number of users (default: 50) *(not yet implemented)*
+- `offset` (optional): Pagination offset *(not yet implemented)*
+
+**Implementation Notes**:
+- Currently returns all employees (role='employee') ordered by creation date
+- Calculates progress dynamically from user_roadmap_tasks completion
+- Status is determined by progress (100% = "Active", <100% = "Onboarding")
+- Search, filtering, and pagination to be added in Phase 2
 
 **Response** (200):
 ```json
@@ -1482,6 +1488,9 @@ Get all users in the organization.
 }
 ```
 
+**Error Responses**:
+- `403 Forbidden`: User is not an admin
+
 ---
 
 ### GET /admin/users/:id
@@ -1491,6 +1500,13 @@ Get detailed information about a specific user.
 **Status**: ✅ Implemented
 
 **Headers**: Authorization required (admin role)
+
+**Implementation Notes**:
+- Uses optimized Drizzle ORM queries with joins
+- Correlates conversations with nudges (within 1-hour window)
+- Groups nudge themes by question topic
+- Activity data is placeholder (real-time tracking in Phase 3)
+- Manager field is `null` (requires schema update to add `managerId`)
 
 **Response** (200):
 ```json
@@ -1545,6 +1561,10 @@ Get detailed information about a specific user.
   }
 }
 ```
+
+**Error Responses**:
+- `403 Forbidden`: User is not an admin
+- `404 Not Found`: User with specified ID doesn't exist
 
 ---
 

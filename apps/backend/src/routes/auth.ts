@@ -8,8 +8,70 @@ import { eq } from "drizzle-orm";
 export const authRouter = Router();
 
 /**
- * POST /api/auth/signup
- * Create a new user account
+ * @openapi
+ * /auth/signup:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Create a new user account
+ *     description: Register a new user with email and password. Creates an account in Supabase Auth and a profile in the database.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - organizationId
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 6
+ *                 example: securePassword123
+ *               firstName:
+ *                 type: string
+ *                 example: John
+ *               lastName:
+ *                 type: string
+ *                 example: Doe
+ *               organizationId:
+ *                 type: string
+ *                 format: uuid
+ *                 example: 123e4567-e89b-12d3-a456-426614174000
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                 session:
+ *                   $ref: '#/components/schemas/Session'
+ *                 message:
+ *                   type: string
+ *                   example: User created successfully. Please check your email to confirm your account.
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security: []
  */
 authRouter.post("/signup", async (req: Request, res: Response) => {
   try {
@@ -90,8 +152,58 @@ authRouter.post("/signup", async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/auth/login
- * Sign in with email and password
+ * @openapi
+ * /auth/login:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Sign in with email and password
+ *     description: Authenticate an existing user and retrieve session tokens
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: securePassword123
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                 session:
+ *                   $ref: '#/components/schemas/Session'
+ *                 profile:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security: []
  */
 authRouter.post("/login", async (req: Request, res: Response) => {
   try {
@@ -143,8 +255,32 @@ authRouter.post("/login", async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/auth/logout
- * Sign out the current user
+ * @openapi
+ * /auth/logout:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Sign out the current user
+ *     description: Invalidate the current session token
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Signed out successfully
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 authRouter.post("/logout", requireAuth, async (req: Request, res: Response) => {
   try {
@@ -184,8 +320,39 @@ authRouter.post("/logout", requireAuth, async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/auth/me
- * Get current user profile
+ * @openapi
+ * /auth/me:
+ *   get:
+ *     tags:
+ *       - Authentication
+ *     summary: Get current user profile
+ *     description: Retrieve the profile of the currently authenticated user
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                 profile:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
   try {
@@ -226,8 +393,42 @@ authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/auth/refresh
- * Refresh the access token
+ * @openapi
+ * /auth/refresh:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Refresh the access token
+ *     description: Exchange a refresh token for a new access token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refresh_token
+ *             properties:
+ *               refresh_token:
+ *                 type: string
+ *                 description: JWT refresh token from previous login
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 session:
+ *                   $ref: '#/components/schemas/Session'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security: []
  */
 authRouter.post("/refresh", async (req: Request, res: Response) => {
   try {
