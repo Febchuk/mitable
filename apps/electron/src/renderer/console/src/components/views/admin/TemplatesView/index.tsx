@@ -14,83 +14,90 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import type { Template } from "../../../../types";
 
-interface Roadmap {
-  id: string;
-  title: string;
-  tasks: number;
-  usedCount: number;
-  description: string;
+interface MockTemplate extends Omit<Template, "icon"> {
   icon: LucideIcon;
-  roles: string[];
 }
 
-const mockRoadmaps: Roadmap[] = [
+const mockTemplates: MockTemplate[] = [
   {
     id: "1",
+    organizationId: "org-1",
     title: "Engineering Onboarding",
     tasks: 12,
     usedCount: 8,
+    totalWeeks: 4,
     description: "Complete technical setup, codebase introduction, and first feature deployment",
     icon: Settings,
-    roles: ["Software Engineer", "Frontend"],
+    roleTags: ["Software Engineer", "Frontend"],
   },
   {
     id: "2",
+    organizationId: "org-1",
     title: "Design Onboarding",
     tasks: 10,
     usedCount: 3,
+    totalWeeks: 3,
     description: "Figma setup, design system review, and first design critique",
     icon: Palette,
-    roles: ["Product Designer", "UI/UX"],
+    roleTags: ["Product Designer", "UI/UX"],
   },
   {
     id: "3",
+    organizationId: "org-1",
     title: "Marketing Onboarding",
     tasks: 9,
     usedCount: 5,
+    totalWeeks: 3,
     description: "Marketing tools setup, brand guidelines review, first campaign",
     icon: Megaphone,
-    roles: ["Marketing Manager"],
+    roleTags: ["Marketing Manager"],
   },
   {
     id: "4",
+    organizationId: "org-1",
     title: "Sales Onboarding",
     tasks: 11,
     usedCount: 6,
+    totalWeeks: 4,
     description: "CRM training, sales process overview, shadow calls",
     icon: Phone,
-    roles: ["Sales Representative"],
+    roleTags: ["Sales Representative"],
   },
   {
     id: "5",
+    organizationId: "org-1",
     title: "Customer Success Onboarding",
     tasks: 8,
     usedCount: 4,
+    totalWeeks: 3,
     description:
       "Support platform training, customer communication best practices, and escalation procedures",
     icon: MessageCircle,
-    roles: ["Customer Success", "Support"],
+    roleTags: ["Customer Success", "Support"],
   },
   {
     id: "6",
+    organizationId: "org-1",
     title: "Product Management Onboarding",
     tasks: 14,
     usedCount: 2,
+    totalWeeks: 5,
     description: "Product strategy overview, roadmap planning, stakeholder management essentials",
     icon: Building,
-    roles: ["Product Manager"],
+    roleTags: ["Product Manager"],
   },
 ];
 
-export default function RoadmapsView() {
+export default function TemplatesView() {
   const navigate = useNavigate();
 
   return (
     <div className="p-8 space-y-6">
       {/* Header */}
       <div className="space-y-6">
-        <h1 className="text-4xl font-bold text-text-primary">Roadmaps</h1>
+        <h1 className="text-4xl font-bold text-text-primary">Templates</h1>
 
         {/* Search and Actions Bar */}
         <div className="flex items-center gap-4">
@@ -101,7 +108,7 @@ export default function RoadmapsView() {
               size={20}
             />
             <Input
-              placeholder="Search integrations..."
+              placeholder="Search templates..."
               className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
             />
           </div>
@@ -115,24 +122,24 @@ export default function RoadmapsView() {
             <span className="font-medium">Filter</span>
           </Button>
 
-          {/* Add New Roadmap Button */}
+          {/* Create Template Button */}
           <Button
             className="gap-2 bg-primary text-white hover:bg-primary/90"
-            onClick={() => navigate("/roadmaps/new")}
+            onClick={() => navigate("/templates/new")}
           >
             <Plus size={20} />
-            <span>Add New Roadmap</span>
+            <span>Create Template</span>
           </Button>
         </div>
       </div>
 
-      {/* Roadmaps Grid */}
+      {/* Templates Grid */}
       <div className="grid grid-cols-2 gap-6">
-        {mockRoadmaps.map((roadmap) => {
-          const IconComponent = roadmap.icon;
+        {mockTemplates.map((template) => {
+          const IconComponent = template.icon;
           return (
             <div
-              key={roadmap.id}
+              key={template.id}
               className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4 hover:border-border-subtle/80 transition-colors cursor-pointer"
             >
               {/* Icon */}
@@ -142,18 +149,18 @@ export default function RoadmapsView() {
 
               {/* Title and Stats */}
               <div className="space-y-2">
-                <h3 className="text-xl font-semibold text-text-primary">{roadmap.title}</h3>
+                <h3 className="text-xl font-semibold text-text-primary">{template.title}</h3>
                 <p className="text-sm text-text-secondary">
-                  {roadmap.tasks} tasks • Used {roadmap.usedCount} times
+                  {template.tasks} tasks • Used {template.usedCount} times
                 </p>
               </div>
 
               {/* Description */}
-              <p className="text-text-secondary text-sm leading-relaxed">{roadmap.description}</p>
+              <p className="text-text-secondary text-sm leading-relaxed">{template.description}</p>
 
               {/* Role Tags */}
               <div className="flex flex-wrap gap-2">
-                {roadmap.roles.map((role, index) => (
+                {template.roleTags.map((role, index) => (
                   <Badge
                     key={index}
                     className="bg-background-secondary text-text-secondary border-transparent hover:bg-background-secondary"

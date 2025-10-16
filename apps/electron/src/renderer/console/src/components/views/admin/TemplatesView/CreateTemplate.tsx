@@ -33,11 +33,11 @@ const availableRoles = [
   "QA Engineer",
 ];
 
-export default function CreateRoadmap() {
+export default function CreateTemplate() {
   const navigate = useNavigate();
 
   // Form state
-  const [roadmapName, setRoadmapName] = useState("");
+  const [templateName, setTemplateName] = useState("");
   const [notionUrl, setNotionUrl] = useState("");
   const [roleTags, setRoleTags] = useState<string[]>(["Software Engineer", "Frontend"]);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
@@ -63,13 +63,13 @@ export default function CreateRoadmap() {
       {/* Header */}
       <div className="space-y-4">
         <button
-          onClick={() => navigate("/roadmaps")}
+          onClick={() => navigate("/templates")}
           className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
         >
           <ArrowLeft size={16} />
-          <span className="text-sm">Back to Roadmaps</span>
+          <span className="text-sm">Back to Templates</span>
         </button>
-        <h1 className="text-4xl font-bold text-text-primary">Create Roadmap</h1>
+        <h1 className="text-4xl font-bold text-text-primary">Create Template</h1>
       </div>
 
       {/* Tabs */}
@@ -101,16 +101,16 @@ export default function CreateRoadmap() {
           <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-6">
             <h2 className="text-xl font-semibold text-text-primary">Import from Notion</h2>
 
-            {/* Roadmap Name */}
+            {/* Template Name */}
             <div className="space-y-2">
-              <Label htmlFor="roadmapName" className="text-text-primary">
-                Roadmap Name <span className="text-red-500">*</span>
+              <Label htmlFor="templateName" className="text-text-primary">
+                Template Name <span className="text-red-500">*</span>
               </Label>
               <Input
-                id="roadmapName"
+                id="templateName"
                 placeholder="e.g. Engineering Onboarding"
-                value={roadmapName}
-                onChange={(e) => setRoadmapName(e.target.value)}
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
                 className="bg-background-secondary border-transparent text-text-primary placeholder:text-text-secondary"
               />
             </div>
@@ -130,7 +130,7 @@ export default function CreateRoadmap() {
                 </Button>
               </div>
               <p className="text-xs text-text-secondary">
-                This icon will be displayed on the roadmap card
+                This icon will be displayed on the template card
               </p>
             </div>
 
@@ -152,7 +152,7 @@ export default function CreateRoadmap() {
                 />
               </div>
               <p className="text-xs text-text-secondary">
-                We'll parse your Notion page and convert it into a roadmap template
+                We'll parse your Notion page and convert it into a template
               </p>
             </div>
 
@@ -213,7 +213,7 @@ export default function CreateRoadmap() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <p className="text-xs text-text-secondary">Tags help organize and filter roadmaps</p>
+              <p className="text-xs text-text-secondary">Tags help organize and filter templates</p>
             </div>
           </div>
 
@@ -277,13 +277,13 @@ export default function CreateRoadmap() {
           <div className="flex justify-end gap-4">
             <Button
               variant="outline"
-              onClick={() => navigate("/roadmaps")}
+              onClick={() => navigate("/templates")}
               className="bg-transparent border-border-subtle text-text-primary hover:bg-background-elevated"
             >
               Cancel
             </Button>
             <Button className="bg-primary text-white hover:bg-primary/90">
-              Import & Generate Roadmap
+              Import & Generate Template
             </Button>
           </div>
 

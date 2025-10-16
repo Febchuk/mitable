@@ -17,36 +17,35 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import type { Template } from "../../../../types";
 
-interface RoadmapTemplate {
-  id: string;
-  title: string;
-  tasks: number;
-  duration: string;
-  description: string;
-}
-
-const roadmapTemplates: RoadmapTemplate[] = [
+const templates: Template[] = [
   {
     id: "1",
+    organizationId: "org-1",
     title: "Engineering Onboarding",
-    tasks: 12,
-    duration: "2 weeks",
     description: "Technical setup, codebase intro, first PR",
+    roleTags: ["Software Engineer"],
+    totalWeeks: 2,
+    tasks: 12,
   },
   {
     id: "2",
+    organizationId: "org-1",
     title: "Company Onboarding (All Roles)",
-    tasks: 8,
-    duration: "1 week",
     description: "Company culture, tools, policies, team intros",
+    roleTags: [],
+    totalWeeks: 1,
+    tasks: 8,
   },
   {
     id: "3",
+    organizationId: "org-1",
     title: "Frontend Specialization",
-    tasks: 8,
-    duration: "1 week",
     description: "React architecture, component library, styling patterns",
+    roleTags: ["Frontend", "Software Engineer"],
+    totalWeeks: 1,
+    tasks: 8,
   },
 ];
 
@@ -80,12 +79,9 @@ export default function AddNewUser() {
   };
 
   const calculateTotals = () => {
-    const selected = roadmapTemplates.filter((t) => selectedTemplates.includes(t.id));
-    const totalTasks = selected.reduce((sum, t) => sum + t.tasks, 0);
-    const totalWeeks = selected.reduce((sum, t) => {
-      const weeks = parseInt(t.duration.split(" ")[0]);
-      return sum + weeks;
-    }, 0);
+    const selected = templates.filter((t) => selectedTemplates.includes(t.id));
+    const totalTasks = selected.reduce((sum, t) => sum + (t.tasks || 0), 0);
+    const totalWeeks = selected.reduce((sum, t) => sum + t.totalWeeks, 0);
     return { totalTasks, totalWeeks };
   };
 
@@ -270,13 +266,13 @@ export default function AddNewUser() {
             Onboarding Roadmap <span className="text-red-500">*</span>
           </h2>
           <p className="text-sm text-text-secondary">
-            Select one or more roadmap templates. They'll be combined into this person's complete
-            onboarding plan.
+            Select one or more templates. They'll be combined into this person's complete onboarding
+            plan.
           </p>
         </div>
 
         <div className="space-y-3">
-          {roadmapTemplates.map((template) => (
+          {templates.map((template) => (
             <Label
               key={template.id}
               htmlFor={template.id}
@@ -291,7 +287,8 @@ export default function AddNewUser() {
               <div className="flex-1">
                 <p className="text-text-primary font-semibold">{template.title}</p>
                 <p className="text-sm text-primary mt-1">
-                  {template.tasks} tasks • {template.duration}
+                  {template.tasks} tasks • {template.totalWeeks}{" "}
+                  {template.totalWeeks === 1 ? "week" : "weeks"}
                 </p>
                 <p className="text-sm text-text-secondary mt-1">{template.description}</p>
               </div>

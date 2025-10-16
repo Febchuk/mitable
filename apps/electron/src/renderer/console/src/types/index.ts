@@ -68,6 +68,54 @@ export interface User {
   role: UserRole;
 }
 
+// ============================================
+// Template Types (Admin-Created)
+// ============================================
+
+export interface Template {
+  id: string;
+  organizationId: string;
+  title: string;
+  description?: string;
+  icon?: string;
+  roleTags: string[];
+  totalWeeks: number;
+  tasks?: number; // Computed field for UI
+  usedCount?: number; // Computed field for UI
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface TemplateTask {
+  id: string;
+  templateId: string;
+  weekNumber: number;
+  title: string;
+  description?: string;
+  timeEstimate?: string;
+  orderIndex: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// ============================================
+// User Roadmap Types
+// ============================================
+
+export interface UserTemplateAssignment {
+  id: string;
+  userId: string;
+  templateId: string;
+  assignedAt: Date;
+  status: "active" | "completed" | "archived";
+}
+
+export interface UserRoadmapTask extends Task {
+  templateId?: string; // null if custom task
+  templateTaskId?: string; // original template task reference
+  isCustom: boolean; // true if manually added by admin
+}
+
 // Status badge variants
 export type BadgeVariant = "success" | "warning" | "error" | "info";
 
