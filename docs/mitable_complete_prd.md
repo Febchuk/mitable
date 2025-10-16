@@ -289,10 +289,10 @@ _For growing companies struggling with lengthy onboarding, Mitable is the AI ass
 │  └────────────────────────────────────────────────────────────┘ │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │ DATA LAYER (PostgreSQL + pgvector)                         │ │
+│  │ DATA LAYER (PostgreSQL + Pinecone)                         │ │
 │  │                                                             │ │
-│  │ • Users & Orgs       • Conversations      • Analytics      │ │
-│  │ • Roadmaps & Tasks   • Nudges & Experts   • Knowledge Base │ │
+│  │ PostgreSQL: Users, Orgs, Roadmaps, Conversations           │ │
+│  │ Pinecone: Vector embeddings for semantic search            │ │
 │  │ • UI Element Coords  • Source Materials   • Feedback       │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────┘
@@ -1105,7 +1105,7 @@ When activated (Cmd+H pressed):
 
 3. **Knowledge Retrieval** (Hybrid Search)
    - Input: Intent + Question semantics
-   - Search: Semantic (pgvector) + Keyword (PostgreSQL FTS)
+   - Search: Semantic (Pinecone) + Keyword (PostgreSQL FTS)
    - Output: Top 3-5 relevant knowledge chunks
    - Processing time: ~500ms
 
@@ -1606,13 +1606,11 @@ interface ConversationContext {
 └──────────────────────────┬───────────────────────────────────────────┘
                            │
 ┌──────────────────────────▼───────────────────────────────────────────┐
-│              DATABASE (PostgreSQL 15 + pgvector)                     │
+│              DATABASE (PostgreSQL 15 + Pinecone)                     │
 │                                                                      │
-│  Organizations    Users         Roadmaps       Conversations         │
-│  RoadmapTasks     Messages      Nudges         Experts               │
-│  Documents        DocumentChunks (embeddings)  UIElements            │
-│  SourceMaterials  HelpInteractions             Analytics             │
-│  FeedbackEvents   UserPreferences              AuditLogs             │
+│  PostgreSQL: Organizations, Users, Roadmaps, Conversations, Nudges   │
+│  PostgreSQL: Messages, SourceMaterials, Analytics, UIElements        │
+│  Pinecone: Vector embeddings (1536-dim) for semantic search          │
 └──────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -2499,7 +2497,8 @@ POST   /api/v1/analytics/event
 
 - Node.js 20+
 - Express.js
-- PostgreSQL 15 + pgvector
+- PostgreSQL 15 (Supabase)
+- Pinecone (vector database)
 - Redis (caching)
 - TypeScript
 

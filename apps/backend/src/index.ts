@@ -1,10 +1,40 @@
-import dotenv from "dotenv";
-import { app } from "./app.js";
+import { app } from './app.js';
+import { config, validateConfig } from './config.js';
+import { testConnection } from './db/client.js';
 
-dotenv.config();
+async function startServer() {
+  // Validate environment variables
+  console.log('🔍 Validating configuration...');
+  const isValid = validateConfig();
 
-const PORT = process.env.PORT || 3000;
+  if (!isValid) {
+    console.error('❌ Configuration validation failed. Please check your .env file.');
+    if (config.nodeEnv !== 'production') {
+      console.warn('⚠️  Continuing in development mode with warnings...');
+    } else {
+      process.exit(1);
+    }
+  }
 
-app.listen(PORT, () => {
-  console.log(`🚀 Mitable Backend API running on http://localhost:${PORT}`);
+  // Test database connection
+  console.log('🔌 Testing database connection...');
+  const dbConnected = await testConnection();
+
+  if (!dbConnected) {
+    console.error('❌ Failed to connect to database');
+    if (config.nodeEnv === 'production') {
+      process.exit(1);
+    }
+  }
+
+  // Start server
+  app.listen(config.port, () => {
+    console.log(`🚀 Mitable Backend API running on http://localhost:${config.port}`);
+    console.log(`📊 Environment: ${config.nodeEnv}`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error('❌ Failed to start server:', error);
+  process.exit(1);
 });
