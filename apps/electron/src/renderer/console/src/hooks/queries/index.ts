@@ -1,11 +1,11 @@
 // Admin queries
-export * from './admin';
+export * from "./admin";
 
 // Roadmap queries
-export * from './roadmap';
+export * from "./roadmap";
 
 // Nudges queries
-export * from './nudges';
+export * from "./nudges";
 
 // Chats queries
-export * from './chats';
+export * from "./chats";

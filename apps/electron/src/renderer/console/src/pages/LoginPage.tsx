@@ -28,6 +28,7 @@ export default function LoginPage() {
 
       // Update user context
       updateUser({
+        id: response.profile.id,
         name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
         firstName: response.profile.firstName || "",
         avatarUrl: response.profile.avatarUrl || undefined,

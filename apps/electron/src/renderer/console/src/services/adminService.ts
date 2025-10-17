@@ -217,9 +217,7 @@ export async function connectIntegration(
 /**
  * Disconnect an integration (admin only)
  */
-export async function disconnectIntegration(
-  integrationId: string
-): Promise<IntegrationResponse> {
+export async function disconnectIntegration(integrationId: string): Promise<IntegrationResponse> {
   try {
     const response = await apiRequest<IntegrationResponse>(
       `/admin/integrations/${integrationId}/disconnect`,
@@ -237,16 +235,11 @@ export async function disconnectIntegration(
 /**
  * Trigger manual sync for an integration (admin only)
  */
-export async function syncIntegration(
-  integrationId: string
-): Promise<SyncResponse> {
+export async function syncIntegration(integrationId: string): Promise<SyncResponse> {
   try {
-    const response = await apiRequest<SyncResponse>(
-      `/admin/integrations/${integrationId}/sync`,
-      {
-        method: "POST",
-      }
-    );
+    const response = await apiRequest<SyncResponse>(`/admin/integrations/${integrationId}/sync`, {
+      method: "POST",
+    });
     return response;
   } catch (error) {
     console.error("Error syncing integration:", error);
@@ -262,13 +255,10 @@ export async function updateIntegrationSettings(
   metadata: Record<string, any>
 ): Promise<IntegrationResponse> {
   try {
-    const response = await apiRequest<IntegrationResponse>(
-      `/admin/integrations/${integrationId}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ metadata }),
-      }
-    );
+    const response = await apiRequest<IntegrationResponse>(`/admin/integrations/${integrationId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ metadata }),
+    });
     return response;
   } catch (error) {
     console.error("Error updating integration settings:", error);

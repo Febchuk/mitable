@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { disconnectIntegration } from '../../../services/adminService';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { disconnectIntegration } from "../../../services/adminService";
 
 export function useDisconnectIntegration() {
   const queryClient = useQueryClient();
@@ -9,7 +9,7 @@ export function useDisconnectIntegration() {
 
     onSuccess: () => {
       // Invalidate integrations query to refetch the list
-      queryClient.invalidateQueries({ queryKey: ['admin', 'integrations'] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "integrations"] });
     },
   });
 }

@@ -104,7 +104,7 @@ export default function PeopleView() {
             ) : error ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-status-error py-8">
-                  Error: {error}
+                  Error: {error.message}
                 </TableCell>
               </TableRow>
             ) : filteredUsers.length === 0 ? (

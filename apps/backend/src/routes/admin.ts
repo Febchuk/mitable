@@ -300,9 +300,10 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
 
     userNudges.forEach((nudge) => {
       const theme = nudge.question || "General question";
-      const expertName = nudge.expertFirstName && nudge.expertLastName
-        ? `${nudge.expertFirstName} ${nudge.expertLastName}`
-        : "Unknown Expert";
+      const expertName =
+        nudge.expertFirstName && nudge.expertLastName
+          ? `${nudge.expertFirstName} ${nudge.expertLastName}`
+          : "Unknown Expert";
 
       if (!nudgeThemeMap.has(theme)) {
         nudgeThemeMap.set(theme, {
@@ -998,7 +999,8 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
     // Update user profile in database (trigger auto-creates it with defaults, we update with full data)
     try {
       // The Supabase trigger auto-creates the user record, so we update it with our custom values
-      await db.update(schema.users)
+      await db
+        .update(schema.users)
         .set({
           role: role,
           startDate: startDate,
@@ -1186,7 +1188,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
 router.post("/templates", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const { title, description, icon, color, roleTags, totalWeeks, notionUrl, tasks } = req.body;
+    const { title, description, icon, color, roleTags, totalWeeks, tasks } = req.body;
 
     // Verify requester is admin
     const [currentUser] = await db
@@ -1328,72 +1330,76 @@ router.post("/templates", requireAuth, async (req: Request, res: Response): Prom
  *     security:
  *       - BearerAuth: []
  */
-router.post("/integrations/:id/connect", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const integrationId = req.params.id;
-    const { accessToken, refreshToken, metadata } = req.body;
+router.post(
+  "/integrations/:id/connect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const integrationId = req.params.id;
+      const { accessToken, refreshToken, metadata } = req.body;
 
-    // Verify user is admin
-    const [currentUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
 
-    if (!currentUser || currentUser.role !== "admin") {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "Admin access required",
-      });
-      return;
-    }
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
 
-    // Check if integration exists and belongs to user's organization
-    const [integration] = await db
-      .select()
-      .from(schema.integrations)
-      .where(
-        and(
-          eq(schema.integrations.id, integrationId),
-          eq(schema.integrations.organizationId, currentUser.organizationId)
+      // Check if integration exists and belongs to user's organization
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.id, integrationId),
+            eq(schema.integrations.organizationId, currentUser.organizationId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!integration) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "Integration not found",
+      if (!integration) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Integration not found",
+        });
+        return;
+      }
+
+      // Update integration status to connected
+      const [updatedIntegration] = await db
+        .update(schema.integrations)
+        .set({
+          status: "connected",
+          accessToken: accessToken || null,
+          refreshToken: refreshToken || null,
+          metadata: metadata || integration.metadata,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integrationId))
+        .returning();
+
+      res.json({
+        success: true,
+        integration: updatedIntegration,
       });
-      return;
+    } catch (error) {
+      console.error("Error connecting integration:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to connect integration",
+      });
     }
-
-    // Update integration status to connected
-    const [updatedIntegration] = await db
-      .update(schema.integrations)
-      .set({
-        status: "connected",
-        accessToken: accessToken || null,
-        refreshToken: refreshToken || null,
-        metadata: metadata || integration.metadata,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.integrations.id, integrationId))
-      .returning();
-
-    res.json({
-      success: true,
-      integration: updatedIntegration,
-    });
-  } catch (error) {
-    console.error("Error connecting integration:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: "Failed to connect integration",
-    });
   }
-});
+);
 
 /**
  * @openapi
@@ -1422,71 +1428,75 @@ router.post("/integrations/:id/connect", requireAuth, async (req: Request, res: 
  *     security:
  *       - BearerAuth: []
  */
-router.post("/integrations/:id/disconnect", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const integrationId = req.params.id;
+router.post(
+  "/integrations/:id/disconnect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const integrationId = req.params.id;
 
-    // Verify user is admin
-    const [currentUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
 
-    if (!currentUser || currentUser.role !== "admin") {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "Admin access required",
-      });
-      return;
-    }
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
 
-    // Check if integration exists and belongs to user's organization
-    const [integration] = await db
-      .select()
-      .from(schema.integrations)
-      .where(
-        and(
-          eq(schema.integrations.id, integrationId),
-          eq(schema.integrations.organizationId, currentUser.organizationId)
+      // Check if integration exists and belongs to user's organization
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.id, integrationId),
+            eq(schema.integrations.organizationId, currentUser.organizationId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!integration) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "Integration not found",
+      if (!integration) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Integration not found",
+        });
+        return;
+      }
+
+      // Update integration status to disconnected and clear tokens
+      const [updatedIntegration] = await db
+        .update(schema.integrations)
+        .set({
+          status: "disconnected",
+          accessToken: null,
+          refreshToken: null,
+          tokenExpiresAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integrationId))
+        .returning();
+
+      res.json({
+        success: true,
+        integration: updatedIntegration,
       });
-      return;
+    } catch (error) {
+      console.error("Error disconnecting integration:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to disconnect integration",
+      });
     }
-
-    // Update integration status to disconnected and clear tokens
-    const [updatedIntegration] = await db
-      .update(schema.integrations)
-      .set({
-        status: "disconnected",
-        accessToken: null,
-        refreshToken: null,
-        tokenExpiresAt: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.integrations.id, integrationId))
-      .returning();
-
-    res.json({
-      success: true,
-      integration: updatedIntegration,
-    });
-  } catch (error) {
-    console.error("Error disconnecting integration:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: "Failed to disconnect integration",
-    });
   }
-});
+);
 
 /**
  * @openapi
@@ -1517,100 +1527,104 @@ router.post("/integrations/:id/disconnect", requireAuth, async (req: Request, re
  *     security:
  *       - BearerAuth: []
  */
-router.post("/integrations/:id/sync", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const integrationId = req.params.id;
+router.post(
+  "/integrations/:id/sync",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const integrationId = req.params.id;
 
-    // Verify user is admin
-    const [currentUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
 
-    if (!currentUser || currentUser.role !== "admin") {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "Admin access required",
-      });
-      return;
-    }
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
 
-    // Check if integration exists and belongs to user's organization
-    const [integration] = await db
-      .select()
-      .from(schema.integrations)
-      .where(
-        and(
-          eq(schema.integrations.id, integrationId),
-          eq(schema.integrations.organizationId, currentUser.organizationId)
+      // Check if integration exists and belongs to user's organization
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.id, integrationId),
+            eq(schema.integrations.organizationId, currentUser.organizationId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!integration) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "Integration not found",
+      if (!integration) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Integration not found",
+        });
+        return;
+      }
+
+      if (integration.status !== "connected") {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "Integration must be connected before syncing",
+        });
+        return;
+      }
+
+      // Create a sync log entry
+      const [syncLog] = await db
+        .insert(schema.syncLogs)
+        .values({
+          integrationId: integrationId,
+          status: "in_progress",
+          startedAt: new Date(),
+        })
+        .returning();
+
+      // Update lastSyncedAt timestamp
+      await db
+        .update(schema.integrations)
+        .set({
+          lastSyncedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integrationId));
+
+      // TODO: Trigger actual sync job here (e.g., queue worker, background job)
+      // For now, immediately mark as success
+      await db
+        .update(schema.syncLogs)
+        .set({
+          status: "success",
+          itemsSynced: 0,
+          completedAt: new Date(),
+        })
+        .where(eq(schema.syncLogs.id, syncLog.id));
+
+      res.json({
+        success: true,
+        syncLog: {
+          ...syncLog,
+          status: "success",
+          completedAt: new Date(),
+        },
       });
-      return;
-    }
-
-    if (integration.status !== "connected") {
-      res.status(400).json({
-        error: "Bad Request",
-        message: "Integration must be connected before syncing",
+    } catch (error) {
+      console.error("Error syncing integration:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to trigger sync",
       });
-      return;
     }
-
-    // Create a sync log entry
-    const [syncLog] = await db
-      .insert(schema.syncLogs)
-      .values({
-        integrationId: integrationId,
-        status: "in_progress",
-        startedAt: new Date(),
-      })
-      .returning();
-
-    // Update lastSyncedAt timestamp
-    await db
-      .update(schema.integrations)
-      .set({
-        lastSyncedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.integrations.id, integrationId));
-
-    // TODO: Trigger actual sync job here (e.g., queue worker, background job)
-    // For now, immediately mark as success
-    await db
-      .update(schema.syncLogs)
-      .set({
-        status: "success",
-        itemsSynced: 0,
-        completedAt: new Date(),
-      })
-      .where(eq(schema.syncLogs.id, syncLog.id));
-
-    res.json({
-      success: true,
-      syncLog: {
-        ...syncLog,
-        status: "success",
-        completedAt: new Date(),
-      },
-    });
-  } catch (error) {
-    console.error("Error syncing integration:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: "Failed to trigger sync",
-    });
   }
-});
+);
 
 /**
  * @openapi
@@ -1648,68 +1662,72 @@ router.post("/integrations/:id/sync", requireAuth, async (req: Request, res: Res
  *     security:
  *       - BearerAuth: []
  */
-router.patch("/integrations/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const integrationId = req.params.id;
-    const { metadata } = req.body;
+router.patch(
+  "/integrations/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const integrationId = req.params.id;
+      const { metadata } = req.body;
 
-    // Verify user is admin
-    const [currentUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
 
-    if (!currentUser || currentUser.role !== "admin") {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "Admin access required",
-      });
-      return;
-    }
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
 
-    // Check if integration exists and belongs to user's organization
-    const [integration] = await db
-      .select()
-      .from(schema.integrations)
-      .where(
-        and(
-          eq(schema.integrations.id, integrationId),
-          eq(schema.integrations.organizationId, currentUser.organizationId)
+      // Check if integration exists and belongs to user's organization
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.id, integrationId),
+            eq(schema.integrations.organizationId, currentUser.organizationId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!integration) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "Integration not found",
+      if (!integration) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Integration not found",
+        });
+        return;
+      }
+
+      // Update integration metadata
+      const [updatedIntegration] = await db
+        .update(schema.integrations)
+        .set({
+          metadata: metadata || integration.metadata,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integrationId))
+        .returning();
+
+      res.json({
+        success: true,
+        integration: updatedIntegration,
       });
-      return;
+    } catch (error) {
+      console.error("Error updating integration:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to update integration",
+      });
     }
-
-    // Update integration metadata
-    const [updatedIntegration] = await db
-      .update(schema.integrations)
-      .set({
-        metadata: metadata || integration.metadata,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.integrations.id, integrationId))
-      .returning();
-
-    res.json({
-      success: true,
-      integration: updatedIntegration,
-    });
-  } catch (error) {
-    console.error("Error updating integration:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: "Failed to update integration",
-    });
   }
-});
+);
 
 export default router;

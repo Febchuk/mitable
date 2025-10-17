@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowUp, ExternalLink, Workflow, Users } from "lucide-react";
 import { useConversations, useSendMessage } from "@/console/src/hooks/queries/chats";
-import { Message } from "../../../../types";
 import UserMessage from "../../../../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../../../../components/domain/messages/AIMessage";
 import WorkflowCard from "../../../../../../components/domain/messages/WorkflowCard";
@@ -92,7 +91,10 @@ export default function ChatDetail() {
       <div className="flex-1 overflow-y-auto px-8 py-4 app-no-drag custom-scrollbar">
         {chat.messages.map((message) => {
           // Render workflow or experts cards
-          if ((message.type === "workflow" || message.type === "experts") && message.cardData) {
+          if (
+            (message.messageType === "workflow" || message.messageType === "experts") &&
+            message.cardData
+          ) {
             const icon = message.cardData.iconType === "workflow" ? Workflow : Users;
             return (
               <WorkflowCard
@@ -102,7 +104,7 @@ export default function ChatDetail() {
                 icon={icon}
                 onClick={() => {
                   // TODO: Handle card click - launch guide or show experts
-                  console.log(`${message.type} card clicked:`, message.cardData);
+                  console.log(`${message.messageType} card clicked:`, message.cardData);
                 }}
               />
             );

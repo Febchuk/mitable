@@ -1,12 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchNudges } from '../../../services/nudgesService';
-import { useUser } from '../../../context/UserContext';
+import { useQuery } from "@tanstack/react-query";
+import { fetchNudges } from "../../../services/nudgesService";
+import { useUser } from "../../../context/UserContext";
 
 export function useNudges() {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: ['nudges', user?.id],
+    queryKey: ["nudges", user?.id],
     queryFn: async () => {
       const data = await fetchNudges();
 

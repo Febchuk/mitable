@@ -1,12 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchConversations } from '../../../services/chatsService';
-import { useUser } from '../../../context/UserContext';
+import { useQuery } from "@tanstack/react-query";
+import { fetchConversations } from "../../../services/chatsService";
+import { useUser } from "../../../context/UserContext";
 
 export function useConversations() {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: ['conversations', user?.id],
+    queryKey: ["conversations", user?.id],
     queryFn: async () => {
       const data = await fetchConversations();
 

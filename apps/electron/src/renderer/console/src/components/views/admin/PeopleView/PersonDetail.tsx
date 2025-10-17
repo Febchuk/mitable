@@ -146,7 +146,9 @@ export default function PersonDetail() {
       <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
         <div>
           <h2 className="text-xl font-semibold text-text-primary mb-1">Assigned Roadmaps</h2>
-          <p className="text-sm text-text-secondary">{person.name.split(' ')[0]}'s active onboarding paths</p>
+          <p className="text-sm text-text-secondary">
+            {person.name.split(" ")[0]}'s active onboarding paths
+          </p>
         </div>
 
         <div className="space-y-3">
@@ -223,7 +225,9 @@ export default function PersonDetail() {
         <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
           <div>
             <h2 className="text-xl font-semibold text-text-primary mb-1">Common Nudge Themes</h2>
-            <p className="text-sm text-text-secondary">Topics where {person.name.split(' ')[0]} needed human help</p>
+            <p className="text-sm text-text-secondary">
+              Topics where {person.name.split(" ")[0]} needed human help
+            </p>
           </div>
 
           <div className="space-y-3">
@@ -241,7 +245,8 @@ export default function PersonDetail() {
                     Nudged:{" "}
                     {theme.nudges.map((nudgedPerson, i) => (
                       <span key={i}>
-                        {nudgedPerson.name} ({nudgedPerson.count}x){i < theme.nudges.length - 1 ? ", " : ""}
+                        {nudgedPerson.name} ({nudgedPerson.count}x)
+                        {i < theme.nudges.length - 1 ? ", " : ""}
                       </span>
                     ))}
                   </p>

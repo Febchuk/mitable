@@ -205,8 +205,16 @@ export default function IntegrationsView() {
         </Button>
       </div>
 
-      {/* Search Results View - Consolidated List */}
-      {isSearching ? (
+      {/* Loading State */}
+      {isLoading ? (
+        <div className="text-center py-12">
+          <p className="text-text-secondary">Loading integrations...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center py-12">
+          <p className="text-status-error">Error: {error.message}</p>
+        </div>
+      ) : isSearching ? (
         <div className="space-y-4 max-w-5xl">
           {sortedIntegrations.length > 0 ? (
             <div className="bg-background-elevated rounded-lg border border-border-subtle overflow-hidden divide-y divide-border-subtle">
@@ -234,7 +242,10 @@ export default function IntegrationsView() {
             </div>
           )}
         </div>
-      ) : (
+      ) : null}
+
+      {/* Default View - Split into Connected and Available */}
+      {!isLoading && !error && !isSearching && (
         <>
           {/* Connected Integrations Section */}
           <div className="space-y-4 max-w-5xl">

@@ -100,7 +100,9 @@ export default function TemplatesView() {
             Loading templates...
           </div>
         ) : error ? (
-          <div className="col-span-2 text-center text-status-error py-12">Error: {error}</div>
+          <div className="col-span-2 text-center text-status-error py-12">
+            Error: {error.message}
+          </div>
         ) : filteredTemplates.length === 0 ? (
           <div className="col-span-2 text-center text-text-secondary py-12">
             {searchQuery ? `No templates found matching "${searchQuery}"` : "No templates found"}

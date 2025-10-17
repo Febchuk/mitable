@@ -1,6 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { dismissNudge as dismissNudgeAPI } from '../../../services/nudgesService';
-import { useUser } from '../../../context/UserContext';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { dismissNudge as dismissNudgeAPI } from "../../../services/nudgesService";
+import { useUser } from "../../../context/UserContext";
 
 export function useDismissNudge() {
   const queryClient = useQueryClient();
@@ -11,24 +11,24 @@ export function useDismissNudge() {
 
     // Optimistic update - remove from list
     onMutate: async (nudgeId) => {
-      await queryClient.cancelQueries({ queryKey: ['nudges', user?.id] });
-      const previousNudges = queryClient.getQueryData(['nudges', user?.id]);
+      await queryClient.cancelQueries({ queryKey: ["nudges", user?.id] });
+      const previousNudges = queryClient.getQueryData(["nudges", user?.id]);
 
-      queryClient.setQueryData(['nudges', user?.id], (old: any) =>
+      queryClient.setQueryData(["nudges", user?.id], (old: any) =>
         old?.filter((nudge: any) => nudge.id !== nudgeId)
       );
 
       return { previousNudges };
     },
 
-    onError: (err, variables, context) => {
+    onError: (_err, _variables, context) => {
       if (context?.previousNudges) {
-        queryClient.setQueryData(['nudges', user?.id], context.previousNudges);
+        queryClient.setQueryData(["nudges", user?.id], context.previousNudges);
       }
     },
 
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['nudges', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["nudges", user?.id] });
     },
   });
 }

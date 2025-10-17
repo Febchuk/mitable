@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toggleTaskCompletion } from '../../../services/roadmapService';
-import { useUser } from '../../../context/UserContext';
-import type { Week } from '../../../types';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toggleTaskCompletion } from "../../../services/roadmapService";
+import { useUser } from "../../../context/UserContext";
+import type { Week } from "../../../types";
 
 export function useToggleTask() {
   const queryClient = useQueryClient();
@@ -14,13 +14,13 @@ export function useToggleTask() {
     // Optimistic update
     onMutate: async ({ taskId }) => {
       // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['roadmap', user?.id] });
+      await queryClient.cancelQueries({ queryKey: ["roadmap", user?.id] });
 
       // Snapshot previous value
-      const previousRoadmap = queryClient.getQueryData(['roadmap', user?.id]);
+      const previousRoadmap = queryClient.getQueryData(["roadmap", user?.id]);
 
       // Optimistically update
-      queryClient.setQueryData(['roadmap', user?.id], (old: any) => {
+      queryClient.setQueryData(["roadmap", user?.id], (old: any) => {
         if (!old) return old;
 
         const updatedWeeks = old.weeks.map((week: Week) => {
@@ -30,7 +30,8 @@ export function useToggleTask() {
 
           const completedCount = updatedTasks.filter((t) => t.completed).length;
           const totalCount = updatedTasks.length;
-          const newPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+          const newPercentage =
+            totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
           return {
             ...week,
@@ -46,15 +47,15 @@ export function useToggleTask() {
     },
 
     // Rollback on error
-    onError: (err, variables, context) => {
+    onError: (_err, _variables, context) => {
       if (context?.previousRoadmap) {
-        queryClient.setQueryData(['roadmap', user?.id], context.previousRoadmap);
+        queryClient.setQueryData(["roadmap", user?.id], context.previousRoadmap);
       }
     },
 
     // Always refetch after error or success
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['roadmap', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["roadmap", user?.id] });
     },
   });
 }

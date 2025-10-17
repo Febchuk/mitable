@@ -51,7 +51,9 @@ export default function RoadmapTaskDetail() {
 
           <Checkbox
             checked={task.completed}
-            onCheckedChange={() => toggleTaskMutation.mutate({ taskId: task.id, completed: !task.completed })}
+            onCheckedChange={() =>
+              toggleTaskMutation.mutate({ taskId: task.id, completed: !task.completed })
+            }
             className="mt-2"
           />
         </div>

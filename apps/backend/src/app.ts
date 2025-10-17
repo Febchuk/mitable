@@ -11,10 +11,14 @@ app.use(cors());
 app.use(express.json());
 
 // Swagger API Documentation
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: "Mitable API Documentation",
-}));
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCss: ".swagger-ui .topbar { display: none }",
+    customSiteTitle: "Mitable API Documentation",
+  })
+);
 
 // Serve OpenAPI spec as JSON
 app.get("/api-docs.json", (_req, res) => {

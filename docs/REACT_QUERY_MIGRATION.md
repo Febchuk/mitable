@@ -15,6 +15,7 @@ Migrate from manual React Context state management to TanStack Query (React Quer
 ## Why React Query?
 
 ### Current Pain Points
+
 - ✗ Stale data after navigation (users don't see newly created items)
 - ✗ Manual cache invalidation is error-prone
 - ✗ Duplicate API calls when multiple components need same data
@@ -22,6 +23,7 @@ Migrate from manual React Context state management to TanStack Query (React Quer
 - ✗ Multi-user scenarios show stale data
 
 ### React Query Benefits
+
 - ✅ Auto-refetch on window focus - users always see fresh data
 - ✅ Auto-refetch on network reconnect - handles offline scenarios
 - ✅ Request deduplication - multiple components requesting same data = 1 API call
@@ -42,15 +44,16 @@ Migrate from manual React Context state management to TanStack Query (React Quer
 
 ```tsx
 <QueryClientProvider client={queryClient}>
-  <UserProvider>  {/* Auth/session only */}
-    <Routes>
-      {/* Components use React Query hooks directly */}
-    </Routes>
+  <UserProvider>
+    {" "}
+    {/* Auth/session only */}
+    <Routes>{/* Components use React Query hooks directly */}</Routes>
   </UserProvider>
 </QueryClientProvider>
 ```
 
 Components will use:
+
 ```tsx
 // Instead of useAdmin().users
 const { data: users } = useUsers();
@@ -79,7 +82,7 @@ npm install @tanstack/react-query-devtools --save-dev
 **New file: `apps/electron/src/renderer/console/src/lib/queryClient.ts`**
 
 ```typescript
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient } from "@tanstack/react-query";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -102,13 +105,15 @@ export const queryClient = new QueryClient({
 **File: `apps/electron/src/renderer/console/src/App.tsx`**
 
 Add imports:
+
 ```typescript
-import { QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { queryClient } from './lib/queryClient';
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { queryClient } from "./lib/queryClient";
 ```
 
 Wrap HashRouter with QueryClientProvider (outermost provider):
+
 ```typescript
 function App() {
   return (
@@ -142,6 +147,7 @@ function App() {
 ### 2.1 Create Hooks Directory
 
 **New directory structure:**
+
 ```
 apps/electron/src/renderer/console/src/hooks/queries/
 ├── admin/
@@ -177,17 +183,17 @@ apps/electron/src/renderer/console/src/hooks/queries/
 **File: `hooks/queries/admin/useUsers.ts`**
 
 ```typescript
-import { useQuery } from '@tanstack/react-query';
-import { fetchUsers } from '../../../services/adminService';
-import { useUser } from '../../../context/UserContext';
+import { useQuery } from "@tanstack/react-query";
+import { fetchUsers } from "../../../services/adminService";
+import { useUser } from "../../../context/UserContext";
 
 export function useUsers() {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: ['admin', 'users'],
+    queryKey: ["admin", "users"],
     queryFn: fetchUsers,
-    enabled: !!user && user.role === 'admin', // Only fetch for admin users
+    enabled: !!user && user.role === "admin", // Only fetch for admin users
   });
 }
 ```
@@ -195,17 +201,17 @@ export function useUsers() {
 **File: `hooks/queries/admin/useTemplates.ts`**
 
 ```typescript
-import { useQuery } from '@tanstack/react-query';
-import { fetchTemplates } from '../../../services/adminService';
-import { useUser } from '../../../context/UserContext';
+import { useQuery } from "@tanstack/react-query";
+import { fetchTemplates } from "../../../services/adminService";
+import { useUser } from "../../../context/UserContext";
 
 export function useTemplates() {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: ['admin', 'templates'],
+    queryKey: ["admin", "templates"],
     queryFn: fetchTemplates,
-    enabled: !!user && user.role === 'admin',
+    enabled: !!user && user.role === "admin",
   });
 }
 ```
@@ -213,17 +219,17 @@ export function useTemplates() {
 **File: `hooks/queries/admin/useIntegrations.ts`**
 
 ```typescript
-import { useQuery } from '@tanstack/react-query';
-import { fetchIntegrations } from '../../../services/adminService';
-import { useUser } from '../../../context/UserContext';
+import { useQuery } from "@tanstack/react-query";
+import { fetchIntegrations } from "../../../services/adminService";
+import { useUser } from "../../../context/UserContext";
 
 export function useIntegrations() {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: ['admin', 'integrations'],
+    queryKey: ["admin", "integrations"],
     queryFn: fetchIntegrations,
-    enabled: !!user && user.role === 'admin',
+    enabled: !!user && user.role === "admin",
   });
 }
 ```
@@ -231,17 +237,17 @@ export function useIntegrations() {
 **File: `hooks/queries/admin/useUserDetail.ts`**
 
 ```typescript
-import { useQuery } from '@tanstack/react-query';
-import { fetchUserDetail } from '../../../services/adminService';
-import { useUser } from '../../../context/UserContext';
+import { useQuery } from "@tanstack/react-query";
+import { fetchUserDetail } from "../../../services/adminService";
+import { useUser } from "../../../context/UserContext";
 
 export function useUserDetail(userId: string) {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: ['admin', 'users', userId],
+    queryKey: ["admin", "users", userId],
     queryFn: () => fetchUserDetail(userId),
-    enabled: !!user && user.role === 'admin' && !!userId,
+    enabled: !!user && user.role === "admin" && !!userId,
   });
 }
 ```
@@ -251,8 +257,8 @@ export function useUserDetail(userId: string) {
 **File: `hooks/queries/admin/useCreateUser.ts`**
 
 ```typescript
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createUser, type CreateUserPayload } from '../../../services/adminService';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createUser, type CreateUserPayload } from "../../../services/adminService";
 
 export function useCreateUser() {
   const queryClient = useQueryClient();
@@ -261,7 +267,7 @@ export function useCreateUser() {
     mutationFn: (payload: CreateUserPayload) => createUser(payload),
     onSuccess: () => {
       // Invalidate users list to trigger refetch
-      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
     },
   });
 }
@@ -270,11 +276,11 @@ export function useCreateUser() {
 **File: `hooks/queries/admin/index.ts`** (barrel export)
 
 ```typescript
-export { useUsers } from './useUsers';
-export { useTemplates } from './useTemplates';
-export { useIntegrations } from './useIntegrations';
-export { useUserDetail } from './useUserDetail';
-export { useCreateUser } from './useCreateUser';
+export { useUsers } from "./useUsers";
+export { useTemplates } from "./useTemplates";
+export { useIntegrations } from "./useIntegrations";
+export { useUserDetail } from "./useUserDetail";
+export { useCreateUser } from "./useCreateUser";
 ```
 
 ### 3.3 Update PeopleView Component
@@ -486,6 +492,7 @@ export function useAdmin() {
 ```
 
 **Option B: Delete entirely**
+
 - Move constants to `lib/dashboardConfig.ts`
 - Remove AdminProvider from App.tsx
 - Update DashboardView to import from config file
@@ -499,15 +506,15 @@ export function useAdmin() {
 **File: `hooks/queries/roadmap/useRoadmap.ts`**
 
 ```typescript
-import { useQuery } from '@tanstack/react-query';
-import { fetchRoadmap } from '../../../services/roadmapService';
-import { useUser } from '../../../context/UserContext';
+import { useQuery } from "@tanstack/react-query";
+import { fetchRoadmap } from "../../../services/roadmapService";
+import { useUser } from "../../../context/UserContext";
 
 export function useRoadmap() {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: ['roadmap', user?.id],
+    queryKey: ["roadmap", user?.id],
     queryFn: fetchRoadmap,
     enabled: !!user,
   });
@@ -519,10 +526,10 @@ export function useRoadmap() {
 **File: `hooks/queries/roadmap/useToggleTask.ts`**
 
 ```typescript
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toggleTaskCompletion } from '../../../services/roadmapService';
-import { useUser } from '../../../context/UserContext';
-import type { Week } from '../../../types';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toggleTaskCompletion } from "../../../services/roadmapService";
+import { useUser } from "../../../context/UserContext";
+import type { Week } from "../../../types";
 
 export function useToggleTask() {
   const queryClient = useQueryClient();
@@ -535,13 +542,13 @@ export function useToggleTask() {
     // Optimistic update
     onMutate: async ({ taskId }) => {
       // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['roadmap', user?.id] });
+      await queryClient.cancelQueries({ queryKey: ["roadmap", user?.id] });
 
       // Snapshot previous value
-      const previousRoadmap = queryClient.getQueryData(['roadmap', user?.id]);
+      const previousRoadmap = queryClient.getQueryData(["roadmap", user?.id]);
 
       // Optimistically update
-      queryClient.setQueryData(['roadmap', user?.id], (old: any) => {
+      queryClient.setQueryData(["roadmap", user?.id], (old: any) => {
         if (!old) return old;
 
         const updatedWeeks = old.weeks.map((week: Week) => {
@@ -551,7 +558,8 @@ export function useToggleTask() {
 
           const completedCount = updatedTasks.filter((t) => t.completed).length;
           const totalCount = updatedTasks.length;
-          const newPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+          const newPercentage =
+            totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
           return {
             ...week,
@@ -569,13 +577,13 @@ export function useToggleTask() {
     // Rollback on error
     onError: (err, variables, context) => {
       if (context?.previousRoadmap) {
-        queryClient.setQueryData(['roadmap', user?.id], context.previousRoadmap);
+        queryClient.setQueryData(["roadmap", user?.id], context.previousRoadmap);
       }
     },
 
     // Always refetch after error or success
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['roadmap', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["roadmap", user?.id] });
     },
   });
 }
@@ -584,8 +592,8 @@ export function useToggleTask() {
 **File: `hooks/queries/roadmap/index.ts`**
 
 ```typescript
-export { useRoadmap } from './useRoadmap';
-export { useToggleTask } from './useToggleTask';
+export { useRoadmap } from "./useRoadmap";
+export { useToggleTask } from "./useToggleTask";
 ```
 
 ### 4.3 Update RoadmapView Component
@@ -635,6 +643,7 @@ export default function RoadmapView() {
 **Delete file: `context/RoadmapContext.tsx`**
 
 **Update App.tsx:**
+
 ```typescript
 // Remove: import { RoadmapProvider } from "./context/RoadmapContext";
 // Remove: <RoadmapProvider> wrapper
@@ -649,15 +658,15 @@ export default function RoadmapView() {
 **File: `hooks/queries/nudges/useNudges.ts`**
 
 ```typescript
-import { useQuery } from '@tanstack/react-query';
-import { fetchNudges } from '../../../services/nudgesService';
-import { useUser } from '../../../context/UserContext';
+import { useQuery } from "@tanstack/react-query";
+import { fetchNudges } from "../../../services/nudgesService";
+import { useUser } from "../../../context/UserContext";
 
 export function useNudges() {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: ['nudges', user?.id],
+    queryKey: ["nudges", user?.id],
     queryFn: async () => {
       const data = await fetchNudges();
 
@@ -680,9 +689,9 @@ export function useNudges() {
 **File: `hooks/queries/nudges/useAcceptNudge.ts`**
 
 ```typescript
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { acceptNudge as acceptNudgeAPI } from '../../../services/nudgesService';
-import { useUser } from '../../../context/UserContext';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { acceptNudge as acceptNudgeAPI } from "../../../services/nudgesService";
+import { useUser } from "../../../context/UserContext";
 
 export function useAcceptNudge() {
   const queryClient = useQueryClient();
@@ -693,13 +702,11 @@ export function useAcceptNudge() {
 
     // Optimistic update
     onMutate: async (nudgeId) => {
-      await queryClient.cancelQueries({ queryKey: ['nudges', user?.id] });
-      const previousNudges = queryClient.getQueryData(['nudges', user?.id]);
+      await queryClient.cancelQueries({ queryKey: ["nudges", user?.id] });
+      const previousNudges = queryClient.getQueryData(["nudges", user?.id]);
 
-      queryClient.setQueryData(['nudges', user?.id], (old: any) =>
-        old?.map((nudge: any) =>
-          nudge.id === nudgeId ? { ...nudge, status: 'accepted' } : nudge
-        )
+      queryClient.setQueryData(["nudges", user?.id], (old: any) =>
+        old?.map((nudge: any) => (nudge.id === nudgeId ? { ...nudge, status: "accepted" } : nudge))
       );
 
       return { previousNudges };
@@ -707,12 +714,12 @@ export function useAcceptNudge() {
 
     onError: (err, variables, context) => {
       if (context?.previousNudges) {
-        queryClient.setQueryData(['nudges', user?.id], context.previousNudges);
+        queryClient.setQueryData(["nudges", user?.id], context.previousNudges);
       }
     },
 
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['nudges', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["nudges", user?.id] });
     },
   });
 }
@@ -721,9 +728,9 @@ export function useAcceptNudge() {
 **File: `hooks/queries/nudges/useDismissNudge.ts`**
 
 ```typescript
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { dismissNudge as dismissNudgeAPI } from '../../../services/nudgesService';
-import { useUser } from '../../../context/UserContext';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { dismissNudge as dismissNudgeAPI } from "../../../services/nudgesService";
+import { useUser } from "../../../context/UserContext";
 
 export function useDismissNudge() {
   const queryClient = useQueryClient();
@@ -734,10 +741,10 @@ export function useDismissNudge() {
 
     // Optimistic update - remove from list
     onMutate: async (nudgeId) => {
-      await queryClient.cancelQueries({ queryKey: ['nudges', user?.id] });
-      const previousNudges = queryClient.getQueryData(['nudges', user?.id]);
+      await queryClient.cancelQueries({ queryKey: ["nudges", user?.id] });
+      const previousNudges = queryClient.getQueryData(["nudges", user?.id]);
 
-      queryClient.setQueryData(['nudges', user?.id], (old: any) =>
+      queryClient.setQueryData(["nudges", user?.id], (old: any) =>
         old?.filter((nudge: any) => nudge.id !== nudgeId)
       );
 
@@ -746,12 +753,12 @@ export function useDismissNudge() {
 
     onError: (err, variables, context) => {
       if (context?.previousNudges) {
-        queryClient.setQueryData(['nudges', user?.id], context.previousNudges);
+        queryClient.setQueryData(["nudges", user?.id], context.previousNudges);
       }
     },
 
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['nudges', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["nudges", user?.id] });
     },
   });
 }
@@ -760,9 +767,9 @@ export function useDismissNudge() {
 **File: `hooks/queries/nudges/index.ts`**
 
 ```typescript
-export { useNudges } from './useNudges';
-export { useAcceptNudge } from './useAcceptNudge';
-export { useDismissNudge } from './useDismissNudge';
+export { useNudges } from "./useNudges";
+export { useAcceptNudge } from "./useAcceptNudge";
+export { useDismissNudge } from "./useDismissNudge";
 ```
 
 ### 5.3 Update NudgesView Component
@@ -799,6 +806,7 @@ export default function NudgesView() {
 **Delete file: `context/NudgesContext.tsx`**
 
 **Update App.tsx:**
+
 ```typescript
 // Remove: import { NudgesProvider } from "./context/NudgesContext";
 // Remove: <NudgesProvider> wrapper
@@ -813,15 +821,15 @@ export default function NudgesView() {
 **File: `hooks/queries/chats/useConversations.ts`**
 
 ```typescript
-import { useQuery } from '@tanstack/react-query';
-import { fetchConversations } from '../../../services/chatsService';
-import { useUser } from '../../../context/UserContext';
+import { useQuery } from "@tanstack/react-query";
+import { fetchConversations } from "../../../services/chatsService";
+import { useUser } from "../../../context/UserContext";
 
 export function useConversations() {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: ['conversations', user?.id],
+    queryKey: ["conversations", user?.id],
     queryFn: async () => {
       const data = await fetchConversations();
 
@@ -845,10 +853,10 @@ export function useConversations() {
 **File: `hooks/queries/chats/useCreateConversation.ts`**
 
 ```typescript
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createConversation } from '../../../services/chatsService';
-import { useUser } from '../../../context/UserContext';
-import type { Chat, Message } from '../../../types';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createConversation } from "../../../services/chatsService";
+import { useUser } from "../../../context/UserContext";
+import type { Chat, Message } from "../../../types";
 
 export function useCreateConversation() {
   const queryClient = useQueryClient();
@@ -876,12 +884,12 @@ export function useCreateConversation() {
         messages: [firstUserMessage],
       };
 
-      queryClient.setQueryData(['conversations', user?.id], (old: any) =>
+      queryClient.setQueryData(["conversations", user?.id], (old: any) =>
         old ? [newChat, ...old] : [newChat]
       );
 
       // Invalidate to ensure consistency
-      queryClient.invalidateQueries({ queryKey: ['conversations', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
     },
   });
 }
@@ -890,17 +898,23 @@ export function useCreateConversation() {
 **File: `hooks/queries/chats/useSendMessage.ts`**
 
 ```typescript
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { sendMessage as sendMessageAPI } from '../../../services/chatsService';
-import { useUser } from '../../../context/UserContext';
-import type { Message } from '../../../types';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { sendMessage as sendMessageAPI } from "../../../services/chatsService";
+import { useUser } from "../../../context/UserContext";
+import type { Message } from "../../../types";
 
 export function useSendMessage() {
   const queryClient = useQueryClient();
   const { user } = useUser();
 
   return useMutation({
-    mutationFn: ({ chatId, message }: { chatId: string; message: Omit<Message, 'id' | 'timestamp'> }) =>
+    mutationFn: ({
+      chatId,
+      message,
+    }: {
+      chatId: string;
+      message: Omit<Message, "id" | "timestamp">;
+    }) =>
       sendMessageAPI(chatId, {
         role: message.role,
         content: message.content,
@@ -910,8 +924,8 @@ export function useSendMessage() {
 
     // Optimistic update
     onMutate: async ({ chatId, message }) => {
-      await queryClient.cancelQueries({ queryKey: ['conversations', user?.id] });
-      const previousConversations = queryClient.getQueryData(['conversations', user?.id]);
+      await queryClient.cancelQueries({ queryKey: ["conversations", user?.id] });
+      const previousConversations = queryClient.getQueryData(["conversations", user?.id]);
 
       const fullMessage: Message = {
         ...message,
@@ -919,7 +933,7 @@ export function useSendMessage() {
         timestamp: new Date(),
       };
 
-      queryClient.setQueryData(['conversations', user?.id], (old: any) =>
+      queryClient.setQueryData(["conversations", user?.id], (old: any) =>
         old?.map((chat: any) => {
           if (chat.id === chatId) {
             return {
@@ -938,12 +952,12 @@ export function useSendMessage() {
 
     onError: (err, variables, context) => {
       if (context?.previousConversations) {
-        queryClient.setQueryData(['conversations', user?.id], context.previousConversations);
+        queryClient.setQueryData(["conversations", user?.id], context.previousConversations);
       }
     },
 
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
     },
   });
 }
@@ -952,9 +966,9 @@ export function useSendMessage() {
 **File: `hooks/queries/chats/index.ts`**
 
 ```typescript
-export { useConversations } from './useConversations';
-export { useCreateConversation } from './useCreateConversation';
-export { useSendMessage } from './useSendMessage';
+export { useConversations } from "./useConversations";
+export { useCreateConversation } from "./useCreateConversation";
+export { useSendMessage } from "./useSendMessage";
 ```
 
 ### 6.3 Update ChatsView Component
@@ -1033,9 +1047,9 @@ export default function ChatDetail() {
     sendMessageMutation.mutate({
       chatId: chatId!,
       message: {
-        role: 'user',
+        role: "user",
         content,
-        type: 'text',
+        type: "text",
       },
     });
   };
@@ -1047,6 +1061,7 @@ export default function ChatDetail() {
 **Delete file: `context/ChatsContext.tsx`**
 
 **Update App.tsx:**
+
 ```typescript
 // Remove: import { ChatsProvider } from "./context/ChatsContext";
 // Remove: <ChatsProvider> wrapper
@@ -1061,6 +1076,7 @@ export default function ChatDetail() {
 **File: `App.tsx`**
 
 Final structure:
+
 ```typescript
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -1090,6 +1106,7 @@ export default App;
 ```
 
 **Removed providers:**
+
 - AdminProvider
 - RoadmapProvider
 - NudgesProvider
@@ -1101,19 +1118,20 @@ export default App;
 
 ```typescript
 // Admin queries
-export * from './admin';
+export * from "./admin";
 
 // Roadmap queries
-export * from './roadmap';
+export * from "./roadmap";
 
 // Nudges queries
-export * from './nudges';
+export * from "./nudges";
 
 // Chats queries
-export * from './chats';
+export * from "./chats";
 ```
 
 Now components can import like:
+
 ```typescript
 import { useUsers, useTemplates, useRoadmap, useNudges } from "@/console/src/hooks/queries";
 ```
@@ -1125,6 +1143,7 @@ import { useUsers, useTemplates, useRoadmap, useNudges } from "@/console/src/hoo
 ### 8.1 Manual Testing Checklist
 
 **Admin Features:**
+
 - [ ] Navigate to People page - users load correctly
 - [ ] Create new user - appears in list immediately after creation
 - [ ] Navigate away and back - users still showing (cached)
@@ -1133,6 +1152,7 @@ import { useUsers, useTemplates, useRoadmap, useNudges } from "@/console/src/hoo
 - [ ] Window focus - data refetches automatically
 
 **Employee Features:**
+
 - [ ] Roadmap loads correctly
 - [ ] Toggle task - updates immediately (optimistic)
 - [ ] Nudges load correctly
@@ -1142,6 +1162,7 @@ import { useUsers, useTemplates, useRoadmap, useNudges } from "@/console/src/hoo
 - [ ] Send message - appears immediately
 
 **DevTools:**
+
 - [ ] Open React Query DevTools (bottom-right icon)
 - [ ] Verify queries are cached with correct keys
 - [ ] Test refetch button in DevTools
@@ -1214,7 +1235,7 @@ const [error, setError] = useState(null);
 const fetchUsers = async () => {
   setLoading(true);
   try {
-    const data = await apiRequest('/admin/users');
+    const data = await apiRequest("/admin/users");
     setUsers(data.users);
   } catch (err) {
     setError(err.message);
@@ -1223,7 +1244,9 @@ const fetchUsers = async () => {
   }
 };
 
-useEffect(() => { fetchUsers() }, [user]);
+useEffect(() => {
+  fetchUsers();
+}, [user]);
 
 // Component
 const { users, loading, error } = useAdmin();
@@ -1235,10 +1258,10 @@ const { users, loading, error } = useAdmin();
 // Hook file: ~10 lines
 export function useUsers() {
   return useQuery({
-    queryKey: ['admin', 'users'],
+    queryKey: ["admin", "users"],
     queryFn: fetchUsers,
     staleTime: 30000,
-    enabled: !!user && user.role === 'admin'
+    enabled: !!user && user.role === "admin",
   });
 }
 
@@ -1255,12 +1278,12 @@ const { data: users, isLoading, error } = useUsers();
 ### Files Created (20 new files)
 
 1. `lib/queryClient.ts`
-2-7. `hooks/queries/admin/*` (6 files)
-8-10. `hooks/queries/roadmap/*` (3 files)
-11-14. `hooks/queries/nudges/*` (4 files)
-15-18. `hooks/queries/chats/*` (4 files)
-19. `hooks/queries/index.ts`
-20. `QUERY_CONVENTIONS.md`
+   2-7. `hooks/queries/admin/*` (6 files)
+   8-10. `hooks/queries/roadmap/*` (3 files)
+   11-14. `hooks/queries/nudges/*` (4 files)
+   15-18. `hooks/queries/chats/*` (4 files)
+2. `hooks/queries/index.ts`
+3. `QUERY_CONVENTIONS.md`
 
 ### Files Modified (12 files)
 
@@ -1324,6 +1347,7 @@ If something breaks:
 ### Q: What if I need to refetch manually?
 
 Use the `refetch` function from the query:
+
 ```typescript
 const { data, refetch } = useUsers();
 // Later:
@@ -1333,7 +1357,7 @@ refetch();
 ### Q: How do I invalidate multiple queries?
 
 ```typescript
-queryClient.invalidateQueries({ queryKey: ['admin'] }); // All admin queries
+queryClient.invalidateQueries({ queryKey: ["admin"] }); // All admin queries
 ```
 
 ### Q: Can I disable auto-refetch on window focus?
@@ -1343,6 +1367,7 @@ Yes, set `refetchOnWindowFocus: false` in query options or globally in queryClie
 ### Q: How do I handle dependent queries?
 
 Use the `enabled` option:
+
 ```typescript
 const { data: user } = useUser();
 const { data: posts } = useUserPosts(user?.id, { enabled: !!user?.id });

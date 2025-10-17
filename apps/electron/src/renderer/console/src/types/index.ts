@@ -61,6 +61,7 @@ export interface Chat {
 export type UserRole = "admin" | "employee";
 
 export interface User {
+  id: string;
   name: string;
   firstName: string;
   avatarUrl?: string;

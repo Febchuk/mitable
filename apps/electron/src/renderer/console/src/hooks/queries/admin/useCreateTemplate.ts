@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createTemplate, type CreateTemplatePayload } from '../../../services/adminService';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createTemplate, type CreateTemplatePayload } from "../../../services/adminService";
 
 export function useCreateTemplate() {
   const queryClient = useQueryClient();
@@ -9,7 +9,7 @@ export function useCreateTemplate() {
 
     onSuccess: () => {
       // Invalidate templates query to refetch the list
-      queryClient.invalidateQueries({ queryKey: ['admin', 'templates'] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "templates"] });
     },
   });
 }

@@ -41,6 +41,7 @@ Create a new user account.
 **Status**: ✅ Implemented
 
 **Request Body**:
+
 ```json
 {
   "email": "user@example.com",
@@ -52,6 +53,7 @@ Create a new user account.
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -81,6 +83,7 @@ Authenticate existing user.
 **Status**: ✅ Implemented
 
 **Request Body**:
+
 ```json
 {
   "email": "user@example.com",
@@ -89,6 +92,7 @@ Authenticate existing user.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -122,6 +126,7 @@ Invalidate current session.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -138,6 +143,7 @@ Refresh access token using refresh token.
 **Status**: ✅ Implemented
 
 **Request Body**:
+
 ```json
 {
   "refresh_token": "jwt_refresh_token"
@@ -145,6 +151,7 @@ Refresh access token using refresh token.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -170,6 +177,7 @@ Get current authenticated user's profile.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -199,6 +207,7 @@ Update current user's profile.
 **Headers**: Authorization required
 
 **Request Body** (partial update):
+
 ```json
 {
   "firstName": "Jane",
@@ -208,6 +217,7 @@ Update current user's profile.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -231,12 +241,14 @@ Upload profile avatar.
 **Status**: 🔨 Needed (Phase 3)
 
 **Headers**:
+
 - Authorization required
 - Content-Type: multipart/form-data
 
 **Request Body**: FormData with `file` field
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -257,10 +269,12 @@ Get all conversations for the current user.
 **Headers**: Authorization required
 
 **Query Parameters**:
+
 - `limit` (optional): Number of conversations to return (default: 50)
 - `offset` (optional): Pagination offset (default: 0)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -292,6 +306,7 @@ Create a new conversation.
 **Headers**: Authorization required
 
 **Request Body**:
+
 ```json
 {
   "title": "Setting up development environment",
@@ -301,6 +316,7 @@ Create a new conversation.
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -326,6 +342,7 @@ Get all messages for a specific conversation.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -369,6 +386,7 @@ Send a message in a conversation.
 **Headers**: Authorization required
 
 **Request Body**:
+
 ```json
 {
   "role": "user",
@@ -378,6 +396,7 @@ Send a message in a conversation.
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -401,15 +420,18 @@ Submit a screenshot for contextual help (Cmd+H flow).
 **Status**: 🔨 Needed (Phase 1 - HIGH PRIORITY)
 
 **Headers**:
+
 - Authorization required
 - Content-Type: multipart/form-data
 
 **Request Body**: FormData with:
+
 - `screenshot`: Image file (PNG/JPEG)
 - `question`: User's question text
 - `windowTitle`: Active window title
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -454,6 +476,7 @@ Update conversation metadata.
 **Headers**: Authorization required
 
 **Request Body**:
+
 ```json
 {
   "title": "Updated conversation title",
@@ -462,6 +485,7 @@ Update conversation metadata.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -485,6 +509,7 @@ Archive a conversation.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -505,6 +530,7 @@ Get the current user's roadmap (all weeks and tasks).
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -559,6 +585,7 @@ Toggle a task's completion status.
 **Headers**: Authorization required
 
 **Request Body**:
+
 ```json
 {
   "completed": true
@@ -566,6 +593,7 @@ Toggle a task's completion status.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -588,6 +616,7 @@ Add a custom task to the roadmap (admin or self-directed).
 **Headers**: Authorization required
 
 **Request Body**:
+
 ```json
 {
   "title": "Review codebase architecture",
@@ -598,6 +627,7 @@ Add a custom task to the roadmap (admin or self-directed).
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -625,6 +655,7 @@ Change task order within a week.
 **Headers**: Authorization required
 
 **Request Body**:
+
 ```json
 {
   "orderIndex": 2
@@ -632,6 +663,7 @@ Change task order within a week.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -653,6 +685,7 @@ Remove a custom task from the roadmap.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -671,6 +704,7 @@ Get aggregated progress statistics.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -703,10 +737,12 @@ Get all active nudges for the current user.
 **Headers**: Authorization required
 
 **Query Parameters**:
+
 - `status` (optional): Filter by status (waiting, accepted, declined, resolved)
 - `limit` (optional): Number of nudges (default: 20)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -748,6 +784,7 @@ Accept a nudge recommendation.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -774,6 +811,7 @@ Dismiss/decline a nudge.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -795,6 +833,7 @@ Mark a nudge as resolved (after help is complete).
 **Headers**: Authorization required
 
 **Request Body** (optional):
+
 ```json
 {
   "rating": 5,
@@ -803,6 +842,7 @@ Mark a nudge as resolved (after help is complete).
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -825,6 +865,7 @@ Manually request expert help.
 **Headers**: Authorization required
 
 **Request Body**:
+
 ```json
 {
   "topic": "React performance optimization",
@@ -834,6 +875,7 @@ Manually request expert help.
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -861,6 +903,7 @@ Get nudge statistics for the user.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -896,11 +939,13 @@ Get list of available experts.
 **Headers**: Authorization required
 
 **Query Parameters**:
+
 - `topic` (optional): Filter by topic/expertise
 - `available` (optional): Filter by availability (boolean)
 - `limit` (optional): Number of experts (default: 20)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -933,6 +978,7 @@ Get expert profile details.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -974,6 +1020,7 @@ Opt-in to become an expert.
 **Headers**: Authorization required
 
 **Request Body**:
+
 ```json
 {
   "topics": ["React", "TypeScript", "Node.js"],
@@ -986,6 +1033,7 @@ Opt-in to become an expert.
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -1010,6 +1058,7 @@ Update expert profile.
 **Headers**: Authorization required
 
 **Request Body** (partial update):
+
 ```json
 {
   "availability": "busy",
@@ -1018,6 +1067,7 @@ Update expert profile.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1043,6 +1093,7 @@ Get admin dashboard overview metrics.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1097,11 +1148,13 @@ Get detailed usage analytics.
 **Headers**: Authorization required (admin role)
 
 **Query Parameters**:
+
 - `startDate`: ISO date string
 - `endDate`: ISO date string
 - `groupBy`: day | week | month
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1124,9 +1177,7 @@ Get detailed usage analytics.
       "declined": 45,
       "avgMatchScore": 0.87
     },
-    "timeSeriesData": [
-      { "date": "2025-01-01", "helpRequests": 15, "conversations": 10 }
-    ]
+    "timeSeriesData": [{ "date": "2025-01-01", "helpRequests": 15, "conversations": 10 }]
   }
 }
 ```
@@ -1144,11 +1195,13 @@ Get all roadmap templates.
 **Headers**: Authorization required (admin role)
 
 **Query Parameters**:
+
 - `search` (optional): Search by title or description
 - `roleTag` (optional): Filter by role tag
 - `limit` (optional): Number of templates (default: 50)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1181,6 +1234,7 @@ Create a new roadmap template.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "title": "Product Designer Onboarding",
@@ -1192,6 +1246,7 @@ Create a new roadmap template.
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -1219,6 +1274,7 @@ Get a specific template with all tasks.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1263,6 +1319,7 @@ Update a template.
 **Headers**: Authorization required (admin role)
 
 **Request Body** (partial update):
+
 ```json
 {
   "title": "Updated Software Engineer Onboarding",
@@ -1272,6 +1329,7 @@ Update a template.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1295,6 +1353,7 @@ Delete a template.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1313,6 +1372,7 @@ Add a task to a template.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "weekNumber": 2,
@@ -1325,6 +1385,7 @@ Add a task to a template.
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -1350,6 +1411,7 @@ Update a template task.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "title": "Updated task title",
@@ -1359,6 +1421,7 @@ Update a template task.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1383,6 +1446,7 @@ Delete a template task.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1401,6 +1465,7 @@ Assign a template to a user.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "userId": "uuid",
@@ -1409,6 +1474,7 @@ Assign a template to a user.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1434,6 +1500,7 @@ Duplicate a template.
 **Headers**: Authorization required (admin role)
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -1458,19 +1525,22 @@ Get all users in the organization.
 **Headers**: Authorization required (admin role)
 
 **Query Parameters**:
-- `search` (optional): Search by name or email *(not yet implemented)*
-- `role` (optional): Filter by role (admin, employee) *(not yet implemented)*
-- `status` (optional): Filter by onboarding status *(not yet implemented)*
-- `limit` (optional): Number of users (default: 50) *(not yet implemented)*
-- `offset` (optional): Pagination offset *(not yet implemented)*
+
+- `search` (optional): Search by name or email _(not yet implemented)_
+- `role` (optional): Filter by role (admin, employee) _(not yet implemented)_
+- `status` (optional): Filter by onboarding status _(not yet implemented)_
+- `limit` (optional): Number of users (default: 50) _(not yet implemented)_
+- `offset` (optional): Pagination offset _(not yet implemented)_
 
 **Implementation Notes**:
+
 - Currently returns all employees (role='employee') ordered by creation date
 - Calculates progress dynamically from user_roadmap_tasks completion
 - Status is determined by progress (100% = "Active", <100% = "Onboarding")
 - Search, filtering, and pagination to be added in Phase 2
 
 **Response** (200):
+
 ```json
 {
   "users": [
@@ -1489,6 +1559,7 @@ Get all users in the organization.
 ```
 
 **Error Responses**:
+
 - `403 Forbidden`: User is not an admin
 
 ---
@@ -1502,6 +1573,7 @@ Get detailed information about a specific user.
 **Headers**: Authorization required (admin role)
 
 **Implementation Notes**:
+
 - Uses optimized Drizzle ORM queries with joins
 - Correlates conversations with nudges (within 1-hour window)
 - Groups nudge themes by question topic
@@ -1509,6 +1581,7 @@ Get detailed information about a specific user.
 - Manager field is `null` (requires schema update to add `managerId`)
 
 **Response** (200):
+
 ```json
 {
   "user": {
@@ -1563,6 +1636,7 @@ Get detailed information about a specific user.
 ```
 
 **Error Responses**:
+
 - `403 Forbidden`: User is not an admin
 - `404 Not Found`: User with specified ID doesn't exist
 
@@ -1577,6 +1651,7 @@ Update user information.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "firstName": "Jane",
@@ -1586,6 +1661,7 @@ Update user information.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1610,6 +1686,7 @@ Assign a template to a user (same as POST /admin/templates/:id/assign).
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "templateId": "uuid",
@@ -1618,6 +1695,7 @@ Assign a template to a user (same as POST /admin/templates/:id/assign).
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1642,6 +1720,7 @@ Deactivate a user.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1660,6 +1739,7 @@ Invite a new user to the organization.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "email": "newuser@company.com",
@@ -1672,6 +1752,7 @@ Invite a new user to the organization.
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -1699,6 +1780,7 @@ Get all integration configurations.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1732,6 +1814,7 @@ Add a new integration.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "provider": "notion",
@@ -1743,6 +1826,7 @@ Add a new integration.
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -1766,6 +1850,7 @@ Update integration configuration.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "status": "disconnected",
@@ -1776,6 +1861,7 @@ Update integration configuration.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1798,6 +1884,7 @@ Remove an integration.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1816,6 +1903,7 @@ Test integration connection.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1842,10 +1930,12 @@ Get high-level analytics overview.
 **Headers**: Authorization required (admin role)
 
 **Query Parameters**:
+
 - `startDate`: ISO date string
 - `endDate`: ISO date string
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1891,6 +1981,7 @@ Get user-level analytics.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1922,6 +2013,7 @@ Get content effectiveness analytics.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1959,6 +2051,7 @@ Get expert performance analytics.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -1991,6 +2084,7 @@ Get organization details.
 **Headers**: Authorization required
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -2021,6 +2115,7 @@ Update organization settings.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "settings": {
@@ -2031,6 +2126,7 @@ Update organization settings.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -2058,11 +2154,13 @@ Get all source materials (documents, videos, etc.).
 **Headers**: Authorization required (admin role)
 
 **Query Parameters**:
+
 - `type` (optional): Filter by type (document, video, link, etc.)
 - `search` (optional): Search by title
 - `limit` (optional): Number of materials (default: 50)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -2095,6 +2193,7 @@ Add a new source material.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "title": "React Best Practices Video",
@@ -2106,6 +2205,7 @@ Add a new source material.
 ```
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -2131,6 +2231,7 @@ Update source material.
 **Headers**: Authorization required (admin role)
 
 **Request Body**:
+
 ```json
 {
   "title": "Updated React Best Practices",
@@ -2139,6 +2240,7 @@ Update source material.
 ```
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -2162,6 +2264,7 @@ Delete source material.
 **Headers**: Authorization required (admin role)
 
 **Response** (200):
+
 ```json
 {
   "success": true,
@@ -2178,16 +2281,19 @@ Upload a document file.
 **Status**: 🔨 Needed (Phase 2)
 
 **Headers**:
+
 - Authorization required (admin role)
 - Content-Type: multipart/form-data
 
 **Request Body**: FormData with:
+
 - `file`: Document file (PDF, DOCX, etc.)
 - `title`: Document title
 - `description`: Document description
 - `tags`: JSON array of tags
 
 **Response** (201):
+
 ```json
 {
   "success": true,
@@ -2209,6 +2315,7 @@ Upload a document file.
 All endpoints follow consistent error response format:
 
 ### 400 Bad Request
+
 ```json
 {
   "success": false,
@@ -2226,6 +2333,7 @@ All endpoints follow consistent error response format:
 ```
 
 ### 401 Unauthorized
+
 ```json
 {
   "success": false,
@@ -2237,6 +2345,7 @@ All endpoints follow consistent error response format:
 ```
 
 ### 403 Forbidden
+
 ```json
 {
   "success": false,
@@ -2248,6 +2357,7 @@ All endpoints follow consistent error response format:
 ```
 
 ### 404 Not Found
+
 ```json
 {
   "success": false,
@@ -2261,6 +2371,7 @@ All endpoints follow consistent error response format:
 ```
 
 ### 409 Conflict
+
 ```json
 {
   "success": false,
@@ -2272,6 +2383,7 @@ All endpoints follow consistent error response format:
 ```
 
 ### 429 Too Many Requests
+
 ```json
 {
   "success": false,
@@ -2284,6 +2396,7 @@ All endpoints follow consistent error response format:
 ```
 
 ### 500 Internal Server Error
+
 ```json
 {
   "success": false,
@@ -2300,9 +2413,11 @@ All endpoints follow consistent error response format:
 ## Implementation Phases
 
 ### Phase 1 (Weeks 1-4) - MVP Core Help System
+
 **Priority**: HIGH
 
 **Endpoints Implemented**:
+
 - ✅ POST /auth/signup
 - ✅ POST /auth/login
 - ✅ POST /auth/logout
@@ -2324,9 +2439,11 @@ All endpoints follow consistent error response format:
 - ✅ GET /admin/integrations
 
 **Endpoints to Implement**:
+
 - 🔨 **POST /conversations/:id/screenshot** - CRITICAL for Cmd+H flow
 
 **Dependencies**:
+
 - Gemini Vision API integration
 - Screenshot capture functionality
 - Overlay window coordination
@@ -2335,9 +2452,11 @@ All endpoints follow consistent error response format:
 ---
 
 ### Phase 2 (Weeks 5-8) - Roadmap & Nudges Enhancement
+
 **Priority**: MEDIUM-HIGH
 
 **Endpoints to Implement**:
+
 - 🔨 POST /roadmaps/tasks (custom tasks)
 - 🔨 POST /admin/templates (create template)
 - 🔨 PATCH /admin/templates/:id (edit template)
@@ -2361,6 +2480,7 @@ All endpoints follow consistent error response format:
 - 🔨 POST /admin/source-materials/upload
 
 **Dependencies**:
+
 - Template assignment workflow
 - Expert matching algorithm
 - Source material management
@@ -2368,9 +2488,11 @@ All endpoints follow consistent error response format:
 ---
 
 ### Phase 3 (Weeks 9-12) - Admin Dashboard & Analytics
+
 **Priority**: MEDIUM
 
 **Endpoints to Implement**:
+
 - 🔨 GET /admin/dashboard (dashboard metrics)
 - 🔨 GET /admin/analytics/usage
 - 🔨 GET /admin/analytics/overview
@@ -2386,6 +2508,7 @@ All endpoints follow consistent error response format:
 - 🔨 DELETE /admin/users/:id (deactivate user)
 
 **Dependencies**:
+
 - Analytics data aggregation pipelines
 - Integration OAuth flows
 - Background job processing
@@ -2393,9 +2516,11 @@ All endpoints follow consistent error response format:
 ---
 
 ### Phase 4 (Weeks 13-16) - Scale & Polish
+
 **Priority**: LOW
 
 **Endpoints to Implement**:
+
 - 🔨 PATCH /auth/me (profile updates)
 - 🔨 POST /auth/me/avatar (avatar upload)
 - 🔨 GET /organizations/:id (organization details)
@@ -2410,6 +2535,7 @@ All endpoints follow consistent error response format:
 - Performance optimization
 
 **Dependencies**:
+
 - Load testing results
 - User feedback incorporation
 - Production monitoring setup

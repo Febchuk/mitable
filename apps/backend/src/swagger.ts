@@ -5,7 +5,8 @@ const swaggerDefinition = {
   info: {
     title: "Mitable API",
     version: "1.0.0",
-    description: "AI-powered onboarding assistant API - provides contextual help, roadmap management, expert nudges, and conversation history for employee onboarding.",
+    description:
+      "AI-powered onboarding assistant API - provides contextual help, roadmap management, expert nudges, and conversation history for employee onboarding.",
     contact: {
       name: "Mitable Team",
       url: "https://mitable.app",
@@ -27,7 +28,8 @@ const swaggerDefinition = {
         type: "http",
         scheme: "bearer",
         bearerFormat: "JWT",
-        description: "JWT access token from Supabase Auth. Include as: Authorization: Bearer <token>",
+        description:
+          "JWT access token from Supabase Auth. Include as: Authorization: Bearer <token>",
       },
     },
     schemas: {
@@ -485,11 +487,7 @@ const swaggerDefinition = {
 const options: swaggerJsdoc.Options = {
   definition: swaggerDefinition,
   // Look for JSDoc comments in route files
-  apis: [
-    "./src/routes/**/*.ts",
-    "./src/routes.ts",
-    "./src/app.ts",
-  ],
+  apis: ["./src/routes/**/*.ts", "./src/routes.ts", "./src/app.ts"],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);
