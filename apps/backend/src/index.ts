@@ -1,6 +1,7 @@
 import { app } from "./app.js";
 import { config, validateConfig } from "./config.js";
 import { testConnection } from "./db/client.js";
+import { vectorService } from "./services/vector.service.js";
 
 async function startServer() {
   // Validate environment variables
@@ -26,6 +27,11 @@ async function startServer() {
       process.exit(1);
     }
   }
+
+  // Initialize vector service
+  console.log("🔧 Initializing vector service...");
+  vectorService.initialize();
+  console.log("✅ Vector service initialized");
 
   // Start server
   app.listen(config.port, () => {

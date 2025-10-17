@@ -77,7 +77,8 @@ class VectorService {
     try {
       const index = this.client.index(this.indexName);
       await index.namespace(namespace || "").upsert(vectors);
-      console.log(`✅ Upserted ${vectors.length} vectors to Pinecone`);
+      const namespaceInfo = namespace ? ` (namespace: ${namespace})` : "";
+      console.log(`✅ Upserted ${vectors.length} vectors to Pinecone${namespaceInfo}`);
     } catch (error) {
       throw new Error("Failed to upsert vectors", { cause: error });
     }

@@ -2327,24 +2327,16 @@ async function seedIntegrations(organizationId: string) {
       {
         organizationId,
         provider: "slack",
-        status: "connected",
+        status: "disconnected", // Changed: No real token, so disconnected
         syncFrequency: "6 hours",
-        lastSyncedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-        metadata: {
-          workspace: "lorikeet-team",
-          channels: ["#general", "#engineering", "#design"],
-        },
+        metadata: {},
       },
       {
         organizationId,
         provider: "notion",
-        status: "connected",
+        status: "disconnected", // Changed: No real token, so disconnected
         syncFrequency: "6 hours",
-        lastSyncedAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
-        metadata: {
-          workspace: "Lorikeet Team",
-          pages: 156,
-        },
+        metadata: {},
       },
       {
         organizationId,
