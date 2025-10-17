@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
@@ -72,6 +72,7 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
         orderIndex: schema.userRoadmapTasks.orderIndex,
         completed: schema.userRoadmapTasks.completed,
         completedAt: schema.userRoadmapTasks.completedAt,
+        templateTaskId: schema.userRoadmapTasks.templateTaskId,
       })
       .from(schema.userRoadmapTasks)
       .where(eq(schema.userRoadmapTasks.userId, userId))
@@ -87,6 +88,46 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    // Fetch source materials for all template tasks
+    const templateTaskIds = tasks
+      .map((t) => t.templateTaskId)
+      .filter((id): id is string => id !== null);
+
+    const sourceMaterialsMap = new Map<string, any[]>();
+
+    if (templateTaskIds.length > 0) {
+      // Fetch all sources for all template tasks in a single query
+      const sourcesResult = await db
+        .select({
+          templateTaskId: schema.roadmapTemplateSources.templateTaskId,
+          sourceId: schema.sourceMaterials.id,
+          title: schema.sourceMaterials.title,
+          type: schema.sourceMaterials.type,
+          url: schema.sourceMaterials.url,
+          description: schema.sourceMaterials.description,
+        })
+        .from(schema.roadmapTemplateSources)
+        .innerJoin(
+          schema.sourceMaterials,
+          eq(schema.roadmapTemplateSources.sourceId, schema.sourceMaterials.id)
+        )
+        .where(inArray(schema.roadmapTemplateSources.templateTaskId, templateTaskIds));
+
+      // Group sources by template task ID
+      sourcesResult.forEach((source) => {
+        if (!sourceMaterialsMap.has(source.templateTaskId)) {
+          sourceMaterialsMap.set(source.templateTaskId, []);
+        }
+        sourceMaterialsMap.get(source.templateTaskId)!.push({
+          id: source.sourceId,
+          title: source.title,
+          type: source.type,
+          url: source.url,
+          description: source.description,
+        });
+      });
+    }
+
     // Group tasks by week and calculate progress
     const weekMap = new Map<number, any[]>();
     let maxWeek = 0;
@@ -99,6 +140,9 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
         weekMap.set(weekNum, []);
       }
 
+      // Get sources for this task from the template task
+      const sources = task.templateTaskId ? sourceMaterialsMap.get(task.templateTaskId) || [] : [];
+
       weekMap.get(weekNum)!.push({
         id: task.id,
         title: task.title,
@@ -108,6 +152,7 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
         completedAt: task.completedAt || null,
         week: task.weekNumber,
         orderIndex: task.orderIndex || 0,
+        sources,
       });
     });
 
