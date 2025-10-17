@@ -119,7 +119,9 @@ export default function RoadmapTaskDetail() {
             ))}
           </div>
         ) : (
-          <p className="text-text-secondary text-center py-8">No resources available for this task</p>
+          <p className="text-text-secondary text-center py-8">
+            No resources available for this task
+          </p>
         )}
       </div>
     </div>
