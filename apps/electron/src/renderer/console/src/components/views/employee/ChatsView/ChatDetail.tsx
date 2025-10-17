@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowUp, ExternalLink, Workflow, Users } from "lucide-react";
-import { useChats } from "../../../../context/ChatsContext";
+import { useConversations, useSendMessage } from "@/console/src/hooks/queries/chats";
 import { Message } from "../../../../types";
 import UserMessage from "../../../../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../../../../components/domain/messages/AIMessage";
@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 export default function ChatDetail() {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
-  const { chats, addMessage } = useChats();
+  const { data: chats = [] } = useConversations();
+  const sendMessageMutation = useSendMessage();
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -39,29 +40,21 @@ export default function ChatDetail() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || !chatId) return;
 
-    // Add user message
-    const userMessage: Message = {
-      id: `${chat.id}-${Date.now()}`,
-      role: "user",
-      content: inputValue.trim(),
-      timestamp: new Date(),
-    };
+    // Send user message
+    sendMessageMutation.mutate({
+      chatId,
+      message: {
+        role: "user",
+        content: inputValue.trim(),
+        type: "text",
+      },
+    });
 
-    addMessage(chat.id, userMessage);
     setInputValue("");
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: `${chat.id}-${Date.now() + 1}`,
-        role: "assistant",
-        content: "I understand your question. Let me help you with that...",
-        timestamp: new Date(),
-      };
-      addMessage(chat.id, aiMessage);
-    }, 1000);
+    // TODO: AI response should come from backend, not simulated here
   };
 
   return (

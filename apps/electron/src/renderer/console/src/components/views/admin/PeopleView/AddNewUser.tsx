@@ -17,8 +17,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { useAdmin } from "../../../../context/AdminContext";
-import { createUser } from "../../../../services/adminService";
+import { useTemplates, useCreateUser } from "@/console/src/hooks/queries/admin";
 import { useToast } from "@/hooks/use-toast";
 
 const roles = [
@@ -35,7 +34,8 @@ const managers = [
 
 export default function AddNewUser() {
   const navigate = useNavigate();
-  const { templates, loading: templatesLoading, refetchData } = useAdmin();
+  const { data: templates = [], isLoading: templatesLoading } = useTemplates();
+  const createUserMutation = useCreateUser();
   const { toast } = useToast();
 
   // Form fields
@@ -50,7 +50,6 @@ export default function AddNewUser() {
   const [role, setRole] = useState("");
   const [managerOpen, setManagerOpen] = useState(false);
   const [manager, setManager] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleTemplateToggle = (templateId: string) => {
     setSelectedTemplates((prev) =>
@@ -114,13 +113,11 @@ export default function AddNewUser() {
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
       // Get the full role label (e.g., "Software Engineer") from the selected role value
       const selectedRole = roles.find((r) => r.value === role);
 
-      await createUser({
+      await createUserMutation.mutateAsync({
         firstName,
         lastName,
         email,
@@ -135,8 +132,7 @@ export default function AddNewUser() {
         description: `${firstName} ${lastName} has been added successfully!`,
       });
 
-      // Refetch users list to show the newly created user
-      refetchData();
+      // React Query auto-invalidates the users list via useCreateUser hook
 
       navigate("/people");
     } catch (error) {
@@ -146,8 +142,6 @@ export default function AddNewUser() {
         description: error instanceof Error ? error.message : "Failed to create user",
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -441,17 +435,17 @@ export default function AddNewUser() {
         <Button
           variant="outline"
           onClick={() => navigate("/people")}
-          disabled={isSubmitting}
+          disabled={createUserMutation.isPending}
           className="bg-transparent border-border-subtle text-text-primary hover:bg-background-elevated"
         >
           Cancel
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={isSubmitting || templatesLoading}
+          disabled={createUserMutation.isPending || templatesLoading}
           className="bg-primary text-white hover:bg-primary/90"
         >
-          {isSubmitting ? "Creating..." : "+ Add New Hire"}
+          {createUserMutation.isPending ? "Creating..." : "+ Add New Hire"}
         </Button>
       </div>
     </div>

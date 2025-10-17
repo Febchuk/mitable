@@ -1,12 +1,15 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { useRoadmap } from "../../../../context/RoadmapContext";
+import { useRoadmap, useToggleTask } from "@/console/src/hooks/queries/roadmap";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function RoadmapTaskDetail() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
-  const { weeks, toggleTask } = useRoadmap();
+  const { data: roadmap } = useRoadmap();
+  const toggleTaskMutation = useToggleTask();
+
+  const weeks = roadmap?.weeks || [];
 
   // Find the task across all weeks
   const task = weeks.flatMap((week) => week.tasks).find((t) => t.id === taskId);
@@ -48,7 +51,7 @@ export default function RoadmapTaskDetail() {
 
           <Checkbox
             checked={task.completed}
-            onCheckedChange={() => toggleTask(task.id)}
+            onCheckedChange={() => toggleTaskMutation.mutate({ taskId: task.id, completed: !task.completed })}
             className="mt-2"
           />
         </div>

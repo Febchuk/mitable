@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useChats } from "../../../../context/ChatsContext";
+import { useConversations } from "@/console/src/hooks/queries/chats";
 import { Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ function formatTimestamp(date: Date): string {
 }
 
 export default function ChatsView() {
-  const { chats } = useChats();
+  const { data: chats = [], isLoading, error } = useConversations();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -35,6 +35,22 @@ export default function ChatsView() {
   const filteredChats = chats.filter((chat) =>
     chat.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (isLoading) {
+    return (
+      <div className="p-8">
+        <div className="text-center text-text-secondary">Loading conversations...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="text-center text-status-error">Error loading conversations</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-6 app-no-drag">

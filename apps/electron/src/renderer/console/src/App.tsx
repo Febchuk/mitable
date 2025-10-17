@@ -1,9 +1,8 @@
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { queryClient } from './lib/queryClient';
 import { UserProvider, useUser } from "./context/UserContext";
-import { AdminProvider } from "./context/AdminContext";
-import { RoadmapProvider } from "./context/RoadmapContext";
-import { NudgesProvider } from "./context/NudgesContext";
-import { ChatsProvider } from "./context/ChatsContext";
 import { Toaster } from "@/components/ui/toaster";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
 import LoginPage from "./pages/LoginPage";
@@ -56,13 +55,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <HashRouter>
-      <UserProvider>
-        <AdminProvider>
-          <RoadmapProvider>
-            <NudgesProvider>
-              <ChatsProvider>
-                <Routes>
+    <QueryClientProvider client={queryClient}>
+      <HashRouter>
+        <UserProvider>
+          <Routes>
                   {/* Public routes */}
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/signup-organization" element={<SignupOrganizationPage />} />
@@ -96,14 +92,12 @@ function App() {
                     <Route path="chats/new" element={<NewChat />} />
                     <Route path="chats/:chatId" element={<ChatDetail />} />
                   </Route>
-                </Routes>
-                <Toaster />
-              </ChatsProvider>
-            </NudgesProvider>
-          </RoadmapProvider>
-        </AdminProvider>
-      </UserProvider>
-    </HashRouter>
+          </Routes>
+          <Toaster />
+        </UserProvider>
+      </HashRouter>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

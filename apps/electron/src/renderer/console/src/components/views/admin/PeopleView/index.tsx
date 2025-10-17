@@ -12,11 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { useAdmin } from "@/console/src/context/AdminContext";
+import { useUsers } from "@/console/src/hooks/queries/admin";
 
 export default function PeopleView() {
   const navigate = useNavigate();
-  const { users, loading, error } = useAdmin();
+  const { data: users = [], isLoading: loading, error } = useUsers();
 
   return (
     <div className="p-8 space-y-6">

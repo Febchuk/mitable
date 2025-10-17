@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useNudges } from "../../../../context/NudgesContext";
+import { useNudges } from "@/console/src/hooks/queries/nudges";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +32,7 @@ function formatTimestamp(date: Date): string {
 }
 
 export default function NudgesView() {
-  const { nudges } = useNudges();
+  const { data: nudges = [], isLoading, error } = useNudges();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -42,6 +42,22 @@ export default function NudgesView() {
       nudge.expertName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       nudge.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (isLoading) {
+    return (
+      <div className="p-8">
+        <div className="text-center text-text-secondary">Loading nudges...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="text-center text-status-error">Error loading nudges</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-6 app-no-drag">

@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAdmin } from "@/console/src/context/AdminContext";
+import { useTemplates } from "@/console/src/hooks/queries/admin";
 
 // Map icon names to Lucide components
 const iconMap: Record<string, LucideIcon> = {
@@ -37,7 +37,7 @@ const iconMap: Record<string, LucideIcon> = {
 
 export default function TemplatesView() {
   const navigate = useNavigate();
-  const { templates, loading, error } = useAdmin();
+  const { data: templates = [], isLoading: loading, error } = useTemplates();
 
   return (
     <div className="p-8 space-y-6">

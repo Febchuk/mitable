@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAdmin } from "@/console/src/context/AdminContext";
+import { useIntegrations } from "@/console/src/hooks/queries/admin";
 import IntegrationCard from "./components/IntegrationCard";
 import SlackConnectDialog from "./components/SlackConnectDialog";
 import { Input } from "@/components/ui/input";
@@ -7,14 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Search, Filter, Plus } from "lucide-react";
 
 export default function IntegrationsView() {
-  const {
-    integrations,
-    connectIntegration,
-    disconnectIntegration,
-    configureIntegration,
-    syncIntegration,
-    viewIntegrationDetails,
-  } = useAdmin();
+  const { data: integrations = [], isLoading, error } = useIntegrations();
+
+  // TODO: These will need mutation hooks later
+  const connectIntegration = (id: string, token?: string) => {
+    console.warn('connectIntegration not yet implemented with React Query');
+  };
+  const disconnectIntegration = (id: string) => {
+    console.warn('disconnectIntegration not yet implemented with React Query');
+  };
+  const configureIntegration = (id: string) => {
+    console.warn('configureIntegration not yet implemented with React Query');
+  };
+  const syncIntegration = (id: string) => {
+    console.warn('syncIntegration not yet implemented with React Query');
+  };
+  const viewIntegrationDetails = (id: string) => {
+    console.warn('viewIntegrationDetails not yet implemented with React Query');
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [slackDialogOpen, setSlackDialogOpen] = useState(false);
 
