@@ -253,10 +253,7 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
 
     // Database trigger created user with 'employee' role, update to 'admin'
     if (data.user) {
-      await db
-        .update(schema.users)
-        .set({ role: "admin" })
-        .where(eq(schema.users.id, data.user.id));
+      await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, data.user.id));
     }
 
     // Auto-login: Generate session by signing in with the new credentials
