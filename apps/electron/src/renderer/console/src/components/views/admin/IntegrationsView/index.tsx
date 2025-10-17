@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import {
-  useIntegrations,
-  useSyncIntegration,
-} from "@/console/src/hooks/queries/admin";
+import { useIntegrations, useSyncIntegration } from "@/console/src/hooks/queries/admin";
 import IntegrationCard from "./components/IntegrationCard";
 import SlackConnectDialog from "./components/SlackConnectDialog";
 import SlackConfigureDialog from "./components/SlackConfigureDialog";
@@ -265,7 +262,9 @@ export default function IntegrationsView() {
                   onConnect={handleConnectIntegration}
                   onDisconnect={handleDisconnect}
                   onConfigure={
-                    integration.provider === "slack" ? handleSlackConfigure : handleConfigureIntegration
+                    integration.provider === "slack"
+                      ? handleSlackConfigure
+                      : handleConfigureIntegration
                   }
                   onSync={handleSyncIntegration}
                   onViewDetails={handleViewDetails}
@@ -298,7 +297,9 @@ export default function IntegrationsView() {
                     onConnect={handleConnectIntegration}
                     onDisconnect={handleDisconnect}
                     onConfigure={
-                      integration.provider === "slack" ? handleSlackConfigure : handleConfigureIntegration
+                      integration.provider === "slack"
+                        ? handleSlackConfigure
+                        : handleConfigureIntegration
                     }
                     onSync={handleSyncIntegration}
                     onViewDetails={handleViewDetails}
@@ -326,7 +327,9 @@ export default function IntegrationsView() {
                     onConnect={handleConnectIntegration}
                     onDisconnect={handleDisconnect}
                     onConfigure={
-                      integration.provider === "slack" ? handleSlackConfigure : handleConfigureIntegration
+                      integration.provider === "slack"
+                        ? handleSlackConfigure
+                        : handleConfigureIntegration
                     }
                     onSync={handleSyncIntegration}
                     onViewDetails={handleViewDetails}
