@@ -1,11 +1,284 @@
 import { Router, Request, Response } from "express";
-import { supabase } from "../lib/supabase.js";
+import { supabase, supabaseAdmin } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
 
 export const authRouter = Router();
+
+/**
+ * @openapi
+ * /auth/signup-organization:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Create organization and admin account
+ *     description: Register a new organization with the first admin user. This creates both the organization and the admin account in one atomic operation.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - firstName
+ *               - lastName
+ *               - organizationName
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: admin@company.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 6
+ *                 example: securePassword123
+ *               firstName:
+ *                 type: string
+ *                 example: Jane
+ *               lastName:
+ *                 type: string
+ *                 example: Smith
+ *               organizationName:
+ *                 type: string
+ *                 example: Acme Corp
+ *               organizationDomain:
+ *                 type: string
+ *                 description: Optional company email domain for auto-joining (e.g., "acme.com")
+ *                 example: acme.com
+ *     responses:
+ *       201:
+ *         description: Organization and admin created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                 session:
+ *                   $ref: '#/components/schemas/Session'
+ *                 organization:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     name:
+ *                       type: string
+ *                     domain:
+ *                       type: string
+ *                       nullable: true
+ *                 profile:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       409:
+ *         description: Conflict - Organization with this domain already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security: []
+ */
+authRouter.post("/signup-organization", async (req: Request, res: Response) => {
+  try {
+    const { email, password, firstName, lastName, organizationName, organizationDomain } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Email and password are required",
+        },
+      });
+      return;
+    }
+
+    if (!firstName || !lastName) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "First name and last name are required",
+        },
+      });
+      return;
+    }
+
+    if (!organizationName) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Organization name is required",
+        },
+      });
+      return;
+    }
+
+    // Check if user with this email already exists
+    const [existingUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .limit(1);
+
+    if (existingUser) {
+      res.status(409).json({
+        success: false,
+        error: {
+          code: "EMAIL_ALREADY_EXISTS",
+          message: "A user with this email already exists",
+        },
+      });
+      return;
+    }
+
+    // Check if organization with same domain already exists
+    if (organizationDomain) {
+      const [existingOrg] = await db
+        .select()
+        .from(schema.organizations)
+        .where(eq(schema.organizations.domain, organizationDomain))
+        .limit(1);
+
+      if (existingOrg) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: "CONFLICT",
+            message: `An organization with the domain "${organizationDomain}" already exists`,
+          },
+        });
+        return;
+      }
+    }
+
+    // Create organization
+    const [organization] = await db
+      .insert(schema.organizations)
+      .values({
+        name: organizationName,
+        domain: organizationDomain || null,
+      })
+      .returning({
+        id: schema.organizations.id,
+        name: schema.organizations.name,
+        domain: schema.organizations.domain,
+      });
+
+    if (!organization) {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Failed to create organization",
+        },
+      });
+      return;
+    }
+
+    // Create admin user in Supabase Auth
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+          organization_id: organization.id,
+        },
+      },
+    });
+
+    if (error) {
+      console.error("Signup error:", error);
+      // Rollback: Delete the organization if user creation fails
+      await db.delete(schema.organizations).where(eq(schema.organizations.id, organization.id));
+
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "SIGNUP_FAILED",
+          message: error.message,
+        },
+      });
+      return;
+    }
+
+    // Create admin user profile in database
+    if (data.user) {
+      try {
+        await db.insert(schema.users).values({
+          id: data.user.id,
+          organizationId: organization.id,
+          email,
+          firstName,
+          lastName,
+          role: "admin",
+          status: "active",
+        });
+      } catch (dbError) {
+        console.error("Error creating admin profile:", dbError);
+        // Cleanup: Delete organization and auth user if profile creation fails
+        await db.delete(schema.organizations).where(eq(schema.organizations.id, organization.id));
+        await supabaseAdmin.auth.admin.deleteUser(data.user.id);
+
+        res.status(500).json({
+          success: false,
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "Failed to create admin profile",
+          },
+        });
+        return;
+      }
+    }
+
+    // Fetch complete user profile
+    const [userProfile] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, data.user!.id))
+      .limit(1);
+
+    res.status(201).json({
+      success: true,
+      user: data.user,
+      session: data.session,
+      organization,
+      profile: userProfile,
+    });
+  } catch (error) {
+    console.error("Organization signup error:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to create organization and admin account",
+      },
+    });
+  }
+});
 
 /**
  * @openapi

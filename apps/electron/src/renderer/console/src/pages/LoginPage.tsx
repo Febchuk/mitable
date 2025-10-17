@@ -132,6 +132,18 @@ export default function LoginPage() {
           <p className="text-center text-sm text-text-tertiary">
             Questions? Your AI assistant is here to help
           </p>
+
+          <div className="text-center pt-2 border-t border-border-subtle">
+            <p className="text-sm text-text-tertiary">
+              Setting up Mitable?{" "}
+              <a
+                href="#/signup-organization"
+                className="text-primary-light hover:text-primary-hover transition-colors font-medium"
+              >
+                Create Organization →
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </div>

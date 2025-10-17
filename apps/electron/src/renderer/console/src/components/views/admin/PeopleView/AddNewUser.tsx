@@ -17,37 +17,9 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import type { Template } from "../../../../types";
-
-const templates: Template[] = [
-  {
-    id: "1",
-    organizationId: "org-1",
-    title: "Engineering Onboarding",
-    description: "Technical setup, codebase intro, first PR",
-    roleTags: ["Software Engineer"],
-    totalWeeks: 2,
-    tasks: 12,
-  },
-  {
-    id: "2",
-    organizationId: "org-1",
-    title: "Company Onboarding (All Roles)",
-    description: "Company culture, tools, policies, team intros",
-    roleTags: [],
-    totalWeeks: 1,
-    tasks: 8,
-  },
-  {
-    id: "3",
-    organizationId: "org-1",
-    title: "Frontend Specialization",
-    description: "React architecture, component library, styling patterns",
-    roleTags: ["Frontend", "Software Engineer"],
-    totalWeeks: 1,
-    tasks: 8,
-  },
-];
+import { useAdmin } from "../../../../context/AdminContext";
+import { createUser } from "../../../../services/adminService";
+import { useToast } from "@/hooks/use-toast";
 
 const roles = [
   { value: "engineer", label: "Software Engineer" },
@@ -63,6 +35,13 @@ const managers = [
 
 export default function AddNewUser() {
   const navigate = useNavigate();
+  const { templates, loading: templatesLoading, refetchData } = useAdmin();
+  const { toast } = useToast();
+
+  // Form fields
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const [welcomeEmail, setWelcomeEmail] = useState(true);
   const [notifyManager, setNotifyManager] = useState(false);
@@ -71,6 +50,7 @@ export default function AddNewUser() {
   const [role, setRole] = useState("");
   const [managerOpen, setManagerOpen] = useState(false);
   const [manager, setManager] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleTemplateToggle = (templateId: string) => {
     setSelectedTemplates((prev) =>
@@ -86,6 +66,90 @@ export default function AddNewUser() {
   };
 
   const { totalTasks, totalWeeks } = calculateTotals();
+
+  const handleSubmit = async () => {
+    // Validation
+    if (!firstName || !lastName) {
+      toast({
+        title: "Error",
+        description: "Please enter first and last name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "Please enter email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!role) {
+      toast({
+        title: "Error",
+        description: "Please select a role",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!date) {
+      toast({
+        title: "Error",
+        description: "Please select a start date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedTemplates.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one onboarding template",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Get the full role label (e.g., "Software Engineer") from the selected role value
+      const selectedRole = roles.find((r) => r.value === role);
+
+      await createUser({
+        firstName,
+        lastName,
+        email,
+        role: selectedRole?.label || "",
+        startDate: format(date, "yyyy-MM-dd"),
+        templateIds: selectedTemplates,
+        sendWelcomeEmail: welcomeEmail,
+      });
+
+      toast({
+        title: "Success",
+        description: `${firstName} ${lastName} has been added successfully!`,
+      });
+
+      // Refetch users list to show the newly created user
+      refetchData();
+
+      navigate("/people");
+    } catch (error) {
+      console.error("Error creating user:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create user",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="p-8 space-y-6">
@@ -104,26 +168,44 @@ export default function AddNewUser() {
       {/* User Info Section */}
       <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          {/* Full Name */}
+          {/* First Name */}
           <div className="space-y-2">
-            <Label htmlFor="fullName" className="text-text-primary">
-              Full Name <span className="text-red-500">*</span>
+            <Label htmlFor="firstName" className="text-text-primary">
+              First Name <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="fullName"
-              placeholder="Enter full name"
+              id="firstName"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="Enter first name"
+              className="bg-background-secondary border-transparent text-text-primary placeholder:text-text-secondary"
+            />
+          </div>
+
+          {/* Last Name */}
+          <div className="space-y-2">
+            <Label htmlFor="lastName" className="text-text-primary">
+              Last Name <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="lastName"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Enter last name"
               className="bg-background-secondary border-transparent text-text-primary placeholder:text-text-secondary"
             />
           </div>
 
           {/* Email */}
-          <div className="space-y-2">
+          <div className="space-y-2 col-span-2">
             <Label htmlFor="email" className="text-text-primary">
               Email Address <span className="text-red-500">*</span>
             </Label>
             <Input
               id="email"
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="email@example.com"
               className="bg-background-secondary border-transparent text-text-primary placeholder:text-text-secondary"
             />
@@ -359,11 +441,18 @@ export default function AddNewUser() {
         <Button
           variant="outline"
           onClick={() => navigate("/people")}
+          disabled={isSubmitting}
           className="bg-transparent border-border-subtle text-text-primary hover:bg-background-elevated"
         >
           Cancel
         </Button>
-        <Button className="bg-primary text-white hover:bg-primary/90">+ Add New Hire</Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={isSubmitting || templatesLoading}
+          className="bg-primary text-white hover:bg-primary/90"
+        >
+          {isSubmitting ? "Creating..." : "+ Add New Hire"}
+        </Button>
       </div>
     </div>
   );

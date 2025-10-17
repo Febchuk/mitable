@@ -4,8 +4,10 @@ import { AdminProvider } from "./context/AdminContext";
 import { RoadmapProvider } from "./context/RoadmapContext";
 import { NudgesProvider } from "./context/NudgesContext";
 import { ChatsProvider } from "./context/ChatsContext";
+import { Toaster } from "@/components/ui/toaster";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
 import LoginPage from "./pages/LoginPage";
+import SignupOrganizationPage from "./pages/SignupOrganizationPage";
 import HomeView from "./components/views/employee/HomeView";
 import RoadmapView from "./components/views/employee/RoadmapView";
 import RoadmapTaskDetail from "./components/views/employee/RoadmapView/RoadmapTaskDetail";
@@ -61,8 +63,9 @@ function App() {
             <NudgesProvider>
               <ChatsProvider>
                 <Routes>
-                  {/* Public route */}
+                  {/* Public routes */}
                   <Route path="/login" element={<LoginPage />} />
+                  <Route path="/signup-organization" element={<SignupOrganizationPage />} />
 
                   {/* Protected routes */}
                   <Route
@@ -94,6 +97,7 @@ function App() {
                     <Route path="chats/:chatId" element={<ChatDetail />} />
                   </Route>
                 </Routes>
+                <Toaster />
               </ChatsProvider>
             </NudgesProvider>
           </RoadmapProvider>

@@ -130,3 +130,42 @@ export async function fetchUserDetail(userId: string): Promise<UserDetail> {
     throw error;
   }
 }
+
+export interface CreateUserPayload {
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string; // Job title (e.g., "Software Engineer", "Product Designer")
+  startDate: string;
+  templateIds: string[];
+  sendWelcomeEmail: boolean;
+}
+
+export interface CreateUserResponse {
+  success: boolean;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+  };
+  templatesAssigned: number;
+  tasksCreated: number;
+}
+
+/**
+ * Create a new user (admin only)
+ */
+export async function createUser(payload: CreateUserPayload): Promise<CreateUserResponse> {
+  try {
+    const response = await apiRequest<CreateUserResponse>("/admin/users", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return response;
+  } catch (error) {
+    console.error("Error creating user:", error);
+    throw error;
+  }
+}

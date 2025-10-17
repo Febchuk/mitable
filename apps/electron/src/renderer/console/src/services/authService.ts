@@ -39,6 +39,23 @@ export interface AuthError {
   message: string;
 }
 
+export interface OrganizationSignupData {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  organizationName: string;
+  organizationDomain?: string;
+}
+
+export interface OrganizationSignupResponse extends AuthResponse {
+  organization: {
+    id: string;
+    name: string;
+    domain: string | null;
+  };
+}
+
 class AuthService {
   /**
    * Login with email and password
@@ -55,6 +72,26 @@ class AuthService {
     if (!response.ok) {
       const error: AuthError = await response.json();
       throw new Error(error.message || "Login failed");
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Sign up organization with first admin user
+   */
+  async signupOrganization(data: OrganizationSignupData): Promise<OrganizationSignupResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/signup-organization`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || errorData.message || "Signup failed");
     }
 
     return response.json();

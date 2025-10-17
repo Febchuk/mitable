@@ -1,8 +1,9 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, sql, count, desc, and, gte, lte } from "drizzle-orm";
+import { eq, sql, count, desc, and, gte, lte, ne } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+import { supabaseAdmin } from "../lib/supabase";
 
 const router = Router();
 
@@ -452,7 +453,7 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
       return;
     }
 
-    // Fetch all users with their task completion stats
+    // Fetch all users with their task completion stats (exclude admins)
     const users = await db
       .select({
         id: schema.users.id,
@@ -466,7 +467,7 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
         avatarUrl: schema.users.avatarUrl,
       })
       .from(schema.users)
-      .where(eq(schema.users.role, "employee"))
+      .where(ne(schema.users.role, "admin"))
       .orderBy(desc(schema.users.createdAt));
 
     // Calculate progress for each user
@@ -768,6 +769,331 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
     res.status(500).json({
       error: "Internal Server Error",
       message: "Failed to fetch integrations",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /admin/users:
+ *   post:
+ *     tags:
+ *       - Admin - People Management
+ *     summary: Create a new employee account
+ *     description: Create a new employee with Supabase Auth account, database profile, and assigned roadmap templates. Generates temporary password and optionally sends welcome email with credentials. Admin access required.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - firstName
+ *               - lastName
+ *               - email
+ *               - role
+ *               - startDate
+ *               - templateIds
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 example: Jane
+ *               lastName:
+ *                 type: string
+ *                 example: Smith
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: jane.smith@company.com
+ *               role:
+ *                 type: string
+ *                 description: Employee role/title
+ *                 example: Software Engineer
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Employee start date
+ *                 example: 2025-01-15
+ *               templateIds:
+ *                 type: array
+ *                 description: Array of roadmap template IDs to assign
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 minItems: 1
+ *                 example: ["123e4567-e89b-12d3-a456-426614174000"]
+ *               sendWelcomeEmail:
+ *                 type: boolean
+ *                 description: Whether to send welcome email with credentials
+ *                 default: true
+ *     responses:
+ *       201:
+ *         description: Employee created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                     firstName:
+ *                       type: string
+ *                     lastName:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                 templatesAssigned:
+ *                   type: integer
+ *                   description: Number of templates assigned
+ *                   example: 2
+ *                 tasksCreated:
+ *                   type: integer
+ *                   description: Total tasks created from templates
+ *                   example: 45
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post("/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { firstName, lastName, email, role, startDate, templateIds, sendWelcomeEmail } = req.body;
+
+    // Verify requester is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Admin access required",
+        },
+      });
+      return;
+    }
+
+    // Validate required fields
+    if (!firstName || !lastName) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "First name and last name are required",
+        },
+      });
+      return;
+    }
+
+    if (!email) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Email is required",
+        },
+      });
+      return;
+    }
+
+    if (!role) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Role is required",
+        },
+      });
+      return;
+    }
+
+    if (!startDate) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Start date is required",
+        },
+      });
+      return;
+    }
+
+    if (!templateIds || templateIds.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "At least one template must be selected",
+        },
+      });
+      return;
+    }
+
+    // Check if email already exists in database
+    const [existingUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .limit(1);
+
+    if (existingUser) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "EMAIL_ALREADY_EXISTS",
+          message: "A user with this email already exists",
+        },
+      });
+      return;
+    }
+
+    // Generate a temporary password (user can reset via email)
+    const tempPassword = Math.random().toString(36).slice(-12) + "A1!";
+
+    // Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+        organization_id: currentUser.organizationId,
+      },
+    });
+
+    if (authError || !authData.user) {
+      console.error("Error creating user in Supabase Auth:", authError);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "USER_CREATION_FAILED",
+          message: authError?.message || "Failed to create user",
+        },
+      });
+      return;
+    }
+
+    // Update user profile in database (trigger auto-creates it with defaults, we update with full data)
+    try {
+      // The Supabase trigger auto-creates the user record, so we update it with our custom values
+      await db.update(schema.users)
+        .set({
+          role: role,
+          startDate: startDate,
+          currentWeek: 1,
+        })
+        .where(eq(schema.users.id, authData.user.id));
+    } catch (dbError) {
+      console.error("Error updating user profile:", dbError);
+      // Cleanup: Delete auth user if profile update fails
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "PROFILE_CREATION_FAILED",
+          message: "Failed to create user profile",
+        },
+      });
+      return;
+    }
+
+    // Assign templates and copy tasks
+    let totalTasksCreated = 0;
+
+    for (const templateId of templateIds) {
+      // Create template assignment
+      await db.insert(schema.userTemplateAssignments).values({
+        userId: authData.user.id,
+        templateId,
+        status: "active",
+        assignedAt: new Date(),
+      });
+
+      // Get all tasks from this template
+      const templateTasks = await db
+        .select()
+        .from(schema.roadmapTemplateTasks)
+        .where(eq(schema.roadmapTemplateTasks.templateId, templateId))
+        .orderBy(schema.roadmapTemplateTasks.weekNumber, schema.roadmapTemplateTasks.orderIndex);
+
+      // Copy tasks to user's roadmap
+      for (const task of templateTasks) {
+        await db.insert(schema.userRoadmapTasks).values({
+          userId: authData.user.id,
+          templateId: templateId,
+          templateTaskId: task.id,
+          weekNumber: task.weekNumber,
+          title: task.title,
+          description: task.description,
+          timeEstimate: task.timeEstimate,
+          orderIndex: task.orderIndex,
+          completed: false,
+        });
+        totalTasksCreated++;
+      }
+    }
+
+    // Send welcome email with password reset link if requested
+    if (sendWelcomeEmail !== false) {
+      try {
+        // Use Supabase's password reset flow to send a secure password setup email
+        const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+          redirectTo: `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password`,
+        });
+
+        if (resetError) {
+          console.error("Failed to send welcome email:", resetError);
+          // Don't fail the entire request if email fails - user is already created
+        }
+      } catch (emailError) {
+        console.error("Error sending welcome email:", emailError);
+        // Don't fail the entire request if email fails
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      user: {
+        id: authData.user.id,
+        email: authData.user.email || email,
+        firstName,
+        lastName,
+        role,
+      },
+      templatesAssigned: templateIds.length,
+      tasksCreated: totalTasksCreated,
+    });
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to create user",
+      },
     });
   }
 });
