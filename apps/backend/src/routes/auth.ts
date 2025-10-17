@@ -135,14 +135,14 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
       return;
     }
 
-    // Check if user with this email already exists
-    const [existingUser] = await db
+    // Check if user already exists in database
+    const [existingDbUser] = await db
       .select()
       .from(schema.users)
       .where(eq(schema.users.email, email))
       .limit(1);
 
-    if (existingUser) {
+    if (existingDbUser) {
       res.status(409).json({
         success: false,
         error: {
@@ -151,6 +151,33 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
         },
       });
       return;
+    }
+
+    // Check for orphaned Supabase Auth users (exist in Auth but not in database)
+    // This can happen if a previous signup attempt created the auth user but failed to create the database profile
+    const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const orphanedAuthUser = authUsers?.users?.find((u) => u.email === email);
+
+    if (orphanedAuthUser) {
+      console.log(`Detected orphaned Supabase Auth user: ${email} (ID: ${orphanedAuthUser.id})`);
+      console.log(`Cleaning up orphaned user before proceeding with signup...`);
+
+      // Delete the orphaned auth user to allow fresh signup
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(orphanedAuthUser.id);
+
+      if (deleteError) {
+        console.error(`Failed to cleanup orphaned user:`, deleteError);
+        res.status(500).json({
+          success: false,
+          error: {
+            code: "CLEANUP_FAILED",
+            message: "Unable to cleanup incomplete previous signup. Please contact support.",
+          },
+        });
+        return;
+      }
+
+      console.log(`Successfully cleaned up orphaned user: ${email}`);
     }
 
     // Check if organization with same domain already exists
@@ -197,16 +224,15 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
       return;
     }
 
-    // Create admin user in Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
+    // Create admin user in Supabase Auth using admin API (bypasses email confirmation)
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-          organization_id: organization.id,
-        },
+      email_confirm: true, // Auto-confirm email for immediate access
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+        organization_id: organization.id,
       },
     });
 
@@ -225,33 +251,38 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
       return;
     }
 
-    // Create admin user profile in database
+    // Database trigger created user with 'employee' role, update to 'admin'
     if (data.user) {
-      try {
-        await db.insert(schema.users).values({
-          id: data.user.id,
-          organizationId: organization.id,
-          email,
-          firstName,
-          lastName,
-          role: "admin",
-          status: "active",
-        });
-      } catch (dbError) {
-        console.error("Error creating admin profile:", dbError);
-        // Cleanup: Delete organization and auth user if profile creation fails
-        await db.delete(schema.organizations).where(eq(schema.organizations.id, organization.id));
-        await supabaseAdmin.auth.admin.deleteUser(data.user.id);
+      await db
+        .update(schema.users)
+        .set({ role: "admin" })
+        .where(eq(schema.users.id, data.user.id));
+    }
 
-        res.status(500).json({
-          success: false,
-          error: {
-            code: "INTERNAL_ERROR",
-            message: "Failed to create admin profile",
-          },
-        });
-        return;
-      }
+    // Auto-login: Generate session by signing in with the new credentials
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError) {
+      console.error("Auto-login error:", signInError);
+      // User is created but auto-login failed - still return success with null session
+      const [userProfile] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, data.user!.id))
+        .limit(1);
+
+      res.status(201).json({
+        success: true,
+        user: data.user,
+        session: null,
+        organization,
+        profile: userProfile,
+        message: "Organization created. Please login to continue.",
+      });
+      return;
     }
 
     // Fetch complete user profile
@@ -263,8 +294,8 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
 
     res.status(201).json({
       success: true,
-      user: data.user,
-      session: data.session,
+      user: signInData.user,
+      session: signInData.session,
       organization,
       profile: userProfile,
     });
