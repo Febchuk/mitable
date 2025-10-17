@@ -169,3 +169,109 @@ export async function createUser(payload: CreateUserPayload): Promise<CreateUser
     throw error;
   }
 }
+
+export interface ConnectIntegrationPayload {
+  accessToken?: string;
+  refreshToken?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface IntegrationResponse {
+  success: boolean;
+  integration: Integration;
+}
+
+export interface SyncResponse {
+  success: boolean;
+  syncLog: {
+    id: string;
+    integrationId: string;
+    status: string;
+    startedAt: Date;
+    completedAt?: Date;
+  };
+}
+
+/**
+ * Connect an integration (admin only)
+ */
+export async function connectIntegration(
+  integrationId: string,
+  payload?: ConnectIntegrationPayload
+): Promise<IntegrationResponse> {
+  try {
+    const response = await apiRequest<IntegrationResponse>(
+      `/admin/integrations/${integrationId}/connect`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload || {}),
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error connecting integration:", error);
+    throw error;
+  }
+}
+
+/**
+ * Disconnect an integration (admin only)
+ */
+export async function disconnectIntegration(
+  integrationId: string
+): Promise<IntegrationResponse> {
+  try {
+    const response = await apiRequest<IntegrationResponse>(
+      `/admin/integrations/${integrationId}/disconnect`,
+      {
+        method: "POST",
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error disconnecting integration:", error);
+    throw error;
+  }
+}
+
+/**
+ * Trigger manual sync for an integration (admin only)
+ */
+export async function syncIntegration(
+  integrationId: string
+): Promise<SyncResponse> {
+  try {
+    const response = await apiRequest<SyncResponse>(
+      `/admin/integrations/${integrationId}/sync`,
+      {
+        method: "POST",
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error syncing integration:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update integration settings (admin only)
+ */
+export async function updateIntegrationSettings(
+  integrationId: string,
+  metadata: Record<string, any>
+): Promise<IntegrationResponse> {
+  try {
+    const response = await apiRequest<IntegrationResponse>(
+      `/admin/integrations/${integrationId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ metadata }),
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error updating integration settings:", error);
+    throw error;
+  }
+}

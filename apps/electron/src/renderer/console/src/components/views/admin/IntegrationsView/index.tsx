@@ -1,30 +1,24 @@
 import { useState } from "react";
-import { useIntegrations } from "@/console/src/hooks/queries/admin";
+import {
+  useIntegrations,
+  useConnectIntegration,
+  useDisconnectIntegration,
+  useSyncIntegration,
+} from "@/console/src/hooks/queries/admin";
 import IntegrationCard from "./components/IntegrationCard";
 import SlackConnectDialog from "./components/SlackConnectDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { Search, Filter, Plus } from "lucide-react";
 
 export default function IntegrationsView() {
   const { data: integrations = [], isLoading, error } = useIntegrations();
+  const connectMutation = useConnectIntegration();
+  const disconnectMutation = useDisconnectIntegration();
+  const syncMutation = useSyncIntegration();
+  const { toast } = useToast();
 
-  // TODO: These will need mutation hooks later
-  const connectIntegration = (id: string, token?: string) => {
-    console.warn('connectIntegration not yet implemented with React Query');
-  };
-  const disconnectIntegration = (id: string) => {
-    console.warn('disconnectIntegration not yet implemented with React Query');
-  };
-  const configureIntegration = (id: string) => {
-    console.warn('configureIntegration not yet implemented with React Query');
-  };
-  const syncIntegration = (id: string) => {
-    console.warn('syncIntegration not yet implemented with React Query');
-  };
-  const viewIntegrationDetails = (id: string) => {
-    console.warn('viewIntegrationDetails not yet implemented with React Query');
-  };
   const [searchQuery, setSearchQuery] = useState("");
   const [slackDialogOpen, setSlackDialogOpen] = useState(false);
 
@@ -32,9 +26,102 @@ export default function IntegrationsView() {
     setSlackDialogOpen(true);
   };
 
-  const handleSlackConnectWithToken = (token: string) => {
-    connectIntegration("slack", token);
-    setSlackDialogOpen(false);
+  const handleSlackConnectWithToken = async (token: string) => {
+    try {
+      // Find slack integration ID
+      const slackIntegration = integrations.find((i) => i.provider === "slack");
+      if (!slackIntegration) {
+        toast({
+          title: "Error",
+          description: "Slack integration not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await connectMutation.mutateAsync({
+        integrationId: slackIntegration.id,
+        payload: { accessToken: token },
+      });
+
+      toast({
+        title: "Success",
+        description: "Slack integration connected successfully",
+      });
+      setSlackDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to connect Slack",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConnectIntegration = async (id: string) => {
+    try {
+      await connectMutation.mutateAsync({ integrationId: id });
+      toast({
+        title: "Success",
+        description: "Integration connected successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to connect integration",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDisconnectIntegration = async (id: string) => {
+    try {
+      await disconnectMutation.mutateAsync(id);
+      toast({
+        title: "Success",
+        description: "Integration disconnected successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to disconnect integration",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSyncIntegration = async (id: string) => {
+    try {
+      await syncMutation.mutateAsync(id);
+      toast({
+        title: "Success",
+        description: "Integration synced successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to sync integration",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConfigureIntegration = (id: string) => {
+    // TODO: Implement configuration modal
+    console.log("Configure integration:", id);
+    toast({
+      title: "Coming Soon",
+      description: "Integration configuration UI coming soon",
+    });
+  };
+
+  const handleViewIntegrationDetails = (id: string) => {
+    // TODO: Implement details view
+    console.log("View integration details:", id);
+    toast({
+      title: "Coming Soon",
+      description: "Integration details view coming soon",
+    });
   };
 
   // Filter integrations based on search query
@@ -127,11 +214,11 @@ export default function IntegrationsView() {
                 <IntegrationCard
                   key={integration.id}
                   integration={integration}
-                  onConnect={connectIntegration}
-                  onDisconnect={disconnectIntegration}
-                  onConfigure={configureIntegration}
-                  onSync={syncIntegration}
-                  onViewDetails={viewIntegrationDetails}
+                  onConnect={handleConnectIntegration}
+                  onDisconnect={handleDisconnectIntegration}
+                  onConfigure={handleConfigureIntegration}
+                  onSync={handleSyncIntegration}
+                  onViewDetails={handleViewIntegrationDetails}
                   onCustomConnect={
                     integration.provider === "slack" ? handleSlackConnect : undefined
                   }
@@ -158,11 +245,11 @@ export default function IntegrationsView() {
                   <IntegrationCard
                     key={integration.id}
                     integration={integration}
-                    onConnect={connectIntegration}
-                    onDisconnect={disconnectIntegration}
-                    onConfigure={configureIntegration}
-                    onSync={syncIntegration}
-                    onViewDetails={viewIntegrationDetails}
+                    onConnect={handleConnectIntegration}
+                    onDisconnect={handleDisconnectIntegration}
+                    onConfigure={handleConfigureIntegration}
+                    onSync={handleSyncIntegration}
+                    onViewDetails={handleViewIntegrationDetails}
                     onCustomConnect={
                       integration.provider === "slack" ? handleSlackConnect : undefined
                     }
@@ -184,11 +271,11 @@ export default function IntegrationsView() {
                   <IntegrationCard
                     key={integration.id}
                     integration={integration}
-                    onConnect={connectIntegration}
-                    onDisconnect={disconnectIntegration}
-                    onConfigure={configureIntegration}
-                    onSync={syncIntegration}
-                    onViewDetails={viewIntegrationDetails}
+                    onConnect={handleConnectIntegration}
+                    onDisconnect={handleDisconnectIntegration}
+                    onConfigure={handleConfigureIntegration}
+                    onSync={handleSyncIntegration}
+                    onViewDetails={handleViewIntegrationDetails}
                     onCustomConnect={
                       integration.provider === "slack" ? handleSlackConnect : undefined
                     }

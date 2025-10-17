@@ -1098,4 +1098,431 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
   }
 });
 
+/**
+ * @openapi
+ * /admin/integrations/{id}/connect:
+ *   post:
+ *     tags:
+ *       - Admin - Integrations
+ *     summary: Connect an integration
+ *     description: Activate an integration connection with optional credentials. Admin access required.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Integration ID to connect
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               accessToken:
+ *                 type: string
+ *                 description: OAuth access token
+ *               refreshToken:
+ *                 type: string
+ *                 description: OAuth refresh token
+ *               metadata:
+ *                 type: object
+ *                 description: Provider-specific configuration
+ *     responses:
+ *       200:
+ *         description: Integration connected successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post("/integrations/:id/connect", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const integrationId = req.params.id;
+    const { accessToken, refreshToken, metadata } = req.body;
+
+    // Verify user is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "Admin access required",
+      });
+      return;
+    }
+
+    // Check if integration exists and belongs to user's organization
+    const [integration] = await db
+      .select()
+      .from(schema.integrations)
+      .where(
+        and(
+          eq(schema.integrations.id, integrationId),
+          eq(schema.integrations.organizationId, currentUser.organizationId)
+        )
+      )
+      .limit(1);
+
+    if (!integration) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "Integration not found",
+      });
+      return;
+    }
+
+    // Update integration status to connected
+    const [updatedIntegration] = await db
+      .update(schema.integrations)
+      .set({
+        status: "connected",
+        accessToken: accessToken || null,
+        refreshToken: refreshToken || null,
+        metadata: metadata || integration.metadata,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.integrations.id, integrationId))
+      .returning();
+
+    res.json({
+      success: true,
+      integration: updatedIntegration,
+    });
+  } catch (error) {
+    console.error("Error connecting integration:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to connect integration",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /admin/integrations/{id}/disconnect:
+ *   post:
+ *     tags:
+ *       - Admin - Integrations
+ *     summary: Disconnect an integration
+ *     description: Deactivate an integration connection and clear credentials. Admin access required.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Integration disconnected successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post("/integrations/:id/disconnect", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const integrationId = req.params.id;
+
+    // Verify user is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "Admin access required",
+      });
+      return;
+    }
+
+    // Check if integration exists and belongs to user's organization
+    const [integration] = await db
+      .select()
+      .from(schema.integrations)
+      .where(
+        and(
+          eq(schema.integrations.id, integrationId),
+          eq(schema.integrations.organizationId, currentUser.organizationId)
+        )
+      )
+      .limit(1);
+
+    if (!integration) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "Integration not found",
+      });
+      return;
+    }
+
+    // Update integration status to disconnected and clear tokens
+    const [updatedIntegration] = await db
+      .update(schema.integrations)
+      .set({
+        status: "disconnected",
+        accessToken: null,
+        refreshToken: null,
+        tokenExpiresAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.integrations.id, integrationId))
+      .returning();
+
+    res.json({
+      success: true,
+      integration: updatedIntegration,
+    });
+  } catch (error) {
+    console.error("Error disconnecting integration:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to disconnect integration",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /admin/integrations/{id}/sync:
+ *   post:
+ *     tags:
+ *       - Admin - Integrations
+ *     summary: Trigger manual sync
+ *     description: Manually trigger a sync for a connected integration. Admin access required.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Sync triggered successfully
+ *       400:
+ *         description: Integration not connected
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post("/integrations/:id/sync", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const integrationId = req.params.id;
+
+    // Verify user is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "Admin access required",
+      });
+      return;
+    }
+
+    // Check if integration exists and belongs to user's organization
+    const [integration] = await db
+      .select()
+      .from(schema.integrations)
+      .where(
+        and(
+          eq(schema.integrations.id, integrationId),
+          eq(schema.integrations.organizationId, currentUser.organizationId)
+        )
+      )
+      .limit(1);
+
+    if (!integration) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "Integration not found",
+      });
+      return;
+    }
+
+    if (integration.status !== "connected") {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "Integration must be connected before syncing",
+      });
+      return;
+    }
+
+    // Create a sync log entry
+    const [syncLog] = await db
+      .insert(schema.syncLogs)
+      .values({
+        integrationId: integrationId,
+        status: "in_progress",
+        startedAt: new Date(),
+      })
+      .returning();
+
+    // Update lastSyncedAt timestamp
+    await db
+      .update(schema.integrations)
+      .set({
+        lastSyncedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.integrations.id, integrationId));
+
+    // TODO: Trigger actual sync job here (e.g., queue worker, background job)
+    // For now, immediately mark as success
+    await db
+      .update(schema.syncLogs)
+      .set({
+        status: "success",
+        itemsSynced: 0,
+        completedAt: new Date(),
+      })
+      .where(eq(schema.syncLogs.id, syncLog.id));
+
+    res.json({
+      success: true,
+      syncLog: {
+        ...syncLog,
+        status: "success",
+        completedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    console.error("Error syncing integration:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to trigger sync",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /admin/integrations/{id}:
+ *   patch:
+ *     tags:
+ *       - Admin - Integrations
+ *     summary: Update integration settings
+ *     description: Update configuration and metadata for an integration. Admin access required.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               metadata:
+ *                 type: object
+ *                 description: Provider-specific configuration
+ *     responses:
+ *       200:
+ *         description: Integration updated successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.patch("/integrations/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const integrationId = req.params.id;
+    const { metadata } = req.body;
+
+    // Verify user is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "Admin access required",
+      });
+      return;
+    }
+
+    // Check if integration exists and belongs to user's organization
+    const [integration] = await db
+      .select()
+      .from(schema.integrations)
+      .where(
+        and(
+          eq(schema.integrations.id, integrationId),
+          eq(schema.integrations.organizationId, currentUser.organizationId)
+        )
+      )
+      .limit(1);
+
+    if (!integration) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "Integration not found",
+      });
+      return;
+    }
+
+    // Update integration metadata
+    const [updatedIntegration] = await db
+      .update(schema.integrations)
+      .set({
+        metadata: metadata || integration.metadata,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.integrations.id, integrationId))
+      .returning();
+
+    res.json({
+      success: true,
+      integration: updatedIntegration,
+    });
+  } catch (error) {
+    console.error("Error updating integration:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to update integration",
+    });
+  }
+});
+
 export default router;
