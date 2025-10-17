@@ -5,7 +5,18 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 
-interface IngestionProgress {
+export interface SlackIntegrationMetadata {
+  team_id?: string;
+  team_name?: string;
+  bot_user_id?: string;
+  scope?: string;
+  app_id?: string;
+  selected_channels?: string[];
+  // TODO: Define complete metadata structure
+  [key: string]: any;
+}
+
+export interface IngestionProgress {
   channelsProcessed: number;
   totalChannels: number;
   messagesProcessed: number;
@@ -14,7 +25,7 @@ interface IngestionProgress {
   currentChannel?: string;
 }
 
-interface IngestionResult {
+export interface IngestionResult {
   success: boolean;
   channelsProcessed: number;
   messagesEmbedded: number;
@@ -62,7 +73,7 @@ class IngestionService {
       }
 
       // Get selected channels from metadata
-      const metadata = integration.metadata as any;
+      const metadata = integration.metadata as SlackIntegrationMetadata;
       const selectedChannels: string[] = metadata?.selected_channels || [];
 
       if (selectedChannels.length === 0) {
@@ -70,8 +81,6 @@ class IngestionService {
           "No channels selected for syncing. Please configure Slack integration first."
         );
       }
-
-      console.log(`🔄 Starting Slack sync for ${selectedChannels.length} channels`);
 
       // Create sync log
       const [syncLog] = await db
@@ -98,10 +107,6 @@ class IngestionService {
           // Get channel info
           const channelInfo = await slackService.getChannelInfo(organizationId, channelId);
           const channelName = channelInfo?.name || channelId;
-
-          console.log(
-            `📥 Fetching messages from #${channelName} (${i + 1}/${selectedChannels.length})`
-          );
 
           // Update progress
           onProgress?.({
@@ -162,12 +167,10 @@ class IngestionService {
           } while (cursor);
 
           result.channelsProcessed++;
-          console.log(`✅ Processed ${channelMessageCount} messages from #${channelName}`);
         } catch (error) {
           const errorMsg = `Failed to process channel ${channelId}: ${
             error instanceof Error ? error.message : "Unknown error"
           }`;
-          console.error(`❌ ${errorMsg}`);
           result.errors.push(errorMsg);
         }
       }
@@ -194,16 +197,8 @@ class IngestionService {
       result.success = true;
       result.duration = Date.now() - startTime;
 
-      console.log(
-        `✅ Sync complete: ${result.messagesEmbedded} messages embedded from ${result.channelsProcessed} channels in ${(
-          result.duration / 1000
-        ).toFixed(2)}s`
-      );
-
       return result;
     } catch (error) {
-      console.error("❌ Sync failed:", error);
-
       // Update sync log as failed
       if (syncLogId) {
         await db
@@ -300,8 +295,7 @@ class IngestionService {
       const namespace = `org-${organizationId}`;
       await vectorService.upsertVectors(vectors, namespace);
     } catch (error) {
-      console.error("Error processing batch:", error);
-      throw error;
+      throw new Error("Failed to process message batch", { cause: error });
     }
   }
 }

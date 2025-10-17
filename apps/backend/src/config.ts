@@ -64,6 +64,8 @@ export function validateConfig() {
     { key: "PINECONE_API_KEY", value: config.pinecone.apiKey },
     { key: "PINECONE_INDEX_NAME", value: config.pinecone.indexName },
     { key: "GEMINI_API_KEY", value: config.gemini.apiKey },
+    { key: "SLACK_CLIENT_ID", value: config.slack.clientId },
+    { key: "SLACK_CLIENT_SECRET", value: config.slack.clientSecret },
     { key: "JWT_SECRET", value: config.jwtSecret },
   ];
 

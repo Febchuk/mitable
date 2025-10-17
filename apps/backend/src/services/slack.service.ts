@@ -80,8 +80,7 @@ class SlackService {
       // Filter to only show channels the bot is a member of
       return channels.filter((ch) => ch.is_member);
     } catch (error) {
-      console.error("Error listing Slack channels:", error);
-      throw new Error("Failed to fetch Slack channels");
+      throw new Error("Failed to fetch Slack channels", { cause: error });
     }
   }
 
@@ -121,8 +120,9 @@ class SlackService {
               message_ts: msg.ts!,
             });
             permalink = permalinkResult.permalink || "";
-          } catch (error) {
-            console.error("Failed to get permalink:", error);
+          } catch (permalinkError) {
+            // Permalink fetch is non-critical, continue without it
+            permalink = "";
           }
 
           return {
@@ -142,13 +142,13 @@ class SlackService {
         hasMore: result.has_more || false,
       };
     } catch (error) {
-      console.error("Error fetching channel messages:", error);
-      throw new Error("Failed to fetch channel messages");
+      throw new Error("Failed to fetch channel messages", { cause: error });
     }
   }
 
   /**
    * Get user info (name, real_name)
+   * Returns null if user info cannot be fetched (non-critical)
    */
   async getUserInfo(organizationId: string, userId: string) {
     const client = await this.getClient(organizationId);
@@ -163,13 +163,14 @@ class SlackService {
         email: result.user?.profile?.email,
       };
     } catch (error) {
-      console.error("Error fetching user info:", error);
+      // User info fetch is non-critical, return null
       return null;
     }
   }
 
   /**
    * Get channel info (name, description)
+   * Returns null if channel info cannot be fetched (non-critical)
    */
   async getChannelInfo(organizationId: string, channelId: string) {
     const client = await this.getClient(organizationId);
@@ -185,7 +186,7 @@ class SlackService {
         purpose: result.channel?.purpose?.value,
       };
     } catch (error) {
-      console.error("Error fetching channel info:", error);
+      // Channel info fetch is non-critical, return null
       return null;
     }
   }
