@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { supabase } from "../lib/supabase.js";
+import { supabase, supabaseAdmin } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
@@ -8,8 +8,371 @@ import { eq } from "drizzle-orm";
 export const authRouter = Router();
 
 /**
- * POST /api/auth/signup
- * Create a new user account
+ * @openapi
+ * /auth/signup-organization:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Create organization and admin account
+ *     description: Register a new organization with the first admin user. This creates both the organization and the admin account in one atomic operation.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - firstName
+ *               - lastName
+ *               - organizationName
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: admin@company.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 6
+ *                 example: securePassword123
+ *               firstName:
+ *                 type: string
+ *                 example: Jane
+ *               lastName:
+ *                 type: string
+ *                 example: Smith
+ *               organizationName:
+ *                 type: string
+ *                 example: Acme Corp
+ *               organizationDomain:
+ *                 type: string
+ *                 description: Optional company email domain for auto-joining (e.g., "acme.com")
+ *                 example: acme.com
+ *     responses:
+ *       201:
+ *         description: Organization and admin created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                 session:
+ *                   $ref: '#/components/schemas/Session'
+ *                 organization:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     name:
+ *                       type: string
+ *                     domain:
+ *                       type: string
+ *                       nullable: true
+ *                 profile:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       409:
+ *         description: Conflict - Organization with this domain already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security: []
+ */
+authRouter.post("/signup-organization", async (req: Request, res: Response) => {
+  try {
+    const { email, password, firstName, lastName, organizationName, organizationDomain } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Email and password are required",
+        },
+      });
+      return;
+    }
+
+    if (!firstName || !lastName) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "First name and last name are required",
+        },
+      });
+      return;
+    }
+
+    if (!organizationName) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Organization name is required",
+        },
+      });
+      return;
+    }
+
+    // Check if user already exists in database
+    const [existingDbUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .limit(1);
+
+    if (existingDbUser) {
+      res.status(409).json({
+        success: false,
+        error: {
+          code: "EMAIL_ALREADY_EXISTS",
+          message: "A user with this email already exists",
+        },
+      });
+      return;
+    }
+
+    // Check for orphaned Supabase Auth users (exist in Auth but not in database)
+    // This can happen if a previous signup attempt created the auth user but failed to create the database profile
+    const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const orphanedAuthUser = authUsers?.users?.find((u) => u.email === email);
+
+    if (orphanedAuthUser) {
+      console.log(`Detected orphaned Supabase Auth user: ${email} (ID: ${orphanedAuthUser.id})`);
+      console.log(`Cleaning up orphaned user before proceeding with signup...`);
+
+      // Delete the orphaned auth user to allow fresh signup
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(orphanedAuthUser.id);
+
+      if (deleteError) {
+        console.error(`Failed to cleanup orphaned user:`, deleteError);
+        res.status(500).json({
+          success: false,
+          error: {
+            code: "CLEANUP_FAILED",
+            message: "Unable to cleanup incomplete previous signup. Please contact support.",
+          },
+        });
+        return;
+      }
+
+      console.log(`Successfully cleaned up orphaned user: ${email}`);
+    }
+
+    // Check if organization with same domain already exists
+    if (organizationDomain) {
+      const [existingOrg] = await db
+        .select()
+        .from(schema.organizations)
+        .where(eq(schema.organizations.domain, organizationDomain))
+        .limit(1);
+
+      if (existingOrg) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: "CONFLICT",
+            message: `An organization with the domain "${organizationDomain}" already exists`,
+          },
+        });
+        return;
+      }
+    }
+
+    // Create organization
+    const [organization] = await db
+      .insert(schema.organizations)
+      .values({
+        name: organizationName,
+        domain: organizationDomain || null,
+      })
+      .returning({
+        id: schema.organizations.id,
+        name: schema.organizations.name,
+        domain: schema.organizations.domain,
+      });
+
+    if (!organization) {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Failed to create organization",
+        },
+      });
+      return;
+    }
+
+    // Create admin user in Supabase Auth using admin API (bypasses email confirmation)
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm email for immediate access
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+        organization_id: organization.id,
+      },
+    });
+
+    if (error) {
+      console.error("Signup error:", error);
+      // Rollback: Delete the organization if user creation fails
+      await db.delete(schema.organizations).where(eq(schema.organizations.id, organization.id));
+
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "SIGNUP_FAILED",
+          message: error.message,
+        },
+      });
+      return;
+    }
+
+    // Database trigger created user with 'employee' role, update to 'admin'
+    if (data.user) {
+      await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, data.user.id));
+    }
+
+    // Auto-login: Generate session by signing in with the new credentials
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError) {
+      console.error("Auto-login error:", signInError);
+      // User is created but auto-login failed - still return success with null session
+      const [userProfile] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, data.user!.id))
+        .limit(1);
+
+      res.status(201).json({
+        success: true,
+        user: data.user,
+        session: null,
+        organization,
+        profile: userProfile,
+        message: "Organization created. Please login to continue.",
+      });
+      return;
+    }
+
+    // Fetch complete user profile
+    const [userProfile] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, data.user!.id))
+      .limit(1);
+
+    res.status(201).json({
+      success: true,
+      user: signInData.user,
+      session: signInData.session,
+      organization,
+      profile: userProfile,
+    });
+  } catch (error) {
+    console.error("Organization signup error:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to create organization and admin account",
+      },
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /auth/signup:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Create a new user account
+ *     description: Register a new user with email and password. Creates an account in Supabase Auth and a profile in the database.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - organizationId
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 6
+ *                 example: securePassword123
+ *               firstName:
+ *                 type: string
+ *                 example: John
+ *               lastName:
+ *                 type: string
+ *                 example: Doe
+ *               organizationId:
+ *                 type: string
+ *                 format: uuid
+ *                 example: 123e4567-e89b-12d3-a456-426614174000
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                 session:
+ *                   $ref: '#/components/schemas/Session'
+ *                 message:
+ *                   type: string
+ *                   example: User created successfully. Please check your email to confirm your account.
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security: []
  */
 authRouter.post("/signup", async (req: Request, res: Response) => {
   try {
@@ -90,8 +453,58 @@ authRouter.post("/signup", async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/auth/login
- * Sign in with email and password
+ * @openapi
+ * /auth/login:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Sign in with email and password
+ *     description: Authenticate an existing user and retrieve session tokens
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: securePassword123
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                 session:
+ *                   $ref: '#/components/schemas/Session'
+ *                 profile:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security: []
  */
 authRouter.post("/login", async (req: Request, res: Response) => {
   try {
@@ -143,8 +556,32 @@ authRouter.post("/login", async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/auth/logout
- * Sign out the current user
+ * @openapi
+ * /auth/logout:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Sign out the current user
+ *     description: Invalidate the current session token
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Signed out successfully
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 authRouter.post("/logout", requireAuth, async (req: Request, res: Response) => {
   try {
@@ -184,8 +621,39 @@ authRouter.post("/logout", requireAuth, async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/auth/me
- * Get current user profile
+ * @openapi
+ * /auth/me:
+ *   get:
+ *     tags:
+ *       - Authentication
+ *     summary: Get current user profile
+ *     description: Retrieve the profile of the currently authenticated user
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                 profile:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
   try {
@@ -226,8 +694,42 @@ authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/auth/refresh
- * Refresh the access token
+ * @openapi
+ * /auth/refresh:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Refresh the access token
+ *     description: Exchange a refresh token for a new access token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refresh_token
+ *             properties:
+ *               refresh_token:
+ *                 type: string
+ *                 description: JWT refresh token from previous login
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 session:
+ *                   $ref: '#/components/schemas/Session'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security: []
  */
 authRouter.post("/refresh", async (req: Request, res: Response) => {
   try {

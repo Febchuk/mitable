@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
@@ -7,8 +7,55 @@ import { requireAuth } from "../middleware/auth";
 const router = Router();
 
 /**
- * GET /api/roadmaps
- * Fetch the user's roadmap with all weeks and tasks
+ * @openapi
+ * /roadmaps:
+ *   get:
+ *     tags:
+ *       - Roadmaps
+ *     summary: Get user's onboarding roadmap
+ *     description: Retrieve the authenticated user's complete roadmap including all weeks, tasks, and completion progress
+ *     responses:
+ *       200:
+ *         description: Roadmap retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 weeks:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       number:
+ *                         type: integer
+ *                         example: 1
+ *                       percentage:
+ *                         type: integer
+ *                         description: Week completion percentage (0-100)
+ *                         example: 80
+ *                       tasks:
+ *                         type: array
+ *                         items:
+ *                           $ref: '#/components/schemas/RoadmapTask'
+ *                 currentWeek:
+ *                   type: integer
+ *                   description: Current week number in roadmap
+ *                   example: 2
+ *                 totalWeeks:
+ *                   type: integer
+ *                   description: Total weeks in roadmap
+ *                   example: 12
+ *                 status:
+ *                   type: string
+ *                   enum: [active, no_roadmap]
+ *                   example: active
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;
@@ -25,6 +72,7 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
         orderIndex: schema.userRoadmapTasks.orderIndex,
         completed: schema.userRoadmapTasks.completed,
         completedAt: schema.userRoadmapTasks.completedAt,
+        templateTaskId: schema.userRoadmapTasks.templateTaskId,
       })
       .from(schema.userRoadmapTasks)
       .where(eq(schema.userRoadmapTasks.userId, userId))
@@ -40,6 +88,46 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    // Fetch source materials for all template tasks
+    const templateTaskIds = tasks
+      .map((t) => t.templateTaskId)
+      .filter((id): id is string => id !== null);
+
+    const sourceMaterialsMap = new Map<string, any[]>();
+
+    if (templateTaskIds.length > 0) {
+      // Fetch all sources for all template tasks in a single query
+      const sourcesResult = await db
+        .select({
+          templateTaskId: schema.roadmapTemplateSources.templateTaskId,
+          sourceId: schema.sourceMaterials.id,
+          title: schema.sourceMaterials.title,
+          type: schema.sourceMaterials.type,
+          url: schema.sourceMaterials.url,
+          description: schema.sourceMaterials.description,
+        })
+        .from(schema.roadmapTemplateSources)
+        .innerJoin(
+          schema.sourceMaterials,
+          eq(schema.roadmapTemplateSources.sourceId, schema.sourceMaterials.id)
+        )
+        .where(inArray(schema.roadmapTemplateSources.templateTaskId, templateTaskIds));
+
+      // Group sources by template task ID
+      sourcesResult.forEach((source) => {
+        if (!sourceMaterialsMap.has(source.templateTaskId)) {
+          sourceMaterialsMap.set(source.templateTaskId, []);
+        }
+        sourceMaterialsMap.get(source.templateTaskId)!.push({
+          id: source.sourceId,
+          title: source.title,
+          type: source.type,
+          url: source.url,
+          description: source.description,
+        });
+      });
+    }
+
     // Group tasks by week and calculate progress
     const weekMap = new Map<number, any[]>();
     let maxWeek = 0;
@@ -52,6 +140,9 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
         weekMap.set(weekNum, []);
       }
 
+      // Get sources for this task from the template task
+      const sources = task.templateTaskId ? sourceMaterialsMap.get(task.templateTaskId) || [] : [];
+
       weekMap.get(weekNum)!.push({
         id: task.id,
         title: task.title,
@@ -61,6 +152,7 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
         completedAt: task.completedAt || null,
         week: task.weekNumber,
         orderIndex: task.orderIndex || 0,
+        sources,
       });
     });
 
@@ -99,8 +191,69 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 /**
- * PATCH /api/roadmaps/tasks/:taskId
- * Toggle a task's completion status
+ * @openapi
+ * /roadmaps/tasks/{taskId}:
+ *   patch:
+ *     tags:
+ *       - Roadmaps
+ *     summary: Update task completion status
+ *     description: Toggle a roadmap task's completion status. Only the task owner can update their tasks.
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the task to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - completed
+ *             properties:
+ *               completed:
+ *                 type: boolean
+ *                 description: New completion status
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: Task updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 task:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     completed:
+ *                       type: boolean
+ *                     completedAt:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.patch("/tasks/:taskId", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;

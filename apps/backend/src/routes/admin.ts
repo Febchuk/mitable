@@ -1,14 +1,449 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, sql, count, desc } from "drizzle-orm";
+import { eq, sql, count, desc, and, gte, lte, ne } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+import { supabaseAdmin } from "../lib/supabase";
 
 const router = Router();
 
+// Helper function to format timestamps
+function formatTimestamp(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffHours < 1) {
+    return "Less than an hour ago";
+  } else if (diffHours < 24) {
+    return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  } else if (diffDays === 1) {
+    return "1 day ago";
+  } else {
+    return `${diffDays} days ago`;
+  }
+}
+
 /**
- * GET /api/admin/users
- * Fetch all users with their onboarding progress
+ * @openapi
+ * /admin/users/{id}:
+ *   get:
+ *     tags:
+ *       - Admin - People Management
+ *     summary: Get detailed user information
+ *     description: Retrieve comprehensive user profile including roadmaps, conversations, nudges, and activity data. Admin access required.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the user to retrieve
+ *     responses:
+ *       200:
+ *         description: User details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     startDate:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                       enum: [Active, Onboarding]
+ *                     progress:
+ *                       type: integer
+ *                       description: Overall completion percentage
+ *                     manager:
+ *                       type: string
+ *                       nullable: true
+ *                     metrics:
+ *                       type: object
+ *                       properties:
+ *                         totalTasks:
+ *                           type: integer
+ *                         completedTasks:
+ *                           type: integer
+ *                         overdueTasks:
+ *                           type: integer
+ *                     assignedRoadmaps:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           title:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           tasks:
+ *                             type: integer
+ *                           completion:
+ *                             type: integer
+ *                     conversations:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           timestamp:
+ *                             type: string
+ *                           question:
+ *                             type: string
+ *                           status:
+ *                             type: string
+ *                             enum: [resolved, nudge]
+ *                     nudgeThemes:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           theme:
+ *                             type: string
+ *                           count:
+ *                             type: integer
+ *                           nudges:
+ *                             type: array
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 name:
+ *                                   type: string
+ *                                 count:
+ *                                   type: integer
+ *                     activityData:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           date:
+ *                             type: string
+ *                           hours:
+ *                             type: number
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const targetUserId = req.params.id;
+
+    // Verify user is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "Admin access required",
+      });
+      return;
+    }
+
+    // Fetch target user
+    const [user] = await db
+      .select({
+        id: schema.users.id,
+        organizationId: schema.users.organizationId,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        email: schema.users.email,
+        role: schema.users.role,
+        startDate: schema.users.startDate,
+        status: schema.users.status,
+        avatarUrl: schema.users.avatarUrl,
+        currentWeek: schema.users.currentWeek,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, targetUserId))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "User not found",
+      });
+      return;
+    }
+
+    // Verify user belongs to the same organization as the admin
+    if (user.organizationId !== currentUser.organizationId) {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "You do not have permission to view this user",
+      });
+      return;
+    }
+
+    // Get assigned roadmap templates with completion stats
+    const assignedRoadmaps = await db
+      .select({
+        templateId: schema.userTemplateAssignments.templateId,
+        templateTitle: schema.roadmapTemplates.title,
+        templateDescription: schema.roadmapTemplates.description,
+        assignedAt: schema.userTemplateAssignments.assignedAt,
+      })
+      .from(schema.userTemplateAssignments)
+      .innerJoin(
+        schema.roadmapTemplates,
+        eq(schema.userTemplateAssignments.templateId, schema.roadmapTemplates.id)
+      )
+      .where(eq(schema.userTemplateAssignments.userId, targetUserId));
+
+    // For each roadmap, calculate completion
+    const roadmapsWithStats = await Promise.all(
+      assignedRoadmaps.map(async (roadmap) => {
+        const [taskStats] = await db
+          .select({
+            total: count(),
+            completed: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
+          })
+          .from(schema.userRoadmapTasks)
+          .where(
+            and(
+              eq(schema.userRoadmapTasks.userId, targetUserId),
+              eq(schema.userRoadmapTasks.templateId, roadmap.templateId)
+            )
+          );
+
+        const totalTasks = Number(taskStats?.total || 0);
+        const completedTasks = Number(taskStats?.completed || 0);
+        const completion = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+        return {
+          id: roadmap.templateId,
+          title: roadmap.templateTitle,
+          description: roadmap.templateDescription || "",
+          tasks: totalTasks,
+          completion,
+        };
+      })
+    );
+
+    // Get recent conversations (last 5)
+    const recentConversations = await db
+      .select({
+        id: schema.conversations.id,
+        title: schema.conversations.title,
+        contextType: schema.conversations.contextType,
+        createdAt: schema.conversations.createdAt,
+      })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.userId, targetUserId))
+      .orderBy(desc(schema.conversations.createdAt))
+      .limit(5);
+
+    // For each conversation, check if it resulted in a nudge
+    const conversationsWithStatus = await Promise.all(
+      recentConversations.map(async (conv) => {
+        // Check if this conversation led to a nudge (within 1 hour)
+        const oneHourLater = new Date(conv.createdAt.getTime() + 60 * 60 * 1000);
+        const [nudgeCount] = await db
+          .select({ count: count() })
+          .from(schema.nudges)
+          .where(
+            and(
+              eq(schema.nudges.userId, targetUserId),
+              gte(schema.nudges.createdAt, conv.createdAt),
+              lte(schema.nudges.createdAt, oneHourLater)
+            )
+          );
+
+        const hasNudge = Number(nudgeCount?.count || 0) > 0;
+
+        return {
+          id: conv.id,
+          timestamp: formatTimestamp(conv.createdAt),
+          question: conv.title || "Untitled conversation",
+          status: hasNudge ? ("nudge" as const) : ("resolved" as const),
+        };
+      })
+    );
+
+    // Get common nudge themes (group by question topics)
+    const userNudges = await db
+      .select({
+        question: schema.nudges.question,
+        expertId: schema.nudges.expertId,
+        expertFirstName: schema.users.firstName,
+        expertLastName: schema.users.lastName,
+        createdAt: schema.nudges.createdAt,
+      })
+      .from(schema.nudges)
+      .leftJoin(schema.users, eq(schema.nudges.expertId, schema.users.id))
+      .where(eq(schema.nudges.userId, targetUserId))
+      .orderBy(desc(schema.nudges.createdAt));
+
+    // Group nudges by theme (simplified - just use question as theme for now)
+    const nudgeThemeMap = new Map<
+      string,
+      { count: number; nudges: Map<string, { name: string; count: number }> }
+    >();
+
+    userNudges.forEach((nudge) => {
+      const theme = nudge.question || "General question";
+      const expertName =
+        nudge.expertFirstName && nudge.expertLastName
+          ? `${nudge.expertFirstName} ${nudge.expertLastName}`
+          : "Unknown Expert";
+
+      if (!nudgeThemeMap.has(theme)) {
+        nudgeThemeMap.set(theme, {
+          count: 0,
+          nudges: new Map(),
+        });
+      }
+
+      const themeData = nudgeThemeMap.get(theme)!;
+      themeData.count++;
+
+      if (!themeData.nudges.has(expertName)) {
+        themeData.nudges.set(expertName, { name: expertName, count: 0 });
+      }
+      themeData.nudges.get(expertName)!.count++;
+    });
+
+    // Convert to array format
+    const nudgeThemes = Array.from(nudgeThemeMap.entries())
+      .map(([theme, data]) => ({
+        theme,
+        count: data.count,
+        nudges: Array.from(data.nudges.values()),
+      }))
+      .slice(0, 5); // Top 5 themes
+
+    // Calculate task metrics
+    const [taskMetrics] = await db
+      .select({
+        totalTasks: count(),
+        completedTasks: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
+        overdueTasks: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = false)`,
+      })
+      .from(schema.userRoadmapTasks)
+      .where(eq(schema.userRoadmapTasks.userId, targetUserId));
+
+    const totalTasks = Number(taskMetrics?.totalTasks || 0);
+    const completedTasks = Number(taskMetrics?.completedTasks || 0);
+    const overdueTasks = Number(taskMetrics?.overdueTasks || 0);
+    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    // Activity data (simplified - can be enhanced with actual analytics later)
+    const activityData = [
+      { date: "Oct 13", hours: 0 },
+      { date: "Yesterday", hours: 0 },
+      { date: "Today", hours: 0 },
+    ];
+
+    // Format response
+    const userDetail = {
+      id: user.id,
+      name: `${user.firstName} ${user.lastName}`,
+      role: user.role,
+      startDate: user.startDate || "N/A",
+      status: progress === 100 ? "Active" : "Onboarding",
+      progress,
+      manager: null, // TODO: Add manager relationship to schema
+      metrics: {
+        totalTasks,
+        completedTasks,
+        overdueTasks,
+      },
+      assignedRoadmaps: roadmapsWithStats,
+      conversations: conversationsWithStatus,
+      nudgeThemes,
+      activityData,
+    };
+
+    res.json({ user: userDetail });
+  } catch (error) {
+    console.error("Error fetching user detail:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to fetch user details",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /admin/users:
+ *   get:
+ *     tags:
+ *       - Admin - People Management
+ *     summary: Get all users in organization
+ *     description: Retrieve list of all employees with onboarding progress and status. Admin access required.
+ *     responses:
+ *       200:
+ *         description: Users retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       name:
+ *                         type: string
+ *                         example: John Doe
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                       role:
+ *                         type: string
+ *                       startDate:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                         enum: [Active, Onboarding]
+ *                         description: Calculated based on completion (100% = Active)
+ *                       progress:
+ *                         type: integer
+ *                         description: Overall completion percentage (0-100)
+ *                       avatarUrl:
+ *                         type: string
+ *                         nullable: true
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -29,7 +464,7 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
       return;
     }
 
-    // Fetch all users with their task completion stats
+    // Fetch all users with their task completion stats (exclude admins, filter by organization)
     const users = await db
       .select({
         id: schema.users.id,
@@ -43,7 +478,12 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
         avatarUrl: schema.users.avatarUrl,
       })
       .from(schema.users)
-      .where(eq(schema.users.role, "employee"))
+      .where(
+        and(
+          ne(schema.users.role, "admin"),
+          eq(schema.users.organizationId, currentUser.organizationId)
+        )
+      )
       .orderBy(desc(schema.users.createdAt));
 
     // Calculate progress for each user
@@ -90,8 +530,33 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
 });
 
 /**
- * GET /api/admin/templates
- * Fetch all roadmap templates with usage statistics
+ * @openapi
+ * /admin/templates:
+ *   get:
+ *     tags:
+ *       - Admin - Templates
+ *     summary: Get all roadmap templates
+ *     description: Retrieve all onboarding roadmap templates with usage statistics and task counts. Admin access required.
+ *     responses:
+ *       200:
+ *         description: Templates retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 templates:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Template'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/templates", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -112,7 +577,7 @@ router.get("/templates", requireAuth, async (req: Request, res: Response): Promi
       return;
     }
 
-    // Fetch all templates
+    // Fetch all templates for the organization
     const templates = await db
       .select({
         id: schema.roadmapTemplates.id,
@@ -125,6 +590,7 @@ router.get("/templates", requireAuth, async (req: Request, res: Response): Promi
         totalWeeks: schema.roadmapTemplates.totalWeeks,
       })
       .from(schema.roadmapTemplates)
+      .where(eq(schema.roadmapTemplates.organizationId, currentUser.organizationId))
       .orderBy(desc(schema.roadmapTemplates.createdAt));
 
     // Get usage stats and task count for each template
@@ -172,8 +638,60 @@ router.get("/templates", requireAuth, async (req: Request, res: Response): Promi
 });
 
 /**
- * GET /api/admin/integrations
- * Fetch all integrations for the user's organization
+ * @openapi
+ * /admin/integrations:
+ *   get:
+ *     tags:
+ *       - Admin - Integrations
+ *     summary: Get all integrations
+ *     description: Retrieve all third-party integrations configured for the organization. Admin access required.
+ *     responses:
+ *       200:
+ *         description: Integrations retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 integrations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       provider:
+ *                         type: string
+ *                         enum: [slack, notion, github, google-drive]
+ *                         example: slack
+ *                       name:
+ *                         type: string
+ *                         example: Slack
+ *                       description:
+ *                         type: string
+ *                         example: Get channel and DM message data. Updates four times a day.
+ *                       status:
+ *                         type: string
+ *                         enum: [connected, disconnected, pending, error]
+ *                         example: connected
+ *                       updatesPerDay:
+ *                         type: integer
+ *                         example: 4
+ *                       connectedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
  */
 router.get("/integrations", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -271,5 +789,961 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
     });
   }
 });
+
+/**
+ * @openapi
+ * /admin/users:
+ *   post:
+ *     tags:
+ *       - Admin - People Management
+ *     summary: Create a new employee account
+ *     description: Create a new employee with Supabase Auth account, database profile, and assigned roadmap templates. Generates temporary password and optionally sends welcome email with credentials. Admin access required.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - firstName
+ *               - lastName
+ *               - email
+ *               - role
+ *               - startDate
+ *               - templateIds
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 example: Jane
+ *               lastName:
+ *                 type: string
+ *                 example: Smith
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: jane.smith@company.com
+ *               role:
+ *                 type: string
+ *                 description: Employee role/title
+ *                 example: Software Engineer
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Employee start date
+ *                 example: 2025-01-15
+ *               templateIds:
+ *                 type: array
+ *                 description: Array of roadmap template IDs to assign
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 minItems: 1
+ *                 example: ["123e4567-e89b-12d3-a456-426614174000"]
+ *               sendWelcomeEmail:
+ *                 type: boolean
+ *                 description: Whether to send welcome email with credentials
+ *                 default: true
+ *     responses:
+ *       201:
+ *         description: Employee created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                     firstName:
+ *                       type: string
+ *                     lastName:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                 templatesAssigned:
+ *                   type: integer
+ *                   description: Number of templates assigned
+ *                   example: 2
+ *                 tasksCreated:
+ *                   type: integer
+ *                   description: Total tasks created from templates
+ *                   example: 45
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post("/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { firstName, lastName, email, role, startDate, templateIds, sendWelcomeEmail } = req.body;
+
+    // Verify requester is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Admin access required",
+        },
+      });
+      return;
+    }
+
+    // Validate required fields
+    if (!firstName || !lastName) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "First name and last name are required",
+        },
+      });
+      return;
+    }
+
+    if (!email) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Email is required",
+        },
+      });
+      return;
+    }
+
+    if (!role) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Role is required",
+        },
+      });
+      return;
+    }
+
+    if (!startDate) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Start date is required",
+        },
+      });
+      return;
+    }
+
+    if (!templateIds || templateIds.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "At least one template must be selected",
+        },
+      });
+      return;
+    }
+
+    // Check if email already exists in database
+    const [existingUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .limit(1);
+
+    if (existingUser) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "EMAIL_ALREADY_EXISTS",
+          message: "A user with this email already exists",
+        },
+      });
+      return;
+    }
+
+    // Generate a temporary password (user can reset via email)
+    const tempPassword = Math.random().toString(36).slice(-12) + "A1!";
+
+    // Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+        organization_id: currentUser.organizationId,
+      },
+    });
+
+    if (authError || !authData.user) {
+      console.error("Error creating user in Supabase Auth:", authError);
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "USER_CREATION_FAILED",
+          message: authError?.message || "Failed to create user",
+        },
+      });
+      return;
+    }
+
+    // Update user profile in database (trigger auto-creates it with defaults, we update with full data)
+    try {
+      // The Supabase trigger auto-creates the user record, so we update it with our custom values
+      await db
+        .update(schema.users)
+        .set({
+          role: role,
+          startDate: startDate,
+          currentWeek: 1,
+        })
+        .where(eq(schema.users.id, authData.user.id));
+    } catch (dbError) {
+      console.error("Error updating user profile:", dbError);
+      // Cleanup: Delete auth user if profile update fails
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "PROFILE_CREATION_FAILED",
+          message: "Failed to create user profile",
+        },
+      });
+      return;
+    }
+
+    // Assign templates and copy tasks
+    let totalTasksCreated = 0;
+
+    for (const templateId of templateIds) {
+      // Create template assignment
+      await db.insert(schema.userTemplateAssignments).values({
+        userId: authData.user.id,
+        templateId,
+        status: "active",
+        assignedAt: new Date(),
+      });
+
+      // Get all tasks from this template
+      const templateTasks = await db
+        .select()
+        .from(schema.roadmapTemplateTasks)
+        .where(eq(schema.roadmapTemplateTasks.templateId, templateId))
+        .orderBy(schema.roadmapTemplateTasks.weekNumber, schema.roadmapTemplateTasks.orderIndex);
+
+      // Copy tasks to user's roadmap
+      for (const task of templateTasks) {
+        await db.insert(schema.userRoadmapTasks).values({
+          userId: authData.user.id,
+          templateId: templateId,
+          templateTaskId: task.id,
+          weekNumber: task.weekNumber,
+          title: task.title,
+          description: task.description,
+          timeEstimate: task.timeEstimate,
+          orderIndex: task.orderIndex,
+          completed: false,
+        });
+        totalTasksCreated++;
+      }
+    }
+
+    // Send welcome email with password reset link if requested
+    if (sendWelcomeEmail !== false) {
+      try {
+        // Use Supabase's password reset flow to send a secure password setup email
+        const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+          redirectTo: `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password`,
+        });
+
+        if (resetError) {
+          console.error("Failed to send welcome email:", resetError);
+          // Don't fail the entire request if email fails - user is already created
+        }
+      } catch (emailError) {
+        console.error("Error sending welcome email:", emailError);
+        // Don't fail the entire request if email fails
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      user: {
+        id: authData.user.id,
+        email: authData.user.email || email,
+        firstName,
+        lastName,
+        role,
+      },
+      templatesAssigned: templateIds.length,
+      tasksCreated: totalTasksCreated,
+    });
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to create user",
+      },
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /admin/templates:
+ *   post:
+ *     tags:
+ *       - Admin - Templates
+ *     summary: Create a new roadmap template
+ *     description: Create a reusable onboarding template with optional tasks. Admin access required.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Engineering Onboarding
+ *               description:
+ *                 type: string
+ *                 example: Complete onboarding path for software engineers
+ *               icon:
+ *                 type: string
+ *                 example: Bot
+ *                 default: Settings
+ *               color:
+ *                 type: string
+ *                 example: "#3b82f6"
+ *                 default: "#3b82f6"
+ *               roleTags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["Software Engineer", "Frontend"]
+ *               totalWeeks:
+ *                 type: integer
+ *                 example: 4
+ *                 default: 4
+ *               notionUrl:
+ *                 type: string
+ *                 description: Notion page URL for future AI generation
+ *               tasks:
+ *                 type: array
+ *                 description: Optional tasks to create with template
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - weekNumber
+ *                     - title
+ *                   properties:
+ *                     weekNumber:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     timeEstimate:
+ *                       type: string
+ *                     orderIndex:
+ *                       type: integer
+ *     responses:
+ *       201:
+ *         description: Template created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 template:
+ *                   $ref: '#/components/schemas/Template'
+ *                 tasksCreated:
+ *                   type: integer
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post("/templates", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { title, description, icon, color, roleTags, totalWeeks, tasks } = req.body;
+
+    // Verify requester is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Admin access required",
+        },
+      });
+      return;
+    }
+
+    // Validate required fields
+    if (!title) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Template title is required",
+        },
+      });
+      return;
+    }
+
+    // Create the template
+    const [template] = await db
+      .insert(schema.roadmapTemplates)
+      .values({
+        organizationId: currentUser.organizationId,
+        title,
+        description: description || null,
+        icon: icon || "Settings",
+        color: color || "#3b82f6",
+        roleTags: roleTags || [],
+        totalWeeks: totalWeeks || 4,
+      })
+      .returning();
+
+    // Create tasks if provided
+    let tasksCreated = 0;
+    if (tasks && Array.isArray(tasks) && tasks.length > 0) {
+      for (const task of tasks) {
+        if (!task.weekNumber || !task.title) {
+          continue; // Skip invalid tasks
+        }
+
+        await db.insert(schema.roadmapTemplateTasks).values({
+          templateId: template.id,
+          weekNumber: task.weekNumber,
+          title: task.title,
+          description: task.description || null,
+          timeEstimate: task.timeEstimate || null,
+          orderIndex: task.orderIndex || 0,
+        });
+        tasksCreated++;
+      }
+    }
+
+    // TODO: If notionUrl is provided, implement AI generation from Notion
+    // This would involve:
+    // 1. Fetching Notion page content via API
+    // 2. Using Gemini to parse and extract tasks
+    // 3. Auto-detecting task types, relative dates, and critical items
+    // 4. Creating tasks based on AI-generated structure
+
+    res.status(201).json({
+      success: true,
+      template: {
+        id: template.id,
+        organizationId: template.organizationId,
+        title: template.title,
+        description: template.description,
+        icon: template.icon,
+        color: template.color,
+        roleTags: template.roleTags,
+        totalWeeks: template.totalWeeks,
+      },
+      tasksCreated,
+    });
+  } catch (error) {
+    console.error("Error creating template:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to create template",
+      },
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /admin/integrations/{id}/connect:
+ *   post:
+ *     tags:
+ *       - Admin - Integrations
+ *     summary: Connect an integration
+ *     description: Activate an integration connection with optional credentials. Admin access required.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Integration ID to connect
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               accessToken:
+ *                 type: string
+ *                 description: OAuth access token
+ *               refreshToken:
+ *                 type: string
+ *                 description: OAuth refresh token
+ *               metadata:
+ *                 type: object
+ *                 description: Provider-specific configuration
+ *     responses:
+ *       200:
+ *         description: Integration connected successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post(
+  "/integrations/:id/connect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const integrationId = req.params.id;
+      const { accessToken, refreshToken, metadata } = req.body;
+
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
+
+      // Check if integration exists and belongs to user's organization
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.id, integrationId),
+            eq(schema.integrations.organizationId, currentUser.organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!integration) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Integration not found",
+        });
+        return;
+      }
+
+      // Update integration status to connected
+      const [updatedIntegration] = await db
+        .update(schema.integrations)
+        .set({
+          status: "connected",
+          accessToken: accessToken || null,
+          refreshToken: refreshToken || null,
+          metadata: metadata || integration.metadata,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integrationId))
+        .returning();
+
+      res.json({
+        success: true,
+        integration: updatedIntegration,
+      });
+    } catch (error) {
+      console.error("Error connecting integration:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to connect integration",
+      });
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /admin/integrations/{id}/disconnect:
+ *   post:
+ *     tags:
+ *       - Admin - Integrations
+ *     summary: Disconnect an integration
+ *     description: Deactivate an integration connection and clear credentials. Admin access required.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Integration disconnected successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post(
+  "/integrations/:id/disconnect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const integrationId = req.params.id;
+
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
+
+      // Check if integration exists and belongs to user's organization
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.id, integrationId),
+            eq(schema.integrations.organizationId, currentUser.organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!integration) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Integration not found",
+        });
+        return;
+      }
+
+      // Update integration status to disconnected and clear tokens
+      const [updatedIntegration] = await db
+        .update(schema.integrations)
+        .set({
+          status: "disconnected",
+          accessToken: null,
+          refreshToken: null,
+          tokenExpiresAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integrationId))
+        .returning();
+
+      res.json({
+        success: true,
+        integration: updatedIntegration,
+      });
+    } catch (error) {
+      console.error("Error disconnecting integration:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to disconnect integration",
+      });
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /admin/integrations/{id}/sync:
+ *   post:
+ *     tags:
+ *       - Admin - Integrations
+ *     summary: Trigger manual sync
+ *     description: Manually trigger a sync for a connected integration. Admin access required.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Sync triggered successfully
+ *       400:
+ *         description: Integration not connected
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post(
+  "/integrations/:id/sync",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const integrationId = req.params.id;
+
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
+
+      // Check if integration exists and belongs to user's organization
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.id, integrationId),
+            eq(schema.integrations.organizationId, currentUser.organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!integration) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Integration not found",
+        });
+        return;
+      }
+
+      if (integration.status !== "connected") {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "Integration must be connected before syncing",
+        });
+        return;
+      }
+
+      // Create a sync log entry
+      const [syncLog] = await db
+        .insert(schema.syncLogs)
+        .values({
+          integrationId: integrationId,
+          status: "in_progress",
+          startedAt: new Date(),
+        })
+        .returning();
+
+      // Update lastSyncedAt timestamp
+      await db
+        .update(schema.integrations)
+        .set({
+          lastSyncedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integrationId));
+
+      // TODO: Trigger actual sync job here (e.g., queue worker, background job)
+      // For now, immediately mark as success
+      await db
+        .update(schema.syncLogs)
+        .set({
+          status: "success",
+          itemsSynced: 0,
+          completedAt: new Date(),
+        })
+        .where(eq(schema.syncLogs.id, syncLog.id));
+
+      res.json({
+        success: true,
+        syncLog: {
+          ...syncLog,
+          status: "success",
+          completedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error("Error syncing integration:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to trigger sync",
+      });
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /admin/integrations/{id}:
+ *   patch:
+ *     tags:
+ *       - Admin - Integrations
+ *     summary: Update integration settings
+ *     description: Update configuration and metadata for an integration. Admin access required.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               metadata:
+ *                 type: object
+ *                 description: Provider-specific configuration
+ *     responses:
+ *       200:
+ *         description: Integration updated successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.patch(
+  "/integrations/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const integrationId = req.params.id;
+      const { metadata } = req.body;
+
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
+
+      // Check if integration exists and belongs to user's organization
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.id, integrationId),
+            eq(schema.integrations.organizationId, currentUser.organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!integration) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Integration not found",
+        });
+        return;
+      }
+
+      // Update integration metadata
+      const [updatedIntegration] = await db
+        .update(schema.integrations)
+        .set({
+          metadata: metadata || integration.metadata,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integrationId))
+        .returning();
+
+      res.json({
+        success: true,
+        integration: updatedIntegration,
+      });
+    } catch (error) {
+      console.error("Error updating integration:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to update integration",
+      });
+    }
+  }
+);
 
 export default router;

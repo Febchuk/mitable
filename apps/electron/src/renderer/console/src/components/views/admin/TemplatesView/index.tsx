@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -18,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAdmin } from "@/console/src/context/AdminContext";
+import { useTemplates } from "@/console/src/hooks/queries/admin";
 
 // Map icon names to Lucide components
 const iconMap: Record<string, LucideIcon> = {
@@ -37,7 +38,18 @@ const iconMap: Record<string, LucideIcon> = {
 
 export default function TemplatesView() {
   const navigate = useNavigate();
-  const { templates, loading, error } = useAdmin();
+  const { data: templates = [], isLoading: loading, error } = useTemplates();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter templates based on search query
+  const filteredTemplates = templates.filter((template) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      template.title.toLowerCase().includes(query) ||
+      template.description?.toLowerCase().includes(query) ||
+      template.roleTags?.some((tag) => tag.toLowerCase().includes(query))
+    );
+  });
 
   return (
     <div className="p-8 space-y-6">
@@ -55,6 +67,8 @@ export default function TemplatesView() {
             />
             <Input
               placeholder="Search templates..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
             />
           </div>
@@ -86,11 +100,15 @@ export default function TemplatesView() {
             Loading templates...
           </div>
         ) : error ? (
-          <div className="col-span-2 text-center text-status-error py-12">Error: {error}</div>
-        ) : templates.length === 0 ? (
-          <div className="col-span-2 text-center text-text-secondary py-12">No templates found</div>
+          <div className="col-span-2 text-center text-status-error py-12">
+            Error: {error.message}
+          </div>
+        ) : filteredTemplates.length === 0 ? (
+          <div className="col-span-2 text-center text-text-secondary py-12">
+            {searchQuery ? `No templates found matching "${searchQuery}"` : "No templates found"}
+          </div>
         ) : (
-          templates.map((template) => {
+          filteredTemplates.map((template) => {
             const IconComponent = iconMap[template.icon] || Settings;
             return (
               <div

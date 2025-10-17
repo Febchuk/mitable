@@ -8,6 +8,14 @@ export interface Week {
   tasks: Task[];
 }
 
+export interface SourceMaterial {
+  id: string;
+  title: string;
+  type: string;
+  url?: string;
+  description?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -16,6 +24,7 @@ export interface Task {
   completed: boolean;
   isActive?: boolean;
   week: number;
+  sources?: SourceMaterial[];
 }
 
 // Nudge types
@@ -61,6 +70,7 @@ export interface Chat {
 export type UserRole = "admin" | "employee";
 
 export interface User {
+  id: string;
   name: string;
   firstName: string;
   avatarUrl?: string;

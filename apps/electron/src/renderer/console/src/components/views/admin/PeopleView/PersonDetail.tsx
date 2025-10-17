@@ -1,98 +1,12 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
-
-// User roadmap instance (created from template, personalized for this user)
-interface UserRoadmapInstance {
-  id: string;
-  title: string;
-  tasks: number;
-  completion: number; // User-specific completion percentage
-  description: string;
-}
-
-// Mock data for the selected person
-const mockPersonData = {
-  "1": {
-    id: "1",
-    name: "Sarah Chen",
-    role: "Software Engineer",
-    startDate: "Oct 1, 2025",
-    status: "Onboarding" as const,
-    progress: 60,
-    manager: { name: "Alex Thompson", id: "manager-1" },
-    metrics: {
-      totalTasks: 12,
-      completedTasks: 8,
-      overdueTasks: 2,
-    },
-    assignedRoadmaps: [
-      {
-        id: "1",
-        title: "Engineering Onboarding",
-        tasks: 12,
-        completion: 60,
-        description: "Technical setup, codebase intro, first PR",
-      },
-      {
-        id: "2",
-        title: "Company Onboarding (All Roles)",
-        tasks: 8,
-        completion: 100,
-        description: "Company culture, tools, policies, team intros",
-      },
-    ] as UserRoadmapInstance[],
-    conversations: [
-      {
-        id: "1",
-        timestamp: "2 hours ago",
-        question: "How do I set up my development environment?",
-        status: "resolved" as const,
-      },
-      {
-        id: "2",
-        timestamp: "1 day ago",
-        question: "I need access to the CI/CD pipeline for deployments",
-        status: "nudge" as const,
-      },
-      {
-        id: "3",
-        timestamp: "2 days ago",
-        question: "What's the code review process here?",
-        status: "resolved" as const,
-      },
-    ],
-    nudgeThemes: [
-      {
-        theme: "Development environment setup",
-        count: 3,
-        nudges: [
-          { name: "Alex Thompson", count: 2 },
-          { name: "Jordan Lee", count: 1 },
-        ],
-      },
-      {
-        theme: "Code review process",
-        count: 2,
-        nudges: [{ name: "Alex Thompson", count: 2 }],
-      },
-      {
-        theme: "CI/CD pipeline access",
-        count: 1,
-        nudges: [{ name: "DevOps Team", count: 1 }],
-      },
-    ],
-    activityData: [
-      { date: "Oct 13", hours: 6 },
-      { date: "Yesterday", hours: 4 },
-      { date: "Today", hours: 1 },
-    ],
-  },
-};
+import { fetchUserDetail, type UserDetail } from "@/console/src/services/adminService";
 
 const chartConfig = {
   hours: {
@@ -104,13 +18,58 @@ const chartConfig = {
 export default function PersonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [person, setPerson] = useState<UserDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const person = id ? mockPersonData[id as keyof typeof mockPersonData] : null;
+  useEffect(() => {
+    if (!id) {
+      setError("No user ID provided");
+      setLoading(false);
+      return;
+    }
 
-  if (!person) {
+    const loadUserDetail = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const userData = await fetchUserDetail(id);
+        setPerson(userData);
+      } catch (err) {
+        console.error("Failed to load user detail:", err);
+        setError(err instanceof Error ? err.message : "Failed to load user details");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserDetail();
+  }, [id]);
+
+  if (loading) {
     return (
       <div className="p-8">
-        <p className="text-text-primary">Person not found</p>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+            <p className="text-sm text-text-secondary">Loading user details...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !person) {
+    return (
+      <div className="p-8">
+        <button
+          onClick={() => navigate("/people")}
+          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-4"
+        >
+          <ArrowLeft size={16} />
+          <span className="text-sm">Back to People</span>
+        </button>
+        <p className="text-status-error">{error || "Person not found"}</p>
       </div>
     );
   }
@@ -134,7 +93,9 @@ export default function PersonDetail() {
               <Badge className="bg-background-elevated text-text-secondary border-transparent hover:bg-background-elevated">
                 {person.role}
               </Badge>
-              <span className="text-text-secondary">Manager: {person.manager.name}</span>
+              {person.manager && (
+                <span className="text-text-secondary">Manager: {person.manager.name}</span>
+              )}
             </div>
           </div>
 
@@ -185,31 +146,37 @@ export default function PersonDetail() {
       <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
         <div>
           <h2 className="text-xl font-semibold text-text-primary mb-1">Assigned Roadmaps</h2>
-          <p className="text-sm text-text-secondary">Sarah's active onboarding paths</p>
+          <p className="text-sm text-text-secondary">
+            {person.name.split(" ")[0]}'s active onboarding paths
+          </p>
         </div>
 
         <div className="space-y-3">
-          {person.assignedRoadmaps.map((roadmap) => (
-            <div
-              key={roadmap.id}
-              className="bg-background-secondary rounded-lg border border-border-subtle p-4 space-y-2"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-text-primary font-semibold">{roadmap.title}</h3>
-                <span
-                  className={`text-sm font-semibold ${
-                    roadmap.completion === 100 ? "text-status-success" : "text-primary"
-                  }`}
-                >
-                  {roadmap.completion}% complete
-                </span>
+          {person.assignedRoadmaps.length === 0 ? (
+            <p className="text-center text-text-secondary py-4">No roadmaps assigned yet</p>
+          ) : (
+            person.assignedRoadmaps.map((roadmap) => (
+              <div
+                key={roadmap.id}
+                className="bg-background-secondary rounded-lg border border-border-subtle p-4 space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-text-primary font-semibold">{roadmap.title}</h3>
+                  <span
+                    className={`text-sm font-semibold ${
+                      roadmap.completion === 100 ? "text-status-success" : "text-primary"
+                    }`}
+                  >
+                    {roadmap.completion}% complete
+                  </span>
+                </div>
+                <p className="text-sm text-text-secondary">
+                  {roadmap.tasks} tasks • {roadmap.description}
+                </p>
+                <Progress value={roadmap.completion} className="h-2 bg-border-subtle" />
               </div>
-              <p className="text-sm text-text-secondary">
-                {roadmap.tasks} tasks • {roadmap.description}
-              </p>
-              <Progress value={roadmap.completion} className="h-2 bg-border-subtle" />
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
@@ -221,29 +188,35 @@ export default function PersonDetail() {
         </div>
 
         <div className="space-y-3">
-          {person.conversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              className="flex items-start justify-between p-3 bg-background-secondary rounded-lg border border-border-subtle"
-            >
-              <div className="flex-1">
-                <p className="text-xs text-text-secondary mb-1">{conversation.timestamp}</p>
-                <p className="text-text-primary">{conversation.question}</p>
-              </div>
-              <Badge
-                className={
-                  conversation.status === "resolved"
-                    ? "bg-status-success/20 text-status-success border-transparent"
-                    : "bg-status-warning/20 text-status-warning border-transparent"
-                }
+          {person.conversations.length === 0 ? (
+            <p className="text-center text-text-secondary py-4">No conversations yet</p>
+          ) : (
+            person.conversations.map((conversation) => (
+              <div
+                key={conversation.id}
+                className="flex items-start justify-between p-3 bg-background-secondary rounded-lg border border-border-subtle"
               >
-                {conversation.status === "resolved" ? "Resolved by Mitable" : "Required a nudge"}
-              </Badge>
-            </div>
-          ))}
+                <div className="flex-1">
+                  <p className="text-xs text-text-secondary mb-1">{conversation.timestamp}</p>
+                  <p className="text-text-primary">{conversation.question}</p>
+                </div>
+                <Badge
+                  className={
+                    conversation.status === "resolved"
+                      ? "bg-status-success/20 text-status-success border-transparent"
+                      : "bg-status-warning/20 text-status-warning border-transparent"
+                  }
+                >
+                  {conversation.status === "resolved" ? "Resolved by Mitable" : "Required a nudge"}
+                </Badge>
+              </div>
+            ))
+          )}
         </div>
 
-        <button className="text-sm text-primary hover:underline">View All Conversations</button>
+        {person.conversations.length > 0 && (
+          <button className="text-sm text-primary hover:underline">View All Conversations</button>
+        )}
       </div>
 
       {/* Common Nudge Themes and Platform Activity */}
@@ -252,33 +225,42 @@ export default function PersonDetail() {
         <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
           <div>
             <h2 className="text-xl font-semibold text-text-primary mb-1">Common Nudge Themes</h2>
-            <p className="text-sm text-text-secondary">Topics where Sarah needed human help</p>
+            <p className="text-sm text-text-secondary">
+              Topics where {person.name.split(" ")[0]} needed human help
+            </p>
           </div>
 
           <div className="space-y-3">
-            {person.nudgeThemes.map((theme, index) => (
-              <div
-                key={index}
-                className="bg-background-secondary rounded-lg border border-border-subtle p-4 space-y-2"
-              >
-                <h3 className="text-text-primary font-semibold">{theme.theme}</h3>
-                <p className="text-sm text-text-secondary">{theme.count} times</p>
-                <p className="text-xs text-text-secondary">
-                  Nudged:{" "}
-                  {theme.nudges.map((person, i) => (
-                    <span key={i}>
-                      {person.name} ({person.count}x){i < theme.nudges.length - 1 ? ", " : ""}
-                    </span>
-                  ))}
-                </p>
-              </div>
-            ))}
+            {person.nudgeThemes.length === 0 ? (
+              <p className="text-center text-text-secondary py-4">No nudges yet</p>
+            ) : (
+              person.nudgeThemes.map((theme, index) => (
+                <div
+                  key={index}
+                  className="bg-background-secondary rounded-lg border border-border-subtle p-4 space-y-2"
+                >
+                  <h3 className="text-text-primary font-semibold">{theme.theme}</h3>
+                  <p className="text-sm text-text-secondary">{theme.count} times</p>
+                  <p className="text-xs text-text-secondary">
+                    Nudged:{" "}
+                    {theme.nudges.map((nudgedPerson, i) => (
+                      <span key={i}>
+                        {nudgedPerson.name} ({nudgedPerson.count}x)
+                        {i < theme.nudges.length - 1 ? ", " : ""}
+                      </span>
+                    ))}
+                  </p>
+                </div>
+              ))
+            )}
           </div>
 
-          <div className="space-y-2">
-            <p className="text-xs text-text-secondary italic">Auto generated by AI</p>
-            <button className="text-sm text-primary hover:underline">View All Nudges</button>
-          </div>
+          {person.nudgeThemes.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-text-secondary italic">Auto generated by AI</p>
+              <button className="text-sm text-primary hover:underline">View All Nudges</button>
+            </div>
+          )}
         </div>
 
         {/* Platform Activity */}

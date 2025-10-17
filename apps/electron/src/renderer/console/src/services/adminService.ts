@@ -34,6 +34,51 @@ export interface Integration {
   connectedAt?: Date;
 }
 
+export interface UserRoadmapInstance {
+  id: string;
+  title: string;
+  tasks: number;
+  completion: number;
+  description: string;
+}
+
+export interface Conversation {
+  id: string;
+  timestamp: string;
+  question: string;
+  status: "resolved" | "nudge";
+}
+
+export interface NudgeTheme {
+  theme: string;
+  count: number;
+  nudges: Array<{ name: string; count: number }>;
+}
+
+export interface ActivityData {
+  date: string;
+  hours: number;
+}
+
+export interface UserDetail {
+  id: string;
+  name: string;
+  role: string;
+  startDate: string;
+  status: "Onboarding" | "Active";
+  progress: number;
+  manager: { name: string; id: string } | null;
+  metrics: {
+    totalTasks: number;
+    completedTasks: number;
+    overdueTasks: number;
+  };
+  assignedRoadmaps: UserRoadmapInstance[];
+  conversations: Conversation[];
+  nudgeThemes: NudgeTheme[];
+  activityData: ActivityData[];
+}
+
 /**
  * Fetch all users (admin only)
  */
@@ -69,6 +114,197 @@ export async function fetchIntegrations(): Promise<Integration[]> {
     return response.integrations;
   } catch (error) {
     console.error("Error fetching integrations:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch detailed information for a single user (admin only)
+ */
+export async function fetchUserDetail(userId: string): Promise<UserDetail> {
+  try {
+    const response = await apiRequest<{ user: UserDetail }>(`/admin/users/${userId}`);
+    return response.user;
+  } catch (error) {
+    console.error("Error fetching user detail:", error);
+    throw error;
+  }
+}
+
+export interface CreateUserPayload {
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string; // Job title (e.g., "Software Engineer", "Product Designer")
+  startDate: string;
+  templateIds: string[];
+  sendWelcomeEmail: boolean;
+}
+
+export interface CreateUserResponse {
+  success: boolean;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+  };
+  templatesAssigned: number;
+  tasksCreated: number;
+}
+
+/**
+ * Create a new user (admin only)
+ */
+export async function createUser(payload: CreateUserPayload): Promise<CreateUserResponse> {
+  try {
+    const response = await apiRequest<CreateUserResponse>("/admin/users", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return response;
+  } catch (error) {
+    console.error("Error creating user:", error);
+    throw error;
+  }
+}
+
+export interface ConnectIntegrationPayload {
+  accessToken?: string;
+  refreshToken?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface IntegrationResponse {
+  success: boolean;
+  integration: Integration;
+}
+
+export interface SyncResponse {
+  success: boolean;
+  syncLog: {
+    id: string;
+    integrationId: string;
+    status: string;
+    startedAt: Date;
+    completedAt?: Date;
+  };
+}
+
+/**
+ * Connect an integration (admin only)
+ */
+export async function connectIntegration(
+  integrationId: string,
+  payload?: ConnectIntegrationPayload
+): Promise<IntegrationResponse> {
+  try {
+    const response = await apiRequest<IntegrationResponse>(
+      `/admin/integrations/${integrationId}/connect`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload || {}),
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error connecting integration:", error);
+    throw error;
+  }
+}
+
+/**
+ * Disconnect an integration (admin only)
+ */
+export async function disconnectIntegration(integrationId: string): Promise<IntegrationResponse> {
+  try {
+    const response = await apiRequest<IntegrationResponse>(
+      `/admin/integrations/${integrationId}/disconnect`,
+      {
+        method: "POST",
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error disconnecting integration:", error);
+    throw error;
+  }
+}
+
+/**
+ * Trigger manual sync for an integration (admin only)
+ */
+export async function syncIntegration(integrationId: string): Promise<SyncResponse> {
+  try {
+    const response = await apiRequest<SyncResponse>(`/admin/integrations/${integrationId}/sync`, {
+      method: "POST",
+    });
+    return response;
+  } catch (error) {
+    console.error("Error syncing integration:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update integration settings (admin only)
+ */
+export async function updateIntegrationSettings(
+  integrationId: string,
+  metadata: Record<string, any>
+): Promise<IntegrationResponse> {
+  try {
+    const response = await apiRequest<IntegrationResponse>(`/admin/integrations/${integrationId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ metadata }),
+    });
+    return response;
+  } catch (error) {
+    console.error("Error updating integration settings:", error);
+    throw error;
+  }
+}
+
+export interface TemplateTask {
+  weekNumber: number;
+  title: string;
+  description?: string;
+  timeEstimate?: string;
+  orderIndex?: number;
+}
+
+export interface CreateTemplatePayload {
+  title: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  roleTags?: string[];
+  totalWeeks?: number;
+  notionUrl?: string;
+  tasks?: TemplateTask[];
+}
+
+export interface CreateTemplateResponse {
+  success: boolean;
+  template: Template;
+  tasksCreated: number;
+}
+
+/**
+ * Create a new roadmap template (admin only)
+ */
+export async function createTemplate(
+  payload: CreateTemplatePayload
+): Promise<CreateTemplateResponse> {
+  try {
+    const response = await apiRequest<CreateTemplateResponse>("/admin/templates", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return response;
+  } catch (error) {
+    console.error("Error creating template:", error);
     throw error;
   }
 }

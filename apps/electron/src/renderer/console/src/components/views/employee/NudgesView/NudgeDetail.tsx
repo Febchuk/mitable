@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { useNudges } from "../../../../context/NudgesContext";
+import { useNudges } from "@/console/src/hooks/queries/nudges";
 import { Badge } from "@/components/ui/badge";
 
 function getInitials(name: string): string {
@@ -32,7 +32,7 @@ function formatTimestamp(date: Date): string {
 export default function NudgeDetail() {
   const { nudgeId } = useParams<{ nudgeId: string }>();
   const navigate = useNavigate();
-  const { nudges } = useNudges();
+  const { data: nudges = [] } = useNudges();
 
   const nudge = nudges.find((n) => n.id === nudgeId);
 

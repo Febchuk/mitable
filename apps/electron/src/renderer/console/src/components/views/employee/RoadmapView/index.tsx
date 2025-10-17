@@ -1,18 +1,57 @@
-import { useRoadmap } from "../../../../context/RoadmapContext";
+import { useState } from "react";
+import { useRoadmap, useToggleTask } from "@/console/src/hooks/queries/roadmap";
 import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function RoadmapView() {
-  const { weeks, currentWeek, setCurrentWeek, toggleTask } = useRoadmap();
+  const { data: roadmap, isLoading, error } = useRoadmap();
+  const toggleTaskMutation = useToggleTask();
   const navigate = useNavigate();
+  const [currentWeek, setCurrentWeek] = useState(roadmap?.currentWeek || 1);
+
+  // Extract weeks from roadmap data
+  const weeks = roadmap?.weeks || [];
 
   // Calculate overall progress
   const allTasks = weeks.flatMap((w) => w.tasks);
   const completedTasks = allTasks.filter((t) => t.completed).length;
   const totalTasks = allTasks.length;
   const overallProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  const handleToggleTask = (taskId: string) => {
+    // Find current completion status
+    let currentCompleted = false;
+    for (const week of weeks) {
+      const task = week.tasks.find((t) => t.id === taskId);
+      if (task) {
+        currentCompleted = task.completed;
+        break;
+      }
+    }
+
+    toggleTaskMutation.mutate({
+      taskId,
+      completed: !currentCompleted,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8">
+        <div className="text-center text-text-secondary">Loading roadmap...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="text-center text-status-error">Error loading roadmap</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-6 app-no-drag">
@@ -62,7 +101,7 @@ export default function RoadmapView() {
                     {/* Checkbox */}
                     <Checkbox
                       checked={task.completed}
-                      onCheckedChange={() => toggleTask(task.id)}
+                      onCheckedChange={() => handleToggleTask(task.id)}
                       className="flex-shrink-0"
                     />
 

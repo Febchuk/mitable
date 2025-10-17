@@ -17,6 +17,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { useCreateTemplate } from "@/console/src/hooks/queries/admin";
+import { useToast } from "@/hooks/use-toast";
 
 const availableRoles = [
   "Software Engineer",
@@ -35,6 +37,8 @@ const availableRoles = [
 
 export default function CreateTemplate() {
   const navigate = useNavigate();
+  const createTemplateMutation = useCreateTemplate();
+  const { toast } = useToast();
 
   // Form state
   const [templateName, setTemplateName] = useState("");
@@ -56,6 +60,44 @@ export default function CreateTemplate() {
 
   const handleRemoveTag = (tagToRemove: string) => {
     setRoleTags(roleTags.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleImportTemplate = async () => {
+    // Validate required fields
+    if (!templateName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Template name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await createTemplateMutation.mutateAsync({
+        title: templateName.trim(),
+        icon: "Settings", // Default icon, can be customized later
+        color: "#3b82f6", // Default color
+        roleTags: roleTags,
+        totalWeeks: 4, // Default
+        notionUrl: notionUrl.trim() || undefined,
+        // TODO: Add tasks array when implementing task builder
+        // For now, creates an empty template
+      });
+
+      toast({
+        title: "Success",
+        description: `Template "${templateName}" created successfully!`,
+      });
+
+      navigate("/templates");
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create template",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -278,12 +320,17 @@ export default function CreateTemplate() {
             <Button
               variant="outline"
               onClick={() => navigate("/templates")}
+              disabled={createTemplateMutation.isPending}
               className="bg-transparent border-border-subtle text-text-primary hover:bg-background-elevated"
             >
               Cancel
             </Button>
-            <Button className="bg-primary text-white hover:bg-primary/90">
-              Import & Generate Template
+            <Button
+              onClick={handleImportTemplate}
+              disabled={createTemplateMutation.isPending || !templateName.trim()}
+              className="bg-primary text-white hover:bg-primary/90"
+            >
+              {createTemplateMutation.isPending ? "Creating..." : "Import & Generate Template"}
             </Button>
           </div>
 

@@ -1,12 +1,15 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { useRoadmap } from "../../../../context/RoadmapContext";
+import { useRoadmap, useToggleTask } from "@/console/src/hooks/queries/roadmap";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function RoadmapTaskDetail() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
-  const { weeks, toggleTask } = useRoadmap();
+  const { data: roadmap } = useRoadmap();
+  const toggleTaskMutation = useToggleTask();
+
+  const weeks = roadmap?.weeks || [];
 
   // Find the task across all weeks
   const task = weeks.flatMap((week) => week.tasks).find((t) => t.id === taskId);
@@ -48,7 +51,9 @@ export default function RoadmapTaskDetail() {
 
           <Checkbox
             checked={task.completed}
-            onCheckedChange={() => toggleTask(task.id)}
+            onCheckedChange={() =>
+              toggleTaskMutation.mutate({ taskId: task.id, completed: !task.completed })
+            }
             className="mt-2"
           />
         </div>
@@ -73,12 +78,51 @@ export default function RoadmapTaskDetail() {
         </div>
       </div>
 
-      {/* Placeholder for additional content */}
+      {/* Resources Section */}
       <div className="bg-background-elevated rounded-lg border border-border-subtle p-6">
         <h2 className="text-xl font-semibold text-text-primary mb-4">Resources</h2>
-        <p className="text-text-secondary text-center py-8">
-          Resources and materials will be displayed here
-        </p>
+        {task.sources && task.sources.length > 0 ? (
+          <div className="space-y-3">
+            {task.sources.map((source) => (
+              <div
+                key={source.id}
+                className="p-4 bg-background-primary rounded-lg border border-border-subtle hover:border-border-hover transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  {/* Type badge */}
+                  <span className="px-2 py-1 text-xs font-medium bg-accent-secondary/10 text-accent-secondary rounded capitalize shrink-0">
+                    {source.type}
+                  </span>
+
+                  <div className="flex-1 min-w-0">
+                    {/* Title (clickable if URL exists) */}
+                    {source.url ? (
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-text-primary hover:text-accent-primary transition-colors"
+                      >
+                        {source.title}
+                      </a>
+                    ) : (
+                      <p className="font-medium text-text-primary">{source.title}</p>
+                    )}
+
+                    {/* Description */}
+                    {source.description && (
+                      <p className="text-sm text-text-secondary mt-1">{source.description}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-text-secondary text-center py-8">
+            No resources available for this task
+          </p>
+        )}
       </div>
     </div>
   );

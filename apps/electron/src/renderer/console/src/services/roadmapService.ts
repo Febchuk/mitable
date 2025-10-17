@@ -1,5 +1,13 @@
 import { apiRequest } from "./api";
 
+export interface SourceMaterial {
+  id: string;
+  title: string;
+  type: string;
+  url?: string;
+  description?: string;
+}
+
 export interface RoadmapTask {
   id: string;
   title: string;
@@ -9,6 +17,7 @@ export interface RoadmapTask {
   completedAt?: Date | null;
   week: number;
   orderIndex?: number;
+  sources?: SourceMaterial[];
 }
 
 export interface Week {

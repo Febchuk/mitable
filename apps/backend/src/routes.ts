@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { authRouter } from "./routes/auth.js";
 import { requireAuth, optionalAuth } from "./middleware/auth.js";
-import roadmapsRouter from "./routes/roadmaps";
-import nudgesRouter from "./routes/nudges";
-import conversationsRouter from "./routes/conversations";
-import adminRouter from "./routes/admin";
+import roadmapsRouter from "./routes/roadmaps.js";
+import nudgesRouter from "./routes/nudges.js";
+import conversationsRouter from "./routes/conversations.js";
+import adminRouter from "./routes/admin.js";
 
 export const router = Router();
 

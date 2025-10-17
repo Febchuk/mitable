@@ -32,6 +32,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const response = await authService.getMe(token);
 
         setUser({
+          id: response.profile.id,
           name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
           firstName: response.profile.firstName || "",
           avatarUrl: response.profile.avatarUrl || undefined,
@@ -53,6 +54,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
             // Try loading user again with new token
             const response = await authService.getMe(refreshResponse.session.access_token);
             setUser({
+              id: response.profile.id,
               name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
               firstName: response.profile.firstName || "",
               avatarUrl: response.profile.avatarUrl || undefined,

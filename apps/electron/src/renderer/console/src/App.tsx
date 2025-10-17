@@ -1,11 +1,12 @@
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { queryClient } from "./lib/queryClient";
 import { UserProvider, useUser } from "./context/UserContext";
-import { AdminProvider } from "./context/AdminContext";
-import { RoadmapProvider } from "./context/RoadmapContext";
-import { NudgesProvider } from "./context/NudgesContext";
-import { ChatsProvider } from "./context/ChatsContext";
+import { Toaster } from "@/components/ui/toaster";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
 import LoginPage from "./pages/LoginPage";
+import SignupOrganizationPage from "./pages/SignupOrganizationPage";
 import HomeView from "./components/views/employee/HomeView";
 import RoadmapView from "./components/views/employee/RoadmapView";
 import RoadmapTaskDetail from "./components/views/employee/RoadmapView/RoadmapTaskDetail";
@@ -54,52 +55,49 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <HashRouter>
-      <UserProvider>
-        <AdminProvider>
-          <RoadmapProvider>
-            <NudgesProvider>
-              <ChatsProvider>
-                <Routes>
-                  {/* Public route */}
-                  <Route path="/login" element={<LoginPage />} />
+    <QueryClientProvider client={queryClient}>
+      <HashRouter>
+        <UserProvider>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup-organization" element={<SignupOrganizationPage />} />
 
-                  {/* Protected routes */}
-                  <Route
-                    path="/"
-                    element={
-                      <ProtectedRoute>
-                        <ConsoleLayout />
-                      </ProtectedRoute>
-                    }
-                  >
-                    <Route index element={<DefaultRoute />} />
-                    {/* Admin Routes */}
-                    <Route path="dashboard" element={<DashboardView />} />
-                    <Route path="people" element={<PeopleView />} />
-                    <Route path="people/new" element={<AddNewUser />} />
-                    <Route path="people/:id" element={<PersonDetail />} />
-                    <Route path="templates" element={<TemplatesView />} />
-                    <Route path="templates/new" element={<CreateTemplate />} />
-                    <Route path="integrations" element={<IntegrationsView />} />
-                    <Route path="setup" element={<SetupView />} />
-                    {/* Employee Routes */}
-                    <Route path="home" element={<HomeView />} />
-                    <Route path="roadmap" element={<RoadmapView />} />
-                    <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
-                    <Route path="nudges" element={<NudgesView />} />
-                    <Route path="nudges/:nudgeId" element={<NudgeDetail />} />
-                    <Route path="chats" element={<ChatsView />} />
-                    <Route path="chats/new" element={<NewChat />} />
-                    <Route path="chats/:chatId" element={<ChatDetail />} />
-                  </Route>
-                </Routes>
-              </ChatsProvider>
-            </NudgesProvider>
-          </RoadmapProvider>
-        </AdminProvider>
-      </UserProvider>
-    </HashRouter>
+            {/* Protected routes */}
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <ConsoleLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<DefaultRoute />} />
+              {/* Admin Routes */}
+              <Route path="dashboard" element={<DashboardView />} />
+              <Route path="people" element={<PeopleView />} />
+              <Route path="people/new" element={<AddNewUser />} />
+              <Route path="people/:id" element={<PersonDetail />} />
+              <Route path="templates" element={<TemplatesView />} />
+              <Route path="templates/new" element={<CreateTemplate />} />
+              <Route path="integrations" element={<IntegrationsView />} />
+              <Route path="setup" element={<SetupView />} />
+              {/* Employee Routes */}
+              <Route path="home" element={<HomeView />} />
+              <Route path="roadmap" element={<RoadmapView />} />
+              <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
+              <Route path="nudges" element={<NudgesView />} />
+              <Route path="nudges/:nudgeId" element={<NudgeDetail />} />
+              <Route path="chats" element={<ChatsView />} />
+              <Route path="chats/new" element={<NewChat />} />
+              <Route path="chats/:chatId" element={<ChatDetail />} />
+            </Route>
+          </Routes>
+          <Toaster />
+        </UserProvider>
+      </HashRouter>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

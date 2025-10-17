@@ -1,22 +1,31 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowUp } from "lucide-react";
-import { useChats } from "../../../../context/ChatsContext";
+import { useCreateConversation } from "@/console/src/hooks/queries/chats";
 
 export default function NewChat() {
   const navigate = useNavigate();
-  const { createNewChat } = useChats();
+  const createConversationMutation = useCreateConversation();
   const [inputValue, setInputValue] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
 
-    // Create new chat with first message
-    const newChatId = createNewChat(inputValue.trim());
+    try {
+      // Create new chat with first message
+      const result = await createConversationMutation.mutateAsync({
+        title: inputValue.slice(0, 50) + (inputValue.length > 50 ? "..." : ""),
+        contextType: "general",
+        initialMessage: inputValue.trim(),
+      });
 
-    // Navigate to the new chat detail page
-    navigate(`/chats/${newChatId}`);
+      // Navigate to the new chat detail page
+      navigate(`/chats/${result.conversation.id}`);
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+      // TODO: Show error toast
+    }
   };
 
   return (

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Filter, Plus } from "lucide-react";
 import {
@@ -12,11 +13,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { useAdmin } from "@/console/src/context/AdminContext";
+import { useUsers } from "@/console/src/hooks/queries/admin";
 
 export default function PeopleView() {
   const navigate = useNavigate();
-  const { users, loading, error } = useAdmin();
+  const { data: users = [], isLoading: loading, error } = useUsers();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter users based on search query
+  const filteredUsers = users.filter((user) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      user.name.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query) ||
+      user.role.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <div className="p-8 space-y-6">
@@ -34,6 +46,8 @@ export default function PeopleView() {
             />
             <Input
               placeholder="Search people..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
             />
           </div>
@@ -90,17 +104,17 @@ export default function PeopleView() {
             ) : error ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-status-error py-8">
-                  Error: {error}
+                  Error: {error.message}
                 </TableCell>
               </TableRow>
-            ) : users.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-text-secondary py-8">
-                  No users found
+                  {searchQuery ? `No people found matching "${searchQuery}"` : "No users found"}
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((employee) => (
+              filteredUsers.map((employee) => (
                 <TableRow
                   key={employee.id}
                   className="border-border-subtle hover:bg-background-primary/50 cursor-pointer"

@@ -1031,6 +1031,256 @@ async function seedTemplates(organizationId: string, _materials: schema.SourceMa
   return templates;
 }
 
+async function linkTasksToSources(materials: schema.SourceMaterial[]) {
+  console.log("🔗 Linking tasks to source materials...");
+
+  // Fetch all roadmap template tasks
+  const allTasks = await db.query.roadmapTemplateTasks.findMany();
+
+  const junctionEntries: schema.NewRoadmapTemplateSource[] = [];
+
+  // Helper function to find materials by keywords
+  const findMaterialsByKeywords = (
+    keywords: string[],
+    limit: number = 4
+  ): schema.SourceMaterial[] => {
+    const matches: Map<string, number> = new Map();
+
+    materials.forEach((material) => {
+      let score = 0;
+      const searchText = `${material.title} ${material.description}`.toLowerCase();
+
+      keywords.forEach((keyword) => {
+        if (searchText.includes(keyword.toLowerCase())) {
+          score++;
+        }
+      });
+
+      if (score > 0) {
+        matches.set(material.id, score);
+      }
+    });
+
+    // Sort by score and return top matches
+    const sorted = Array.from(matches.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([id]) => materials.find((m) => m.id === id)!);
+
+    return sorted;
+  };
+
+  // Link each task to 3-4 relevant source materials
+  for (const task of allTasks) {
+    const searchText = `${task.title} ${task.description || ""}`.toLowerCase();
+
+    let relevantMaterials: schema.SourceMaterial[] = [];
+
+    // Development environment setup
+    if (
+      searchText.includes("setup") ||
+      searchText.includes("environment") ||
+      searchText.includes("install")
+    ) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Setup Guide",
+        "Architecture",
+        "API Reference",
+        "Database",
+      ]);
+    }
+    // LangChain / AI agent tasks
+    else if (
+      searchText.includes("langchain") ||
+      (searchText.includes("agent") && searchText.includes("build"))
+    ) {
+      relevantMaterials = findMaterialsByKeywords([
+        "LangChain",
+        "Building Your First Agent",
+        "LLM Integration",
+        "Agent Architecture",
+      ]);
+    }
+    // Prompt engineering
+    else if (searchText.includes("prompt")) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Prompt Engineering",
+        "LLM Integration",
+        "Building Your First Agent",
+        "Agent Context",
+      ]);
+    }
+    // RAG / retrieval
+    else if (searchText.includes("rag") || searchText.includes("retrieval")) {
+      relevantMaterials = findMaterialsByKeywords([
+        "RAG Pipeline",
+        "LLM Integration",
+        "Agent Context",
+        "Architecture",
+      ]);
+    }
+    // Multi-agent orchestration
+    else if (searchText.includes("multi-agent") || searchText.includes("orchestration")) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Multi-Agent",
+        "Agent Architecture",
+        "Agent Context",
+        "Building Your First Agent",
+      ]);
+    }
+    // API integration
+    else if (
+      searchText.includes("api") ||
+      (searchText.includes("integration") && searchText.includes("external"))
+    ) {
+      relevantMaterials = findMaterialsByKeywords([
+        "API Integration",
+        "API Reference",
+        "code_sample",
+        "Architecture",
+      ]);
+    }
+    // Context management
+    else if (searchText.includes("context")) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Agent Context",
+        "Agent Architecture",
+        "LLM Integration",
+        "RAG Pipeline",
+      ]);
+    }
+    // Deployment
+    else if (
+      searchText.includes("deploy") ||
+      searchText.includes("production") ||
+      searchText.includes("staging")
+    ) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Deployment",
+        "Infrastructure",
+        "Monitoring",
+        "CI/CD",
+      ]);
+    }
+    // Monitoring / debugging
+    else if (
+      searchText.includes("monitor") ||
+      searchText.includes("debug") ||
+      searchText.includes("observability")
+    ) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Monitoring",
+        "Deployment",
+        "Infrastructure",
+        "Architecture",
+      ]);
+    }
+    // Design system
+    else if (searchText.includes("design system") || searchText.includes("figma")) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Design System",
+        "Figma",
+        "Component Library",
+        "Product Demo",
+      ]);
+    }
+    // Product / roadmap
+    else if (
+      searchText.includes("product") ||
+      searchText.includes("roadmap") ||
+      searchText.includes("prd")
+    ) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Product Roadmap",
+        "Product Demo",
+        "Design System",
+        "API Reference",
+      ]);
+    }
+    // Customer success / platform training
+    else if (
+      searchText.includes("platform training") ||
+      (searchText.includes("customer") && searchText.includes("onboarding"))
+    ) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Platform Training",
+        "Customer Communication",
+        "Escalation",
+        "Product Demo",
+      ]);
+    }
+    // Sales / demo
+    else if (searchText.includes("demo") || searchText.includes("sales")) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Sales Playbook",
+        "Demo Environment",
+        "Product Demo",
+        "Objection Handling",
+      ]);
+    }
+    // Codebase / architecture review
+    else if (
+      searchText.includes("codebase") ||
+      searchText.includes("architecture") ||
+      searchText.includes("monorepo")
+    ) {
+      relevantMaterials = findMaterialsByKeywords([
+        "Architecture",
+        "Setup Guide",
+        "API Reference",
+        "Database",
+      ]);
+    }
+    // Testing
+    else if (searchText.includes("test")) {
+      relevantMaterials = findMaterialsByKeywords([
+        "code_sample",
+        "API Reference",
+        "Architecture",
+        "Setup Guide",
+      ]);
+    }
+    // Default: general engineering resources
+    else {
+      relevantMaterials = findMaterialsByKeywords([
+        "Architecture",
+        "API Reference",
+        "Setup Guide",
+        "Product Demo",
+      ]);
+    }
+
+    // Ensure we have 3-4 materials per task
+    if (relevantMaterials.length < 3) {
+      // Add more general materials to reach at least 3
+      const additionalMaterials = materials
+        .filter((m) => !relevantMaterials.includes(m))
+        .slice(0, 4 - relevantMaterials.length);
+      relevantMaterials = [...relevantMaterials, ...additionalMaterials];
+    }
+
+    // Take top 3-4 materials
+    relevantMaterials = relevantMaterials.slice(0, 4);
+
+    // Create junction table entries
+    for (const material of relevantMaterials) {
+      junctionEntries.push({
+        templateTaskId: task.id,
+        sourceId: material.id,
+      });
+    }
+  }
+
+  // Insert all junction table entries
+  if (junctionEntries.length > 0) {
+    await db.insert(schema.roadmapTemplateSources).values(junctionEntries);
+  }
+
+  console.log(
+    `✅ Linked ${junctionEntries.length} task-source associations (${allTasks.length} tasks × ~3-4 sources each)`
+  );
+}
+
 async function seedUserAssignments(users: schema.User[], templates: schema.RoadmapTemplate[]) {
   console.log("🔗 Seeding user template assignments...");
 
@@ -2153,6 +2403,7 @@ async function seed() {
     const users = await seedUsers(organization.id);
     const materials = await seedSourceMaterials(organization.id);
     const templates = await seedTemplates(organization.id, materials);
+    await linkTasksToSources(materials); // Link roadmap tasks to source materials
     const assignments = await seedUserAssignments(users, templates);
     const userTasks = await seedUserTasks(users, templates);
     const experts = await seedExpertProfiles(users);
