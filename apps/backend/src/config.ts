@@ -31,6 +31,11 @@ export const config = {
     indexName: (process.env.PINECONE_INDEX_NAME || "mitable-embeddings").trim(),
   },
 
+  // Vector Configuration
+  // IMPORTANT: This must match your Pinecone index dimension configuration
+  // Changing the embedding model requires recreating the Pinecone index with matching dimensions
+  vectorDimensions: 1536,
+
   // Gemini Configuration
   gemini: {
     apiKey: (process.env.GEMINI_API_KEY || "").trim(),
@@ -48,6 +53,7 @@ export function validateConfig() {
     { key: "SUPABASE_ANON_KEY", value: config.supabase.anonKey },
     { key: "OPENAI_API_KEY", value: config.openai.apiKey },
     { key: "PINECONE_API_KEY", value: config.pinecone.apiKey },
+    { key: "PINECONE_INDEX_NAME", value: config.pinecone.indexName },
     { key: "GEMINI_API_KEY", value: config.gemini.apiKey },
     { key: "JWT_SECRET", value: config.jwtSecret },
   ];
@@ -55,14 +61,29 @@ export function validateConfig() {
   const missing = required.filter((item) => !item.value);
 
   if (missing.length > 0) {
-    console.error("❌ Missing required environment variables:");
-    missing.forEach((item) => console.error(`   - ${item.key}`));
-    console.error("\nPlease check your .env file.");
-    return false;
+    const missingKeys = missing.map((item) => item.key).join(", ");
+    throw new Error(
+      `Missing required environment variables: ${missingKeys}. ` +
+        `Please check your .env file and ensure all required keys are set.`
+    );
   }
 
-  console.log("✅ All required environment variables are set");
   return true;
+}
+
+/**
+ * Validate that embedding model dimensions match Pinecone index dimensions
+ * Must be called after embedding service is initialized
+ */
+export function validateVectorDimensions(embeddingDimensions: number) {
+  if (embeddingDimensions !== config.vectorDimensions) {
+    throw new Error(
+      `Embedding model dimension mismatch! ` +
+        `Embedding model "${config.openai.embeddingModel}" produces ${embeddingDimensions}D vectors, ` +
+        `but Pinecone index is configured for ${config.vectorDimensions}D vectors. ` +
+        `Either change the embedding model or recreate the Pinecone index with matching dimensions.`
+    );
+  }
 }
 
 // Validate config on module load in production
