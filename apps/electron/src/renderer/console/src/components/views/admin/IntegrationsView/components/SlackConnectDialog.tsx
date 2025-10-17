@@ -40,7 +40,7 @@ export default function SlackConnectDialog({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -101,17 +101,23 @@ export default function SlackConnectDialog({
               <h3 className="font-semibold text-text-primary">Required Permissions:</h3>
             </div>
             <ul className="space-y-2 text-sm text-text-secondary ml-7">
-              <li>• <strong>channels:read, channels:history</strong> - Read public channel messages</li>
-              <li>• <strong>groups:read, groups:history</strong> - Read private channel messages</li>
-              <li>• <strong>users:read</strong> - Get user information for attribution</li>
+              <li>
+                • <strong>channels:read, channels:history</strong> - Read public channel messages
+              </li>
+              <li>
+                • <strong>groups:read, groups:history</strong> - Read private channel messages
+              </li>
+              <li>
+                • <strong>users:read</strong> - Get user information for attribution
+              </li>
             </ul>
           </div>
 
           {/* Important Note */}
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
             <p className="text-sm text-text-secondary">
-              <strong className="text-text-primary">Important:</strong> After connecting, you'll need
-              to invite the Mitable bot to specific channels using{" "}
+              <strong className="text-text-primary">Important:</strong> After connecting, you'll
+              need to invite the Mitable bot to specific channels using{" "}
               <code className="font-mono text-xs bg-background-primary px-2 py-1 rounded text-text-primary">
                 /invite @Mitable
               </code>{" "}

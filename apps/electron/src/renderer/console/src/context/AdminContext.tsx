@@ -130,7 +130,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const syncIntegration = async (id: string) => {
     const integration = integrations.find((i) => i.id === id);
-    
+
     if (!integration) {
       console.error("Integration not found:", id);
       return;
@@ -154,7 +154,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 

@@ -66,7 +66,9 @@ class IngestionService {
       const selectedChannels: string[] = metadata?.selected_channels || [];
 
       if (selectedChannels.length === 0) {
-        throw new Error("No channels selected for syncing. Please configure Slack integration first.");
+        throw new Error(
+          "No channels selected for syncing. Please configure Slack integration first."
+        );
       }
 
       console.log(`🔄 Starting Slack sync for ${selectedChannels.length} channels`);
@@ -97,7 +99,9 @@ class IngestionService {
           const channelInfo = await slackService.getChannelInfo(organizationId, channelId);
           const channelName = channelInfo?.name || channelId;
 
-          console.log(`📥 Fetching messages from #${channelName} (${i + 1}/${selectedChannels.length})`);
+          console.log(
+            `📥 Fetching messages from #${channelName} (${i + 1}/${selectedChannels.length})`
+          );
 
           // Update progress
           onProgress?.({

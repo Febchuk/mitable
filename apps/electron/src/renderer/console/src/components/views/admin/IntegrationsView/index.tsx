@@ -42,7 +42,7 @@ export default function IntegrationsView() {
     // Show confirmation dialog
     const confirmed = window.confirm(
       `Disconnect ${integration.name}?\n\n` +
-      `This will remove all credentials and stop syncing data from ${integration.name}.`
+        `This will remove all credentials and stop syncing data from ${integration.name}.`
     );
 
     if (!confirmed) return;
@@ -60,7 +60,7 @@ export default function IntegrationsView() {
           method: "DELETE",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
         });
 
@@ -81,7 +81,7 @@ export default function IntegrationsView() {
 
   const handleSlackOAuthStarted = () => {
     // Start polling for connection status after OAuth window opens
-    
+
     // Poll every 1 second for up to 2 minutes
     let pollCount = 0;
     const maxPolls = 120; // 2 minutes (120 polls at 1 second each)
@@ -93,17 +93,17 @@ export default function IntegrationsView() {
       await refetchData();
 
       const slackIntegration = integrations.find((i) => i.provider === "slack");
-      
+
       if (slackIntegration?.status === "connected") {
         // Success! Stop polling
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
-        
+
         // Show success notification
         console.log("✅ Slack connected successfully!");
-        
+
         // Auto-open configure dialog
         setTimeout(() => {
           setSlackConfigureDialogOpen(true);
@@ -219,7 +219,9 @@ export default function IntegrationsView() {
                   integration={integration}
                   onConnect={connectIntegration}
                   onDisconnect={handleDisconnect}
-                  onConfigure={integration.provider === "slack" ? handleSlackConfigure : configureIntegration}
+                  onConfigure={
+                    integration.provider === "slack" ? handleSlackConfigure : configureIntegration
+                  }
                   onSync={syncIntegration}
                   onViewDetails={viewIntegrationDetails}
                   onCustomConnect={
@@ -250,7 +252,9 @@ export default function IntegrationsView() {
                     integration={integration}
                     onConnect={connectIntegration}
                     onDisconnect={handleDisconnect}
-                    onConfigure={integration.provider === "slack" ? handleSlackConfigure : configureIntegration}
+                    onConfigure={
+                      integration.provider === "slack" ? handleSlackConfigure : configureIntegration
+                    }
                     onSync={syncIntegration}
                     onViewDetails={viewIntegrationDetails}
                     onCustomConnect={
@@ -276,7 +280,9 @@ export default function IntegrationsView() {
                     integration={integration}
                     onConnect={connectIntegration}
                     onDisconnect={handleDisconnect}
-                    onConfigure={integration.provider === "slack" ? handleSlackConfigure : configureIntegration}
+                    onConfigure={
+                      integration.provider === "slack" ? handleSlackConfigure : configureIntegration
+                    }
                     onSync={syncIntegration}
                     onViewDetails={viewIntegrationDetails}
                     onCustomConnect={

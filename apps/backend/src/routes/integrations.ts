@@ -32,65 +32,76 @@ interface SlackOAuthResponse {
 const SLACK_CLIENT_ID = config.slack?.clientId || process.env.SLACK_CLIENT_ID;
 const SLACK_CLIENT_SECRET = config.slack?.clientSecret || process.env.SLACK_CLIENT_SECRET;
 const SLACK_REDIRECT_URI =
-  config.slack?.redirectUri || process.env.SLACK_REDIRECT_URI || "http://localhost:3000/api/integrations/slack/callback";
+  config.slack?.redirectUri ||
+  process.env.SLACK_REDIRECT_URI ||
+  "http://localhost:3000/api/integrations/slack/callback";
 
 /**
  * POST /api/integrations/slack/oauth/start
  * Initiate Slack OAuth flow
  * Returns the authorization URL for the user to visit
  */
-router.post("/slack/oauth/start", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
+router.post(
+  "/slack/oauth/start",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
 
-    // Validate Slack credentials are configured
-    if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
+      // Validate Slack credentials are configured
+      if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
+        res.status(500).json({
+          error: "Configuration Error",
+          message:
+            "Slack OAuth credentials not configured. Please set SLACK_CLIENT_ID and SLACK_CLIENT_SECRET.",
+        });
+        return;
+      }
+
+      // Get user's organization
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!user) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "User not found",
+        });
+        return;
+      }
+
+      // Required bot token scopes for message fetching and metadata
+      const scopes = [
+        "channels:history", // Read public channel messages
+        "channels:read", // List public channels
+        "groups:history", // Read private channel messages
+        "groups:read", // List private channels
+        "users:read", // Get user information (names, emails)
+        "chat:write", // Optional: post messages (for future features)
+      ];
+
+      // Build Slack OAuth URL
+      // Use organizationId as state for security and to identify the org after redirect
+      const authUrl =
+        `https://slack.com/oauth/v2/authorize?` +
+        `client_id=${SLACK_CLIENT_ID}&` +
+        `scope=${scopes.join(",")}&` +
+        `redirect_uri=${encodeURIComponent(SLACK_REDIRECT_URI)}&` +
+        `state=${user.organizationId}`;
+
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting Slack OAuth:", error);
       res.status(500).json({
-        error: "Configuration Error",
-        message: "Slack OAuth credentials not configured. Please set SLACK_CLIENT_ID and SLACK_CLIENT_SECRET.",
+        error: "Internal Server Error",
+        message: "Failed to initiate Slack OAuth",
       });
-      return;
     }
-
-    // Get user's organization
-    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
-
-    if (!user) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "User not found",
-      });
-      return;
-    }
-
-    // Required bot token scopes for message fetching and metadata
-    const scopes = [
-      "channels:history", // Read public channel messages
-      "channels:read", // List public channels
-      "groups:history", // Read private channel messages
-      "groups:read", // List private channels
-      "users:read", // Get user information (names, emails)
-      "chat:write", // Optional: post messages (for future features)
-    ];
-
-    // Build Slack OAuth URL
-    // Use organizationId as state for security and to identify the org after redirect
-    const authUrl =
-      `https://slack.com/oauth/v2/authorize?` +
-      `client_id=${SLACK_CLIENT_ID}&` +
-      `scope=${scopes.join(",")}&` +
-      `redirect_uri=${encodeURIComponent(SLACK_REDIRECT_URI)}&` +
-      `state=${user.organizationId}`;
-
-    res.json({ authUrl });
-  } catch (error) {
-    console.error("Error starting Slack OAuth:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: "Failed to initiate Slack OAuth",
-    });
   }
-});
+);
 
 /**
  * GET /api/integrations/slack/callback
@@ -152,7 +163,7 @@ router.get("/slack/callback", async (req: Request, res: Response): Promise<void>
       }),
     });
 
-    const data = await tokenResponse.json() as SlackOAuthResponse;
+    const data = (await tokenResponse.json()) as SlackOAuthResponse;
 
     if (!data.ok) {
       throw new Error(data.error || "Failed to exchange code for token");
@@ -275,44 +286,55 @@ router.get("/slack/callback", async (req: Request, res: Response): Promise<void>
  * DELETE /api/integrations/slack/disconnect
  * Disconnect Slack integration
  */
-router.delete("/slack/disconnect", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
+router.delete(
+  "/slack/disconnect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
 
-    // Get user's organization
-    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+      // Get user's organization
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
 
-    if (!user) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "User not found",
+      if (!user) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "User not found",
+        });
+        return;
+      }
+
+      // Update integration status to disconnected
+      await db
+        .update(schema.integrations)
+        .set({
+          status: "disconnected",
+          accessToken: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.integrations.organizationId, user.organizationId),
+            eq(schema.integrations.provider, "slack")
+          )
+        );
+
+      console.log(`✅ Slack disconnected for organization: ${user.organizationId}`);
+
+      res.json({ success: true, message: "Slack integration disconnected" });
+    } catch (error) {
+      console.error("Error disconnecting Slack:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to disconnect Slack integration",
       });
-      return;
     }
-
-    // Update integration status to disconnected
-    await db
-      .update(schema.integrations)
-      .set({
-        status: "disconnected",
-        accessToken: null,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(eq(schema.integrations.organizationId, user.organizationId), eq(schema.integrations.provider, "slack"))
-      );
-
-    console.log(`✅ Slack disconnected for organization: ${user.organizationId}`);
-
-    res.json({ success: true, message: "Slack integration disconnected" });
-  } catch (error) {
-    console.error("Error disconnecting Slack:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: "Failed to disconnect Slack integration",
-    });
   }
-});
+);
 
 /**
  * GET /api/integrations/slack/channels
@@ -381,7 +403,10 @@ router.post("/slack/configure", requireAuth, async (req: Request, res: Response)
       .select()
       .from(schema.integrations)
       .where(
-        and(eq(schema.integrations.organizationId, user.organizationId), eq(schema.integrations.provider, "slack"))
+        and(
+          eq(schema.integrations.organizationId, user.organizationId),
+          eq(schema.integrations.provider, "slack")
+        )
       )
       .limit(1);
 
@@ -407,7 +432,10 @@ router.post("/slack/configure", requireAuth, async (req: Request, res: Response)
         updatedAt: new Date(),
       })
       .where(
-        and(eq(schema.integrations.organizationId, user.organizationId), eq(schema.integrations.provider, "slack"))
+        and(
+          eq(schema.integrations.organizationId, user.organizationId),
+          eq(schema.integrations.provider, "slack")
+        )
       );
 
     console.log(`✅ Slack channels configured for organization: ${user.organizationId}`);
