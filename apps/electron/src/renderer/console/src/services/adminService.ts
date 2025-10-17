@@ -275,3 +275,46 @@ export async function updateIntegrationSettings(
     throw error;
   }
 }
+
+export interface TemplateTask {
+  weekNumber: number;
+  title: string;
+  description?: string;
+  timeEstimate?: string;
+  orderIndex?: number;
+}
+
+export interface CreateTemplatePayload {
+  title: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  roleTags?: string[];
+  totalWeeks?: number;
+  notionUrl?: string;
+  tasks?: TemplateTask[];
+}
+
+export interface CreateTemplateResponse {
+  success: boolean;
+  template: Template;
+  tasksCreated: number;
+}
+
+/**
+ * Create a new roadmap template (admin only)
+ */
+export async function createTemplate(
+  payload: CreateTemplatePayload
+): Promise<CreateTemplateResponse> {
+  try {
+    const response = await apiRequest<CreateTemplateResponse>("/admin/templates", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return response;
+  } catch (error) {
+    console.error("Error creating template:", error);
+    throw error;
+  }
+}

@@ -1100,6 +1100,193 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
 
 /**
  * @openapi
+ * /admin/templates:
+ *   post:
+ *     tags:
+ *       - Admin - Templates
+ *     summary: Create a new roadmap template
+ *     description: Create a reusable onboarding template with optional tasks. Admin access required.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Engineering Onboarding
+ *               description:
+ *                 type: string
+ *                 example: Complete onboarding path for software engineers
+ *               icon:
+ *                 type: string
+ *                 example: Bot
+ *                 default: Settings
+ *               color:
+ *                 type: string
+ *                 example: "#3b82f6"
+ *                 default: "#3b82f6"
+ *               roleTags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["Software Engineer", "Frontend"]
+ *               totalWeeks:
+ *                 type: integer
+ *                 example: 4
+ *                 default: 4
+ *               notionUrl:
+ *                 type: string
+ *                 description: Notion page URL for future AI generation
+ *               tasks:
+ *                 type: array
+ *                 description: Optional tasks to create with template
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - weekNumber
+ *                     - title
+ *                   properties:
+ *                     weekNumber:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     timeEstimate:
+ *                       type: string
+ *                     orderIndex:
+ *                       type: integer
+ *     responses:
+ *       201:
+ *         description: Template created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 template:
+ *                   $ref: '#/components/schemas/Template'
+ *                 tasksCreated:
+ *                   type: integer
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post("/templates", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { title, description, icon, color, roleTags, totalWeeks, notionUrl, tasks } = req.body;
+
+    // Verify requester is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Admin access required",
+        },
+      });
+      return;
+    }
+
+    // Validate required fields
+    if (!title) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Template title is required",
+        },
+      });
+      return;
+    }
+
+    // Create the template
+    const [template] = await db
+      .insert(schema.roadmapTemplates)
+      .values({
+        organizationId: currentUser.organizationId,
+        title,
+        description: description || null,
+        icon: icon || "Settings",
+        color: color || "#3b82f6",
+        roleTags: roleTags || [],
+        totalWeeks: totalWeeks || 4,
+      })
+      .returning();
+
+    // Create tasks if provided
+    let tasksCreated = 0;
+    if (tasks && Array.isArray(tasks) && tasks.length > 0) {
+      for (const task of tasks) {
+        if (!task.weekNumber || !task.title) {
+          continue; // Skip invalid tasks
+        }
+
+        await db.insert(schema.roadmapTemplateTasks).values({
+          templateId: template.id,
+          weekNumber: task.weekNumber,
+          title: task.title,
+          description: task.description || null,
+          timeEstimate: task.timeEstimate || null,
+          orderIndex: task.orderIndex || 0,
+        });
+        tasksCreated++;
+      }
+    }
+
+    // TODO: If notionUrl is provided, implement AI generation from Notion
+    // This would involve:
+    // 1. Fetching Notion page content via API
+    // 2. Using Gemini to parse and extract tasks
+    // 3. Auto-detecting task types, relative dates, and critical items
+    // 4. Creating tasks based on AI-generated structure
+
+    res.status(201).json({
+      success: true,
+      template: {
+        id: template.id,
+        organizationId: template.organizationId,
+        title: template.title,
+        description: template.description,
+        icon: template.icon,
+        color: template.color,
+        roleTags: template.roleTags,
+        totalWeeks: template.totalWeeks,
+      },
+      tasksCreated,
+    });
+  } catch (error) {
+    console.error("Error creating template:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to create template",
+      },
+    });
+  }
+});
+
+/**
+ * @openapi
  * /admin/integrations/{id}/connect:
  *   post:
  *     tags:
