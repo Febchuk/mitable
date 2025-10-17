@@ -50,6 +50,27 @@ interface SlackOAuthResponse {
   };
 }
 
+// Type definition for Notion OAuth token response
+interface NotionOAuthResponse {
+  access_token: string;
+  refresh_token: string;
+  bot_id: string;
+  workspace_id: string;
+  workspace_name?: string;
+  workspace_icon?: string;
+  owner: {
+    type: string;
+    user?: {
+      id: string;
+      name?: string;
+      avatar_url?: string;
+      type?: string;
+      person?: { email?: string };
+    };
+  };
+  duplicated_template_id?: string;
+}
+
 // Slack OAuth configuration from environment
 const SLACK_CLIENT_ID = config.slack?.clientId || process.env.SLACK_CLIENT_ID;
 const SLACK_CLIENT_SECRET = config.slack?.clientSecret || process.env.SLACK_CLIENT_SECRET;
@@ -552,6 +573,421 @@ router.post("/slack/sync", requireAuth, async (req: Request, res: Response): Pro
     }
   } catch (error) {
     console.error("Error triggering Slack sync:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to trigger sync",
+    });
+  }
+});
+
+// ============================================================================
+// NOTION INTEGRATION ROUTES
+// ============================================================================
+
+/**
+ * POST /api/integrations/notion/oauth/start
+ * Initiate Notion OAuth flow
+ * Returns the authorization URL for the user to visit
+ */
+router.post(
+  "/notion/oauth/start",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      // Validate Notion credentials are configured
+      if (!config.notion.clientId || !config.notion.clientSecret) {
+        res.status(500).json({
+          error: "Configuration Error",
+          message:
+            "Notion OAuth credentials not configured. Please set NOTION_CLIENT_ID and NOTION_CLIENT_SECRET.",
+        });
+        return;
+      }
+
+      // Get user's organization
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!user) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "User not found",
+        });
+        return;
+      }
+
+      // Build Notion OAuth URL
+      // Note: Notion doesn't use scopes - user selects pages during OAuth flow
+      // Use organizationId as state for security
+      const authUrl =
+        `https://api.notion.com/v1/oauth/authorize?` +
+        `client_id=${config.notion.clientId}&` +
+        `response_type=code&` +
+        `owner=user&` +
+        `redirect_uri=${encodeURIComponent(config.notion.redirectUri)}&` +
+        `state=${user.organizationId}`;
+
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting Notion OAuth:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to initiate Notion OAuth",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/integrations/notion/callback
+ * Notion OAuth callback endpoint
+ * Notion redirects here after user approves and selects pages
+ */
+router.get("/notion/callback", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { code, state, error } = req.query;
+
+    // Handle OAuth error (user denied access)
+    if (error) {
+      res.status(400).send(`
+        <html>
+          <head>
+            <title>Notion Connection Failed</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+              h1 { color: #eb5757; }
+            </style>
+          </head>
+          <body>
+            <h1>❌ Notion Connection Failed</h1>
+            <p>You denied access or an error occurred.</p>
+            <p>Error: ${error}</p>
+            <p>You can close this window and try again.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    if (!code || !state) {
+      res.status(400).send(`
+        <html>
+          <head>
+            <title>Invalid Request</title>
+          </head>
+          <body>
+            <h1>Invalid OAuth callback</h1>
+            <p>Missing authorization code or state parameter.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    const organizationId = state as string;
+
+    // Exchange authorization code for access token
+    // Notion uses HTTP Basic Authentication
+    const encoded = Buffer.from(`${config.notion.clientId}:${config.notion.clientSecret}`).toString(
+      "base64"
+    );
+
+    const tokenResponse = await fetch("https://api.notion.com/v1/oauth/token", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Basic ${encoded}`,
+      },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        code: code as string,
+        redirect_uri: config.notion.redirectUri,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      throw new Error(`Failed to exchange code for token: ${errorText}`);
+    }
+
+    const data = (await tokenResponse.json()) as NotionOAuthResponse;
+
+    // Notion doesn't provide token expiry time, estimate 90 days
+    const tokenExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+    // Store integration in database
+    await db
+      .insert(schema.integrations)
+      .values({
+        organizationId: organizationId,
+        provider: "notion",
+        status: "connected",
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        tokenExpiresAt: tokenExpiresAt,
+        metadata: {
+          bot_id: data.bot_id, // Use as primary key
+          workspace_id: data.workspace_id,
+          workspace_name: data.workspace_name,
+          workspace_icon: data.workspace_icon,
+          owner: data.owner,
+          duplicated_template_id: data.duplicated_template_id,
+        },
+        lastSyncedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [schema.integrations.organizationId, schema.integrations.provider],
+        set: {
+          status: "connected",
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token,
+          tokenExpiresAt: tokenExpiresAt,
+          metadata: {
+            bot_id: data.bot_id,
+            workspace_id: data.workspace_id,
+            workspace_name: data.workspace_name,
+            workspace_icon: data.workspace_icon,
+            owner: data.owner,
+            duplicated_template_id: data.duplicated_template_id,
+          },
+          updatedAt: new Date(),
+        },
+      });
+
+    console.log(
+      `✅ Notion connected for organization: ${organizationId} (${data.workspace_name || "Workspace"})`
+    );
+
+    // Return success page
+    res.send(`
+      <html>
+        <head>
+          <title>Notion Connected</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              text-align: center;
+              padding: 50px;
+              background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+              color: white;
+            }
+            .container {
+              background: white;
+              color: #333;
+              border-radius: 10px;
+              padding: 40px;
+              max-width: 500px;
+              margin: 0 auto;
+              box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            }
+            h1 { color: #6366f1; margin-bottom: 10px; }
+            p { font-size: 16px; line-height: 1.6; }
+            .workspace-name { font-weight: bold; color: #8b5cf6; }
+            button {
+              margin-top: 20px;
+              padding: 12px 24px;
+              background: #6366f1;
+              color: white;
+              border: none;
+              border-radius: 5px;
+              font-size: 16px;
+              cursor: pointer;
+            }
+            button:hover { background: #8b5cf6; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>✅ Notion Connected Successfully!</h1>
+            <p>Your workspace <span class="workspace-name">${data.workspace_name || "Notion"}</span> is now connected to Mitable.</p>
+            <p>Your selected pages will be synced automatically.</p>
+            <p>You can close this window and return to the app.</p>
+            <button onclick="window.close()">Close Window</button>
+          </div>
+          <script>
+            // Auto-close after 1 second
+            setTimeout(() => window.close(), 1000);
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Notion OAuth callback error:", error);
+    res.status(500).send(`
+      <html>
+        <head>
+          <title>Connection Error</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            h1 { color: #eb5757; }
+          </style>
+        </head>
+        <body>
+          <h1>❌ Connection Error</h1>
+          <p>Failed to connect to Notion. Please try again.</p>
+          <p>Error: ${error instanceof Error ? error.message : "Unknown error"}</p>
+        </body>
+      </html>
+    `);
+  }
+});
+
+/**
+ * DELETE /api/integrations/notion/disconnect
+ * Disconnect Notion integration
+ */
+router.delete(
+  "/notion/disconnect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      // Get user's organization
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!user) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "User not found",
+        });
+        return;
+      }
+
+      // Update integration status to disconnected
+      await db
+        .update(schema.integrations)
+        .set({
+          status: "disconnected",
+          accessToken: null,
+          refreshToken: null,
+          tokenExpiresAt: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.integrations.organizationId, user.organizationId),
+            eq(schema.integrations.provider, "notion")
+          )
+        );
+
+      console.log(`✅ Notion disconnected for organization: ${user.organizationId}`);
+
+      res.json({ success: true, message: "Notion integration disconnected" });
+    } catch (error) {
+      console.error("Error disconnecting Notion:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to disconnect Notion integration",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/integrations/notion/pages
+ * List all pages shared with the integration
+ */
+router.get("/notion/pages", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    // Get user's organization
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+
+    if (!user) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "User not found",
+      });
+      return;
+    }
+
+    // Import notion service dynamically
+    const { notionService } = await import("../services/notion.service.js");
+
+    const pages = await notionService.searchPages(user.organizationId);
+
+    res.json({ pages });
+  } catch (error) {
+    console.error("Error fetching Notion pages:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to fetch pages",
+    });
+  }
+});
+
+/**
+ * POST /api/integrations/notion/sync
+ * Trigger Notion page sync (fetch, embed, store in Pinecone)
+ * Note: Unlike Slack, Notion doesn't need a separate configure step
+ * Pages are already selected during OAuth flow
+ */
+router.post("/notion/sync", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    // Get user's organization
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+
+    if (!user) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "User not found",
+      });
+      return;
+    }
+
+    // Get organization details for logging
+    const [org] = await db
+      .select()
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, user.organizationId))
+      .limit(1);
+
+    console.log(`🔄 Starting Notion sync for organization: ${org?.name || user.organizationId}`);
+
+    // Import ingestion service dynamically
+    const { ingestionService } = await import("../services/ingestion.service.js");
+
+    // Start sync (runs in background)
+    const result = await ingestionService.syncNotionPages(user.organizationId);
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: "Sync completed successfully",
+        pagesProcessed: result.channelsProcessed, // Reusing field name
+        blocksEmbedded: result.messagesEmbedded,
+        totalBlocks: result.totalMessages,
+        duration: result.duration,
+        errors: result.errors,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: "Sync Failed",
+        message: "Sync completed with errors",
+        pagesProcessed: result.channelsProcessed,
+        blocksEmbedded: result.messagesEmbedded,
+        errors: result.errors,
+      });
+    }
+  } catch (error) {
+    console.error("Error triggering Notion sync:", error);
     res.status(500).json({
       error: "Internal Server Error",
       message: error instanceof Error ? error.message : "Failed to trigger sync",

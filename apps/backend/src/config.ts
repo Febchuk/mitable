@@ -53,6 +53,17 @@ export const config = {
     ).trim(),
   },
 
+  // Notion OAuth Configuration
+  notion: {
+    clientId: (process.env.NOTION_CLIENT_ID || "").trim(),
+    clientSecret: (process.env.NOTION_CLIENT_SECRET || "").trim(),
+    redirectUri: (
+      process.env.NOTION_REDIRECT_URI || "http://localhost:3000/api/integrations/notion/callback"
+    ).trim(),
+    // Notion uses versioned API - must include in all requests
+    apiVersion: "2022-06-28",
+  },
+
   // Security
   jwtSecret: process.env.JWT_SECRET || "",
 };
@@ -69,6 +80,8 @@ export function validateConfig() {
     { key: "GEMINI_API_KEY", value: config.gemini.apiKey },
     { key: "SLACK_CLIENT_ID", value: config.slack.clientId },
     { key: "SLACK_CLIENT_SECRET", value: config.slack.clientSecret },
+    { key: "NOTION_CLIENT_ID", value: config.notion.clientId },
+    { key: "NOTION_CLIENT_SECRET", value: config.notion.clientSecret },
     { key: "JWT_SECRET", value: config.jwtSecret },
   ];
 
