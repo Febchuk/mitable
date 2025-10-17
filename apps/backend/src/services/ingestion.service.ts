@@ -162,8 +162,8 @@ class IngestionService {
             result.totalMessages += messages.length;
             cursor = nextCursor;
 
-            // Don't fetch too much for now (limit to 1000 messages per channel for testing)
-            if (!hasMore || channelMessageCount >= 1000) break;
+            // Continue fetching until all messages are retrieved
+            if (!hasMore) break;
           } while (cursor);
 
           result.channelsProcessed++;

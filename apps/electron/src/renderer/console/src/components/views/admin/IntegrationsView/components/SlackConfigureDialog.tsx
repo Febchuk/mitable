@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
 import { Hash, Lock, Loader2, CheckCircle2, ArrowRight } from "lucide-react";
 import { authService } from "@/console/src/services/authService";
 
@@ -31,6 +32,7 @@ export default function SlackConfigureDialog({
   onOpenChange,
   onSave,
 }: SlackConfigureDialogProps) {
+  const { toast } = useToast();
   const [channels, setChannels] = useState<SlackChannel[]>([]);
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -131,11 +133,9 @@ export default function SlackConfigureDialog({
         throw new Error(error.message || "Failed to save configuration");
       }
 
-      console.log("✅ Channel selection saved");
       setSaving(false);
 
       // Trigger initial sync automatically
-      console.log("🔄 Starting initial sync...");
       setSyncing(true);
 
       try {
@@ -150,21 +150,31 @@ export default function SlackConfigureDialog({
         if (syncResponse.ok) {
           const result = await syncResponse.json();
           setSyncing(false);
-          onOpenChange(false);
-          alert(
-            `✅ Initial Sync Complete!\n\n` +
-              `Messages Embedded: ${result.messagesEmbedded}\n` +
-              `Channels Processed: ${result.channelsProcessed}\n` +
-              `Duration: ${(result.duration / 1000).toFixed(2)}s`
-          );
+          
+          // Show toast first
+          toast({
+            title: "✅ Initial Sync Complete!",
+            description: `Embedded ${result.messagesEmbedded} messages from ${result.channelsProcessed} channels in ${(result.duration / 1000).toFixed(2)}s`,
+          });
+          
+          // Close dialog after a short delay so toast is visible
+          setTimeout(() => onOpenChange(false), 500);
         } else {
           throw new Error("Sync request failed");
         }
       } catch (syncError) {
         console.error("Error during initial sync:", syncError);
         setSyncing(false);
-        onOpenChange(false);
-        alert(`⚠️ Channels saved but sync failed. You can retry using the Sync button.`);
+        
+        // Show toast first
+        toast({
+          title: "Warning",
+          description: "Channels saved but sync failed. You can retry using the Sync button.",
+          variant: "destructive",
+        });
+        
+        // Close dialog after a short delay
+        setTimeout(() => onOpenChange(false), 500);
       }
 
       onSave();
