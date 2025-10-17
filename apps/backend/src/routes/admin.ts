@@ -172,6 +172,7 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
     const [user] = await db
       .select({
         id: schema.users.id,
+        organizationId: schema.users.organizationId,
         firstName: schema.users.firstName,
         lastName: schema.users.lastName,
         email: schema.users.email,
@@ -189,6 +190,15 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
       res.status(404).json({
         error: "Not Found",
         message: "User not found",
+      });
+      return;
+    }
+
+    // Verify user belongs to the same organization as the admin
+    if (user.organizationId !== currentUser.organizationId) {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "You do not have permission to view this user",
       });
       return;
     }
@@ -454,7 +464,7 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
       return;
     }
 
-    // Fetch all users with their task completion stats (exclude admins)
+    // Fetch all users with their task completion stats (exclude admins, filter by organization)
     const users = await db
       .select({
         id: schema.users.id,
@@ -468,7 +478,12 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
         avatarUrl: schema.users.avatarUrl,
       })
       .from(schema.users)
-      .where(ne(schema.users.role, "admin"))
+      .where(
+        and(
+          ne(schema.users.role, "admin"),
+          eq(schema.users.organizationId, currentUser.organizationId)
+        )
+      )
       .orderBy(desc(schema.users.createdAt));
 
     // Calculate progress for each user
@@ -562,7 +577,7 @@ router.get("/templates", requireAuth, async (req: Request, res: Response): Promi
       return;
     }
 
-    // Fetch all templates
+    // Fetch all templates for the organization
     const templates = await db
       .select({
         id: schema.roadmapTemplates.id,
@@ -575,6 +590,7 @@ router.get("/templates", requireAuth, async (req: Request, res: Response): Promi
         totalWeeks: schema.roadmapTemplates.totalWeeks,
       })
       .from(schema.roadmapTemplates)
+      .where(eq(schema.roadmapTemplates.organizationId, currentUser.organizationId))
       .orderBy(desc(schema.roadmapTemplates.createdAt));
 
     // Get usage stats and task count for each template
