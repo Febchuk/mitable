@@ -20,7 +20,7 @@ export default function ChatDetail() {
     onChunk: (chunk: string) => {
       setStreamingContent((prev) => prev + chunk);
     },
-    onComplete: (fullContent: string) => {
+    onComplete: (_fullContent: string) => {
       setStreamingContent("");
       setIsStreaming(false);
     },
@@ -135,10 +135,7 @@ export default function ChatDetail() {
 
         {/* Streaming message */}
         {isStreaming && (
-          <AIMessage
-            content={streamingContent || "Thinking..."}
-            isStreaming={true}
-          />
+          <AIMessage content={streamingContent || "Thinking..."} isStreaming={true} />
         )}
 
         <div ref={messagesEndRef} />

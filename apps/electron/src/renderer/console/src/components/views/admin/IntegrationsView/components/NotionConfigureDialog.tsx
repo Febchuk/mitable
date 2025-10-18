@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { FileText, Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import { authService } from "@/console/src/services/authService";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 interface NotionPage {
   id: string;
   title: string;
@@ -55,7 +57,7 @@ export default function NotionConfigureDialog({
         throw new Error("Not authenticated");
       }
 
-      const response = await fetch("http://localhost:3000/api/integrations/notion/pages", {
+      const response = await fetch(`${API_BASE_URL}/api/integrations/notion/pages`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -86,7 +88,7 @@ export default function NotionConfigureDialog({
         throw new Error("Not authenticated");
       }
 
-      const syncResponse = await fetch("http://localhost:3000/api/integrations/notion/sync", {
+      const syncResponse = await fetch(`${API_BASE_URL}/api/integrations/notion/sync`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

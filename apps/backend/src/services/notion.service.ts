@@ -43,10 +43,17 @@ export interface TokenResponse {
   duplicated_template_id?: string;
 }
 
+// Notion API configuration constants
+export const NOTION_CONFIG = {
+  RATE_LIMIT_DELAY: 350, // ms (Notion allows 3 req/sec, we use 350ms for safety)
+  TOKEN_EXPIRY_DAYS: 90, // Estimated token lifetime (Notion doesn't provide exact expiry)
+  PAGE_SIZE: 100, // Max items per page (Notion API limit)
+} as const;
+
 class NotionService {
   // Rate limiting: Notion allows 3 requests per second
   private lastRequestTime = 0;
-  private readonly RATE_LIMIT_DELAY = 350; // ms (slightly over 1/3 second)
+  private readonly RATE_LIMIT_DELAY = NOTION_CONFIG.RATE_LIMIT_DELAY;
 
   /**
    * Get Notion Client instance for an organization
@@ -83,8 +90,10 @@ class NotionService {
         .set({
           accessToken: tokenResponse.access_token,
           refreshToken: tokenResponse.refresh_token,
-          // Notion doesn't provide expiry time, estimate 90 days
-          tokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+          // Notion doesn't provide expiry time, use estimated lifetime
+          tokenExpiresAt: new Date(
+            Date.now() + NOTION_CONFIG.TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+          ),
           updatedAt: new Date(),
         })
         .where(eq(schema.integrations.id, integration.id));
@@ -172,7 +181,7 @@ class NotionService {
             property: "object",
             value: "page",
           },
-          page_size: 100,
+          page_size: NOTION_CONFIG.PAGE_SIZE,
           start_cursor: startCursor,
         });
 
@@ -242,7 +251,7 @@ class NotionService {
       while (hasMore) {
         const response: any = await client.blocks.children.list({
           block_id: blockId,
-          page_size: 100,
+          page_size: NOTION_CONFIG.PAGE_SIZE,
           start_cursor: startCursor,
         });
 

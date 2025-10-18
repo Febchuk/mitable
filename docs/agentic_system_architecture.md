@@ -12,6 +12,7 @@ Mitable's chat system is built on an **agentic architecture** where the AI doesn
 ## Why Agentic?
 
 ### The Problem with Simple Chat
+
 A traditional chat system only has one capability: generate text. This creates limitations:
 
 ```
@@ -27,6 +28,7 @@ Simple Chat: "First go to the repo, then click Pull Requests, then..."
 ```
 
 ### The Agentic Solution
+
 An agentic system can choose the right tool for each task:
 
 ```
@@ -79,6 +81,7 @@ class AgentService {
 ```
 
 **Responsibilities:**
+
 - Maintain registry of available tools
 - Convert conversation history to OpenAI format
 - Call OpenAI with tool definitions (function calling)
@@ -120,16 +123,13 @@ export abstract class BaseTool {
       function: {
         name: this.name,
         description: this.description,
-        parameters: this.parameters
-      }
+        parameters: this.parameters,
+      },
     };
   }
 
   // Execute the tool with parsed arguments
-  abstract execute(
-    args: Record<string, any>,
-    context: ToolContext
-  ): Promise<ToolResult>;
+  abstract execute(args: Record<string, any>, context: ToolContext): Promise<ToolResult>;
 }
 
 export interface ToolContext {
@@ -140,7 +140,7 @@ export interface ToolContext {
 }
 
 export interface ToolResult {
-  messageType: 'text' | 'workflow' | 'experts';
+  messageType: "text" | "workflow" | "experts";
   content: string;
   cardData?: Record<string, any>;
   sources?: Array<{
@@ -169,7 +169,7 @@ const response = await openai.chat.completions.create({
   messages: conversationHistory,
   tools: tools,
   tool_choice: "auto", // Let AI decide which tool to use
-  stream: true
+  stream: true,
 });
 
 // AI returns which tool to call and with what arguments
@@ -184,6 +184,7 @@ if (response.tool_calls) {
 ```
 
 **How It Works:**
+
 1. System provides tool definitions to OpenAI
 2. AI analyzes user message + conversation context
 3. AI decides which tool best addresses user's need
@@ -201,12 +202,14 @@ if (response.tool_calls) {
 **Purpose:** Answer general questions with conversational text responses
 
 **When Used:**
+
 - General questions: "What is our company mission?"
 - Explanations: "How does our PTO policy work?"
 - Clarifications: "What did you mean by that?"
 - Chitchat: "How are you doing?"
 
 **Implementation:**
+
 ```typescript
 // apps/backend/src/tools/respond-text.tool.ts
 
@@ -219,24 +222,25 @@ export class RespondTextTool extends BaseTool {
     properties: {
       response: {
         type: "string",
-        description: "The text response to the user's question"
-      }
+        description: "The text response to the user's question",
+      },
     },
-    required: ["response"]
+    required: ["response"],
   };
 
   async execute(args: { response: string }, context: ToolContext) {
     // Simple pass-through - AI already generated the response
     return {
-      messageType: 'text',
+      messageType: "text",
       content: args.response,
-      streamable: true
+      streamable: true,
     };
   }
 }
 ```
 
 **System Prompt:**
+
 ```
 You are an experienced employee assistant at [Company Name], helping new hires
 ramp up quickly. You have deep product knowledge and guide people through their
@@ -252,12 +256,14 @@ and help find someone who does.
 **Purpose:** Search internal documentation, Slack history, wikis using RAG
 
 **When Used:**
+
 - Documentation questions: "What's our deployment process?"
 - Policy questions: "How do I request time off?"
 - Process questions: "How do we handle customer escalations?"
 - Historical context: "What was discussed about the pricing change?"
 
 **Implementation:**
+
 ```typescript
 export class SearchKnowledgeTool extends BaseTool {
   name = "search_knowledge_base";
@@ -268,15 +274,15 @@ export class SearchKnowledgeTool extends BaseTool {
     properties: {
       query: {
         type: "string",
-        description: "The search query to find relevant information"
+        description: "The search query to find relevant information",
       },
       sources: {
         type: "array",
         items: { type: "string" },
-        description: "Specific sources to search (e.g., 'docs', 'slack', 'wiki')"
-      }
+        description: "Specific sources to search (e.g., 'docs', 'slack', 'wiki')",
+      },
     },
-    required: ["query"]
+    required: ["query"],
   };
 
   async execute(args: { query: string; sources?: string[] }, context: ToolContext) {
@@ -298,20 +304,21 @@ export class SearchKnowledgeTool extends BaseTool {
     );
 
     return {
-      messageType: 'text',
+      messageType: "text",
       content: response,
-      sources: mergedResults.map(r => ({
+      sources: mergedResults.map((r) => ({
         title: r.title,
         url: r.url,
-        snippet: r.snippet
+        snippet: r.snippet,
       })),
-      streamable: true
+      streamable: true,
     };
   }
 }
 ```
 
 **AI Decides When:**
+
 - User asks about company-specific information
 - Question likely has documented answer
 - Requires citing sources or referencing past discussions
@@ -323,11 +330,13 @@ export class SearchKnowledgeTool extends BaseTool {
 **Purpose:** Match users with the best colleague to help with specific topics
 
 **When Used:**
+
 - "Who can help me with [topic]?"
 - "I need someone who knows [technology/process]"
 - "Who should I ask about [project/feature]?"
 
 **Implementation:**
+
 ```typescript
 export class FindExpertTool extends BaseTool {
   name = "find_expert";
@@ -338,15 +347,15 @@ export class FindExpertTool extends BaseTool {
     properties: {
       topic: {
         type: "string",
-        description: "The topic or skill the user needs help with"
+        description: "The topic or skill the user needs help with",
       },
       urgency: {
         type: "string",
         enum: ["low", "medium", "high"],
-        description: "How urgently the user needs help"
-      }
+        description: "How urgently the user needs help",
+      },
     },
-    required: ["topic"]
+    required: ["topic"],
   };
 
   async execute(args: { topic: string; urgency?: string }, context: ToolContext) {
@@ -359,31 +368,32 @@ export class FindExpertTool extends BaseTool {
     //    - Availability (30%): current status + calendar
     const rankedExperts = await expertService.findBestMatches(
       topicEmbedding,
-      args.urgency || 'medium'
+      args.urgency || "medium"
     );
 
     // 3. Return top 3-5 experts as structured cards
     return {
-      messageType: 'experts',
+      messageType: "experts",
       content: `Here are the best colleagues to help with ${args.topic}:`,
       cardData: {
-        experts: rankedExperts.slice(0, 5).map(e => ({
+        experts: rankedExperts.slice(0, 5).map((e) => ({
           id: e.id,
           name: e.name,
           title: e.title,
           expertise: e.topicScore,
           availability: e.availabilityStatus,
           responseTime: e.avgResponseTime,
-          helpfulnessRating: e.rating
-        }))
+          helpfulnessRating: e.rating,
+        })),
       },
-      streamable: false // Cards appear all at once
+      streamable: false, // Cards appear all at once
     };
   }
 }
 ```
 
 **AI Decides When:**
+
 - User explicitly asks for expert help
 - Question is complex and likely needs human assistance
 - Previous attempts to answer didn't satisfy user
@@ -395,11 +405,13 @@ export class FindExpertTool extends BaseTool {
 **Purpose:** Provide visual step-by-step UI guidance across any application
 
 **When Used:**
+
 - "How do I [perform UI task]?"
 - "Where is the [UI element] button?"
 - "Help me navigate to [feature]"
 
 **Implementation:**
+
 ```typescript
 export class GuideNextStepTool extends BaseTool {
   name = "guide_next_ui_step";
@@ -410,25 +422,22 @@ export class GuideNextStepTool extends BaseTool {
     properties: {
       instruction: {
         type: "string",
-        description: "Clear instruction for what the user should do next"
+        description: "Clear instruction for what the user should do next",
       },
       requiresScreenshot: {
         type: "boolean",
-        description: "Whether a screenshot is needed to provide guidance"
-      }
+        description: "Whether a screenshot is needed to provide guidance",
+      },
     },
-    required: ["instruction", "requiresScreenshot"]
+    required: ["instruction", "requiresScreenshot"],
   };
 
-  async execute(
-    args: { instruction: string; requiresScreenshot: boolean },
-    context: ToolContext
-  ) {
+  async execute(args: { instruction: string; requiresScreenshot: boolean }, context: ToolContext) {
     if (args.requiresScreenshot && !context.screenshot) {
       return {
-        messageType: 'text',
+        messageType: "text",
         content: "I'll need to see your screen to guide you. Press Cmd+H to capture a screenshot.",
-        streamable: false
+        streamable: false,
       };
     }
 
@@ -447,7 +456,7 @@ export class GuideNextStepTool extends BaseTool {
 
     // 4. Return workflow step with coordinates
     return {
-      messageType: 'workflow',
+      messageType: "workflow",
       content: args.instruction,
       cardData: {
         stepNumber: stepNumber,
@@ -455,18 +464,19 @@ export class GuideNextStepTool extends BaseTool {
         targetElement: {
           label: targetElement.label,
           boundingBox: targetElement.boundingBox,
-          application: targetElement.application
+          application: targetElement.application,
         },
         highlightColor: "blue",
-        arrowPosition: this.calculateArrowPosition(targetElement.boundingBox)
+        arrowPosition: this.calculateArrowPosition(targetElement.boundingBox),
       },
-      streamable: false // Workflow steps appear atomically
+      streamable: false, // Workflow steps appear atomically
     };
   }
 }
 ```
 
 **AI Decides When:**
+
 - User asks how-to question about UI navigation
 - Question requires showing specific UI elements
 - User is in active workflow conversation (`contextType: 'workflow'`)
@@ -596,13 +606,14 @@ const conversationHistory: Message[] = await db.getRecentMessages(
 
 ```typescript
 enum ConversationType {
-  GENERAL = 'general',      // Normal Q&A
-  HELP_REQUEST = 'help_request',  // User asked for expert help
-  WORKFLOW = 'workflow'     // Active UI guidance session
+  GENERAL = "general", // Normal Q&A
+  HELP_REQUEST = "help_request", // User asked for expert help
+  WORKFLOW = "workflow", // Active UI guidance session
 }
 ```
 
 **State Transitions:**
+
 - `general` → `workflow`: User asks "how to" question, agent chooses guide_next_ui_step
 - `workflow` → `general`: User completes workflow or asks unrelated question
 - `general` → `help_request`: Agent recommends expert, user confirms
@@ -650,28 +661,27 @@ export class AgentService {
 ```typescript
 // apps/backend/src/routes/conversations.ts
 
-router.post('/:conversationId/messages/stream', authenticate, async (req, res) => {
+router.post("/:conversationId/messages/stream", authenticate, async (req, res) => {
   // 1. Save user message to DB
   const userMessage = await db.createMessage({
     conversationId: req.params.conversationId,
-    role: 'user',
-    content: req.body.content
+    role: "user",
+    content: req.body.content,
   });
 
   // 2. Get conversation history
   const history = await db.getRecentMessages(req.params.conversationId, 20);
 
   // 3. Set up SSE
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
 
   // 4. Stream from agent
-  const stream = agentService.processMessage(
-    req.params.conversationId,
-    req.body.content,
-    { conversationHistory: history, userId: req.user.id }
-  );
+  const stream = agentService.processMessage(req.params.conversationId, req.body.content, {
+    conversationHistory: history,
+    userId: req.user.id,
+  });
 
   // 5. Forward chunks to client
   for await (const chunk of stream) {
@@ -696,9 +706,10 @@ try {
 } catch (error) {
   // Fallback to text response
   return {
-    messageType: 'text',
-    content: "I encountered an error processing your request. Let me try to help in a different way...",
-    streamable: true
+    messageType: "text",
+    content:
+      "I encountered an error processing your request. Let me try to help in a different way...",
+    streamable: true,
   };
 }
 ```
@@ -732,32 +743,27 @@ eventSource.onerror = () => {
 ## Testing Strategy
 
 ### Tool Unit Tests
+
 ```typescript
-describe('RespondTextTool', () => {
-  it('should return text response', async () => {
+describe("RespondTextTool", () => {
+  it("should return text response", async () => {
     const tool = new RespondTextTool();
-    const result = await tool.execute(
-      { response: "Hello!" },
-      mockContext
-    );
-    expect(result.messageType).toBe('text');
+    const result = await tool.execute({ response: "Hello!" }, mockContext);
+    expect(result.messageType).toBe("text");
     expect(result.content).toBe("Hello!");
   });
 });
 ```
 
 ### Agent Integration Tests
+
 ```typescript
-describe('AgentService', () => {
-  it('should route to correct tool based on user intent', async () => {
+describe("AgentService", () => {
+  it("should route to correct tool based on user intent", async () => {
     const agent = new AgentService();
 
     // Test general question → respond_with_text
-    const stream = agent.processMessage(
-      'conv-123',
-      'What is our mission?',
-      mockContext
-    );
+    const stream = agent.processMessage("conv-123", "What is our mission?", mockContext);
 
     // Verify correct tool was called
   });
@@ -765,9 +771,10 @@ describe('AgentService', () => {
 ```
 
 ### End-to-End Tests
+
 ```typescript
-describe('Chat streaming', () => {
-  it('should stream AI responses in real-time', async () => {
+describe("Chat streaming", () => {
+  it("should stream AI responses in real-time", async () => {
     // Send message via API
     // Verify SSE chunks received
     // Verify final message saved to DB
@@ -779,18 +786,21 @@ describe('Chat streaming', () => {
 ## Performance Considerations
 
 ### Token Usage
+
 - Conversation history limited to 20 messages
 - System prompt kept concise
 - Tool descriptions clear but brief
 - Monitor token costs per request
 
 ### Latency
+
 - Target: <2 seconds for first token
 - Streaming starts immediately
 - Tool execution parallelized where possible
 - Database queries optimized
 
 ### Caching
+
 - Tool definitions cached (static)
 - Conversation history cached (5 min TTL)
 - Expert profiles cached (15 min TTL)
@@ -799,38 +809,42 @@ describe('Chat streaming', () => {
 ## Security
 
 ### Tool Access Control
+
 ```typescript
 // Future: Role-based tool access
 if (tool.requiresAdminAccess && !context.userIsAdmin) {
-  throw new Error('Insufficient permissions for this tool');
+  throw new Error("Insufficient permissions for this tool");
 }
 ```
 
 ### Input Validation
+
 ```typescript
 // Validate tool arguments before execution
 const validated = toolParametersSchema.parse(args);
 ```
 
 ### Rate Limiting
+
 ```typescript
 // Limit API calls per user
 const rateLimiter = new RateLimiter({
   maxRequests: 50,
-  windowMs: 60000 // 50 requests per minute
+  windowMs: 60000, // 50 requests per minute
 });
 ```
 
 ## Monitoring & Analytics
 
 Track tool usage:
+
 ```typescript
-analytics.track('tool_used', {
+analytics.track("tool_used", {
   toolName: tool.name,
   userId: context.userId,
   conversationId: context.conversationId,
   success: true,
-  latency: executionTime
+  latency: executionTime,
 });
 ```
 

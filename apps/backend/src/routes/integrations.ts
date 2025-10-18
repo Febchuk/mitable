@@ -4,6 +4,7 @@ import * as schema from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { config } from "../config.js";
+import { NOTION_CONFIG } from "../services/notion.service.js";
 
 const router = Router();
 
@@ -718,8 +719,10 @@ router.get("/notion/callback", async (req: Request, res: Response): Promise<void
 
     const data = (await tokenResponse.json()) as NotionOAuthResponse;
 
-    // Notion doesn't provide token expiry time, estimate 90 days
-    const tokenExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+    // Notion doesn't provide token expiry time, use estimated lifetime
+    const tokenExpiresAt = new Date(
+      Date.now() + NOTION_CONFIG.TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+    );
 
     // Store integration in database
     await db

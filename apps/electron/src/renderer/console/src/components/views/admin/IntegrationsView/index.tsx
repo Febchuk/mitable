@@ -11,8 +11,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, Filter, Plus } from "lucide-react";
 import { authService } from "@/console/src/services/authService";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
 // Polling configuration for OAuth callback
 const POLLING_CONFIG = {
   INTERVAL_MS: 1000, // Poll every 1 second

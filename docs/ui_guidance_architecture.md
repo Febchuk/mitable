@@ -8,6 +8,7 @@ Mitable's UI guidance system provides step-by-step visual overlays to help users
 
 **The Fundamental Constraint:**
 The AI can only guide users through UI elements it can actually see in the current screenshot. It cannot:
+
 - See future screens the user hasn't navigated to yet
 - Know what UI elements will appear after an action
 - Predict the total number of steps required
@@ -15,6 +16,7 @@ The AI can only guide users through UI elements it can actually see in the curre
 
 **Why This Matters:**
 If the AI tries to generate a complete workflow upfront (e.g., "Step 2 of 5"), it would be hallucinating future UI states. This leads to:
+
 - Inaccurate coordinates for elements that don't exist yet
 - Incorrect instructions for screens with different layouts
 - Broken guidance when users have different permissions/settings
@@ -23,17 +25,20 @@ If the AI tries to generate a complete workflow upfront (e.g., "Step 2 of 5"), i
 ## The Iterative Guidance Flow
 
 ### 1. Initial Request
+
 ```
 User (in Agent pill): "How do I submit a PR in GitHub?"
 ```
 
 ### 2. Screenshot Analysis
+
 - System captures current screen
 - AI analyzes visible UI elements
 - Extracts bounding boxes and labels
 - Understands current application context
 
 ### 3. First Step Generation
+
 ```typescript
 // AI returns single step only
 {
@@ -53,32 +58,40 @@ User (in Agent pill): "How do I submit a PR in GitHub?"
 ```
 
 ### 4. Visual Presentation
+
 **Overlay Window:**
+
 - Displays arrow pointing to target element
 - Shows highlight box around "New Pull Request" button
 - Only shows current step (Step 1)
 
 **Guide Window:**
+
 - Shows instruction: "Click 'New Pull Request'"
 - Displays as "Step 1" (no total count)
 - No future steps listed yet
 
 ### 5. User Action
+
 User performs the action (clicks button)
 → Screen changes to PR creation form
 
 ### 6. Continuation
+
 User signals continuation in Agent pill:
+
 - Explicit: "Done", "Next", "Okay"
 - Implicit: "I don't see the description field" (follow-up question)
 - Automatic: AI detects screen change in next message
 
 ### 7. Next Screenshot Analysis
+
 - System captures NEW screen state
 - AI analyzes NEW visible elements
 - Compares to conversation history to understand progress
 
 ### 8. Next Step Generation
+
 ```typescript
 {
   messageType: 'workflow',
@@ -95,28 +108,34 @@ User signals continuation in Agent pill:
 ```
 
 ### 9. Visual Update
+
 **Overlay Window:**
+
 - Clears previous arrow (Step 1 is done)
 - Shows NEW arrow for Step 2 pointing to title field
 
 **Guide Window:**
+
 - Appends Step 2 below Step 1
 - Shows Step 1 with checkmark (completed)
 - Highlights Step 2 as current
 - Scrollable history accumulates
 
 ### 10. Repeat Until Complete
+
 Cycle continues until user achieves goal or exits workflow.
 
 ## Window Behaviors
 
 ### Agent Pill (Always Visible)
+
 - User's primary interaction point
 - Receives questions and continuation signals
 - Takes screenshot on each message
 - Maintains conversation context
 
 ### Overlay Window (Fullscreen Transparent)
+
 - **Current Step Only**: Shows arrows/highlights for active step
 - Clears when step completes
 - Updates immediately when new step arrives
@@ -124,6 +143,7 @@ Cycle continues until user achieves goal or exits workflow.
 - Always click-through except for dismiss button
 
 ### Guide Window (Side Panel)
+
 - **Accumulating History**: Shows all steps taken
 - Each step rendered as card with:
   - Step number (1, 2, 3... no total)
@@ -136,6 +156,7 @@ Cycle continues until user achieves goal or exits workflow.
 ## Conversation State Management
 
 ### Workflow Detection
+
 The system tracks when a conversation becomes a workflow:
 
 ```typescript
@@ -150,16 +171,19 @@ conversation {
 ### Continuation Detection
 
 **Explicit Signals:**
+
 - "Done", "Next", "Continue", "Okay"
 - "I completed that step"
 - "What's next?"
 
 **Implicit Signals:**
+
 - Follow-up questions about current screen
 - Error reports ("I don't see that button")
 - Clarification requests
 
 **Screen Change Detection:**
+
 - Compare screenshot hash/key elements
 - If significant change detected → likely progressed
 - If no change → user might be stuck
@@ -167,11 +191,13 @@ conversation {
 ### Workflow Completion
 
 **User-Initiated:**
+
 - "Thanks, I'm done"
 - "I got it from here"
 - Starts asking unrelated questions
 
 **AI-Detected:**
+
 - User confirms goal achieved
 - Reaches typical endpoint (e.g., PR created confirmation)
 
@@ -196,6 +222,7 @@ Each step adapts to whatever application is currently visible.
 ## Handling Deviations
 
 ### User Clicks Wrong Element
+
 ```
 Expected: Click "New Pull Request"
 Actual: User clicks "New Issue" instead
@@ -206,6 +233,7 @@ AI adapts: "It looks like you're creating an issue. To submit a PR instead,
 ```
 
 ### Different Permissions/UI
+
 ```
 Expected: "Click Settings in the sidebar"
 User's screen: Sidebar doesn't have Settings (limited permissions)
@@ -215,6 +243,7 @@ AI adapts: "I don't see the Settings option on your screen. You may need admin
 ```
 
 ### Branching Paths
+
 ```
 User: "How do I share this document?"
 
@@ -237,26 +266,31 @@ The AI naturally follows whichever path the user takes.
 ## Benefits of This Approach
 
 ### Accuracy
+
 ✅ Only describes UI elements that actually exist
 ✅ Provides real coordinates from current screen
 ✅ No hallucination of future states
 
 ### Adaptability
+
 ✅ Handles different user permissions/settings
 ✅ Adapts to UI changes or updates
 ✅ Follows user's chosen path in branching workflows
 
 ### Cross-Application
+
 ✅ Works across any application (Slack, GitHub, Figma, Terminal, etc.)
 ✅ No pre-mapping of every possible app required
 ✅ Seamlessly transitions between applications
 
 ### Self-Correcting
+
 ✅ Detects when user makes mistakes
 ✅ Provides corrective guidance based on actual state
 ✅ Doesn't get "stuck" following invalid plan
 
 ### Unknown Complexity
+
 ✅ Doesn't need to know total step count upfront
 ✅ Handles simple (2 steps) or complex (20 steps) equally well
 ✅ Adjusts difficulty based on user proficiency
@@ -264,24 +298,28 @@ The AI naturally follows whichever path the user takes.
 ## Technical Requirements
 
 ### Screenshot Capture
+
 - Trigger on each user message in workflow context
 - Capture full screen or active window
 - Include multi-monitor support
 - Respect user blacklist (excluded apps)
 
 ### UI Object Detection (Gemini Vision)
+
 - Extract bounding boxes for interactive elements
 - Label detection (button text, field labels)
 - Application context recognition
 - ~1-2 second processing time
 
 ### Coordinate Precision
+
 - Account for DPI scaling
 - Map coordinates to correct display
 - <10 pixel accuracy for overlays
 - Handle window repositioning
 
 ### State Management
+
 - Track workflow context in conversation
 - Store previous steps in message history
 - Maintain screenshot references (temporary, 30 sec retention)
@@ -339,7 +377,9 @@ Guide: ✓ All steps complete | Workflow ended
 ## Future Enhancements
 
 ### Planned Workflow Templates
+
 For known internal processes, store workflow templates:
+
 ```typescript
 workflowTemplate {
   id: "submit-expense-report",
@@ -354,18 +394,23 @@ workflowTemplate {
 ```
 
 Still deliver one step at a time, but use template to:
+
 - Provide better initial estimation
 - Detect if user is off-path
 - Suggest shortcut tips
 
 ### Proactive Guidance
+
 If user is on a known screen, suggest relevant help:
+
 ```
 Overlay (subtle hint): "Need help? Press Cmd+H"
 ```
 
 ### Video Recording
+
 Capture video of successful workflows to:
+
 - Generate training materials
 - Improve workflow templates
 - Share with other team members

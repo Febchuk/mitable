@@ -15,13 +15,7 @@ export function useSendMessage(options?: SendMessageOptions) {
   const { user } = useUser();
 
   return useMutation({
-    mutationFn: async ({
-      chatId,
-      content,
-    }: {
-      chatId: string;
-      content: string;
-    }) => {
+    mutationFn: async ({ chatId, content }: { chatId: string; content: string }) => {
       const token = authService.getAccessToken();
 
       if (!token) {

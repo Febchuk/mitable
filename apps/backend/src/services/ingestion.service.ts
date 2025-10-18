@@ -403,10 +403,9 @@ class IngestionService {
           const validBlocks = blocks.filter((block) => block.text && block.text.trim().length > 0);
 
           if (validBlocks.length > 0) {
-            // Process blocks in batches of 10
-            const batchSize = 10;
-            for (let j = 0; j < validBlocks.length; j += batchSize) {
-              const batch = validBlocks.slice(j, j + batchSize);
+            // Process blocks in batches
+            for (let j = 0; j < validBlocks.length; j += SYNC_CONFIG.BATCH_SIZE) {
+              const batch = validBlocks.slice(j, j + SYNC_CONFIG.BATCH_SIZE);
               await this.processNotionBatch(
                 batch,
                 page,
