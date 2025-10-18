@@ -722,11 +722,12 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
     }
 
     // Fetch integrations for the organization
-    const integrations = await db
+    const dbIntegrations = await db
       .select({
         id: schema.integrations.id,
         provider: schema.integrations.provider,
         status: schema.integrations.status,
+        accessToken: schema.integrations.accessToken,
         lastSyncedAt: schema.integrations.lastSyncedAt,
         syncFrequency: schema.integrations.syncFrequency,
         createdAt: schema.integrations.createdAt,
@@ -735,7 +736,7 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
       .where(eq(schema.integrations.organizationId, currentUser.organizationId))
       .orderBy(desc(schema.integrations.createdAt));
 
-    // Transform to frontend format with display names and descriptions
+    // Define all available integrations
     const integrationMap: Record<
       string,
       { name: string; description: string; updatesPerDay: number }
@@ -762,21 +763,23 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
       },
     };
 
-    const formattedIntegrations = integrations.map((integration) => {
-      const providerInfo = integrationMap[integration.provider] || {
-        name: integration.provider,
-        description: `Integration for ${integration.provider}`,
-        updatesPerDay: 1,
-      };
+    // Create map of existing integrations
+    const existingIntegrations = new Map(
+      dbIntegrations.map((integration) => [integration.provider, integration])
+    );
+
+    // Return all possible integrations, marking status based on DB presence
+    const formattedIntegrations = Object.entries(integrationMap).map(([provider, providerInfo]) => {
+      const existing = existingIntegrations.get(provider);
 
       return {
-        id: integration.id,
-        provider: integration.provider,
+        id: existing?.id || `${provider}-placeholder`,
+        provider: provider as "slack" | "notion" | "github" | "google-drive",
         name: providerInfo.name,
         description: providerInfo.description,
-        status: integration.status,
+        status: existing?.status || "disconnected",
         updatesPerDay: providerInfo.updatesPerDay,
-        connectedAt: integration.status === "connected" ? integration.createdAt : undefined,
+        connectedAt: existing?.status === "connected" ? existing.createdAt : undefined,
       };
     });
 

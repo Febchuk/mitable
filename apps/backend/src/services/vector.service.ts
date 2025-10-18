@@ -77,7 +77,6 @@ class VectorService {
     try {
       const index = this.client.index(this.indexName);
       await index.namespace(namespace || "").upsert(vectors);
-      console.log(`✅ Upserted ${vectors.length} vectors to Pinecone`);
     } catch (error) {
       throw new Error("Failed to upsert vectors", { cause: error });
     }
@@ -135,7 +134,6 @@ class VectorService {
     try {
       const index = this.client.index(this.indexName);
       await index.namespace(namespace || "").deleteMany(ids);
-      console.log(`✅ Deleted ${ids.length} vectors from Pinecone`);
     } catch (error) {
       throw new Error("Failed to delete vectors", { cause: error });
     }
@@ -153,7 +151,6 @@ class VectorService {
     try {
       const index = this.client.index(this.indexName);
       await index.namespace(namespace).deleteAll();
-      console.log(`✅ Cleared namespace: ${namespace}`);
     } catch (error) {
       throw new Error("Failed to clear namespace", { cause: error });
     }

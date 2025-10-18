@@ -5,6 +5,7 @@ import roadmapsRouter from "./routes/roadmaps.js";
 import nudgesRouter from "./routes/nudges.js";
 import conversationsRouter from "./routes/conversations.js";
 import adminRouter from "./routes/admin.js";
+import integrationsRouter from "./routes/integrations.js";
 
 export const router = Router();
 
@@ -25,6 +26,7 @@ router.use("/roadmaps", roadmapsRouter);
 router.use("/nudges", nudgesRouter);
 router.use("/conversations", conversationsRouter);
 router.use("/admin", adminRouter);
+router.use("/integrations", integrationsRouter);
 
 // Protected routes - require authentication
 router.post("/help", requireAuth, (req, res) => {

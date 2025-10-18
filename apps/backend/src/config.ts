@@ -41,6 +41,15 @@ export const config = {
     apiKey: (process.env.GEMINI_API_KEY || "").trim(),
   },
 
+  // Slack OAuth Configuration
+  slack: {
+    clientId: (process.env.SLACK_CLIENT_ID || "").trim(),
+    clientSecret: (process.env.SLACK_CLIENT_SECRET || "").trim(),
+    redirectUri: (
+      process.env.SLACK_REDIRECT_URI || "http://localhost:3000/api/integrations/slack/callback"
+    ).trim(),
+  },
+
   // Security
   jwtSecret: process.env.JWT_SECRET || "",
 };
@@ -55,6 +64,8 @@ export function validateConfig() {
     { key: "PINECONE_API_KEY", value: config.pinecone.apiKey },
     { key: "PINECONE_INDEX_NAME", value: config.pinecone.indexName },
     { key: "GEMINI_API_KEY", value: config.gemini.apiKey },
+    { key: "SLACK_CLIENT_ID", value: config.slack.clientId },
+    { key: "SLACK_CLIENT_SECRET", value: config.slack.clientSecret },
     { key: "JWT_SECRET", value: config.jwtSecret },
   ];
 

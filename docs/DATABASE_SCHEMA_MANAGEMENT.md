@@ -72,14 +72,14 @@ apps/backend/
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `drizzle.config.ts` | Drizzle Kit configuration (schema path, output dir, DB connection) |
-| `schema/index.ts` | Central export point for all schemas |
-| `schema/*.schema.ts` | Individual table definitions organized by feature |
-| `migrations/*.sql` | Auto-generated SQL for schema changes |
-| `seed.ts` | Script to populate database with test data |
-| `client.ts` | Database connection and Drizzle instance |
+| File                 | Purpose                                                            |
+| -------------------- | ------------------------------------------------------------------ |
+| `drizzle.config.ts`  | Drizzle Kit configuration (schema path, output dir, DB connection) |
+| `schema/index.ts`    | Central export point for all schemas                               |
+| `schema/*.schema.ts` | Individual table definitions organized by feature                  |
+| `migrations/*.sql`   | Auto-generated SQL for schema changes                              |
+| `seed.ts`            | Script to populate database with test data                         |
+| `client.ts`          | Database connection and Drizzle instance                           |
 
 ---
 
@@ -118,8 +118,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
 }));
 
 // 3. Type Inference
-export type User = typeof users.$inferSelect;      // For SELECT queries
-export type NewUser = typeof users.$inferInsert;   // For INSERT queries
+export type User = typeof users.$inferSelect; // For SELECT queries
+export type NewUser = typeof users.$inferInsert; // For INSERT queries
 ```
 
 ### Schema Export Pattern
@@ -142,9 +142,9 @@ This allows clean imports:
 import * as schema from "./db/schema/index";
 
 // Access any table
-schema.users
-schema.organizations
-schema.roadmapTemplates
+schema.users;
+schema.organizations;
+schema.roadmapTemplates;
 ```
 
 ---
@@ -163,7 +163,7 @@ schema.roadmapTemplates
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  phoneNumber: varchar("phone_number", { length: 20 }),  // NEW COLUMN
+  phoneNumber: varchar("phone_number", { length: 20 }), // NEW COLUMN
   // ... other columns
 });
 ```
@@ -178,7 +178,7 @@ export const users = pgTable("users", {
 const userData = [
   {
     email: "sarah@lorikeet.ai",
-    phoneNumber: "+1-555-0123",  // Add phone data
+    phoneNumber: "+1-555-0123", // Add phone data
     // ... other fields
   },
 ];
@@ -224,7 +224,7 @@ export type NewTeam = typeof teams.$inferInsert;
 ```typescript
 // apps/backend/src/db/schema/index.ts
 
-export * from "./teams.schema";  // Add this line
+export * from "./teams.schema"; // Add this line
 ```
 
 3. **Add seed function** (see [Updating Seed Script](#️-updating-seed-script-when-schema-changes))
@@ -250,12 +250,13 @@ export const userRoadmapTasks = pgTable("user_roadmap_tasks", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),  // Foreign key
+    .references(() => users.id, { onDelete: "cascade" }), // Foreign key
   // ... other columns
 });
 ```
 
 **Cascade Options**:
+
 - `onDelete: "cascade"` - Delete child rows when parent is deleted
 - `onDelete: "set null"` - Set child FK to null when parent is deleted
 - `onDelete: "no action"` - Prevent deletion if children exist
@@ -265,12 +266,16 @@ export const userRoadmapTasks = pgTable("user_roadmap_tasks", {
 ```typescript
 import { index } from "drizzle-orm/pg-core";
 
-export const users = pgTable("users", {
-  // ... columns
-}, (table) => ({
-  emailIdx: index("email_idx").on(table.email),
-  orgIdx: index("org_idx").on(table.organizationId),
-}));
+export const users = pgTable(
+  "users",
+  {
+    // ... columns
+  },
+  (table) => ({
+    emailIdx: index("email_idx").on(table.email),
+    orgIdx: index("org_idx").on(table.organizationId),
+  })
+);
 ```
 
 ---
@@ -284,17 +289,20 @@ Drizzle offers two approaches for applying schema changes:
 **Use for**: Local development, quick iterations, prototyping
 
 **Pros**:
+
 - ✅ Fast - No migration files
 - ✅ Simple - One command
 - ✅ Good for experimentation
 
 **Cons**:
+
 - ❌ No migration history
 - ❌ Can't rollback
 - ❌ Not safe for production
 - ❌ Team members must manually sync
 
 **Command**:
+
 ```bash
 npm run db:push --workspace=apps/backend
 ```
@@ -304,6 +312,7 @@ npm run db:push --workspace=apps/backend
 **Use for**: Production, team collaboration, version control
 
 **Pros**:
+
 - ✅ Version controlled SQL files
 - ✅ Reproducible across environments
 - ✅ Rollback capability
@@ -311,10 +320,12 @@ npm run db:push --workspace=apps/backend
 - ✅ Audit trail
 
 **Cons**:
+
 - ❌ Two-step process (generate + migrate)
 - ❌ Must commit migration files
 
 **Commands**:
+
 ```bash
 npm run db:generate --workspace=apps/backend  # Generate migration
 npm run db:migrate --workspace=apps/backend   # Apply migration
@@ -322,14 +333,14 @@ npm run db:migrate --workspace=apps/backend   # Apply migration
 
 ### When to Use Which
 
-| Scenario | Use |
-|----------|-----|
-| Local experimentation | `db:push` |
-| Team development | Migrations |
-| Production deployment | Migrations (ALWAYS) |
-| Quick prototype | `db:push` |
-| Adding test data | `db:push` + `db:seed` |
-| Preparing for PR | Migrations |
+| Scenario              | Use                   |
+| --------------------- | --------------------- |
+| Local experimentation | `db:push`             |
+| Team development      | Migrations            |
+| Production deployment | Migrations (ALWAYS)   |
+| Quick prototype       | `db:push`             |
+| Adding test data      | `db:push` + `db:seed` |
+| Preparing for PR      | Migrations            |
 
 ---
 
@@ -338,20 +349,23 @@ npm run db:migrate --workspace=apps/backend   # Apply migration
 ### Quick Start
 
 1. **Modify your schema**:
+
    ```typescript
    // apps/backend/src/db/schema/users.schema.ts
    export const users = pgTable("users", {
      // ... existing columns
-     bio: varchar("bio", { length: 500 }),  // NEW
+     bio: varchar("bio", { length: 500 }), // NEW
    });
    ```
 
 2. **Push to database**:
+
    ```bash
    npm run db:push --workspace=apps/backend
    ```
 
 3. **Output**:
+
    ```
    No config path provided, using default 'drizzle.config.ts'
    Reading config file '/path/to/drizzle.config.ts'
@@ -400,12 +414,14 @@ npm run db:generate --workspace=apps/backend
 ```
 
 **What happens**:
+
 1. Drizzle Kit analyzes your schema files
 2. Compares with previous migration state
 3. Generates SQL file in `src/db/migrations/`
 4. Prompts for migration name (optional)
 
 **Example Output**:
+
 ```
 No config path provided, using default 'drizzle.config.ts'
 Reading config file '/path/to/drizzle.config.ts'
@@ -417,6 +433,7 @@ Generated 1 migration:
 ```
 
 **Generated SQL** (`migrations/0004_users_add_bio_column.sql`):
+
 ```sql
 ALTER TABLE "users" ADD COLUMN "bio" varchar(500);
 ```
@@ -430,6 +447,7 @@ cat apps/backend/src/db/migrations/0004_users_add_bio_column.sql
 ```
 
 Check for:
+
 - ✅ Correct table names
 - ✅ Correct column types
 - ✅ Foreign keys are correct
@@ -443,12 +461,14 @@ npm run db:migrate --workspace=apps/backend
 ```
 
 **What happens**:
+
 1. Connects to database
 2. Checks which migrations have been applied
 3. Runs new migrations in order
 4. Records migration in `__drizzle_migrations` table
 
 **Output**:
+
 ```
 No config path provided, using default 'drizzle.config.ts'
 Reading config file '/path/to/drizzle.config.ts'
@@ -467,6 +487,7 @@ git commit -m "Add bio column to users table"
 ```
 
 **Important**: Commit both:
+
 - The `.sql` file
 - The `meta/*.json` metadata files
 
@@ -483,6 +504,7 @@ npm run db:seed --workspace=apps/backend
 ```
 
 **What it does**:
+
 1. Clears existing data (deletes Supabase Auth users + database tables)
 2. Seeds organization
 3. Creates test users (with Supabase Auth accounts)
@@ -490,6 +512,7 @@ npm run db:seed --workspace=apps/backend
 5. Links related data (e.g., tasks to sources)
 
 **Output**:
+
 ```
 🌱 Starting database seed for Lorikeet...
 
@@ -543,7 +566,7 @@ const organization = await seedOrganization();
 const users = await seedUsers(organization.id);
 const materials = await seedSourceMaterials(organization.id);
 const templates = await seedTemplates(organization.id, materials);
-await linkTasksToSources(materials);  // Junction table
+await linkTasksToSources(materials); // Junction table
 const assignments = await seedUserAssignments(users, templates);
 await seedUserRoadmapTasks(users, templates, assignments);
 // ... etc
@@ -621,7 +644,7 @@ async function seedUsers(organizationId: string) {
 // Schema: Added required `department` column
 export const users = pgTable("users", {
   // ... other columns
-  department: varchar("department", { length: 100 }).notNull(),  // NEW!
+  department: varchar("department", { length: 100 }).notNull(), // NEW!
 });
 
 // Seed script: Still missing department
@@ -641,25 +664,27 @@ const userData = [
 #### 1. Adding a Required Column
 
 **Schema Change**:
+
 ```typescript
 export const users = pgTable("users", {
   // ... existing columns
-  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),  // NEW
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull(), // NEW
 });
 ```
 
 **Seed Update**:
+
 ```typescript
 const userData = [
   {
     email: "sarah@lorikeet.ai",
     firstName: "Sarah",
-    phoneNumber: "+1-555-0123",  // ADD THIS
+    phoneNumber: "+1-555-0123", // ADD THIS
   },
   {
     email: "emily@lorikeet.ai",
     firstName: "Emily",
-    phoneNumber: "+1-555-0456",  // ADD THIS
+    phoneNumber: "+1-555-0456", // ADD THIS
   },
 ];
 ```
@@ -667,6 +692,7 @@ const userData = [
 #### 2. Adding a New Table
 
 **Schema Change**:
+
 ```typescript
 // apps/backend/src/db/schema/teams.schema.ts
 export const teams = pgTable("teams", {
@@ -677,6 +703,7 @@ export const teams = pgTable("teams", {
 ```
 
 **Seed Update**:
+
 ```typescript
 // apps/backend/src/db/seed.ts
 
@@ -684,11 +711,14 @@ export const teams = pgTable("teams", {
 async function seedTeams(organizationId: string) {
   console.log("👥 Seeding teams...");
 
-  const teams = await db.insert(schema.teams).values([
-    { name: "Engineering", organizationId },
-    { name: "Product", organizationId },
-    { name: "Design", organizationId },
-  ]).returning();
+  const teams = await db
+    .insert(schema.teams)
+    .values([
+      { name: "Engineering", organizationId },
+      { name: "Product", organizationId },
+      { name: "Design", organizationId },
+    ])
+    .returning();
 
   console.log(`✅ Created ${teams.length} teams`);
   return teams;
@@ -697,7 +727,7 @@ async function seedTeams(organizationId: string) {
 // Call in main seed function
 async function main() {
   const organization = await seedOrganization();
-  const teams = await seedTeams(organization.id);  // ADD THIS
+  const teams = await seedTeams(organization.id); // ADD THIS
   const users = await seedUsers(organization.id);
   // ... etc
 }
@@ -706,24 +736,26 @@ async function main() {
 #### 3. Adding a Foreign Key / Relationship
 
 **Schema Change**:
+
 ```typescript
 export const users = pgTable("users", {
   // ... existing columns
-  teamId: uuid("team_id").references(() => teams.id),  // NEW FK
+  teamId: uuid("team_id").references(() => teams.id), // NEW FK
 });
 ```
 
 **Seed Update**:
+
 ```typescript
 async function seedUsers(organizationId: string, teams: schema.Team[]) {
   const userData = [
     {
       email: "sarah@lorikeet.ai",
-      teamId: teams[0].id,  // Reference engineering team
+      teamId: teams[0].id, // Reference engineering team
     },
     {
       email: "emily@lorikeet.ai",
-      teamId: teams[0].id,  // Reference engineering team
+      teamId: teams[0].id, // Reference engineering team
     },
   ];
 
@@ -734,7 +766,7 @@ async function seedUsers(organizationId: string, teams: schema.Team[]) {
 async function main() {
   const organization = await seedOrganization();
   const teams = await seedTeams(organization.id);
-  const users = await seedUsers(organization.id, teams);  // Pass teams!
+  const users = await seedUsers(organization.id, teams); // Pass teams!
   // ... etc
 }
 ```
@@ -742,17 +774,27 @@ async function main() {
 #### 4. Adding a Junction Table (Many-to-Many)
 
 **Schema Change**:
+
 ```typescript
 // apps/backend/src/db/schema/user-teams.schema.ts
-export const userTeams = pgTable("user_teams", {
-  userId: uuid("user_id").notNull().references(() => users.id),
-  teamId: uuid("team_id").notNull().references(() => teams.id),
-}, (table) => ({
-  pk: primaryKey({ columns: [table.userId, table.teamId] }),
-}));
+export const userTeams = pgTable(
+  "user_teams",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.teamId] }),
+  })
+);
 ```
 
 **Seed Update**:
+
 ```typescript
 async function seedUserTeams(users: schema.User[], teams: schema.Team[]) {
   console.log("🔗 Linking users to teams...");
@@ -774,7 +816,7 @@ async function main() {
   const organization = await seedOrganization();
   const teams = await seedTeams(organization.id);
   const users = await seedUsers(organization.id);
-  await seedUserTeams(users, teams);  // ADD THIS
+  await seedUserTeams(users, teams); // ADD THIS
   // ... etc
 }
 ```
@@ -782,6 +824,7 @@ async function main() {
 #### 5. Changing Column Type
 
 **Schema Change**:
+
 ```typescript
 // Before
 currentWeek: integer("current_week").default(1),
@@ -791,15 +834,14 @@ currentWeek: varchar("current_week", { length: 10 }).default("Week 1"),
 ```
 
 **Seed Update**:
+
 ```typescript
 // Before
-const userData = [
-  { currentWeek: 3 },
-];
+const userData = [{ currentWeek: 3 }];
 
 // After
 const userData = [
-  { currentWeek: "Week 3" },  // Update to string!
+  { currentWeek: "Week 3" }, // Update to string!
 ];
 ```
 
@@ -808,6 +850,7 @@ const userData = [
 When we added `sources` to roadmap tasks, we had to:
 
 **1. Schema Change** (already existed):
+
 ```typescript
 // roadmap-templates.schema.ts
 export const roadmapTemplateSources = pgTable("roadmap_template_sources", {
@@ -817,6 +860,7 @@ export const roadmapTemplateSources = pgTable("roadmap_template_sources", {
 ```
 
 **2. Seed Script Update**:
+
 ```typescript
 // seed.ts - Added new function
 async function linkTasksToSources(materials: schema.SourceMaterial[]) {
@@ -847,7 +891,7 @@ async function main() {
   // ...
   const materials = await seedSourceMaterials(organization.id);
   const templates = await seedTemplates(organization.id, materials);
-  await linkTasksToSources(materials);  // NEW LINE! ✨
+  await linkTasksToSources(materials); // NEW LINE! ✨
   // ...
 }
 ```
@@ -1003,6 +1047,7 @@ npm run db:migrate --workspace=apps/backend
 ```
 
 **⚠️ If migration was already pushed and others have applied it**:
+
 - DON'T delete the migration
 - Create a new migration to fix it
 - Or coordinate with team to reset migrations
@@ -1048,12 +1093,14 @@ npm run db:studio --workspace=apps/backend
 ### 1. Never Modify Existing Migrations
 
 **❌ DON'T**:
+
 ```bash
 # Edit a migration that's already been applied
 vim apps/backend/src/db/migrations/0001_old_migration.sql
 ```
 
 **✅ DO**:
+
 ```bash
 # Create a new migration to make changes
 npm run db:generate --workspace=apps/backend
@@ -1072,6 +1119,7 @@ cat apps/backend/src/db/migrations/0005_new_migration.sql
 ```
 
 **Check for**:
+
 - ✅ Correct table/column names
 - ✅ Appropriate data types
 - ⚠️ Data loss operations (DROP, ALTER TYPE)
@@ -1156,12 +1204,12 @@ Add a comment in the migration file and notify team.
 
 ### 8. Use db:push for Local, Migrations for Production
 
-| Environment | Use |
-|-------------|-----|
-| Local dev | `db:push` (fast iteration) |
-| Staging | Migrations (reproducible) |
-| Production | Migrations (ALWAYS) |
-| CI/CD | Migrations (automated deployments) |
+| Environment | Use                                |
+| ----------- | ---------------------------------- |
+| Local dev   | `db:push` (fast iteration)         |
+| Staging     | Migrations (reproducible)          |
+| Production  | Migrations (ALWAYS)                |
+| CI/CD       | Migrations (automated deployments) |
 
 ---
 
@@ -1189,10 +1237,11 @@ export const users = pgTable("users", {
 **Note**: `updatedAt` doesn't auto-update. Update it manually:
 
 ```typescript
-await db.update(schema.users)
+await db
+  .update(schema.users)
   .set({
     firstName: "New Name",
-    updatedAt: new Date(),  // Explicitly set
+    updatedAt: new Date(), // Explicitly set
   })
   .where(eq(schema.users.id, userId));
 ```
@@ -1212,15 +1261,18 @@ export const userRoadmapTasks = pgTable("user_roadmap_tasks", {
 
 ```typescript
 export const integrations = pgTable("integrations", {
-  metadata: jsonb("metadata").$type<{
-    webhookUrl?: string;
-    apiVersion?: string;
-    customSettings?: Record<string, any>;
-  }>().default({}),
+  metadata: jsonb("metadata")
+    .$type<{
+      webhookUrl?: string;
+      apiVersion?: string;
+      customSettings?: Record<string, any>;
+    }>()
+    .default({}),
 });
 ```
 
 **Usage**:
+
 ```typescript
 await db.insert(schema.integrations).values({
   metadata: {
@@ -1233,11 +1285,13 @@ await db.insert(schema.integrations).values({
 ### Pattern 5: Enums vs Varchar
 
 **Option A: Varchar** (what Mitable uses):
+
 ```typescript
 role: varchar("role", { length: 50 }).notNull(),  // 'admin' | 'employee'
 ```
 
 **Option B: PostgreSQL Enum**:
+
 ```typescript
 import { pgEnum } from "drizzle-orm/pg-core";
 
@@ -1253,16 +1307,20 @@ export const users = pgTable("users", {
 ### Pattern 6: Junction Tables (Many-to-Many)
 
 ```typescript
-export const roadmapTemplateSources = pgTable("roadmap_template_sources", {
-  templateTaskId: uuid("template_task_id")
-    .notNull()
-    .references(() => roadmapTemplateTasks.id, { onDelete: "cascade" }),
-  sourceId: uuid("source_id")
-    .notNull()
-    .references(() => sourceMaterials.id, { onDelete: "cascade" }),
-}, (table) => ({
-  pk: primaryKey({ columns: [table.templateTaskId, table.sourceId] }),
-}));
+export const roadmapTemplateSources = pgTable(
+  "roadmap_template_sources",
+  {
+    templateTaskId: uuid("template_task_id")
+      .notNull()
+      .references(() => roadmapTemplateTasks.id, { onDelete: "cascade" }),
+    sourceId: uuid("source_id")
+      .notNull()
+      .references(() => sourceMaterials.id, { onDelete: "cascade" }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.templateTaskId, table.sourceId] }),
+  })
+);
 ```
 
 **Composite primary key**: Both columns together are unique.
@@ -1274,6 +1332,7 @@ export const roadmapTemplateSources = pgTable("roadmap_template_sources", {
 ### Error: "Column does not exist"
 
 **Symptom**:
+
 ```
 PostgresError: column "phone_number" does not exist
 ```
@@ -1281,6 +1340,7 @@ PostgresError: column "phone_number" does not exist
 **Cause**: Schema changed but database not updated
 
 **Fix**:
+
 ```bash
 # Development
 npm run db:push --workspace=apps/backend
@@ -1295,6 +1355,7 @@ npm run db:migrate --workspace=apps/backend
 ### Error: "Null value violates not-null constraint"
 
 **Symptom**:
+
 ```
 PostgresError: null value in column "department" violates not-null constraint
 ```
@@ -1302,11 +1363,12 @@ PostgresError: null value in column "department" violates not-null constraint
 **Cause**: Seed script missing required column
 
 **Fix**: Update seed script to provide value:
+
 ```typescript
 const userData = [
   {
     email: "sarah@lorikeet.ai",
-    department: "Engineering",  // ADD THIS
+    department: "Engineering", // ADD THIS
   },
 ];
 ```
@@ -1316,6 +1378,7 @@ const userData = [
 ### Error: "Foreign key constraint violation"
 
 **Symptom**:
+
 ```
 PostgresError: insert or update on table "users" violates foreign key constraint
 ```
@@ -1323,13 +1386,14 @@ PostgresError: insert or update on table "users" violates foreign key constraint
 **Cause**: Trying to insert row with FK that doesn't exist
 
 **Fix**: Ensure referenced data is seeded first:
+
 ```typescript
 // ✅ Correct order
 const organization = await seedOrganization();
-const users = await seedUsers(organization.id);  // References organization
+const users = await seedUsers(organization.id); // References organization
 
 // ❌ Wrong order
-const users = await seedUsers(organization.id);  // organization not created yet!
+const users = await seedUsers(organization.id); // organization not created yet!
 const organization = await seedOrganization();
 ```
 
@@ -1338,6 +1402,7 @@ const organization = await seedOrganization();
 ### Error: "Cannot connect to database"
 
 **Symptom**:
+
 ```
 Error: connect ECONNREFUSED
 ```
@@ -1345,6 +1410,7 @@ Error: connect ECONNREFUSED
 **Cause**: DATABASE_URL is incorrect or database is down
 
 **Fix**:
+
 ```bash
 # 1. Check .env file
 cat apps/backend/.env
@@ -1361,6 +1427,7 @@ psql $DATABASE_URL
 ### Error: "Migration already applied"
 
 **Symptom**:
+
 ```
 Error: Migration 0005_* already applied
 ```
@@ -1370,6 +1437,7 @@ Error: Migration 0005_* already applied
 **Fix**: This is expected behavior. Drizzle tracks applied migrations.
 
 If you need to re-apply:
+
 ```sql
 -- Connect to database
 psql $DATABASE_URL
@@ -1388,6 +1456,7 @@ DELETE FROM __drizzle_migrations WHERE name = '0005_migration_name';
 ### Error: Seed script fails after schema change
 
 **Symptom**:
+
 ```
 Error: Seed failed at seedUsers
 ```
@@ -1431,21 +1500,21 @@ const user = await db.query.users.findFirst({
 });
 
 // INSERT
-const [newUser] = await db.insert(schema.users).values({
-  email: "new@example.com",
-  firstName: "New",
-  role: "employee",
-  organizationId: "uuid",
-}).returning();
+const [newUser] = await db
+  .insert(schema.users)
+  .values({
+    email: "new@example.com",
+    firstName: "New",
+    role: "employee",
+    organizationId: "uuid",
+  })
+  .returning();
 
 // UPDATE
-await db.update(schema.users)
-  .set({ firstName: "Updated" })
-  .where(eq(schema.users.id, userId));
+await db.update(schema.users).set({ firstName: "Updated" }).where(eq(schema.users.id, userId));
 
 // DELETE
-await db.delete(schema.users)
-  .where(eq(schema.users.id, userId));
+await db.delete(schema.users).where(eq(schema.users.id, userId));
 
 // JOIN
 const usersWithOrg = await db.query.users.findMany({
@@ -1455,16 +1524,12 @@ const usersWithOrg = await db.query.users.findMany({
 });
 
 // WHERE
-const admins = await db.select()
-  .from(schema.users)
-  .where(eq(schema.users.role, "admin"));
+const admins = await db.select().from(schema.users).where(eq(schema.users.role, "admin"));
 
-const filtered = await db.select()
+const filtered = await db
+  .select()
   .from(schema.users)
-  .where(and(
-    eq(schema.users.role, "admin"),
-    eq(schema.users.status, "active")
-  ));
+  .where(and(eq(schema.users.role, "admin"), eq(schema.users.status, "active")));
 ```
 
 ### Schema Definition Cheat Sheet
@@ -1534,6 +1599,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
 **Get Supabase connection string**:
+
 1. Go to Supabase dashboard
 2. Settings → Database
 3. Copy "Connection string" → "URI"

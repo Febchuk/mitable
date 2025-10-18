@@ -8,13 +8,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ArrowRight, MessageSquare, FileText } from "lucide-react";
+import { ArrowRight, Loader2, MessageSquare, FileText } from "lucide-react";
+import { authService } from "@/console/src/services/authService";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 interface SlackConnectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConnect: (token: string) => void;
+  onConnect: () => void;
 }
 
 export default function SlackConnectDialog({
@@ -22,12 +24,48 @@ export default function SlackConnectDialog({
   onOpenChange,
   onConnect,
 }: SlackConnectDialogProps) {
-  const [botToken, setBotToken] = useState("");
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleConnect = () => {
-    if (botToken.trim()) {
-      onConnect(botToken.trim());
-      setBotToken("");
+  const handleConnect = async () => {
+    try {
+      setIsConnecting(true);
+      setError(null);
+
+      // Request OAuth URL from backend
+      const token = authService.getAccessToken();
+      if (!token) {
+        throw new Error("Not authenticated. Please log in again.");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/oauth/start`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to start OAuth flow");
+      }
+
+      const { authUrl } = await response.json();
+
+      // Open OAuth URL in system browser
+      window.open(authUrl, "_blank");
+
+      // Close dialog
+      onOpenChange(false);
+
+      // Call onConnect callback to trigger polling
+      onConnect();
+    } catch (err) {
+      console.error("Error starting Slack OAuth:", err);
+      setError(err instanceof Error ? err.message : "Failed to connect to Slack");
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -35,85 +73,66 @@ export default function SlackConnectDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl bg-background-elevated border-border-subtle">
         <DialogHeader>
-          <DialogTitle className="text-2xl text-text-primary">Connect Slack Bot Token</DialogTitle>
+          <DialogTitle className="text-2xl text-text-primary">Connect Slack Workspace</DialogTitle>
           <DialogDescription className="text-text-secondary">
-            Enter your Slack bot token to connect your workspace. Bot tokens provide secure, scoped
-            access to only invited channels.
+            Connect your Slack workspace to Mitable for AI-powered knowledge retrieval. You'll be
+            redirected to Slack to authorize access.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Why Bot Token Section */}
+          {/* What Happens Section */}
           <div className="bg-background-secondary rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <MessageSquare size={20} className="text-primary" />
-              <h3 className="font-semibold text-text-primary">Why Bot Token?</h3>
-            </div>
-            <ul className="space-y-2 text-sm text-text-secondary ml-7">
-              <li>• Secure, granular permissions - only access invited channels</li>
-              <li>• Admin gatekeeping - bot must be invited to channels</li>
-              <li>• No user impersonation - avoids broader access like DMs</li>
-              <li>• Future-proof for Events API and real-time syncing</li>
-            </ul>
-          </div>
-
-          {/* Setup Instructions Section */}
-          <div className="bg-background-secondary rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <FileText size={20} className="text-primary" />
-              <h3 className="font-semibold text-text-primary">Setup Instructions:</h3>
+              <h3 className="font-semibold text-text-primary">What Happens Next:</h3>
             </div>
             <ol className="space-y-2 text-sm text-text-secondary ml-7 list-decimal list-inside">
-              <li>
-                Go to{" "}
-                <a
-                  href="https://api.slack.com/apps"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  Slack API
-                </a>{" "}
-                and create a new app
-              </li>
-              <li>Navigate to "OAuth & Permissions" in the sidebar</li>
-              <li>
-                Add bot token scopes:{" "}
-                <code className="font-mono text-xs bg-background-primary px-2 py-1 rounded text-text-primary">
-                  channels:read, channels:history, groups:read, groups:history, im:read, mpim:read
-                </code>
-              </li>
-              <li>Install the app to your workspace</li>
-              <li>
-                Copy the "Bot User OAuth Token" (starts with{" "}
-                <code className="font-mono text-xs bg-background-primary px-1 rounded text-text-primary">
-                  xoxb-
-                </code>
-                )
-              </li>
-              <li>
-                Invite the bot to channels you want to embed by pasting this command{" "}
-                <code className="font-mono text-xs bg-background-primary px-2 py-1 rounded text-text-primary">
-                  /invite @app_name
-                </code>
-              </li>
+              <li>You'll be redirected to Slack to authorize Mitable</li>
+              <li>Select your Slack workspace from the dropdown</li>
+              <li>Review the permissions and click "Allow"</li>
+              <li>The Mitable bot will be installed in your workspace</li>
+              <li>You'll return here to select which channels to sync</li>
             </ol>
           </div>
 
-          {/* Bot Token Input */}
-          <div className="space-y-2">
-            <label htmlFor="bot-token" className="text-sm font-medium text-text-primary">
-              Bot Token
-            </label>
-            <Input
-              id="bot-token"
-              type="text"
-              placeholder="xoxb-your-bot-token-here"
-              value={botToken}
-              onChange={(e) => setBotToken(e.target.value)}
-              className="bg-background-primary border-border-subtle text-text-primary placeholder:text-text-tertiary"
-            />
+          {/* Permissions Section */}
+          <div className="bg-background-secondary rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <FileText size={20} className="text-primary" />
+              <h3 className="font-semibold text-text-primary">Required Permissions:</h3>
+            </div>
+            <ul className="space-y-2 text-sm text-text-secondary ml-7">
+              <li>
+                • <strong>channels:read, channels:history</strong> - Read public channel messages
+              </li>
+              <li>
+                • <strong>groups:read, groups:history</strong> - Read private channel messages
+              </li>
+              <li>
+                • <strong>users:read</strong> - Get user information for attribution
+              </li>
+            </ul>
           </div>
+
+          {/* Important Note */}
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+            <p className="text-sm text-text-secondary">
+              <strong className="text-text-primary">Important:</strong> After connecting, you'll
+              need to invite the Mitable bot to specific channels using{" "}
+              <code className="font-mono text-xs bg-background-primary px-2 py-1 rounded text-text-primary">
+                /invite @Mitable
+              </code>{" "}
+              in Slack. Only invited channels will be accessible.
+            </p>
+          </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">
@@ -121,16 +140,26 @@ export default function SlackConnectDialog({
             variant="ghost"
             onClick={() => onOpenChange(false)}
             className="text-text-secondary"
+            disabled={isConnecting}
           >
             Cancel
           </Button>
           <Button
             onClick={handleConnect}
-            disabled={!botToken.trim()}
+            disabled={isConnecting}
             className="bg-primary hover:bg-primary/90 text-white gap-2"
           >
-            Connect & Continue
-            <ArrowRight size={16} />
+            {isConnecting ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Opening Slack...
+              </>
+            ) : (
+              <>
+                Connect to Slack
+                <ArrowRight size={16} />
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
