@@ -14,7 +14,16 @@ export const authRouter = Router();
  *     tags:
  *       - Authentication
  *     summary: Create organization and admin account
- *     description: Register a new organization with the first admin user. This creates both the organization and the admin account in one atomic operation.
+ *     description: |
+ *       Register a new organization with the first admin user. This endpoint performs several operations atomically:
+ *
+ *       1. **Orphan Detection & Cleanup**: Checks for orphaned Supabase Auth users (users that exist in Auth but not in database from failed previous signups). If found, automatically deletes them before proceeding.
+ *       2. **Organization Creation**: Creates a new organization record
+ *       3. **Admin User Creation**: Creates admin user via Supabase Admin API with auto-confirmed email (bypasses email verification)
+ *       4. **Role Assignment**: Database trigger creates user with 'employee' role, then updates to 'admin'
+ *       5. **Auto-Login**: Automatically signs in the new admin user and returns session tokens
+ *
+ *       If auto-login fails, the organization and user are still created successfully, but session will be null with a message to login manually.
  *     requestBody:
  *       required: true
  *       content:
@@ -52,7 +61,7 @@ export const authRouter = Router();
  *                 example: acme.com
  *     responses:
  *       201:
- *         description: Organization and admin created successfully
+ *         description: Organization and admin created successfully (auto-login succeeded)
  *         content:
  *           application/json:
  *             schema:
@@ -71,7 +80,10 @@ export const authRouter = Router();
  *                       type: string
  *                       format: email
  *                 session:
- *                   $ref: '#/components/schemas/Session'
+ *                   allOf:
+ *                     - $ref: '#/components/schemas/Session'
+ *                     - nullable: true
+ *                       description: Session tokens if auto-login succeeded, null if auto-login failed
  *                 organization:
  *                   type: object
  *                   properties:
@@ -85,16 +97,52 @@ export const authRouter = Router();
  *                       nullable: true
  *                 profile:
  *                   $ref: '#/components/schemas/User'
+ *                 message:
+ *                   type: string
+ *                   description: Optional message, included if auto-login failed
+ *                   example: Organization created. Please login to continue.
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       409:
- *         description: Conflict - Organization with this domain already exists
+ *         description: Conflict - Email already exists or organization domain already exists
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       enum: [EMAIL_ALREADY_EXISTS, CONFLICT]
+ *                       example: EMAIL_ALREADY_EXISTS
+ *                     message:
+ *                       type: string
+ *                       example: A user with this email already exists
  *       500:
- *         $ref: '#/components/responses/InternalError'
+ *         description: Internal server error or cleanup failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       enum: [CLEANUP_FAILED, INTERNAL_ERROR, SIGNUP_FAILED]
+ *                       example: CLEANUP_FAILED
+ *                     message:
+ *                       type: string
+ *                       example: Unable to cleanup incomplete previous signup. Please contact support.
  *     security: []
  */
 authRouter.post("/signup-organization", async (req: Request, res: Response) => {
