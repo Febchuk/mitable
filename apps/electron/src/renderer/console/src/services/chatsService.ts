@@ -79,3 +79,125 @@ export async function sendMessage(
     body: JSON.stringify(data),
   });
 }
+
+/**
+ * Stream chunk from SSE
+ */
+export interface StreamChunk {
+  type: "chunk" | "complete" | "error" | "done";
+  content?: string;
+  messageId?: string;
+  error?: string;
+}
+
+/**
+ * Stream callbacks
+ */
+export interface StreamCallbacks {
+  onChunk?: (content: string) => void;
+  onComplete?: (fullContent: string) => void;
+  onDone?: (messageId: string) => void;
+  onError?: (error: string) => void;
+}
+
+/**
+ * Send a message and stream the AI response
+ *
+ * Uses Server-Sent Events (SSE) to receive real-time streaming responses.
+ * The user message is saved immediately, and the assistant response is streamed
+ * word-by-word as it's generated.
+ *
+ * @param conversationId - The conversation ID
+ * @param content - The user message content
+ * @param callbacks - Callbacks for handling stream events
+ * @param token - Auth token
+ * @returns Promise that resolves when streaming completes
+ */
+export async function sendStreamingMessage(
+  conversationId: string,
+  content: string,
+  callbacks: StreamCallbacks,
+  token: string
+): Promise<void> {
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+
+  return new Promise((resolve, reject) => {
+    // Use fetch with streaming instead of EventSource for better control
+    fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content }),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        if (!response.body) {
+          throw new Error("No response body");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        // Read stream
+        const read = (): Promise<void> => {
+          return reader.read().then(({ done, value }) => {
+            if (done) {
+              resolve();
+              return;
+            }
+
+            // Decode chunk
+            buffer += decoder.decode(value, { stream: true });
+
+            // Process complete SSE messages
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6); // Remove "data: " prefix
+
+                if (data === "") continue; // Empty data line
+                if (data.startsWith(":")) continue; // Comment (ping)
+
+                try {
+                  const chunk: StreamChunk = JSON.parse(data);
+
+                  if (chunk.type === "chunk" && chunk.content) {
+                    callbacks.onChunk?.(chunk.content);
+                  } else if (chunk.type === "complete" && chunk.content) {
+                    callbacks.onComplete?.(chunk.content);
+                  } else if (chunk.type === "done" && chunk.messageId) {
+                    callbacks.onDone?.(chunk.messageId);
+                  } else if (chunk.type === "error" && chunk.error) {
+                    callbacks.onError?.(chunk.error);
+                    reject(new Error(chunk.error));
+                  }
+                } catch (parseError) {
+                  console.error("Error parsing SSE data:", parseError, data);
+                }
+              }
+            }
+
+            // Continue reading
+            return read();
+          });
+        };
+
+        return read();
+      })
+      .catch((error) => {
+        console.error("Streaming error:", error);
+        callbacks.onError?.(
+          error instanceof Error ? error.message : "Streaming failed"
+        );
+        reject(error);
+      });
+  });
+}

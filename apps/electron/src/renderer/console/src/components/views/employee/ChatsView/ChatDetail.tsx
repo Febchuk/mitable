@@ -11,16 +11,33 @@ export default function ChatDetail() {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
   const { data: chats = [] } = useConversations();
-  const sendMessageMutation = useSendMessage();
   const [inputValue, setInputValue] = useState("");
+  const [streamingContent, setStreamingContent] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const sendMessageMutation = useSendMessage({
+    onChunk: (chunk: string) => {
+      setStreamingContent((prev) => prev + chunk);
+    },
+    onComplete: (fullContent: string) => {
+      setStreamingContent("");
+      setIsStreaming(false);
+    },
+    onError: (error: string) => {
+      console.error("Streaming error:", error);
+      setStreamingContent("");
+      setIsStreaming(false);
+      // TODO: Show error toast notification
+    },
+  });
 
   const chat = chats.find((c) => c.id === chatId);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages change or streaming content updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chat?.messages]);
+  }, [chat?.messages, streamingContent]);
 
   if (!chat) {
     return (
@@ -41,19 +58,17 @@ export default function ChatDetail() {
     e.preventDefault();
     if (!inputValue.trim() || !chatId) return;
 
-    // Send user message
+    // Start streaming
+    setIsStreaming(true);
+    setStreamingContent("");
+
+    // Send user message and stream AI response
     sendMessageMutation.mutate({
       chatId,
-      message: {
-        role: "user",
-        content: inputValue.trim(),
-        type: "text",
-      },
+      content: inputValue.trim(),
     });
 
     setInputValue("");
-
-    // TODO: AI response should come from backend, not simulated here
   };
 
   return (
@@ -117,6 +132,15 @@ export default function ChatDetail() {
             <AIMessage key={message.id} content={message.content} />
           );
         })}
+
+        {/* Streaming message */}
+        {isStreaming && (
+          <AIMessage
+            content={streamingContent || "Thinking..."}
+            isStreaming={true}
+          />
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 

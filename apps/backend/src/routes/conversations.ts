@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
+import { agentService } from "../services/agent.service";
 
 const router = Router();
 
@@ -512,6 +513,249 @@ router.post(
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to send message",
       });
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /conversations/{conversationId}/messages/stream:
+ *   post:
+ *     tags:
+ *       - Conversations
+ *     summary: Send a message and stream AI response
+ *     description: Send a user message and receive a streaming AI response in real-time via Server-Sent Events (SSE)
+ *     parameters:
+ *       - in: path
+ *         name: conversationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the conversation
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - content
+ *             properties:
+ *               content:
+ *                 type: string
+ *                 description: User message content
+ *                 example: How do I submit a pull request?
+ *     responses:
+ *       200:
+ *         description: Streaming response (SSE)
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 type:
+ *                   type: string
+ *                   enum: [chunk, complete, error]
+ *                 content:
+ *                   type: string
+ *                 messageId:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post(
+  "/:conversationId/messages/stream",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.user?.id || req.userId;
+    const { conversationId } = req.params;
+    const { content } = req.body;
+
+    if (!userId) {
+      res.status(401).json({
+        error: "Unauthorized",
+        message: "User not authenticated",
+      });
+      return;
+    }
+
+    if (!content) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "content is required",
+      });
+      return;
+    }
+
+    try {
+      // Verify conversation belongs to user
+      const [conversation] = await db
+        .select()
+        .from(schema.conversations)
+        .where(eq(schema.conversations.id, conversationId))
+        .limit(1);
+
+      if (!conversation) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Conversation not found",
+        });
+        return;
+      }
+
+      if (conversation.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to access this conversation",
+        });
+        return;
+      }
+
+      // Save user message to database
+      const [userMessage] = await db
+        .insert(schema.messages)
+        .values({
+          conversationId,
+          role: "user",
+          content,
+          messageType: "text",
+        })
+        .returning({
+          id: schema.messages.id,
+          role: schema.messages.role,
+          content: schema.messages.content,
+          createdAt: schema.messages.createdAt,
+        });
+
+      console.log(`[Stream] User message saved: ${userMessage.id}`);
+
+      // Get recent conversation history (last 20 messages for context)
+      const historyData = await db
+        .select({
+          id: schema.messages.id,
+          role: schema.messages.role,
+          content: schema.messages.content,
+          messageType: schema.messages.messageType,
+          cardData: schema.messages.cardData,
+          sources: schema.messages.sources,
+          createdAt: schema.messages.createdAt,
+        })
+        .from(schema.messages)
+        .where(eq(schema.messages.conversationId, conversationId))
+        .orderBy(sql`${schema.messages.createdAt} DESC`)
+        .limit(20);
+
+      // Reverse to get chronological order (oldest first)
+      const conversationHistory = historyData.reverse();
+
+      // Set up Server-Sent Events (SSE)
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
+
+      // Keep connection alive
+      const keepAliveInterval = setInterval(() => {
+        res.write(":ping\n\n");
+      }, 15000);
+
+      let assistantContent = "";
+
+      try {
+        // Stream AI response
+        const stream = agentService.processMessage(content, {
+          conversationId,
+          userId,
+          conversationHistory: conversationHistory.map((msg) => ({
+            id: msg.id,
+            conversationId,
+            role: msg.role as "user" | "assistant",
+            content: msg.content,
+            messageType: msg.messageType || "text",
+            cardData: msg.cardData || null,
+            sources: (msg.sources as any) || [],
+            createdAt: msg.createdAt,
+          })),
+        });
+
+        for await (const chunk of stream) {
+          // Send chunk to client
+          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+
+          // Accumulate content for database save
+          if (chunk.type === "chunk" && chunk.content) {
+            assistantContent += chunk.content;
+          } else if (chunk.type === "complete" && chunk.content) {
+            assistantContent = chunk.content;
+          }
+        }
+
+        // Save complete assistant message to database
+        const [assistantMessage] = await db
+          .insert(schema.messages)
+          .values({
+            conversationId,
+            role: "assistant",
+            content: assistantContent,
+            messageType: "text",
+          })
+          .returning({
+            id: schema.messages.id,
+          });
+
+        console.log(`[Stream] Assistant message saved: ${assistantMessage.id}`);
+
+        // Update conversation's updatedAt timestamp
+        await db
+          .update(schema.conversations)
+          .set({ updatedAt: new Date() })
+          .where(eq(schema.conversations.id, conversationId));
+
+        // Send final event with message ID
+        res.write(
+          `data: ${JSON.stringify({
+            type: "done",
+            messageId: assistantMessage.id,
+          })}\n\n`
+        );
+      } catch (streamError) {
+        console.error("[Stream] Error during streaming:", streamError);
+        res.write(
+          `data: ${JSON.stringify({
+            type: "error",
+            error:
+              streamError instanceof Error
+                ? streamError.message
+                : "An error occurred during streaming",
+          })}\n\n`
+        );
+      } finally {
+        clearInterval(keepAliveInterval);
+        res.end();
+      }
+    } catch (error) {
+      console.error("[Stream] Error:", error);
+      // If headers haven't been sent yet, send JSON error
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: "Internal Server Error",
+          message:
+            error instanceof Error ? error.message : "Failed to process message",
+        });
+      }
     }
   }
 );

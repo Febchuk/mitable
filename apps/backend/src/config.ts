@@ -23,6 +23,9 @@ export const config = {
   openai: {
     apiKey: (process.env.OPENAI_API_KEY || "").trim(),
     embeddingModel: "text-embedding-3-small", // 1536 dimensions
+    chatModel: (process.env.OPENAI_CHAT_MODEL || "gpt-4-turbo-preview").trim(),
+    maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS || "2000", 10),
+    temperature: parseFloat(process.env.OPENAI_TEMPERATURE || "0.7"),
   },
 
   // Pinecone Configuration
