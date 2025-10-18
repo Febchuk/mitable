@@ -64,7 +64,7 @@ class SlackService {
 
         if (result.channels) {
           channels.push(
-            ...result.channels.map((ch) => ({
+            ...result.channels.map((ch: any) => ({
               id: ch.id!,
               name: ch.name!,
               is_private: ch.is_private || false,
@@ -112,7 +112,7 @@ class SlackService {
 
       // Generate permalinks for each message
       const messages: SlackMessage[] = await Promise.all(
-        result.messages.map(async (msg) => {
+        result.messages.map(async (msg: any) => {
           let permalink = "";
           try {
             const permalinkResult = await client.chat.getPermalink({
