@@ -5,6 +5,12 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 
+// Sync configuration constants
+const SYNC_CONFIG = {
+  MESSAGES_PER_PAGE: 100, // Number of messages to fetch per API call
+  BATCH_SIZE: 10, // Number of messages to process in each embedding batch
+} as const;
+
 export interface SlackIntegrationMetadata {
   team_id?: string;
   team_name?: string;
@@ -127,15 +133,14 @@ class IngestionService {
               organizationId,
               channelId,
               cursor,
-              100 // Fetch 100 messages per page
+              SYNC_CONFIG.MESSAGES_PER_PAGE
             );
 
             if (messages.length === 0) break;
 
             // Process messages in batches
-            const batchSize = 10;
-            for (let j = 0; j < messages.length; j += batchSize) {
-              const batch = messages.slice(j, j + batchSize);
+            for (let j = 0; j < messages.length; j += SYNC_CONFIG.BATCH_SIZE) {
+              const batch = messages.slice(j, j + SYNC_CONFIG.BATCH_SIZE);
               await this.processBatch(
                 batch,
                 organizationId,

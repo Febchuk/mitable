@@ -21,8 +21,11 @@ export const integrations = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     provider: varchar("provider", { length: 50 }).notNull(), // 'slack' | 'notion' | 'github' | 'google-drive'
     status: varchar("status", { length: 50 }).notNull(), // 'connected' | 'disconnected' | 'pending' | 'error'
-    accessToken: text("access_token"), // Encrypted in production
-    refreshToken: text("refresh_token"), // Encrypted in production
+    // TODO: SECURITY - Implement encryption for sensitive tokens before production deployment
+    // Consider using @aws-sdk/client-kms, Supabase Vault, or database-level encryption
+    // These tokens grant full workspace access and MUST be encrypted at rest
+    accessToken: text("access_token"), // Currently plaintext - MUST encrypt before production
+    refreshToken: text("refresh_token"), // Currently plaintext - MUST encrypt before production
     tokenExpiresAt: timestamp("token_expires_at"),
     metadata: jsonb("metadata").default("{}"), // Provider-specific config
     lastSyncedAt: timestamp("last_synced_at"),

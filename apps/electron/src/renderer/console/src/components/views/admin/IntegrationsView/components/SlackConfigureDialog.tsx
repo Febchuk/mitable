@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Hash, Lock, Loader2, CheckCircle2, ArrowRight } from "lucide-react";
 import { authService } from "@/console/src/services/authService";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 interface SlackChannel {
   id: string;
   name: string;
@@ -65,7 +67,7 @@ export default function SlackConfigureDialog({
         throw new Error("Not authenticated");
       }
 
-      const response = await fetch("http://localhost:3000/api/integrations/slack/channels", {
+      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/channels`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -117,7 +119,7 @@ export default function SlackConfigureDialog({
         throw new Error("Not authenticated");
       }
 
-      const response = await fetch("http://localhost:3000/api/integrations/slack/configure", {
+      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/configure`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -139,7 +141,7 @@ export default function SlackConfigureDialog({
       setSyncing(true);
 
       try {
-        const syncResponse = await fetch("http://localhost:3000/api/integrations/slack/sync", {
+        const syncResponse = await fetch(`${API_BASE_URL}/api/integrations/slack/sync`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

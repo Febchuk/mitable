@@ -9,6 +9,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, Filter, Plus } from "lucide-react";
 import { authService } from "@/console/src/services/authService";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+// Polling configuration for OAuth callback
+const POLLING_CONFIG = {
+  INTERVAL_MS: 1000, // Poll every 1 second
+  MAX_POLLS: 120, // Maximum 120 polls (2 minutes timeout)
+  UI_DELAY_MS: 500, // Delay before opening configure dialog
+} as const;
+
 export default function IntegrationsView() {
   const { data: integrations = [], refetch } = useIntegrations();
   const syncMutation = useSyncIntegration();
@@ -88,7 +97,7 @@ export default function IntegrationsView() {
 
       // Call backend disconnect endpoint (currently only Slack is implemented)
       if (integration.provider === "slack") {
-        const response = await fetch(`http://localhost:3000/api/integrations/slack/disconnect`, {
+        const response = await fetch(`${API_BASE_URL}/api/integrations/slack/disconnect`, {
           method: "DELETE",
           headers: {
             "Content-Type": "application/json",
@@ -123,7 +132,7 @@ export default function IntegrationsView() {
 
     // Poll every 1 second for up to 2 minutes
     let pollCount = 0;
-    const maxPolls = 120; // 2 minutes (120 polls at 1 second each)
+    const maxPolls = POLLING_CONFIG.MAX_POLLS;
 
     pollingIntervalRef.current = setInterval(async () => {
       pollCount++;
@@ -149,7 +158,7 @@ export default function IntegrationsView() {
         // Auto-open configure dialog
         setTimeout(() => {
           setSlackConfigureDialogOpen(true);
-        }, 500); // Small delay to ensure UI is ready
+        }, POLLING_CONFIG.UI_DELAY_MS);
       } else if (pollCount >= maxPolls) {
         // Timeout - stop polling
         if (pollingIntervalRef.current) {
@@ -157,7 +166,7 @@ export default function IntegrationsView() {
           pollingIntervalRef.current = null;
         }
       }
-    }, 1000); // Poll every 1 second instead of 2
+    }, POLLING_CONFIG.INTERVAL_MS);
   };
 
   // Cleanup polling on unmount

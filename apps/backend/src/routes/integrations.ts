@@ -7,6 +7,28 @@ import { config } from "../config.js";
 
 const router = Router();
 
+// Standardized error response interface
+interface ApiError {
+  error: string; // Error code (e.g., "SLACK_NOT_CONFIGURED")
+  message: string; // User-friendly message
+  details?: unknown; // Additional context (optional)
+}
+
+// Helper function to send standardized error responses
+function sendError(
+  res: Response,
+  statusCode: number,
+  errorCode: string,
+  message: string,
+  details?: unknown
+): void {
+  const error: ApiError = { error: errorCode, message };
+  if (details) {
+    error.details = details;
+  }
+  res.status(statusCode).json(error);
+}
+
 // Type definition for Slack OAuth v2 access response
 interface SlackOAuthResponse {
   ok: boolean;
@@ -50,11 +72,12 @@ router.post(
 
       // Validate Slack credentials are configured
       if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
-        res.status(500).json({
-          error: "Configuration Error",
-          message:
-            "Slack OAuth credentials not configured. Please set SLACK_CLIENT_ID and SLACK_CLIENT_SECRET.",
-        });
+        sendError(
+          res,
+          500,
+          "SLACK_NOT_CONFIGURED",
+          "Slack OAuth credentials not configured. Please set SLACK_CLIENT_ID and SLACK_CLIENT_SECRET."
+        );
         return;
       }
 
@@ -383,6 +406,26 @@ router.post("/slack/configure", requireAuth, async (req: Request, res: Response)
       res.status(400).json({
         error: "Bad Request",
         message: "selectedChannels must be an array of channel IDs",
+      });
+      return;
+    }
+
+    if (selectedChannels.length === 0) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "At least one channel must be selected",
+      });
+      return;
+    }
+
+    // Validate channel IDs format (Slack channel IDs start with C or G followed by alphanumeric)
+    const invalidChannels = selectedChannels.filter(
+      (id) => typeof id !== "string" || !/^[CG][A-Z0-9]+$/.test(id)
+    );
+    if (invalidChannels.length > 0) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: `Invalid channel IDs: ${invalidChannels.join(", ")}`,
       });
       return;
     }

@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, MessageSquare, FileText } from "lucide-react";
 import { authService } from "@/console/src/services/authService";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 interface SlackConnectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,7 +38,7 @@ export default function SlackConnectDialog({
         throw new Error("Not authenticated. Please log in again.");
       }
 
-      const response = await fetch("http://localhost:3000/api/integrations/slack/oauth/start", {
+      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/oauth/start`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

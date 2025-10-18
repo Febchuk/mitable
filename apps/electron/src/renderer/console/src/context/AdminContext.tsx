@@ -11,6 +11,8 @@ import {
 import { authService } from "../services/authService";
 import { useUser } from "./UserContext";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 interface AdminContextType {
   integrations: Integration[];
   users: User[];
@@ -150,7 +152,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         throw new Error("Not authenticated. Please log in again.");
       }
 
-      const response = await fetch("http://localhost:3000/api/integrations/slack/sync", {
+      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/sync`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
