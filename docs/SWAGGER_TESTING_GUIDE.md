@@ -23,11 +23,13 @@ This guide explains how to use Swagger UI to test the Mitable API, including how
 ### Development Environment
 
 1. **Start the backend server**:
+
    ```bash
    npm run dev --workspace=apps/backend
    ```
 
 2. **Open Swagger UI in your browser**:
+
    ```
    http://localhost:3000/api-docs
    ```
@@ -119,6 +121,7 @@ To test protected endpoints, you need a JWT access token. Here's how to get one:
 1. **Find**: `POST /auth/login` endpoint
 2. **Click "Try it out"**
 3. **Enter credentials**:
+
    ```json
    {
      "email": "emily@lorikeet.ai",
@@ -147,11 +150,13 @@ If you need admin privileges:
 ### Understanding the Token
 
 A typical JWT token looks like:
+
 ```
 eyJhbGciOiJIUzI1NiIsImtpZCI6Ik8yQ2s4OElNV1IvMnNPeDMi...
 ```
 
 **Key Facts**:
+
 - Token is valid for **1 hour** (3600 seconds)
 - After expiration, use the `refresh_token` with `POST /auth/refresh`
 - Tokens contain user info (id, email, role, organization)
@@ -171,6 +176,7 @@ Once you have an access token, you need to authorize Swagger to include it in re
    - `BearerAuth (http, Bearer)`
 
 3. **In the "Value" field**, enter:
+
    ```
    Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ik8yQ2s4OElNV1IvMnNPeDMi...
    ```
@@ -184,6 +190,7 @@ Once you have an access token, you need to authorize Swagger to include it in re
 ### Verification
 
 After authorizing:
+
 - The "Authorize" button should show a **🔒 locked icon**
 - Protected endpoints (with lock icons) will now include the Authorization header automatically
 - You can click "Authorize" again to view/update the token
@@ -191,6 +198,7 @@ After authorizing:
 ### Removing Authorization
 
 To test unauthenticated requests:
+
 1. Click "Authorize" button
 2. Click "Logout" button
 3. Click "Close"
@@ -249,6 +257,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 **Endpoint**: `POST /conversations`
 
 **Request Body**:
+
 ```json
 {
   "title": "Need help with development setup",
@@ -266,9 +275,11 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 **Endpoint**: `POST /conversations/{conversationId}/messages`
 
 **Parameters**:
+
 - `conversationId`: UUID from created conversation
 
 **Request Body**:
+
 ```json
 {
   "role": "user",
@@ -286,6 +297,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 **Endpoint**: `POST /nudges/{nudgeId}/accept`
 
 **Parameters**:
+
 - `nudgeId`: UUID from nudge list (get from `GET /nudges`)
 
 **Request Body**: None (empty)
@@ -299,6 +311,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 **Endpoint**: `GET /admin/templates`
 
 **Requirements**:
+
 - Must be logged in as admin
 - Uses Bearer token from admin user
 
@@ -315,6 +328,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 **Requirements**: Admin role
 
 **Expected Response**: List of all employees with:
+
 - Name, email, role
 - Start date and status
 - Onboarding progress percentage
@@ -329,6 +343,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 **Problem**: "Missing or invalid authorization header"
 
 **Solutions**:
+
 1. **Check if you've authorized Swagger**:
    - Click the "Authorize" button
    - Verify token is entered correctly
@@ -352,6 +367,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 **Cause**: You're trying to access an admin endpoint with an employee account
 
 **Solution**:
+
 1. **Logout from current token**:
    - Click "Authorize" → "Logout"
 2. **Login with admin account**:
@@ -366,8 +382,9 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 **Problem**: "Invalid request body" or "Validation error"
 
 **Solutions**:
+
 1. **Check required fields**:
-   - Swagger marks required fields with red asterisks (*)
+   - Swagger marks required fields with red asterisks (\*)
    - All required fields must be provided
 
 2. **Check data types**:
@@ -382,6 +399,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
    - Dates: ISO 8601 format (`2025-01-16T10:30:00Z`)
 
 **Example Error Response**:
+
 ```json
 {
   "success": false,
@@ -405,6 +423,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 **Problem**: "Resource not found"
 
 **Causes**:
+
 1. **Invalid ID in URL parameter**:
    - Check that the UUID exists
    - Copy IDs directly from previous responses
@@ -414,6 +433,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 3. **Wrong endpoint path**
 
 **Solution**: Use `GET` endpoints first to verify IDs:
+
 - `GET /conversations` → get conversation IDs
 - `GET /roadmaps` → get task IDs
 - `GET /nudges` → get nudge IDs
@@ -427,6 +447,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 **Note**: This shouldn't happen when using Swagger UI on the same domain
 
 **If it occurs**:
+
 - Verify backend CORS configuration
 - Check `apps/backend/src/app.ts` has `app.use(cors())`
 - Ensure you're accessing Swagger from `http://localhost:3000/api-docs`
@@ -438,6 +459,7 @@ If you get `401 Unauthorized`, your token may be expired or incorrect.
 ### 1. Start with Public Endpoints
 
 Before dealing with authentication, test simple endpoints:
+
 - `GET /health` - Verify server is running
 - `POST /auth/login` - Get familiar with request bodies
 
@@ -455,6 +477,7 @@ Before dealing with authentication, test simple endpoints:
 ### 4. Check Response Schemas
 
 Each endpoint shows:
+
 - **Request Schema** - What data to send
 - **Response Schema** - What data you'll receive
 - **Example Values** - Sample requests/responses
@@ -466,11 +489,13 @@ Click "Schema" tab to see the structure.
 The seed script creates users with different roles:
 
 **Employees** (role: "employee"):
+
 - `emily@lorikeet.ai`
 - `alex@lorikeet.ai`
 - `jordan@lorikeet.ai`
 
 **Admins** (role: "admin"):
+
 - `sarah@lorikeet.ai`
 - `marcus@lorikeet.ai`
 - `david@lorikeet.ai`
@@ -482,6 +507,7 @@ Test admin-only endpoints with admin tokens, and regular endpoints with employee
 ### 6. Check the "Responses" Section
 
 Before executing, scroll down to see:
+
 - Possible status codes (200, 400, 401, 403, 404, 500)
 - Response schemas for each status
 - Example error responses
@@ -491,6 +517,7 @@ This helps you understand what to expect.
 ### 7. Use Developer Console
 
 Open browser DevTools (F12) while using Swagger:
+
 - **Network tab** - See actual HTTP requests/responses
 - **Console tab** - View any JavaScript errors
 - Helpful for debugging token issues
@@ -514,6 +541,7 @@ Receive new access_token
 ### 9. Copy IDs from Responses
 
 Many endpoints require IDs (UUIDs) as parameters:
+
 - Get roadmap → copy task IDs → use for updating tasks
 - Get conversations → copy conversation ID → use for sending messages
 - Get nudges → copy nudge ID → use for accepting/dismissing
@@ -521,6 +549,7 @@ Many endpoints require IDs (UUIDs) as parameters:
 ### 10. Read Error Messages Carefully
 
 Mitable API provides detailed error messages:
+
 ```json
 {
   "error": "Bad Request",
@@ -537,12 +566,14 @@ These messages tell you exactly what's wrong.
 Here's a complete workflow for testing the roadmap feature:
 
 ### Step 1: Login
+
 ```
 POST /auth/login
 → Copy access_token from response
 ```
 
 ### Step 2: Authorize Swagger
+
 ```
 Click "Authorize"
 → Enter: Bearer <access_token>
@@ -550,6 +581,7 @@ Click "Authorize"
 ```
 
 ### Step 3: Get Roadmap
+
 ```
 GET /roadmaps
 → View weeks, tasks, and completion percentages
@@ -557,6 +589,7 @@ GET /roadmaps
 ```
 
 ### Step 4: Mark Task Complete
+
 ```
 PATCH /roadmaps/tasks/{taskId}
 → Use copied task ID
@@ -565,6 +598,7 @@ PATCH /roadmaps/tasks/{taskId}
 ```
 
 ### Step 5: Verify Update
+
 ```
 GET /roadmaps (again)
 → Check that task shows completed: true
@@ -595,6 +629,7 @@ GET /roadmaps (again)
 ## Quick Reference Card
 
 ### Authentication Flow
+
 ```
 1. POST /auth/login → get access_token
 2. Click "Authorize" → Bearer <token>
@@ -603,6 +638,7 @@ GET /roadmaps (again)
 ```
 
 ### Common Endpoints to Test
+
 ```
 Authentication:
   - POST /auth/login
@@ -629,6 +665,7 @@ Admin:
 ```
 
 ### Troubleshooting Quick Checks
+
 ```
 ❌ 401 Unauthorized → Check if authorized in Swagger
 ❌ 403 Forbidden → Need admin role
