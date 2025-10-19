@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Workflow, LucideIcon } from "lucide-react";
 import AgentPill from "./components/AgentPill";
 import ConversationDialog from "./components/ConversationDialog";
@@ -9,7 +9,6 @@ declare global {
       toggle: () => void;
       showConsole: () => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
-      resizeWindow: (mode: "pill" | "conversation") => void;
       showNudge: (data: unknown) => void;
       startGuide: (data: unknown) => void;
     };
@@ -104,6 +103,11 @@ function App() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
 
+  // Set initial click-through state - window should be click-through by default
+  useEffect(() => {
+    window.agentAPI.setIgnoreMouseEvents(true);
+  }, []);
+
   const handleCardClick = () => {
     window.agentAPI.startGuide(BILLING_ESCALATION_GUIDE);
   };
@@ -122,7 +126,6 @@ function App() {
     // Expand to conversation mode
     if (!isExpanded) {
       setIsExpanded(true);
-      window.agentAPI.resizeWindow("conversation");
     }
 
     // Simulate AI response (replace with actual API call)
@@ -180,7 +183,6 @@ function App() {
   const handleClose = () => {
     setIsExpanded(false);
     setMessages([]);
-    window.agentAPI.resizeWindow("pill");
   };
 
   const handleMouseEnter = () => {
@@ -192,12 +194,12 @@ function App() {
   };
 
   return (
-    <div
-      className="w-full h-full flex flex-col-reverse items-center gap-4 p-4"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      <div className="flex items-center justify-center">
+    <div className="w-full h-full flex flex-col-reverse items-center gap-4 pb-4">
+      <div
+        className="flex items-center justify-center"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <AgentPill onSubmit={handleSubmit} />
       </div>
       {isExpanded && (
@@ -206,6 +208,8 @@ function App() {
           onSubmit={handleSubmit}
           onClose={handleClose}
           onCardClick={handleCardClick}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         />
       )}
     </div>

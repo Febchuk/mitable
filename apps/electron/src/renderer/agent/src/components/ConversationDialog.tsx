@@ -20,6 +20,8 @@ interface ConversationDialogProps {
   onSubmit: (message: string) => void;
   onClose: () => void;
   onCardClick?: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 export default function ConversationDialog({
@@ -27,9 +29,15 @@ export default function ConversationDialog({
   onSubmit: _onSubmit,
   onClose,
   onCardClick,
+  onMouseEnter,
+  onMouseLeave,
 }: ConversationDialogProps) {
   return (
-    <div className="relative w-full h-[600px] flex flex-col bg-background-secondary rounded-2xl overflow-hidden app-no-drag">
+    <div
+      className="relative w-full h-[600px] flex flex-col bg-background-secondary rounded-2xl overflow-hidden app-no-drag"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       {/* Close Button */}
       <button
         onClick={onClose}

@@ -10,9 +10,21 @@ let guideWindow: BrowserWindow | null = null;
 let nudgeWindow: BrowserWindow | null = null;
 
 function createAgentWindow() {
+  // Get primary display dimensions
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+
+  // Calculate position: centered horizontally, flush with bottom
+  const windowWidth = 740;
+  const windowHeight = 696;
+  const x = Math.floor((screenWidth - windowWidth) / 2);
+  const y = screenHeight - windowHeight;
+
   agentWindow = new BrowserWindow({
-    width: 740,
-    height: 80,
+    width: windowWidth,
+    height: windowHeight,
+    x,
+    y,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -279,16 +291,6 @@ function setupIPC() {
     }
   });
 
-  // Agent window resize
-  ipcMain.on(IPC_CHANNELS.AGENT_RESIZE, (_event, mode: "pill" | "conversation") => {
-    if (agentWindow && !agentWindow.isDestroyed()) {
-      if (mode === "pill") {
-        agentWindow.setSize(740, 80, true);
-      } else {
-        agentWindow.setSize(740, 696, true);
-      }
-    }
-  });
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)
