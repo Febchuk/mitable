@@ -10,21 +10,18 @@ let guideWindow: BrowserWindow | null = null;
 let nudgeWindow: BrowserWindow | null = null;
 
 function createAgentWindow() {
-  // Get primary display dimensions
+  // Get screen dimensions for bottom-center positioning
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
-
-  // Calculate position: centered horizontally, flush with bottom
   const windowWidth = 740;
-  const windowHeight = 696;
-  const x = Math.floor((screenWidth - windowWidth) / 2);
-  const y = screenHeight - windowHeight;
+  const windowHeight = 80;
+  const bottomMargin = 40;
 
   agentWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
-    x,
-    y,
+    x: Math.floor((screenWidth - windowWidth) / 2), // Center horizontally
+    y: screenHeight - windowHeight - bottomMargin, // Position at bottom with margin
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -291,6 +288,25 @@ function setupIPC() {
     }
   });
 
+  // Agent window resize with upward expansion
+  ipcMain.on(IPC_CHANNELS.AGENT_RESIZE, (_event, mode: "pill" | "conversation") => {
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      const currentBounds = agentWindow.getBounds();
+      const newWidth = 740;
+      const newHeight = mode === "pill" ? 80 : 696;
+
+      // Calculate new Y position to keep bottom edge fixed (expand/shrink upward)
+      const heightDiff = newHeight - currentBounds.height;
+      const newY = currentBounds.y - heightDiff;
+
+      agentWindow.setBounds({
+        x: currentBounds.x,
+        y: newY,
+        width: newWidth,
+        height: newHeight,
+      }, true);
+    }
+  });
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)
