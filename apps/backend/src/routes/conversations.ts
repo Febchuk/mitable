@@ -601,6 +601,21 @@ router.post(
     }
 
     try {
+      // Fetch user to get organization ID
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!user) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "User not found",
+        });
+        return;
+      }
+
       // Verify conversation belongs to user
       const [conversation] = await db
         .select()
@@ -679,6 +694,11 @@ router.post(
         const stream = agentService.processMessage(content, {
           conversationId,
           userId,
+          userProfile: {
+            name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
+            email: user.email,
+            organizationId: user.organizationId,
+          },
           conversationHistory: conversationHistory.map((msg) => ({
             id: msg.id,
             conversationId,
