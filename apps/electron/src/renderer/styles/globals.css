@@ -96,6 +96,12 @@
     width: 100vw;
     height: 100vh;
   }
+
+  /* Transparent window override for agent/overlay windows */
+  html.transparent-window,
+  body.transparent-window {
+    background: transparent !important;
+  }
 }
 
 /* Typography system */
