@@ -50,9 +50,10 @@ function createConsoleWindow() {
   consoleWindow = new BrowserWindow({
     width: 1264,
     height: 888,
-    backgroundColor: "#000000",
-    // Hidden title bar on macOS for native traffic lights, default frame on Windows
-    titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
+    transparent: true,
+    // Hidden inset title bar on macOS for native traffic lights, frameless on Windows
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    frame: process.platform !== "darwin",
     maximizable: false,
     webPreferences: {
       preload: join(__dirname, "../preload/console.cjs"),
