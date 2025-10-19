@@ -4,9 +4,9 @@
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "VITE_USER_ROLE=employee electron-vite dev",
-    "dev:admin": "VITE_USER_ROLE=admin electron-vite dev",
-    "dev:employee": "VITE_USER_ROLE=employee electron-vite dev",
+    "dev": "cross-env VITE_USER_ROLE=employee electron-vite dev",
+    "dev:admin": "cross-env VITE_USER_ROLE=admin electron-vite dev",
+    "dev:employee": "cross-env VITE_USER_ROLE=employee electron-vite dev",
     "dev:windows": "cross-env VITE_USER_ROLE=employee electron-vite dev",
     "dev:admin:windows": "cross-env VITE_USER_ROLE=admin electron-vite dev",
     "dev:employee:windows": "cross-env VITE_USER_ROLE=employee electron-vite dev",
