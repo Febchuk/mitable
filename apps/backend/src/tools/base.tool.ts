@@ -38,6 +38,14 @@ export interface ToolContext {
 }
 
 /**
+ * Window trigger data for launching UI windows
+ */
+export interface WindowTrigger {
+  window: "nudge" | "guide";
+  data: Record<string, any>;
+}
+
+/**
  * Result returned by tool execution
  */
 export interface ToolResult {
@@ -50,16 +58,18 @@ export interface ToolResult {
     snippet: string;
   }>;
   streamable: boolean; // Whether this result can be streamed
+  triggerWindow?: WindowTrigger; // Optional window trigger for UI coordination
 }
 
 /**
  * Streaming chunk for real-time responses
  */
 export interface StreamChunk {
-  type: "chunk" | "complete" | "error";
+  type: "chunk" | "complete" | "error" | "window_trigger";
   content?: string;
   messageId?: string;
   error?: string;
+  windowTrigger?: WindowTrigger; // Window trigger for UI coordination
 }
 
 /**

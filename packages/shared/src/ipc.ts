@@ -41,6 +41,12 @@ export const IPC_CHANNELS = {
   CONVERSATION_NEW: "conversation-new",
   CONVERSATION_LOAD: "conversation-load",
   CONVERSATION_UPDATE: "conversation-update",
+
+  // Auth management (cross-window token sharing)
+  AUTH_SET_TOKENS: "auth-set-tokens",
+  AUTH_GET_TOKEN: "auth-get-token",
+  AUTH_CLEAR: "auth-clear",
+  AUTH_TOKEN_UPDATED: "auth-token-updated",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

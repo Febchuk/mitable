@@ -1,3 +1,14 @@
+// Type declarations for Electron IPC API
+declare global {
+  interface Window {
+    consoleAPI?: {
+      setAuthTokens: (accessToken: string, refreshToken: string) => void;
+      clearAuthTokens: () => void;
+      onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
+    };
+  }
+}
+
 // API Base URL - defaults to localhost in development
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -154,11 +165,16 @@ class AuthService {
   }
 
   /**
-   * Store tokens in localStorage
+   * Store tokens in localStorage AND send to main process for cross-window sharing
    */
   saveTokens(accessToken: string, refreshToken: string): void {
     localStorage.setItem("access_token", accessToken);
     localStorage.setItem("refresh_token", refreshToken);
+
+    // Send tokens to main process for sharing with other windows (Agent, Guide, Nudge)
+    if (window.consoleAPI?.setAuthTokens) {
+      window.consoleAPI.setAuthTokens(accessToken, refreshToken);
+    }
   }
 
   /**
@@ -176,11 +192,16 @@ class AuthService {
   }
 
   /**
-   * Clear tokens from localStorage
+   * Clear tokens from localStorage AND main process
    */
   clearTokens(): void {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+
+    // Clear tokens in main process
+    if (window.consoleAPI?.clearAuthTokens) {
+      window.consoleAPI.clearAuthTokens();
+    }
   }
 
   /**

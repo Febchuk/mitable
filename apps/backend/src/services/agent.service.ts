@@ -4,6 +4,8 @@ import type { Message } from "../db/schema/conversations.schema";
 import { BaseTool, ToolContext, StreamChunk, ToolDefinition } from "../tools/base.tool";
 import { RespondTextTool } from "../tools/respond-text.tool";
 import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
+import { FindExpertTool } from "../tools/find-expert.tool";
+import { GuideNextStepTool } from "../tools/guide-next-step.tool";
 
 /**
  * System prompt that defines the agent's role and personality
@@ -98,14 +100,14 @@ export class AgentService {
     // Register Phase 1 tools
     this.registerTool(new RespondTextTool());
 
-    // Phase 2: Knowledge search (RAG)
+    // Register Phase 2 tools - RAG Knowledge Search
     this.registerTool(new SearchKnowledgeTool());
 
-    // Phase 3: Uncomment when ready
-    // this.registerTool(new FindExpertTool());
+    // Register Phase 3 tools - Expert Matching
+    this.registerTool(new FindExpertTool());
 
-    // Phase 4: Uncomment when ready
-    // this.registerTool(new GuideNextStepTool());
+    // Register Phase 4 tools - Visual Guidance
+    this.registerTool(new GuideNextStepTool());
   }
 
   /**
@@ -152,16 +154,22 @@ export class AgentService {
    * 2. Calls OpenAI with function calling enabled
    * 3. Lets AI decide which tool to use
    * 4. Executes the chosen tool
-   * 5. Streams the response back
+   * 5. Supports tool chaining (tools can trigger follow-up tools)
+   * 6. Streams the response back with window triggers
    *
    * @param userMessage - The new user message to process
    * @param context - Context including conversation history, user info, etc.
    * @returns Async iterable of stream chunks
    */
-  async *processMessage(userMessage: string, context: ToolContext): AsyncIterable<StreamChunk> {
+  async *processMessage(
+    userMessage: string,
+    context: ToolContext
+  ): AsyncIterable<StreamChunk> {
+    const MAX_ITERATIONS = 5; // Prevent infinite loops
+    let iterationCount = 0;
     try {
       // Convert conversation history to OpenAI format
-      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         { role: "system", content: SYSTEM_PROMPT },
         ...this.convertToOpenAIMessages(context.conversationHistory),
         { role: "user", content: userMessage },
@@ -172,82 +180,97 @@ export class AgentService {
 
       console.log(`[AgentService] Processing message with ${tools.length} available tools`);
 
-      // Call OpenAI with function calling
-      const response = await this.openai.chat.completions.create({
-        model: config.openai.chatModel,
-        messages: messages,
-        tools: tools,
-        tool_choice: "auto", // Let AI decide which tool to use
-        temperature: config.openai.temperature,
-        max_tokens: config.openai.maxTokens,
-        stream: true, // Enable streaming
-      });
+      // Agentic Loop: Continue until we get a final response or hit max iterations
+      while (iterationCount < MAX_ITERATIONS) {
+        iterationCount++;
+        console.log(`[AgentService] Iteration ${iterationCount}/${MAX_ITERATIONS}`);
 
-      let functionName: string | null = null;
-      let functionArgs = "";
-      let textContent = "";
+        // Call OpenAI with function calling
+        const response = await this.openai.chat.completions.create({
+          model: config.openai.chatModel,
+          messages: messages,
+          tools: tools,
+          tool_choice: "auto", // Let AI decide which tool to use
+          temperature: config.openai.temperature,
+          max_tokens: config.openai.maxTokens,
+          stream: true, // Enable streaming
+        });
 
-      // Process streaming response
-      for await (const chunk of response) {
-        const delta = chunk.choices[0]?.delta;
+        let functionName: string | null = null;
+        let functionArgs = "";
+        let textContent = "";
+        let toolCallId: string | null = null;
 
-        // Check if AI is calling a function/tool
-        if (delta?.tool_calls) {
-          // Only process the first tool call (index 0)
-          // OpenAI might send multiple tool calls, but we only handle one at a time
-          const toolCall = delta.tool_calls.find((tc) => tc.index === 0);
+        // Process streaming response
+        for await (const chunk of response) {
+          const delta = chunk.choices[0]?.delta;
 
-          if (toolCall?.function?.name) {
-            functionName = toolCall.function.name;
-            console.log(`[AgentService] AI chose tool: ${functionName}`);
+          // Check if AI is calling a function/tool
+          if (delta?.tool_calls) {
+            const toolCall = delta.tool_calls[0];
+
+            if (toolCall?.id) {
+              toolCallId = toolCall.id;
+            }
+
+            if (toolCall?.function?.name) {
+              functionName = toolCall.function.name;
+              console.log(`[AgentService] AI chose tool: ${functionName}`);
+            }
+
+            if (toolCall?.function?.arguments) {
+              functionArgs += toolCall.function.arguments;
+            }
           }
 
-          if (toolCall?.function?.arguments) {
-            functionArgs += toolCall.function.arguments;
+          // Check for text content (final response without tool call)
+          if (delta?.content) {
+            textContent += delta.content;
+          }
+
+          // Check if the response is finished
+          const finishReason = chunk.choices[0]?.finish_reason;
+          if (finishReason === "stop" && textContent) {
+            // AI decided to respond directly without a tool
+            // This happens when all tools have been used and AI is ready to give final answer
+            console.log("[AgentService] AI provided final response");
+            break;
           }
         }
 
-        // Check for text content (when no tool is called, shouldn't happen with our setup)
-        if (delta?.content) {
-          textContent += delta.content;
-        }
-      }
+        // Execute the chosen tool
+        if (functionName && functionArgs) {
+          const tool = this.tools.get(functionName);
 
-      // Execute the chosen tool
-      if (functionName && functionArgs) {
-        const tool = this.tools.get(functionName);
+          if (!tool) {
+            throw new Error(`Tool not found: ${functionName}`);
+          }
 
-        if (!tool) {
-          throw new Error(`Tool not found: ${functionName}`);
-        }
-
-        // Parse function arguments with error handling
-        let parsedArgs;
-        try {
-          parsedArgs = JSON.parse(functionArgs);
-          console.log(`[AgentService] Executing tool ${functionName} with args:`, parsedArgs);
-        } catch (error) {
-          console.error(`[AgentService] Failed to parse tool arguments:`, functionArgs);
-          throw new Error(
-            `Invalid tool arguments for ${functionName}: ${error instanceof Error ? error.message : String(error)}`,
-            { cause: error }
+          // Parse function arguments
+          const parsedArgs = JSON.parse(functionArgs);
+          console.log(
+            `[AgentService] Executing tool ${functionName} with args:`,
+            parsedArgs
           );
-        }
 
-        // Execute tool
-        const toolResult = await tool.execute(parsedArgs, context);
+          // Execute tool
+          const toolResult = await tool.execute(parsedArgs, context);
 
-        console.log(`[AgentService] Tool executed, feeding result back to AI for synthesis`);
+          // Send window trigger if present
+          if (toolResult.triggerWindow) {
+            yield {
+              type: "window_trigger",
+              windowTrigger: toolResult.triggerWindow,
+            };
+          }
 
-        // Feed tool result back to AI for proper synthesis
-        const messagesWithToolResult: OpenAI.Chat.ChatCompletionMessageParam[] = [
-          ...messages,
-          {
+          // Add tool result to conversation history for next iteration
+          messages.push({
             role: "assistant",
             content: null,
             tool_calls: [
               {
-                id: "tool_call_1",
+                id: toolCallId || `call_${Date.now()}`,
                 type: "function",
                 function: {
                   name: functionName,
@@ -255,59 +278,75 @@ export class AgentService {
                 },
               },
             ],
-          },
-          {
+          });
+
+          messages.push({
             role: "tool",
-            tool_call_id: "tool_call_1",
             content: toolResult.content,
-          },
-        ];
+            tool_call_id: toolCallId || `call_${Date.now()}`,
+          });
 
-        // Get AI's synthesized response (non-streaming to get full answer)
-        const synthesisResponse = await this.openai.chat.completions.create({
-          model: config.openai.chatModel,
-          messages: messagesWithToolResult,
-          temperature: config.openai.temperature,
-          max_tokens: config.openai.maxTokens,
-          stream: false, // Get complete response first
-        });
+          // Check if tool result suggests we should continue (e.g., "Would you like me to connect you with an expert?")
+          // If the tool returns a complete answer, stream it and finish
+          // If the tool result is incomplete, continue the loop for the AI to decide next step
+          const isIncompleteResult = toolResult.content.toLowerCase().includes("would you like") ||
+            toolResult.content.toLowerCase().includes("connect you with") ||
+            toolResult.content.toLowerCase().includes("couldn't find");
 
-        const finalAnswer = synthesisResponse.choices[0]?.message?.content || "";
+          if (!isIncompleteResult) {
+            // Complete result - stream it and finish
+            if (toolResult.streamable) {
+              const words = toolResult.content.split(" ");
+              for (let i = 0; i < words.length; i++) {
+                const word = words[i];
+                const isLast = i === words.length - 1;
+                yield {
+                  type: "chunk",
+                  content: isLast ? word : word + " ",
+                };
+                await new Promise((resolve) => setTimeout(resolve, 20));
+              }
+            }
 
-        console.log(`[AgentService] AI synthesized response, now streaming to user`);
+            yield {
+              type: "complete",
+              content: toolResult.content,
+            };
 
-        // Stream the final answer word by word
-        const words = finalAnswer.split(" ");
-        for (let i = 0; i < words.length; i++) {
-          const word = words[i];
-          const isLast = i === words.length - 1;
+            return; // Exit the loop
+          }
+
+          // Continue loop - AI will decide next action based on tool result
+        } else if (textContent) {
+          // AI provided final response - stream it
+          const words = textContent.split(" ");
+          for (let i = 0; i < words.length; i++) {
+            const word = words[i];
+            const isLast = i === words.length - 1;
+            yield {
+              type: "chunk",
+              content: isLast ? word : word + " ",
+            };
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
 
           yield {
-            type: "chunk",
-            content: isLast ? word : word + " ",
+            type: "complete",
+            content: textContent,
           };
 
-          // Small delay for smooth streaming
-          await new Promise((resolve) => setTimeout(resolve, 20));
+          return; // Exit the loop
+        } else {
+          throw new Error("No function call or content in AI response");
         }
-
-        // Send completion signal
-        yield {
-          type: "complete",
-          content: finalAnswer,
-        };
-      } else if (textContent) {
-        // Fallback: AI returned text content directly without calling a tool
-        // This shouldn't happen with our setup, but handle it gracefully
-        console.warn("[AgentService] AI returned text content without calling a tool");
-
-        yield {
-          type: "complete",
-          content: textContent,
-        };
-      } else {
-        throw new Error("No function call or content in AI response");
       }
+
+      // Max iterations reached
+      console.warn(`[AgentService] Max iterations (${MAX_ITERATIONS}) reached`);
+      yield {
+        type: "complete",
+        content: "I apologize, but I'm having trouble processing your request. Could you please rephrase your question?",
+      };
     } catch (error) {
       console.error("[AgentService] Error processing message:", error);
 

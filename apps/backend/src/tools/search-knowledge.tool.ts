@@ -1,8 +1,8 @@
-import { BaseTool, ToolContext, ToolResult, ToolParameters } from "./base.tool.js";
-import { embeddingService } from "../services/embedding.service.js";
-import { vectorService } from "../services/vector.service.js";
-import { intentService } from "../services/intent.service.js";
-import { trustRankingService } from "../services/trust-ranking.service.js";
+import { BaseTool, ToolContext, ToolResult, ToolParameters } from "./base.tool";
+import { embeddingService } from "../services/embedding.service";
+import { vectorService } from "../services/vector.service";
+import { intentService } from "../services/intent.service";
+import { trustRankingService } from "../services/trust-ranking.service";
 
 /**
  * SearchKnowledgeTool
@@ -39,7 +39,7 @@ import { trustRankingService } from "../services/trust-ranking.service.js";
 export class SearchKnowledgeTool extends BaseTool {
   name = "search_knowledge";
 
-  description = `Search the company knowledge base (Slack messages and Notion documentation) for relevant information. 
+  description = `Search the company knowledge base (Slack messages and Notion documentation) for relevant information.
 Use this tool when the user asks questions about company policies, processes, tools, or any information that might be documented.
 Returns relevant excerpts from Slack conversations and Notion pages with source links.`;
 

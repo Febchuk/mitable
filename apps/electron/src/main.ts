@@ -9,6 +9,15 @@ let overlayWindow: BrowserWindow | null = null;
 let guideWindow: BrowserWindow | null = null;
 let nudgeWindow: BrowserWindow | null = null;
 
+// Auth token storage (shared across all windows)
+let authTokens: {
+  accessToken: string | null;
+  refreshToken: string | null;
+} = {
+  accessToken: null,
+  refreshToken: null,
+};
+
 function createAgentWindow() {
   // Get screen dimensions for bottom-center positioning
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -306,6 +315,46 @@ function setupIPC() {
         height: newHeight,
       }, true);
     }
+  });
+
+  // Auth Management - Cross-window token sharing
+  // Console sets tokens after login
+  ipcMain.on(
+    IPC_CHANNELS.AUTH_SET_TOKENS,
+    (_event, accessToken: string, refreshToken: string) => {
+      console.log("[Auth] Tokens set from Console window");
+      authTokens.accessToken = accessToken;
+      authTokens.refreshToken = refreshToken;
+
+      // Broadcast token update to all windows
+      const allWindows = [agentWindow, guideWindow, nudgeWindow, overlayWindow];
+      allWindows.forEach((win) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, accessToken);
+        }
+      });
+    }
+  );
+
+  // Any window can request current auth token
+  ipcMain.handle(IPC_CHANNELS.AUTH_GET_TOKEN, () => {
+    console.log("[Auth] Token requested, returning:", authTokens.accessToken ? "present" : "null");
+    return authTokens.accessToken;
+  });
+
+  // Console clears tokens on logout
+  ipcMain.on(IPC_CHANNELS.AUTH_CLEAR, () => {
+    console.log("[Auth] Tokens cleared");
+    authTokens.accessToken = null;
+    authTokens.refreshToken = null;
+
+    // Broadcast token clear to all windows
+    const allWindows = [agentWindow, guideWindow, nudgeWindow, overlayWindow];
+    allWindows.forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, null);
+      }
+    });
   });
 }
 
