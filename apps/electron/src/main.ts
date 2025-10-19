@@ -51,8 +51,9 @@ function createConsoleWindow() {
     width: 1264,
     height: 888,
     transparent: true,
-    // Hidden inset title bar on macOS for native traffic lights, frameless on Windows
-    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    // Hidden title bar on macOS for native traffic lights with custom positioning
+    titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
+    trafficLightPosition: process.platform === "darwin" ? { x: 6, y: 10 } : undefined,
     frame: process.platform !== "darwin",
     maximizable: false,
     webPreferences: {
