@@ -29,6 +29,8 @@ export interface StreamChunk {
   content?: string;
   messageId?: string;
   error?: string;
+  messageType?: string;
+  cardData?: any;
   windowTrigger?: {
     window: "nudge" | "guide";
     data: any;

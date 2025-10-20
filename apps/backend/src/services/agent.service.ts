@@ -348,6 +348,8 @@ export class AgentService {
             yield {
               type: "complete",
               content: toolResult.content,
+              messageType: toolResult.messageType,
+              cardData: toolResult.cardData,
             };
 
             return; // Exit the loop
@@ -370,6 +372,8 @@ export class AgentService {
           yield {
             type: "complete",
             content: textContent,
+            messageType: "text",
+            cardData: undefined,
           };
 
           return; // Exit the loop
@@ -383,6 +387,8 @@ export class AgentService {
       yield {
         type: "complete",
         content: "I apologize, but I'm having trouble processing your request. Could you please rephrase your question?",
+        messageType: "text",
+        cardData: undefined,
       };
     } catch (error) {
       console.error("[AgentService] Error processing message:", error);
