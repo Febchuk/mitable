@@ -115,7 +115,10 @@ export class AgentService {
    */
   registerTool(tool: BaseTool): void {
     this.tools.set(tool.name, tool);
-    console.log(`[AgentService] Registered tool: ${tool.name}`);
+    console.log(`[AgentService] Registered tool: ${tool.name}`, {
+      description: tool.description.substring(0, 80) + "...",
+      parametersRequired: tool.parameters.required || [],
+    });
   }
 
   /**
@@ -184,6 +187,11 @@ export class AgentService {
       while (iterationCount < MAX_ITERATIONS) {
         iterationCount++;
         console.log(`[AgentService] Iteration ${iterationCount}/${MAX_ITERATIONS}`);
+        console.log("[AgentService] Current messages:", {
+          messageCount: messages.length,
+          roles: messages.map(m => m.role),
+          lastUserMessage: messages.filter(m => m.role === "user").pop()?.content?.substring(0, 100),
+        });
 
         // Call OpenAI with function calling
         const response = await this.openai.chat.completions.create({
@@ -226,6 +234,10 @@ export class AgentService {
           // Check for text content (final response without tool call)
           if (delta?.content) {
             textContent += delta.content;
+            // Log first text content received (not every chunk)
+            if (textContent.length < 50) {
+              console.log("[AgentService] AI generating direct response (no tool call)");
+            }
           }
 
           // Check if the response is finished
@@ -250,14 +262,28 @@ export class AgentService {
           const parsedArgs = JSON.parse(functionArgs);
           console.log(
             `[AgentService] Executing tool ${functionName} with args:`,
-            parsedArgs
+            JSON.stringify(parsedArgs, null, 2)
           );
 
           // Execute tool
           const toolResult = await tool.execute(parsedArgs, context);
 
+          console.log("[AgentService] Tool result structure:", {
+            messageType: toolResult.messageType,
+            contentLength: toolResult.content?.length || 0,
+            hasCardData: !!toolResult.cardData,
+            hasSources: !!(toolResult.sources && toolResult.sources.length > 0),
+            hasWindowTrigger: !!toolResult.triggerWindow,
+            streamable: toolResult.streamable,
+          });
+
           // Send window trigger if present
           if (toolResult.triggerWindow) {
+            console.log("[AgentService] Window trigger:", {
+              window: toolResult.triggerWindow.window,
+              dataKeys: Object.keys(toolResult.triggerWindow.data),
+            });
+
             yield {
               type: "window_trigger",
               windowTrigger: toolResult.triggerWindow,
@@ -293,8 +319,19 @@ export class AgentService {
             toolResult.content.toLowerCase().includes("connect you with") ||
             toolResult.content.toLowerCase().includes("couldn't find");
 
+          console.log("[AgentService] Completion decision:", {
+            isIncompleteResult,
+            willContinueLoop: isIncompleteResult,
+            contentPreview: toolResult.content.substring(0, 100) + "...",
+          });
+
           if (!isIncompleteResult) {
             // Complete result - stream it and finish
+            console.log("[AgentService] Streaming final response:", {
+              wordCount: toolResult.content.split(" ").length,
+              streamable: toolResult.streamable,
+            });
+
             if (toolResult.streamable) {
               const words = toolResult.content.split(" ");
               for (let i = 0; i < words.length; i++) {

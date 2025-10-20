@@ -1,7 +1,6 @@
 import { db } from "../db/client";
-import { expertProfiles, expertTopics, users } from "../db/schema";
-import { eq, sql, desc } from "drizzle-orm";
-import { embeddingService } from "./embedding.service";
+import { users } from "../db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * Expert match result
@@ -42,197 +41,104 @@ class ExpertMatchingService {
   /**
    * Find best matching experts for a query
    *
-   * @param query - User's question or topic
+   * SIMPLIFIED VERSION: Returns first 5 users in organization with mock data
+   * For testing UI without needing expertProfiles setup
+   *
+   * @param query - User's question or topic (not used in simplified version)
    * @param organizationId - Organization to search within
-   * @param topK - Number of experts to return (default: 3)
-   * @returns Ranked list of expert matches
+   * @param topK - Number of experts to return (default: 5)
+   * @returns List of users formatted as expert matches
    */
   async findExperts(
     query: string,
     organizationId: string,
-    topK: number = 3
+    topK: number = 5
   ): Promise<ExpertMatch[]> {
-    console.log(`[ExpertMatchingService] Finding experts for: "${query}"`);
+    console.log(`[ExpertMatchingService] Finding experts (simplified): "${query}"`);
+    console.log("[ExpertMatchingService] Request params:", {
+      query,
+      organizationId,
+      topK,
+    });
 
     try {
-      // Step 1: Get all expert profiles in the organization
-      const expertsData = await db
+      // Simplified: Just get ALL users in organization (first topK)
+      const allUsers = await db
         .select({
           userId: users.id,
-          name: users.name,
+          firstName: users.firstName,
+          lastName: users.lastName,
           email: users.email,
           role: users.role,
-          department: users.department,
           avatarUrl: users.avatarUrl,
           status: users.status,
-          organizationId: users.organizationId,
-          expertiseSummary: expertProfiles.expertiseSummary,
-          responseRate: expertProfiles.responseRate,
-          helpfulnessScore: expertProfiles.helpfulnessScore,
-          avgResponseTime: expertProfiles.avgResponseTime,
-          totalInteractions: expertProfiles.totalInteractions,
         })
         .from(users)
-        .innerJoin(expertProfiles, eq(users.id, expertProfiles.userId))
-        .where(eq(users.organizationId, organizationId));
+        .where(eq(users.organizationId, organizationId))
+        .limit(topK);
 
-      if (expertsData.length === 0) {
-        console.log("[ExpertMatchingService] No experts found in organization");
+      console.log("[ExpertMatchingService] Query executed:", {
+        usersFound: allUsers.length,
+        requestedTopK: topK,
+      });
+
+      if (allUsers.length === 0) {
+        console.log("[ExpertMatchingService] No users found in organization");
         return [];
       }
 
-      console.log(`[ExpertMatchingService] Found ${expertsData.length} experts`);
+      console.log(`[ExpertMatchingService] Found ${allUsers.length} users (simplified)`);
+      console.log("[ExpertMatchingService] User details:", {
+        names: allUsers.map(u => [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email),
+        roles: allUsers.map(u => u.role),
+      });
 
-      // Step 2: Get all expert topics for expertise similarity
-      const allTopics = await db
-        .select()
-        .from(expertTopics)
-        .where(
-          sql`${expertTopics.userId} IN (${sql.join(
-            expertsData.map((e) => sql`${e.userId}`),
-            sql`, `
-          )})`
-        );
+      // Format as ExpertMatch with mock data
+      const matches: ExpertMatch[] = allUsers.map((user, index) => {
+        // Construct full name from firstName + lastName
+        const fullName = [user.firstName, user.lastName]
+          .filter(Boolean)
+          .join(" ") || user.email;
 
-      // Group topics by user
-      const topicsByUser = new Map<string, typeof allTopics>();
-      for (const topic of allTopics) {
-        const existing = topicsByUser.get(topic.userId) || [];
-        topicsByUser.set(topic.userId, [...existing, topic]);
-      }
-
-      // Step 3: Embed the query for semantic similarity
-      const queryEmbedding = await embeddingService.embedText(query);
-
-      // Step 4: Calculate scores for each expert
-      const matches: ExpertMatch[] = [];
-
-      for (const expert of expertsData) {
-        const topics = topicsByUser.get(expert.userId) || [];
-
-        // Calculate expertise similarity (40%)
-        const expertiseSimilarity = await this.calculateExpertiseSimilarity(
-          queryEmbedding,
-          topics.map((t) => t.topic)
-        );
-
-        // Calculate performance score (30%)
-        const performanceScore = this.calculatePerformanceScore(
-          parseFloat(expert.responseRate || "0"),
-          parseFloat(expert.helpfulnessScore || "0")
-        );
-
-        // Calculate availability score (30%)
-        const availabilityScore = this.calculateAvailabilityScore(
-          expert.status as string
-        );
-
-        // Weighted final score
-        const matchScore =
-          expertiseSimilarity * 0.4 +
-          performanceScore * 0.3 +
-          availabilityScore * 0.3;
-
-        // Generate match reasons
-        const matchReasons = this.generateMatchReasons(
-          expertiseSimilarity,
-          performanceScore,
-          availabilityScore,
-          topics.map((t) => t.topic)
-        );
-
-        matches.push({
-          userId: expert.userId,
-          name: expert.name,
-          email: expert.email,
-          role: expert.role || undefined,
-          department: expert.department || undefined,
-          avatarUrl: expert.avatarUrl || undefined,
-          matchScore: Math.round(matchScore * 100) / 100,
-          matchReasons,
+        return {
+          userId: user.userId,
+          name: fullName,
+          email: user.email,
+          role: user.role || "Employee",
+          department: "General", // Hardcoded since field doesn't exist in schema
+          avatarUrl: user.avatarUrl || undefined,
+          matchScore: Math.round((0.9 - index * 0.1) * 100) / 100, // Mock decreasing scores: 0.9, 0.8, 0.7, ...
+          matchReasons: [
+            "Available to help",
+            "Works in your team",
+            "Experienced team member",
+          ],
           expertise: {
-            summary: expert.expertiseSummary || "",
-            topics: topics.map((t) => t.topic),
+            summary: `${user.role || "Employee"} with general knowledge`,
+            topics: ["Team support", "General knowledge"],
           },
           performance: {
-            responseRate: parseFloat(expert.responseRate || "0"),
-            helpfulnessScore: parseFloat(expert.helpfulnessScore || "0"),
-            avgResponseTime: expert.avgResponseTime,
-            totalInteractions: expert.totalInteractions || 0,
+            responseRate: 85.0,
+            helpfulnessScore: 4.5,
+            avgResponseTime: null,
+            totalInteractions: 0,
           },
-          availability: this.mapAvailability(expert.status as string),
-        });
-      }
+          availability: this.mapAvailability(user.status as string),
+        };
+      });
 
-      // Step 5: Sort by match score and return top K
-      matches.sort((a, b) => b.matchScore - a.matchScore);
-      return matches.slice(0, topK);
+      console.log("[ExpertMatchingService] Matches created:", {
+        matchesCount: matches.length,
+        topMatch: matches[0]?.name,
+        topScore: matches[0]?.matchScore,
+        allScores: matches.map(m => m.matchScore),
+      });
+
+      return matches;
     } catch (error) {
       console.error("[ExpertMatchingService] Error finding experts:", error);
       throw error;
     }
-  }
-
-  /**
-   * Calculate expertise similarity using semantic embeddings
-   * Returns score from 0 to 1
-   */
-  private async calculateExpertiseSimilarity(
-    queryEmbedding: number[],
-    expertTopics: string[]
-  ): Promise<number> {
-    if (expertTopics.length === 0) return 0;
-
-    // Embed all expert topics
-    const topicEmbeddings = await embeddingService.embedTexts(expertTopics);
-
-    // Calculate cosine similarity with each topic and take the max
-    const similarities = topicEmbeddings.map((topicEmb) =>
-      this.cosineSimilarity(queryEmbedding, topicEmb)
-    );
-
-    return Math.max(...similarities);
-  }
-
-  /**
-   * Calculate cosine similarity between two vectors
-   */
-  private cosineSimilarity(a: number[], b: number[]): number {
-    const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
-    const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
-    const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
-
-    if (magnitudeA === 0 || magnitudeB === 0) return 0;
-    return dotProduct / (magnitudeA * magnitudeB);
-  }
-
-  /**
-   * Calculate performance score (0 to 1)
-   * Based on response rate (0-100%) and helpfulness (0-5)
-   */
-  private calculatePerformanceScore(
-    responseRate: number,
-    helpfulnessScore: number
-  ): number {
-    const normalizedResponseRate = responseRate / 100; // 0-1
-    const normalizedHelpfulness = helpfulnessScore / 5; // 0-1
-
-    return (normalizedResponseRate + normalizedHelpfulness) / 2;
-  }
-
-  /**
-   * Calculate availability score (0 to 1)
-   * available = 1.0, away = 0.7, busy = 0.4, offline = 0.1
-   */
-  private calculateAvailabilityScore(status: string): number {
-    const statusMap: Record<string, number> = {
-      available: 1.0,
-      away: 0.7,
-      busy: 0.4,
-      offline: 0.1,
-    };
-
-    return statusMap[status] || 0.5; // Default to 0.5 if unknown
   }
 
   /**
@@ -245,41 +151,6 @@ class ExpertMatchingService {
       return status as "available" | "away" | "busy" | "offline";
     }
     return "offline";
-  }
-
-  /**
-   * Generate human-readable match reasons
-   */
-  private generateMatchReasons(
-    expertiseSimilarity: number,
-    performanceScore: number,
-    availabilityScore: number,
-    topics: string[]
-  ): string[] {
-    const reasons: string[] = [];
-
-    // Expertise reasons
-    if (expertiseSimilarity > 0.8) {
-      reasons.push(`Highly relevant expertise in: ${topics.slice(0, 3).join(", ")}`);
-    } else if (expertiseSimilarity > 0.6) {
-      reasons.push(`Relevant experience with: ${topics.slice(0, 2).join(", ")}`);
-    }
-
-    // Performance reasons
-    if (performanceScore > 0.8) {
-      reasons.push("Excellent response rate and helpfulness ratings");
-    } else if (performanceScore > 0.6) {
-      reasons.push("Good track record of helping colleagues");
-    }
-
-    // Availability reasons
-    if (availabilityScore === 1.0) {
-      reasons.push("Currently available");
-    } else if (availabilityScore >= 0.7) {
-      reasons.push("Likely to respond soon");
-    }
-
-    return reasons.length > 0 ? reasons : ["Matched based on general expertise"];
   }
 }
 

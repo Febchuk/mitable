@@ -43,12 +43,19 @@ class GuideGenerationService {
     screenshot?: string
   ): Promise<GuideLookupResult> {
     console.log(`[GuideGenerationService] Looking for guide: "${query}"`);
+    console.log("[GuideGenerationService] Request details:", {
+      query,
+      hasScreenshot: !!screenshot,
+      normalizedQuery: query.toLowerCase(),
+    });
 
     // Normalize query for keyword matching
     const normalizedQuery = query.toLowerCase();
 
     // Match common patterns
     if (this.matchesPattern(normalizedQuery, ["expense", "report", "submit"])) {
+      console.log("[GuideGenerationService] Pattern matched: expense report");
+
       return {
         found: true,
         guide: this.predefinedGuides.get("submit-expense-report"),
@@ -57,6 +64,8 @@ class GuideGenerationService {
     }
 
     if (this.matchesPattern(normalizedQuery, ["pto", "time off", "vacation", "request"])) {
+      console.log("[GuideGenerationService] Pattern matched: PTO request");
+
       return {
         found: true,
         guide: this.predefinedGuides.get("request-pto"),
@@ -65,6 +74,8 @@ class GuideGenerationService {
     }
 
     if (this.matchesPattern(normalizedQuery, ["slack", "channel", "create"])) {
+      console.log("[GuideGenerationService] Pattern matched: Slack channel creation");
+
       return {
         found: true,
         guide: this.predefinedGuides.get("create-slack-channel"),
@@ -73,6 +84,8 @@ class GuideGenerationService {
     }
 
     if (this.matchesPattern(normalizedQuery, ["billing", "issue", "escalate"])) {
+      console.log("[GuideGenerationService] Pattern matched: billing escalation");
+
       return {
         found: true,
         guide: this.predefinedGuides.get("billing-escalation"),
@@ -82,6 +95,14 @@ class GuideGenerationService {
 
     // No guide found
     console.log("[GuideGenerationService] No matching guide found");
+    console.log("[GuideGenerationService] Patterns checked:", {
+      patterns: [
+        "expense report",
+        "PTO request",
+        "Slack channel",
+        "billing escalation",
+      ],
+    });
     return {
       found: false,
       message: "I couldn't find a specific guide for that task. Would you like me to search the knowledge base or connect you with an expert?",

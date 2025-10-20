@@ -44,8 +44,8 @@ export class FindExpertTool extends BaseTool {
       topK: {
         type: "number",
         description:
-          "Number of expert recommendations to provide (default: 3, max: 5)",
-        default: 3,
+          "Number of expert recommendations to provide (default: 5, max: 5)",
+        default: 5,
       },
     },
     required: ["query"],
@@ -68,6 +68,12 @@ export class FindExpertTool extends BaseTool {
     const { query, topK = 3 } = args;
     const organizationId = context.userProfile?.organizationId;
 
+    console.log("[FindExpertTool] Organization context:", {
+      organizationId: organizationId || "none",
+      hasUserProfile: !!context.userProfile,
+      topK,
+    });
+
     if (!organizationId) {
       return {
         messageType: "text",
@@ -86,7 +92,14 @@ export class FindExpertTool extends BaseTool {
         Math.min(topK, 5) // Cap at 5 experts
       );
 
+      console.log("[FindExpertTool] Experts found:", {
+        count: experts.length,
+        topExpert: experts[0]?.name,
+        topScore: experts[0]?.matchScore,
+      });
+
       if (experts.length === 0) {
+        console.log("[FindExpertTool] No experts found in organization");
         return {
           messageType: "text",
           content: "I couldn't find any experts in your organization for this topic at the moment. You might want to post in a team channel or reach out to your manager.",
@@ -105,6 +118,12 @@ export class FindExpertTool extends BaseTool {
 ${topExpert.name} seems like the best match - they have ${topExpert.expertise.topics.slice(0, 2).join(" and ")} expertise with a ${topExpert.performance.helpfulnessScore.toFixed(1)}/5.0 helpfulness rating.
 
 I'm showing you their profiles now so you can reach out!`;
+
+      console.log("[FindExpertTool] Success - triggering Nudge window:", {
+        expertsCount: experts.length,
+        expertNames: experts.map(e => e.name),
+        windowTrigger: "nudge",
+      });
 
       // Return with window trigger to launch Nudge window
       return {

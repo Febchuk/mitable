@@ -70,6 +70,11 @@ export class GuideNextStepTool extends BaseTool {
     const screenshot = context.screenshot; // Future: screenshot from Cmd+H
 
     console.log(`[GuideNextStepTool] Finding guide for task: "${task}"`);
+    console.log("[GuideNextStepTool] Request details:", {
+      task,
+      userQuestion: userQuestion.substring(0, 100),
+      hasScreenshot: !!screenshot,
+    });
 
     try {
       // Search for or generate a guide
@@ -80,6 +85,10 @@ export class GuideNextStepTool extends BaseTool {
 
       if (!result.found || !result.guide) {
         // No guide found - suggest alternatives
+        console.log("[GuideNextStepTool] No guide found:", {
+          message: result.message,
+        });
+
         return {
           messageType: "text",
           content: `I don't have a step-by-step guide for "${task}" yet. ${result.message}`,
@@ -88,12 +97,23 @@ export class GuideNextStepTool extends BaseTool {
       }
 
       console.log(`[GuideNextStepTool] Found guide: ${result.guide.title}`);
+      console.log("[GuideNextStepTool] Guide details:", {
+        title: result.guide.title,
+        stepsCount: result.guide.steps.length,
+        currentStep: result.guide.currentStep,
+        completed: result.guide.completed,
+      });
 
       // Format response message
       const stepCount = result.guide.steps.length;
       const responseText = `Great! I found a ${stepCount}-step guide for "${result.guide.title}".
 
 I'm showing you the visual guide now - it will highlight exactly where to click and what to do at each step. Just follow along!`;
+
+      console.log("[GuideNextStepTool] Success - triggering Guide window:", {
+        guideTitle: result.guide.title,
+        windowTrigger: "guide",
+      });
 
       // Return with window trigger to launch Guide + Overlay windows
       return {

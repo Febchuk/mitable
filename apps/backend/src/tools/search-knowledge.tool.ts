@@ -79,9 +79,15 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
     // We'll apply trust ranking to a larger set, then take top K
     const fetchLimit = Math.min(limitedTopK * 10, 50); // 10x the requested amount, max 50
 
-    console.log(
-      `[SearchKnowledgeTool] Searching for: "${query}" (topK: ${limitedTopK}, fetching: ${fetchLimit})`
-    );
+    // Get organization ID for namespace filtering
+    const organizationId = context.userProfile?.organizationId;
+
+    console.log(`[SearchKnowledgeTool] Searching for: "${query}"`);
+    console.log("[SearchKnowledgeTool] Organization context:", {
+      organizationId: organizationId || "none",
+      topK: limitedTopK,
+      fetchLimit,
+    });
 
     try {
       // Step 1: Detect user intent for intelligent ranking
@@ -96,20 +102,33 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
 
       // Step 2: Generate embedding for the search query
       const embedding = await embeddingService.embedText(query);
+      console.log("[SearchKnowledgeTool] Embedding generated:", {
+        dimension: embedding.length,
+      });
 
       // Step 3: Get organization ID for namespace filtering
-      const organizationId = context.userProfile?.organizationId;
       if (!organizationId) {
         throw new Error("Organization ID not found in user context");
       }
 
       const namespace = `org-${organizationId}`;
-      console.log(`[SearchKnowledgeTool] Querying namespace: ${namespace}`);
+      console.log("[SearchKnowledgeTool] Querying vectors:", {
+        namespace,
+        fetchLimit,
+      });
 
       // Step 4: Query Pinecone for similar vectors (fetch more for better ranking)
       const rawResults = await vectorService.queryVectors(embedding, fetchLimit, namespace);
 
       console.log(`[SearchKnowledgeTool] Found ${rawResults.length} raw results`);
+      if (rawResults.length > 0) {
+        console.log("[SearchKnowledgeTool] Raw results preview:", {
+          count: rawResults.length,
+          topScore: rawResults[0]?.score,
+          avgScore: rawResults.reduce((sum, r) => sum + r.score, 0) / rawResults.length,
+          titles: rawResults.slice(0, 3).map(r => r.metadata.title),
+        });
+      }
 
       // Step 5: Apply trust-based ranking to the larger set
       const rankedResults = trustRankingService.applyTrustRanking(rawResults, intent, query);
@@ -123,6 +142,8 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
 
       // Step 7: Check if we found any results
       if (!results || results.length === 0) {
+        console.log("[SearchKnowledgeTool] No results found - suggesting expert connection");
+
         return {
           messageType: "text",
           content:
@@ -186,16 +207,22 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
         }
       }
 
-      // Step 6: Join all context into a single string
+      // Step 9: Join all context into a single string
       const contextText = contextParts.join("\n\n");
 
       console.log(`[SearchKnowledgeTool] Returning ${sources.length} sources`);
 
-      // Step 9: Return formatted result with sources for AI to cite
+      // Step 10: Return formatted result with sources for AI to cite
       // Format sources as a list at the end for AI to reference
       const sourcesText = sources.map((s, i) => `${i + 1}. ${s.title} - ${s.url}`).join("\n");
 
       const contentWithSources = `${contextText}\n\n---\nAvailable sources to cite:\n${sourcesText}`;
+
+      console.log("[SearchKnowledgeTool] Success - returning knowledge:", {
+        responseLength: contentWithSources.length,
+        sourcesCount: sources.length,
+        sourceNames: sources.map(s => s.title),
+      });
 
       return {
         messageType: "text",
