@@ -140,7 +140,7 @@ export const Response = memo(
     options,
     allowedImagePrefixes = ["*"],
     allowedLinkPrefixes = ["*"],
-    defaultOrigin,
+    defaultOrigin: _defaultOrigin,
     parseIncompleteMarkdown: shouldParseIncomplete = true,
     className,
     ...props

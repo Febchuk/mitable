@@ -1,6 +1,7 @@
 # Notion Service Account Setup
 
 ## Problem
+
 Notion OAuth only allows the original authorizer to reconnect and modify page permissions. This creates a single point of failure when that admin is unavailable.
 
 ## Solution: Service Account
@@ -28,17 +29,19 @@ Use a dedicated "service" Notion account that all admins have access to, rather 
 ### 3. Disconnect Current Integration
 
 **In Mitable Admin Panel:**
+
 1. Go to Integrations → Notion
 2. Click "Disconnect"
 3. Confirm disconnection
 
 **In Database (if needed):**
+
 ```sql
 -- Check current integration
 SELECT * FROM integrations WHERE provider = 'notion';
 
 -- Delete it
-DELETE FROM integrations 
+DELETE FROM integrations
 WHERE organization_id = 'your-org-id' AND provider = 'notion';
 ```
 
@@ -66,6 +69,7 @@ WHERE organization_id = 'your-org-id' AND provider = 'notion';
 ### Adding/Removing Pages
 
 **Any admin can now:**
+
 1. Access the service account credentials from password manager
 2. Log into Notion as `mitable-integration@yourcompany.com`
 3. Go to Mitable admin panel
@@ -86,16 +90,19 @@ WHERE organization_id = 'your-org-id' AND provider = 'notion';
 ## Troubleshooting
 
 ### "Client Secret Error" when reconnecting
+
 - Ensure you're logged into the **service account**, not your personal account
 - Check browser cookies - clear if needed
 - Try incognito mode
 
 ### Integration shows as "Connected" but no pages appear
+
 - The service account needs **Full Access** permission to pages
 - Share pages explicitly with the service account in Notion
 - Wait a few minutes and click "Sync Now"
 
 ### Token expired
+
 - Reconnect through the service account
 - Backend will automatically refresh the token
 
@@ -106,12 +113,15 @@ WHERE organization_id = 'your-org-id' AND provider = 'notion';
 If service account doesn't work for your organization:
 
 ### Option A: Multiple Integrations
+
 Store one integration per admin in database. Modify schema to track `userId`.
 
 ### Option B: Internal Integration
+
 Switch to Internal Integration type - any admin can share pages from Notion UI without OAuth.
 
 ### Option C: Request System
+
 Build a request/approval workflow where non-owner admins request page access from the owner.
 
 ---
@@ -119,6 +129,7 @@ Build a request/approval workflow where non-owner admins request page access fro
 ## Security Considerations
 
 ✅ **DO:**
+
 - Use a strong, unique password
 - Enable 2FA on the service account
 - Store credentials in encrypted password manager
@@ -126,6 +137,7 @@ Build a request/approval workflow where non-owner admins request page access fro
 - Audit access logs
 
 ❌ **DON'T:**
+
 - Share credentials in plain text (Slack, email)
 - Use a personal email for the service account
 - Give access to non-admin employees
