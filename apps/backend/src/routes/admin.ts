@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, sql, count, desc, and, gte, lte, ne } from "drizzle-orm";
+import { eq, sql, count, desc, and, gte, lte, ne, asc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { supabaseAdmin } from "../lib/supabase";
 import { extractNotionPageId } from "../utils/notion-url-parser.js";
@@ -636,6 +636,208 @@ router.get("/templates", requireAuth, async (req: Request, res: Response): Promi
     res.status(500).json({
       error: "Internal Server Error",
       message: "Failed to fetch templates",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /admin/templates/{id}:
+ *   get:
+ *     tags:
+ *       - Admin - Templates
+ *     summary: Get template details
+ *     description: Retrieve detailed information about a specific template including tasks, usage stats, and assigned users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Template ID
+ *     responses:
+ *       200:
+ *         description: Template details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 template:
+ *                   type: object
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get("/templates/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id: templateId } = req.params;
+
+    // Verify user is admin
+    const [currentUser] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!currentUser || currentUser.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Admin access required",
+        },
+      });
+      return;
+    }
+
+    // Fetch template
+    const [template] = await db
+      .select()
+      .from(schema.roadmapTemplates)
+      .where(
+        and(
+          eq(schema.roadmapTemplates.id, templateId),
+          eq(schema.roadmapTemplates.organizationId, currentUser.organizationId)
+        )
+      )
+      .limit(1);
+
+    if (!template) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Template not found",
+        },
+      });
+      return;
+    }
+
+    // Fetch all tasks for this template
+    const tasks = await db
+      .select()
+      .from(schema.roadmapTemplateTasks)
+      .where(eq(schema.roadmapTemplateTasks.templateId, templateId))
+      .orderBy(
+        asc(schema.roadmapTemplateTasks.weekNumber),
+        asc(schema.roadmapTemplateTasks.orderIndex)
+      );
+
+    // Group tasks by week
+    const tasksByWeek: Record<number, any[]> = {};
+    for (const task of tasks) {
+      if (!tasksByWeek[task.weekNumber]) {
+        tasksByWeek[task.weekNumber] = [];
+      }
+      tasksByWeek[task.weekNumber].push({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        timeEstimate: task.timeEstimate,
+        orderIndex: task.orderIndex,
+        sources: [], // TODO: Fetch source materials when schema is ready
+      });
+    }
+
+    // Convert to array format sorted by week
+    const tasksByWeekArray = Object.entries(tasksByWeek)
+      .sort(([weekA], [weekB]) => Number(weekA) - Number(weekB))
+      .map(([weekNumber, weekTasks]) => ({
+        weekNumber: Number(weekNumber),
+        tasks: weekTasks,
+      }));
+
+    // Get usage statistics
+    const assignments = await db
+      .select({
+        userId: schema.userTemplateAssignments.userId,
+        assignedAt: schema.userTemplateAssignments.assignedAt,
+      })
+      .from(schema.userTemplateAssignments)
+      .where(eq(schema.userTemplateAssignments.templateId, templateId));
+
+    // Fetch assigned user details
+    const assignedUsers = await Promise.all(
+      assignments.map(async (assignment) => {
+        const [user] = await db
+          .select({
+            id: schema.users.id,
+            firstName: schema.users.firstName,
+            lastName: schema.users.lastName,
+            email: schema.users.email,
+            role: schema.users.role,
+          })
+          .from(schema.users)
+          .where(eq(schema.users.id, assignment.userId))
+          .limit(1);
+
+        if (!user) return null;
+
+        // Calculate progress (count completed tasks)
+        const [completedCount] = await db
+          .select({
+            count: count(),
+          })
+          .from(schema.userRoadmapTasks)
+          .where(
+            and(
+              eq(schema.userRoadmapTasks.userId, user.id),
+              eq(schema.userRoadmapTasks.completed, true)
+            )
+          );
+
+        const totalTasks = tasks.length;
+        const progress = totalTasks > 0 ? Math.round((Number(completedCount?.count || 0) / totalTasks) * 100) : 0;
+
+        return {
+          id: user.id,
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          role: user.role,
+          progress,
+          assignedAt: assignment.assignedAt,
+        };
+      })
+    );
+
+    // Filter out null values
+    const validAssignedUsers = assignedUsers.filter((user) => user !== null);
+
+    res.json({
+      success: true,
+      template: {
+        id: template.id,
+        organizationId: template.organizationId,
+        title: template.title,
+        description: template.description,
+        icon: template.icon,
+        color: template.color,
+        roleTags: template.roleTags || [],
+        totalWeeks: template.totalWeeks,
+        createdAt: template.createdAt,
+        updatedAt: template.updatedAt,
+        tasksByWeek: tasksByWeekArray,
+        usageStats: {
+          assignedCount: validAssignedUsers.length,
+          assignedUsers: validAssignedUsers,
+        },
+        taskCount: tasks.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching template details:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch template details",
+      },
     });
   }
 });

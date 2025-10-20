@@ -24,6 +24,48 @@ export interface Template {
   usedCount: number;
 }
 
+export interface TemplateTask {
+  id: string;
+  title: string;
+  description: string | null;
+  timeEstimate: string | null;
+  orderIndex: number;
+  sources: any[]; // Source materials to be implemented
+}
+
+export interface TemplateWeek {
+  weekNumber: number;
+  tasks: TemplateTask[];
+}
+
+export interface AssignedUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  progress: number;
+  assignedAt: Date | string;
+}
+
+export interface TemplateDetail {
+  id: string;
+  organizationId: string;
+  title: string;
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+  roleTags: string[];
+  totalWeeks: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  tasksByWeek: TemplateWeek[];
+  usageStats: {
+    assignedCount: number;
+    assignedUsers: AssignedUser[];
+  };
+  taskCount: number;
+}
+
 export interface Integration {
   id: string;
   provider: "slack" | "notion" | "github" | "google-drive";
@@ -101,6 +143,19 @@ export async function fetchTemplates(): Promise<Template[]> {
     return response.templates;
   } catch (error) {
     console.error("Error fetching templates:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch template details by ID (admin only)
+ */
+export async function fetchTemplateDetail(id: string): Promise<TemplateDetail> {
+  try {
+    const response = await apiRequest<{ template: TemplateDetail }>(`/admin/templates/${id}`);
+    return response.template;
+  } catch (error) {
+    console.error("Error fetching template detail:", error);
     throw error;
   }
 }

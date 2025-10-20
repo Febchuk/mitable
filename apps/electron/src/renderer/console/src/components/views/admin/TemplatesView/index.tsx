@@ -113,6 +113,7 @@ export default function TemplatesView() {
             return (
               <div
                 key={template.id}
+                onClick={() => navigate(`/templates/${template.id}`)}
                 className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4 hover:border-border-subtle/80 transition-colors cursor-pointer"
               >
                 {/* Icon */}
