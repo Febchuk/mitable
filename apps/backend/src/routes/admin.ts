@@ -4,6 +4,9 @@ import * as schema from "../db/schema/index";
 import { eq, sql, count, desc, and, gte, lte, ne } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { supabaseAdmin } from "../lib/supabase";
+import { extractNotionPageId } from "../utils/notion-url-parser.js";
+import { notionService } from "../services/notion.service.js";
+import { llmService } from "../services/llm.service.js";
 
 const router = Router();
 
@@ -1126,7 +1129,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
  *     tags:
  *       - Admin - Templates
  *     summary: Create a new roadmap template
- *     description: Create a reusable onboarding template with optional tasks. Admin access required.
+ *     description: Create a reusable onboarding template with optional tasks or import from Notion. When a Notion URL is provided, AI automatically extracts tasks from the page content. Admin access required.
  *     requestBody:
  *       required: true
  *       content:
@@ -1161,7 +1164,8 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
  *                 default: 4
  *               notionUrl:
  *                 type: string
- *                 description: Notion page URL for future AI generation
+ *                 description: Optional Notion page URL to import tasks from. When provided, AI extracts tasks from the page content. Requires Notion integration to be connected.
+ *                 example: "https://notion.so/Engineering-Onboarding-abc123def456"
  *               tasks:
  *                 type: array
  *                 description: Optional tasks to create with template
@@ -1207,7 +1211,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
 router.post("/templates", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const { title, description, icon, color, roleTags, totalWeeks, tasks } = req.body;
+    const { title, description, icon, color, roleTags, totalWeeks, notionUrl, tasks } = req.body;
 
     // Verify requester is admin
     const [currentUser] = await db
@@ -1237,6 +1241,137 @@ router.post("/templates", requireAuth, async (req: Request, res: Response): Prom
         },
       });
       return;
+    }
+
+    // Handle Notion URL if provided
+    // This will be used to automatically extract tasks from a Notion page
+    let notionPageId: string | null = null;
+
+    if (notionUrl && notionUrl.trim()) {
+      try {
+        // Step 1: Extract page ID from the Notion URL
+        // Supports various formats: https://notion.so/Page-abc123, direct IDs, etc.
+        notionPageId = extractNotionPageId(notionUrl);
+        console.log(`✓ Extracted Notion page ID: ${notionPageId}`);
+
+        // Step 2: Validate that organization has a connected Notion integration
+        // This is required because we need OAuth tokens to fetch page content
+        const [integration] = await db
+          .select()
+          .from(schema.integrations)
+          .where(
+            and(
+              eq(schema.integrations.organizationId, currentUser.organizationId),
+              eq(schema.integrations.provider, "notion"),
+              eq(schema.integrations.status, "connected")
+            )
+          )
+          .limit(1);
+
+        if (!integration) {
+          // User hasn't connected Notion yet - provide helpful error
+          res.status(400).json({
+            success: false,
+            error: {
+              code: "NOTION_NOT_CONNECTED",
+              message:
+                "Notion integration required. Please connect Notion in your integrations settings before importing templates.",
+            },
+          });
+          return;
+        }
+
+        console.log(`✓ Notion integration found for organization: ${currentUser.organizationId}`);
+
+        // Step 3: Fetch all blocks from the Notion page
+        // This uses the existing notionService which handles:
+        // - OAuth token management and refresh
+        // - Rate limiting (350ms between requests)
+        // - Recursive fetching of nested blocks
+        // - Text extraction from various block types
+        const blocks = await notionService.getPageBlocks(
+          currentUser.organizationId,
+          notionPageId
+        );
+
+        // Filter out blocks with no meaningful text content
+        // Empty blocks or blocks with only whitespace won't help the AI
+        const validBlocks = blocks.filter((block) => block.text && block.text.trim().length > 0);
+
+        console.log(
+          `✓ Fetched ${blocks.length} total blocks, ${validBlocks.length} with content from Notion page`
+        );
+
+        // Handle case where page has no extractable content
+        if (validBlocks.length === 0) {
+          console.warn(`⚠ No content found in Notion page: ${notionPageId}`);
+          // Continue with template creation but no tasks
+          // This allows users to create the template structure even if the page is empty
+        } else {
+          // Step 4: Extract tasks from Notion blocks using AI
+          // The LLM analyzes block structure (headings, paragraphs, lists) to:
+          // - Identify week numbers from headings (e.g., "Week 1: Onboarding")
+          // - Extract task titles from action items
+          // - Parse time estimates (e.g., "2 hours", "by Friday")
+          // - Generate descriptions from supporting text
+          // - Determine proper ordering within each week
+          const extractedTasks = await llmService.extractTasksFromNotionBlocks(validBlocks);
+
+          console.log(`✓ AI extracted ${extractedTasks.length} tasks from Notion content`);
+
+          // Override the tasks array with AI-extracted tasks
+          // This replaces any manually provided tasks in the request
+          // The extracted tasks are already in the correct format for our database schema
+          req.body.tasks = extractedTasks;
+        }
+      } catch (error) {
+        // Handle URL parsing errors
+        if (error instanceof Error && error.message.includes("Invalid Notion URL")) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: "INVALID_NOTION_URL",
+              message: error.message,
+            },
+          });
+          return;
+        }
+
+        // Handle Notion API errors (page not found, not shared, etc.)
+        if (error instanceof Error && error.message.includes("Could not find page")) {
+          res.status(403).json({
+            success: false,
+            error: {
+              code: "NOTION_PAGE_NOT_ACCESSIBLE",
+              message:
+                "Unable to access this Notion page. Please ensure the page is shared with your Notion integration. " +
+                "You can share pages during the OAuth connection or update sharing settings in Notion.",
+            },
+          });
+          return;
+        }
+
+        // Handle AI extraction errors
+        if (
+          error instanceof Error &&
+          (error.message.includes("AI returned invalid JSON") ||
+            error.message.includes("Failed to process Notion content"))
+        ) {
+          res.status(500).json({
+            success: false,
+            error: {
+              code: "AI_EXTRACTION_FAILED",
+              message:
+                "Failed to extract tasks from Notion page using AI. " +
+                "This may be due to complex page formatting. You can try simplifying the page or create tasks manually.",
+            },
+          });
+          return;
+        }
+
+        // Re-throw other errors to be caught by outer try/catch
+        throw error;
+      }
     }
 
     // Create the template
@@ -1273,14 +1408,8 @@ router.post("/templates", requireAuth, async (req: Request, res: Response): Prom
       }
     }
 
-    // TODO: If notionUrl is provided, implement AI generation from Notion
-    // This would involve:
-    // 1. Fetching Notion page content via API
-    // 2. Using Gemini to parse and extract tasks
-    // 3. Auto-detecting task types, relative dates, and critical items
-    // 4. Creating tasks based on AI-generated structure
-
-    res.status(201).json({
+    // Build response with template info and task count
+    const response: any = {
       success: true,
       template: {
         id: template.id,
@@ -1293,14 +1422,39 @@ router.post("/templates", requireAuth, async (req: Request, res: Response): Prom
         totalWeeks: template.totalWeeks,
       },
       tasksCreated,
-    });
+    };
+
+    // Add metadata if tasks were imported from Notion
+    // This helps the frontend show a success message with details
+    if (notionPageId) {
+      response.importedFromNotion = true;
+      response.notionPageId = notionPageId;
+      console.log(
+        `✅ Template "${title}" created successfully with ${tasksCreated} tasks imported from Notion page ${notionPageId}`
+      );
+    } else {
+      console.log(`✅ Template "${title}" created successfully with ${tasksCreated} tasks`);
+    }
+
+    res.status(201).json(response);
   } catch (error) {
+    // Log the full error for debugging
     console.error("Error creating template:", error);
+
+    // Provide detailed error response
+    // If error has already been handled (responded to client), don't send again
+    if (res.headersSent) {
+      return;
+    }
+
+    // Handle any unexpected errors with helpful message
     res.status(500).json({
       success: false,
       error: {
         code: "INTERNAL_ERROR",
-        message: "Failed to create template",
+        message:
+          "Failed to create template. " +
+          (error instanceof Error ? error.message : "An unexpected error occurred."),
       },
     });
   }
