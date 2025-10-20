@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { ExpertProfile } from "@mitable/shared";
-import ExpertListCollapsed from "./components/ExpertListCollapsed";
-import ExpertListExpanded from "./components/ExpertListExpanded";
+import ExpertList from "./components/ExpertList";
 
 interface ExpertMatch {
   expert: ExpertProfile;
@@ -146,19 +145,16 @@ function App() {
 
   return (
     <div
-      className="w-full h-full flex items-center justify-center p-4"
+      className="w-full h-full flex items-end justify-start p-4"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {isExpanded ? (
-        <ExpertListExpanded
-          experts={experts}
-          onCollapse={() => setIsExpanded(false)}
-          onEscalate={handleEscalate}
-        />
-      ) : (
-        <ExpertListCollapsed experts={experts} onExpand={() => setIsExpanded(true)} />
-      )}
+      <ExpertList
+        experts={experts}
+        isExpanded={isExpanded}
+        onToggle={() => setIsExpanded(!isExpanded)}
+        onEscalate={handleEscalate}
+      />
     </div>
   );
 }
