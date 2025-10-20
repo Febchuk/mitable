@@ -1390,8 +1390,8 @@ router.post("/templates", requireAuth, async (req: Request, res: Response): Prom
 
     // Create tasks if provided
     let tasksCreated = 0;
-    if (tasks && Array.isArray(tasks) && tasks.length > 0) {
-      for (const task of tasks) {
+    if (req.body.tasks && Array.isArray(req.body.tasks) && req.body.tasks.length > 0) {
+      for (const task of req.body.tasks) {
         if (!task.weekNumber || !task.title) {
           continue; // Skip invalid tasks
         }
