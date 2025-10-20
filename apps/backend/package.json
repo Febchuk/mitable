@@ -18,6 +18,7 @@
     "sync-slack": "tsx src/scripts/sync-slack.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@mitable/shared": "*",
     "@notionhq/client": "^5.2.1",
     "@pinecone-database/pinecone": "^6.1.2",
@@ -26,12 +27,14 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.44.6",
+    "drizzle-zod": "^0.8.3",
     "express": "^4.18.3",
     "openai": "^6.3.0",
     "pg": "^8.13.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
