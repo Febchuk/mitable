@@ -128,7 +128,7 @@ export default function ExpertList({ experts, isExpanded, onToggle, onEscalate }
       <div className="flex-shrink-0 flex items-center justify-center px-2 pb-2">
         <button
           onClick={onToggle}
-          className="w-full h-6 flex items-center justify-center bg-[#2a2a2a] hover:bg-[#1a1a1a] rounded-lg transition-colors text-gray-400"
+          className="w-full h-6 flex items-center justify-center bg-[#3e3e3e] hover:bg-[#1a1a1a] rounded-lg transition-colors text-gray-400"
           aria-label={isExpanded ? "Collapse" : "Expand"}
         >
           {isExpanded ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}

@@ -4,6 +4,35 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --background: 0 0% 10%; /* #1A1A1A */
+    --foreground: 0 0% 100%; /* #FFFFFF */
+
+    --card: 240 4% 22%; /* #30303e similar to expert card color */
+    --card-foreground: 0 0% 100%;
+
+    --primary: 221 83% 53%; /* #3B82F6 blue */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 240 4% 16%;
+    --muted-foreground: 0 0% 63%;
+
+    --accent: 240 4% 22%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 4% 29%;
+    --input: 240 4% 29%;
+    --ring: 221 83% 53%;
+  }
+}
+
 body {
   margin: 0;
   padding: 0;

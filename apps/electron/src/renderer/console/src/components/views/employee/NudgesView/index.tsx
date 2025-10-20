@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNudges } from "@/console/src/hooks/queries/nudges";
-import { Search } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 function getInitials(name: string): string {
   return name
@@ -62,7 +63,16 @@ export default function NudgesView() {
   return (
     <div className="p-8 space-y-6 app-no-drag">
       {/* Header */}
-      <h1 className="text-4xl font-bold text-text-primary">Your nudge history</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-4xl font-bold text-text-primary">Your nudge history</h1>
+        <Button
+          onClick={() => navigate("/nudges/new")}
+          className="gap-2 bg-primary text-white hover:bg-primary/90"
+        >
+          <Plus size={20} />
+          <span>New Nudge</span>
+        </Button>
+      </div>
 
       {/* Search Bar */}
       <div className="relative">

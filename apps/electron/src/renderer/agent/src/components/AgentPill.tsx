@@ -63,10 +63,10 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
       )}
 
       {/* Mode Toggle (Text/Audio) */}
-      <div className="relative flex items-center bg-muted rounded-full p-1 w-20 h-10 mr-3 app-no-drag">
+      <div className="relative flex items-center bg-[#3e3e3e] rounded-full p-1 w-20 h-10 mr-3 app-no-drag">
         {/* Sliding background indicator */}
         <div
-          className={`absolute w-9 h-8 bg-primary rounded-full transition-transform duration-200 ease-in-out ${
+          className={`absolute w-9 h-8 bg-[#1a1a1a] rounded-full transition-transform duration-200 ease-in-out ${
             inputMode === "audio" ? "translate-x-10" : "translate-x-0"
           }`}
         />

@@ -49,7 +49,11 @@ function App() {
     console.log(`Card clicked - launching ${windowType} window`, data);
 
     if (windowType === "nudge") {
-      window.agentAPI.showNudge(data);
+      // Pass expert data + conversationId for context generation
+      window.agentAPI.showNudge({
+        ...data,
+        conversationId, // Add conversationId for Generate buttons
+      });
     } else if (windowType === "guide") {
       window.agentAPI.startGuide(data.guide);
     }
@@ -173,11 +177,10 @@ function App() {
           console.log(`Window trigger: ${windowType}`, data);
 
           if (windowType === "nudge") {
-            // Auto-launch Nudge window with expert data and conversationId
-            window.agentAPI.showNudge({
-              ...data,
-              conversationId: convId, // Pass conversation ID for context generation
-            });
+            // Don't auto-open nudge window - let user click "View Experts" card
+            console.log("Expert data ready. User can click 'View Experts' card to open nudge window.");
+            // The windowTrigger data (including experts) is already stored in the message
+            // and will be accessible when user clicks the card via handleCardClick
           } else if (windowType === "guide") {
             // Auto-launch Guide + Overlay windows with guide data
             window.agentAPI.startGuide(data.guide);
