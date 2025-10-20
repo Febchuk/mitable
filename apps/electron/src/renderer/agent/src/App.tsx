@@ -133,9 +133,7 @@ function App() {
         onChunk: (chunk) => {
           setMessages((prev) =>
             prev.map((msg) =>
-              msg.id === streamingMessageId
-                ? { ...msg, content: msg.content + chunk }
-                : msg
+              msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
             )
           );
         },
@@ -178,7 +176,9 @@ function App() {
 
           if (windowType === "nudge") {
             // Don't auto-open nudge window - let user click "View Experts" card
-            console.log("Expert data ready. User can click 'View Experts' card to open nudge window.");
+            console.log(
+              "Expert data ready. User can click 'View Experts' card to open nudge window."
+            );
             // The windowTrigger data (including experts) is already stored in the message
             // and will be accessible when user clicks the card via handleCardClick
           } else if (windowType === "guide") {

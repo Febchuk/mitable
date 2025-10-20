@@ -89,16 +89,14 @@ class ExpertMatchingService {
 
       console.log(`[ExpertMatchingService] Found ${allUsers.length} users (simplified)`);
       console.log("[ExpertMatchingService] User details:", {
-        names: allUsers.map(u => [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email),
-        roles: allUsers.map(u => u.role),
+        names: allUsers.map((u) => [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email),
+        roles: allUsers.map((u) => u.role),
       });
 
       // Format as ExpertMatch with mock data
       const matches: ExpertMatch[] = allUsers.map((user, index) => {
         // Construct full name from firstName + lastName
-        const fullName = [user.firstName, user.lastName]
-          .filter(Boolean)
-          .join(" ") || user.email;
+        const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
 
         return {
           userId: user.userId,
@@ -108,11 +106,7 @@ class ExpertMatchingService {
           department: "General", // Hardcoded since field doesn't exist in schema
           avatarUrl: user.avatarUrl || undefined,
           matchScore: Math.round((0.9 - index * 0.1) * 100) / 100, // Mock decreasing scores: 0.9, 0.8, 0.7, ...
-          matchReasons: [
-            "Available to help",
-            "Works in your team",
-            "Experienced team member",
-          ],
+          matchReasons: ["Available to help", "Works in your team", "Experienced team member"],
           expertise: {
             summary: `${user.role || "Employee"} with general knowledge`,
             topics: ["Team support", "General knowledge"],
@@ -131,7 +125,7 @@ class ExpertMatchingService {
         matchesCount: matches.length,
         topMatch: matches[0]?.name,
         topScore: matches[0]?.matchScore,
-        allScores: matches.map(m => m.matchScore),
+        allScores: matches.map((m) => m.matchScore),
       });
 
       return matches;
@@ -144,9 +138,7 @@ class ExpertMatchingService {
   /**
    * Map status string to availability enum
    */
-  private mapAvailability(
-    status: string
-  ): "available" | "away" | "busy" | "offline" {
+  private mapAvailability(status: string): "available" | "away" | "busy" | "offline" {
     if (["available", "away", "busy", "offline"].includes(status)) {
       return status as "available" | "away" | "busy" | "offline";
     }

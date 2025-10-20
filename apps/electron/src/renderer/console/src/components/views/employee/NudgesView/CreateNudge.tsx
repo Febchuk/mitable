@@ -4,7 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCreateNudge } from "@/console/src/hooks/queries/nudges";
 import { useToast } from "@/hooks/use-toast";
-import { NudgeResource, generateNudgeContext, generateNudgeQuestion } from "@/console/src/services/nudgesService";
+import {
+  NudgeResource,
+  generateNudgeContext,
+  generateNudgeQuestion,
+} from "@/console/src/services/nudgesService";
 import PeopleSelector from "./PeopleSelector";
 import ResourceUploader from "./ResourceUploader";
 
@@ -29,7 +33,9 @@ export default function CreateNudge() {
   const location = useLocation();
   const { toast } = useToast();
   const { mutate: createNudge, isPending } = useCreateNudge();
-  const [selectedPeople, setSelectedPeople] = useState<Array<{ id: string; name: string; role: string }>>([]);
+  const [selectedPeople, setSelectedPeople] = useState<
+    Array<{ id: string; name: string; role: string }>
+  >([]);
   const [context, setContext] = useState("");
   const [question, setQuestion] = useState("");
   const [resources, setResources] = useState<NudgeResource[]>([]);
@@ -51,11 +57,13 @@ export default function CreateNudge() {
 
       // Pre-populate expert if provided
       if (nudgeData.expert) {
-        setSelectedPeople([{
-          id: nudgeData.expert.id,
-          name: nudgeData.expert.name,
-          role: nudgeData.expert.role,
-        }]);
+        setSelectedPeople([
+          {
+            id: nudgeData.expert.id,
+            name: nudgeData.expert.name,
+            role: nudgeData.expert.role,
+          },
+        ]);
       }
 
       // Pre-populate context if provided
@@ -324,11 +332,7 @@ export default function CreateNudge() {
           >
             Save as Draft
           </Button>
-          <Button
-            variant="default"
-            onClick={handleSendNudge}
-            disabled={!isFormValid || isPending}
-          >
+          <Button variant="default" onClick={handleSendNudge} disabled={!isFormValid || isPending}>
             {isPending ? "Sending..." : "Send Nudge"}
           </Button>
         </div>

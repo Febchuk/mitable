@@ -58,7 +58,7 @@ export default function ConversationDialog({
 
           if (message.messageType === "experts" && message.cardData) {
             const expertCount = message.cardData.experts?.length || 0;
-            title = `${expertCount} Expert${expertCount > 1 ? 's' : ''} Available`;
+            title = `${expertCount} Expert${expertCount > 1 ? "s" : ""} Available`;
             subtitle = "View Experts";
             Icon = Users;
           } else if (message.messageType === "workflow" && message.cardData) {

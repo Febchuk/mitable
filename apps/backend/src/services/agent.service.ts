@@ -164,15 +164,12 @@ export class AgentService {
    * @param context - Context including conversation history, user info, etc.
    * @returns Async iterable of stream chunks
    */
-  async *processMessage(
-    userMessage: string,
-    context: ToolContext
-  ): AsyncIterable<StreamChunk> {
+  async *processMessage(userMessage: string, context: ToolContext): AsyncIterable<StreamChunk> {
     const MAX_ITERATIONS = 5; // Prevent infinite loops
     let iterationCount = 0;
     try {
       // Convert conversation history to OpenAI format
-      let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         { role: "system", content: SYSTEM_PROMPT },
         ...this.convertToOpenAIMessages(context.conversationHistory),
         { role: "user", content: userMessage },
@@ -189,8 +186,11 @@ export class AgentService {
         console.log(`[AgentService] Iteration ${iterationCount}/${MAX_ITERATIONS}`);
         console.log("[AgentService] Current messages:", {
           messageCount: messages.length,
-          roles: messages.map(m => m.role),
-          lastUserMessage: messages.filter(m => m.role === "user").pop()?.content?.substring(0, 100),
+          roles: messages.map((m) => m.role),
+          lastUserMessage: (() => {
+            const lastMsg = messages.filter((m) => m.role === "user").pop()?.content;
+            return typeof lastMsg === "string" ? lastMsg.substring(0, 100) : "[non-text content]";
+          })(),
         });
 
         // Call OpenAI with function calling
@@ -315,7 +315,8 @@ export class AgentService {
           // Check if tool result suggests we should continue (e.g., "Would you like me to connect you with an expert?")
           // If the tool returns a complete answer, stream it and finish
           // If the tool result is incomplete, continue the loop for the AI to decide next step
-          const isIncompleteResult = toolResult.content.toLowerCase().includes("would you like") ||
+          const isIncompleteResult =
+            toolResult.content.toLowerCase().includes("would you like") ||
             toolResult.content.toLowerCase().includes("connect you with") ||
             toolResult.content.toLowerCase().includes("couldn't find");
 
@@ -386,7 +387,8 @@ export class AgentService {
       console.warn(`[AgentService] Max iterations (${MAX_ITERATIONS}) reached`);
       yield {
         type: "complete",
-        content: "I apologize, but I'm having trouble processing your request. Could you please rephrase your question?",
+        content:
+          "I apologize, but I'm having trouble processing your request. Could you please rephrase your question?",
         messageType: "text",
         cardData: undefined,
       };

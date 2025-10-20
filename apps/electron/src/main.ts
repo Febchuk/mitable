@@ -10,7 +10,7 @@ let guideWindow: BrowserWindow | null = null;
 let nudgeWindow: BrowserWindow | null = null;
 
 // Auth token storage (shared across all windows)
-let authTokens: {
+const authTokens: {
   accessToken: string | null;
   refreshToken: string | null;
 } = {
@@ -328,33 +328,33 @@ function setupIPC() {
       const heightDiff = newHeight - currentBounds.height;
       const newY = currentBounds.y - heightDiff;
 
-      agentWindow.setBounds({
-        x: currentBounds.x,
-        y: newY,
-        width: newWidth,
-        height: newHeight,
-      }, true);
+      agentWindow.setBounds(
+        {
+          x: currentBounds.x,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
+        },
+        true
+      );
     }
   });
 
   // Auth Management - Cross-window token sharing
   // Console sets tokens after login
-  ipcMain.on(
-    IPC_CHANNELS.AUTH_SET_TOKENS,
-    (_event, accessToken: string, refreshToken: string) => {
-      console.log("[Auth] Tokens set from Console window");
-      authTokens.accessToken = accessToken;
-      authTokens.refreshToken = refreshToken;
+  ipcMain.on(IPC_CHANNELS.AUTH_SET_TOKENS, (_event, accessToken: string, refreshToken: string) => {
+    console.log("[Auth] Tokens set from Console window");
+    authTokens.accessToken = accessToken;
+    authTokens.refreshToken = refreshToken;
 
-      // Broadcast token update to all windows
-      const allWindows = [agentWindow, guideWindow, nudgeWindow, overlayWindow];
-      allWindows.forEach((win) => {
-        if (win && !win.isDestroyed()) {
-          win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, accessToken);
-        }
-      });
-    }
-  );
+    // Broadcast token update to all windows
+    const allWindows = [agentWindow, guideWindow, nudgeWindow, overlayWindow];
+    allWindows.forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, accessToken);
+      }
+    });
+  });
 
   // Any window can request current auth token
   ipcMain.handle(IPC_CHANNELS.AUTH_GET_TOKEN, () => {

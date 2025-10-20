@@ -73,8 +73,7 @@ export const nudges = pgTable("nudges", {
   expertId: uuid("expert_id")
     .notNull()
     .references(() => users.id), // Recommended expert
-  creatorId: uuid("creator_id")
-    .references(() => users.id), // User who created the nudge (can be null for AI-generated)
+  creatorId: uuid("creator_id").references(() => users.id), // User who created the nudge (can be null for AI-generated)
   context: text("context"), // What the user was doing
   question: text("question"), // User's question/need
   matchScore: decimal("match_score", { precision: 3, scale: 2 }), // 0.0 to 1.0

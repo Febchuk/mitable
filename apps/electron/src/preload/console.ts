@@ -47,8 +47,9 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.send(IPC_CHANNELS.AUTH_SET_TOKENS, accessToken, refreshToken),
   clearAuthTokens: () => ipcRenderer.send(IPC_CHANNELS.AUTH_CLEAR),
   onAuthTokenUpdated: (callback: (token: string | null) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.AUTH_TOKEN_UPDATED, (_event: IpcRendererEvent, token: string | null) =>
-      callback(token)
+    ipcRenderer.on(
+      IPC_CHANNELS.AUTH_TOKEN_UPDATED,
+      (_event: IpcRendererEvent, token: string | null) => callback(token)
     );
   },
 });

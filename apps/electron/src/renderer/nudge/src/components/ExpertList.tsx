@@ -102,11 +102,13 @@ export default function ExpertList({ experts, isExpanded, onToggle, onEscalate }
                 {/* Match Badge + Nudge Button Stacked */}
                 <div className="flex-shrink-0 flex flex-col gap-1.5 items-end">
                   {/* Match Badge */}
-                  <div className={`border text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
-                    isBestMatch
-                      ? "border-[#F59E0B] text-[#F59E0B]"
-                      : "border-gray-600 text-gray-300"
-                  }`}>
+                  <div
+                    className={`border text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
+                      isBestMatch
+                        ? "border-[#F59E0B] text-[#F59E0B]"
+                        : "border-gray-600 text-gray-300"
+                    }`}
+                  >
                     {Math.round(matchScore * 100)}% Match
                   </div>
 

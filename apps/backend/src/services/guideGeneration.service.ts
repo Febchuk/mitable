@@ -1,4 +1,4 @@
-import type { Guide, GuideStep } from "@mitable/shared/guides";
+import type { Guide } from "@mitable/shared";
 
 /**
  * Guide lookup result
@@ -38,10 +38,7 @@ class GuideGenerationService {
    * @param screenshot - Base64 encoded screenshot (optional, for dynamic generation)
    * @returns Guide lookup result
    */
-  async findGuide(
-    query: string,
-    screenshot?: string
-  ): Promise<GuideLookupResult> {
+  async findGuide(query: string, screenshot?: string): Promise<GuideLookupResult> {
     console.log(`[GuideGenerationService] Looking for guide: "${query}"`);
     console.log("[GuideGenerationService] Request details:", {
       query,
@@ -96,16 +93,12 @@ class GuideGenerationService {
     // No guide found
     console.log("[GuideGenerationService] No matching guide found");
     console.log("[GuideGenerationService] Patterns checked:", {
-      patterns: [
-        "expense report",
-        "PTO request",
-        "Slack channel",
-        "billing escalation",
-      ],
+      patterns: ["expense report", "PTO request", "Slack channel", "billing escalation"],
     });
     return {
       found: false,
-      message: "I couldn't find a specific guide for that task. Would you like me to search the knowledge base or connect you with an expert?",
+      message:
+        "I couldn't find a specific guide for that task. Would you like me to search the knowledge base or connect you with an expert?",
     };
   }
 
@@ -327,26 +320,9 @@ class GuideGenerationService {
     );
   }
 
-  /**
-   * Future: Generate dynamic guide using Gemini Vision
-   * This would analyze a screenshot and generate step-by-step instructions
-   * with precise UI element coordinates
-   *
-   * @param query - User's question
-   * @param screenshot - Base64 encoded screenshot
-   * @returns Generated guide
-   */
-  private async generateDynamicGuide(
-    query: string,
-    screenshot: string
-  ): Promise<Guide> {
-    // TODO: Implement Gemini Vision integration
-    // 1. Send screenshot to Gemini Vision API
-    // 2. Extract UI elements with bounding boxes
-    // 3. Generate step-by-step instructions
-    // 4. Return structured Guide object
-    throw new Error("Dynamic guide generation not yet implemented");
-  }
+  // TODO: Future feature - generateDynamicGuide(query, screenshot)
+  // Will use Gemini Vision to analyze screenshots and generate
+  // step-by-step instructions with precise UI element coordinates
 }
 
 // Export singleton instance

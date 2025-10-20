@@ -126,7 +126,7 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
           count: rawResults.length,
           topScore: rawResults[0]?.score,
           avgScore: rawResults.reduce((sum, r) => sum + r.score, 0) / rawResults.length,
-          titles: rawResults.slice(0, 3).map(r => r.metadata.title),
+          titles: rawResults.slice(0, 3).map((r) => r.metadata.title),
         });
       }
 
@@ -221,7 +221,7 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
       console.log("[SearchKnowledgeTool] Success - returning knowledge:", {
         responseLength: contentWithSources.length,
         sourcesCount: sources.length,
-        sourceNames: sources.map(s => s.title),
+        sourceNames: sources.map((s) => s.title),
       });
 
       return {

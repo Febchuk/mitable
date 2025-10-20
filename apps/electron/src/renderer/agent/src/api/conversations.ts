@@ -79,17 +79,12 @@ export async function createConversation(
 /**
  * Get conversation by ID
  */
-export async function getConversation(
-  conversationId: string
-): Promise<Conversation> {
+export async function getConversation(conversationId: string): Promise<Conversation> {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(
-    `${API_BASE_URL}/conversations/${conversationId}`,
-    {
-      headers,
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+    headers,
+  });
 
   if (!response.ok) {
     throw new Error(`Failed to get conversation: ${response.statusText}`);
@@ -127,20 +122,15 @@ export async function sendMessageStream(
 ): Promise<void> {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(
-    `${API_BASE_URL}/conversations/${conversationId}/messages/stream`,
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ content }),
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ content }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    callbacks.onError?.(
-      `Failed to send message: ${response.statusText} - ${errorText}`
-    );
+    callbacks.onError?.(`Failed to send message: ${response.statusText} - ${errorText}`);
     return;
   }
 
@@ -159,6 +149,7 @@ export async function sendMessageStream(
   let windowTriggerData: { window: "nudge" | "guide"; data: any } | undefined;
 
   try {
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       const { done, value } = await reader.read();
 
@@ -209,10 +200,7 @@ export async function sendMessageStream(
               case "window_trigger":
                 if (chunk.windowTrigger) {
                   windowTriggerData = chunk.windowTrigger;
-                  callbacks.onWindowTrigger?.(
-                    chunk.windowTrigger.window,
-                    chunk.windowTrigger.data
-                  );
+                  callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
                 }
                 break;
 
@@ -241,8 +229,6 @@ export async function sendMessageStream(
     }
   } catch (error) {
     console.error("Stream reading error:", error);
-    callbacks.onError?.(
-      error instanceof Error ? error.message : "Stream reading error"
-    );
+    callbacks.onError?.(error instanceof Error ? error.message : "Stream reading error");
   }
 }

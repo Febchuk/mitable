@@ -38,13 +38,11 @@ export class FindExpertTool extends BaseTool {
     properties: {
       query: {
         type: "string",
-        description:
-          "The topic or question to find an expert for. Should be clear and specific.",
+        description: "The topic or question to find an expert for. Should be clear and specific.",
       },
       topK: {
         type: "number",
-        description:
-          "Number of expert recommendations to provide (default: 5, max: 5)",
+        description: "Number of expert recommendations to provide (default: 5, max: 5)",
         default: 5,
       },
     },
@@ -58,10 +56,7 @@ export class FindExpertTool extends BaseTool {
    * @param context - User and organization context
    * @returns Tool result with expert matches and window trigger
    */
-  async execute(
-    args: { query: string; topK?: number },
-    context: ToolContext
-  ): Promise<ToolResult> {
+  async execute(args: { query: string; topK?: number }, context: ToolContext): Promise<ToolResult> {
     // Validate arguments
     this.validate(args);
 
@@ -102,7 +97,8 @@ export class FindExpertTool extends BaseTool {
         console.log("[FindExpertTool] No experts found in organization");
         return {
           messageType: "text",
-          content: "I couldn't find any experts in your organization for this topic at the moment. You might want to post in a team channel or reach out to your manager.",
+          content:
+            "I couldn't find any experts in your organization for this topic at the moment. You might want to post in a team channel or reach out to your manager.",
           streamable: true,
         };
       }
@@ -113,7 +109,7 @@ export class FindExpertTool extends BaseTool {
       const expertNames = experts.map((e) => e.name).join(", ");
       const topExpert = experts[0];
 
-      const responseText = `I found ${experts.length} expert${experts.length > 1 ? 's' : ''} who can help with this: ${expertNames}.
+      const responseText = `I found ${experts.length} expert${experts.length > 1 ? "s" : ""} who can help with this: ${expertNames}.
 
 ${topExpert.name} seems like the best match - they have ${topExpert.expertise.topics.slice(0, 2).join(" and ")} expertise with a ${topExpert.performance.helpfulnessScore.toFixed(1)}/5.0 helpfulness rating.
 
@@ -121,7 +117,7 @@ I'm showing you their profiles now so you can reach out!`;
 
       console.log("[FindExpertTool] Success - triggering Nudge window:", {
         expertsCount: experts.length,
-        expertNames: experts.map(e => e.name),
+        expertNames: experts.map((e) => e.name),
         windowTrigger: "nudge",
       });
 
@@ -146,7 +142,8 @@ I'm showing you their profiles now so you can reach out!`;
 
       return {
         messageType: "text",
-        content: "I encountered an error while searching for experts. Please try again or reach out through your team channels.",
+        content:
+          "I encountered an error while searching for experts. Please try again or reach out through your team channels.",
         streamable: true,
       };
     }

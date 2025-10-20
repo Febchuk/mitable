@@ -68,6 +68,8 @@ export interface StreamChunk {
   type: "chunk" | "complete" | "error" | "window_trigger";
   content?: string;
   messageId?: string;
+  messageType?: "text" | "workflow" | "experts";
+  cardData?: Record<string, any>;
   error?: string;
   windowTrigger?: WindowTrigger; // Window trigger for UI coordination
 }

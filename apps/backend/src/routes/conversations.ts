@@ -703,9 +703,9 @@ router.post(
         return;
       }
 
-      const fullName = [userProfile.firstName, userProfile.lastName]
-        .filter(Boolean)
-        .join(" ") || userProfile.email;
+      const fullName =
+        [userProfile.firstName, userProfile.lastName].filter(Boolean).join(" ") ||
+        userProfile.email;
 
       console.log("[Conversations] User profile fetched:", {
         organizationId: userProfile.organizationId,
@@ -756,11 +756,6 @@ router.post(
             sources: (msg.sources as any) || [],
             createdAt: msg.createdAt,
           })),
-          userProfile: {
-            name: fullName,
-            email: userProfile.email,
-            organizationId: userProfile.organizationId,
-          },
         });
 
         for await (const chunk of stream) {

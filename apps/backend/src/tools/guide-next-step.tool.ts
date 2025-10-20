@@ -45,8 +45,7 @@ export class GuideNextStepTool extends BaseTool {
       },
       userQuestion: {
         type: "string",
-        description:
-          "The original user question for context",
+        description: "The original user question for context",
       },
     },
     required: ["task", "userQuestion"],
@@ -78,10 +77,7 @@ export class GuideNextStepTool extends BaseTool {
 
     try {
       // Search for or generate a guide
-      const result = await guideGenerationService.findGuide(
-        userQuestion,
-        screenshot
-      );
+      const result = await guideGenerationService.findGuide(userQuestion, screenshot);
 
       if (!result.found || !result.guide) {
         // No guide found - suggest alternatives
@@ -135,7 +131,8 @@ I'm showing you the visual guide now - it will highlight exactly where to click 
 
       return {
         messageType: "text",
-        content: "I encountered an error while looking for a guide. Let me search the knowledge base or connect you with an expert instead.",
+        content:
+          "I encountered an error while looking for a guide. Let me search the knowledge base or connect you with an expert instead.",
         streamable: true,
       };
     }

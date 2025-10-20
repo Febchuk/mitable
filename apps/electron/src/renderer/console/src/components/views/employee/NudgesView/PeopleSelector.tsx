@@ -118,10 +118,7 @@ export default function PeopleSelector({ selectedPeople, onAddPerson }: PeopleSe
 
       {/* Search Input */}
       <div className="relative">
-        <Search
-          size={18}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
-        />
+        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
         <input
           type="text"
           value={searchQuery}
@@ -173,9 +170,7 @@ export default function PeopleSelector({ selectedPeople, onAddPerson }: PeopleSe
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">
-                      {expert.name}
-                    </p>
+                    <p className="text-sm font-medium text-text-primary truncate">{expert.name}</p>
                     <p className="text-xs text-text-secondary">{expert.role}</p>
                   </div>
                   <Button

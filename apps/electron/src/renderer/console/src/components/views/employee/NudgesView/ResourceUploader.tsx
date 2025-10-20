@@ -228,11 +228,7 @@ export default function ResourceUploader({ resources, onResourcesChange }: Resou
             <p className="text-xs text-text-secondary mb-4">
               Max 10MB per file • PDF, DOC, DOCX, XLS, XLSX, PNG, JPG, GIF
             </p>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-            >
+            <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
               Choose Files
             </Button>
             <input
@@ -347,8 +343,8 @@ export default function ResourceUploader({ resources, onResourcesChange }: Resou
             <Camera size={32} className="mx-auto mb-3 text-text-tertiary" />
             <p className="text-sm text-text-primary mb-2">Screenshot capture coming soon</p>
             <p className="text-xs text-text-secondary mb-4">
-              This feature will allow you to capture and annotate screenshots to include with
-              your nudge
+              This feature will allow you to capture and annotate screenshots to include with your
+              nudge
             </p>
             <Button variant="secondary" size="md" disabled>
               <Camera size={16} className="mr-2" />
