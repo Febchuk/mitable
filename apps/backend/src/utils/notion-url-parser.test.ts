@@ -87,9 +87,9 @@ describe("extractNotionPageId", () => {
     });
 
     it("should throw error for page ID with invalid characters", () => {
-      expect(() => extractNotionPageId("https://notion.so/Page-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")).toThrow(
-        "Could not find a valid page ID"
-      );
+      expect(() =>
+        extractNotionPageId("https://notion.so/Page-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")
+      ).toThrow("Could not find a valid page ID");
     });
 
     it("should throw error for direct ID that is too short", () => {

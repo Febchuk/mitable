@@ -103,7 +103,7 @@ describe("LLMService", () => {
     describe("successful extraction", () => {
       it("should extract tasks from valid Notion blocks", async () => {
         // Mock the Gemini API to return valid JSON
-        const mockGenerateContent = jest.fn().mockResolvedValue({
+        const mockGenerateContent = jest.fn<any>().mockResolvedValue({
           response: {
             text: () => JSON.stringify(mockAIResponse),
           },
@@ -127,7 +127,6 @@ describe("LLMService", () => {
         });
       });
 
-
       it("should filter out blocks with no text content", async () => {
         const blocksWithEmpty: NotionBlock[] = [
           ...sampleNotionBlocks,
@@ -149,7 +148,7 @@ describe("LLMService", () => {
           },
         ];
 
-        const mockGenerateContent = jest.fn().mockResolvedValue({
+        const mockGenerateContent = jest.fn<any>().mockResolvedValue({
           response: {
             text: () => JSON.stringify(mockAIResponse),
           },
@@ -187,7 +186,7 @@ describe("LLMService", () => {
       });
 
       it("should handle AI returning empty array (no tasks found)", async () => {
-        const mockGenerateContent = jest.fn().mockResolvedValue({
+        const mockGenerateContent = jest.fn<any>().mockResolvedValue({
           response: {
             text: () => "[]",
           },
@@ -219,7 +218,7 @@ describe("LLMService", () => {
           },
         ];
 
-        const mockGenerateContent = jest.fn().mockResolvedValue({
+        const mockGenerateContent = jest.fn<any>().mockResolvedValue({
           response: {
             text: () => JSON.stringify(invalidTasks),
           },
@@ -236,7 +235,7 @@ describe("LLMService", () => {
 
     describe("error handling", () => {
       it("should throw error when AI returns invalid JSON", async () => {
-        const mockGenerateContent = jest.fn().mockResolvedValue({
+        const mockGenerateContent = jest.fn<any>().mockResolvedValue({
           response: {
             text: () => "This is not valid JSON{]",
           },
@@ -250,7 +249,7 @@ describe("LLMService", () => {
       });
 
       it("should throw error when AI returns non-array response", async () => {
-        const mockGenerateContent = jest.fn().mockResolvedValue({
+        const mockGenerateContent = jest.fn<any>().mockResolvedValue({
           response: {
             text: () => JSON.stringify({ error: "Not an array" }),
           },
@@ -265,7 +264,7 @@ describe("LLMService", () => {
 
       it("should throw error when AI API fails", async () => {
         const mockGenerateContent = jest
-          .fn()
+          .fn<any>()
           .mockRejectedValue(new Error("API rate limit exceeded"));
 
         (llmService as any).model.generateContent = mockGenerateContent;
@@ -276,9 +275,7 @@ describe("LLMService", () => {
       });
 
       it("should include original error message in thrown error", async () => {
-        const mockGenerateContent = jest
-          .fn()
-          .mockRejectedValue(new Error("Network timeout"));
+        const mockGenerateContent = jest.fn<any>().mockRejectedValue(new Error("Network timeout"));
 
         (llmService as any).model.generateContent = mockGenerateContent;
 
@@ -290,7 +287,7 @@ describe("LLMService", () => {
 
     describe("block structure preservation", () => {
       it("should send block types to AI for context", async () => {
-        const mockGenerateContent = jest.fn().mockResolvedValue({
+        const mockGenerateContent = jest.fn<any>().mockResolvedValue({
           response: {
             text: () => JSON.stringify([]),
           },
@@ -309,7 +306,7 @@ describe("LLMService", () => {
       });
 
       it("should include timestamps in structured data sent to AI", async () => {
-        const mockGenerateContent = jest.fn().mockResolvedValue({
+        const mockGenerateContent = jest.fn<any>().mockResolvedValue({
           response: {
             text: () => JSON.stringify([]),
           },

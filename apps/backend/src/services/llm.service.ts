@@ -5,7 +5,7 @@
  * Schema derived from database for type safety and compatibility.
  */
 
-import { GoogleGenerativeAI, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config.js";
 import type { NotionBlock } from "./notion.service.js";
 import { toGeminiSchema } from "../utils/gemini-schema.js";
@@ -23,7 +23,6 @@ const TaskSchema = z.object({
 
 const ExtractedTasksArraySchema = z.array(TaskSchema);
 
-// @ts-ignore - drizzle-zod type complexity
 export type ExtractedTask = z.infer<typeof TaskSchema>;
 
 /**
@@ -43,7 +42,7 @@ class LLMService {
       model: "gemini-2.5-flash-lite",
       generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: geminiSchema
+        responseSchema: geminiSchema as any,
       },
     });
   }
@@ -186,7 +185,10 @@ NOW EXTRACT TASKS FROM THE NOTION BLOCKS:`;
       console.log("\n🔍 Parsing JSON response...");
       const parsed = JSON.parse(text);
       console.log("✓ JSON parsed successfully");
-      console.log("Parsed object type:", Array.isArray(parsed) ? `Array(${parsed.length})` : typeof parsed);
+      console.log(
+        "Parsed object type:",
+        Array.isArray(parsed) ? `Array(${parsed.length})` : typeof parsed
+      );
 
       // Validate with Zod as safety net
       console.log("\n🔍 Validating with Zod schema...");
@@ -204,9 +206,7 @@ NOW EXTRACT TASKS FROM THE NOTION BLOCKS:`;
       // Handle Zod validation errors
       if (error instanceof z.ZodError) {
         console.error("Schema validation failed:", JSON.stringify(error.errors, null, 2));
-        throw new Error(
-          "AI returned data that doesn't match database schema. Please try again."
-        );
+        throw new Error("AI returned data that doesn't match database schema. Please try again.");
       }
 
       // Handle JSON parsing errors
@@ -225,7 +225,7 @@ NOW EXTRACT TASKS FROM THE NOTION BLOCKS:`;
 
       throw new Error(
         "Failed to process Notion content with AI. " +
-        (error instanceof Error ? error.message : "Unknown error occurred")
+          (error instanceof Error ? error.message : "Unknown error occurred")
       );
     }
   }

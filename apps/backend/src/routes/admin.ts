@@ -1211,7 +1211,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
 router.post("/templates", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const { title, description, icon, color, roleTags, totalWeeks, notionUrl, tasks } = req.body;
+    const { title, description, icon, color, roleTags, totalWeeks, notionUrl } = req.body;
 
     // Verify requester is admin
     const [currentUser] = await db
@@ -1289,10 +1289,7 @@ router.post("/templates", requireAuth, async (req: Request, res: Response): Prom
         // - Rate limiting (350ms between requests)
         // - Recursive fetching of nested blocks
         // - Text extraction from various block types
-        const blocks = await notionService.getPageBlocks(
-          currentUser.organizationId,
-          notionPageId
-        );
+        const blocks = await notionService.getPageBlocks(currentUser.organizationId, notionPageId);
 
         // Filter out blocks with no meaningful text content
         // Empty blocks or blocks with only whitespace won't help the AI
