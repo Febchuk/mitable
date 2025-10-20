@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@mitable/shared": "*",
+    "@notionhq/client": "^5.2.1",
     "@pinecone-database/pinecone": "^6.1.2",
     "@slack/web-api": "^7.11.0",
     "@supabase/supabase-js": "^2.75.0",

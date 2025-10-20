@@ -7,6 +7,7 @@ export interface ToolParameters {
   type: "object";
   properties: Record<string, any>;
   required?: string[];
+  [key: string]: any; // Allow additional properties for OpenAI compatibility
 }
 
 /**
@@ -115,10 +116,7 @@ export abstract class BaseTool {
    * @param context - Context including conversation history, user info, etc.
    * @returns Tool result with message type, content, and optional structured data
    */
-  abstract execute(
-    args: Record<string, any>,
-    context: ToolContext
-  ): Promise<ToolResult>;
+  abstract execute(args: Record<string, any>, context: ToolContext): Promise<ToolResult>;
 
   /**
    * Validate tool arguments before execution
@@ -132,9 +130,7 @@ export abstract class BaseTool {
     if (this.parameters.required) {
       for (const requiredParam of this.parameters.required) {
         if (!(requiredParam in args)) {
-          throw new Error(
-            `Missing required parameter: ${requiredParam} for tool ${this.name}`
-          );
+          throw new Error(`Missing required parameter: ${requiredParam} for tool ${this.name}`);
         }
       }
     }

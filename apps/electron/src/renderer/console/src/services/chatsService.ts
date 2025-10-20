@@ -194,9 +194,7 @@ export async function sendStreamingMessage(
       })
       .catch((error) => {
         console.error("Streaming error:", error);
-        callbacks.onError?.(
-          error instanceof Error ? error.message : "Streaming failed"
-        );
+        callbacks.onError?.(error instanceof Error ? error.message : "Streaming failed");
         reject(error);
       });
   });

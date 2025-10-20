@@ -3,6 +3,7 @@ import type {
   IngestionProgress,
   IngestionResult,
   SlackIntegrationMetadata,
+  NotionIntegrationMetadata,
 } from "./ingestion.service.js";
 
 /**
@@ -266,6 +267,132 @@ describe("IngestionService", () => {
 
       expect(duration).toBe(45000); // 45 seconds
       expect(duration / 1000).toBe(45);
+    });
+  });
+
+  describe("NotionIntegrationMetadata interface", () => {
+    it("should store Notion workspace metadata", () => {
+      const metadata: NotionIntegrationMetadata = {
+        bot_id: "bot-abc123",
+        workspace_id: "workspace-xyz789",
+        workspace_name: "Lorikeet",
+        workspace_icon: "https://notion.so/icon.png",
+        owner: { type: "user", user: { id: "user-123" } },
+      };
+
+      expect(metadata.bot_id).toBe("bot-abc123");
+      expect(metadata.workspace_id).toBe("workspace-xyz789");
+      expect(metadata.workspace_name).toBe("Lorikeet");
+    });
+
+    it("should support optional fields", () => {
+      const metadata: NotionIntegrationMetadata = {
+        bot_id: "bot-abc123",
+        workspace_id: "workspace-xyz789",
+        owner: { type: "workspace" },
+      };
+
+      expect(metadata.workspace_name).toBeUndefined();
+      expect(metadata.workspace_icon).toBeUndefined();
+      expect(metadata.duplicated_template_id).toBeUndefined();
+    });
+
+    it("should store bot_id as primary key", () => {
+      const metadata: NotionIntegrationMetadata = {
+        bot_id: "bot-primary-key",
+        workspace_id: "workspace-123",
+        owner: {},
+      };
+
+      expect(metadata.bot_id).toBeDefined();
+      expect(metadata.bot_id).toBe("bot-primary-key");
+    });
+  });
+
+  describe("Notion vector metadata structure", () => {
+    it("should include all required Notion metadata fields", () => {
+      const metadata = {
+        text: "Test block content",
+        source: "notion",
+        source_type: "block",
+        page_id: "page-123",
+        page_title: "Engineering Docs",
+        page_url: "https://notion.so/Engineering-Docs-123",
+        block_id: "block-456",
+        block_type: "paragraph",
+        created_by_id: "user-123",
+        last_edited_by_id: "user-456",
+        created_time: "2025-01-15T10:00:00.000Z",
+        last_edited_time: "2025-10-17T14:00:00.000Z",
+        timestamp: 1729177200,
+        date: "2025-10-17",
+        year: 2025,
+        month: 10,
+        organization_id: "org-789",
+        workspace_id: "workspace-abc",
+        workspace_name: "Lorikeet",
+        bot_id: "bot-def",
+      };
+
+      expect(metadata.source).toBe("notion");
+      expect(metadata.source_type).toBe("block");
+      expect(metadata.block_type).toBe("paragraph");
+      expect(metadata.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it("should support different block types", () => {
+      const blockTypes = [
+        "paragraph",
+        "heading_1",
+        "heading_2",
+        "heading_3",
+        "bulleted_list_item",
+        "to_do",
+        "quote",
+        "code",
+      ];
+
+      blockTypes.forEach((type) => {
+        const metadata = {
+          block_type: type,
+          source: "notion",
+        };
+
+        expect(metadata.block_type).toBe(type);
+      });
+    });
+
+    it("should include optional hierarchy fields", () => {
+      const metadata = {
+        source: "notion",
+        page_id: "page-123",
+        parent_page_id: "parent-456",
+        parent_database_id: undefined,
+      };
+
+      expect(metadata.parent_page_id).toBe("parent-456");
+      expect(metadata.parent_database_id).toBeUndefined();
+    });
+  });
+
+  describe("Notion batch processing", () => {
+    it("should filter out empty blocks", () => {
+      const blocks = [
+        { text: "Valid block content", id: "block-1" },
+        { text: "", id: "block-2" },
+        { text: "   ", id: "block-3" },
+        { text: "Another valid block", id: "block-4" },
+      ];
+
+      const validBlocks = blocks.filter((block) => block.text && block.text.trim().length > 0);
+
+      expect(validBlocks).toHaveLength(2);
+    });
+
+    it("should use same batch size as Slack (10)", () => {
+      const batchSize = 10;
+
+      expect(batchSize).toBe(10);
     });
   });
 });

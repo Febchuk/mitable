@@ -1,18 +1,14 @@
 import OpenAI from "openai";
 import { config } from "../config";
 import type { Message } from "../db/schema/conversations.schema";
-import {
-  BaseTool,
-  ToolContext,
-  StreamChunk,
-  ToolDefinition,
-} from "../tools/base.tool";
+import { BaseTool, ToolContext, StreamChunk, ToolDefinition } from "../tools/base.tool";
 import { RespondTextTool } from "../tools/respond-text.tool";
 
 /**
  * System prompt that defines the agent's role and personality
  */
-const SYSTEM_PROMPT = `You are an experienced employee assistant helping new hires ramp up quickly at their company. You have deep product knowledge and guide people through their work like an expert colleague who's always available to help.
+const SYSTEM_PROMPT =
+  `You are an experienced employee assistant helping new hires ramp up quickly at their company. You have deep product knowledge and guide people through their work like an expert colleague who's always available to help.
 
 Your role is to:
 - Help employees learn company processes, policies, and tools
@@ -124,10 +120,7 @@ export class AgentService {
    * @param context - Context including conversation history, user info, etc.
    * @returns Async iterable of stream chunks
    */
-  async *processMessage(
-    userMessage: string,
-    context: ToolContext
-  ): AsyncIterable<StreamChunk> {
+  async *processMessage(userMessage: string, context: ToolContext): AsyncIterable<StreamChunk> {
     try {
       // Convert conversation history to OpenAI format
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -139,9 +132,7 @@ export class AgentService {
       // Get tool definitions
       const tools = this.getToolDefinitions();
 
-      console.log(
-        `[AgentService] Processing message with ${tools.length} available tools`
-      );
+      console.log(`[AgentService] Processing message with ${tools.length} available tools`);
 
       // Call OpenAI with function calling
       const response = await this.openai.chat.completions.create({
@@ -192,10 +183,7 @@ export class AgentService {
 
         // Parse function arguments
         const parsedArgs = JSON.parse(functionArgs);
-        console.log(
-          `[AgentService] Executing tool ${functionName} with args:`,
-          parsedArgs
-        );
+        console.log(`[AgentService] Executing tool ${functionName} with args:`, parsedArgs);
 
         // Execute tool
         const toolResult = await tool.execute(parsedArgs, context);
@@ -235,9 +223,7 @@ export class AgentService {
       } else if (textContent) {
         // Fallback: AI returned text content directly without calling a tool
         // This shouldn't happen with our setup, but handle it gracefully
-        console.warn(
-          "[AgentService] AI returned text content without calling a tool"
-        );
+        console.warn("[AgentService] AI returned text content without calling a tool");
 
         yield {
           type: "complete",

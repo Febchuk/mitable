@@ -31,8 +31,7 @@ export class RespondTextTool extends BaseTool {
     properties: {
       response: {
         type: "string",
-        description:
-          "The helpful, friendly text response to the user's question",
+        description: "The helpful, friendly text response to the user's question",
       },
     },
     required: ["response"],
@@ -48,10 +47,7 @@ export class RespondTextTool extends BaseTool {
    * @param context - Conversation context (not used for simple text responses)
    * @returns Tool result with text content that can be streamed
    */
-  async execute(
-    args: { response: string },
-    context: ToolContext
-  ): Promise<ToolResult> {
+  async execute(args: { response: string }, _context: ToolContext): Promise<ToolResult> {
     // Validate arguments
     this.validate(args);
 

@@ -3,13 +3,13 @@ import { useIntegrations, useSyncIntegration } from "@/console/src/hooks/queries
 import IntegrationCard from "./components/IntegrationCard";
 import SlackConnectDialog from "./components/SlackConnectDialog";
 import SlackConfigureDialog from "./components/SlackConfigureDialog";
+import NotionConnectDialog from "./components/NotionConnectDialog";
+import NotionConfigureDialog from "./components/NotionConfigureDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Filter, Plus } from "lucide-react";
 import { authService } from "@/console/src/services/authService";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Polling configuration for OAuth callback
 const POLLING_CONFIG = {
@@ -25,6 +25,8 @@ export default function IntegrationsView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [slackDialogOpen, setSlackDialogOpen] = useState(false);
   const [slackConfigureDialogOpen, setSlackConfigureDialogOpen] = useState(false);
+  const [notionDialogOpen, setNotionDialogOpen] = useState(false);
+  const [notionConfigureDialogOpen, setNotionConfigureDialogOpen] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSlackConnect = () => {
@@ -38,6 +40,25 @@ export default function IntegrationsView() {
   const handleSlackConfigureSave = () => {
     // Refresh integrations to get updated metadata
     refetch();
+  };
+
+  const handleNotionConnect = () => {
+    setNotionDialogOpen(true);
+  };
+
+  const handleNotionConfigure = () => {
+    setNotionConfigureDialogOpen(true);
+  };
+
+  const handleNotionConfigureSave = () => {
+    // Refresh integrations to get updated metadata
+    refetch();
+  };
+
+  const handleNotionReconnect = () => {
+    // Close configure dialog and open connect dialog to re-auth
+    setNotionConfigureDialogOpen(false);
+    setNotionDialogOpen(true);
   };
 
   // Stub handlers for IntegrationCard (not used for Slack, but required by component)
@@ -95,9 +116,16 @@ export default function IntegrationsView() {
         return;
       }
 
-      // Call backend disconnect endpoint (currently only Slack is implemented)
+      // Call backend disconnect endpoint
+      let endpoint = "";
       if (integration.provider === "slack") {
-        const response = await fetch(`${API_BASE_URL}/api/integrations/slack/disconnect`, {
+        endpoint = "http://localhost:3000/api/integrations/slack/disconnect";
+      } else if (integration.provider === "notion") {
+        endpoint = "http://localhost:3000/api/integrations/notion/disconnect";
+      }
+
+      if (endpoint) {
+        const response = await fetch(endpoint, {
           method: "DELETE",
           headers: {
             "Content-Type": "application/json",
@@ -167,6 +195,59 @@ export default function IntegrationsView() {
         }
       }
     }, POLLING_CONFIG.INTERVAL_MS);
+  };
+
+  const handleNotionOAuthStarted = () => {
+    // Start polling for connection status after OAuth window opens
+    let pollCount = 0;
+    const maxPolls = 120; // 2 minutes
+
+    pollingIntervalRef.current = setInterval(async () => {
+      pollCount++;
+
+      // Refresh integrations to check if Notion is connected
+      await refetch();
+
+      const notionIntegration = integrations.find((i) => i.provider === "notion");
+
+      if (notionIntegration?.status === "connected") {
+        // Success! Stop polling
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+
+        // Show success notification
+        toast({
+          title: "Notion Connected",
+          description: "Your Notion workspace has been connected successfully!",
+        });
+
+        // Auto-trigger sync (Notion doesn't need configure step)
+        setTimeout(async () => {
+          try {
+            const token = authService.getAccessToken();
+            if (token) {
+              await fetch("http://localhost:3000/api/integrations/notion/sync", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+            }
+          } catch (error) {
+            console.error("Auto-sync failed:", error);
+          }
+        }, 1000);
+      } else if (pollCount >= maxPolls) {
+        // Timeout - stop polling
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      }
+    }, 1000);
   };
 
   // Cleanup polling on unmount
@@ -278,7 +359,11 @@ export default function IntegrationsView() {
                   onSync={handleSyncIntegration}
                   onViewDetails={handleViewDetails}
                   onCustomConnect={
-                    integration.provider === "slack" ? handleSlackConnect : undefined
+                    integration.provider === "slack"
+                      ? handleSlackConnect
+                      : integration.provider === "notion"
+                        ? handleNotionConnect
+                        : undefined
                   }
                   position={getCardPosition(index, sortedIntegrations.length)}
                 />
@@ -308,12 +393,18 @@ export default function IntegrationsView() {
                     onConfigure={
                       integration.provider === "slack"
                         ? handleSlackConfigure
-                        : handleConfigureIntegration
+                        : integration.provider === "notion"
+                          ? handleNotionConfigure
+                          : handleConfigureIntegration
                     }
                     onSync={handleSyncIntegration}
                     onViewDetails={handleViewDetails}
                     onCustomConnect={
-                      integration.provider === "slack" ? handleSlackConnect : undefined
+                      integration.provider === "slack"
+                        ? handleSlackConnect
+                        : integration.provider === "notion"
+                          ? handleNotionConnect
+                          : undefined
                     }
                     position={getCardPosition(index, connectedIntegrations.length)}
                   />
@@ -338,12 +429,18 @@ export default function IntegrationsView() {
                     onConfigure={
                       integration.provider === "slack"
                         ? handleSlackConfigure
-                        : handleConfigureIntegration
+                        : integration.provider === "notion"
+                          ? handleNotionConfigure
+                          : handleConfigureIntegration
                     }
                     onSync={handleSyncIntegration}
                     onViewDetails={handleViewDetails}
                     onCustomConnect={
-                      integration.provider === "slack" ? handleSlackConnect : undefined
+                      integration.provider === "slack"
+                        ? handleSlackConnect
+                        : integration.provider === "notion"
+                          ? handleNotionConnect
+                          : undefined
                     }
                     position={getCardPosition(index, availableIntegrations.length)}
                   />
@@ -370,6 +467,21 @@ export default function IntegrationsView() {
         open={slackConfigureDialogOpen}
         onOpenChange={setSlackConfigureDialogOpen}
         onSave={handleSlackConfigureSave}
+      />
+
+      {/* Notion Connect Dialog */}
+      <NotionConnectDialog
+        open={notionDialogOpen}
+        onOpenChange={setNotionDialogOpen}
+        onConnect={handleNotionOAuthStarted}
+      />
+
+      {/* Notion Configure Dialog */}
+      <NotionConfigureDialog
+        open={notionConfigureDialogOpen}
+        onOpenChange={setNotionConfigureDialogOpen}
+        onSave={handleNotionConfigureSave}
+        onReconnect={handleNotionReconnect}
       />
     </div>
   );

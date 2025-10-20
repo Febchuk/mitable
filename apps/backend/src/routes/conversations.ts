@@ -752,8 +752,7 @@ router.post(
       if (!res.headersSent) {
         res.status(500).json({
           error: "Internal Server Error",
-          message:
-            error instanceof Error ? error.message : "Failed to process message",
+          message: error instanceof Error ? error.message : "Failed to process message",
         });
       }
     }
