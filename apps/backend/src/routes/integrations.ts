@@ -607,6 +607,20 @@ router.post(
         return;
       }
 
+      // Check for placeholder values
+      if (
+        config.notion.clientId.includes("your-client-id") ||
+        config.notion.clientId.includes("example") ||
+        config.notion.clientId.length < 20
+      ) {
+        res.status(500).json({
+          error: "Configuration Error",
+          message:
+            "NOTION_CLIENT_ID appears to be a placeholder value. Please set it to your actual Notion OAuth Client ID from https://www.notion.so/my-integrations",
+        });
+        return;
+      }
+
       // Get user's organization
       const [user] = await db
         .select()
