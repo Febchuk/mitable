@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ExpertProfile } from "@mitable/shared";
 import ExpertListCollapsed from "./components/ExpertListCollapsed";
 import ExpertListExpanded from "./components/ExpertListExpanded";
@@ -100,11 +100,41 @@ declare global {
 
 function App() {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [experts, setExperts] = useState<ExpertMatch[]>(mockExperts);
 
   const handleEscalate = (expertId: string) => {
     console.log("Escalating to expert:", expertId);
     // TODO: Implement escalation logic via IPC
   };
+
+  // Listen for expert data from Agent window
+  useEffect(() => {
+    window.nudgeAPI?.onNudgeShow((data: any) => {
+      console.log("[Nudge] Received expert data:", data);
+
+      if (data?.experts && Array.isArray(data.experts)) {
+        // Transform backend ExpertMatch to Nudge ExpertMatch format
+        const transformedExperts: ExpertMatch[] = data.experts.map((expert: any) => ({
+          expert: {
+            id: expert.userId,
+            userId: expert.userId,
+            name: expert.name,
+            email: expert.email,
+            department: expert.department || "General",
+            role: expert.role || "Employee",
+            expertise: expert.expertise?.topics || [],
+            responseRate: expert.performance?.responseRate || 0,
+            helpfulnessRating: expert.performance?.helpfulnessScore || 0,
+            availability: expert.availability || "offline",
+          },
+          matchScore: expert.matchScore,
+        }));
+
+        setExperts(transformedExperts);
+        console.log("[Nudge] Transformed experts:", transformedExperts);
+      }
+    });
+  }, []);
 
   const handleMouseEnter = () => {
     window.nudgeAPI?.setIgnoreMouseEvents(false);
@@ -122,12 +152,12 @@ function App() {
     >
       {isExpanded ? (
         <ExpertListExpanded
-          experts={mockExperts}
+          experts={experts}
           onCollapse={() => setIsExpanded(false)}
           onEscalate={handleEscalate}
         />
       ) : (
-        <ExpertListCollapsed experts={mockExperts} onExpand={() => setIsExpanded(true)} />
+        <ExpertListCollapsed experts={experts} onExpand={() => setIsExpanded(true)} />
       )}
     </div>
   );

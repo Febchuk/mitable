@@ -114,7 +114,13 @@ export async function sendMessageStream(
   content: string,
   callbacks: {
     onChunk?: (chunk: string) => void;
-    onComplete?: (fullContent: string, messageId: string) => void;
+    onComplete?: (
+      fullContent: string,
+      messageId: string,
+      messageType?: string,
+      cardData?: any,
+      windowTrigger?: { window: "nudge" | "guide"; data: any }
+    ) => void;
     onError?: (error: string) => void;
     onWindowTrigger?: (window: "nudge" | "guide", data: any) => void;
   }
@@ -148,6 +154,9 @@ export async function sendMessageStream(
   let buffer = "";
   let fullContent = "";
   let messageId = "";
+  let messageType: string | undefined;
+  let cardData: any = undefined;
+  let windowTriggerData: { window: "nudge" | "guide"; data: any } | undefined;
 
   try {
     while (true) {
@@ -189,10 +198,17 @@ export async function sendMessageStream(
                 if (chunk.content) {
                   fullContent = chunk.content;
                 }
+                if (chunk.messageType) {
+                  messageType = chunk.messageType;
+                }
+                if (chunk.cardData) {
+                  cardData = chunk.cardData;
+                }
                 break;
 
               case "window_trigger":
                 if (chunk.windowTrigger) {
+                  windowTriggerData = chunk.windowTrigger;
                   callbacks.onWindowTrigger?.(
                     chunk.windowTrigger.window,
                     chunk.windowTrigger.data
@@ -204,7 +220,13 @@ export async function sendMessageStream(
                 if (chunk.messageId) {
                   messageId = chunk.messageId;
                 }
-                callbacks.onComplete?.(fullContent, messageId);
+                callbacks.onComplete?.(
+                  fullContent,
+                  messageId,
+                  messageType,
+                  cardData,
+                  windowTriggerData
+                );
                 break;
 
               case "error":

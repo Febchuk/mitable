@@ -24,10 +24,12 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   type?: "text" | "card";
-  cardData?: {
-    title: string;
-    subtitle: string;
-    icon: LucideIcon;
+  messageType?: string;
+  cardData?: any;
+  sources?: any[];
+  windowTrigger?: {
+    window: "nudge" | "guide";
+    data: any;
   };
 }
 
@@ -110,8 +112,20 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const streamingMessageIdRef = useRef<string | null>(null);
 
-  const handleCardClick = () => {
-    window.agentAPI.startGuide(BILLING_ESCALATION_GUIDE);
+  const handleCardClick = (message: Message) => {
+    if (!message.windowTrigger) {
+      console.warn("Card clicked but no window trigger data");
+      return;
+    }
+
+    const { window: windowType, data } = message.windowTrigger;
+    console.log(`Card clicked - launching ${windowType} window`, data);
+
+    if (windowType === "nudge") {
+      window.agentAPI.showNudge(data);
+    } else if (windowType === "guide") {
+      window.agentAPI.startGuide(data.guide);
+    }
   };
 
   // Create conversation on first message if needed
@@ -194,11 +208,19 @@ function App() {
             )
           );
         },
-        onComplete: (fullContent, messageId) => {
+        onComplete: (fullContent, messageId, messageType, cardData, windowTrigger) => {
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === streamingMessageId
-                ? { ...msg, id: messageId, content: fullContent }
+                ? {
+                    ...msg,
+                    id: messageId,
+                    content: fullContent,
+                    type: cardData ? "card" : "text",
+                    messageType,
+                    cardData,
+                    windowTrigger,
+                  }
                 : msg
             )
           );
