@@ -25,6 +25,8 @@ export const IPC_CHANNELS = {
   NUDGE_HIDE: "nudge-hide",
   NUDGE_ACCEPT: "nudge-accept",
   NUDGE_DISMISS: "nudge-dismiss",
+  NUDGE_CREATE_REQUEST: "nudge-create-request",
+  NUDGE_OPEN_CREATOR: "nudge-open-creator",
 
   // Window management
   WINDOW_SHOW: "window-show",

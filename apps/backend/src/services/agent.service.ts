@@ -403,6 +403,84 @@ export class AgentService {
       };
     }
   }
+
+  /**
+   * Generate nudge context from conversation messages
+   * Analyzes the conversation and creates a concise summary for the expert
+   */
+  async generateNudgeContext(messages: Message[]): Promise<string> {
+    try {
+      // Format conversation for AI
+      const conversationText = messages
+        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+        .join("\n\n");
+
+      const prompt = `Based on this conversation, write a concise context summary (max 300 words) that explains what the user needs help with. This will be shared with an expert who can provide assistance.
+
+Focus on:
+- What the user is trying to accomplish
+- What they've tried so far
+- What specific problems or blockers they're encountering
+- Any relevant technical details
+
+Keep it professional and actionable. Write in third person (e.g., "The user is trying to...").
+
+Conversation:
+${conversationText}
+
+Context summary:`;
+
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 500,
+      });
+
+      return response.choices[0].message.content?.trim() || "Unable to generate context.";
+    } catch (error) {
+      console.error("[AgentService] Error generating nudge context:", error);
+      throw new Error("Failed to generate context from conversation");
+    }
+  }
+
+  /**
+   * Generate specific question from conversation
+   * Extracts or formulates the main question the user needs answered
+   */
+  async generateNudgeQuestion(messages: Message[]): Promise<string> {
+    try {
+      // Format conversation for AI
+      const conversationText = messages
+        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+        .join("\n\n");
+
+      const prompt = `Based on this conversation, formulate a specific, actionable question (1-2 sentences) that captures what the user needs help with. This question will be shared with an expert.
+
+Make it:
+- Direct and clear
+- Focused on the main issue
+- Actionable (the expert should know what to address)
+- Professional tone
+
+Conversation:
+${conversationText}
+
+Specific question:`;
+
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 150,
+      });
+
+      return response.choices[0].message.content?.trim() || "How can I help with this?";
+    } catch (error) {
+      console.error("[AgentService] Error generating nudge question:", error);
+      throw new Error("Failed to generate question from conversation");
+    }
+  }
 }
 
 // Export singleton instance

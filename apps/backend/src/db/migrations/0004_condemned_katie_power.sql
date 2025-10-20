@@ -1,0 +1,15 @@
+CREATE TABLE "nudge_resources" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"nudge_id" uuid NOT NULL,
+	"type" varchar(50) NOT NULL,
+	"url" text NOT NULL,
+	"filename" varchar(255),
+	"filesize" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "nudges" ADD COLUMN "creator_id" uuid;--> statement-breakpoint
+ALTER TABLE "nudges" ADD COLUMN "is_draft" varchar(10) DEFAULT 'false';--> statement-breakpoint
+ALTER TABLE "nudges" ADD COLUMN "updated_at" timestamp DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "nudge_resources" ADD CONSTRAINT "nudge_resources_nudge_id_nudges_id_fk" FOREIGN KEY ("nudge_id") REFERENCES "public"."nudges"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "nudges" ADD CONSTRAINT "nudges_creator_id_users_id_fk" FOREIGN KEY ("creator_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;

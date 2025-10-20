@@ -73,15 +73,32 @@ export const nudges = pgTable("nudges", {
   expertId: uuid("expert_id")
     .notNull()
     .references(() => users.id), // Recommended expert
+  creatorId: uuid("creator_id")
+    .references(() => users.id), // User who created the nudge (can be null for AI-generated)
   context: text("context"), // What the user was doing
   question: text("question"), // User's question/need
   matchScore: decimal("match_score", { precision: 3, scale: 2 }), // 0.0 to 1.0
   matchReasons: jsonb("match_reasons").default("[]"), // Why this expert was chosen
   status: varchar("status", { length: 50 }).default("waiting"), // 'waiting' | 'accepted' | 'declined' | 'resolved'
+  isDraft: varchar("is_draft", { length: 10 }).default("false"), // 'true' | 'false' (using varchar for consistency)
   deliveryChannel: varchar("delivery_channel", { length: 50 }), // 'in_app' | 'slack' | 'email'
   deliveredAt: timestamp("delivered_at"),
   acceptedAt: timestamp("accepted_at"),
   resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Nudge Resources
+export const nudgeResources = pgTable("nudge_resources", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nudgeId: uuid("nudge_id")
+    .notNull()
+    .references(() => nudges.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(), // 'file' | 'link' | 'screenshot'
+  url: text("url").notNull(), // URL to the resource (could be file path or external link)
+  filename: varchar("filename", { length: 255 }), // Original filename for files
+  filesize: integer("filesize"), // File size in bytes
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -112,7 +129,7 @@ export const expertInteractionsRelations = relations(expertInteractions, ({ one 
   }),
 }));
 
-export const nudgesRelations = relations(nudges, ({ one }) => ({
+export const nudgesRelations = relations(nudges, ({ one, many }) => ({
   user: one(users, {
     fields: [nudges.userId],
     references: [users.id],
@@ -120,6 +137,18 @@ export const nudgesRelations = relations(nudges, ({ one }) => ({
   expert: one(users, {
     fields: [nudges.expertId],
     references: [users.id],
+  }),
+  creator: one(users, {
+    fields: [nudges.creatorId],
+    references: [users.id],
+  }),
+  resources: many(nudgeResources),
+}));
+
+export const nudgeResourcesRelations = relations(nudgeResources, ({ one }) => ({
+  nudge: one(nudges, {
+    fields: [nudgeResources.nudgeId],
+    references: [nudges.id],
   }),
 }));
 
@@ -132,3 +161,5 @@ export type ExpertInteraction = typeof expertInteractions.$inferSelect;
 export type NewExpertInteraction = typeof expertInteractions.$inferInsert;
 export type Nudge = typeof nudges.$inferSelect;
 export type NewNudge = typeof nudges.$inferInsert;
+export type NudgeResource = typeof nudgeResources.$inferSelect;
+export type NewNudgeResource = typeof nudgeResources.$inferInsert;

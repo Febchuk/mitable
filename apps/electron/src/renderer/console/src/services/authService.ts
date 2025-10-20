@@ -5,6 +5,7 @@ declare global {
       setAuthTokens: (accessToken: string, refreshToken: string) => void;
       clearAuthTokens: () => void;
       onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
+      onNudgeOpenCreator: (callback: (data: unknown) => void) => void;
     };
   }
 }

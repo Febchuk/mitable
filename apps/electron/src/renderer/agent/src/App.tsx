@@ -173,8 +173,11 @@ function App() {
           console.log(`Window trigger: ${windowType}`, data);
 
           if (windowType === "nudge") {
-            // Auto-launch Nudge window with expert data
-            window.agentAPI.showNudge(data);
+            // Auto-launch Nudge window with expert data and conversationId
+            window.agentAPI.showNudge({
+              ...data,
+              conversationId: convId, // Pass conversation ID for context generation
+            });
           } else if (windowType === "guide") {
             // Auto-launch Guide + Overlay windows with guide data
             window.agentAPI.startGuide(data.guide);

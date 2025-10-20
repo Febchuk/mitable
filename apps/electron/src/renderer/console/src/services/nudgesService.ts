@@ -60,3 +60,115 @@ export async function resolveNudge(
     method: "POST",
   });
 }
+
+// Types for create nudge
+export interface NudgeResource {
+  type: "file" | "link" | "screenshot";
+  url: string;
+  filename?: string;
+  filesize?: number;
+}
+
+export interface CreateNudgeRequest {
+  recipientIds: string[];
+  context: string;
+  question?: string;
+  isDraft?: boolean;
+  resources?: NudgeResource[];
+}
+
+export interface CreateNudgeResponse {
+  success: boolean;
+  nudges: Array<{ id: string }>;
+  message: string;
+}
+
+/**
+ * Create a new nudge
+ */
+export async function createNudge(data: CreateNudgeRequest): Promise<CreateNudgeResponse> {
+  return apiRequest("/nudges/create", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+// Types for search
+export interface Expert {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string | null;
+  status: string;
+  responseRate: number;
+  helpfulnessScore: number;
+  expertiseSummary?: string | null;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string | null;
+  status: string;
+}
+
+/**
+ * Search for experts
+ */
+export async function searchExperts(query: string): Promise<{ experts: Expert[] }> {
+  return apiRequest(`/nudges/experts/search?query=${encodeURIComponent(query)}`);
+}
+
+/**
+ * Search for users in organization
+ */
+export async function searchUsers(query: string): Promise<{ users: User[] }> {
+  return apiRequest(`/nudges/users/search?query=${encodeURIComponent(query)}`);
+}
+
+// Types for generate context/question
+export interface GenerateContextResponse {
+  success: boolean;
+  context: string;
+}
+
+export interface GenerateQuestionResponse {
+  success: boolean;
+  question: string;
+}
+
+/**
+ * Generate nudge context from conversation
+ */
+export async function generateNudgeContext(
+  conversationId: string
+): Promise<GenerateContextResponse> {
+  return apiRequest(`/nudges/generate-context`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ conversationId }),
+  });
+}
+
+/**
+ * Generate nudge question from conversation
+ */
+export async function generateNudgeQuestion(
+  conversationId: string
+): Promise<GenerateQuestionResponse> {
+  return apiRequest(`/nudges/generate-question`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ conversationId }),
+  });
+}

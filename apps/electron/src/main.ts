@@ -284,6 +284,26 @@ function setupIPC() {
     }
   });
 
+  // Nudge creation request - from nudge window to console
+  ipcMain.on(IPC_CHANNELS.NUDGE_CREATE_REQUEST, (_event, data) => {
+    console.log("[Nudge] Create request received:", data);
+
+    // Show and focus console window
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+
+      // Forward nudge creation data to console
+      // Console will navigate to /nudges/new and populate the form
+      consoleWindow.webContents.send(IPC_CHANNELS.NUDGE_OPEN_CREATOR, data);
+    }
+
+    // Hide nudge window after triggering creation
+    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      nudgeWindow.hide();
+    }
+  });
+
   // Dynamic mouse events for overlay
   ipcMain.on(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, (_event, ignore: boolean) => {
     if (agentWindow && !agentWindow.isDestroyed()) {
