@@ -1,8 +1,9 @@
 import { Router, Request, Response } from "express";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, or, ilike, and, asc } from "drizzle-orm";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
+import { agentService } from "../services/agent.service";
 
 const router = Router();
 
@@ -408,5 +409,445 @@ router.post(
     }
   }
 );
+
+/**
+ * @openapi
+ * /nudges/create:
+ *   post:
+ *     tags:
+ *       - Nudges
+ *     summary: Create a new nudge
+ *     description: Create a new nudge to request help from experts. Can create as draft or send immediately.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - recipientIds
+ *               - context
+ *             properties:
+ *               recipientIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 description: Array of expert/user IDs to send the nudge to
+ *               context:
+ *                 type: string
+ *                 description: Context or question for the nudge
+ *               question:
+ *                 type: string
+ *                 description: Optional specific question
+ *               isDraft:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Whether to save as draft or send immediately
+ *               resources:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     type:
+ *                       type: string
+ *                       enum: [file, link, screenshot]
+ *                     url:
+ *                       type: string
+ *                     filename:
+ *                       type: string
+ *                     filesize:
+ *                       type: integer
+ *     responses:
+ *       201:
+ *         description: Nudge(s) created successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post("/create", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { recipientIds, context, question, isDraft = false, resources = [] } = req.body;
+
+  try {
+    // Validate required fields
+    if (!recipientIds || !Array.isArray(recipientIds) || recipientIds.length === 0) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "At least one recipient is required",
+      });
+      return;
+    }
+
+    if (!context || !context.trim()) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "Context is required",
+      });
+      return;
+    }
+
+    // Create a nudge for each recipient
+    const createdNudges = [];
+    for (const recipientId of recipientIds) {
+      // Create the nudge
+      const [nudge] = await db
+        .insert(schema.nudges)
+        .values({
+          userId, // Current user is the recipient
+          expertId: recipientId, // The person being nudged
+          creatorId: userId, // User who created the nudge
+          context: context.trim(),
+          question: question?.trim() || null,
+          isDraft: isDraft ? "true" : "false",
+          status: isDraft ? "waiting" : "waiting",
+          deliveryChannel: "in_app",
+          deliveredAt: isDraft ? null : new Date(),
+        })
+        .returning();
+
+      // If there are resources, add them
+      if (resources.length > 0 && nudge) {
+        const resourceValues = resources.map((resource: any) => ({
+          nudgeId: nudge.id,
+          type: resource.type,
+          url: resource.url,
+          filename: resource.filename || null,
+          filesize: resource.filesize || null,
+        }));
+
+        await db.insert(schema.nudgeResources).values(resourceValues);
+      }
+
+      createdNudges.push(nudge);
+    }
+
+    res.status(201).json({
+      success: true,
+      nudges: createdNudges,
+      message: isDraft
+        ? `Draft saved with ${createdNudges.length} recipient(s)`
+        : `Nudge sent to ${createdNudges.length} recipient(s)`,
+    });
+  } catch (error) {
+    console.error("Error creating nudge:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to create nudge",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /experts/search:
+ *   get:
+ *     tags:
+ *       - Experts
+ *     summary: Search for experts
+ *     description: Search for expert profiles by name, role, or expertise
+ *     parameters:
+ *       - in: query
+ *         name: query
+ *         schema:
+ *           type: string
+ *         description: Search query string
+ *     responses:
+ *       200:
+ *         description: Experts found successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get("/experts/search", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { query = "" } = req.query;
+  const searchTerm = `%${query}%`;
+
+  try {
+    const experts = await db
+      .select({
+        userId: schema.expertProfiles.userId,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        email: schema.users.email,
+        role: schema.users.role,
+        avatar: schema.users.avatarUrl,
+        status: schema.users.status,
+        responseRate: schema.expertProfiles.responseRate,
+        helpfulnessScore: schema.expertProfiles.helpfulnessScore,
+        expertiseSummary: schema.expertProfiles.expertiseSummary,
+      })
+      .from(schema.expertProfiles)
+      .innerJoin(schema.users, eq(schema.expertProfiles.userId, schema.users.id))
+      .where(
+        or(
+          ilike(schema.users.firstName, searchTerm),
+          ilike(schema.users.lastName, searchTerm),
+          ilike(schema.users.email, searchTerm),
+          ilike(schema.users.role, searchTerm)
+        )
+      )
+      .limit(20);
+
+    const formattedExperts = experts.map((expert) => ({
+      id: expert.userId,
+      name: `${expert.firstName} ${expert.lastName}`,
+      email: expert.email,
+      role: expert.role || "Team Member",
+      avatar: expert.avatar,
+      status: expert.status || "active",
+      responseRate: expert.responseRate ? parseFloat(expert.responseRate) : 0,
+      helpfulnessScore: expert.helpfulnessScore ? parseFloat(expert.helpfulnessScore) : 0,
+      expertiseSummary: expert.expertiseSummary,
+    }));
+
+    res.json({ experts: formattedExperts });
+  } catch (error) {
+    console.error("Error searching experts:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to search experts",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /users/search:
+ *   get:
+ *     tags:
+ *       - Users
+ *     summary: Search for users
+ *     description: Search for users in the organization by name, email, or role
+ *     parameters:
+ *       - in: query
+ *         name: query
+ *         schema:
+ *           type: string
+ *         description: Search query string
+ *     responses:
+ *       200:
+ *         description: Users found successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get("/users/search", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { query = "" } = req.query;
+  const searchTerm = `%${query}%`;
+
+  try {
+    // Get current user to filter by same organization
+    const [currentUser] = await db
+      .select({ organizationId: schema.users.organizationId })
+      .from(schema.users)
+      .where(eq(schema.users.id, req.userId!))
+      .limit(1);
+
+    if (!currentUser) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "Current user not found",
+      });
+      return;
+    }
+
+    const users = await db
+      .select({
+        id: schema.users.id,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        email: schema.users.email,
+        role: schema.users.role,
+        avatar: schema.users.avatarUrl,
+        status: schema.users.status,
+      })
+      .from(schema.users)
+      .where(
+        sql`${schema.users.organizationId} = ${currentUser.organizationId}
+        AND (
+          ${schema.users.firstName} ILIKE ${searchTerm}
+          OR ${schema.users.lastName} ILIKE ${searchTerm}
+          OR ${schema.users.email} ILIKE ${searchTerm}
+          OR ${schema.users.role} ILIKE ${searchTerm}
+        )`
+      )
+      .limit(20);
+
+    const formattedUsers = users.map((user) => ({
+      id: user.id,
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      role: user.role || "Team Member",
+      avatar: user.avatar,
+      status: user.status || "active",
+    }));
+
+    res.json({ users: formattedUsers });
+  } catch (error) {
+    console.error("Error searching users:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to search users",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /nudges/generate-context:
+ *   post:
+ *     tags:
+ *       - Nudges
+ *     summary: Generate nudge context from conversation
+ *     description: Use AI to generate a context summary from a conversation that can be used when creating a nudge
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               conversationId:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       200:
+ *         description: Context generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 context:
+ *                   type: string
+ *       404:
+ *         description: Conversation not found
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.post("/generate-context", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { conversationId } = req.body;
+    const userId = req.user!.id;
+
+    if (!conversationId) {
+      return res.status(400).json({ error: "conversationId is required" });
+    }
+
+    // Fetch conversation with messages
+    const conversation = await db.query.conversations.findFirst({
+      where: and(
+        eq(schema.conversations.id, conversationId),
+        eq(schema.conversations.userId, userId)
+      ),
+      with: {
+        messages: {
+          orderBy: asc(schema.messages.createdAt),
+        },
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    // Generate context using AI
+    const context = await agentService.generateNudgeContext(conversation.messages);
+
+    res.json({ success: true, context });
+  } catch (error) {
+    console.error("Error generating context:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to generate context",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /nudges/generate-question:
+ *   post:
+ *     tags:
+ *       - Nudges
+ *     summary: Generate nudge question from conversation
+ *     description: Use AI to extract or formulate a specific question from a conversation that can be used when creating a nudge
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               conversationId:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       200:
+ *         description: Question generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 question:
+ *                   type: string
+ *       404:
+ *         description: Conversation not found
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.post("/generate-question", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { conversationId } = req.body;
+    const userId = req.user!.id;
+
+    if (!conversationId) {
+      return res.status(400).json({ error: "conversationId is required" });
+    }
+
+    // Fetch conversation with messages
+    const conversation = await db.query.conversations.findFirst({
+      where: and(
+        eq(schema.conversations.id, conversationId),
+        eq(schema.conversations.userId, userId)
+      ),
+      with: {
+        messages: {
+          orderBy: asc(schema.messages.createdAt),
+        },
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    // Generate question using AI
+    const question = await agentService.generateNudgeQuestion(conversation.messages);
+
+    res.json({ success: true, question });
+  } catch (error) {
+    console.error("Error generating question:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to generate question",
+    });
+  }
+});
 
 export default router;

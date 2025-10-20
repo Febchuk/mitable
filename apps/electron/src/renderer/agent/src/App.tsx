@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Workflow, LucideIcon } from "lucide-react";
+import { useState, useRef } from "react";
 import AgentPill from "./components/AgentPill";
 import ConversationDialog from "./components/ConversationDialog";
+import { createConversation, sendMessageStream } from "./api/conversations";
 
 declare global {
   interface Window {
@@ -12,6 +12,8 @@ declare global {
       resizeWindow: (mode: "pill" | "conversation") => void;
       showNudge: (data: unknown) => void;
       startGuide: (data: unknown) => void;
+      getAuthToken: () => Promise<string | null>;
+      onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
     };
   }
 }
@@ -21,94 +23,64 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   type?: "text" | "card";
-  cardData?: {
-    title: string;
-    subtitle: string;
-    icon: LucideIcon;
+  messageType?: string;
+  cardData?: any;
+  sources?: any[];
+  windowTrigger?: {
+    window: "nudge" | "guide";
+    data: any;
   };
 }
-
-// Mock guide data for Ticket Billing Escalation workflow
-const BILLING_ESCALATION_GUIDE = {
-  id: "billing-escalation-guide",
-  title: "Agent Interactive Workflow",
-  description: "Step-by-step guide to escalate a billing ticket",
-  steps: [
-    {
-      id: "step-1",
-      stepNumber: 1,
-      instruction: "Click the 'Priority' dropdown in the top toolbar.",
-      targetElement: {
-        label: "Priority Dropdown",
-        boundingBox: { x: 100, y: 50, width: 120, height: 40 },
-      },
-      completed: false,
-    },
-    {
-      id: "step-2",
-      stepNumber: 2,
-      instruction: "Click the 'Assign' button in the top toolbar.",
-      targetElement: {
-        label: "Assign Button",
-        boundingBox: { x: 250, y: 50, width: 100, height: 40 },
-      },
-      completed: false,
-    },
-    {
-      id: "step-3",
-      stepNumber: 3,
-      instruction: "Select 'Billing Team' from the assignment dropdown.",
-      targetElement: {
-        label: "Team Dropdown",
-        boundingBox: { x: 250, y: 100, width: 200, height: 150 },
-      },
-      completed: false,
-    },
-    {
-      id: "step-4",
-      stepNumber: 4,
-      instruction: "Add an escalation note in the comments section.",
-      targetElement: {
-        label: "Comments Field",
-        boundingBox: { x: 50, y: 300, width: 400, height: 100 },
-      },
-      completed: false,
-    },
-    {
-      id: "step-5",
-      stepNumber: 5,
-      instruction: "Click the 'Notify Team Lead' checkbox.",
-      targetElement: {
-        label: "Notify Checkbox",
-        boundingBox: { x: 50, y: 420, width: 200, height: 30 },
-      },
-      completed: false,
-    },
-    {
-      id: "step-6",
-      stepNumber: 6,
-      instruction: "Click 'Save' to complete the escalation.",
-      targetElement: {
-        label: "Save Button",
-        boundingBox: { x: 300, y: 500, width: 100, height: 40 },
-      },
-      completed: false,
-    },
-  ],
-  currentStep: 0,
-  completed: false,
-  createdAt: new Date().toISOString(),
-};
 
 function App() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const streamingMessageIdRef = useRef<string | null>(null);
 
-  const handleCardClick = () => {
-    window.agentAPI.startGuide(BILLING_ESCALATION_GUIDE);
+  const handleCardClick = (message: Message) => {
+    if (!message.windowTrigger) {
+      console.warn("Card clicked but no window trigger data");
+      return;
+    }
+
+    const { window: windowType, data } = message.windowTrigger;
+    console.log(`Card clicked - launching ${windowType} window`, data);
+
+    if (windowType === "nudge") {
+      // Pass expert data + conversationId for context generation
+      window.agentAPI.showNudge({
+        ...data,
+        conversationId, // Add conversationId for Generate buttons
+      });
+    } else if (windowType === "guide") {
+      window.agentAPI.startGuide(data.guide);
+    }
   };
 
-  const handleSubmit = (message: string) => {
+  // Create conversation on first message if needed
+  const ensureConversation = async (): Promise<string> => {
+    if (conversationId) {
+      return conversationId;
+    }
+
+    try {
+      const conversation = await createConversation("Agent Conversation");
+      setConversationId(conversation.id);
+      return conversation.id;
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+      throw error;
+    }
+  };
+
+  const handleSubmit = async (message: string) => {
+    if (isStreaming) {
+      console.log("Already streaming, ignoring new message");
+      return;
+    }
+
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -125,56 +97,111 @@ function App() {
       window.agentAPI.resizeWindow("conversation");
     }
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
-      const aiMessage: Message = {
+    // Ensure we have a conversation ID
+    let convId: string;
+    try {
+      convId = await ensureConversation();
+    } catch (error) {
+      // Show error message
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content:
-          "You'll need to set the priority to High, then assign it to the Billing Team. The escalation will automatically notify their team lead. Would you like me to show you where those buttons are?",
+        content: "Failed to start conversation. Please try again.",
         type: "text",
       };
+      setMessages((prev) => [...prev, errorMessage]);
+      return;
+    }
 
-      setMessages((prev) => [...prev, aiMessage]);
+    // Create placeholder for streaming assistant message
+    const streamingMessageId = `streaming-${Date.now()}`;
+    streamingMessageIdRef.current = streamingMessageId;
 
-      // Add example user follow-up
-      setTimeout(() => {
-        const followUpMessage: Message = {
-          id: (Date.now() + 2).toString(),
-          role: "user",
-          content: "Yes, show me!",
-          type: "text",
-        };
+    const assistantMessage: Message = {
+      id: streamingMessageId,
+      role: "assistant",
+      content: "",
+      type: "text",
+    };
 
-        setMessages((prev) => [...prev, followUpMessage]);
+    setMessages((prev) => [...prev, assistantMessage]);
+    setIsStreaming(true);
 
-        // Add interactive card
-        setTimeout(() => {
-          const cardMessage: Message = {
-            id: (Date.now() + 3).toString(),
-            role: "assistant",
-            content: "",
-            type: "card",
-            cardData: {
-              title: "Ticket Billing Escalation",
-              subtitle: "Interactive Workflow",
-              icon: Workflow,
-            },
-          };
+    // Stream the response
+    try {
+      await sendMessageStream(convId, message, {
+        onChunk: (chunk) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
+            )
+          );
+        },
+        onComplete: (fullContent, messageId, messageType, cardData, windowTrigger) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === streamingMessageId
+                ? {
+                    ...msg,
+                    id: messageId,
+                    content: fullContent,
+                    type: cardData ? "card" : "text",
+                    messageType,
+                    cardData,
+                    windowTrigger,
+                  }
+                : msg
+            )
+          );
+          setIsStreaming(false);
+          streamingMessageIdRef.current = null;
+        },
+        onError: (error) => {
+          console.error("Streaming error:", error);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === streamingMessageId
+                ? {
+                    ...msg,
+                    content: `Error: ${error}. Please try again.`,
+                  }
+                : msg
+            )
+          );
+          setIsStreaming(false);
+          streamingMessageIdRef.current = null;
+        },
+        onWindowTrigger: (windowType, data) => {
+          console.log(`Window trigger: ${windowType}`, data);
 
-          setMessages((prev) => [...prev, cardMessage]);
-
-          // Trigger nudge window with expert recommendations
-          setTimeout(() => {
-            window.agentAPI.showNudge({
-              type: "expert_match",
-              title: "Billing Escalation Experts",
-              description: "We found experts who can help with billing escalations",
-            });
-          }, 500);
-        }, 1000);
-      }, 1500);
-    }, 1000);
+          if (windowType === "nudge") {
+            // Don't auto-open nudge window - let user click "View Experts" card
+            console.log(
+              "Expert data ready. User can click 'View Experts' card to open nudge window."
+            );
+            // The windowTrigger data (including experts) is already stored in the message
+            // and will be accessible when user clicks the card via handleCardClick
+          } else if (windowType === "guide") {
+            // Auto-launch Guide + Overlay windows with guide data
+            window.agentAPI.startGuide(data.guide);
+          }
+        },
+      });
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === streamingMessageId
+            ? {
+                ...msg,
+                content: "Failed to send message. Please try again.",
+              }
+            : msg
+        )
+      );
+      setIsStreaming(false);
+      streamingMessageIdRef.current = null;
+    }
   };
 
   const handleClose = () => {

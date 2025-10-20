@@ -51,12 +51,21 @@ export class RespondTextTool extends BaseTool {
     // Validate arguments
     this.validate(args);
 
+    console.log("[RespondTextTool] Execute:", {
+      responseLength: args.response.length,
+      wordCount: args.response.split(" ").length,
+    });
+
     // For text responses, AI has already generated the content
     // We just need to format it as a streamable result
-    return {
-      messageType: "text",
+    const result = {
+      messageType: "text" as const,
       content: args.response,
       streamable: true,
     };
+
+    console.log("[RespondTextTool] Success - returning streamable text response");
+
+    return result;
   }
 }

@@ -28,6 +28,7 @@ export default function Logo() {
           <button
             onClick={toggle}
             className="p-1 rounded-md hover:bg-white/10 transition-colors"
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             aria-label="Toggle sidebar"
           >
             <PanelLeft className="w-5 h-5" />
@@ -39,6 +40,7 @@ export default function Logo() {
           <button
             onClick={toggle}
             className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto bg-[#1A1A1A] rounded-md transition-all"
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             aria-label="Expand sidebar"
           >
             <PanelLeft className="w-5 h-5" />

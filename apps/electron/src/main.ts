@@ -9,10 +9,28 @@ let overlayWindow: BrowserWindow | null = null;
 let guideWindow: BrowserWindow | null = null;
 let nudgeWindow: BrowserWindow | null = null;
 
+// Auth token storage (shared across all windows)
+const authTokens: {
+  accessToken: string | null;
+  refreshToken: string | null;
+} = {
+  accessToken: null,
+  refreshToken: null,
+};
+
 function createAgentWindow() {
+  // Get screen dimensions for bottom-center positioning
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+  const windowWidth = 740;
+  const windowHeight = 80;
+  const bottomMargin = 40;
+
   agentWindow = new BrowserWindow({
-    width: 740,
-    height: 80,
+    width: windowWidth,
+    height: windowHeight,
+    x: Math.floor((screenWidth - windowWidth) / 2), // Center horizontally
+    y: screenHeight - windowHeight - bottomMargin, // Position at bottom with margin
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -50,9 +68,11 @@ function createConsoleWindow() {
   consoleWindow = new BrowserWindow({
     width: 1264,
     height: 888,
-    backgroundColor: "#000000",
-    // Hidden title bar on macOS for native traffic lights, default frame on Windows
+    transparent: true,
+    // Hidden title bar on macOS for native traffic lights with custom positioning
     titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
+    trafficLightPosition: process.platform === "darwin" ? { x: 6, y: 10 } : undefined,
+    frame: process.platform !== "darwin",
     maximizable: false,
     webPreferences: {
       preload: join(__dirname, "../preload/console.cjs"),
@@ -264,6 +284,26 @@ function setupIPC() {
     }
   });
 
+  // Nudge creation request - from nudge window to console
+  ipcMain.on(IPC_CHANNELS.NUDGE_CREATE_REQUEST, (_event, data) => {
+    console.log("[Nudge] Create request received:", data);
+
+    // Show and focus console window
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+
+      // Forward nudge creation data to console
+      // Console will navigate to /nudges/new and populate the form
+      consoleWindow.webContents.send(IPC_CHANNELS.NUDGE_OPEN_CREATOR, data);
+    }
+
+    // Hide nudge window after triggering creation
+    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      nudgeWindow.hide();
+    }
+  });
+
   // Dynamic mouse events for overlay
   ipcMain.on(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, (_event, ignore: boolean) => {
     if (agentWindow && !agentWindow.isDestroyed()) {
@@ -277,15 +317,64 @@ function setupIPC() {
     }
   });
 
-  // Agent window resize
+  // Agent window resize with upward expansion
   ipcMain.on(IPC_CHANNELS.AGENT_RESIZE, (_event, mode: "pill" | "conversation") => {
     if (agentWindow && !agentWindow.isDestroyed()) {
-      if (mode === "pill") {
-        agentWindow.setSize(740, 80, true);
-      } else {
-        agentWindow.setSize(740, 696, true);
-      }
+      const currentBounds = agentWindow.getBounds();
+      const newWidth = 740;
+      const newHeight = mode === "pill" ? 80 : 696;
+
+      // Calculate new Y position to keep bottom edge fixed (expand/shrink upward)
+      const heightDiff = newHeight - currentBounds.height;
+      const newY = currentBounds.y - heightDiff;
+
+      agentWindow.setBounds(
+        {
+          x: currentBounds.x,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
+        },
+        true
+      );
     }
+  });
+
+  // Auth Management - Cross-window token sharing
+  // Console sets tokens after login
+  ipcMain.on(IPC_CHANNELS.AUTH_SET_TOKENS, (_event, accessToken: string, refreshToken: string) => {
+    console.log("[Auth] Tokens set from Console window");
+    authTokens.accessToken = accessToken;
+    authTokens.refreshToken = refreshToken;
+
+    // Broadcast token update to all windows
+    const allWindows = [agentWindow, guideWindow, nudgeWindow, overlayWindow];
+    allWindows.forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, accessToken);
+      }
+    });
+  });
+
+  // Any window can request current auth token
+  ipcMain.handle(IPC_CHANNELS.AUTH_GET_TOKEN, () => {
+    console.log("[Auth] Token requested, returning:", authTokens.accessToken ? "present" : "null");
+    return authTokens.accessToken;
+  });
+
+  // Console clears tokens on logout
+  ipcMain.on(IPC_CHANNELS.AUTH_CLEAR, () => {
+    console.log("[Auth] Tokens cleared");
+    authTokens.accessToken = null;
+    authTokens.refreshToken = null;
+
+    // Broadcast token clear to all windows
+    const allWindows = [agentWindow, guideWindow, nudgeWindow, overlayWindow];
+    allWindows.forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, null);
+      }
+    });
   });
 }
 

@@ -8,8 +8,8 @@
   :root {
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card: 240 4% 22%;
+    --card-foreground: 0 0% 98%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
     --primary: 250 84% 65%;
@@ -44,7 +44,7 @@
   .dark {
     --background: 0 0% 0%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 10%;
+    --card: 240 4% 22%;
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 3.9%;
     --popover-foreground: 0 0% 98%;
@@ -95,6 +95,12 @@
   #root {
     width: 100vw;
     height: 100vh;
+  }
+
+  /* Transparent window override for agent/overlay windows */
+  html.transparent-window,
+  body.transparent-window {
+    background: transparent !important;
   }
 }
 

@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ExpertProfile } from "@mitable/shared";
-import ExpertListCollapsed from "./components/ExpertListCollapsed";
-import ExpertListExpanded from "./components/ExpertListExpanded";
+import ExpertList from "./components/ExpertList";
 
 interface ExpertMatch {
   expert: ExpertProfile;
@@ -93,6 +92,7 @@ declare global {
       onNudgeShow: (callback: (data: unknown) => void) => void;
       accept: (nudgeId: string) => void;
       dismiss: (nudgeId: string) => void;
+      createNudge: (data: unknown) => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
     };
   }
@@ -100,11 +100,62 @@ declare global {
 
 function App() {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [experts, setExperts] = useState<ExpertMatch[]>(mockExperts);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   const handleEscalate = (expertId: string) => {
     console.log("Escalating to expert:", expertId);
-    // TODO: Implement escalation logic via IPC
+
+    // Find the expert data
+    const expertMatch = experts.find((e) => e.expert.id === expertId);
+    if (!expertMatch) {
+      console.error("Expert not found:", expertId);
+      return;
+    }
+
+    // Send nudge creation request to main process
+    // The main process will forward this to the console window
+    window.nudgeAPI?.createNudge({
+      expert: expertMatch.expert,
+      matchScore: expertMatch.matchScore,
+      conversationId, // Pass conversationId for context generation
+    });
   };
+
+  // Listen for expert data from Agent window
+  useEffect(() => {
+    window.nudgeAPI?.onNudgeShow((data: any) => {
+      console.log("[Nudge] Received expert data:", data);
+
+      // Store conversationId for context generation
+      if (data?.conversationId) {
+        setConversationId(data.conversationId);
+        console.log("[Nudge] Stored conversationId:", data.conversationId);
+      }
+
+      if (data?.experts && Array.isArray(data.experts)) {
+        // Transform backend ExpertMatch to Nudge ExpertMatch format
+        const transformedExperts: ExpertMatch[] = data.experts.map((expert: any) => ({
+          expert: {
+            id: expert.userId,
+            userId: expert.userId,
+            name: expert.name,
+            email: expert.email,
+            department: expert.department || "General",
+            role: expert.role || "Employee",
+            expertise: expert.expertise?.topics || [],
+            responseRate: expert.performance?.responseRate || 0,
+            helpfulnessRating: expert.performance?.helpfulnessScore || 0,
+            availability: expert.availability || "offline",
+          },
+          matchScore: expert.matchScore,
+        }));
+
+        setExperts(transformedExperts);
+        console.log("[Nudge] Transformed experts:", transformedExperts);
+      }
+    });
+  }, []);
 
   const handleMouseEnter = () => {
     window.nudgeAPI?.setIgnoreMouseEvents(false);
@@ -116,19 +167,16 @@ function App() {
 
   return (
     <div
-      className="w-full h-full flex items-center justify-center p-4"
+      className="w-full h-full flex items-end justify-start p-4"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {isExpanded ? (
-        <ExpertListExpanded
-          experts={mockExperts}
-          onCollapse={() => setIsExpanded(false)}
-          onEscalate={handleEscalate}
-        />
-      ) : (
-        <ExpertListCollapsed experts={mockExperts} onExpand={() => setIsExpanded(true)} />
-      )}
+      <ExpertList
+        experts={experts}
+        isExpanded={isExpanded}
+        onToggle={() => setIsExpanded(!isExpanded)}
+        onEscalate={handleEscalate}
+      />
     </div>
   );
 }

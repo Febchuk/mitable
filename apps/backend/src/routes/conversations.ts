@@ -584,6 +584,12 @@ router.post(
     const { conversationId } = req.params;
     const { content } = req.body;
 
+    console.log("[Conversations] Request received:", {
+      conversationId,
+      userId,
+      contentLength: content?.length || 0,
+    });
+
     if (!userId) {
       res.status(401).json({
         error: "Unauthorized",
@@ -676,6 +682,45 @@ router.post(
       // Reverse to get chronological order (oldest first)
       const conversationHistory = historyData.reverse();
 
+      // Fetch user profile for tool context
+      const [userProfile] = await db
+        .select({
+          id: schema.users.id,
+          email: schema.users.email,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+          organizationId: schema.users.organizationId,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!userProfile) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "User profile not found",
+        });
+        return;
+      }
+
+      const fullName =
+        [userProfile.firstName, userProfile.lastName].filter(Boolean).join(" ") ||
+        userProfile.email;
+
+      console.log("[Conversations] User profile fetched:", {
+        organizationId: userProfile.organizationId,
+        name: fullName,
+        email: userProfile.email,
+      });
+
+      console.log("[Conversations] ToolContext created:", {
+        conversationId,
+        userId,
+        historyLength: conversationHistory.length,
+        hasUserProfile: !!userProfile,
+        userProfileOrg: userProfile.organizationId,
+      });
+
       // Set up Server-Sent Events (SSE)
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
@@ -690,6 +735,8 @@ router.post(
       let assistantContent = "";
 
       try {
+        console.log("[Conversations] Starting AgentService.processMessage");
+
         // Stream AI response
         const stream = agentService.processMessage(content, {
           conversationId,
@@ -712,6 +759,16 @@ router.post(
         });
 
         for await (const chunk of stream) {
+          // Log chunk details (only for non-text chunks to avoid spam)
+          if (chunk.type !== "chunk") {
+            console.log("[Conversations] Streaming chunk sent:", {
+              type: chunk.type,
+              hasContent: !!chunk.content,
+              hasWindowTrigger: !!(chunk as any).windowTrigger,
+              windowType: (chunk as any).windowTrigger?.window,
+            });
+          }
+
           // Send chunk to client
           res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 
@@ -751,6 +808,11 @@ router.post(
             messageId: assistantMessage.id,
           })}\n\n`
         );
+
+        console.log("[Conversations] Streaming completed successfully:", {
+          messageId: assistantMessage.id,
+          contentLength: assistantContent.length,
+        });
       } catch (streamError) {
         console.error("[Stream] Error during streaming:", streamError);
         res.write(
