@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 export default function ChatDetail() {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
-  const { data: chats = [] } = useConversations();
+  const { data } = useConversations();
+  const chats = data?.conversations || [];
   const [inputValue, setInputValue] = useState("");
   const [streamingContent, setStreamingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);

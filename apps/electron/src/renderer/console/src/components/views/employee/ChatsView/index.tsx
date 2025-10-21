@@ -4,6 +4,14 @@ import { useConversations } from "@/console/src/hooks/queries/chats";
 import { Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 function formatTimestamp(date: Date): string {
   const now = new Date();
@@ -27,9 +35,14 @@ function formatTimestamp(date: Date): string {
 }
 
 export default function ChatsView() {
-  const { data: chats = [], isLoading, error } = useConversations();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 20;
+
+  const { data, isLoading, error } = useConversations(page, limit);
+  const chats = data?.conversations || [];
+  const pagination = data?.pagination;
 
   // Filter chats based on search query
   const filteredChats = chats.filter((chat) =>
@@ -100,6 +113,84 @@ export default function ChatsView() {
           <p className="text-text-secondary text-center">
             {searchQuery ? `No chats found matching "${searchQuery}"` : "No conversations yet"}
           </p>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="space-y-4 pt-4">
+          {/* Pagination Info */}
+          <p className="text-sm text-text-secondary text-center">
+            Showing {(page - 1) * limit + 1}-{Math.min(page * limit, pagination.total)} of{" "}
+            {pagination.total} conversations
+          </p>
+
+          {/* Pagination Controls */}
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => pagination.hasPrev && setPage(page - 1)}
+                  className={
+                    pagination.hasPrev
+                      ? "cursor-pointer hover:bg-background-elevated"
+                      : "opacity-50 cursor-not-allowed"
+                  }
+                />
+              </PaginationItem>
+
+              {/* Page Numbers */}
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => {
+                // Show first page, last page, current page, and pages around current
+                const shouldShow =
+                  pageNum === 1 ||
+                  pageNum === pagination.totalPages ||
+                  Math.abs(pageNum - page) <= 1;
+
+                if (!shouldShow) {
+                  // Show ellipsis for gaps
+                  if (pageNum === 2 && page > 3) {
+                    return (
+                      <PaginationItem key={pageNum}>
+                        <span className="px-4 py-2 text-text-secondary">...</span>
+                      </PaginationItem>
+                    );
+                  }
+                  if (pageNum === pagination.totalPages - 1 && page < pagination.totalPages - 2) {
+                    return (
+                      <PaginationItem key={pageNum}>
+                        <span className="px-4 py-2 text-text-secondary">...</span>
+                      </PaginationItem>
+                    );
+                  }
+                  return null;
+                }
+
+                return (
+                  <PaginationItem key={pageNum}>
+                    <PaginationLink
+                      onClick={() => setPage(pageNum)}
+                      isActive={pageNum === page}
+                      className="cursor-pointer"
+                    >
+                      {pageNum}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => pagination.hasNext && setPage(page + 1)}
+                  className={
+                    pagination.hasNext
+                      ? "cursor-pointer hover:bg-background-elevated"
+                      : "opacity-50 cursor-not-allowed"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
     </div>

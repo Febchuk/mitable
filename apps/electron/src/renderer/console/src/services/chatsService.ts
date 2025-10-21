@@ -19,8 +19,18 @@ export interface Chat {
   messages: Message[];
 }
 
+export interface PaginationMetadata {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
 export interface ConversationsResponse {
   conversations: Chat[];
+  pagination: PaginationMetadata;
 }
 
 export interface MessagesResponse {
@@ -28,10 +38,15 @@ export interface MessagesResponse {
 }
 
 /**
- * Fetch all conversations for the user
+ * Fetch conversations for the user with pagination
+ * @param page - Page number (default: 1)
+ * @param limit - Number of conversations per page (default: 20)
  */
-export async function fetchConversations(): Promise<ConversationsResponse> {
-  return apiRequest<ConversationsResponse>("/conversations");
+export async function fetchConversations(
+  page: number = 1,
+  limit: number = 20
+): Promise<ConversationsResponse> {
+  return apiRequest<ConversationsResponse>(`/conversations?page=${page}&limit=${limit}`);
 }
 
 /**
