@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
@@ -13,8 +13,24 @@ const router = Router();
  *   get:
  *     tags:
  *       - Conversations
- *     summary: Get all conversations
- *     description: Retrieve all conversations for the authenticated user, including all messages and last message preview
+ *     summary: Get paginated conversations
+ *     description: Retrieve paginated conversations for the authenticated user, including all messages and last message preview
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number (starts at 1)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Number of conversations per page (max 100)
  *     responses:
  *       200:
  *         description: Conversations retrieved successfully
@@ -46,6 +62,27 @@ const router = Router();
  *                         type: array
  *                         items:
  *                           $ref: '#/components/schemas/Message'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 20
+ *                     total:
+ *                       type: integer
+ *                       example: 49
+ *                     totalPages:
+ *                       type: integer
+ *                       example: 3
+ *                     hasNext:
+ *                       type: boolean
+ *                       example: true
+ *                     hasPrev:
+ *                       type: boolean
+ *                       example: false
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       500:
@@ -57,7 +94,20 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
   const userId = req.userId!;
 
   try {
-    // Get all conversations with their latest message
+    // Parse pagination parameters
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const offset = (page - 1) * limit;
+
+    // Get total count of conversations
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.userId, userId));
+
+    const totalPages = Math.ceil(count / limit);
+
+    // Get paginated conversations
     const conversationsData = await db
       .select({
         id: schema.conversations.id,
@@ -68,49 +118,88 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
       })
       .from(schema.conversations)
       .where(eq(schema.conversations.userId, userId))
-      .orderBy(sql`${schema.conversations.updatedAt} DESC`);
+      .orderBy(sql`${schema.conversations.updatedAt} DESC`)
+      .limit(limit)
+      .offset(offset);
 
-    // For each conversation, get the last message and all messages
-    const conversations = await Promise.all(
-      conversationsData.map(async (conv) => {
-        const messagesData = await db
-          .select({
-            id: schema.messages.id,
-            role: schema.messages.role,
-            content: schema.messages.content,
-            messageType: schema.messages.messageType,
-            cardData: schema.messages.cardData,
-            sources: schema.messages.sources,
-            createdAt: schema.messages.createdAt,
-          })
-          .from(schema.messages)
-          .where(eq(schema.messages.conversationId, conv.id))
-          .orderBy(schema.messages.createdAt);
+    // If no conversations, return empty result
+    if (conversationsData.length === 0) {
+      res.json({
+        conversations: [],
+        pagination: {
+          page,
+          limit,
+          total: count,
+          totalPages,
+          hasNext: false,
+          hasPrev: false,
+        },
+      });
+      return;
+    }
 
-        const messages = messagesData.map((msg) => ({
-          id: msg.id,
-          role: msg.role as "user" | "assistant",
-          content: msg.content,
-          timestamp: msg.createdAt,
-          messageType: msg.messageType || undefined,
-          cardData: msg.cardData || undefined,
-          sources: (msg.sources as any[]) || undefined,
-        }));
-
-        const lastMessage = messages[messages.length - 1];
-
-        return {
-          id: conv.id,
-          title: conv.title || "Untitled Conversation",
-          lastMessage: lastMessage?.content || "",
-          timestamp: conv.updatedAt,
-          unread: false, // TODO: Implement unread status tracking if needed
-          messages,
-        };
+    // Get all messages for these conversations in a single query (optimized!)
+    const conversationIds = conversationsData.map((conv) => conv.id);
+    const allMessages = await db
+      .select({
+        id: schema.messages.id,
+        conversationId: schema.messages.conversationId,
+        role: schema.messages.role,
+        content: schema.messages.content,
+        messageType: schema.messages.messageType,
+        cardData: schema.messages.cardData,
+        sources: schema.messages.sources,
+        createdAt: schema.messages.createdAt,
       })
-    );
+      .from(schema.messages)
+      .where(inArray(schema.messages.conversationId, conversationIds))
+      .orderBy(schema.messages.createdAt);
 
-    res.json({ conversations });
+    // Group messages by conversation ID
+    const messagesByConversation = new Map<string, typeof allMessages>();
+    for (const msg of allMessages) {
+      if (!messagesByConversation.has(msg.conversationId)) {
+        messagesByConversation.set(msg.conversationId, []);
+      }
+      messagesByConversation.get(msg.conversationId)!.push(msg);
+    }
+
+    // Build conversation response with messages
+    const conversations = conversationsData.map((conv) => {
+      const messagesData = messagesByConversation.get(conv.id) || [];
+      const messages = messagesData.map((msg) => ({
+        id: msg.id,
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+        timestamp: msg.createdAt,
+        messageType: msg.messageType || undefined,
+        cardData: msg.cardData || undefined,
+        sources: (msg.sources as any[]) || undefined,
+      }));
+
+      const lastMessage = messages[messages.length - 1];
+
+      return {
+        id: conv.id,
+        title: conv.title || "Untitled Conversation",
+        lastMessage: lastMessage?.content || "",
+        timestamp: conv.updatedAt,
+        unread: false, // TODO: Implement unread status tracking if needed
+        messages,
+      };
+    });
+
+    res.json({
+      conversations,
+      pagination: {
+        page,
+        limit,
+        total: count,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    });
   } catch (error) {
     console.error("Error fetching conversations:", error);
     res.status(500).json({
