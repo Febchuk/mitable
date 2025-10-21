@@ -8,6 +8,7 @@ export interface SendMessageOptions {
   onChunk?: (content: string) => void;
   onComplete?: (fullContent: string) => void;
   onError?: (error: string) => void;
+  captureScreenshot?: boolean; // Whether to capture screenshot before sending
 }
 
 export function useSendMessage(options?: SendMessageOptions) {
@@ -20,6 +21,22 @@ export function useSendMessage(options?: SendMessageOptions) {
 
       if (!token) {
         throw new Error("No authentication token");
+      }
+
+      // Capture screenshot if requested (for workflow mode)
+      let screenshot: string | undefined;
+      if (options?.captureScreenshot && window.consoleAPI?.captureScreenshot) {
+        try {
+          console.log("[useSendMessage] Capturing screenshot...");
+          screenshot = (await window.consoleAPI.captureScreenshot()) || undefined;
+          console.log("[useSendMessage] Screenshot captured:", {
+            hasScreenshot: !!screenshot,
+            size: screenshot?.length || 0,
+          });
+        } catch (error) {
+          console.error("[useSendMessage] Screenshot capture failed:", error);
+          // Continue without screenshot
+        }
       }
 
       // Define streaming callbacks
@@ -35,8 +52,8 @@ export function useSendMessage(options?: SendMessageOptions) {
         },
       };
 
-      // Start streaming
-      await sendStreamingMessage(chatId, content, callbacks, token);
+      // Start streaming with optional screenshot
+      await sendStreamingMessage(chatId, content, callbacks, token, screenshot);
     },
 
     // Optimistic update for user message

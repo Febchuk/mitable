@@ -31,6 +31,8 @@ export default function ChatDetail() {
       setIsStreaming(false);
       // TODO: Show error toast notification
     },
+    // Enable screenshot capture for workflow mode
+    captureScreenshot: true,
   });
 
   const chat = chats.find((c) => c.id === chatId);

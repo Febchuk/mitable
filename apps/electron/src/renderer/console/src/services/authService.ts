@@ -1,15 +1,3 @@
-// Type declarations for Electron IPC API
-declare global {
-  interface Window {
-    consoleAPI?: {
-      setAuthTokens: (accessToken: string, refreshToken: string) => void;
-      clearAuthTokens: () => void;
-      onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
-      onNudgeOpenCreator: (callback: (data: unknown) => void) => void;
-    };
-  }
-}
-
 // API Base URL - defaults to localhost in development
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 

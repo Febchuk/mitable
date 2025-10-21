@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, screen, desktopCapturer } from "electron";
 import { join } from "path";
 import { IPC_CHANNELS } from "@mitable/shared";
 
@@ -375,6 +375,48 @@ function setupIPC() {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, null);
       }
     });
+  });
+
+  // Screenshot Capture
+  ipcMain.handle(IPC_CHANNELS.CAPTURE_SCREENSHOT, async () => {
+    console.log("[Screenshot] Capture requested");
+
+    try {
+      // Get all displays for multi-monitor support
+      const displays = screen.getAllDisplays();
+      console.log(`[Screenshot] Found ${displays.length} display(s)`);
+
+      // Get primary display
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width, height } = primaryDisplay.size;
+
+      console.log(`[Screenshot] Primary display size: ${width}x${height}`);
+
+      // Capture screenshot using desktopCapturer
+      const sources = await desktopCapturer.getSources({
+        types: ["screen"],
+        thumbnailSize: {
+          width: width * primaryDisplay.scaleFactor,
+          height: height * primaryDisplay.scaleFactor,
+        },
+      });
+
+      if (sources.length === 0) {
+        console.error("[Screenshot] No screen sources found");
+        return null;
+      }
+
+      // Use the first screen source (primary display)
+      const screenshot = sources[0].thumbnail;
+      const base64Data = screenshot.toDataURL();
+
+      console.log(`[Screenshot] Captured successfully. Size: ${base64Data.length} bytes`);
+
+      return base64Data;
+    } catch (error) {
+      console.error("[Screenshot] Capture failed:", error);
+      return null;
+    }
   });
 }
 

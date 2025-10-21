@@ -6,6 +6,8 @@ import { RespondTextTool } from "../tools/respond-text.tool";
 import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
 import { FindExpertTool } from "../tools/find-expert.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
+import { workflowService } from "./workflow.service";
+import { continuationDetectorService } from "./continuation-detector.service";
 
 /**
  * System prompt that defines the agent's role and personality
@@ -159,6 +161,8 @@ export class AgentService {
    * 4. Executes the chosen tool
    * 5. Supports tool chaining (tools can trigger follow-up tools)
    * 6. Streams the response back with window triggers
+   * 7. Detects workflow mode for iterative guidance
+   * 8. Handles continuation signals ("Done", "Next", etc.)
    *
    * @param userMessage - The new user message to process
    * @param context - Context including conversation history, user info, etc.
@@ -168,6 +172,109 @@ export class AgentService {
     const MAX_ITERATIONS = 5; // Prevent infinite loops
     let iterationCount = 0;
     try {
+      // Check for workflow mode entry
+      const shouldEnterWorkflow = workflowService.shouldEnterWorkflowMode(
+        userMessage,
+        context.conversationHistory
+      );
+
+      console.log("[AgentService] Workflow detection:", {
+        shouldEnterWorkflow,
+        userMessage: userMessage.substring(0, 50),
+        hasScreenshot: !!context.screenshot,
+      });
+
+      // Check for continuation signals if we have screenshot (indicates possible workflow)
+      const continuationSignal = continuationDetectorService.detectContinuation(
+        userMessage,
+        context.conversationHistory[context.conversationHistory.length - 1]?.content,
+        context.screenshot ? continuationDetectorService.hashScreenshot(context.screenshot) : undefined,
+        undefined // TODO: Track previous screenshot hash in workflow state
+      );
+
+      console.log("[AgentService] Continuation detection:", {
+        isContinuation: continuationSignal.isContinuation,
+        type: continuationSignal.type,
+        confidence: continuationSignal.confidence,
+        reason: continuationSignal.reason,
+      });
+
+      // If it's a continuation with high confidence, automatically trigger guide tool
+      if (
+        continuationSignal.isContinuation &&
+        continuationSignal.confidence > 0.7 &&
+        context.screenshot
+      ) {
+        console.log("[AgentService] Auto-triggering GuideNextStepTool for continuation");
+
+        const guideTool = this.tools.get("guide_next_step");
+        if (guideTool) {
+          // Execute guide tool directly for continuation
+          const toolResult = await guideTool.execute(
+            {
+              task: "Continue to the next step based on the screenshot",
+            },
+            context
+          );
+
+          // Send window trigger if present
+          if (toolResult.triggerWindow) {
+            yield {
+              type: "window_trigger",
+              windowTrigger: toolResult.triggerWindow,
+            };
+          }
+
+          // Stream the response
+          if (toolResult.streamable) {
+            const words = toolResult.content.split(" ");
+            for (let i = 0; i < words.length; i++) {
+              const word = words[i];
+              const isLast = i === words.length - 1;
+              yield {
+                type: "chunk",
+                content: isLast ? word : word + " ",
+              };
+              await new Promise((resolve) => setTimeout(resolve, 20));
+            }
+          }
+
+          yield {
+            type: "complete",
+            content: toolResult.content,
+            messageType: toolResult.messageType,
+            cardData: toolResult.cardData,
+          };
+
+          return; // Exit - continuation handled
+        }
+      }
+
+      // If it's a completion signal, acknowledge and exit workflow mode
+      if (continuationSignal.type === "completion") {
+        console.log("[AgentService] User signaled completion");
+
+        yield {
+          type: "chunk",
+          content: "Great job! ",
+        };
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        yield {
+          type: "chunk",
+          content: "Let me know if you need help with anything else.",
+        };
+
+        yield {
+          type: "complete",
+          content: "Great job! Let me know if you need help with anything else.",
+          messageType: "text",
+          cardData: undefined,
+        };
+
+        return; // Exit - workflow completed
+      }
+
       // Convert conversation history to OpenAI format
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         { role: "system", content: SYSTEM_PROMPT },

@@ -671,12 +671,14 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id || req.userId;
     const { conversationId } = req.params;
-    const { content } = req.body;
+    const { content, screenshot } = req.body;
 
     console.log("[Conversations] Request received:", {
       conversationId,
       userId,
       contentLength: content?.length || 0,
+      hasScreenshot: !!screenshot,
+      screenshotLength: screenshot?.length || 0,
     });
 
     if (!userId) {
@@ -830,6 +832,7 @@ router.post(
         const stream = agentService.processMessage(content, {
           conversationId,
           userId,
+          screenshot: screenshot || undefined, // Pass screenshot if provided
           userProfile: {
             name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
             email: user.email,

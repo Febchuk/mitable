@@ -126,17 +126,25 @@ export interface StreamCallbacks {
  * @param content - The user message content
  * @param callbacks - Callbacks for handling stream events
  * @param token - Auth token
+ * @param screenshot - Optional base64-encoded screenshot for workflow context
  * @returns Promise that resolves when streaming completes
  */
 export async function sendStreamingMessage(
   conversationId: string,
   content: string,
   callbacks: StreamCallbacks,
-  token: string
+  token: string,
+  screenshot?: string
 ): Promise<void> {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
   return new Promise((resolve, reject) => {
+    // Build request body
+    const requestBody: { content: string; screenshot?: string } = { content };
+    if (screenshot) {
+      requestBody.screenshot = screenshot;
+    }
+
     // Use fetch with streaming instead of EventSource for better control
     fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
       method: "POST",
@@ -144,7 +152,7 @@ export async function sendStreamingMessage(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(requestBody),
     })
       .then((response) => {
         if (!response.ok) {

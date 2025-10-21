@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
 const IPC_CHANNELS = {
   HELP_REQUEST: "help-request",
   HELP_RESPONSE: "help-response",
+  CAPTURE_SCREENSHOT: "capture-screenshot",
   GUIDE_START: "guide-start",
   GUIDE_DATA: "guide-data",
   CONVERSATION_NEW: "conversation-new",
@@ -22,6 +23,9 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       callback(data)
     );
   },
+
+  // Screenshot capture
+  captureScreenshot: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT),
 
   // Guide system
   startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),

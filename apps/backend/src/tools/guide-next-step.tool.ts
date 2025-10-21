@@ -1,38 +1,55 @@
 import { BaseTool, ToolContext, ToolParameters, ToolResult } from "./base.tool";
-import { guideGenerationService } from "../services/guideGeneration.service";
+import { geminiVisionService } from "../services/gemini-vision.service";
 
 /**
  * Guide Next Step Tool
  *
- * Provides step-by-step visual UI guidance for completing tasks.
- * Detects "how do I..." type questions and finds/generates interactive guides
- * with visual overlays and precise UI element highlighting.
+ * Provides ITERATIVE, just-in-time visual UI guidance for completing tasks.
+ * Uses Gemini Vision to analyze screenshots and generate ONE step at a time
+ * based on current screen state. Supports continuation signals ("Done", "Next")
+ * to progress through multi-step workflows dynamically.
+ *
+ * ITERATIVE MODEL:
+ * - Generates single steps, not complete workflows
+ * - Adapts to what's currently on screen via screenshot analysis
+ * - Waits for user confirmation before generating next step
+ * - No pre-planning - responds to current context only
  *
  * Use cases:
- * - "How do I submit an expense report?"
- * - "Show me how to request PTO"
- * - "Guide me through escalating a billing issue"
- * - Any procedural "how to" question requiring UI interaction
+ * - Initial: "How do I submit an expense report?" → Step 1 generated
+ * - Continuation: User says "Done" → Screenshot captured → Step 2 generated
+ * - Each step is dynamically created based on current UI state
  *
- * Auto-launches the Guide + Overlay windows to show step-by-step instructions
- * with visual highlights on target UI elements.
+ * REQUIREMENTS:
+ * - Screenshot MUST be provided for all steps
+ * - Tracks step numbers for context
+ * - Launches Guide + Overlay windows with visual highlights
  */
 export class GuideNextStepTool extends BaseTool {
   name = "show_step_by_step_guide";
 
   description = `
-    Provide step-by-step visual guidance for completing a task in the UI.
-    Use this tool ONLY when:
-    - The user explicitly asks "how do I..." or "show me how to..."
-    - The question is about a procedural task that requires UI interaction
-    - Step-by-step instructions would be more helpful than text explanation
+    Provide iterative, just-in-time visual guidance for completing a task.
 
-    This tool will search for existing guides or generate a new guide,
-    then automatically launch the Guide window with visual overlays showing
-    exactly where to click and what to do at each step.
+    IMPORTANT - ITERATIVE MODEL:
+    - Generate ONLY ONE STEP at a time based on current screenshot
+    - Do NOT plan ahead or generate complete workflows
+    - Wait for user to complete step before generating next one
 
-    DO NOT use this for general questions or information requests - use
-    respond_with_text or search_knowledge_base instead.
+    Use this tool when:
+    - User asks "how do I..." or "show me how to..." (initial step)
+    - User signals continuation: "Done", "Next", "Okay" (subsequent steps)
+    - A screenshot is available showing current UI state
+
+    Requirements:
+    - Screenshot MUST be provided
+    - Use Gemini Vision to analyze current screen
+    - Generate single actionable step with precise UI element coordinates
+
+    DO NOT use this for:
+    - General questions or information requests (use respond_with_text)
+    - Documentation lookups (use search_knowledge_base)
+    - Tasks without UI interaction
   `.trim();
 
   parameters: ToolParameters = {
@@ -45,86 +62,154 @@ export class GuideNextStepTool extends BaseTool {
       },
       userQuestion: {
         type: "string",
-        description: "The original user question for context",
+        description: "The original user question for context (optional for continuation steps)",
+      },
+      stepNumber: {
+        type: "number",
+        description: "Current step number for iterative workflow (default: 1)",
+      },
+      previousStep: {
+        type: "string",
+        description: "Description of the previous step completed (for context in multi-step flows)",
       },
     },
-    required: ["task", "userQuestion"],
+    required: ["task"],
   };
 
   /**
    * Execute guide lookup/generation
    *
-   * @param args - Task description and user question
+   * @param args - Task description, optional user question, step tracking
    * @param context - User context and optional screenshot
    * @returns Tool result with guide data and window trigger
    */
   async execute(
-    args: { task: string; userQuestion: string },
+    args: { task: string; userQuestion?: string; stepNumber?: number; previousStep?: string },
     context: ToolContext
   ): Promise<ToolResult> {
     // Validate arguments
     this.validate(args);
 
-    const { task, userQuestion } = args;
-    const screenshot = context.screenshot; // Future: screenshot from Cmd+H
+    const { task, userQuestion, stepNumber = 1, previousStep } = args;
+    const screenshot = context.screenshot;
 
-    console.log(`[GuideNextStepTool] Finding guide for task: "${task}"`);
+    console.log(`[GuideNextStepTool] Generating step ${stepNumber} for task: "${task}"`);
     console.log("[GuideNextStepTool] Request details:", {
       task,
-      userQuestion: userQuestion.substring(0, 100),
+      userQuestion: userQuestion?.substring(0, 100),
+      stepNumber,
+      previousStep: previousStep?.substring(0, 50),
       hasScreenshot: !!screenshot,
     });
 
     try {
-      // Search for or generate a guide
-      const result = await guideGenerationService.findGuide(userQuestion, screenshot);
-
-      if (!result.found || !result.guide) {
-        // No guide found - suggest alternatives
-        console.log("[GuideNextStepTool] No guide found:", {
-          message: result.message,
-        });
+      // Screenshot is REQUIRED for iterative workflow
+      if (!screenshot) {
+        console.log("[GuideNextStepTool] No screenshot provided - cannot generate iterative step");
 
         return {
           messageType: "text",
-          content: `I don't have a step-by-step guide for "${task}" yet. ${result.message}`,
+          content:
+            "I need to see your current screen to provide step-by-step guidance. Please make sure screenshot capture is enabled and try again.",
           streamable: true,
         };
       }
 
-      console.log(`[GuideNextStepTool] Found guide: ${result.guide.title}`);
-      console.log("[GuideNextStepTool] Guide details:", {
-        title: result.guide.title,
-        stepsCount: result.guide.steps.length,
-        currentStep: result.guide.currentStep,
-        completed: result.guide.completed,
+      // Analyze screenshot with Gemini Vision
+      console.log(
+        `[GuideNextStepTool] Screenshot detected - generating step ${stepNumber} using Gemini Vision`
+      );
+
+      const visionResult = await geminiVisionService.analyzeScreenshot(screenshot, task);
+
+      console.log("[GuideNextStepTool] Vision analysis complete:", {
+        applicationContext: visionResult.applicationContext,
+        elementsFound: visionResult.elements.length,
+        screenDescription: visionResult.screenDescription.substring(0, 100),
       });
 
-      // Format response message
-      const stepCount = result.guide.steps.length;
-      const responseText = `Great! I found a ${stepCount}-step guide for "${result.guide.title}".
+      // If we found interactive elements, use vision-based guidance
+      if (visionResult.elements.length > 0) {
+        // Find the most relevant element for the current step
+        const targetElement = geminiVisionService.findRelevantElement(visionResult.elements, task);
 
-I'm showing you the visual guide now - it will highlight exactly where to click and what to do at each step. Just follow along!`;
+        if (targetElement) {
+          console.log("[GuideNextStepTool] Found target element:", {
+            label: targetElement.label,
+            type: targetElement.type,
+            confidence: targetElement.confidence,
+          });
 
-      console.log("[GuideNextStepTool] Success - triggering Guide window:", {
-        guideTitle: result.guide.title,
-        windowTrigger: "guide",
-      });
+          // Generate single-step guidance based on vision analysis
+          const stepInstruction = `Click "${targetElement.label}"`;
 
-      // Return with window trigger to launch Guide + Overlay windows
+          // Build context-aware response
+          let responseText = "";
+          if (stepNumber === 1) {
+            // First step
+            responseText = `I can see you're on ${visionResult.applicationContext}. ${visionResult.screenDescription}
+
+To ${task}, ${stepInstruction.toLowerCase()}.`;
+          } else {
+            // Continuation step
+            responseText = `Great! ${previousStep ? `You completed: "${previousStep}". ` : ""}
+
+Now, ${stepInstruction.toLowerCase()}.`;
+          }
+
+          return {
+            messageType: "workflow",
+            content: responseText,
+            cardData: {
+              stepNumber,
+              instruction: stepInstruction,
+              targetElement: {
+                label: targetElement.label,
+                boundingBox: targetElement.boundingBox,
+              },
+              highlightColor: "blue",
+              arrowPosition: "top-right",
+            },
+            streamable: true,
+            triggerWindow: {
+              window: "guide",
+              data: {
+                guide: {
+                  id: `vision-${Date.now()}`,
+                  title: task,
+                  description: visionResult.screenDescription,
+                  steps: [
+                    {
+                      id: `step-${stepNumber}`,
+                      stepNumber,
+                      instruction: stepInstruction,
+                      targetElement: {
+                        label: targetElement.label,
+                        boundingBox: targetElement.boundingBox,
+                      },
+                      completed: false,
+                    },
+                  ],
+                  currentStep: stepNumber - 1,
+                  completed: false,
+                },
+              },
+            },
+          };
+        }
+      }
+
+      // No clear target element - describe what we see and ask for clarification
+      console.log(
+        "[GuideNextStepTool] No clear target element found - providing screen context instead"
+      );
+
       return {
-        messageType: "workflow",
-        content: responseText,
-        cardData: {
-          guide: result.guide,
-        },
+        messageType: "text",
+        content: `I can see you're on ${visionResult.applicationContext}. ${visionResult.screenDescription}
+
+I'm not sure which specific element to guide you to next for "${task}". Could you describe what you're trying to do, or let me search the knowledge base for documentation?`,
         streamable: true,
-        triggerWindow: {
-          window: "guide",
-          data: {
-            guide: result.guide,
-          },
-        },
       };
     } catch (error) {
       console.error("[GuideNextStepTool] Error finding guide:", error);
