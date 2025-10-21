@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowUp, ExternalLink, Workflow, Users } from "lucide-react";
+import { ArrowLeft, ArrowUp, ExternalLink, Workflow, Users, Camera } from "lucide-react";
 import { useConversations, useSendMessage } from "@/console/src/hooks/queries/chats";
 import UserMessage from "../../../../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../../../../components/domain/messages/AIMessage";
@@ -26,13 +26,20 @@ export default function ChatDetail() {
       setIsStreaming(false);
     },
     onError: (error: string) => {
-      console.error("Streaming error:", error);
+      console.error("[ChatDetail] Streaming error:", error);
       setStreamingContent("");
       setIsStreaming(false);
       // TODO: Show error toast notification
     },
     // Enable screenshot capture for workflow mode
     captureScreenshot: true,
+  });
+
+  console.log("[ChatDetail] Component loaded", {
+    hasSendMutation: !!sendMessageMutation,
+    captureScreenshotEnabled: true,
+    hasConsoleAPI: typeof window !== 'undefined' && !!window.consoleAPI,
+    hasCaptureMethod: typeof window !== 'undefined' && !!window.consoleAPI?.captureScreenshot,
   });
 
   const chat = chats.find((c) => c.id === chatId);
@@ -74,6 +81,45 @@ export default function ChatDetail() {
     setInputValue("");
   };
 
+  const handleTestScreenshot = async () => {
+    console.log("[ChatDetail] Test Screenshot button clicked");
+    console.log("[ChatDetail] Checking window.consoleAPI...", {
+      hasConsoleAPI: !!window.consoleAPI,
+      hasCaptureMethod: !!window.consoleAPI?.captureScreenshot,
+    });
+
+    if (!window.consoleAPI) {
+      console.error("[ChatDetail] window.consoleAPI is NOT available!");
+      alert("ERROR: window.consoleAPI is not available. Check console logs.");
+      return;
+    }
+
+    if (!window.consoleAPI.captureScreenshot) {
+      console.error("[ChatDetail] window.consoleAPI.captureScreenshot is NOT available!");
+      alert("ERROR: captureScreenshot method is not available. Check console logs.");
+      return;
+    }
+
+    try {
+      console.log("[ChatDetail] Calling captureScreenshot()...");
+      const screenshot = await window.consoleAPI.captureScreenshot();
+      console.log("[ChatDetail] Screenshot result:", {
+        hasScreenshot: !!screenshot,
+        size: screenshot?.length || 0,
+        preview: screenshot?.substring(0, 100),
+      });
+
+      if (screenshot) {
+        alert(`SUCCESS! Screenshot captured: ${screenshot.length} bytes`);
+      } else {
+        alert("Screenshot returned null. Check console and Electron main process logs.");
+      }
+    } catch (error) {
+      console.error("[ChatDetail] Screenshot capture error:", error);
+      alert(`ERROR: ${error}. Check console logs.`);
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
@@ -87,17 +133,28 @@ export default function ChatDetail() {
             <span className="text-sm">Back to Chats</span>
           </button>
 
-          <Button
-            variant="ghost"
-            className="gap-2 text-text-secondary hover:text-white hover:bg-primary rounded-full px-4 py-2 h-auto"
-            onClick={() => {
-              // TODO: Implement agent pill integration
-              console.log("Launch in Pill clicked");
-            }}
-          >
-            <ExternalLink size={14} />
-            <span className="text-xs">Launch in Pill</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              className="gap-2 text-text-secondary hover:text-white hover:bg-primary rounded-full px-4 py-2 h-auto"
+              onClick={handleTestScreenshot}
+            >
+              <Camera size={14} />
+              <span className="text-xs">Test Screenshot</span>
+            </Button>
+
+            <Button
+              variant="ghost"
+              className="gap-2 text-text-secondary hover:text-white hover:bg-primary rounded-full px-4 py-2 h-auto"
+              onClick={() => {
+                // TODO: Implement agent pill integration
+                console.log("Launch in Pill clicked");
+              }}
+            >
+              <ExternalLink size={14} />
+              <span className="text-xs">Launch in Pill</span>
+            </Button>
+          </div>
         </div>
 
         <div>

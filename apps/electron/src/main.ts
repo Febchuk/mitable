@@ -65,6 +65,9 @@ function createAgentWindow() {
 }
 
 function createConsoleWindow() {
+  console.log("[Console] Creating console window...");
+  console.log("[Console] Preload script path:", join(__dirname, "../preload/console.cjs"));
+
   consoleWindow = new BrowserWindow({
     width: 1264,
     height: 888,
@@ -81,12 +84,23 @@ function createConsoleWindow() {
     },
   });
 
+  // Log when preload script finishes loading
+  consoleWindow.webContents.on("did-finish-load", () => {
+    console.log("[Console] Window finished loading - preload script should be ready");
+  });
+
+  // Log when DOM is ready
+  consoleWindow.webContents.on("dom-ready", () => {
+    console.log("[Console] DOM ready - window.consoleAPI should be available now");
+  });
+
   // Remove menu bar on Windows (keep on macOS for native experience)
   if (process.platform !== "darwin") {
     consoleWindow.setMenu(null);
   }
 
   if (!app.isPackaged) {
+    console.log("[Console] Loading dev URL: http://localhost:5173/console/index.html");
     consoleWindow.loadURL("http://localhost:5173/console/index.html");
     consoleWindow.webContents.openDevTools();
   } else {
@@ -189,6 +203,8 @@ function createNudgeWindow() {
 
 // IPC Handlers
 function setupIPC() {
+  console.log("[IPC] Setting up IPC handlers...");
+
   // Agent window toggle
   ipcMain.on(IPC_CHANNELS.AGENT_TOGGLE, () => {
     if (agentWindow && !agentWindow.isDestroyed()) {
@@ -379,7 +395,7 @@ function setupIPC() {
 
   // Screenshot Capture
   ipcMain.handle(IPC_CHANNELS.CAPTURE_SCREENSHOT, async () => {
-    console.log("[Screenshot] Capture requested");
+    console.log("[Screenshot] IPC handler called - capture requested");
 
     try {
       // Get all displays for multi-monitor support
@@ -418,6 +434,8 @@ function setupIPC() {
       return null;
     }
   });
+
+  console.log("[IPC] Screenshot capture handler registered successfully");
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)

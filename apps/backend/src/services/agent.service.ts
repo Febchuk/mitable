@@ -322,19 +322,32 @@ export class AgentService {
 
           // Check if AI is calling a function/tool
           if (delta?.tool_calls) {
-            const toolCall = delta.tool_calls[0];
+            // IMPORTANT: When OpenAI calls multiple tools in parallel,
+            // delta.tool_calls is an array where each element has an "index" property.
+            // We only want to process the FIRST tool call (index 0).
+            // Subsequent tool calls (index 1, 2, etc.) should be ignored.
 
-            if (toolCall?.id) {
-              toolCallId = toolCall.id;
-            }
+            for (const toolCall of delta.tool_calls) {
+              // Only process the first tool call (index 0)
+              if (toolCall.index !== 0) {
+                if (toolCall?.function?.name) {
+                  console.log(`[AgentService] Ignoring additional tool call at index ${toolCall.index}: ${toolCall.function.name}`);
+                }
+                continue;
+              }
 
-            if (toolCall?.function?.name) {
-              functionName = toolCall.function.name;
-              console.log(`[AgentService] AI chose tool: ${functionName}`);
-            }
+              if (toolCall?.id) {
+                toolCallId = toolCall.id;
+              }
 
-            if (toolCall?.function?.arguments) {
-              functionArgs += toolCall.function.arguments;
+              if (toolCall?.function?.name) {
+                functionName = toolCall.function.name;
+                console.log(`[AgentService] AI chose tool: ${functionName}`);
+              }
+
+              if (toolCall?.function?.arguments) {
+                functionArgs += toolCall.function.arguments;
+              }
             }
           }
 
@@ -365,8 +378,41 @@ export class AgentService {
             throw new Error(`Tool not found: ${functionName}`);
           }
 
-          // Parse function arguments
-          const parsedArgs = JSON.parse(functionArgs);
+          // Parse function arguments with defensive error handling
+          let parsedArgs;
+          try {
+            // Trim whitespace that might cause parsing issues
+            const trimmedArgs = functionArgs.trim();
+
+            console.log(`[AgentService] Raw function args (length: ${trimmedArgs.length}):`,
+              trimmedArgs.substring(0, 200));
+
+            parsedArgs = JSON.parse(trimmedArgs);
+          } catch (error) {
+            console.error(`[AgentService] JSON parse error:`, error);
+            console.error(`[AgentService] Function args that failed to parse:`, functionArgs);
+
+            // Try to extract just the first complete JSON object
+            // This handles cases where OpenAI might be calling multiple tools
+            // and we accidentally concatenated arguments
+            const firstBraceIndex = functionArgs.indexOf('{');
+            const lastBraceIndex = functionArgs.lastIndexOf('}');
+
+            if (firstBraceIndex !== -1 && lastBraceIndex !== -1) {
+              const extracted = functionArgs.substring(firstBraceIndex, lastBraceIndex + 1);
+              console.log(`[AgentService] Attempting to parse extracted JSON:`, extracted);
+              try {
+                parsedArgs = JSON.parse(extracted);
+                console.log(`[AgentService] Successfully parsed extracted JSON`);
+              } catch (extractError) {
+                console.error(`[AgentService] Extracted JSON also failed to parse:`, extractError);
+                throw error; // Re-throw original error
+              }
+            } else {
+              throw error; // Re-throw original error
+            }
+          }
+
           console.log(
             `[AgentService] Executing tool ${functionName} with args:`,
             JSON.stringify(parsedArgs, null, 2)

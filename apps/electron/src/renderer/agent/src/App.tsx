@@ -12,6 +12,7 @@ declare global {
       resizeWindow: (mode: "pill" | "conversation") => void;
       showNudge: (data: unknown) => void;
       startGuide: (data: unknown) => void;
+      captureScreenshot: () => Promise<string | null>;
       getAuthToken: () => Promise<string | null>;
       onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
     };
@@ -113,6 +114,20 @@ function App() {
       return;
     }
 
+    // Capture screenshot for visual guidance
+    console.log("[Agent] Attempting to capture screenshot for workflow...");
+    let screenshot: string | null = null;
+    try {
+      screenshot = await window.agentAPI.captureScreenshot();
+      console.log("[Agent] Screenshot capture result:", {
+        hasScreenshot: !!screenshot,
+        size: screenshot?.length || 0,
+      });
+    } catch (error) {
+      console.error("[Agent] Screenshot capture failed:", error);
+      // Continue without screenshot - backend will handle gracefully
+    }
+
     // Create placeholder for streaming assistant message
     const streamingMessageId = `streaming-${Date.now()}`;
     streamingMessageIdRef.current = streamingMessageId;
@@ -127,9 +142,9 @@ function App() {
     setMessages((prev) => [...prev, assistantMessage]);
     setIsStreaming(true);
 
-    // Stream the response
+    // Stream the response with optional screenshot
     try {
-      await sendMessageStream(convId, message, {
+      await sendMessageStream(convId, message, screenshot, {
         onChunk: (chunk) => {
           setMessages((prev) =>
             prev.map((msg) =>

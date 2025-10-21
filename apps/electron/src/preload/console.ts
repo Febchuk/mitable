@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
 
+console.log("[Preload] Console preload script starting...");
+
 // IPC channel constants (inlined to avoid chunking issues)
 const IPC_CHANNELS = {
   HELP_REQUEST: "help-request",
@@ -25,7 +27,10 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   },
 
   // Screenshot capture
-  captureScreenshot: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT),
+  captureScreenshot: (): Promise<string | null> => {
+    console.log("[Preload] captureScreenshot() called from renderer");
+    return ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
+  },
 
   // Guide system
   startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),
@@ -57,3 +62,5 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     );
   },
 });
+
+console.log("[Preload] Console preload script finished - window.consoleAPI exposed");

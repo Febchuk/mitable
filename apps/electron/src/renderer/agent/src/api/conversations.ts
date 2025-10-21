@@ -99,6 +99,7 @@ export async function getConversation(conversationId: string): Promise<Conversat
  *
  * @param conversationId - Conversation ID
  * @param content - Message content
+ * @param screenshot - Optional base64-encoded screenshot for visual guidance
  * @param onChunk - Callback for each streaming chunk
  * @param onComplete - Callback when streaming completes
  * @param onError - Callback for errors
@@ -107,6 +108,7 @@ export async function getConversation(conversationId: string): Promise<Conversat
 export async function sendMessageStream(
   conversationId: string,
   content: string,
+  screenshot: string | null | undefined,
   callbacks: {
     onChunk?: (chunk: string) => void;
     onComplete?: (
@@ -122,10 +124,19 @@ export async function sendMessageStream(
 ): Promise<void> {
   const headers = await getAuthHeaders();
 
+  // Build request body with optional screenshot
+  const requestBody: { content: string; screenshot?: string } = { content };
+  if (screenshot) {
+    requestBody.screenshot = screenshot;
+    console.log(`[Agent API] Sending message with screenshot (${screenshot.length} bytes)`);
+  } else {
+    console.log("[Agent API] Sending message without screenshot");
+  }
+
   const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ content }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {

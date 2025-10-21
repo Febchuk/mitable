@@ -19,24 +19,43 @@ export function useSendMessage(options?: SendMessageOptions) {
     mutationFn: async ({ chatId, content }: { chatId: string; content: string }) => {
       const token = authService.getAccessToken();
 
+      console.log("[useSendMessage] Starting mutation", {
+        chatId,
+        contentLength: content.length,
+        captureScreenshotOption: options?.captureScreenshot,
+        hasWindow: typeof window !== 'undefined',
+        hasConsoleAPI: typeof window !== 'undefined' && !!window.consoleAPI,
+        hasCaptureMethod: typeof window !== 'undefined' && !!window.consoleAPI?.captureScreenshot,
+      });
+
       if (!token) {
         throw new Error("No authentication token");
       }
 
       // Capture screenshot if requested (for workflow mode)
       let screenshot: string | undefined;
-      if (options?.captureScreenshot && window.consoleAPI?.captureScreenshot) {
-        try {
-          console.log("[useSendMessage] Capturing screenshot...");
-          screenshot = (await window.consoleAPI.captureScreenshot()) || undefined;
-          console.log("[useSendMessage] Screenshot captured:", {
-            hasScreenshot: !!screenshot,
-            size: screenshot?.length || 0,
-          });
-        } catch (error) {
-          console.error("[useSendMessage] Screenshot capture failed:", error);
-          // Continue without screenshot
+      if (options?.captureScreenshot) {
+        console.log("[useSendMessage] Screenshot capture requested");
+
+        if (!window.consoleAPI) {
+          console.error("[useSendMessage] window.consoleAPI is not available!");
+        } else if (!window.consoleAPI.captureScreenshot) {
+          console.error("[useSendMessage] window.consoleAPI.captureScreenshot is not available!");
+        } else {
+          try {
+            console.log("[useSendMessage] Calling captureScreenshot...");
+            screenshot = (await window.consoleAPI.captureScreenshot()) || undefined;
+            console.log("[useSendMessage] Screenshot captured:", {
+              hasScreenshot: !!screenshot,
+              size: screenshot?.length || 0,
+            });
+          } catch (error) {
+            console.error("[useSendMessage] Screenshot capture failed:", error);
+            // Continue without screenshot
+          }
         }
+      } else {
+        console.log("[useSendMessage] Screenshot capture NOT requested (captureScreenshot option not set)");
       }
 
       // Define streaming callbacks
