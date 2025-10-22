@@ -49,10 +49,7 @@ class GeminiVisionService {
    * @param task - Optional task description for context
    * @returns Detected UI elements with bounding boxes
    */
-  async analyzeScreenshot(
-    screenshotData: string,
-    task?: string
-  ): Promise<VisionAnalysisResult> {
+  async analyzeScreenshot(screenshotData: string, task?: string): Promise<VisionAnalysisResult> {
     console.log("[GeminiVision] Starting screenshot analysis", {
       hasTask: !!task,
       dataLength: screenshotData.length,

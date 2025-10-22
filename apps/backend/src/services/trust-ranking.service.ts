@@ -95,12 +95,13 @@ class TrustRankingService {
    * @returns Ranked results with boosted scores
    */
   applyTrustRanking(results: QueryResult[], intent: IntentAnalysis, query: string): RankedResult[] {
-    // Skip ranking for date-based queries (want all sources equally)
-    if (this.hasDateFilter(query)) {
+    // Check if this is a date-based query
+    const isDateQuery = this.hasDateFilter(query);
+
+    if (isDateQuery) {
       console.log(
-        "[TrustRanking] Date filter detected, skipping trust ranking (showing all sources equally)"
+        "[TrustRanking] Date filter detected - will apply intent-based ranking but skip keyword matching"
       );
-      return [...results].sort((a, b) => (b.score || 0) - (a.score || 0));
     }
 
     // Skip ranking if confidence is too low or no trust config
@@ -119,19 +120,21 @@ class TrustRankingService {
       `[TrustRanking] Multipliers - codebase: ${trustConfig.multipliers.codebase}x, document: ${trustConfig.multipliers.document}x, chat: ${trustConfig.multipliers.chat}x`
     );
 
-    // Apply trust multipliers + keyword matching boost
+    // Apply trust multipliers + keyword matching boost (skip keyword boost for date queries)
     const rankedResults: RankedResult[] = results.map((result) => {
       const metadata = result.metadata || {};
       const sourceType = this.getSourceType(metadata);
       let multiplier = trustConfig.multipliers[sourceType];
 
-      // Apply additional boost for keyword matches in title
-      const title = metadata.title || metadata.page_title || metadata.channel_name || "";
-      const hasKeywordBoost = this.hasKeywordMatch(query, title);
+      // Apply additional boost for keyword matches in title (SKIP for date queries)
+      if (!isDateQuery) {
+        const title = metadata.title || metadata.page_title || metadata.channel_name || "";
+        const hasKeywordBoost = this.hasKeywordMatch(query, title);
 
-      if (hasKeywordBoost) {
-        multiplier *= 2.0; // 2x boost for keyword match (e.g., "PRD" in title)
-        console.log(`[TrustRanking] Keyword match boost applied to: ${title}`);
+        if (hasKeywordBoost) {
+          multiplier *= 2.0; // 2x boost for keyword match (e.g., "PRD" in title)
+          console.log(`[TrustRanking] Keyword match boost applied to: ${title}`);
+        }
       }
 
       // Apply massive boost when query explicitly mentions source type

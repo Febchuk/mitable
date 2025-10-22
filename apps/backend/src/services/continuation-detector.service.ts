@@ -190,7 +190,8 @@ class ContinuationDetectorService {
     // In production, you might use a proper perceptual hash
     const sampleSize = 1000;
     const sample =
-      screenshotData.substring(0, sampleSize) + screenshotData.substring(screenshotData.length - sampleSize);
+      screenshotData.substring(0, sampleSize) +
+      screenshotData.substring(screenshotData.length - sampleSize);
 
     // Simple hash based on length and sample content
     let hash = screenshotData.length.toString(36);

@@ -40,6 +40,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
           role: response.profile.role,
         });
         setIsAuthenticated(true);
+
+        // Broadcast token to main process for cross-window sharing (Agent pill, etc.)
+        const refreshToken = authService.getRefreshToken();
+        if (refreshToken) {
+          authService.saveTokens(token, refreshToken);
+        }
       } catch (error) {
         console.error("Failed to load user:", error);
         // Token might be expired, try to refresh

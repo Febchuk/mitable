@@ -1,10 +1,22 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Edit, Calendar, Users, CheckCircle2, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  ArrowLeft,
+  Edit,
+  Calendar,
+  Users,
+  CheckCircle2,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { fetchTemplateDetail, type TemplateDetail as TemplateDetailType } from "@/console/src/services/adminService";
+import {
+  fetchTemplateDetail,
+  type TemplateDetail as TemplateDetailType,
+} from "@/console/src/services/adminService";
 
 // Icon map for template icons
 const iconMap: Record<string, any> = {
@@ -166,7 +178,9 @@ export default function TemplateDetail() {
             <h2 className="text-xl font-semibold text-text-primary">Usage</h2>
           </div>
           <div className="space-y-2">
-            <p className="text-5xl font-bold text-text-primary">{template.usageStats.assignedCount}</p>
+            <p className="text-5xl font-bold text-text-primary">
+              {template.usageStats.assignedCount}
+            </p>
             <p className="text-sm text-text-secondary">
               {template.usageStats.assignedCount === 1 ? "user assigned" : "users assigned"}
             </p>
@@ -191,7 +205,9 @@ export default function TemplateDetail() {
           </div>
           <div className="space-y-2">
             <p className="text-2xl font-bold text-text-primary">{formatDate(template.createdAt)}</p>
-            <p className="text-sm text-text-secondary">Last updated {formatDate(template.updatedAt)}</p>
+            <p className="text-sm text-text-secondary">
+              Last updated {formatDate(template.updatedAt)}
+            </p>
           </div>
         </div>
       </div>

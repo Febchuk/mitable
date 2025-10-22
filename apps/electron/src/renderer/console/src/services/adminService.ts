@@ -321,14 +321,6 @@ export async function updateIntegrationSettings(
   }
 }
 
-export interface TemplateTask {
-  weekNumber: number;
-  title: string;
-  description?: string;
-  timeEstimate?: string;
-  orderIndex?: number;
-}
-
 export interface CreateTemplatePayload {
   title: string;
   description?: string;

@@ -36,7 +36,9 @@ pool.on("connect", () => {
 
 pool.on("acquire", () => {
   if (config.nodeEnv === "development") {
-    console.log(`📊 Pool stats - Total: ${pool.totalCount}, Idle: ${pool.idleCount}, Waiting: ${pool.waitingCount}`);
+    console.log(
+      `📊 Pool stats - Total: ${pool.totalCount}, Idle: ${pool.idleCount}, Waiting: ${pool.waitingCount}`
+    );
   }
 });
 

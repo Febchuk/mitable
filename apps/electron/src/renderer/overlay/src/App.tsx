@@ -236,9 +236,7 @@ function App() {
         <div className="text-xs font-bold uppercase tracking-wide opacity-80 mb-1">
           Step {currentStep.stepNumber}
         </div>
-        <div className="text-sm font-medium leading-snug">
-          {currentStep.instruction}
-        </div>
+        <div className="text-sm font-medium leading-snug">{currentStep.instruction}</div>
       </div>
     </div>
   );
