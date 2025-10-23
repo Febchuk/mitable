@@ -324,8 +324,8 @@ export async function updateIntegrationSettings(
 export interface CreateTemplateTask {
   weekNumber: number;
   title: string;
-  description?: string;
-  timeEstimate?: string;
+  description?: string | null;
+  timeEstimate?: string | null;
   orderIndex?: number;
 }
 
