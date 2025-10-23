@@ -54,7 +54,8 @@ CRITICAL: When you receive search results from the knowledge base:
 3. SYNTHESIZE the information into a natural, conversational explanation
 4. Answer the user's question directly in your own words
 5. When timestamps are present (e.g., "[Last edited: 2024-10-15]" or "[2024-10-15T10:30:00Z]"), USE THEM in your answer
-6. ALWAYS end with a "**Sources:**" section - this is MANDATORY, never skip it!
+6. DO NOT cite sources inline in your text (no "(Notion)" or "(Slack)" in the middle of sentences)
+7. ALWAYS end with a "**Sources:**" section - this is MANDATORY, never skip it!
 
 When asked about dates or "when":
 - Look for timestamps in the search results: "[Last edited: DATE]" for Notion, "[DATE]" for Slack
@@ -70,20 +71,39 @@ BAD response (DO NOT DO THIS):
 GOOD response (DO THIS):
 "The Mitable PRD outlines our vision for an intelligent onboarding platform. We're building a system that uses AI to help new hires ramp up faster by centralizing company knowledge and delivering personalized learning experiences. Key features include RAG-powered search, adaptive learning paths, and real-time documentation updates.
 
+[NO inline source citations in the text above - only list them at the end]
+
 **Sources:**
 - Mitable AI Business Model ([Notion](https://notion.so/page-url))
 - #product - febchuk ([Slack](https://slack.com/message-url))
 - Product Requirements Document ([Notion](https://notion.so/prd-url))"
 
-CRITICAL SOURCE FORMATTING:
-- Format: "Title ([Source Type](url))" - ONLY the source type in parentheses is hyperlinked
-- Do NOT hyperlink the entire line
-- Do NOT hyperlink the title
-- Examples:
-  ✅ CORRECT: "Mitable AI Business Model ([Notion](url))"
-  ✅ CORRECT: "#engineering - febchuk ([Slack](url))"
-  ❌ WRONG: "[Mitable AI Business Model (Notion)](url)"
-  ❌ WRONG: "[Mitable AI Business Model](url) (Notion)"
+CRITICAL SOURCE FORMATTING - FOLLOW THIS EXACT FORMAT:
+
+**Sources:** (at the end of your response, after your summary)
+- #channel - username ([Slack](url))
+- Document Title ([Notion](url))
+
+Rules:
+1. DO NOT cite sources inline in your response text - no "(Notion)" or "(Slack)" in sentences
+2. ONLY cite sources in the **Sources:** section at the very end
+3. Use bullet points with "-" (dash) in the Sources section
+4. ONLY the word in parentheses gets hyperlinked: ([Slack](url)) or ([Notion](url))
+5. Everything before the parentheses stays as plain text
+6. For Slack: format as "#channel - username"
+7. For Notion: use the document title
+
+Examples - COPY EXACTLY:
+  ✅ CORRECT: "- #engineering - febchuk ([Slack](https://slack.com/msg))"
+  ✅ CORRECT: "- #product - mikun.adewole ([Slack](https://slack.com/msg))"
+  ✅ CORRECT: "- Lorikeet Development Environment Setup Guide ([Notion](https://notion.so/page))"
+  ✅ CORRECT: "- Product Requirements Document (PRD) ([Notion](https://notion.so/prd))"
+  
+  ❌ WRONG: "[#engineering - febchuk (Slack)](url)" - entire line hyperlinked
+  ❌ WRONG: "#engineering - febchuk (Slack)" - no hyperlink
+  ❌ WRONG: "• #engineering - febchuk (Slack)" - wrong bullet character
+
+MANDATORY: Every source MUST have the source type (Slack or Notion) hyperlinked in parentheses.
 
 When responding:
 - Be conversational and warm, like talking to a colleague
@@ -509,51 +529,12 @@ export class AgentService {
             tool_call_id: toolCallId || `call_${Date.now()}`,
           });
 
-          // Check if tool result suggests we should continue (e.g., "Would you like me to connect you with an expert?")
-          // If the tool returns a complete answer, stream it and finish
-          // If the tool result is incomplete, continue the loop for the AI to decide next step
-          const isIncompleteResult =
-            toolResult.content.toLowerCase().includes("would you like") ||
-            toolResult.content.toLowerCase().includes("connect you with") ||
-            toolResult.content.toLowerCase().includes("couldn't find");
+          console.log(
+            "[AgentService] Tool result added to conversation, continuing loop for AI synthesis"
+          );
 
-          console.log("[AgentService] Completion decision:", {
-            isIncompleteResult,
-            willContinueLoop: isIncompleteResult,
-            contentPreview: toolResult.content.substring(0, 100) + "...",
-          });
-
-          if (!isIncompleteResult) {
-            // Complete result - stream it and finish
-            console.log("[AgentService] Streaming final response:", {
-              wordCount: toolResult.content.split(" ").length,
-              streamable: toolResult.streamable,
-            });
-
-            if (toolResult.streamable) {
-              const words = toolResult.content.split(" ");
-              for (let i = 0; i < words.length; i++) {
-                const word = words[i];
-                const isLast = i === words.length - 1;
-                yield {
-                  type: "chunk",
-                  content: isLast ? word : word + " ",
-                };
-                await new Promise((resolve) => setTimeout(resolve, 20));
-              }
-            }
-
-            yield {
-              type: "complete",
-              content: toolResult.content,
-              messageType: toolResult.messageType,
-              cardData: toolResult.cardData,
-            };
-
-            return; // Exit the loop
-          }
-
-          // Continue loop - AI will decide next action based on tool result
+          // Continue loop - AI will receive tool result and synthesize natural response
+          // The only exception is if the tool explicitly couldn't find anything and suggests alternatives
         } else if (textContent) {
           // AI provided final response - stream it
           const words = textContent.split(" ");

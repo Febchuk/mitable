@@ -1,4 +1,12 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  screen,
+  desktopCapturer,
+  shell,
+} from "electron";
 import { join } from "path";
 import { IPC_CHANNELS } from "@mitable/shared";
 import { captureService, CaptureOptions, CaptureResult } from "./services/captureService";
@@ -53,6 +61,15 @@ function createAgentWindow() {
     agentWindow.setAlwaysOnTop(true, "normal", 1);
   }
 
+  // Handle external links - open in default browser/app instead of new window
+  agentWindow.webContents.setWindowOpenHandler(({ url }) => {
+    console.log("[Agent] External link clicked:", url);
+    shell.openExternal(url).catch((err) => {
+      console.error("[Agent] Failed to open external link:", err);
+    });
+    return { action: "deny" };
+  });
+
   if (!app.isPackaged) {
     agentWindow.loadURL("http://localhost:5173/agent/index.html");
   } else {
@@ -93,6 +110,19 @@ function createConsoleWindow() {
   // Log when DOM is ready
   consoleWindow.webContents.on("dom-ready", () => {
     console.log("[Console] DOM ready - window.consoleAPI should be available now");
+  });
+
+  // Handle external links - open in default browser/app instead of new window
+  consoleWindow.webContents.setWindowOpenHandler(({ url }) => {
+    console.log("[Console] External link clicked:", url);
+
+    // Open in default browser/app (e.g., Slack links open in Slack)
+    shell.openExternal(url).catch((err) => {
+      console.error("[Console] Failed to open external link:", err);
+    });
+
+    // Prevent Electron from creating a new window
+    return { action: "deny" };
   });
 
   // Remove menu bar on Windows (keep on macOS for native experience)
