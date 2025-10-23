@@ -6,6 +6,8 @@ export const IPC_CHANNELS = {
   HELP_RESPONSE: "help-response",
   CAPTURE_SCREENSHOT: "capture-screenshot",
   SCREENSHOT_CAPTURED: "screenshot-captured",
+  CAPTURE_FEEDBACK: "capture-feedback", // Visual/audio feedback on capture success/failure
+  CAPTURE_CANCEL: "capture-cancel", // Cancel ongoing capture operation
 
   // Guide system
   GUIDE_START: "guide-start",

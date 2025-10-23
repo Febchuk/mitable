@@ -116,6 +116,7 @@ graph TB
 ```
 
 **Legend:**
+
 - 🟢 Green = Fully implemented and operational
 - 🟡 Yellow = Partially implemented
 - 🔴 Red = Missing or non-functional
@@ -559,12 +560,12 @@ graph TB
 
 ## Integration Status Summary
 
-| Integration | OAuth | Fetch Data | Auto-Sync | Send Data | Status |
-|------------|-------|-----------|-----------|-----------|--------|
-| **Slack** | ✓ | ✓ Channels/Messages | ✗ | ✗ Nudges | 60% |
-| **Notion** | ✓ | ✓ Pages/Blocks | ✗ | N/A | 95% |
-| **GitHub** | ~ | ✗ | ✗ | ✗ | 10% |
-| **Google Drive** | ~ | ✗ | ✗ | ✗ | 10% |
+| Integration      | OAuth | Fetch Data          | Auto-Sync | Send Data | Status |
+| ---------------- | ----- | ------------------- | --------- | --------- | ------ |
+| **Slack**        | ✓     | ✓ Channels/Messages | ✗         | ✗ Nudges  | 60%    |
+| **Notion**       | ✓     | ✓ Pages/Blocks      | ✗         | N/A       | 95%    |
+| **GitHub**       | ~     | ✗                   | ✗         | ✗         | 10%    |
+| **Google Drive** | ~     | ✗                   | ✗         | ✗         | 10%    |
 
 ---
 

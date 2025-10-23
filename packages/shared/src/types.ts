@@ -13,6 +13,40 @@ export const BoundingBoxSchema = z.object({
 
 export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
 
+// Screenshot capture types
+export const ScreenshotMetadataSchema = z.object({
+  width: z.number(),
+  height: z.number(),
+  originalWidth: z.number(),
+  originalHeight: z.number(),
+  captureMode: z.string(),
+  timestamp: z.number(),
+  window: z
+    .object({
+      title: z.string(),
+      bounds: BoundingBoxSchema,
+      sourceId: z.string(),
+      display: z.object({
+        id: z.number(),
+        bounds: BoundingBoxSchema,
+        workArea: BoundingBoxSchema,
+        scaleFactor: z.number(),
+        rotation: z.number(),
+        internal: z.boolean(),
+      }),
+    })
+    .optional(),
+});
+
+export type ScreenshotMetadata = z.infer<typeof ScreenshotMetadataSchema>;
+
+export const ScreenshotResultSchema = z.object({
+  dataUrl: z.string(),
+  metadata: ScreenshotMetadataSchema,
+});
+
+export type ScreenshotResult = z.infer<typeof ScreenshotResultSchema>;
+
 // UI Element detection
 export const UIElementSchema = z.object({
   id: z.string(),

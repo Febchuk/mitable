@@ -25,7 +25,19 @@ contextBridge.exposeInMainWorld("agentAPI", {
   startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),
 
   // Screenshot capture - for workflow visual guidance
-  captureScreenshot: (): Promise<string | null> => {
+  // Returns {dataUrl: string, metadata: ScreenshotMetadata} or null on failure
+  captureScreenshot: (): Promise<{
+    dataUrl: string;
+    metadata: {
+      width: number;
+      height: number;
+      originalWidth: number;
+      originalHeight: number;
+      captureMode: string;
+      timestamp: number;
+      window?: unknown;
+    };
+  } | null> => {
     console.log("[Agent Preload] captureScreenshot() called from renderer");
     return ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
   },

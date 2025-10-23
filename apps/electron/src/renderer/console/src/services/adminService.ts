@@ -321,7 +321,7 @@ export async function updateIntegrationSettings(
   }
 }
 
-export interface TemplateTask {
+export interface CreateTemplateTask {
   weekNumber: number;
   title: string;
   description?: string;
@@ -337,7 +337,7 @@ export interface CreateTemplatePayload {
   roleTags?: string[];
   totalWeeks?: number;
   notionUrl?: string;
-  tasks?: TemplateTask[];
+  tasks?: CreateTemplateTask[];
 }
 
 export interface CreateTemplateResponse {

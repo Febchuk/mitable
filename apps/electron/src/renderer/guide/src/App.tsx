@@ -121,14 +121,8 @@ function App() {
                 onClick={toggleCompletedSteps}
                 className="w-full flex items-center justify-between text-text-secondary hover:text-text-primary transition-colors text-sm px-2 py-1 rounded-lg hover:bg-[#3A3A3A]"
               >
-                <span className="font-medium">
-                  Completed ({completedSteps.length})
-                </span>
-                {showCompletedSteps ? (
-                  <ChevronUp size={16} />
-                ) : (
-                  <ChevronDown size={16} />
-                )}
+                <span className="font-medium">Completed ({completedSteps.length})</span>
+                {showCompletedSteps ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
 
               {showCompletedSteps && (
@@ -148,9 +142,7 @@ function App() {
                         <div className="text-text-tertiary text-xs font-medium">
                           Step {step.stepNumber}
                         </div>
-                        <div className="text-white text-sm line-through">
-                          {step.instruction}
-                        </div>
+                        <div className="text-white text-sm line-through">{step.instruction}</div>
                       </div>
                     </div>
                   ))}
@@ -161,21 +153,20 @@ function App() {
 
           {/* Current Step - Highlighted */}
           {currentStep && !currentStep.completed && (
-            <div ref={currentStepRef} className="bg-primary/10 rounded-lg p-4 border-2 border-primary">
+            <div
+              ref={currentStepRef}
+              className="bg-primary/10 rounded-lg p-4 border-2 border-primary"
+            >
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">
-                      {currentStep.stepNumber}
-                    </span>
+                    <span className="text-white text-xs font-bold">{currentStep.stepNumber}</span>
                   </div>
                   <span className="text-primary text-xs font-bold uppercase tracking-wide">
                     Current Step
                   </span>
                 </div>
-                <p className="text-white text-lg leading-relaxed pl-8">
-                  {currentStep.instruction}
-                </p>
+                <p className="text-white text-lg leading-relaxed pl-8">{currentStep.instruction}</p>
               </div>
             </div>
           )}
@@ -187,9 +178,7 @@ function App() {
                 <Check size={24} className="text-white" />
               </div>
               <p className="text-green-500 text-lg font-bold">All Done!</p>
-              <p className="text-text-secondary text-sm mt-2">
-                You've completed all steps
-              </p>
+              <p className="text-text-secondary text-sm mt-2">You've completed all steps</p>
             </div>
           )}
         </div>

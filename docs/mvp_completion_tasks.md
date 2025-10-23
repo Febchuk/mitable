@@ -17,6 +17,7 @@ This document provides detailed tasks and acceptance criteria to complete the re
 ---
 
 ## Phase 1: Visual Guidance System (Core Value Proposition)
+
 **Priority:** CRITICAL  
 **Timeline:** Weeks 1-2  
 **Current Status:** 15% Complete  
@@ -29,6 +30,7 @@ This document provides detailed tasks and acceptance criteria to complete the re
 **Location:** `/apps/electron/src/main.ts` and new service `/apps/electron/src/services/captureService.ts`
 
 **Technical Requirements:**
+
 - Use `desktopCapturer.getSources()` to capture screens and windows
 - Capture at high DPI (Retina support for macOS)
 - Convert to PNG buffer for transmission
@@ -38,6 +40,7 @@ This document provides detailed tasks and acceptance criteria to complete the re
 - Support both full screen and active window capture
 
 **Implementation Steps:**
+
 1. Create `captureService.ts` with methods:
    - `captureActiveWindow()`: Captures the currently focused window
    - `captureFullScreen()`: Captures primary display
@@ -48,6 +51,7 @@ This document provides detailed tasks and acceptance criteria to complete the re
 5. Send screenshot path + metadata to backend via IPC
 
 **Acceptance Criteria:**
+
 - [ ] Cmd+H triggers screenshot capture within 500ms
 - [ ] Screenshots captured at native resolution (up to 1920x1080)
 - [ ] Retina/HiDPI displays handled correctly
@@ -60,6 +64,7 @@ This document provides detailed tasks and acceptance criteria to complete the re
 - [ ] User receives visual/audio feedback when capture succeeds
 
 **Testing Requirements:**
+
 - Test on macOS (Intel and Apple Silicon)
 - Test on Windows 10 and 11
 - Test with multiple monitors (2 and 3 displays)
@@ -69,6 +74,7 @@ This document provides detailed tasks and acceptance criteria to complete the re
 - Test with maximized, windowed, and fullscreen apps
 
 **Dependencies:**
+
 - None (can start immediately)
 
 **Estimated Effort:** 3-4 days
@@ -82,6 +88,7 @@ This document provides detailed tasks and acceptance criteria to complete the re
 **Location:** `/apps/backend/src/services/visionService.ts` (expand existing scaffold)
 
 **Technical Requirements:**
+
 - Use Gemini 2.0 Flash with vision capabilities
 - Send screenshot as base64-encoded image
 - Prompt engineering for UI element detection
@@ -93,6 +100,7 @@ This document provides detailed tasks and acceptance criteria to complete the re
 - Handle API rate limits gracefully
 
 **Prompt Template:**
+
 ```
 Analyze this screenshot of a desktop application interface. Identify all interactive UI elements and return them in JSON format.
 
@@ -115,6 +123,7 @@ Return ONLY valid JSON, no markdown:
 ```
 
 **Implementation Steps:**
+
 1. Expand `visionService.ts` with `detectUIElements(imageBuffer)` method
 2. Add image preprocessing (resize, compress if needed)
 3. Implement Gemini API call with vision model
@@ -127,6 +136,7 @@ Return ONLY valid JSON, no markdown:
 10. Add unit tests with mock responses
 
 **Acceptance Criteria:**
+
 - [ ] API successfully detects buttons with >85% accuracy
 - [ ] API successfully detects text inputs with >80% accuracy
 - [ ] API successfully detects links with >80% accuracy
@@ -141,6 +151,7 @@ Return ONLY valid JSON, no markdown:
 - [ ] Returns empty array (not error) for non-UI screenshots
 
 **Testing Requirements:**
+
 - Test with 20+ different application screenshots
 - Test with various UI frameworks (Electron, web, native)
 - Test with different color schemes and themes
@@ -153,6 +164,7 @@ Return ONLY valid JSON, no markdown:
 - Load test with 100 concurrent requests
 
 **Dependencies:**
+
 - Task 1.1 (Screenshot Capture) must be complete
 - Gemini API key in environment variables
 
@@ -167,6 +179,7 @@ Return ONLY valid JSON, no markdown:
 **Location:** `/apps/electron/src/renderer/overlay/src/` (expand existing components)
 
 **Technical Requirements:**
+
 - Render on transparent, click-through window
 - Support multiple highlight types: arrow, box, circle, tooltip
 - Animate highlights (fade in, pulse)
@@ -178,6 +191,7 @@ Return ONLY valid JSON, no markdown:
 - Smooth transitions (300ms duration)
 
 **Component Structure:**
+
 ```
 OverlayRenderer/
 ├── OverlayCanvas.tsx (main canvas component)
@@ -197,6 +211,7 @@ OverlayRenderer/
 ```
 
 **Highlight Types:**
+
 1. **Box Highlight:** Red/yellow border around element (3px width)
 2. **Arrow:** Curved arrow from point to element with label
 3. **Tooltip:** Floating text box with white background, drop shadow
@@ -204,6 +219,7 @@ OverlayRenderer/
 5. **Dimming:** Darken everything except highlighted element
 
 **Implementation Steps:**
+
 1. Create Canvas-based rendering system
 2. Implement coordinate transformation (screen → window)
 3. Build Arrow renderer with Bezier curves
@@ -219,6 +235,7 @@ OverlayRenderer/
 13. Optimize rendering for 60fps
 
 **Acceptance Criteria:**
+
 - [ ] Overlays render within 200ms of receiving highlight data
 - [ ] Animations run at smooth 60fps
 - [ ] Arrows point accurately to elements (±5px tolerance)
@@ -234,6 +251,7 @@ OverlayRenderer/
 - [ ] Tooltips have proper drop shadows and readability
 
 **Testing Requirements:**
+
 - Test with 1, 5, 10, 20 highlights simultaneously
 - Test on monitors at different DPI settings
 - Test with windows in all screen positions (corners, edges, center)
@@ -246,6 +264,7 @@ OverlayRenderer/
 - Accessibility: Test with screen readers (overlays should be ignored)
 
 **Dependencies:**
+
 - Task 1.2 (UI Detection) must be complete
 - Overlay window already exists (implemented)
 
@@ -260,6 +279,7 @@ OverlayRenderer/
 **Location:** Multiple files across electron app and backend
 
 **Flow Diagram:**
+
 ```
 User presses Cmd+H
     ↓
@@ -285,6 +305,7 @@ User sees visual guidance
 ```
 
 **Technical Requirements:**
+
 - Complete flow executes in under 5 seconds
 - User receives feedback at each stage (loading states)
 - Errors at any stage show helpful messages
@@ -295,6 +316,7 @@ User sees visual guidance
 - Graceful degradation if vision API fails (text-only help)
 
 **Implementation Steps:**
+
 1. Create orchestration service `/apps/backend/src/services/helpFlowService.ts`
 2. Add IPC channel `HELP_REQUEST_WITH_SCREENSHOT`
 3. Implement state machine for flow stages:
@@ -310,6 +332,7 @@ User sees visual guidance
 12. Add comprehensive logging
 
 **Agent Window UI Updates:**
+
 - Show spinner with stage text: "Capturing screen...", "Analyzing interface...", "Generating guidance..."
 - Show progress bar (0-100%)
 - Add cancel button
@@ -317,6 +340,7 @@ User sees visual guidance
 - Animate transitions between states
 
 **Acceptance Criteria:**
+
 - [ ] Cmd+H initiates complete flow without additional user action
 - [ ] Total flow completes in under 5 seconds (90th percentile)
 - [ ] User sees progress feedback within 100ms of Cmd+H
@@ -334,6 +358,7 @@ User sees visual guidance
 - [ ] Works offline for cached screenshots
 
 **Testing Requirements:**
+
 - Test complete flow 50+ times with various applications
 - Test with slow network conditions (simulated)
 - Test with API failures at each stage
@@ -346,6 +371,7 @@ User sees visual guidance
 - Monitor error rates in staging environment
 
 **Dependencies:**
+
 - Task 1.1 (Screenshot Capture) must be complete
 - Task 1.2 (UI Detection) must be complete
 - Task 1.3 (Overlay Rendering) must be complete
@@ -356,6 +382,7 @@ User sees visual guidance
 ---
 
 ## Phase 2: Knowledge Base & Semantic Search
+
 **Priority:** HIGH  
 **Timeline:** Weeks 3-4  
 **Current Status:** 50% Complete  
@@ -368,6 +395,7 @@ User sees visual guidance
 **Location:** `/apps/backend/src/services/ingestionService.ts` (new file)
 
 **Technical Requirements:**
+
 - Support document types: PDF, Notion pages, Slack messages, plain text, markdown
 - Intelligent chunking strategy:
   - Respect semantic boundaries (paragraphs, sections)
@@ -381,6 +409,7 @@ User sees visual guidance
 - Support incremental updates (re-index changed docs)
 
 **Metadata Schema:**
+
 ```typescript
 {
   doc_id: string,           // UUID of source document
@@ -399,6 +428,7 @@ User sees visual guidance
 ```
 
 **Implementation Steps:**
+
 1. Create `IngestionService` class with methods:
    - `ingestDocument(docId, content, metadata)`
    - `ingestNotion(pageId)`
@@ -429,6 +459,7 @@ User sees visual guidance
 9. Add unit tests and integration tests
 
 **Acceptance Criteria:**
+
 - [ ] Can ingest PDF files up to 100MB in size
 - [ ] Can ingest Notion pages with all blocks (text, lists, code, tables)
 - [ ] Can ingest Slack channel history (up to 10k messages)
@@ -446,6 +477,7 @@ User sees visual guidance
 - [ ] Batch processing reduces API calls by >80%
 
 **Testing Requirements:**
+
 - Test with various PDF sizes (1KB to 100MB)
 - Test with complex Notion pages (nested blocks, databases)
 - Test with long Slack channel histories (1000+ messages)
@@ -458,6 +490,7 @@ User sees visual guidance
 - Integration test full pipeline end-to-end
 
 **Dependencies:**
+
 - Pinecone client configured ✓
 - OpenAI API key in environment ✓
 - Notion and Slack OAuth tokens available ✓
@@ -474,6 +507,7 @@ User sees visual guidance
 **Location:** `/apps/backend/src/services/searchService.ts` (new file)
 
 **Technical Requirements:**
+
 - Hybrid approach: 70% semantic + 30% keyword (tunable)
 - Use Reciprocal Rank Fusion (RRF) to merge results
 - Support filters: document type, date range, author, tags
@@ -485,6 +519,7 @@ User sees visual guidance
 - Log search queries for analytics
 
 **Search Algorithm:**
+
 ```
 1. Generate embedding for user query (OpenAI)
 2. Semantic search: Query Pinecone (top 20 results)
@@ -496,6 +531,7 @@ User sees visual guidance
 ```
 
 **Implementation Steps:**
+
 1. Create `SearchService` class with method:
    - `search(query, filters?, topK?): SearchResult[]`
 2. Implement semantic search:
@@ -524,6 +560,7 @@ User sees visual guidance
 10. Add unit and integration tests
 
 **Acceptance Criteria:**
+
 - [ ] Semantic search returns relevant results for conceptual queries
 - [ ] Keyword search returns exact matches for specific terms
 - [ ] Hybrid results better than either method alone (measured by nDCG)
@@ -541,6 +578,7 @@ User sees visual guidance
 - [ ] RRF merging produces diverse result set
 
 **Testing Requirements:**
+
 - Create test dataset of 1000+ documents with ground truth
 - Measure precision@5 and recall@10
 - Compare hybrid vs semantic-only vs keyword-only
@@ -553,6 +591,7 @@ User sees visual guidance
 - User testing: 5+ people rate result relevance
 
 **Dependencies:**
+
 - Task 2.1 (Document Ingestion) must be complete
 - Pinecone index populated with embeddings
 - PostgreSQL full-text search extensions enabled
@@ -568,6 +607,7 @@ User sees visual guidance
 **Location:** `/apps/backend/src/services/llm.service.ts` (expand existing)
 
 **Technical Requirements:**
+
 - Automatically search knowledge base for relevant context
 - Include search results in LLM prompt as "retrieved documents"
 - Implement RAG (Retrieval-Augmented Generation) pattern
@@ -579,6 +619,7 @@ User sees visual guidance
 - Support follow-up questions with conversation context
 
 **RAG Prompt Template:**
+
 ```
 You are Mitable, an AI assistant helping new employees onboard.
 
@@ -606,6 +647,7 @@ Instructions:
 ```
 
 **Implementation Steps:**
+
 1. Update `llm.service.ts` to add RAG capability:
    - Add `searchService` dependency
    - Implement `ragCompletion(query, conversationHistory)` method
@@ -639,6 +681,7 @@ Instructions:
 9. Update frontend to render sources
 
 **Acceptance Criteria:**
+
 - [ ] AI responses cite relevant company documents when available
 - [ ] Citations include document name and type
 - [ ] Users can click sources to view full document
@@ -655,6 +698,7 @@ Instructions:
 - [ ] System logs which documents were retrieved but not cited
 
 **Testing Requirements:**
+
 - Test with queries that have relevant docs vs those that don't
 - Test with single-source vs multi-source answers
 - Test citation accuracy (all cited sources are real)
@@ -667,6 +711,7 @@ Instructions:
 - Load test RAG flow with 50 concurrent conversations
 
 **Dependencies:**
+
 - Task 2.2 (Hybrid Search) must be complete
 - Knowledge base populated with content
 - Existing conversation system operational ✓
@@ -677,6 +722,7 @@ Instructions:
 ---
 
 ## Phase 3: Security & Token Management
+
 **Priority:** HIGH  
 **Timeline:** Week 5  
 **Current Status:** 40% Complete  
@@ -689,6 +735,7 @@ Instructions:
 **Location:** `/apps/backend/src/services/encryption.service.ts` (new file)
 
 **Technical Requirements:**
+
 - Use AES-256-GCM encryption algorithm
 - Store encryption key in environment variable (not in code)
 - Use unique IV (initialization vector) per token
@@ -700,6 +747,7 @@ Instructions:
 - Support encryption of: OAuth access tokens, refresh tokens, API keys
 
 **Database Schema Update:**
+
 ```sql
 ALTER TABLE integrations ADD COLUMN encrypted_access_token BYTEA;
 ALTER TABLE integrations ADD COLUMN access_token_iv BYTEA;
@@ -710,6 +758,7 @@ ALTER TABLE integrations ADD COLUMN encryption_key_version INTEGER DEFAULT 1;
 ```
 
 **Implementation Steps:**
+
 1. Create `EncryptionService` class:
    - `encrypt(plaintext: string): {ciphertext: Buffer, iv: Buffer}`
    - `decrypt(ciphertext: Buffer, iv: Buffer): string`
@@ -745,6 +794,7 @@ ALTER TABLE integrations ADD COLUMN encryption_key_version INTEGER DEFAULT 1;
 9. Write security tests
 
 **Acceptance Criteria:**
+
 - [ ] All OAuth tokens encrypted before database storage
 - [ ] Tokens successfully decrypted when needed for API calls
 - [ ] No plaintext tokens in database
@@ -762,6 +812,7 @@ ALTER TABLE integrations ADD COLUMN encryption_key_version INTEGER DEFAULT 1;
 - [ ] Admin can view encryption status (not decrypt) in UI
 
 **Testing Requirements:**
+
 - Unit tests for encryption/decryption
 - Test with various token lengths and formats
 - Test key rotation with simulated tokens
@@ -774,6 +825,7 @@ ALTER TABLE integrations ADD COLUMN encryption_key_version INTEGER DEFAULT 1;
 - Performance benchmark encrypt/decrypt operations
 
 **Dependencies:**
+
 - Existing integration system operational ✓
 - Node.js `crypto` module available ✓
 
@@ -788,6 +840,7 @@ ALTER TABLE integrations ADD COLUMN encryption_key_version INTEGER DEFAULT 1;
 **Location:** `/apps/backend/src/services/tokenRefreshService.ts` (new file)
 
 **Technical Requirements:**
+
 - Check token expiration before each API call
 - Refresh token if expires in <1 hour
 - Store new access token and expiry time
@@ -799,6 +852,7 @@ ALTER TABLE integrations ADD COLUMN encryption_key_version INTEGER DEFAULT 1;
 - Support both Slack and Notion OAuth flows
 
 **OAuth Token Refresh Flow:**
+
 ```
 API call initiated
     ↓
@@ -818,6 +872,7 @@ Proceed with original API call
 ```
 
 **Implementation Steps:**
+
 1. Create `TokenRefreshService` class:
    - `refreshIfNeeded(integrationId: string): Promise<void>`
    - `refreshSlackToken(integration: Integration): Promise<TokenResponse>`
@@ -858,6 +913,7 @@ Proceed with original API call
 10. Add comprehensive logging and monitoring
 
 **Acceptance Criteria:**
+
 - [ ] Tokens automatically refresh before expiration
 - [ ] API calls never fail due to expired tokens
 - [ ] Refresh occurs seamlessly without user awareness
@@ -875,6 +931,7 @@ Proceed with original API call
 - [ ] Works with rate-limited refresh endpoints
 
 **Testing Requirements:**
+
 - Test refresh logic with mock OAuth providers
 - Test with tokens at various expiry states (expired, expiring soon, fresh)
 - Test refresh token rotation scenarios
@@ -887,6 +944,7 @@ Proceed with original API call
 - Load test background job with 100+ integrations
 
 **Dependencies:**
+
 - Task 3.1 (Token Encryption) must be complete
 - Existing integration OAuth flows operational ✓
 - Background job scheduler available (node-cron or similar)
@@ -902,6 +960,7 @@ Proceed with original API call
 **Location:** All backend services + `/apps/backend/src/middleware/errorHandler.ts`
 
 **Technical Requirements:**
+
 - Catch all errors at appropriate boundaries
 - Map technical errors to user-friendly messages
 - Log errors with context (user, action, timestamp, stack trace)
@@ -914,6 +973,7 @@ Proceed with original API call
 - Graceful degradation when services unavailable
 
 **Error Response Format:**
+
 ```typescript
 {
   error: {
@@ -927,6 +987,7 @@ Proceed with original API call
 ```
 
 **Error Categories:**
+
 - **Auth Errors:** Invalid credentials, expired sessions, insufficient permissions
 - **Integration Errors:** OAuth failures, API rate limits, connection timeouts
 - **Validation Errors:** Invalid input, missing required fields, format errors
@@ -936,6 +997,7 @@ Proceed with original API call
 - **Business Logic Errors:** Invalid state transitions, rule violations
 
 **Implementation Steps:**
+
 1. Create `ErrorHandler` middleware:
    - Catch unhandled errors
    - Log with appropriate level
@@ -985,6 +1047,7 @@ Proceed with original API call
 11. Document common errors and resolutions
 
 **Acceptance Criteria:**
+
 - [ ] All errors caught and handled appropriately
 - [ ] Error responses use consistent JSON format
 - [ ] No stack traces exposed to end users (only to admins/logs)
@@ -1002,6 +1065,7 @@ Proceed with original API call
 - [ ] Error documentation covers top 20 errors
 
 **Testing Requirements:**
+
 - Simulate each error category (auth, integration, validation, etc.)
 - Test circuit breaker behavior (open, half-open, closed states)
 - Test timeout handling with delayed responses
@@ -1014,6 +1078,7 @@ Proceed with original API call
 - Code review for error handling coverage
 
 **Dependencies:**
+
 - None (can implement alongside other tasks)
 - Sentry account and DSN (optional but recommended)
 
@@ -1022,6 +1087,7 @@ Proceed with original API call
 ---
 
 ## Phase 4: Real-time Integrations & Background Workers
+
 **Priority:** MEDIUM  
 **Timeline:** Week 6  
 **Current Status:** 60% Complete  
@@ -1034,6 +1100,7 @@ Proceed with original API call
 **Location:** `/apps/backend/src/workers/` (new directory)
 
 **Technical Requirements:**
+
 - Use BullMQ for job queue (Redis-backed)
 - Support job types: ingestion, sync, scheduled tasks, notifications
 - Implement job priorities (high, normal, low)
@@ -1046,6 +1113,7 @@ Proceed with original API call
 - Graceful shutdown handling
 
 **Worker Architecture:**
+
 ```
 Job Queue (Redis)
     ↓
@@ -1057,12 +1125,14 @@ Worker Processes
 ```
 
 **Job Types:**
+
 1. **Ingestion Jobs:** Process uploaded documents
 2. **Sync Jobs:** Fetch data from Slack/Notion
 3. **Scheduled Tasks:** Token refresh, cleanup, analytics
 4. **Notification Jobs:** Send nudges via Slack, emails
 
 **Implementation Steps:**
+
 1. Install and configure BullMQ:
    - `npm install bullmq ioredis`
    - Configure Redis connection
@@ -1082,7 +1152,7 @@ Worker Processes
    ingestionQueue.process(async (job) => {
      const { docId, content, metadata } = job.data;
      await ingestionService.ingestDocument(docId, content, metadata);
-     return { status: 'success', chunksCreated: 150 };
+     return { status: "success", chunksCreated: 150 };
    });
    ```
 5. Add job creation utilities:
@@ -1118,6 +1188,7 @@ Worker Processes
     - Endpoint for orchestration tools (e.g., PM2, Docker)
 
 **Acceptance Criteria:**
+
 - [ ] Jobs successfully queued and processed asynchronously
 - [ ] Failed jobs automatically retry with backoff
 - [ ] Job progress tracked and visible in UI
@@ -1135,6 +1206,7 @@ Worker Processes
 - [ ] Worker processes auto-restart on crash (with PM2 or similar)
 
 **Testing Requirements:**
+
 - Test job queuing and processing end-to-end
 - Test retry logic with simulated failures
 - Test concurrency limits (queue 20 jobs, verify only N run concurrently)
@@ -1147,6 +1219,7 @@ Worker Processes
 - Test telemetry and alerting
 
 **Dependencies:**
+
 - Redis instance available (local or hosted)
 - Task 2.1 (Ingestion Pipeline) complete for ingestion jobs
 - Task 4.2 (Sync Logic) complete for sync jobs
@@ -1162,6 +1235,7 @@ Worker Processes
 **Location:** `/apps/backend/src/workers/syncWorker.ts` and service updates
 
 **Technical Requirements:**
+
 - Auto-sync on schedule (every 6 hours for Slack, daily for Notion)
 - Support incremental sync (only fetch new/updated content since last sync)
 - Use webhooks for real-time updates (optional enhancement)
@@ -1173,6 +1247,7 @@ Worker Processes
 - Log all sync operations for audit trail
 
 **Sync Flow:**
+
 ```
 Scheduled trigger (cron) or manual trigger
     ↓
@@ -1188,6 +1263,7 @@ For each integration:
 ```
 
 **Implementation Steps:**
+
 1. Update `integrations` table:
    - Add `last_sync_at` column (timestamp)
    - Add `next_sync_at` column (timestamp)
@@ -1220,8 +1296,8 @@ For each integration:
    ```typescript
    syncQueue.process(async (job) => {
      const { integrationId, type } = job.data;
-     if (type === 'slack') await syncSlack(integrationId);
-     if (type === 'notion') await syncNotion(integrationId);
+     if (type === "slack") await syncSlack(integrationId);
+     if (type === "notion") await syncNotion(integrationId);
    });
    ```
 7. Add manual sync trigger:
@@ -1251,6 +1327,7 @@ For each integration:
     - Show sync errors in admin UI
 
 **Acceptance Criteria:**
+
 - [ ] Slack messages automatically sync every 6 hours
 - [ ] Notion pages automatically sync daily
 - [ ] Incremental sync only fetches new/changed content
@@ -1268,6 +1345,7 @@ For each integration:
 - [ ] Works with multiple organizations simultaneously
 
 **Testing Requirements:**
+
 - Test initial sync (no prior data) vs incremental sync
 - Test with small workspaces (10 channels/pages) and large (1000+)
 - Test sync with new, updated, and deleted content
@@ -1281,6 +1359,7 @@ For each integration:
 - Test sync error handling and notifications
 
 **Dependencies:**
+
 - Task 4.1 (Background Workers) must be complete
 - Task 2.1 (Ingestion Pipeline) must be complete
 - Slack and Notion OAuth functional ✓
@@ -1297,6 +1376,7 @@ For each integration:
 **Location:** `/apps/backend/src/services/slack.service.ts` (expand existing)
 
 **Technical Requirements:**
+
 - Send Slack DM when expert matched with nudge
 - Include question, context, and attachments
 - Provide "Accept" and "Decline" buttons (Slack interactive components)
@@ -1308,6 +1388,7 @@ For each integration:
 - Handle Slack workspace not connected gracefully
 
 **Slack Message Format:**
+
 ```
 📩 New Question for You
 
@@ -1325,6 +1406,7 @@ View full details in Mitable Console
 ```
 
 **Implementation Steps:**
+
 1. Update `slack.service.ts` with `sendNudge()` method:
    - Accept nudge data (question, context, expert)
    - Find expert's Slack user ID via email
@@ -1384,6 +1466,7 @@ View full details in Mitable Console
     - Retry failed deliveries manually
 
 **Acceptance Criteria:**
+
 - [ ] Experts receive Slack DM when matched with nudge
 - [ ] Message includes question, context, and action buttons
 - [ ] Accept button updates nudge status and notifies asker
@@ -1401,6 +1484,7 @@ View full details in Mitable Console
 - [ ] Asker receives notification within 1 minute of expert accepting
 
 **Testing Requirements:**
+
 - Test Slack DM delivery to real users
 - Test Accept button interaction
 - Test Decline button interaction and next-expert logic
@@ -1415,6 +1499,7 @@ View full details in Mitable Console
 - Test delivery tracking accuracy
 
 **Dependencies:**
+
 - Task 4.1 (Background Workers) must be complete
 - Slack OAuth and bot setup complete ✓
 - Nudge creation system operational ✓
@@ -1425,6 +1510,7 @@ View full details in Mitable Console
 ---
 
 ## Phase 5: Polish & Production Readiness
+
 **Priority:** MEDIUM  
 **Timeline:** Week 7-8  
 **Current Status:** Various  
@@ -1437,6 +1523,7 @@ View full details in Mitable Console
 **Location:** `/apps/backend/src/services/analytics.service.ts` (expand existing)
 
 **Technical Requirements:**
+
 - Track user actions: help requests, roadmap completions, nudge interactions, chats
 - Track system metrics: response times, error rates, API usage
 - Store events in `analytics_events` table
@@ -1449,6 +1536,7 @@ View full details in Mitable Console
 **Key Metrics to Track:**
 
 **User Engagement:**
+
 - Daily/weekly/monthly active users
 - Help requests per user per day
 - Roadmap task completion rate
@@ -1457,6 +1545,7 @@ View full details in Mitable Console
 - Feature adoption rates (overlay, search, integrations)
 
 **System Performance:**
+
 - API response time (p50, p95, p99)
 - Screenshot capture latency
 - UI detection latency
@@ -1466,6 +1555,7 @@ View full details in Mitable Console
 - Queue job processing time
 
 **Business Metrics:**
+
 - New user onboarding completion rate
 - Time to first value (first help request)
 - User retention (D1, D7, D30)
@@ -1474,6 +1564,7 @@ View full details in Mitable Console
 - Integration connection rate
 
 **Implementation Steps:**
+
 1. Expand `analytics.service.ts`:
    - `trackEvent(userId, eventName, properties)`
    - `trackMetric(metricName, value, tags)`
@@ -1544,6 +1635,7 @@ View full details in Mitable Console
     - Provide interpretation guidelines
 
 **Acceptance Criteria:**
+
 - [ ] All key user actions tracked and stored
 - [ ] Analytics dashboard shows real-time and historical data
 - [ ] Dashboard loads in <2 seconds
@@ -1561,6 +1653,7 @@ View full details in Mitable Console
 - [ ] Metrics documented and understandable
 
 **Testing Requirements:**
+
 - Simulate user flows and verify events tracked
 - Test dashboard with various date ranges and filters
 - Test aggregation jobs with large datasets
@@ -1573,6 +1666,7 @@ View full details in Mitable Console
 - User testing: Do admins understand the dashboard?
 
 **Dependencies:**
+
 - `analytics_events` table exists ✓
 - Dashboard UI space in Console window ✓
 
@@ -1587,6 +1681,7 @@ View full details in Mitable Console
 **Location:** All backend services, database, and Electron app
 
 **Technical Requirements:**
+
 - API response times: p95 <500ms, p99 <1s
 - Database query optimization: All queries <100ms
 - Frontend bundle size: <2MB per window
@@ -1601,6 +1696,7 @@ View full details in Mitable Console
 **Optimization Areas:**
 
 **Backend API:**
+
 - Profile endpoints with high latency
 - Add database indexes for common queries
 - Implement query result caching (Redis)
@@ -1610,6 +1706,7 @@ View full details in Mitable Console
 - Implement rate limiting per user
 
 **Database:**
+
 - Add indexes for frequently queried columns
 - Analyze slow query log
 - Optimize expensive queries (e.g., analytics aggregations)
@@ -1618,12 +1715,14 @@ View full details in Mitable Console
 - Vacuum and analyze tables regularly
 
 **Vector Store:**
+
 - Optimize Pinecone query latency
 - Reduce dimension size if possible (test impact on accuracy)
 - Implement query result caching
 - Batch embed requests to reduce API calls
 
 **Frontend:**
+
 - Code-split large components
 - Lazy load window renderers
 - Optimize bundle size (tree-shaking, minification)
@@ -1632,6 +1731,7 @@ View full details in Mitable Console
 - Cache static assets aggressively
 
 **Caching Strategy:**
+
 - Cache search results (TTL: 10 minutes)
 - Cache integration data (TTL: 1 hour)
 - Cache user profiles (TTL: 30 minutes)
@@ -1639,6 +1739,7 @@ View full details in Mitable Console
 - Invalidate cache on relevant updates
 
 **Implementation Steps:**
+
 1. Set up performance monitoring:
    - Install profiling tools (clinic.js, autocannon for load testing)
    - Monitor with New Relic or DataDog
@@ -1706,6 +1807,7 @@ View full details in Mitable Console
     - Set performance budgets for future development
 
 **Acceptance Criteria:**
+
 - [ ] API p95 response time <500ms for all endpoints
 - [ ] Database queries <100ms (90th percentile)
 - [ ] Search queries return in <500ms
@@ -1723,6 +1825,7 @@ View full details in Mitable Console
 - [ ] Performance regression tests in CI/CD pipeline
 
 **Testing Requirements:**
+
 - Load test with 50, 100, 200 concurrent users
 - Stress test to find breaking point
 - Endurance test (8 hours continuous load)
@@ -1735,6 +1838,7 @@ View full details in Mitable Console
 - Compare before/after metrics for each optimization
 
 **Dependencies:**
+
 - All core features implemented
 - Production-like environment for testing
 
@@ -1749,6 +1853,7 @@ View full details in Mitable Console
 **Location:** All application layers
 
 **Technical Requirements:**
+
 - Fix all high and critical vulnerabilities
 - Implement input validation and sanitization
 - Add CSRF protection
@@ -1763,6 +1868,7 @@ View full details in Mitable Console
 **Security Checklist:**
 
 **Authentication & Authorization:**
+
 - [ ] All API endpoints require authentication (except public routes)
 - [ ] Role-based access control (admin vs user)
 - [ ] JWT tokens properly validated and secured
@@ -1773,6 +1879,7 @@ View full details in Mitable Console
 - [ ] Session timeout after inactivity
 
 **Input Validation:**
+
 - [ ] All user inputs validated and sanitized
 - [ ] SQL injection protection (use parameterized queries)
 - [ ] XSS protection (escape HTML output)
@@ -1782,6 +1889,7 @@ View full details in Mitable Console
 - [ ] Regex DoS protection (avoid complex regex on user input)
 
 **Data Protection:**
+
 - [ ] Sensitive data encrypted at rest (tokens, API keys)
 - [ ] HTTPS enforced for all communications
 - [ ] Database credentials stored in environment variables
@@ -1790,6 +1898,7 @@ View full details in Mitable Console
 - [ ] Secure token storage (HTTP-only cookies or encrypted local storage)
 
 **API Security:**
+
 - [ ] CORS configured correctly (whitelist trusted origins)
 - [ ] Rate limiting implemented (prevent brute force, DoS)
 - [ ] CSRF protection for state-changing operations
@@ -1797,6 +1906,7 @@ View full details in Mitable Console
 - [ ] Request signing/verification for webhooks
 
 **Security Headers:**
+
 - [ ] Content-Security-Policy (CSP)
 - [ ] X-Content-Type-Options: nosniff
 - [ ] X-Frame-Options: DENY
@@ -1805,12 +1915,14 @@ View full details in Mitable Console
 - [ ] Referrer-Policy: no-referrer
 
 **Dependency Security:**
+
 - [ ] All dependencies up-to-date
 - [ ] No known vulnerabilities (`npm audit`)
 - [ ] Dependabot enabled for automatic updates
 - [ ] Minimal dependency footprint
 
 **Electron-Specific:**
+
 - [ ] Context isolation enabled
 - [ ] Node integration disabled in renderers
 - [ ] Preload scripts properly sandboxed
@@ -1819,6 +1931,7 @@ View full details in Mitable Console
 - [ ] Deep link handling secure
 
 **Audit & Logging:**
+
 - [ ] Security events logged (auth failures, permission denied)
 - [ ] Audit trail for sensitive operations
 - [ ] Log retention policy defined
@@ -1826,6 +1939,7 @@ View full details in Mitable Console
 - [ ] PII excluded from logs
 
 **Implementation Steps:**
+
 1. Run automated security scan:
    - Use OWASP ZAP or similar tool
    - Scan all API endpoints
@@ -1877,6 +1991,7 @@ View full details in Mitable Console
     - Establish secure coding guidelines
 
 **Acceptance Criteria:**
+
 - [ ] No high or critical vulnerabilities in security scan
 - [ ] All OWASP Top 10 risks mitigated
 - [ ] Input validation implemented for all user inputs
@@ -1894,6 +2009,7 @@ View full details in Mitable Console
 - [ ] Team trained on security practices
 
 **Testing Requirements:**
+
 - Automated security scan (OWASP ZAP, Burp Suite)
 - Manual penetration testing
 - Test authentication/authorization edge cases
@@ -1906,6 +2022,7 @@ View full details in Mitable Console
 - Review all third-party dependencies
 
 **Dependencies:**
+
 - Task 3.1 (Token Encryption) must be complete
 - Task 3.3 (Error Handling) must be complete
 
@@ -1920,6 +2037,7 @@ View full details in Mitable Console
 **Location:** Root directory (GitHub Actions, Docker configs)
 
 **Technical Requirements:**
+
 - Automated builds on every commit
 - Run tests (unit, integration, e2e) in CI
 - Automated security scanning
@@ -1932,6 +2050,7 @@ View full details in Mitable Console
 - Deployment notifications (Slack, email)
 
 **CI/CD Pipeline Stages:**
+
 ```
 1. Code Commit → GitHub
     ↓
@@ -1965,6 +2084,7 @@ View full details in Mitable Console
 ```
 
 **Implementation Steps:**
+
 1. Set up GitHub Actions:
    - Create `.github/workflows/ci.yml` for continuous integration
    - Create `.github/workflows/deploy-staging.yml` for staging deployment
@@ -2065,6 +2185,7 @@ View full details in Mitable Console
     - Support silent updates (for minor versions)
 
 **Acceptance Criteria:**
+
 - [ ] CI pipeline runs on every commit and PR
 - [ ] All tests pass in CI before deployment
 - [ ] Security scans block deployment if critical issues found
@@ -2085,6 +2206,7 @@ View full details in Mitable Console
 - [ ] Logs and monitoring active post-deployment
 
 **Testing Requirements:**
+
 - Test entire CI/CD pipeline end-to-end
 - Test staging deployment from scratch
 - Test production deployment from staging
@@ -2097,6 +2219,7 @@ View full details in Mitable Console
 - Test build artifacts (installers install correctly)
 
 **Dependencies:**
+
 - All application features complete
 - Staging and production servers provisioned
 - Docker and container registry set up
@@ -2108,6 +2231,7 @@ View full details in Mitable Console
 ---
 
 ## Phase 6: Documentation and Launch Preparation
+
 **Priority:** LOW (but essential for launch)  
 **Timeline:** Week 8+  
 **Current Status:** Minimal  
@@ -2120,6 +2244,7 @@ View full details in Mitable Console
 **Location:** `/docs/user-guides/` (new directory)
 
 **Documentation Structure:**
+
 ```
 /docs/user-guides/
 ├── employee/
@@ -2146,6 +2271,7 @@ View full details in Mitable Console
 ```
 
 **Employee Guides:**
+
 1. **Getting Started:**
    - First login
    - Understanding the Agent window
@@ -2171,6 +2297,7 @@ View full details in Mitable Console
    - Interacting with experts
 
 **Admin Guides:**
+
 1. **Getting Started:**
    - Admin dashboard overview
    - Key responsibilities
@@ -2197,6 +2324,7 @@ View full details in Mitable Console
    - Exporting reports
 
 **Implementation Steps:**
+
 1. Write employee documentation (5-6 guides)
 2. Write admin documentation (5-6 guides)
 3. Create developer documentation (API reference, deployment guide)
@@ -2211,6 +2339,7 @@ View full details in Mitable Console
 12. Get feedback from beta users and iterate
 
 **Acceptance Criteria:**
+
 - [ ] All employee guides written and reviewed
 - [ ] All admin guides written and reviewed
 - [ ] Developer documentation complete
@@ -2228,6 +2357,7 @@ View full details in Mitable Console
 - [ ] Documentation versioned with app releases
 
 **Testing Requirements:**
+
 - Peer review all documentation
 - User testing: Can new users complete tasks using guides?
 - Test all links and screenshots
@@ -2236,6 +2366,7 @@ View full details in Mitable Console
 - Ensure documentation matches current app version
 
 **Dependencies:**
+
 - All core features implemented
 - Beta testing underway or complete
 
@@ -2252,6 +2383,7 @@ View full details in Mitable Console
 **Beta Testing Plan:**
 
 **Objectives:**
+
 - Validate core use cases work end-to-end
 - Identify bugs and usability issues
 - Gather product feedback
@@ -2259,12 +2391,14 @@ View full details in Mitable Console
 - Test on various hardware/OS configurations
 
 **Beta Program Structure:**
+
 - **Duration:** 3-4 weeks
 - **Participants:** 15-25 users across 3-5 organizations
 - **Mix:** 80% employees, 20% admins
 - **Recruitment:** Outreach to early customers, personal network, beta signup form
 
 **Testing Phases:**
+
 1. **Week 1: Onboarding and First Impressions**
    - Goal: Test setup, first-time experience, learning curve
    - Tasks: Install app, connect integrations, complete first roadmap task, ask first question
@@ -2283,6 +2417,7 @@ View full details in Mitable Console
    - Metrics: NPS score, feature requests, bug reports
 
 **Data Collection:**
+
 - **Automated:** Analytics (usage, errors, performance)
 - **Surveys:** Weekly feedback surveys (SurveyMonkey, Typeform)
 - **Interviews:** 1-on-1 interviews with 5-10 users
@@ -2290,6 +2425,7 @@ View full details in Mitable Console
 - **Support Tickets:** Track questions and issues via email/Slack
 
 **Implementation Steps:**
+
 1. Create beta program landing page:
    - Explain program goals and timeline
    - Sign-up form
@@ -2347,11 +2483,12 @@ View full details in Mitable Console
     - Gather testimonials from happy beta users
 
 **Acceptance Criteria:**
+
 - [ ] 15+ users enrolled in beta program
 - [ ] All users successfully onboard and complete first task
-- [ ] >70% of users active daily during Week 2
-- [ ] >80% of critical bugs identified and fixed
-- [ ] >50 pieces of feedback collected (surveys, interviews, bug reports)
+- [ ] > 70% of users active daily during Week 2
+- [ ] > 80% of critical bugs identified and fixed
+- [ ] > 50 pieces of feedback collected (surveys, interviews, bug reports)
 - [ ] NPS score >40 (good) or >70 (excellent)
 - [ ] Retention rate: >60% D7, >40% D30
 - [ ] Feature satisfaction ratings >4/5 for core features
@@ -2364,6 +2501,7 @@ View full details in Mitable Console
 - [ ] Beta program documentation complete (for future betas)
 
 **Testing Requirements:**
+
 - Test on macOS (Intel and Apple Silicon)
 - Test on Windows 10 and 11
 - Test in small orgs (1-10 users) and medium orgs (10-50 users)
@@ -2372,6 +2510,7 @@ View full details in Mitable Console
 - Test in different use cases (technical onboarding, general onboarding, training)
 
 **Dependencies:**
+
 - All MVP features complete
 - Documentation complete (Task 6.1)
 - Deployment pipeline operational (Task 5.4)
@@ -2390,6 +2529,7 @@ View full details in Mitable Console
 **Marketing Assets:**
 
 **Website (landing page):**
+
 - Hero section with value proposition
 - Feature highlights (visual guidance, AI chat, expert matching)
 - Screenshots and demo video
@@ -2400,6 +2540,7 @@ View full details in Mitable Console
 - Blog (optional, for content marketing)
 
 **Demo Video:**
+
 - 2-3 minute product demo
 - Show key workflows:
   - New employee logs in
@@ -2412,6 +2553,7 @@ View full details in Mitable Console
 - Host on YouTube and embed on site
 
 **Launch Plan:**
+
 - **Launch Date:** TBD (post-beta)
 - **Channels:**
   - Product Hunt launch
@@ -2431,6 +2573,7 @@ View full details in Mitable Console
   - 50+ trial organizations
 
 **Implementation Steps:**
+
 1. Design landing page:
    - Hire designer or use template (Webflow, Framer)
    - Write copy emphasizing benefits (not features)
@@ -2486,6 +2629,7 @@ View full details in Mitable Console
     - Measure launch success against goals
 
 **Acceptance Criteria:**
+
 - [ ] Landing page live and optimized for conversions
 - [ ] Demo video published and embedded on site
 - [ ] 5+ beta testimonials collected and displayed
@@ -2503,6 +2647,7 @@ View full details in Mitable Console
 - [ ] SEO optimized (meta tags, Open Graph tags)
 
 **Testing Requirements:**
+
 - Test landing page on multiple devices and browsers
 - Test sign-up form submission
 - Proofread all content for errors
@@ -2511,6 +2656,7 @@ View full details in Mitable Console
 - Get feedback on copy and design from non-team members
 
 **Dependencies:**
+
 - Beta testing complete (Task 6.2)
 - Testimonials collected
 - Product stable and ready for public use
@@ -2522,6 +2668,7 @@ View full details in Mitable Console
 ## Summary: Path to 100% MVP
 
 ### Timeline Overview
+
 ```
 Week 1-2:  Phase 1 - Visual Guidance (CRITICAL PATH)
 Week 3-4:  Phase 2 - Knowledge Base
@@ -2532,6 +2679,7 @@ Week 8+:   Phase 6 - Documentation & Launch
 ```
 
 ### Total Estimated Effort
+
 - **Phase 1:** 18-22 days
 - **Phase 2:** 15-18 days
 - **Phase 3:** 15-18 days
@@ -2542,6 +2690,7 @@ Week 8+:   Phase 6 - Documentation & Launch
 **Total:** ~8-10 weeks with 1-2 developers working in parallel
 
 ### Critical Success Factors
+
 1. **Visual Guidance System:** Must work flawlessly - it's the core differentiator
 2. **Performance:** Fast response times critical for user satisfaction
 3. **Security:** Cannot launch without proper token encryption and security hardening
@@ -2549,6 +2698,7 @@ Week 8+:   Phase 6 - Documentation & Launch
 5. **Beta Feedback:** Validate product-market fit before public launch
 
 ### Risk Mitigation
+
 - **Gemini Vision API reliability:** Have fallback to text-only help if vision fails
 - **Performance at scale:** Load test early and often
 - **Complex dependencies:** Implement feature flags to deploy incrementally
@@ -2556,6 +2706,7 @@ Week 8+:   Phase 6 - Documentation & Launch
 - **Timeline slippage:** Build buffer into schedule, prioritize ruthlessly
 
 ### Definition of "Done" for MVP
+
 - [ ] All Phase 1-3 tasks complete (100%)
 - [ ] All Phase 4 tasks complete (>90%)
 - [ ] All Phase 5 tasks complete (>80%)

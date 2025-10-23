@@ -212,7 +212,9 @@ export class AgentService {
       const continuationSignal = continuationDetectorService.detectContinuation(
         userMessage,
         context.conversationHistory[context.conversationHistory.length - 1]?.content,
-        context.screenshot ? continuationDetectorService.hashScreenshot(context.screenshot) : undefined,
+        context.screenshot
+          ? continuationDetectorService.hashScreenshot(context.screenshot)
+          : undefined,
         undefined // TODO: Track previous screenshot hash in workflow state
       );
 
@@ -327,9 +329,10 @@ export class AgentService {
         // Determine tool choice strategy
         // If we're in workflow mode with a screenshot, FORCE the guide tool
         // Otherwise, let AI choose automatically
-        const toolChoice = shouldEnterWorkflow && context.screenshot
-          ? { type: "function" as const, function: { name: "show_step_by_step_guide" } }
-          : "auto";
+        const toolChoice =
+          shouldEnterWorkflow && context.screenshot
+            ? { type: "function" as const, function: { name: "show_step_by_step_guide" } }
+            : "auto";
 
         console.log("[AgentService] Tool choice strategy:", {
           strategy: shouldEnterWorkflow && context.screenshot ? "forced guide tool" : "auto",
@@ -368,7 +371,9 @@ export class AgentService {
               // Only process the first tool call (index 0)
               if (toolCall.index !== 0) {
                 if (toolCall?.function?.name) {
-                  console.log(`[AgentService] Ignoring additional tool call at index ${toolCall.index}: ${toolCall.function.name}`);
+                  console.log(
+                    `[AgentService] Ignoring additional tool call at index ${toolCall.index}: ${toolCall.function.name}`
+                  );
                 }
                 continue;
               }
@@ -421,8 +426,10 @@ export class AgentService {
             // Trim whitespace that might cause parsing issues
             const trimmedArgs = functionArgs.trim();
 
-            console.log(`[AgentService] Raw function args (length: ${trimmedArgs.length}):`,
-              trimmedArgs.substring(0, 200));
+            console.log(
+              `[AgentService] Raw function args (length: ${trimmedArgs.length}):`,
+              trimmedArgs.substring(0, 200)
+            );
 
             parsedArgs = JSON.parse(trimmedArgs);
           } catch (error) {
@@ -432,8 +439,8 @@ export class AgentService {
             // Try to extract just the first complete JSON object
             // This handles cases where OpenAI might be calling multiple tools
             // and we accidentally concatenated arguments
-            const firstBraceIndex = functionArgs.indexOf('{');
-            const lastBraceIndex = functionArgs.lastIndexOf('}');
+            const firstBraceIndex = functionArgs.indexOf("{");
+            const lastBraceIndex = functionArgs.lastIndexOf("}");
 
             if (firstBraceIndex !== -1 && lastBraceIndex !== -1) {
               const extracted = functionArgs.substring(firstBraceIndex, lastBraceIndex + 1);

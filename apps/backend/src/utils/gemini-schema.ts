@@ -25,11 +25,15 @@ export function toGeminiSchema(zodSchema: ZodType): Record<string, any> {
     $refStrategy: "none", // Gemini doesn't support $ref
   });
 
-  console.log("🔍 Full JSON Schema:", JSON.stringify(fullJsonSchema, null, 2));
+  if (process.env.NODE_ENV !== "test") {
+    console.log("🔍 Full JSON Schema:", JSON.stringify(fullJsonSchema, null, 2));
+  }
 
   const simplified = simplifyForGemini(fullJsonSchema);
 
-  console.log("✨ Simplified Gemini Schema:", JSON.stringify(simplified, null, 2));
+  if (process.env.NODE_ENV !== "test") {
+    console.log("✨ Simplified Gemini Schema:", JSON.stringify(simplified, null, 2));
+  }
 
   return simplified;
 }
@@ -53,11 +57,15 @@ function simplifyForGemini(schema: any): any {
     const hasNull = schema.anyOf.some((s: any) => s.type === "null");
 
     if (hasNull && nonNullSchemas.length === 1) {
-      console.log("🔄 Converting anyOf nullable:", JSON.stringify(schema.anyOf));
+      if (process.env.NODE_ENV !== "test") {
+        console.log("🔄 Converting anyOf nullable:", JSON.stringify(schema.anyOf));
+      }
       // Convert to Gemini's nullable format
       const baseSchema = simplifyForGemini(nonNullSchemas[0]);
       const result = { ...baseSchema, nullable: true };
-      console.log("  ✓ Converted to:", JSON.stringify(result));
+      if (process.env.NODE_ENV !== "test") {
+        console.log("  ✓ Converted to:", JSON.stringify(result));
+      }
       return result;
     }
   }
@@ -71,7 +79,9 @@ function simplifyForGemini(schema: any): any {
 
     // Handle type arrays like ["string", "null"] → convert to {type: "string", nullable: true}
     if (key === "type" && Array.isArray(value)) {
-      console.log("🔄 Converting type array:", JSON.stringify(value));
+      if (process.env.NODE_ENV !== "test") {
+        console.log("🔄 Converting type array:", JSON.stringify(value));
+      }
       const nonNullTypes = value.filter((t: string) => t !== "null");
       const hasNull = value.includes("null");
 
@@ -80,14 +90,18 @@ function simplifyForGemini(schema: any): any {
         if (hasNull) {
           simplified.nullable = true;
         }
-        console.log(`  ✓ Converted to: type="${simplified.type}", nullable=${hasNull}`);
+        if (process.env.NODE_ENV !== "test") {
+          console.log(`  ✓ Converted to: type="${simplified.type}", nullable=${hasNull}`);
+        }
       } else if (nonNullTypes.length > 1) {
         // Multiple non-null types - just use first one and mark as nullable if needed
         simplified.type = nonNullTypes[0];
         if (hasNull) {
           simplified.nullable = true;
         }
-        console.log(`  ✓ Converted to: type="${simplified.type}", nullable=${hasNull}`);
+        if (process.env.NODE_ENV !== "test") {
+          console.log(`  ✓ Converted to: type="${simplified.type}", nullable=${hasNull}`);
+        }
       }
       continue;
     }

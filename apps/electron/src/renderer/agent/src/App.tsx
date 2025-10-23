@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import AgentPill from "./components/AgentPill";
 import ConversationDialog from "./components/ConversationDialog";
 import { createConversation, sendMessageStream } from "./api/conversations";
+import type { ScreenshotResult } from "@mitable/shared";
 
 declare global {
   interface Window {
@@ -12,7 +13,7 @@ declare global {
       resizeWindow: (mode: "pill" | "conversation") => void;
       showNudge: (data: unknown) => void;
       startGuide: (data: unknown) => void;
-      captureScreenshot: () => Promise<string | null>;
+      captureScreenshot: () => Promise<ScreenshotResult | null>;
       getAuthToken: () => Promise<string | null>;
       onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
       onGuideNextStep: (callback: () => void) => void;
@@ -48,7 +49,8 @@ function App() {
       // Send "Next" message to continue workflow
       handleSubmit("Next");
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Note: Empty deps array is intentional - we only want to set up the listener once
+  }, []);
 
   const handleCardClick = (message: Message) => {
     if (!message.windowTrigger) {
@@ -128,11 +130,14 @@ function App() {
     console.log("[Agent] Attempting to capture screenshot for workflow...");
     let screenshot: string | null = null;
     try {
-      screenshot = await window.agentAPI.captureScreenshot();
+      const result = await window.agentAPI.captureScreenshot();
       console.log("[Agent] Screenshot capture result:", {
-        hasScreenshot: !!screenshot,
-        size: screenshot?.length || 0,
+        hasScreenshot: !!result,
+        size: result?.dataUrl?.length || 0,
+        metadata: result?.metadata,
       });
+      // Extract data URL from result
+      screenshot = result?.dataUrl || null;
     } catch (error) {
       console.error("[Agent] Screenshot capture failed:", error);
       // Continue without screenshot - backend will handle gracefully
@@ -208,9 +213,7 @@ function App() {
             // and will be accessible when user clicks the card via handleCardClick
           } else if (windowType === "guide") {
             // Don't auto-launch guide window - let user click "Start Guide" card
-            console.log(
-              "Guide data ready. User can click 'Start Guide' card to launch guide."
-            );
+            console.log("Guide data ready. User can click 'Start Guide' card to launch guide.");
             // The windowTrigger data (including guide) is already stored in the message
             // and will be accessible when user clicks the card via handleCardClick
           }
