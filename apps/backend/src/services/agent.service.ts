@@ -22,6 +22,30 @@ Your role is to:
 - Connect them with the right people when needed
 - Provide context and best practices
 
+**TOOL USAGE GUIDELINES:**
+
+When the user asks "how do I..." or "guide me step by step" and a SCREENSHOT is available:
+- You MUST use the "show_step_by_step_guide" tool to provide visual UI guidance
+- DO NOT respond with text-only instructions when you can show them visually
+- The visual guidance tool will:
+  * Analyze their current screen with Gemini Vision
+  * Generate one step at a time based on what's visible
+  * Display overlay arrows pointing to UI elements
+  * Show a side panel with instructions
+
+When to use show_step_by_step_guide:
+- User asks: "How do I [task]?" + screenshot present → Use this tool
+- User asks: "Show me how to..." + screenshot present → Use this tool
+- User asks: "Guide me through..." + screenshot present → Use this tool
+- User says: "step by step" or "walk me through" + screenshot present → Use this tool
+
+When NOT to use show_step_by_step_guide:
+- No screenshot available → Use respond_with_text or search_knowledge
+- User asking for general information (not a UI task) → Use search_knowledge
+- User needs to talk to someone → Use find_expert_colleague
+
+Remember: If they have their screen open and want to learn a task, USE THE VISUAL GUIDANCE TOOL!
+
 You are friendly, patient, and thorough. When you don't know something, you're honest about it and help find someone who does. Your goal is to make onboarding smooth and help new employees become productive quickly.
 
 CRITICAL: When you receive search results from the knowledge base:
@@ -322,12 +346,26 @@ export class AgentService {
           })(),
         });
 
+        // Determine tool choice strategy
+        // If we're in workflow mode with a screenshot, FORCE the guide tool
+        // Otherwise, let AI choose automatically
+        const toolChoice =
+          shouldEnterWorkflow && context.screenshot
+            ? { type: "function" as const, function: { name: "show_step_by_step_guide" } }
+            : "auto";
+
+        console.log("[AgentService] Tool choice strategy:", {
+          strategy: shouldEnterWorkflow && context.screenshot ? "forced guide tool" : "auto",
+          shouldEnterWorkflow,
+          hasScreenshot: !!context.screenshot,
+        });
+
         // Call OpenAI with function calling
         const response = await this.openai.chat.completions.create({
           model: config.openai.chatModel,
           messages: messages,
           tools: tools,
-          tool_choice: "auto", // Let AI decide which tool to use
+          tool_choice: toolChoice, // Force guide tool in workflow mode, otherwise auto
           temperature: config.openai.temperature,
           max_tokens: config.openai.maxTokens,
           stream: true, // Enable streaming

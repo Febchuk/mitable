@@ -9,6 +9,7 @@ import {
 } from "electron";
 import { join } from "path";
 import { IPC_CHANNELS } from "@mitable/shared";
+import { captureService, CaptureOptions, CaptureResult } from "./services/captureService";
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
@@ -302,6 +303,14 @@ function setupIPC() {
     }
   });
 
+  // Guide next step - forward to Agent window to trigger screenshot + "Next" message
+  ipcMain.on(IPC_CHANNELS.GUIDE_NEXT_STEP, () => {
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      console.log("[Main] Guide next step requested - forwarding to Agent window");
+      agentWindow.webContents.send(IPC_CHANNELS.AGENT_GUIDE_NEXT_STEP);
+    }
+  });
+
   // Nudge system
   ipcMain.on(IPC_CHANNELS.NUDGE_SHOW, (_event, data) => {
     if (nudgeWindow && !nudgeWindow.isDestroyed()) {
@@ -423,47 +432,42 @@ function setupIPC() {
     });
   });
 
-  // Screenshot Capture
-  ipcMain.handle(IPC_CHANNELS.CAPTURE_SCREENSHOT, async () => {
-    console.log("[Screenshot] IPC handler called - capture requested");
+  // Screenshot Capture - using enhanced CaptureService
+  ipcMain.handle(
+    IPC_CHANNELS.CAPTURE_SCREENSHOT,
+    async (
+      _event,
+      options?: CaptureOptions
+    ): Promise<Pick<CaptureResult, "dataUrl" | "metadata"> | null> => {
+      console.log("[Screenshot] IPC handler called - capture requested", options);
 
-    try {
-      // Get all displays for multi-monitor support
-      const displays = screen.getAllDisplays();
-      console.log(`[Screenshot] Found ${displays.length} display(s)`);
+      try {
+        // Use CaptureService for enhanced capture with all features
+        const result = await captureService.capture(options || { mode: "full-screen" });
 
-      // Get primary display
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const { width, height } = primaryDisplay.size;
+        if (!result) {
+          console.error("[Screenshot] Capture failed - no result returned");
+          return null;
+        }
 
-      console.log(`[Screenshot] Primary display size: ${width}x${height}`);
+        console.log("[Screenshot] Capture successful:", {
+          mode: result.metadata.captureMode,
+          width: result.metadata.width,
+          height: result.metadata.height,
+          hasFile: !!result.filePath,
+        });
 
-      // Capture screenshot using desktopCapturer
-      const sources = await desktopCapturer.getSources({
-        types: ["screen"],
-        thumbnailSize: {
-          width: width * primaryDisplay.scaleFactor,
-          height: height * primaryDisplay.scaleFactor,
-        },
-      });
-
-      if (sources.length === 0) {
-        console.error("[Screenshot] No screen sources found");
+        // Return both data URL and metadata (omit filePath for security)
+        return {
+          dataUrl: result.dataUrl,
+          metadata: result.metadata,
+        };
+      } catch (error) {
+        console.error("[Screenshot] Capture failed with error:", error);
         return null;
       }
-
-      // Use the first screen source (primary display)
-      const screenshot = sources[0].thumbnail;
-      const base64Data = screenshot.toDataURL();
-
-      console.log(`[Screenshot] Captured successfully. Size: ${base64Data.length} bytes`);
-
-      return base64Data;
-    } catch (error) {
-      console.error("[Screenshot] Capture failed:", error);
-      return null;
     }
-  });
+  );
 
   console.log("[IPC] Screenshot capture handler registered successfully");
 }

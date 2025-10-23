@@ -6,6 +6,8 @@ export const IPC_CHANNELS = {
   HELP_RESPONSE: "help-response",
   CAPTURE_SCREENSHOT: "capture-screenshot",
   SCREENSHOT_CAPTURED: "screenshot-captured",
+  CAPTURE_FEEDBACK: "capture-feedback", // Visual/audio feedback on capture success/failure
+  CAPTURE_CANCEL: "capture-cancel", // Cancel ongoing capture operation
 
   // Guide system
   GUIDE_START: "guide-start",
@@ -38,6 +40,7 @@ export const IPC_CHANNELS = {
   AGENT_TOGGLE: "agent-toggle",
   AGENT_SHOW_CONSOLE: "agent-show-console",
   AGENT_RESIZE: "agent-resize",
+  AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step", // Triggered when Guide "Done" button clicked
 
   // Conversation management
   CONVERSATION_NEW: "conversation-new",
