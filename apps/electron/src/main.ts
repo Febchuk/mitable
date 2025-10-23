@@ -272,6 +272,14 @@ function setupIPC() {
     }
   });
 
+  // Guide next step - forward to Agent window to trigger screenshot + "Next" message
+  ipcMain.on(IPC_CHANNELS.GUIDE_NEXT_STEP, () => {
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      console.log("[Main] Guide next step requested - forwarding to Agent window");
+      agentWindow.webContents.send(IPC_CHANNELS.AGENT_GUIDE_NEXT_STEP);
+    }
+  });
+
   // Nudge system
   ipcMain.on(IPC_CHANNELS.NUDGE_SHOW, (_event, data) => {
     if (nudgeWindow && !nudgeWindow.isDestroyed()) {

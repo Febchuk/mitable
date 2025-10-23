@@ -6,6 +6,7 @@ const IPC_CHANNELS = {
   AGENT_SHOW_CONSOLE: "agent-show-console",
   SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
   AGENT_RESIZE: "agent-resize",
+  AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step",
   NUDGE_SHOW: "nudge-show",
   GUIDE_START: "guide-start",
   CAPTURE_SCREENSHOT: "capture-screenshot",
@@ -35,5 +36,10 @@ contextBridge.exposeInMainWorld("agentAPI", {
     ipcRenderer.on(IPC_CHANNELS.AUTH_TOKEN_UPDATED, (_event, token: string | null) =>
       callback(token)
     );
+  },
+
+  // Guide next step - triggered when Guide "Done" button clicked
+  onGuideNextStep: (callback: () => void) => {
+    ipcRenderer.on(IPC_CHANNELS.AGENT_GUIDE_NEXT_STEP, () => callback());
   },
 });

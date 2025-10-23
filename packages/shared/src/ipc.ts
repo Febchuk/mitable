@@ -38,6 +38,7 @@ export const IPC_CHANNELS = {
   AGENT_TOGGLE: "agent-toggle",
   AGENT_SHOW_CONSOLE: "agent-show-console",
   AGENT_RESIZE: "agent-resize",
+  AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step", // Triggered when Guide "Done" button clicked
 
   // Conversation management
   CONVERSATION_NEW: "conversation-new",

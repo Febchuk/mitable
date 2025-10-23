@@ -194,24 +194,37 @@ function App() {
           )}
         </div>
 
-        {/* Footer - Progress Indicator */}
+        {/* Footer - Progress Indicator + Done Button */}
         {stepHistory.length > 0 && (
-          <div className="flex-shrink-0 text-center">
-            <p className="text-text-tertiary text-xs">
-              {completedSteps.length > 0 && (
-                <span className="text-green-500 font-medium">
-                  {completedSteps.length} completed
-                </span>
-              )}
-              {completedSteps.length > 0 && !currentStep?.completed && (
-                <span className="text-text-tertiary"> • </span>
-              )}
-              {!currentStep?.completed && (
-                <span className="text-text-secondary">
-                  Step {currentStep?.stepNumber || stepHistory.length}
-                </span>
-              )}
-            </p>
+          <div className="flex-shrink-0 space-y-3">
+            {/* Progress Text */}
+            <div className="text-center">
+              <p className="text-text-tertiary text-xs">
+                {completedSteps.length > 0 && (
+                  <span className="text-green-500 font-medium">
+                    {completedSteps.length} completed
+                  </span>
+                )}
+                {completedSteps.length > 0 && !currentStep?.completed && (
+                  <span className="text-text-tertiary"> • </span>
+                )}
+                {!currentStep?.completed && (
+                  <span className="text-text-secondary">
+                    Step {currentStep?.stepNumber || stepHistory.length}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {/* Done Button - Only show when current step is active */}
+            {currentStep && !currentStep.completed && (
+              <button
+                onClick={() => window.guideAPI?.nextStep()}
+                className="w-full bg-primary hover:bg-primary-hover text-white font-medium py-3 px-6 rounded-lg transition-colors"
+              >
+                Done - Next Step
+              </button>
+            )}
           </div>
         )}
       </div>
