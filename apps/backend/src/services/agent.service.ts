@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config";
 import type { Message } from "../db/schema/conversations.schema";
 import { BaseTool, ToolContext, StreamChunk, ToolDefinition } from "../tools/base.tool";
@@ -135,6 +136,7 @@ When responding:
  */
 export class AgentService {
   private openai: OpenAI;
+  private gemini: GoogleGenerativeAI;
   private tools: Map<string, BaseTool> = new Map();
 
   constructor() {
@@ -142,6 +144,9 @@ export class AgentService {
     this.openai = new OpenAI({
       apiKey: config.openai.apiKey,
     });
+
+    // Initialize Gemini client (for cost-effective text generation)
+    this.gemini = new GoogleGenerativeAI(config.gemini.apiKey);
 
     // Register Phase 1 tools
     this.registerTool(new RespondTextTool());
@@ -587,6 +592,7 @@ export class AgentService {
   /**
    * Generate nudge context from conversation messages
    * Analyzes the conversation and creates a concise summary for the expert
+   * Uses Gemini 2.5 Flash Lite for cost-effective text generation
    */
   async generateNudgeContext(messages: Message[]): Promise<string> {
     try {
@@ -610,14 +616,15 @@ ${conversationText}
 
 Context summary:`;
 
-      const response = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 500,
+      // Use Gemini for cost-effective text generation
+      const model = this.gemini.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
       });
 
-      return response.choices[0].message.content?.trim() || "Unable to generate context.";
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+
+      return text.trim() || "Unable to generate context.";
     } catch (error) {
       console.error("[AgentService] Error generating nudge context:", error);
       throw new Error("Failed to generate context from conversation");
@@ -627,6 +634,7 @@ Context summary:`;
   /**
    * Generate specific question from conversation
    * Extracts or formulates the main question the user needs answered
+   * Uses Gemini 2.5 Flash Lite for cost-effective text generation
    */
   async generateNudgeQuestion(messages: Message[]): Promise<string> {
     try {
@@ -648,14 +656,15 @@ ${conversationText}
 
 Specific question:`;
 
-      const response = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 150,
+      // Use Gemini for cost-effective text generation
+      const model = this.gemini.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
       });
 
-      return response.choices[0].message.content?.trim() || "How can I help with this?";
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+
+      return text.trim() || "How can I help with this?";
     } catch (error) {
       console.error("[AgentService] Error generating nudge question:", error);
       throw new Error("Failed to generate question from conversation");
