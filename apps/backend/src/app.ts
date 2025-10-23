@@ -8,7 +8,7 @@ export const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Increased limit for screenshot uploads (~2MB base64)
+app.use(express.json({ limit: "10mb" })); // Increased limit for screenshot uploads (~2MB base64)
 
 // Swagger API Documentation
 app.use(

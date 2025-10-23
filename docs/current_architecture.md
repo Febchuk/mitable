@@ -166,6 +166,7 @@ This document represents the **actual current state** of the Mitable implementat
 All 5 windows from the planned architecture are fully implemented in `/apps/electron/src/main.ts`:
 
 #### Agent Window
+
 - **Dimensions:** 740x80px (collapsed), 740x696px (expanded)
 - **Position:** Bottom center of screen
 - **Behavior:**
@@ -176,6 +177,7 @@ All 5 windows from the planned architecture are fully implemented in `/apps/elec
   - Persists across fullscreen apps (macOS: `visibleOnAllWorkspaces`)
 
 #### Console Window
+
 - **Dimensions:** 1264x888px
 - **Behavior:**
   - Main application hub
@@ -184,6 +186,7 @@ All 5 windows from the planned architecture are fully implemented in `/apps/elec
   - Three main tabs: Roadmap ✓, Chats ✓, Nudges ✓
 
 #### Overlay Window
+
 - **Dimensions:** Fullscreen (primary display)
 - **Behavior:**
   - Transparent, non-focusable
@@ -192,6 +195,7 @@ All 5 windows from the planned architecture are fully implemented in `/apps/elec
   - **Status:** Window implemented, but visual rendering (arrows/highlights) NOT implemented
 
 #### Guide Window
+
 - **Dimensions:** 400x600px
 - **Position:** Left side, vertically centered
 - **Behavior:**
@@ -201,6 +205,7 @@ All 5 windows from the planned architecture are fully implemented in `/apps/elec
   - Step-by-step guidance display
 
 #### Nudge Window
+
 - **Dimensions:** 400x600px
 - **Position:** Right of Agent window with 16px gap
 - **Behavior:**
@@ -216,12 +221,14 @@ All 5 windows from the planned architecture are fully implemented in `/apps/elec
 All channels are defined and operational:
 
 **Help System:**
+
 - `HELP_REQUEST` - User requests help
 - `HELP_RESPONSE` - AI provides help response
 - `CAPTURE_SCREENSHOT` - Trigger screenshot capture (NOT IMPLEMENTED)
 - `SCREENSHOT_CAPTURED` - Screenshot data returned (NOT IMPLEMENTED)
 
 **Guide System:**
+
 - `GUIDE_START` - Begin guided walkthrough
 - `GUIDE_NEXT_STEP` - Proceed to next step
 - `GUIDE_STEP_UPDATE` - Update current step status
@@ -230,11 +237,13 @@ All channels are defined and operational:
 - `GUIDE_DATA` - Guide configuration data
 
 **Overlay:**
+
 - `OVERLAY_SHOW` - Display overlay
 - `OVERLAY_HIDE` - Hide overlay
 - `OVERLAY_HIGHLIGHT_UPDATE` - Update visual highlights (NOT RENDERED)
 
 **Nudge:**
+
 - `NUDGE_SHOW` - Display nudge window
 - `NUDGE_HIDE` - Hide nudge window
 - `NUDGE_ACCEPT` - User accepts nudge recommendation
@@ -243,23 +252,27 @@ All channels are defined and operational:
 - `NUDGE_OPEN_CREATOR` - Open nudge creation UI
 
 **Window Management:**
+
 - `WINDOW_SHOW` - Show specific window
 - `WINDOW_HIDE` - Hide specific window
 - `WINDOW_TOGGLE` - Toggle window visibility
 - `SET_IGNORE_MOUSE_EVENTS` - Control click-through behavior
 
 **Agent:**
+
 - `AGENT_TOGGLE` - Toggle agent window visibility
 - `AGENT_SHOW_CONSOLE` - Open console from agent
 - `AGENT_RESIZE` - Resize agent window (collapse/expand)
 
 **Authentication:**
+
 - `AUTH_SET_TOKENS` - Store auth tokens
 - `AUTH_GET_TOKEN` - Retrieve auth token
 - `AUTH_CLEAR` - Clear auth state
 - `AUTH_TOKEN_UPDATED` - Token refresh notification
 
 **Conversation:**
+
 - `CONVERSATION_NEW` - Create new conversation
 - `CONVERSATION_LOAD` - Load existing conversation
 - `CONVERSATION_UPDATE` - Update conversation state
@@ -269,10 +282,12 @@ All channels are defined and operational:
 **Base URL:** `http://localhost:3000`
 
 #### Authentication (`/auth`)
+
 - `POST /auth/login` - Email/password login via Supabase
 - `POST /auth/signup` - New user registration
 
 #### Conversations (`/conversations`)
+
 - `GET /conversations` - List all conversations with messages
 - `GET /conversations/:conversationId/messages` - Get specific conversation
 - `POST /conversations` - Create new conversation
@@ -280,6 +295,7 @@ All channels are defined and operational:
 - `POST /conversations/:conversationId/messages/stream` - Stream AI response (SSE)
 
 #### Nudges (`/nudges`)
+
 - `GET /nudges` - Get all nudges with expert information
 - `POST /nudges/create` - Create nudge(s) with resources
 - `POST /nudges/:nudgeId/accept` - Accept nudge recommendation
@@ -291,16 +307,19 @@ All channels are defined and operational:
 - `GET /users/search` - Search users in organization
 
 #### Admin - People Management (`/admin`)
+
 - `GET /admin/users` - List all employees with progress metrics
 - `GET /admin/users/:id` - Detailed user profile with analytics
 - `POST /admin/users` - Create employee (Supabase Auth + DB + template assignment)
 
 #### Admin - Template Management (`/admin`)
+
 - `GET /admin/templates` - List all templates with usage statistics
 - `GET /admin/templates/:id` - Template details with tasks organized by week
 - `POST /admin/templates` - Create template (supports Notion URL import)
 
 #### Admin - Integration Management (`/admin`)
+
 - `GET /admin/integrations` - List all integrations with status
 - `POST /admin/integrations/:id/connect` - Activate integration
 - `POST /admin/integrations/:id/disconnect` - Deactivate integration
@@ -308,6 +327,7 @@ All channels are defined and operational:
 - `PATCH /admin/integrations/:id` - Update integration settings
 
 #### Integrations (`/integrations`)
+
 - `POST /integrations/slack/oauth/start` - Initiate Slack OAuth flow
 - `POST /integrations/notion/oauth/start` - Initiate Notion OAuth flow
 - Additional OAuth callbacks for GitHub, Google Drive (scaffolded)
@@ -317,6 +337,7 @@ All channels are defined and operational:
 **Location:** `/apps/backend/src/services/`
 
 #### agent.service.ts ✓
+
 - **Purpose:** Core AI orchestrator with OpenAI function calling
 - **Features:**
   - Tool registration and execution framework
@@ -325,6 +346,7 @@ All channels are defined and operational:
   - Agentic responses with multiple tool calls
 
 #### llm.service.ts ✓
+
 - **Purpose:** Google Gemini integration for multimodal AI
 - **Features:**
   - Task extraction from Notion pages
@@ -332,6 +354,7 @@ All channels are defined and operational:
   - Structured output generation
 
 #### embedding.service.ts ✓
+
 - **Purpose:** Vector embeddings via OpenAI
 - **Model:** text-embedding-3-large (1536 dimensions)
 - **Features:**
@@ -339,6 +362,7 @@ All channels are defined and operational:
   - Batch embedding support
 
 #### vector.service.ts ✓
+
 - **Purpose:** Pinecone vector search
 - **Index:** `mitable-embeddings`
 - **Features:**
@@ -347,6 +371,7 @@ All channels are defined and operational:
   - Configurable top-k results
 
 #### notion.service.ts ✓
+
 - **Purpose:** Notion OAuth + API integration
 - **Features:**
   - OAuth token management with refresh
@@ -356,6 +381,7 @@ All channels are defined and operational:
   - Image/file attachment handling
 
 #### slack.service.ts ✓
+
 - **Purpose:** Slack API integration
 - **Features:**
   - Channel list retrieval
@@ -365,6 +391,7 @@ All channels are defined and operational:
   - **Missing:** Nudge delivery mechanism
 
 #### expertMatching.service.ts ✓
+
 - **Purpose:** Expert recommendation algorithm
 - **Algorithm Weights:**
   - Expertise similarity: 40% (cosine similarity of embeddings)
@@ -375,6 +402,7 @@ All channels are defined and operational:
   - Ranked expert list generation
 
 #### guideGeneration.service.ts ✓
+
 - **Purpose:** Visual guidance generation
 - **Features:**
   - Step-by-step instruction generation
@@ -382,6 +410,7 @@ All channels are defined and operational:
   - Integration with overlay system
 
 #### ingestion.service.ts ~
+
 - **Purpose:** Knowledge base document ingestion
 - **Status:** Partially implemented
 - **Features:**
@@ -397,6 +426,7 @@ All channels are defined and operational:
 **Location:** `/apps/backend/src/db/schema/`
 
 #### Core Entities
+
 1. **organizations** - Multi-tenant support with name, domain, settings
 2. **users** - Employee profiles with:
    - role (admin/employee)
@@ -406,6 +436,7 @@ All channels are defined and operational:
    - organizationId (FK)
 
 #### Onboarding - Admin Templates
+
 3. **roadmap_templates** - Reusable onboarding templates with:
    - name, description
    - icon, color (UI customization)
@@ -433,6 +464,7 @@ All channels are defined and operational:
    - organizationId (FK)
 
 #### Onboarding - User Roadmaps
+
 7. **user_template_assignments** - Template-to-user assignments:
    - userId (FK)
    - templateId (FK)
@@ -448,6 +480,7 @@ All channels are defined and operational:
    - notes (user annotations)
 
 #### Help System
+
 9. **conversations** - Chat history:
    - title
    - userId (FK)
@@ -462,6 +495,7 @@ All channels are defined and operational:
     - sources (JSON array - citation links)
 
 #### Expert Matching
+
 11. **expert_profiles** - Expert metadata:
     - userId (FK)
     - bio
@@ -502,6 +536,7 @@ All channels are defined and operational:
     - title
 
 #### Integrations
+
 16. **integrations** - OAuth connections:
     - organizationId (FK)
     - type (slack/notion/github/google_drive)
@@ -518,6 +553,7 @@ All channels are defined and operational:
     - errorMessage
 
 #### Analytics
+
 18. **analytics_events** - Event tracking:
     - userId (FK)
     - eventType (page_view/task_completed/help_requested/etc.)
@@ -529,6 +565,7 @@ All channels are defined and operational:
 **Location:** `/apps/electron/src/renderer/console/src/components/`
 
 #### Admin Views
+
 - **SetupView** ✓ - Initial organization configuration wizard
 - **DashboardView** ✓ - Admin dashboard with MetricCard components
 - **PeopleView** ✓ - Employee management with:
@@ -546,6 +583,7 @@ All channels are defined and operational:
   - OAuth flow handling
 
 #### Employee Views
+
 - **HomeView** ✓ - Employee home dashboard
 - **RoadmapView** ✓ - Task roadmap with:
   - Week-by-week task view
@@ -564,6 +602,7 @@ All channels are defined and operational:
   - ResourceUploader for file attachments
 
 #### Shared Infrastructure
+
 - **Layout:** ConsoleLayout, Sidebar with NavItem, Logo
 - **Context Providers:** UserContext, AdminContext, SidebarContext
 - **React Query Hooks:** Custom hooks for all major operations:
@@ -586,6 +625,7 @@ All channels are defined and operational:
 ### 7. External Integrations
 
 #### OpenAI ✓
+
 - **Service:** Embeddings + Function Calling
 - **Model:** text-embedding-3-large (1536 dimensions)
 - **Features:**
@@ -594,6 +634,7 @@ All channels are defined and operational:
   - Fully operational
 
 #### Google Gemini ~
+
 - **Service:** Multimodal AI (Vision + Text)
 - **Features:**
   - ✓ Task extraction from Notion pages
@@ -602,6 +643,7 @@ All channels are defined and operational:
   - ✗ Screenshot analysis (NOT IMPLEMENTED)
 
 #### Pinecone ~
+
 - **Service:** Vector database
 - **Index:** `mitable-embeddings` (1536 dimensions)
 - **Features:**
@@ -611,6 +653,7 @@ All channels are defined and operational:
   - ? Actual vector data status unclear
 
 #### Slack ✓
+
 - **Service:** Team collaboration
 - **Features:**
   - ✓ OAuth flow complete
@@ -620,6 +663,7 @@ All channels are defined and operational:
   - ⚠️ Tokens stored plaintext (TODO: encrypt)
 
 #### Notion ✓
+
 - **Service:** Documentation import
 - **Features:**
   - ✓ OAuth flow complete
@@ -629,6 +673,7 @@ All channels are defined and operational:
   - ⚠️ Tokens stored plaintext (TODO: encrypt)
 
 #### Supabase ✓
+
 - **Service:** PostgreSQL database + Authentication
 - **Features:**
   - ✓ User authentication (email/password)
@@ -737,6 +782,7 @@ All channels are defined and operational:
 **Status:** Architecture exists, implementation missing
 
 **Missing Components:**
+
 - Screenshot capture mechanism
   - `CAPTURE_SCREENSHOT` IPC channel defined but no handler
   - No native screen capture integration
@@ -760,6 +806,7 @@ All channels are defined and operational:
 **Status:** OAuth flows complete, sync workers missing
 
 **Missing Components:**
+
 - Background worker infrastructure
   - No cron jobs or scheduled tasks
   - No queue system for sync jobs
@@ -780,6 +827,7 @@ All channels are defined and operational:
 ### 3. Security Hardening (HIGH PRIORITY - BLOCKER FOR PRODUCTION)
 
 **Critical Issues:**
+
 - OAuth tokens stored in plaintext in database
   - `integrations.accessToken` and `refreshToken` unencrypted
   - TODO comments in code acknowledge this risk
@@ -800,6 +848,7 @@ All channels are defined and operational:
 **Status:** Individual services work, full pipeline not integrated
 
 **Missing Components:**
+
 - Hybrid search integration
   - Pinecone client exists
   - PostgreSQL full-text search exists
@@ -820,6 +869,7 @@ All channels are defined and operational:
 ### 5. Error Handling & Resilience (LOW PRIORITY)
 
 **Missing Components:**
+
 - API error handling inconsistent across routes
 - No retry logic for external API calls
 - No circuit breakers for failing services
@@ -831,26 +881,26 @@ All channels are defined and operational:
 
 ## Implementation Completeness by Subsystem
 
-| Subsystem | Completion | Notes |
-|-----------|-----------|-------|
-| **Electron Windows** | 100% | All 5 windows functional |
-| **IPC Channels** | 100% | 28 channels defined, most operational |
-| **Backend API Routes** | 95% | 40+ endpoints, minor error handling gaps |
-| **Backend Services** | 75% | Core services done, pipeline integration gaps |
-| **Database Schema** | 100% | 18 tables with relations |
-| **Frontend Components** | 90% | All major views, polish needed |
-| **Authentication** | 100% | Supabase Auth fully integrated |
-| **Onboarding System** | 95% | Templates & roadmaps operational |
-| **Conversation System** | 100% | Chat with streaming responses |
-| **Nudge System** | 85% | Creation/display works, delivery missing |
-| **Expert Matching** | 100% | Algorithm operational |
-| **Visual Guidance** | 15% | Window exists, rendering missing |
-| **Screenshot Capture** | 0% | Not implemented |
-| **UI Detection (Vision)** | 10% | API configured, service missing |
-| **Notion Integration** | 95% | OAuth + import fully working |
-| **Slack Integration** | 60% | OAuth + fetch working, sync/delivery missing |
-| **Vector Search** | 50% | Client ready, ingestion incomplete |
-| **Security** | 40% | Auth works, encryption missing |
+| Subsystem                 | Completion | Notes                                         |
+| ------------------------- | ---------- | --------------------------------------------- |
+| **Electron Windows**      | 100%       | All 5 windows functional                      |
+| **IPC Channels**          | 100%       | 28 channels defined, most operational         |
+| **Backend API Routes**    | 95%        | 40+ endpoints, minor error handling gaps      |
+| **Backend Services**      | 75%        | Core services done, pipeline integration gaps |
+| **Database Schema**       | 100%       | 18 tables with relations                      |
+| **Frontend Components**   | 90%        | All major views, polish needed                |
+| **Authentication**        | 100%       | Supabase Auth fully integrated                |
+| **Onboarding System**     | 95%        | Templates & roadmaps operational              |
+| **Conversation System**   | 100%       | Chat with streaming responses                 |
+| **Nudge System**          | 85%        | Creation/display works, delivery missing      |
+| **Expert Matching**       | 100%       | Algorithm operational                         |
+| **Visual Guidance**       | 15%        | Window exists, rendering missing              |
+| **Screenshot Capture**    | 0%         | Not implemented                               |
+| **UI Detection (Vision)** | 10%        | API configured, service missing               |
+| **Notion Integration**    | 95%        | OAuth + import fully working                  |
+| **Slack Integration**     | 60%        | OAuth + fetch working, sync/delivery missing  |
+| **Vector Search**         | 50%        | Client ready, ingestion incomplete            |
+| **Security**              | 40%        | Auth works, encryption missing                |
 
 **Overall: ~65-70% Complete**
 
@@ -945,24 +995,28 @@ All channels are defined and operational:
 ## Next Steps (Recommended Priority Order)
 
 ### Phase 1: Core Value Proposition (Weeks 1-2)
+
 1. Implement screenshot capture (Electron native APIs)
 2. Integrate Gemini Vision for UI object detection
 3. Build overlay rendering (Canvas/SVG arrows and highlights)
 4. Test end-to-end help flow: Cmd+H → screenshot → detection → overlay
 
 ### Phase 2: Knowledge Base (Weeks 3-4)
+
 5. Complete ingestion pipeline (document → chunks → embeddings → Pinecone)
 6. Implement hybrid search (semantic + keyword)
 7. Integrate search results into AI responses
 8. Test knowledge base quality with real documents
 
 ### Phase 3: Security & Production Readiness (Week 5)
+
 9. Implement AES-256 encryption for OAuth tokens
 10. Add automatic token refresh logic
 11. Implement comprehensive error handling
 12. Add logging and monitoring
 
 ### Phase 4: Real-time Integrations (Week 6)
+
 13. Build background worker infrastructure
 14. Implement Slack/Notion auto-sync
 15. Add Slack nudge delivery
@@ -973,24 +1027,28 @@ All channels are defined and operational:
 ## File Locations Reference
 
 ### Electron Application
+
 - Main process: `/apps/electron/src/main.ts`
 - Preload scripts: `/apps/electron/src/preload/*.ts` (output: `.cjs`)
 - Renderers: `/apps/electron/src/renderer/*/src/`
 - Config: `/apps/electron/electron.vite.config.ts`
 
 ### Backend API
+
 - Entry point: `/apps/backend/src/index.ts`
 - Routes: `/apps/backend/src/routes.ts`
 - Services: `/apps/backend/src/services/*.ts`
 - Database schema: `/apps/backend/src/db/schema/*.ts`
 
 ### Shared Package
+
 - IPC channels: `/packages/shared/src/ipc.ts`
 - Types: `/packages/shared/src/types.ts`
 - Guides: `/packages/shared/src/guides.ts`
 - Nudges: `/packages/shared/src/nudges.ts`
 
 ### Documentation
+
 - Complete PRD: `/docs/mitable_complete_prd.md`
 - Architecture scaffold: `/docs/Electron_Express_monorepo_UPDATED.md`
 - Project instructions: `/CLAUDE.md`

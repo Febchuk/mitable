@@ -55,7 +55,9 @@ class WorkflowService {
     title: string,
     firstStep: Omit<WorkflowStep, "completed" | "timestamp">
   ): Promise<WorkflowState> {
-    console.log(`[WorkflowService] Starting workflow: "${title}" in conversation ${conversationId}`);
+    console.log(
+      `[WorkflowService] Starting workflow: "${title}" in conversation ${conversationId}`
+    );
 
     const workflowState: WorkflowState = {
       active: true,

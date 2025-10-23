@@ -793,7 +793,8 @@ router.get("/templates/:id", requireAuth, async (req: Request, res: Response): P
           );
 
         const totalTasks = tasks.length;
-        const progress = totalTasks > 0 ? Math.round((Number(completedCount?.count || 0) / totalTasks) * 100) : 0;
+        const progress =
+          totalTasks > 0 ? Math.round((Number(completedCount?.count || 0) / totalTasks) * 100) : 0;
 
         return {
           id: user.id,

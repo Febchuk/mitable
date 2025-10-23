@@ -23,9 +23,9 @@ export function useSendMessage(options?: SendMessageOptions) {
         chatId,
         contentLength: content.length,
         captureScreenshotOption: options?.captureScreenshot,
-        hasWindow: typeof window !== 'undefined',
-        hasConsoleAPI: typeof window !== 'undefined' && !!window.consoleAPI,
-        hasCaptureMethod: typeof window !== 'undefined' && !!window.consoleAPI?.captureScreenshot,
+        hasWindow: typeof window !== "undefined",
+        hasConsoleAPI: typeof window !== "undefined" && !!window.consoleAPI,
+        hasCaptureMethod: typeof window !== "undefined" && !!window.consoleAPI?.captureScreenshot,
       });
 
       if (!token) {
@@ -55,7 +55,9 @@ export function useSendMessage(options?: SendMessageOptions) {
           }
         }
       } else {
-        console.log("[useSendMessage] Screenshot capture NOT requested (captureScreenshot option not set)");
+        console.log(
+          "[useSendMessage] Screenshot capture NOT requested (captureScreenshot option not set)"
+        );
       }
 
       // Define streaming callbacks

@@ -38,8 +38,8 @@ export default function ChatDetail() {
   console.log("[ChatDetail] Component loaded", {
     hasSendMutation: !!sendMessageMutation,
     captureScreenshotEnabled: true,
-    hasConsoleAPI: typeof window !== 'undefined' && !!window.consoleAPI,
-    hasCaptureMethod: typeof window !== 'undefined' && !!window.consoleAPI?.captureScreenshot,
+    hasConsoleAPI: typeof window !== "undefined" && !!window.consoleAPI,
+    hasCaptureMethod: typeof window !== "undefined" && !!window.consoleAPI?.captureScreenshot,
   });
 
   const chat = chats.find((c) => c.id === chatId);
