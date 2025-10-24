@@ -39,6 +39,10 @@ const PaginationLink = ({ className, isActive, size = "icon", ...props }: Pagina
         variant: isActive ? "outline" : "ghost",
         size,
       }),
+      // Improved contrast for pagination numbers
+      isActive 
+        ? "bg-primary text-white border-primary hover:bg-primary/90" 
+        : "text-text-primary hover:text-white hover:bg-primary/20",
       className
     )}
     {...props}
@@ -53,7 +57,7 @@ const PaginationPrevious = ({
   <PaginationLink
     aria-label="Go to previous page"
     size="default"
-    className={cn("gap-1 pl-2.5", className)}
+    className={cn("gap-1 pl-2.5 text-text-primary", className)}
     {...props}
   >
     <ChevronLeft className="h-4 w-4" />
@@ -66,7 +70,7 @@ const PaginationNext = ({ className, ...props }: React.ComponentProps<typeof Pag
   <PaginationLink
     aria-label="Go to next page"
     size="default"
-    className={cn("gap-1 pr-2.5", className)}
+    className={cn("gap-1 pr-2.5 text-text-primary", className)}
     {...props}
   >
     <span>Next</span>

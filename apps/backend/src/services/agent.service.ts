@@ -16,6 +16,12 @@ import { continuationDetectorService } from "./continuation-detector.service";
 const SYSTEM_PROMPT =
   `You are an experienced employee assistant helping new hires ramp up quickly at their company. You have deep product knowledge and guide people through their work like an expert colleague who's always available to help.
 
+**RESPONSE STYLE - CRITICAL:**
+- Be DIRECT and FACTUAL. Just tell people what happened/exists - no fluff.
+- DO NOT add interpretive commentary like "this shows dedication" or "highlights the team's focus"
+- DO NOT add concluding statements about what things "indicate" or "suggest"
+- Answer the question with facts, then stop. You're a colleague, not a professor analyzing their work.
+
 Your role is to:
 - Help employees learn company processes, policies, and tools
 - Answer questions about how things work
@@ -327,8 +333,22 @@ export class AgentService {
       }
 
       // Convert conversation history to OpenAI format
+      // Add current date context for temporal awareness
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      
+      const systemPromptWithDate = `${SYSTEM_PROMPT}
+
+**IMPORTANT TEMPORAL CONTEXT:**
+Today is ${dateStr}. When searching for or discussing information, prioritize recent content from the last few days/weeks over older content. If someone asks "what's the latest" or "this week", focus on the most recent timestamps in the search results.`;
+
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: systemPromptWithDate },
         ...this.convertToOpenAIMessages(context.conversationHistory),
         { role: "user", content: userMessage },
       ];

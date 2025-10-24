@@ -1,19 +1,21 @@
 import { BaseTool, ToolContext, ToolResult, ToolParameters } from "./base.tool";
-import { embeddingService } from "../services/embedding.service";
-import { vectorService } from "../services/vector.service";
+import { searchService } from "../services/search.service";
 import { intentService } from "../services/intent.service";
 import { trustRankingService } from "../services/trust-ranking.service";
 
 /**
  * SearchKnowledgeTool
  *
- * Phase 2 of the agentic system - Intelligent knowledge search with RAG + trust-based ranking
+ * Phase 2 of the agentic system - Hybrid search with RAG + trust-based ranking
  *
  * This tool enables the AI to search the company's knowledge base
- * (Slack messages + Notion pages) stored in Pinecone and retrieve
- * relevant context to answer employee questions.
+ * (Slack messages + Notion pages) using hybrid search that combines:
+ * - Semantic search (Pinecone vector similarity) for conceptual matches
+ * - Keyword search (PostgreSQL FTS) for exact term matches
+ * - RRF (Reciprocal Rank Fusion) to merge both results (70% semantic + 30% keyword)
  *
  * Features:
+ * - Hybrid search: Combines semantic understanding + keyword precision
  * - Intent detection: Classifies queries into company/product/operations/technical/greeting/general
  * - Trust-based ranking: Boosts relevant sources based on query type
  *   • Company questions → Boost Notion/Google Drive 2.5x
@@ -24,8 +26,8 @@ import { trustRankingService } from "../services/trust-ranking.service";
  *
  * Flow:
  * 1. Detect user intent (company/product/operations/technical/greeting/general)
- * 2. Generate embedding for the question
- * 3. Query Pinecone for similar vectors
+ * 2. Perform hybrid search (Pinecone semantic + PostgreSQL keyword)
+ * 3. Apply RRF merge (70/30 weighting)
  * 4. Apply trust-based ranking to boost relevant sources
  * 5. Return top K most relevant results
  * 6. AI uses this context to generate informed answer
@@ -34,7 +36,7 @@ import { trustRankingService } from "../services/trust-ranking.service";
  * - "What is Mitable's business model?" → company intent, boosts Notion docs
  * - "What features are in the PRD?" → product intent, boosts product specs
  * - "What did we discuss last week?" → operations intent, boosts Slack
- * - "How do we deploy?" → technical intent, boosts codebase + docs
+ * - "How do we deploy?" → technical intent, finds both concepts AND exact terms
  */
 export class SearchKnowledgeTool extends BaseTool {
   name = "search_knowledge";
@@ -52,8 +54,8 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
       },
       topK: {
         type: "number",
-        description: "Number of results to return (default: 5, max: 10)",
-        default: 5,
+        description: "Number of results to return (default: 10, max: 15). Use more results for complex queries or when asking about specific people's work.",
+        default: 10,
       },
     },
     required: ["query"],
@@ -70,10 +72,10 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
     // Validate arguments
     this.validate(args);
 
-    const { query, topK = 5 } = args;
+    const { query, topK = 10 } = args;
 
     // Validate topK range
-    const limitedTopK = Math.min(Math.max(topK, 1), 10);
+    const limitedTopK = Math.min(Math.max(topK, 1), 15);
 
     // Fetch more results from Pinecone for better trust ranking
     // We'll apply trust ranking to a larger set, then take top K
@@ -100,37 +102,57 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
         `[SearchKnowledgeTool] Detected intent: ${intent.type} (confidence: ${intent.confidence})`
       );
 
-      // Step 2: Generate embedding for the search query
-      const embedding = await embeddingService.embedText(query);
-      console.log("[SearchKnowledgeTool] Embedding generated:", {
-        dimension: embedding.length,
-      });
-
-      // Step 3: Get organization ID for namespace filtering
+      // Step 2: Validate organization ID
       if (!organizationId) {
         throw new Error("Organization ID not found in user context");
       }
 
-      const namespace = `org-${organizationId}`;
-      console.log("[SearchKnowledgeTool] Querying vectors:", {
-        namespace,
+      // Step 3: Parse temporal keywords for date filtering
+      const dateFilters = this.parseTemporalKeywords(query);
+      
+      console.log("[SearchKnowledgeTool] Performing hybrid search:", {
+        organizationId,
+        query,
         fetchLimit,
+        dateFilters,
       });
 
-      // Step 4: Query Pinecone for similar vectors (fetch more for better ranking)
-      const rawResults = await vectorService.queryVectors(embedding, fetchLimit, namespace);
+      // Step 4: Perform hybrid search (combines Pinecone semantic + PostgreSQL keyword with RRF)
+      const searchResponse = await searchService.search({
+        query,
+        organizationId,
+        filters: dateFilters,
+        topK: fetchLimit, // Fetch more for trust ranking
+      });
 
-      console.log(`[SearchKnowledgeTool] Found ${rawResults.length} raw results`);
-      if (rawResults.length > 0) {
-        console.log("[SearchKnowledgeTool] Raw results preview:", {
-          count: rawResults.length,
-          topScore: rawResults[0]?.score,
-          avgScore: rawResults.reduce((sum, r) => sum + r.score, 0) / rawResults.length,
-          titles: rawResults.slice(0, 3).map((r) => r.metadata.title),
-        });
-      }
+      console.log(`[SearchKnowledgeTool] Hybrid search complete:`, {
+        totalResults: searchResponse.totalResults,
+        semanticResults: searchResponse.semanticResults,
+        keywordResults: searchResponse.keywordResults,
+        searchTime: `${searchResponse.searchTime}ms`,
+      });
 
-      // Step 5: Apply trust-based ranking to the larger set
+      // Step 4: Transform to old format for trust ranking compatibility
+      const rawResults = searchResponse.results.map((result) => ({
+        id: result.id,
+        score: result.score,
+        metadata: {
+          text: result.text,
+          source: result.source,
+          source_type: result.sourceType,
+          channel_name: result.channelName,
+          username: result.username,
+          page_title: result.pageTitle,
+          page_url: result.pageUrl,
+          block_type: result.blockType,
+          timestamp: result.timestamp,
+          last_edited_time: result.date,
+          message_url: result.messageUrl,
+          title: result.channelName || result.pageTitle || "Untitled",
+        },
+      }));
+
+      // Step 5: Apply trust-based ranking to the hybrid results
       const rankedResults = trustRankingService.applyTrustRanking(rawResults, intent, query);
 
       // Step 6: Take top K after ranking
@@ -142,12 +164,35 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
 
       // Step 7: Check if we found any results
       if (!results || results.length === 0) {
-        console.log("[SearchKnowledgeTool] No results found - suggesting expert connection");
+        console.log("[SearchKnowledgeTool] No results found");
+
+        // Build helpful no-results message with date context
+        const now = new Date();
+        let noResultsMessage = "I couldn't find any information in the knowledge base for that query.";
+        
+        if (dateFilters) {
+          const dateFrom = dateFilters.dateFrom;
+          const dateTo = dateFilters.dateTo;
+          
+          if (dateFrom && dateTo) {
+            const fromStr = dateFrom.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const toStr = dateTo.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            noResultsMessage = `I couldn't find any messages in the knowledge base between ${fromStr} and ${toStr}. `;
+            
+            // Check if future date
+            if (dateFrom > now) {
+              noResultsMessage += "Note: This date range is in the future, so no data exists yet.";
+            } else {
+              noResultsMessage += "The data for this period may not have been synced yet, or there may not have been any relevant discussions during that time.";
+            }
+          }
+        } else {
+          noResultsMessage += " This might be something new, not yet documented, or outside the synced data range.";
+        }
 
         return {
           messageType: "text",
-          content:
-            "I couldn't find any relevant information in the knowledge base for that question. This might be something new or not yet documented.",
+          content: noResultsMessage,
           streamable: true,
         };
       }
@@ -234,5 +279,104 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
       console.error("[SearchKnowledgeTool] Error during search:", error);
       throw new Error("Failed to search knowledge base", { cause: error });
     }
+  }
+
+  /**
+   * Parse temporal keywords from query and convert to date filters
+   * Handles "this week", "last week", "today", "yesterday", etc.
+   */
+  private parseTemporalKeywords(query: string): { dateFrom?: Date; dateTo?: Date } | undefined {
+    const queryLower = query.toLowerCase();
+    const now = new Date();
+    
+    // Get start of current week (Monday)
+    const getStartOfWeek = (date: Date): Date => {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = day === 0 ? -6 : 1 - day; // If Sunday, go back 6 days, else go to Monday
+      d.setDate(d.getDate() + diff);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
+    // Get end of current week (Sunday)
+    const getEndOfWeek = (date: Date): Date => {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = day === 0 ? 0 : 7 - day;
+      d.setDate(d.getDate() + diff);
+      d.setHours(23, 59, 59, 999);
+      return d;
+    };
+
+    // "this week" = current calendar week (Mon-Sun)
+    if (/\bthis week\b/i.test(queryLower)) {
+      return {
+        dateFrom: getStartOfWeek(now),
+        dateTo: getEndOfWeek(now),
+      };
+    }
+
+    // "last week" = previous calendar week
+    if (/\blast week\b/i.test(queryLower)) {
+      const lastWeekStart = getStartOfWeek(now);
+      lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+      const lastWeekEnd = getEndOfWeek(lastWeekStart);
+      return {
+        dateFrom: lastWeekStart,
+        dateTo: lastWeekEnd,
+      };
+    }
+
+    // "today"
+    if (/\btoday\b/i.test(queryLower)) {
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      return {
+        dateFrom: startOfDay,
+        dateTo: endOfDay,
+      };
+    }
+
+    // "yesterday"
+    if (/\byesterday\b/i.test(queryLower)) {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      const yesterdayEnd = new Date(yesterday);
+      yesterdayEnd.setHours(23, 59, 59, 999);
+      return {
+        dateFrom: yesterday,
+        dateTo: yesterdayEnd,
+      };
+    }
+
+    // "this month"
+    if (/\bthis month\b/i.test(queryLower)) {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      return {
+        dateFrom: startOfMonth,
+        dateTo: endOfMonth,
+      };
+    }
+
+    // "last N days"
+    const lastDaysMatch = queryLower.match(/\blast (\d+) days?\b/i);
+    if (lastDaysMatch) {
+      const days = parseInt(lastDaysMatch[1]);
+      const startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - days);
+      startDate.setHours(0, 0, 0, 0);
+      return {
+        dateFrom: startDate,
+        dateTo: now,
+      };
+    }
+
+    // No temporal keywords found
+    return undefined;
   }
 }
