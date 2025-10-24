@@ -100,15 +100,14 @@ export async function getConversation(conversationId: string): Promise<Conversat
  * @param conversationId - Conversation ID
  * @param content - Message content
  * @param screenshot - Optional base64-encoded screenshot for visual guidance
- * @param onChunk - Callback for each streaming chunk
- * @param onComplete - Callback when streaming completes
- * @param onError - Callback for errors
- * @param onWindowTrigger - Callback for window triggers (Nudge/Guide)
+ * @param screenshotMetadata - Optional screenshot metadata (width, height, scaleFactor)
+ * @param callbacks - Streaming callbacks
  */
 export async function sendMessageStream(
   conversationId: string,
   content: string,
   screenshot: string | null | undefined,
+  screenshotMetadata: any | null | undefined,
   callbacks: {
     onChunk?: (chunk: string) => void;
     onComplete?: (
@@ -124,11 +123,16 @@ export async function sendMessageStream(
 ): Promise<void> {
   const headers = await getAuthHeaders();
 
-  // Build request body with optional screenshot
-  const requestBody: { content: string; screenshot?: string } = { content };
+  // Build request body with optional screenshot and metadata
+  const requestBody: { content: string; screenshot?: string; screenshotMetadata?: any } = {
+    content,
+  };
   if (screenshot) {
     requestBody.screenshot = screenshot;
-    console.log(`[Agent API] Sending message with screenshot (${screenshot.length} bytes)`);
+    requestBody.screenshotMetadata = screenshotMetadata;
+    console.log(`[Agent API] Sending message with screenshot (${screenshot.length} bytes)`, {
+      metadata: screenshotMetadata,
+    });
   } else {
     console.log("[Agent API] Sending message without screenshot");
   }

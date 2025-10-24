@@ -21,6 +21,7 @@ export const IPC_CHANNELS = {
   OVERLAY_SHOW: "overlay-show",
   OVERLAY_HIDE: "overlay-hide",
   OVERLAY_HIGHLIGHT_UPDATE: "overlay-highlight-update",
+  GET_DISPLAY_METADATA: "get-display-metadata",
 
   // Nudge system
   NUDGE_SHOW: "nudge-show",

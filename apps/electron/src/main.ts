@@ -4,7 +4,6 @@ import {
   globalShortcut,
   ipcMain,
   screen,
-  desktopCapturer,
   shell,
 } from "electron";
 import { join } from "path";
@@ -469,7 +468,16 @@ function setupIPC() {
     }
   );
 
-  console.log("[IPC] Screenshot capture handler registered successfully");
+  // Display Metadata - for multi-monitor support
+  ipcMain.handle(IPC_CHANNELS.GET_DISPLAY_METADATA, () => {
+    const displays = screen.getAllDisplays();
+    return displays.map((display) => ({
+      bounds: display.bounds,
+      scaleFactor: display.scaleFactor,
+    }));
+  });
+
+  console.log("[IPC] Screenshot capture and display metadata handlers registered successfully");
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)
