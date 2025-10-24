@@ -469,7 +469,82 @@ function setupIPC() {
     }
   );
 
+  // AI Generation - Context
+  ipcMain.handle(IPC_CHANNELS.NUDGE_GENERATE_CONTEXT, async (_event, conversationId: string) => {
+    console.log("[Nudge] Generate context requested for conversation:", conversationId);
+
+    // Check if we have an auth token
+    if (!authTokens.accessToken) {
+      console.error("[Nudge] No auth token available");
+      throw new Error("Not authenticated. Please log in first.");
+    }
+
+    try {
+      const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
+      const response = await fetch(`${API_BASE_URL}/api/nudges/generate-context`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authTokens.accessToken}`,
+        },
+        body: JSON.stringify({ conversationId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          message: response.statusText,
+        }));
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("[Nudge] Context generated successfully");
+      return data; // Returns { success: true, context: "..." }
+    } catch (error) {
+      console.error("[Nudge] Context generation failed:", error);
+      throw error;
+    }
+  });
+
+  // AI Generation - Question
+  ipcMain.handle(IPC_CHANNELS.NUDGE_GENERATE_QUESTION, async (_event, conversationId: string) => {
+    console.log("[Nudge] Generate question requested for conversation:", conversationId);
+
+    // Check if we have an auth token
+    if (!authTokens.accessToken) {
+      console.error("[Nudge] No auth token available");
+      throw new Error("Not authenticated. Please log in first.");
+    }
+
+    try {
+      const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
+      const response = await fetch(`${API_BASE_URL}/api/nudges/generate-question`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authTokens.accessToken}`,
+        },
+        body: JSON.stringify({ conversationId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          message: response.statusText,
+        }));
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("[Nudge] Question generated successfully");
+      return data; // Returns { success: true, question: "..." }
+    } catch (error) {
+      console.error("[Nudge] Question generation failed:", error);
+      throw error;
+    }
+  });
+
   console.log("[IPC] Screenshot capture handler registered successfully");
+  console.log("[IPC] Nudge generation handlers registered successfully");
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)

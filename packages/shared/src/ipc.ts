@@ -29,6 +29,8 @@ export const IPC_CHANNELS = {
   NUDGE_DISMISS: "nudge-dismiss",
   NUDGE_CREATE_REQUEST: "nudge-create-request",
   NUDGE_OPEN_CREATOR: "nudge-open-creator",
+  NUDGE_GENERATE_CONTEXT: "nudge-generate-context", // AI context generation
+  NUDGE_GENERATE_QUESTION: "nudge-generate-question", // AI question generation
 
   // Window management
   WINDOW_SHOW: "window-show",
