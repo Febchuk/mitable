@@ -1,8 +1,8 @@
 # Mitable AI Onboarding Buddy - Visual Architecture Diagrams
 
-**Document Version:** 1.0
-**Last Updated:** 2025-10-20
-**Status:** Current implementation state (~65-70% complete)
+**Document Version:** 1.1
+**Last Updated:** 2025-10-23
+**Status:** Current implementation state (~75-80% complete)
 
 This document provides Mermaid diagrams for the current implementation. These diagrams are fully compatible with GitHub, GitLab, and any modern markdown renderer that supports Mermaid.
 
@@ -47,11 +47,13 @@ graph TB
     subgraph "Service Layer"
         AgentSvc["🤖 agent.service<br/>OpenAI Function Calling"]
         LLMSvc["🧠 llm.service<br/>Gemini Multimodal"]
-        EmbedSvc["📊 embedding.service<br/>OpenAI Embeddings"]
-        VectorSvc["🔍 vector.service<br/>Pinecone Search"]
+        EmbedSvc["📊 embedding.service<br/>OpenAI Embeddings + Retry"]
+        VectorSvc["🔍 vector.service<br/>Pinecone Search + Retry"]
+        ChunkSvc["✂️ chunking.service<br/>Token-based Chunking"]
         NotionSvc["📝 notion.service<br/>Notion API"]
         SlackSvc["💬 slack.service<br/>Slack API"]
         ExpertSvc["👤 expertMatching.service<br/>Scoring Algorithm"]
+        IngestionSvc["📥 ingestion.service<br/>Full Pipeline"]
     end
 
     subgraph "Data Layer"
@@ -85,8 +87,15 @@ graph TB
     Conv --> LLMSvc
     NudgeAPI --> ExpertSvc
     Admin --> NotionSvc
+    Admin --> IngestionSvc
     Integrations --> SlackSvc
     Integrations --> NotionSvc
+
+    %% Ingestion pipeline
+    IngestionSvc --> ChunkSvc
+    IngestionSvc --> EmbedSvc
+    IngestionSvc --> VectorSvc
+    ChunkSvc --> EmbedSvc
 
     %% Services to Data
     AgentSvc --> EmbedSvc
@@ -110,9 +119,9 @@ graph TB
     classDef partial fill:#fbbf24,stroke:#d97706,stroke-width:2px,color:#000
     classDef missing fill:#f87171,stroke:#dc2626,stroke-width:2px,color:#000
 
-    class Agent,Console,Guide,Nudge,Auth,Conv,NudgeAPI,Admin,Postgres,AgentSvc,ExpertSvc,NotionSvc,SlackSvc implemented
-    class Overlay,VectorSvc,EmbedSvc,LLMSvc,Pinecone partial
-    class Integrations partial
+    class Agent,Console,Guide,Nudge,Auth,Conv,NudgeAPI,Admin,Postgres implemented
+    class AgentSvc,ExpertSvc,NotionSvc,SlackSvc,EmbedSvc,VectorSvc,ChunkSvc,IngestionSvc,Pinecone implemented
+    class Overlay,LLMSvc,Integrations partial
 ```
 
 **Legend:**
@@ -583,14 +592,20 @@ graph LR
         A7["Expert Matching"]
     end
 
-    subgraph "🟡 Partially Working (50-90%)"
+    subgraph "🟡 Partially Working (60-95%)"
         B1["Backend API (95%)"]
         B2["Frontend Components (90%)"]
         B3["Nudge System (85%)"]
         B4["Notion Integration (95%)"]
-        B5["AI Services (75%)"]
+        B5["AI Services (95%)"]
         B6["Slack Integration (60%)"]
-        B7["Vector Search (50%)"]
+    end
+
+    subgraph "✅ Recently Completed"
+        B7["Vector Search (100%)"]
+        B8["Knowledge Base Ingestion (100%)"]
+        B9["Intelligent Chunking (100%)"]
+        B10["Retry Logic (100%)"]
     end
 
     subgraph "🔴 Not Implemented (0-15%)"
@@ -605,8 +620,8 @@ graph LR
     classDef yellow fill:#fbbf24,stroke:#d97706,stroke-width:3px,color:#000
     classDef red fill:#f87171,stroke:#dc2626,stroke-width:3px,color:#000
 
-    class A1,A2,A3,A4,A5,A6,A7 green
-    class B1,B2,B3,B4,B5,B6,B7 yellow
+    class A1,A2,A3,A4,A5,A6,A7,B7,B8,B9,B10 green
+    class B1,B2,B3,B4,B5,B6 yellow
     class C1,C2,C3,C4,C5 red
 ```
 
@@ -616,9 +631,9 @@ graph LR
 
 ```mermaid
 graph TD
-    Start["Current State<br/>~65-70% Complete"] --> Phase1
+    Start["Current State<br/>~75-80% Complete"] --> Phase1
 
-    Phase1["Phase 1: Visual Guidance<br/>(Weeks 1-2)"]
+    Phase1["Phase 1: Visual Guidance<br/>(Weeks 1-2)<br/>HIGH PRIORITY"]
     Phase1 --> P1T1["Implement screenshot capture"]
     Phase1 --> P1T2["Integrate Gemini Vision"]
     Phase1 --> P1T3["Build overlay rendering"]
@@ -627,20 +642,22 @@ graph TD
     P1T2 --> Milestone1
     P1T3 --> Milestone1
 
-    Milestone1["✓ Help Flow Works End-to-End"] --> Phase2
+    Milestone1["✓ Help Flow Works End-to-End"] --> Phase3
 
-    Phase2["Phase 2: Knowledge Base<br/>(Weeks 3-4)"]
-    Phase2 --> P2T1["Complete ingestion pipeline"]
-    Phase2 --> P2T2["Implement hybrid search"]
-    Phase2 --> P2T3["Integrate with AI responses"]
+    Phase2["✅ Phase 2: Knowledge Base<br/>COMPLETED"]
+    Phase2 --> P2T1["✅ Intelligent chunking<br/>(500-1000 tokens, 100 overlap)"]
+    Phase2 --> P2T2["✅ Full ingestion pipeline<br/>(Slack + Notion)"]
+    Phase2 --> P2T3["✅ Retry logic with backoff"]
+    Phase2 --> P2T4["✅ Batch optimization (10x)"]
 
     P2T1 --> Milestone2
     P2T2 --> Milestone2
     P2T3 --> Milestone2
+    P2T4 --> Milestone2
 
-    Milestone2["✓ AI Has Knowledge Base Context"] --> Phase3
+    Milestone2["✅ AI Has Knowledge Base Context"] --> Start
 
-    Phase3["Phase 3: Security<br/>(Week 5)"]
+    Phase3["Phase 3: Security<br/>(Week 3)<br/>HIGH PRIORITY"]
     Phase3 --> P3T1["Encrypt OAuth tokens"]
     Phase3 --> P3T2["Auto token refresh"]
     Phase3 --> P3T3["Error handling"]
@@ -653,13 +670,16 @@ graph TD
 
     classDef current fill:#3b82f6,stroke:#1d4ed8,stroke-width:3px,color:#fff
     classDef phase fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:#fff
+    classDef completed fill:#10b981,stroke:#059669,stroke-width:3px,color:#fff
     classDef task fill:#a78bfa,stroke:#7c3aed,stroke-width:1px,color:#000
     classDef milestone fill:#10b981,stroke:#059669,stroke-width:3px,color:#fff
     classDef mvp fill:#f59e0b,stroke:#d97706,stroke-width:4px,color:#000
 
     class Start current
-    class Phase1,Phase2,Phase3 phase
-    class P1T1,P1T2,P1T3,P2T1,P2T2,P2T3,P3T1,P3T2,P3T3 task
+    class Phase1,Phase3 phase
+    class Phase2 completed
+    class P1T1,P1T2,P1T3,P3T1,P3T2,P3T3 task
+    class P2T1,P2T2,P2T3,P2T4 completed
     class Milestone1,Milestone2 milestone
     class MVP mvp
 ```

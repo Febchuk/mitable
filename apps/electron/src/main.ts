@@ -4,7 +4,7 @@ import {
   globalShortcut,
   ipcMain,
   screen,
-  desktopCapturer,
+  // desktopCapturer, // TODO: Re-enable when UI guidance feature is complete
   shell,
 } from "electron";
 import { join } from "path";

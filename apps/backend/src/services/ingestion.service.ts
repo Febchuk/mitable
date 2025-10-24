@@ -2,14 +2,14 @@ import { slackService } from "./slack.service.js";
 import { notionService } from "./notion.service.js";
 import { embeddingService } from "./embedding.service.js";
 import { vectorService } from "./vector.service.js";
+import { chunkingService } from "./chunking.service.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 
-// Sync configuration constants
 const SYNC_CONFIG = {
-  MESSAGES_PER_PAGE: 100, // Number of messages to fetch per API call
-  BATCH_SIZE: 10, // Number of messages to process in each embedding batch
+  MESSAGES_PER_PAGE: 100,
+  BATCH_SIZE: 100,
 } as const;
 
 export interface SlackIntegrationMetadata {
@@ -245,62 +245,73 @@ class IngestionService {
     channelName: string,
     isPrivate: boolean
   ): Promise<void> {
-    // Filter out empty messages
     const validMessages = messages.filter((msg) => msg.text && msg.text.trim().length > 0);
 
     if (validMessages.length === 0) return;
 
     try {
-      // Embed all messages in batch
-      const texts = validMessages.map((msg) => msg.text);
+      const allChunks: Array<{
+        chunkText: string;
+        chunkIndex: number;
+        totalChunks: number;
+        parentMessage: any;
+      }> = [];
+
+      for (const msg of validMessages) {
+        const chunks = chunkingService.chunkText(msg.text);
+        for (const chunk of chunks) {
+          allChunks.push({
+            chunkText: chunk.text,
+            chunkIndex: chunk.chunkIndex,
+            totalChunks: chunk.totalChunks,
+            parentMessage: msg,
+          });
+        }
+      }
+
+      const texts = allChunks.map((c) => c.chunkText);
       const embeddings = await embeddingService.embedTexts(texts);
 
-      // Prepare vectors for Pinecone
       const vectors = await Promise.all(
-        validMessages.map(async (msg, idx) => {
-          // Get user info
+        allChunks.map(async (chunkData, idx) => {
+          const msg = chunkData.parentMessage;
           const userInfo = await slackService.getUserInfo(organizationId, msg.user);
-
-          // Create timestamp
           const timestamp = parseFloat(msg.ts);
           const date = new Date(timestamp * 1000);
 
           return {
-            id: `slack-${msg.channel}-${msg.ts}`,
+            id: `slack-${msg.channel}-${msg.ts}-chunk-${chunkData.chunkIndex}`,
             values: embeddings[idx],
             metadata: {
-              // Core fields
-              text: msg.text,
+              text: chunkData.chunkText,
               source: "slack",
               source_type: msg.thread_ts ? "thread_reply" : "message",
 
-              // Slack identifiers
               channel_id: msg.channel,
               channel_name: channelName,
               message_ts: msg.ts,
-              ...(msg.thread_ts && { thread_ts: msg.thread_ts }), // Only include if exists
+              ...(msg.thread_ts && { thread_ts: msg.thread_ts }),
 
-              // User information
+              chunk_index: chunkData.chunkIndex,
+              total_chunks: chunkData.totalChunks,
+              is_chunked: chunkData.totalChunks > 1,
+
               user_id: msg.user,
               username: userInfo?.name || "unknown",
               user_real_name: userInfo?.real_name || "Unknown User",
 
-              // URL
               message_url: msg.permalink,
 
-              // Date/Time filters
               timestamp: Math.floor(timestamp),
-              date: date.toISOString().split("T")[0], // YYYY-MM-DD
+              date: date.toISOString().split("T")[0],
               year: date.getFullYear(),
               month: date.getMonth() + 1,
               day_of_week: date.toLocaleDateString("en-US", { weekday: "long" }),
 
-              // Organization context
               organization_id: organizationId,
               workspace_id: workspaceId,
               workspace_name: workspaceName,
 
-              // Privacy
               is_private_channel: isPrivate,
               channel_type: isPrivate ? "private_channel" : "public_channel",
             },
@@ -308,7 +319,6 @@ class IngestionService {
         })
       );
 
-      // Upsert to Pinecone using organization namespace for data isolation
       const namespace = `org-${organizationId}`;
       await vectorService.upsertVectors(vectors, namespace);
     } catch (error) {
@@ -493,61 +503,73 @@ class IngestionService {
     botId: string
   ): Promise<void> {
     try {
-      // Embed all block texts in batch
-      const texts = blocks.map((block) => block.text);
+      const allChunks: Array<{
+        chunkText: string;
+        chunkIndex: number;
+        totalChunks: number;
+        parentBlock: any;
+      }> = [];
+
+      for (const block of blocks) {
+        const chunks = chunkingService.chunkText(block.text);
+        for (const chunk of chunks) {
+          allChunks.push({
+            chunkText: chunk.text,
+            chunkIndex: chunk.chunkIndex,
+            totalChunks: chunk.totalChunks,
+            parentBlock: block,
+          });
+        }
+      }
+
+      const texts = allChunks.map((c) => c.chunkText);
       const embeddings = await embeddingService.embedTexts(texts);
 
-      // Prepare vectors for Pinecone (block-level granularity)
-      const vectors = blocks.map((block, idx) => {
-        // Create timestamp from last edited time
+      const vectors = allChunks.map((chunkData, idx) => {
+        const block = chunkData.parentBlock;
         const editedDate = new Date(block.last_edited_time);
 
         return {
-          id: `notion-${page.id}-${block.id}`,
+          id: `notion-${page.id}-${block.id}-chunk-${chunkData.chunkIndex}`,
           values: embeddings[idx],
           metadata: {
-            // Core fields
-            text: block.text,
+            text: chunkData.chunkText,
             source: "notion",
             source_type: "block",
 
-            // Page identification
             page_id: page.id,
             page_title: page.title,
             page_url: page.url,
 
-            // Block-level details (granular search)
             block_id: block.id,
             block_type: block.type,
 
-            // Authorship
+            chunk_index: chunkData.chunkIndex,
+            total_chunks: chunkData.totalChunks,
+            is_chunked: chunkData.totalChunks > 1,
+
             created_by_id: page.created_by_id,
             last_edited_by_id: page.last_edited_by_id,
 
-            // Timestamps
             created_time: block.created_time,
             last_edited_time: block.last_edited_time,
             timestamp: Math.floor(editedDate.getTime() / 1000),
 
-            // Date/Time filters
-            date: editedDate.toISOString().split("T")[0], // YYYY-MM-DD
+            date: editedDate.toISOString().split("T")[0],
             year: editedDate.getFullYear(),
             month: editedDate.getMonth() + 1,
 
-            // Organization context
             organization_id: organizationId,
             workspace_id: workspaceId,
             workspace_name: workspaceName,
             bot_id: botId,
 
-            // Hierarchy (for context)
             ...(page.parent_page_id && { parent_page_id: page.parent_page_id }),
             ...(page.parent_database_id && { parent_database_id: page.parent_database_id }),
           },
         };
       });
 
-      // Upsert to Pinecone using organization namespace for data isolation
       const namespace = `org-${organizationId}`;
       await vectorService.upsertVectors(vectors, namespace);
     } catch (error) {

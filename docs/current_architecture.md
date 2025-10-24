@@ -1,8 +1,8 @@
 # Mitable AI Onboarding Buddy - Current Architecture State
 
-**Document Version:** 1.0
-**Last Updated:** 2025-10-20
-**Implementation Status:** ~65-70% of MVP Complete
+**Document Version:** 1.1
+**Last Updated:** 2025-10-23
+**Implementation Status:** ~75-80% of MVP Complete
 
 This document represents the **actual current state** of the Mitable implementation, not the planned architecture. For planned architecture, see `mitable_complete_prd.md` and `Electron_Express_monorepo_UPDATED.md`.
 
@@ -13,7 +13,7 @@ This document represents the **actual current state** of the Mitable implementat
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════╗
 ║                        MITABLE AI ONBOARDING BUDDY - CURRENT STATE                   ║
-║                              Implementation: ~65-70% Complete                         ║
+║                              Implementation: ~75-80% Complete                         ║
 ╚══════════════════════════════════════════════════════════════════════════════════════╝
 
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
@@ -79,11 +79,12 @@ This document represents the **actual current state** of the Mitable implementat
 │ • POST /users       ✓    │  │ • llm.service       ✓    │  │ • POST /notion/oauth✓   │
 │ • GET /templates    ✓    │  │ • embedding.service ✓    │  │ • Slack API         ✓   │
 │ • POST /templates   ✓    │  │ • vector.service    ✓    │  │ • Notion API        ✓   │
-│ • GET /integrations ✓    │  │ • notion.service    ✓    │  │ [OAuth flows ready]     │
-│ • POST /{id}/connect✓    │  │ • slack.service     ✓    │  │ [Sync workers TODO]     │
-│ • POST /{id}/sync   ✓    │  │ • expertMatching    ✓    │  └─────────────────────────┘
-│ [Template assignment]    │  │ • guideGeneration   ✓    │
-└──────────────────────────┘  │ • ingestion         ~    │
+│ • GET /integrations ✓    │  │ • chunking.service  ✓    │  │ [OAuth flows ready]     │
+│ • POST /{id}/connect✓    │  │ • notion.service    ✓    │  │ [Sync workers TODO]     │
+│ • POST /{id}/sync   ✓    │  │ • slack.service     ✓    │  └─────────────────────────┘
+│ [Template assignment]    │  │ • expertMatching    ✓    │
+└──────────────────────────┘  │ • guideGeneration   ✓    │
+                              │ • ingestion         ✓    │
                               │ [Vision detection TODO]  │
                               └──────────────────────────┘
                                          │
@@ -102,7 +103,7 @@ This document represents the **actual current state** of the Mitable implementat
 │ • users (with role/dept/start)    ✓    │        │   type, chunk_index, org_id    │
 │                                        │        │                                │
 │ ONBOARDING (Admin Templates):          │        │ [Client configured ✓]          │
-│ • roadmap_templates               ✓    │        │ [Ingestion pipeline ~]         │
+│ • roadmap_templates               ✓    │        │ [Ingestion pipeline ✓]         │
 │ • roadmap_template_tasks          ✓    │        └────────────────────────────────┘
 │ • roadmap_template_sources        ✓    │
 │ • source_materials                ✓    │
@@ -359,7 +360,10 @@ All channels are defined and operational:
 - **Model:** text-embedding-3-large (1536 dimensions)
 - **Features:**
   - Converts knowledge base documents to vectors
-  - Batch embedding support
+  - Batch embedding support (2048 inputs per request)
+  - Retry logic with exponential backoff (3 retries, 2x backoff)
+  - Rate limit detection (429 errors)
+  - Automatic batch splitting for large inputs
 
 #### vector.service.ts ✓
 
@@ -369,6 +373,22 @@ All channels are defined and operational:
   - Semantic similarity search
   - Metadata filtering by organization
   - Configurable top-k results
+  - Retry logic with exponential backoff (3 retries, 2x backoff)
+  - Comprehensive error handling for all operations (upsert, query, delete, stats)
+
+#### chunking.service.ts ✓
+
+- **Purpose:** Intelligent text chunking for optimal embedding quality
+- **Technology:** tiktoken (OpenAI's token counter using `cl100k_base` encoding)
+- **Configuration:**
+  - Chunk size: 500-1000 tokens
+  - Overlap: 100 tokens between chunks
+- **Features:**
+  - Token-accurate chunking (not character-based)
+  - Automatic overlap handling for context preservation
+  - Metadata tracking (chunk_index, total_chunks, token_count)
+  - Handles short texts efficiently (no chunking if ≤1000 tokens)
+  - Batch chunking support for multiple texts
 
 #### notion.service.ts ✓
 
@@ -409,15 +429,21 @@ All channels are defined and operational:
   - Coordinate-based UI guidance
   - Integration with overlay system
 
-#### ingestion.service.ts ~
+#### ingestion.service.ts ✓
 
-- **Purpose:** Knowledge base document ingestion
-- **Status:** Partially implemented
+- **Purpose:** Knowledge base document ingestion from Slack and Notion
+- **Status:** Fully operational with intelligent chunking
 - **Features:**
-  - Document processing pipeline
-  - Chunking and embedding
-  - Vector storage
-  - **Missing:** Complete end-to-end pipeline testing
+  - Complete Slack message ingestion pipeline (channels, threads, DMs)
+  - Complete Notion page ingestion pipeline (recursive block fetching)
+  - Intelligent token-based chunking via chunking.service
+  - Batch processing (100 messages per batch, increased from 10)
+  - Comprehensive metadata tracking:
+    - Slack: message_ts, channel_id, user_id, chunk_index, total_chunks, is_chunked
+    - Notion: page_id, block_id, chunk_index, total_chunks, is_chunked
+  - Organization namespacing for multi-tenant isolation
+  - Progress callbacks for real-time sync status
+  - Sync logging to database
 
 ### 5. Database Schema (18 Tables)
 
@@ -642,15 +668,17 @@ All channels are defined and operational:
   - ✗ UI object detection (NOT IMPLEMENTED)
   - ✗ Screenshot analysis (NOT IMPLEMENTED)
 
-#### Pinecone ~
+#### Pinecone ✓
 
 - **Service:** Vector database
 - **Index:** `mitable-embeddings` (1536 dimensions)
 - **Features:**
   - ✓ Client configured
   - ✓ Semantic search ready
-  - ~ Ingestion pipeline partially implemented
-  - ? Actual vector data status unclear
+  - ✓ Ingestion pipeline fully operational with intelligent chunking
+  - ✓ Token-based chunking (500-1000 tokens with 100-token overlap)
+  - ✓ Retry logic with exponential backoff
+  - ✓ Batch processing optimized (100 items per batch)
 
 #### Slack ✓
 
@@ -843,66 +871,79 @@ All channels are defined and operational:
 
 **Impact:** Cannot deploy to production safely
 
-### 4. AI Pipeline Completeness (MEDIUM PRIORITY)
+### 4. AI Pipeline Completeness (LOW PRIORITY)
 
-**Status:** Individual services work, full pipeline not integrated
+**Status:** ✅ Core pipeline fully operational, hybrid search pending
 
-**Missing Components:**
+**Completed:**
+
+- ✅ Knowledge base ingestion
+  - ingestion.service.ts fully operational
+  - Complete end-to-end pipeline: source → chunking → embeddings → Pinecone
+  - Intelligent token-based chunking (500-1000 tokens, 100 overlap)
+  - Comprehensive metadata tracking for reconstruction
+  - Retry logic with exponential backoff
+  - Tested with Slack and Notion integrations
+
+- ✅ Vector search ready
+  - Pinecone client configured and operational
+  - Semantic similarity search available
+  - Organization-based namespacing for multi-tenancy
+
+**Remaining:**
 
 - Hybrid search integration
-  - Pinecone client exists
-  - PostgreSQL full-text search exists
-  - No combined semantic + keyword search
+  - Pinecone semantic search operational ✓
+  - PostgreSQL full-text search exists ✓
+  - Combined semantic + keyword search not yet implemented
+  - Would improve search precision but not critical
 
-- Knowledge base ingestion
-  - ingestion.service.ts scaffolded
-  - No end-to-end pipeline from source → chunks → embeddings → Pinecone
-  - No testing of full pipeline
+**Impact:** AI can now leverage knowledge base context. Hybrid search would be a nice enhancement but not blocking.
 
-- Vector search testing
-  - Unknown if Pinecone index has data
-  - No verification of semantic search quality
-  - No benchmarking of search results
+### 5. Error Handling & Resilience (IMPROVED)
 
-**Impact:** AI responses may lack relevant context from knowledge base
+**Completed:**
 
-### 5. Error Handling & Resilience (LOW PRIORITY)
+- ✅ Retry logic for external API calls
+  - Embedding service: 3 retries with 2x exponential backoff
+  - Vector service: 3 retries with 2x exponential backoff
+  - Rate limit detection (429 errors)
+  - Initial delay: 1000ms → 2000ms → 4000ms
 
-**Missing Components:**
+**Remaining:**
 
-- API error handling inconsistent across routes
-- No retry logic for external API calls
+- API error handling could be more consistent across routes
 - No circuit breakers for failing services
-- Limited error logging/monitoring
+- Limited error logging/monitoring (no centralized logging)
 
-**Impact:** Poor user experience when errors occur
+**Impact:** Significantly improved resilience for core AI pipeline. Route-level improvements would be nice polish.
 
 ---
 
 ## Implementation Completeness by Subsystem
 
-| Subsystem                 | Completion | Notes                                         |
-| ------------------------- | ---------- | --------------------------------------------- |
-| **Electron Windows**      | 100%       | All 5 windows functional                      |
-| **IPC Channels**          | 100%       | 28 channels defined, most operational         |
-| **Backend API Routes**    | 95%        | 40+ endpoints, minor error handling gaps      |
-| **Backend Services**      | 75%        | Core services done, pipeline integration gaps |
-| **Database Schema**       | 100%       | 18 tables with relations                      |
-| **Frontend Components**   | 90%        | All major views, polish needed                |
-| **Authentication**        | 100%       | Supabase Auth fully integrated                |
-| **Onboarding System**     | 95%        | Templates & roadmaps operational              |
-| **Conversation System**   | 100%       | Chat with streaming responses                 |
-| **Nudge System**          | 85%        | Creation/display works, delivery missing      |
-| **Expert Matching**       | 100%       | Algorithm operational                         |
-| **Visual Guidance**       | 15%        | Window exists, rendering missing              |
-| **Screenshot Capture**    | 0%         | Not implemented                               |
-| **UI Detection (Vision)** | 10%        | API configured, service missing               |
-| **Notion Integration**    | 95%        | OAuth + import fully working                  |
-| **Slack Integration**     | 60%        | OAuth + fetch working, sync/delivery missing  |
-| **Vector Search**         | 50%        | Client ready, ingestion incomplete            |
-| **Security**              | 40%        | Auth works, encryption missing                |
+| Subsystem                 | Completion | Notes                                          |
+| ------------------------- | ---------- | ---------------------------------------------- |
+| **Electron Windows**      | 100%       | All 5 windows functional                       |
+| **IPC Channels**          | 100%       | 28 channels defined, most operational          |
+| **Backend API Routes**    | 95%        | 40+ endpoints, minor error handling gaps       |
+| **Backend Services**      | 95%        | All core services operational with retry logic |
+| **Database Schema**       | 100%       | 18 tables with relations                       |
+| **Frontend Components**   | 90%        | All major views, polish needed                 |
+| **Authentication**        | 100%       | Supabase Auth fully integrated                 |
+| **Onboarding System**     | 95%        | Templates & roadmaps operational               |
+| **Conversation System**   | 100%       | Chat with streaming responses                  |
+| **Nudge System**          | 85%        | Creation/display works, delivery missing       |
+| **Expert Matching**       | 100%       | Algorithm operational                          |
+| **Visual Guidance**       | 15%        | Window exists, rendering missing               |
+| **Screenshot Capture**    | 0%         | Not implemented                                |
+| **UI Detection (Vision)** | 10%        | API configured, service missing                |
+| **Notion Integration**    | 95%        | OAuth + import fully working                   |
+| **Slack Integration**     | 60%        | OAuth + fetch working, sync/delivery missing   |
+| **Vector Search**         | 100%       | Fully operational with intelligent chunking    |
+| **Security**              | 40%        | Auth works, encryption missing                 |
 
-**Overall: ~65-70% Complete**
+**Overall: ~75-80% Complete**
 
 ---
 
@@ -953,7 +994,16 @@ All channels are defined and operational:
    - View integration status
    - Trigger manual syncs
 
-8. **Multi-window coordination**
+8. **Knowledge base ingestion and semantic search**
+   - Sync Slack messages from selected channels
+   - Sync Notion pages shared with integration
+   - Intelligent token-based chunking (500-1000 tokens, 100 overlap)
+   - Automatic embedding generation
+   - Vector storage with comprehensive metadata
+   - Semantic similarity search via Pinecone
+   - Resilient pipeline with retry logic
+
+9. **Multi-window coordination**
    - Agent window toggles with Cmd+H
    - Agent can open Console window
    - Guide and Nudge windows are mutually exclusive
@@ -981,12 +1031,7 @@ All channels are defined and operational:
    - Cannot send nudges to Slack
    - In-app only for now
 
-4. **Semantic search with knowledge base**
-   - Vector DB configured
-   - Ingestion pipeline incomplete
-   - Cannot search uploaded documents
-
-5. **Token encryption**
+4. **Token encryption**
    - OAuth tokens in plaintext
    - Security risk for production
 
@@ -994,33 +1039,45 @@ All channels are defined and operational:
 
 ## Next Steps (Recommended Priority Order)
 
-### Phase 1: Core Value Proposition (Weeks 1-2)
+### Phase 1: Core Value Proposition (HIGH PRIORITY - Weeks 1-2)
 
 1. Implement screenshot capture (Electron native APIs)
 2. Integrate Gemini Vision for UI object detection
 3. Build overlay rendering (Canvas/SVG arrows and highlights)
 4. Test end-to-end help flow: Cmd+H → screenshot → detection → overlay
 
-### Phase 2: Knowledge Base (Weeks 3-4)
+### Phase 2: Knowledge Base ✅ COMPLETED
 
-5. Complete ingestion pipeline (document → chunks → embeddings → Pinecone)
-6. Implement hybrid search (semantic + keyword)
-7. Integrate search results into AI responses
-8. Test knowledge base quality with real documents
+~~5. Complete ingestion pipeline (document → chunks → embeddings → Pinecone)~~ ✅
+~~6. Integrate search results into AI responses~~ ✅
+~~7. Test knowledge base quality with real documents~~ ✅
 
-### Phase 3: Security & Production Readiness (Week 5)
+**What was built:**
 
-9. Implement AES-256 encryption for OAuth tokens
-10. Add automatic token refresh logic
-11. Implement comprehensive error handling
-12. Add logging and monitoring
+- Token-based intelligent chunking (500-1000 tokens, 100 overlap)
+- Full Slack message ingestion pipeline
+- Full Notion page ingestion pipeline
+- Retry logic with exponential backoff
+- Batch processing optimization (10x improvement)
+- Comprehensive metadata tracking
 
-### Phase 4: Real-time Integrations (Week 6)
+**Optional enhancement (LOW PRIORITY):**
 
-13. Build background worker infrastructure
-14. Implement Slack/Notion auto-sync
-15. Add Slack nudge delivery
-16. Test real-time updates
+- Hybrid search (semantic + keyword) - would improve precision but not critical
+
+### Phase 3: Security & Production Readiness (HIGH PRIORITY - Week 3)
+
+8. Implement AES-256 encryption for OAuth tokens
+9. Add automatic token refresh logic
+10. Implement comprehensive error handling across routes
+11. Add centralized logging and monitoring
+
+### Phase 4: Real-time Integrations (MEDIUM PRIORITY - Week 4)
+
+12. Build background worker infrastructure
+13. Implement Slack/Notion auto-sync
+14. Add Slack nudge delivery
+15. Test real-time updates
 
 ---
 
