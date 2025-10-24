@@ -335,13 +335,13 @@ export class AgentService {
       // Convert conversation history to OpenAI format
       // Add current date context for temporal awareness
       const now = new Date();
-      const dateStr = now.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      const dateStr = now.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       });
-      
+
       const systemPromptWithDate = `${SYSTEM_PROMPT}
 
 **IMPORTANT TEMPORAL CONTEXT:**

@@ -38,30 +38,30 @@ export interface SearchResult {
   score: number; // Combined RRF score (0-1)
   semanticScore?: number; // Raw Pinecone cosine similarity
   keywordScore?: number; // Raw PostgreSQL ts_rank
-  
+
   // Source metadata
   source: "slack" | "notion";
   sourceType?: string;
-  
+
   // Slack metadata
   channelId?: string;
   channelName?: string;
   userId?: string;
   username?: string;
   messageUrl?: string;
-  
+
   // Notion metadata
   pageId?: string;
   pageTitle?: string;
   pageUrl?: string;
   blockId?: string;
   blockType?: string;
-  
+
   // Chunk metadata
   chunkIndex?: number;
   totalChunks?: number;
   isChunked?: boolean;
-  
+
   // Temporal
   timestamp?: number;
   date?: string;
@@ -115,9 +115,7 @@ class SearchService {
       const mergedResults = this.mergeWithRRF(semanticResults, keywordResults, topK);
 
       // Extract snippets
-      const resultsWithSnippets = mergedResults.map((result) =>
-        this.addSnippet(result, query)
-      );
+      const resultsWithSnippets = mergedResults.map((result) => this.addSnippet(result, query));
 
       return {
         results: resultsWithSnippets,
@@ -274,7 +272,9 @@ class SearchService {
             sql`${searchContent.textVector} @@ plainto_tsquery('english', ${query})`
           )
         )
-        .orderBy(sql`ts_rank(${searchContent.textVector}, plainto_tsquery('english', ${query})) DESC`)
+        .orderBy(
+          sql`ts_rank(${searchContent.textVector}, plainto_tsquery('english', ${query})) DESC`
+        )
         .limit(topK);
 
       // Transform to SearchResult format
@@ -310,17 +310,12 @@ class SearchService {
       const keywordEntry = keywordMap.get(id);
 
       // Calculate RRF scores
-      const semanticScore = semanticEntry
-        ? 1 / (RRF_CONFIG.K + semanticEntry.rank)
-        : 0;
-      const keywordScore = keywordEntry
-        ? 1 / (RRF_CONFIG.K + keywordEntry.rank)
-        : 0;
+      const semanticScore = semanticEntry ? 1 / (RRF_CONFIG.K + semanticEntry.rank) : 0;
+      const keywordScore = keywordEntry ? 1 / (RRF_CONFIG.K + keywordEntry.rank) : 0;
 
       // Weighted combination
       const combinedScore =
-        RRF_CONFIG.SEMANTIC_WEIGHT * semanticScore +
-        RRF_CONFIG.KEYWORD_WEIGHT * keywordScore;
+        RRF_CONFIG.SEMANTIC_WEIGHT * semanticScore + RRF_CONFIG.KEYWORD_WEIGHT * keywordScore;
 
       // Use result from whichever source has it (prefer semantic for metadata completeness)
       const baseResult = semanticEntry?.result || keywordEntry!.result;
@@ -331,7 +326,7 @@ class SearchService {
         const resultDate = new Date(baseResult.date);
         const now = new Date();
         const daysDiff = Math.floor((now.getTime() - resultDate.getTime()) / (1000 * 60 * 60 * 24));
-        
+
         if (daysDiff <= 7) {
           recencyBoost = 1.5; // Last 7 days: 50% boost
         } else if (daysDiff <= 30) {
@@ -378,9 +373,7 @@ class SearchService {
     const end = Math.min(text.length, matchIndex + query.length + 100);
 
     const snippet =
-      (start > 0 ? "..." : "") +
-      text.substring(start, end) +
-      (end < text.length ? "..." : "");
+      (start > 0 ? "..." : "") + text.substring(start, end) + (end < text.length ? "..." : "");
 
     return {
       ...result,

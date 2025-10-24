@@ -54,7 +54,8 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
       },
       topK: {
         type: "number",
-        description: "Number of results to return (default: 10, max: 15). Use more results for complex queries or when asking about specific people's work.",
+        description:
+          "Number of results to return (default: 10, max: 15). Use more results for complex queries or when asking about specific people's work.",
         default: 10,
       },
     },
@@ -109,7 +110,7 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
 
       // Step 3: Parse temporal keywords for date filtering
       const dateFilters = this.parseTemporalKeywords(query);
-      
+
       console.log("[SearchKnowledgeTool] Performing hybrid search:", {
         organizationId,
         query,
@@ -168,26 +169,37 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
 
         // Build helpful no-results message with date context
         const now = new Date();
-        let noResultsMessage = "I couldn't find any information in the knowledge base for that query.";
-        
+        let noResultsMessage =
+          "I couldn't find any information in the knowledge base for that query.";
+
         if (dateFilters) {
           const dateFrom = dateFilters.dateFrom;
           const dateTo = dateFilters.dateTo;
-          
+
           if (dateFrom && dateTo) {
-            const fromStr = dateFrom.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const toStr = dateTo.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const fromStr = dateFrom.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+            const toStr = dateTo.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
             noResultsMessage = `I couldn't find any messages in the knowledge base between ${fromStr} and ${toStr}. `;
-            
+
             // Check if future date
             if (dateFrom > now) {
               noResultsMessage += "Note: This date range is in the future, so no data exists yet.";
             } else {
-              noResultsMessage += "The data for this period may not have been synced yet, or there may not have been any relevant discussions during that time.";
+              noResultsMessage +=
+                "The data for this period may not have been synced yet, or there may not have been any relevant discussions during that time.";
             }
           }
         } else {
-          noResultsMessage += " This might be something new, not yet documented, or outside the synced data range.";
+          noResultsMessage +=
+            " This might be something new, not yet documented, or outside the synced data range.";
         }
 
         return {
@@ -288,7 +300,7 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
   private parseTemporalKeywords(query: string): { dateFrom?: Date; dateTo?: Date } | undefined {
     const queryLower = query.toLowerCase();
     const now = new Date();
-    
+
     // Get start of current week (Monday)
     const getStartOfWeek = (date: Date): Date => {
       const d = new Date(date);

@@ -11,18 +11,21 @@
 ## Progress Tracker
 
 ### ✅ Phase 1.1 - Database Schema (COMPLETE)
+
 - ✅ Created `search-content.schema.ts` with tsvector column
 - ✅ Added GIN index for full-text search
 - ✅ Exported schema from index.ts
 - ✅ TypeScript compiles successfully
 
 ### ✅ Phase 1.2 - Migration (COMPLETE)
+
 - ✅ Created `0005_add_search_content_fts.sql` migration
 - ✅ Added trigger to auto-update text_vector
 - ✅ Migration executed successfully
 - ✅ Table created in Supabase with all indexes
 
 ### ✅ Phase 1.3 - Update Ingestion Service (COMPLETE & VERIFIED)
+
 - ✅ Modified `ingestion.service.ts` for dual-write (Pinecone + PostgreSQL)
 - ✅ Added `transformVectorToSearchContent()` helper function
 - ✅ Updated `processBatch()` for Slack dual-write
@@ -33,6 +36,7 @@
 - ✅ **Perfect synchronization** between both systems
 
 ### ✅ Phase 2 - Search Service (COMPLETE & PRODUCTION-TESTED)
+
 - ✅ Created `search.service.ts` with full hybrid search
 - ✅ Semantic search (Pinecone) - finds conceptually related content
 - ✅ Keyword search (PostgreSQL FTS) - exact term matching
@@ -46,6 +50,7 @@
 ### ⏸️ Phase 3 - Search API Routes (SKIPPED - Not needed for agent chat)
 
 ### ✅ Phase 4 - Agent Integration (COMPLETE & PRODUCTION-TESTED)
+
 - ✅ Updated `SearchKnowledgeTool` to use hybrid search service
 - ✅ Agent now uses: Intent Detection → Hybrid Search → Trust Ranking → Response
 - ✅ Search flow: Semantic (Pinecone) + Keyword (PostgreSQL) → RRF merge → Recency boost → Trust boost
@@ -55,12 +60,13 @@
 - ✅ **Anti-hallucination:** Proper no-results messages with date context, future date detection
 - ✅ **Response style:** Direct and factual, no interpretive fluff
 - ✅ TypeScript compiles successfully
-- ✅ **PRODUCTION-TESTED:** 
+- ✅ **PRODUCTION-TESTED:**
   - "What is the team working on this week?" → Comprehensive multi-person/multi-day summary
   - "What happened in #product this week?" → Channel-specific filtering works perfectly
   - "What is Mitable's business model?" → Notion document retrieval working
 
 ### ✅ Phase 5 - Production Testing & Validation (COMPLETE)
+
 - ✅ Dual-write verified: 150 Slack + Notion records in both systems
 - ✅ Date filtering working correctly (calendar weeks, not "last 7 days")
 - ✅ Recency boosting prioritizes Oct 24 content over Oct 13-14
@@ -68,16 +74,18 @@
 - ✅ Thread context properly captured with increased topK
 - ✅ Notion and Slack both searchable
 - ✅ No hallucinations on missing data or future dates
-- ✅ Response quality: factual, direct, with proper source citations  
+- ✅ Response quality: factual, direct, with proper source citations
 
 ---
 
 ## 🎉 Implementation Complete!
 
 ### Summary
+
 Hybrid search system fully operational in production. Agent can now search company knowledge (Slack + Notion) using a combination of semantic understanding and keyword precision, with intelligent temporal filtering and recency boosting.
 
 ### Key Achievements
+
 - **Sub-3s search performance** with dual-source querying
 - **Intelligent temporal parsing** (calendar weeks, not rolling 7 days)
 - **Recency-aware ranking** (recent content automatically prioritized)
@@ -86,6 +94,7 @@ Hybrid search system fully operational in production. Agent can now search compa
 - **Production-validated** with real user queries
 
 ### Architecture
+
 ```
 User Query → Temporal Parser → Hybrid Search Service
                                     ↓
@@ -116,6 +125,7 @@ Build search functionality that combines semantic search (Pinecone vector simila
 ## Technical Requirements
 
 ### Core Functionality
+
 - **Hybrid Approach:** 70% semantic + 30% keyword (tunable weights)
 - **Merge Strategy:** Reciprocal Rank Fusion (RRF)
 - **Filters:** document type, date range, author, tags
@@ -124,11 +134,13 @@ Build search functionality that combines semantic search (Pinecone vector simila
 - **Caching:** 10-minute TTL for frequent queries
 
 ### Performance Targets
+
 - ✅ **Cached queries:** <500ms
 - ✅ **Uncached queries:** <2 seconds
 - ✅ **Cache improvement:** >80% faster for repeat queries
 
 ### Quality Targets
+
 - Semantic search works for conceptual queries
 - Keyword search works for exact matches
 - Hybrid results better than either alone (measured by nDCG)
@@ -212,7 +224,7 @@ CREATE TABLE IF NOT EXISTS search_content (
   source_type TEXT,               -- 'message' | 'block' | 'thread_reply'
   text TEXT NOT NULL,             -- Full text content
   text_vector tsvector,           -- FTS searchable vector
-  
+
   -- Metadata for filtering
   channel_id TEXT,
   channel_name TEXT,
@@ -220,51 +232,51 @@ CREATE TABLE IF NOT EXISTS search_content (
   username TEXT,
   page_id TEXT,
   page_title TEXT,
-  
+
   -- Chunk metadata
   chunk_index INTEGER,
   total_chunks INTEGER,
   is_chunked BOOLEAN DEFAULT FALSE,
-  
+
   -- Temporal metadata
   created_at TIMESTAMP DEFAULT NOW(),
   timestamp BIGINT,
   date DATE,
-  
+
   -- Indexes
-  CONSTRAINT fk_organization 
-    FOREIGN KEY (organization_id) 
-    REFERENCES organizations(id) 
+  CONSTRAINT fk_organization
+    FOREIGN KEY (organization_id)
+    REFERENCES organizations(id)
     ON DELETE CASCADE
 );
 
 -- Create GIN index for full-text search
-CREATE INDEX idx_search_content_text_vector 
-  ON search_content 
+CREATE INDEX idx_search_content_text_vector
+  ON search_content
   USING GIN(text_vector);
 
 -- Create indexes for filters
-CREATE INDEX idx_search_content_org 
+CREATE INDEX idx_search_content_org
   ON search_content(organization_id);
-  
-CREATE INDEX idx_search_content_source 
+
+CREATE INDEX idx_search_content_source
   ON search_content(source, source_type);
-  
-CREATE INDEX idx_search_content_date 
+
+CREATE INDEX idx_search_content_date
   ON search_content(date);
-  
-CREATE INDEX idx_search_content_channel 
+
+CREATE INDEX idx_search_content_channel
   ON search_content(channel_id);
 
 -- Create composite index for common query patterns
-CREATE INDEX idx_search_content_org_source_date 
+CREATE INDEX idx_search_content_org_source_date
   ON search_content(organization_id, source, date DESC);
 
 -- Trigger to auto-update tsvector on insert/update
 CREATE OR REPLACE FUNCTION update_text_vector()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.text_vector := 
+  NEW.text_vector :=
     setweight(to_tsvector('english', COALESCE(NEW.channel_name, '')), 'A') ||
     setweight(to_tsvector('english', COALESCE(NEW.page_title, '')), 'A') ||
     setweight(to_tsvector('english', COALESCE(NEW.username, '')), 'B') ||
@@ -291,7 +303,7 @@ Modify `ingestion.service.ts` to **also write to PostgreSQL** when upserting to 
 ```typescript
 // After Pinecone upsert, also store in PostgreSQL for FTS
 await db.insert(searchContent).values(
-  vectors.map(v => ({
+  vectors.map((v) => ({
     id: v.id,
     organizationId,
     source: v.metadata.source,
@@ -305,6 +317,7 @@ await db.insert(searchContent).values(
 ```
 
 **Files to modify:**
+
 - `apps/backend/src/db/schema.ts` (add `search_content` table)
 - `apps/backend/src/services/ingestion.service.ts` (dual write)
 
@@ -335,8 +348,8 @@ interface SearchQuery {
     userIds?: string[];
   };
   weights?: {
-    semantic: number;  // default: 0.7
-    keyword: number;   // default: 0.3
+    semantic: number; // default: 0.7
+    keyword: number; // default: 0.3
   };
 }
 
@@ -373,7 +386,7 @@ class SearchService {
 
   constructor() {
     this.cache = new Map();
-    
+
     // Cleanup expired cache entries every minute
     setInterval(() => this.cleanupCache(), 60 * 1000);
   }
@@ -383,7 +396,7 @@ class SearchService {
    */
   async hybridSearch(query: SearchQuery): Promise<HybridSearchResponse> {
     const startTime = Date.now();
-    
+
     // Check cache
     const cacheKey = this.getCacheKey(query);
     const cached = this.cache.get(cacheKey);
@@ -458,12 +471,7 @@ class SearchService {
 
     // Query Pinecone
     const namespace = `org-${query.organizationId}`;
-    const results = await vectorService.queryVectors(
-      queryEmbedding,
-      topK,
-      namespace,
-      filter
-    );
+    const results = await vectorService.queryVectors(queryEmbedding, topK, namespace, filter);
 
     return results.map((r, index) => ({
       id: r.id,
@@ -478,9 +486,7 @@ class SearchService {
    * Keyword search using PostgreSQL Full-Text Search
    */
   private async keywordSearch(query: SearchQuery, topK: number) {
-    const conditions: any[] = [
-      eq(searchContent.organizationId, query.organizationId),
-    ];
+    const conditions: any[] = [eq(searchContent.organizationId, query.organizationId)];
 
     // Apply filters
     if (query.filters?.sources) {
@@ -502,8 +508,8 @@ class SearchService {
     // PostgreSQL FTS query
     const tsQuery = query.query
       .split(/\s+/)
-      .map(term => `${term}:*`)
-      .join(' & ');
+      .map((term) => `${term}:*`)
+      .join(" & ");
 
     const results = await db
       .select({
@@ -520,12 +526,7 @@ class SearchService {
         },
       })
       .from(searchContent)
-      .where(
-        and(
-          ...conditions,
-          sql`text_vector @@ to_tsquery('english', ${tsQuery})`
-        )
-      )
+      .where(and(...conditions, sql`text_vector @@ to_tsquery('english', ${tsQuery})`))
       .orderBy(sql`ts_rank(text_vector, to_tsquery('english', ${tsQuery})) DESC`)
       .limit(topK);
 
@@ -548,18 +549,21 @@ class SearchService {
     semanticWeight: number,
     keywordWeight: number
   ) {
-    const scores = new Map<string, {
-      id: string;
-      text: string;
-      semanticScore: number;
-      keywordScore: number;
-      semanticRank: number;
-      keywordRank: number;
-      metadata: any;
-    }>();
+    const scores = new Map<
+      string,
+      {
+        id: string;
+        text: string;
+        semanticScore: number;
+        keywordScore: number;
+        semanticRank: number;
+        keywordRank: number;
+        metadata: any;
+      }
+    >();
 
     // Add semantic scores
-    semanticResults.forEach(result => {
+    semanticResults.forEach((result) => {
       scores.set(result.id, {
         id: result.id,
         text: result.text,
@@ -572,7 +576,7 @@ class SearchService {
     });
 
     // Add keyword scores
-    keywordResults.forEach(result => {
+    keywordResults.forEach((result) => {
       const existing = scores.get(result.id);
       const keywordScore = keywordWeight / (this.RRF_K + result.rank);
 
@@ -594,7 +598,7 @@ class SearchService {
 
     // Sort by combined RRF score
     return Array.from(scores.values())
-      .map(item => ({
+      .map((item) => ({
         ...item,
         score: item.semanticScore + item.keywordScore,
       }))
@@ -604,10 +608,10 @@ class SearchService {
   /**
    * Apply additional filters to results
    */
-  private applyFilters(results: any[], filters?: SearchQuery['filters']) {
+  private applyFilters(results: any[], filters?: SearchQuery["filters"]) {
     if (!filters) return results;
 
-    return results.filter(result => {
+    return results.filter((result) => {
       // Date range filter
       if (filters.dateFrom || filters.dateTo) {
         const resultDate = result.metadata.timestamp
@@ -637,7 +641,7 @@ class SearchService {
   private async extractSnippets(results: any[], query: string): Promise<SearchResult[]> {
     const queryTerms = query.toLowerCase().split(/\s+/);
 
-    return results.map(result => {
+    return results.map((result) => {
       const text = result.text;
       const lowerText = text.toLowerCase();
 
@@ -793,11 +797,13 @@ const searchResults = await searchService.hybridSearch({
 
 // Format results for AI
 const context = searchResults.results
-  .map((r, i) => `
+  .map(
+    (r, i) => `
 [Result ${i + 1}] (Score: ${r.score.toFixed(3)}, Source: ${r.metadata.source})
 ${r.snippet}
 From: ${r.metadata.channelName || r.metadata.pageTitle || "Unknown"}
-`)
+`
+  )
   .join("\n\n");
 ```
 
@@ -908,17 +914,20 @@ SEARCH_DEFAULT_TOP_K=20
 ## Dependencies
 
 ### External Services
+
 - ✅ Pinecone (already configured)
 - ✅ OpenAI (already configured)
 - ✅ PostgreSQL (already configured)
 
 ### Internal Dependencies
+
 - ✅ Task 2.1: Document Ingestion (COMPLETE)
 - ✅ Intelligent Chunking (COMPLETE)
 - ✅ Embedding Service (COMPLETE)
 - ✅ Vector Service (COMPLETE)
 
 ### NPM Packages (may need)
+
 ```bash
 npm install --save node-cache  # For in-memory caching (alternative to Map)
 ```
@@ -937,6 +946,7 @@ npm install --save node-cache  # For in-memory caching (alternative to Map)
 ## Monitoring
 
 **Metrics to track:**
+
 - Search query volume
 - Latency (p50, p95, p99)
 - Cache hit rate
@@ -944,6 +954,7 @@ npm install --save node-cache  # For in-memory caching (alternative to Map)
 - Top queries (for optimization)
 
 **Alerts:**
+
 - Search latency >3 seconds for 5 minutes
 - Error rate >5%
 - Cache hit rate <20%

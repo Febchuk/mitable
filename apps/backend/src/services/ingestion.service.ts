@@ -65,10 +65,12 @@ class IngestionService {
     organizationId: string
   ): NewSearchContent {
     const { id, metadata } = vector;
-    
+
     // Extract timestamp - handle both seconds and milliseconds
-    const timestamp = metadata.timestamp 
-      ? (metadata.timestamp < 10000000000 ? metadata.timestamp * 1000 : metadata.timestamp)
+    const timestamp = metadata.timestamp
+      ? metadata.timestamp < 10000000000
+        ? metadata.timestamp * 1000
+        : metadata.timestamp
       : Date.now();
 
     return {
@@ -77,28 +79,28 @@ class IngestionService {
       source: metadata.source || "unknown",
       sourceType: metadata.source_type,
       text: metadata.text || "",
-      
+
       // textVector is populated by BEFORE INSERT trigger (update_search_content_text_vector)
       // We provide empty string as placeholder, trigger will override with to_tsvector('english', text)
       textVector: "",
-      
+
       // Slack-specific fields
       channelId: metadata.channel_id,
       channelName: metadata.channel_name,
       userId: metadata.user_id,
       username: metadata.username,
-      
+
       // Notion-specific fields
       pageId: metadata.page_id,
       pageTitle: metadata.page_title,
       blockId: metadata.block_id,
       blockType: metadata.block_type,
-      
+
       // Chunk metadata
       chunkIndex: metadata.chunk_index || 0,
       totalChunks: metadata.total_chunks || 1,
       isChunked: metadata.is_chunked || false,
-      
+
       // Temporal metadata
       timestamp,
       date: metadata.date || new Date(timestamp).toISOString().split("T")[0],
@@ -372,15 +374,15 @@ class IngestionService {
       );
 
       const namespace = `org-${organizationId}`;
-      
+
       // DUAL-WRITE: Store in both Pinecone (semantic) and PostgreSQL (keyword)
       await vectorService.upsertVectors(vectors, namespace);
-      
+
       // Transform vectors to PostgreSQL format and insert
       const searchContentRecords = vectors.map((v) =>
         this.transformVectorToSearchContent(v, organizationId)
       );
-      
+
       await db.insert(schema.searchContent).values(searchContentRecords);
     } catch (error) {
       throw new Error("Failed to process message batch", { cause: error });
@@ -632,15 +634,15 @@ class IngestionService {
       });
 
       const namespace = `org-${organizationId}`;
-      
+
       // DUAL-WRITE: Store in both Pinecone (semantic) and PostgreSQL (keyword)
       await vectorService.upsertVectors(vectors, namespace);
-      
+
       // Transform vectors to PostgreSQL format and insert
       const searchContentRecords = vectors.map((v) =>
         this.transformVectorToSearchContent(v, organizationId)
       );
-      
+
       await db.insert(schema.searchContent).values(searchContentRecords);
     } catch (error) {
       throw new Error("Failed to process Notion block batch", { cause: error });

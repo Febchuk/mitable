@@ -63,9 +63,11 @@ async function main() {
     // Display top results
     results.results.forEach((result, i) => {
       console.log(`\n📄 Result ${i + 1}:`);
-      console.log(`   Score: ${result.score.toFixed(4)} (semantic: ${result.semanticScore?.toFixed(4) || "N/A"}, keyword: ${result.keywordScore?.toFixed(4) || "N/A"})`);
+      console.log(
+        `   Score: ${result.score.toFixed(4)} (semantic: ${result.semanticScore?.toFixed(4) || "N/A"}, keyword: ${result.keywordScore?.toFixed(4) || "N/A"})`
+      );
       console.log(`   Source: ${result.source} (${result.sourceType || "N/A"})`);
-      
+
       if (result.channelName) {
         console.log(`   Channel: #${result.channelName}`);
       }
@@ -78,7 +80,7 @@ async function main() {
       if (result.date) {
         console.log(`   Date: ${result.date}`);
       }
-      
+
       console.log(`   Snippet: ${result.snippet || result.text.substring(0, 150) + "..."}`);
     });
 

@@ -20,7 +20,7 @@ async function main() {
   console.log("\n📊 Pinecone Stats:");
   const pineconeStats = await vectorService.getStats();
   console.log(`Total vectors: ${pineconeStats.totalRecordCount || 0}`);
-  
+
   if (pineconeStats.namespaces) {
     for (const [namespace, stats] of Object.entries(pineconeStats.namespaces)) {
       console.log(`  Namespace "${namespace}": ${(stats as any).recordCount || 0} vectors`);
@@ -68,7 +68,7 @@ async function main() {
   console.log("\n📅 Most Recent Messages (sorted by date):");
   samples.forEach((record, i) => {
     console.log(`\n  Sample ${i + 1}:`);
-    console.log(`    📅 Date: ${record.date || 'N/A'}`);
+    console.log(`    📅 Date: ${record.date || "N/A"}`);
     if (record.timestamp) {
       const msgDate = new Date(record.timestamp * 1000);
       console.log(`    🕐 Timestamp: ${msgDate.toLocaleString()}`);
@@ -91,7 +91,7 @@ async function main() {
   console.log("✅ Dual-Write Verification:");
   const pineconeTotal = pineconeStats.totalRecordCount || 0;
   const postgresTotal = Number(pgTotal[0].count);
-  
+
   if (pineconeTotal === postgresTotal) {
     console.log(`✅ SUCCESS: Both systems match with ${pineconeTotal} records!`);
   } else {

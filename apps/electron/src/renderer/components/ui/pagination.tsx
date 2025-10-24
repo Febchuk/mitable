@@ -40,8 +40,8 @@ const PaginationLink = ({ className, isActive, size = "icon", ...props }: Pagina
         size,
       }),
       // Improved contrast for pagination numbers
-      isActive 
-        ? "bg-primary text-white border-primary hover:bg-primary/90" 
+      isActive
+        ? "bg-primary text-white border-primary hover:bg-primary/90"
         : "text-text-primary hover:text-white hover:bg-primary/20",
       className
     )}
