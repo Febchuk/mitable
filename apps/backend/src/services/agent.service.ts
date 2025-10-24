@@ -264,12 +264,27 @@ export class AgentService {
       ) {
         console.log("[AgentService] Auto-triggering GuideNextStepTool for continuation");
 
+        // Extract original task from previous workflow message
+        const lastWorkflowMessage = context.conversationHistory
+          .filter((m) => m.role === "assistant" && m.messageType === "workflow")
+          .pop();
+
+        const firstStepInstruction = (lastWorkflowMessage?.cardData as any)?.allSteps?.[0]?.instruction;
+        const originalTask = firstStepInstruction
+          ? // Extract task from first step's instruction (e.g., "Click 'Send confirmation code'" -> "send confirmation code")
+            this.extractTaskFromInstruction(firstStepInstruction)
+          : "Continue to the next step based on the screenshot";
+
+        console.log("[AgentService] Continuation with original task:", originalTask);
+
         const guideTool = this.tools.get("guide_next_step");
         if (guideTool) {
           // Execute guide tool directly for continuation
           const toolResult = await guideTool.execute(
             {
-              task: "Continue to the next step based on the screenshot",
+              task: originalTask,
+              stepNumber: ((lastWorkflowMessage?.cardData as any)?.stepNumber || 0) + 1,
+              previousStep: (lastWorkflowMessage?.cardData as any)?.instruction,
             },
             context
           );
@@ -441,8 +456,8 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
           // Check for text content (final response without tool call)
           if (delta?.content) {
             textContent += delta.content;
-            // Log first text content received (not every chunk)
-            if (textContent.length < 50) {
+            // Log only once when we first detect direct response
+            if (textContent.length === delta.content.length) {
               console.log("[AgentService] AI generating direct response (no tool call)");
             }
           }
@@ -530,6 +545,25 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
               type: "window_trigger",
               windowTrigger: toolResult.triggerWindow,
             };
+
+            // IMPORTANT: If this is the guide tool and it succeeded with a window trigger,
+            // exit immediately. The guide window will display the visual guidance - no need
+            // for AI to synthesize a response. This prevents infinite loops where the AI
+            // keeps calling the guide tool on every iteration.
+            if (functionName === "show_step_by_step_guide") {
+              console.log(
+                "[AgentService] Guide tool succeeded - exiting immediately (guide window will display step)"
+              );
+
+              yield {
+                type: "complete",
+                content: toolResult.content,
+                messageType: toolResult.messageType,
+                cardData: toolResult.cardData,
+              };
+
+              return; // Exit the loop - guide window handles the rest
+            }
           }
 
           // Add tool result to conversation history for next iteration
@@ -689,6 +723,59 @@ Specific question:`;
       console.error("[AgentService] Error generating nudge question:", error);
       throw new Error("Failed to generate question from conversation");
     }
+  }
+
+  /**
+   * Extract task from instruction text
+   *
+   * Removes common action verbs and formatting to get core task.
+   * Examples:
+   * - "Click 'Send confirmation code'" -> "send confirmation code"
+   * - "Enter your email address" -> "enter your email address"
+   * - "Navigate to the Settings page" -> "navigate to the settings page"
+   *
+   * @param instruction - Step instruction text
+   * @returns Extracted task description
+   */
+  private extractTaskFromInstruction(instruction: string): string {
+    // Remove common action verbs at the start
+    const actionVerbs = [
+      "click",
+      "press",
+      "select",
+      "choose",
+      "open",
+      "navigate to",
+      "go to",
+      "tap",
+      "hover over",
+      "scroll to",
+      "find",
+      "locate",
+    ];
+
+    let task = instruction.toLowerCase().trim();
+
+    // Remove action verbs from the beginning
+    for (const verb of actionVerbs) {
+      if (task.startsWith(verb + " ")) {
+        task = task.substring(verb.length + 1);
+        break;
+      }
+    }
+
+    // Remove quotes (both single and double)
+    task = task.replace(/['"]/g, "");
+
+    // Remove "the" at the beginning if present
+    if (task.startsWith("the ")) {
+      task = task.substring(4);
+    }
+
+    // Clean up whitespace
+    task = task.trim();
+
+    return task;
   }
 }
 
