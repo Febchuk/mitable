@@ -180,18 +180,42 @@ class ContinuationDetectorService {
   }
 
   /**
-   * Simple hash function for screenshot comparison
-   *
-   * @param screenshotData - Base64 screenshot data
+   * Create a simple hash of screenshot data for comparison
+   * @param screenshotData - Base64 screenshot data (string or Buffer)
    * @returns Simple hash string
    */
-  hashScreenshot(screenshotData: string): string {
+  hashScreenshot(screenshotData: string | Buffer | any): string {
+    // Handle null, undefined, or empty
+    if (!screenshotData) {
+      return "empty-screenshot";
+    }
+
+    // Handle Buffer
+    if (Buffer.isBuffer(screenshotData)) {
+      if (screenshotData.length === 0) {
+        return "empty-screenshot";
+      }
+      screenshotData = screenshotData.toString("base64");
+    }
+
+    // Handle non-string types (could be object, array, etc)
+    if (typeof screenshotData !== "string") {
+      return "empty-screenshot";
+    }
+
+    // Handle empty or very short strings
+    if (screenshotData.length === 0) {
+      return "empty-screenshot";
+    }
+
     // Take a sample of the screenshot data for quick comparison
     // In production, you might use a proper perceptual hash
-    const sampleSize = 1000;
+    const sampleSize = Math.min(1000, screenshotData.length);
     const sample =
       screenshotData.substring(0, sampleSize) +
-      screenshotData.substring(screenshotData.length - sampleSize);
+      (screenshotData.length > sampleSize
+        ? screenshotData.substring(screenshotData.length - sampleSize)
+        : "");
 
     // Simple hash based on length and sample content
     let hash = screenshotData.length.toString(36);
