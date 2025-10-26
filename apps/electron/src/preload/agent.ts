@@ -7,6 +7,9 @@ const IPC_CHANNELS = {
   SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
   AGENT_RESIZE: "agent-resize",
   AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step",
+  CONVERSATION_SHOW: "conversation-show",
+  CONVERSATION_HIDE: "conversation-hide",
+  CONVERSATION_SEND_MESSAGE: "conversation-send-message",
   NUDGE_SHOW: "nudge-show",
   GUIDE_START: "guide-start",
   CAPTURE_SCREENSHOT: "capture-screenshot",
@@ -21,6 +24,13 @@ contextBridge.exposeInMainWorld("agentAPI", {
     ipcRenderer.send(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, ignore),
   resizeWindow: (mode: "pill" | "conversation") =>
     ipcRenderer.send(IPC_CHANNELS.AGENT_RESIZE, mode),
+
+  // Conversation window management
+  showConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SHOW),
+  hideConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_HIDE),
+  sendMessageToConversation: (messageData: any, screenshot: string | null) =>
+    ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, messageData, screenshot),
+
   showNudge: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.NUDGE_SHOW, data),
   startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),
 

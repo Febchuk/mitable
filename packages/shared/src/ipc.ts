@@ -44,7 +44,14 @@ export const IPC_CHANNELS = {
   AGENT_RESIZE: "agent-resize",
   AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step", // Triggered when Guide "Done" button clicked
 
-  // Conversation management
+  // Conversation window (parent-child with agent)
+  CONVERSATION_SHOW: "conversation-show", // Agent → Main (show conversation window)
+  CONVERSATION_HIDE: "conversation-hide", // Agent/Conversation → Main (hide conversation window)
+  CONVERSATION_SEND_MESSAGE: "conversation-send-message", // Agent → Conversation (forward user message)
+  CONVERSATION_UPDATE_MESSAGES: "conversation-update-messages", // Conversation → Agent (sync message state)
+  CONVERSATION_POSITION_UPDATE: "conversation-position-update", // Main → Conversation (on pill drag)
+
+  // Legacy conversation management (kept for backward compatibility)
   CONVERSATION_NEW: "conversation-new",
   CONVERSATION_LOAD: "conversation-load",
   CONVERSATION_UPDATE: "conversation-update",
