@@ -4,6 +4,8 @@ import { db } from "../db/client.js";
 import { searchContent } from "../db/schema/index.js";
 import { sql, and, eq, gte, lte, inArray, SQL } from "drizzle-orm";
 import type { QueryResult } from "./vector.service.js";
+import { cacheService } from "./cache.service.js";
+import { searchLoggerService } from "./search-logger.service.js";
 
 /**
  * Search query filters
@@ -95,6 +97,7 @@ const RRF_CONFIG = {
 class SearchService {
   /**
    * Perform hybrid search combining semantic and keyword search
+   * Includes caching with 10-minute TTL
    */
   async search(params: SearchQuery): Promise<SearchResponse> {
     const startTime = Date.now();
@@ -104,8 +107,41 @@ class SearchService {
       throw new Error("Search query cannot be empty");
     }
 
+    // Generate cache key
+    const cacheKey = cacheService.generateKey(organizationId, query, filters);
+
+    // Check cache first
+    const cachedResult = cacheService.get<SearchResponse>(cacheKey);
+    if (cachedResult) {
+      const cacheRetrievalTime = Date.now() - startTime;
+
+      // Log cache hit
+      if (cachedResult.totalResults > 0) {
+        searchLoggerService.logSearch({
+          cacheHit: true,
+          query,
+          timeMs: cacheRetrievalTime,
+          totalResults: cachedResult.totalResults,
+          semanticResults: cachedResult.semanticResults,
+          keywordResults: cachedResult.keywordResults,
+        });
+      } else {
+        searchLoggerService.logNoResults({
+          cacheHit: true,
+          query,
+          timeMs: cacheRetrievalTime,
+        });
+      }
+
+      // Return cached result with updated search time (cache retrieval time)
+      return {
+        ...cachedResult,
+        searchTime: cacheRetrievalTime,
+      };
+    }
+
     try {
-      // Run both searches in parallel for performance
+      // Cache miss - run both searches in parallel for performance
       const [semanticResults, keywordResults] = await Promise.all([
         this.semanticSearch(query, organizationId, filters, topK * 2), // Fetch more for better RRF
         this.keywordSearch(query, organizationId, filters, topK * 2),
@@ -117,13 +153,36 @@ class SearchService {
       // Extract snippets
       const resultsWithSnippets = mergedResults.map((result) => this.addSnippet(result, query));
 
-      return {
+      const response: SearchResponse = {
         results: resultsWithSnippets,
         totalResults: resultsWithSnippets.length,
         semanticResults: semanticResults.length,
         keywordResults: keywordResults.length,
         searchTime: Date.now() - startTime,
       };
+
+      // Store in cache
+      cacheService.set(cacheKey, response);
+
+      // Log cache miss
+      if (response.totalResults > 0) {
+        searchLoggerService.logSearch({
+          cacheHit: false,
+          query,
+          timeMs: response.searchTime,
+          totalResults: response.totalResults,
+          semanticResults: response.semanticResults,
+          keywordResults: response.keywordResults,
+        });
+      } else {
+        searchLoggerService.logNoResults({
+          cacheHit: false,
+          query,
+          timeMs: response.searchTime,
+        });
+      }
+
+      return response;
     } catch (error) {
       throw new Error("Hybrid search failed", { cause: error });
     }
