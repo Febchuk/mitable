@@ -1,7 +1,8 @@
 /**
- * API Client for Conversations
+ * Shared API Client for Conversations
  *
  * Handles communication with the backend streaming API
+ * Works with both Agent and Conversation windows
  */
 
 const API_BASE_URL = "http://localhost:3000/api";
@@ -31,6 +32,7 @@ export interface StreamChunk {
   error?: string;
   messageType?: string;
   cardData?: any;
+  sources?: any[];
   windowTrigger?: {
     window: "nudge" | "guide";
     data: any;
@@ -39,9 +41,17 @@ export interface StreamChunk {
 
 /**
  * Get auth token from main process
+ * Works with both agentAPI and conversationAPI
  */
 async function getAuthHeaders(): Promise<HeadersInit> {
-  const token = await window.agentAPI.getAuthToken();
+  let token: string | null = null;
+
+  // Check which window API is available
+  if ("agentAPI" in window && window.agentAPI?.getAuthToken) {
+    token = await window.agentAPI.getAuthToken();
+  } else if ("conversationAPI" in window && window.conversationAPI?.getAuthToken) {
+    token = await window.conversationAPI.getAuthToken();
+  }
 
   return {
     "Content-Type": "application/json",
@@ -128,9 +138,9 @@ export async function sendMessageStream(
   const requestBody: { content: string; screenshot?: string } = { content };
   if (screenshot) {
     requestBody.screenshot = screenshot;
-    console.log(`[Agent API] Sending message with screenshot (${screenshot.length} bytes)`);
+    console.log(`[API] Sending message with screenshot (${screenshot.length} bytes)`);
   } else {
-    console.log("[Agent API] Sending message without screenshot");
+    console.log("[API] Sending message without screenshot");
   }
 
   const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {

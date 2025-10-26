@@ -824,6 +824,9 @@ router.post(
       }, 15000);
 
       let assistantContent = "";
+      let assistantMessageType = "text";
+      let assistantCardData: any = null;
+      let assistantSources: any[] = [];
 
       try {
         console.log("[Conversations] Starting AgentService.processMessage");
@@ -864,22 +867,36 @@ router.post(
           // Send chunk to client
           res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 
-          // Accumulate content for database save
+          // Accumulate content and metadata for database save
           if (chunk.type === "chunk" && chunk.content) {
             assistantContent += chunk.content;
-          } else if (chunk.type === "complete" && chunk.content) {
-            assistantContent = chunk.content;
+          } else if (chunk.type === "complete") {
+            if (chunk.content) {
+              assistantContent = chunk.content;
+            }
+            // Extract metadata from complete chunk
+            if ((chunk as any).messageType) {
+              assistantMessageType = (chunk as any).messageType;
+            }
+            if ((chunk as any).cardData) {
+              assistantCardData = (chunk as any).cardData;
+            }
+            if ((chunk as any).sources) {
+              assistantSources = (chunk as any).sources;
+            }
           }
         }
 
-        // Save complete assistant message to database
+        // Save complete assistant message to database with metadata
         const [assistantMessage] = await db
           .insert(schema.messages)
           .values({
             conversationId,
             role: "assistant",
             content: assistantContent,
-            messageType: "text",
+            messageType: assistantMessageType,
+            cardData: assistantCardData,
+            sources: assistantSources,
           })
           .returning({
             id: schema.messages.id,

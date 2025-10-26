@@ -4,19 +4,19 @@ import { Code, LucideIcon, Users, Workflow } from "lucide-react";
 import UserMessage from "../../components/domain/messages/UserMessage";
 import AIMessage from "../../components/domain/messages/AIMessage";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
-import { sendMessageStream } from "../../agent/src/api/conversations";
+import { sendMessageStream } from "../../lib/api/conversations";
 
 declare global {
   interface Window {
     conversationAPI: {
       hideWindow: () => void;
-      onMessageReceived: (callback: (message: any, screenshot: string | null) => void) => void;
+      onMessageReceived: (callback: (message: any, screenshot: string | null) => void) => () => void;
       updateMessages: (messages: any[]) => void;
-      onPositionUpdate: (callback: (x: number, y: number) => void) => void;
+      onPositionUpdate: (callback: (x: number, y: number) => void) => () => void;
       showNudge: (data: unknown) => void;
       startGuide: (data: unknown) => void;
       getAuthToken: () => Promise<string | null>;
-      onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
+      onAuthTokenUpdated: (callback: (token: string | null) => void) => () => void;
     };
   }
 }
@@ -48,7 +48,7 @@ function App() {
 
   // Listen for messages from Agent window
   useEffect(() => {
-    window.conversationAPI.onMessageReceived(async (messageData: any, screenshot: string | null) => {
+    const cleanup = window.conversationAPI.onMessageReceived(async (messageData: any, screenshot: string | null) => {
       console.log("[Conversation] Message received from Agent:", messageData);
 
       // Destructure message data
@@ -145,6 +145,9 @@ function App() {
         streamingMessageIdRef.current = null;
       }
     });
+
+    // Cleanup listener on unmount or remount
+    return cleanup;
   }, []);
 
   const handleCardClick = (message: Message) => {

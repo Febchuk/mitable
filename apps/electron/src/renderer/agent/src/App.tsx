@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import AgentPill from "./components/AgentPill";
-import { createConversation } from "./api/conversations";
+import { createConversation } from "../../lib/api/conversations";
 import type { ScreenshotResult } from "@mitable/shared";
 
 declare global {

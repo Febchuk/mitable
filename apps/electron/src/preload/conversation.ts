@@ -17,10 +17,18 @@ contextBridge.exposeInMainWorld("conversationAPI", {
   hideWindow: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_HIDE),
 
   // Message communication with Agent window
+  // Returns cleanup function to remove listener
   onMessageReceived: (callback: (message: any, screenshot: string | null) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, (_event, message, screenshot) =>
-      callback(message, screenshot)
-    );
+    const handler = (_event: any, message: any, screenshot: string | null) => {
+      callback(message, screenshot);
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, handler);
+
+    // Return cleanup function to remove this specific listener
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, handler);
+    };
   },
 
   // Update message state (send back to Agent if needed)
@@ -28,8 +36,18 @@ contextBridge.exposeInMainWorld("conversationAPI", {
     ipcRenderer.send(IPC_CHANNELS.CONVERSATION_UPDATE_MESSAGES, messages),
 
   // Position updates (when pill is dragged)
+  // Returns cleanup function to remove listener
   onPositionUpdate: (callback: (x: number, y: number) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.CONVERSATION_POSITION_UPDATE, (_event, x, y) => callback(x, y));
+    const handler = (_event: any, x: number, y: number) => {
+      callback(x, y);
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.CONVERSATION_POSITION_UPDATE, handler);
+
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.CONVERSATION_POSITION_UPDATE, handler);
+    };
   },
 
   // Trigger Nudge/Guide windows from cards
@@ -38,9 +56,17 @@ contextBridge.exposeInMainWorld("conversationAPI", {
 
   // Auth management - Conversation requests token from main process
   getAuthToken: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_TOKEN),
+  // Returns cleanup function to remove listener
   onAuthTokenUpdated: (callback: (token: string | null) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.AUTH_TOKEN_UPDATED, (_event, token: string | null) =>
-      callback(token)
-    );
+    const handler = (_event: any, token: string | null) => {
+      callback(token);
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.AUTH_TOKEN_UPDATED, handler);
+
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.AUTH_TOKEN_UPDATED, handler);
+    };
   },
 });
