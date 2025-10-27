@@ -6,8 +6,6 @@ const IPC_CHANNELS = {
   NUDGE_ACCEPT: "nudge-accept",
   NUDGE_DISMISS: "nudge-dismiss",
   NUDGE_CREATE_REQUEST: "nudge-create-request",
-  NUDGE_GENERATE_CONTEXT: "nudge-generate-context", // NEW: For AI context generation
-  NUDGE_GENERATE_QUESTION: "nudge-generate-question", // NEW: For AI question generation
   SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
 } as const;
 
@@ -22,10 +20,4 @@ contextBridge.exposeInMainWorld("nudgeAPI", {
   createNudge: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.NUDGE_CREATE_REQUEST, data),
   setIgnoreMouseEvents: (ignore: boolean) =>
     ipcRenderer.send(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, ignore),
-
-  // NEW: AI generation methods (async - return promises)
-  generateContext: (conversationId: string): Promise<{ context: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.NUDGE_GENERATE_CONTEXT, conversationId),
-  generateQuestion: (conversationId: string): Promise<{ question: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.NUDGE_GENERATE_QUESTION, conversationId),
 });

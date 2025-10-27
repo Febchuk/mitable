@@ -1,12 +1,6 @@
 import OpenAI from "openai";
 import { config, validateVectorDimensions } from "../config.js";
 
-const RETRY_CONFIG = {
-  MAX_RETRIES: 3,
-  BACKOFF_MULTIPLIER: 2,
-  INITIAL_DELAY_MS: 1000,
-} as const;
-
 /**
  * Model dimension mapping
  * Maps OpenAI embedding model names to their vector dimensions
@@ -49,55 +43,22 @@ class EmbeddingService {
     });
   }
 
-  private async retryWithBackoff<T>(operation: () => Promise<T>, context: string): Promise<T> {
-    let lastError: Error | undefined;
-
-    for (let attempt = 0; attempt < RETRY_CONFIG.MAX_RETRIES; attempt++) {
-      try {
-        return await operation();
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-
-        const isRateLimitError =
-          error instanceof Error && "status" in error && error.status === 429;
-
-        const isLastAttempt = attempt === RETRY_CONFIG.MAX_RETRIES - 1;
-
-        if (isLastAttempt) {
-          break;
-        }
-
-        if (isRateLimitError || (error instanceof Error && error.message.includes("rate limit"))) {
-          const delayMs =
-            RETRY_CONFIG.INITIAL_DELAY_MS * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt);
-          console.log(
-            `[EmbeddingService] Rate limit hit, retrying ${context} in ${delayMs}ms (attempt ${attempt + 1}/${RETRY_CONFIG.MAX_RETRIES})`
-          );
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    throw new Error(`${context} failed after ${RETRY_CONFIG.MAX_RETRIES} attempts`, {
-      cause: lastError,
-    });
-  }
-
   /**
    * Generate embedding for a single text input
    * @param text - Text to embed
    * @returns Promise resolving to embedding vector (dimensions depend on model)
    */
   async embedText(text: string): Promise<number[]> {
-    return this.retryWithBackoff(async () => {
+    try {
       const response = await this.client.embeddings.create({
         model: this.model,
         input: text,
       });
+
       return response.data[0].embedding;
-    }, "embedText");
+    } catch (error) {
+      throw new Error("Failed to generate embedding", { cause: error });
+    }
   }
 
   /**
@@ -119,13 +80,16 @@ class EmbeddingService {
 
     // If within batch size limit, process directly
     if (texts.length <= chunkSize) {
-      return this.retryWithBackoff(async () => {
+      try {
         const response = await this.client.embeddings.create({
           model: this.model,
           input: texts,
         });
+
         return response.data.map((item) => item.embedding);
-      }, `embedTexts (${texts.length} texts)`);
+      } catch (error) {
+        throw new Error("Failed to generate embeddings", { cause: error });
+      }
     }
 
     // For large batches, chunk and process sequentially
@@ -133,17 +97,21 @@ class EmbeddingService {
 
     for (let i = 0; i < texts.length; i += chunkSize) {
       const chunk = texts.slice(i, i + chunkSize);
-      const chunkNumber = Math.floor(i / chunkSize) + 1;
 
-      const embeddings = await this.retryWithBackoff(async () => {
+      try {
         const response = await this.client.embeddings.create({
           model: this.model,
           input: chunk,
         });
-        return response.data.map((item) => item.embedding);
-      }, `embedTexts chunk ${chunkNumber}`);
 
-      allEmbeddings.push(...embeddings);
+        const embeddings = response.data.map((item) => item.embedding);
+        allEmbeddings.push(...embeddings);
+      } catch (error) {
+        throw new Error(
+          `Failed to generate embeddings for chunk ${Math.floor(i / chunkSize) + 1}`,
+          { cause: error }
+        );
+      }
     }
 
     return allEmbeddings;

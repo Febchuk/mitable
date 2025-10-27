@@ -15,10 +15,6 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
-    "db:migrate-fts": "tsx src/scripts/run-fts-migration.ts",
-    "clear-search-data": "tsx src/scripts/clear-search-data.ts",
-    "verify-dual-write": "tsx src/scripts/verify-dual-write.ts",
-    "test-search": "tsx src/scripts/test-search.ts",
     "sync-slack": "tsx src/scripts/sync-slack.ts"
   },
   "dependencies": {
@@ -37,7 +33,6 @@
     "pg": "^8.13.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "tiktoken": "^1.0.22",
     "zod": "^3.22.4",
     "zod-to-json-schema": "^3.24.6"
   },
