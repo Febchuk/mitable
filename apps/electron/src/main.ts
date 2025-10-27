@@ -91,26 +91,29 @@ function createAgentWindow() {
 }
 
 // Helper function to position conversation window centered above pill
-function positionConversationWindow() {
+function positionConversationWindow(state: "collapsed" | "expanded" = "expanded") {
   if (!agentWindow || agentWindow.isDestroyed() || !conversationWindow || conversationWindow.isDestroyed()) {
     return;
   }
 
   const pillBounds = agentWindow.getBounds();
   const conversationWidth = 740;
-  const conversationHeight = 600;
+  const conversationHeight = state === "collapsed" ? 120 : 600; // NEW: Dynamic height
   const gap = 16;
 
   // Calculate centered position above pill
   const x = pillBounds.x + (pillBounds.width - conversationWidth) / 2;
   const y = pillBounds.y - conversationHeight - gap;
 
-  conversationWindow.setBounds({
-    x: Math.round(x),
-    y: Math.round(y),
-    width: conversationWidth,
-    height: conversationHeight,
-  });
+  conversationWindow.setBounds(
+    {
+      x: Math.round(x),
+      y: Math.round(y),
+      width: conversationWidth,
+      height: conversationHeight,
+    },
+    true // animate: true for smooth transition
+  );
 }
 
 function createConversationWindow() {
@@ -382,6 +385,90 @@ function setupIPC() {
         messageData,
         screenshot
       );
+    }
+  });
+
+  // NEW: Toggle conversation (collapsed combobox)
+  ipcMain.on(IPC_CHANNELS.CONVERSATION_TOGGLE, () => {
+    if (!conversationWindow || conversationWindow.isDestroyed()) return;
+
+    if (conversationWindow.isVisible()) {
+      conversationWindow.hide();
+    } else {
+      positionConversationWindow("collapsed"); // 740x120
+      conversationWindow.show();
+      // Trigger conversation list fetch
+      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_REQUEST);
+    }
+  });
+
+  // NEW: Set conversation state (handles window sizing)
+  ipcMain.on(
+    IPC_CHANNELS.CONVERSATION_SET_STATE,
+    (_event, state: "hidden" | "collapsed" | "expanded") => {
+      if (!conversationWindow || conversationWindow.isDestroyed()) return;
+
+      switch (state) {
+        case "hidden":
+          conversationWindow.hide();
+          break;
+        case "collapsed":
+          positionConversationWindow("collapsed"); // 740x120
+          if (!conversationWindow.isVisible()) conversationWindow.show();
+          break;
+        case "expanded":
+          positionConversationWindow("expanded"); // 740x600
+          if (!conversationWindow.isVisible()) conversationWindow.show();
+          break;
+      }
+    }
+  );
+
+  // NEW: Open specific conversation from Console
+  ipcMain.on(IPC_CHANNELS.AGENT_OPEN_CONVERSATION, (_event, conversationId: string) => {
+    if (!agentWindow || agentWindow.isDestroyed()) return;
+    if (!conversationWindow || conversationWindow.isDestroyed()) return;
+
+    // Show agent if hidden
+    if (!agentWindow.isVisible()) agentWindow.show();
+
+    // Position and show conversation in expanded state
+    positionConversationWindow("expanded");
+    conversationWindow.show();
+
+    // Load the specific conversation
+    conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LOAD, conversationId);
+  });
+
+  // NEW: Handle conversation list request (fetch from backend)
+  ipcMain.on(IPC_CHANNELS.CONVERSATION_LIST_REQUEST, async () => {
+    if (!conversationWindow || conversationWindow.isDestroyed()) return;
+
+    try {
+      // Check if we have an auth token
+      if (!authTokens.accessToken) {
+        console.log("[Conversation] No auth token, returning empty list");
+        conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, []);
+        return;
+      }
+
+      // Fetch from backend
+      const API_BASE_URL = "http://localhost:3000"; // TODO: Move to config
+      const response = await fetch(`${API_BASE_URL}/api/conversations`, {
+        headers: { Authorization: `Bearer ${authTokens.accessToken}` },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const conversations = await response.json();
+
+      // Send back to renderer
+      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, conversations);
+    } catch (error) {
+      console.error("[Conversation] Failed to fetch conversation list:", error);
+      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, []);
     }
   });
 

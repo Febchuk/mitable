@@ -44,6 +44,7 @@ export const IPC_CHANNELS = {
   AGENT_SHOW_CONSOLE: "agent-show-console",
   AGENT_RESIZE: "agent-resize",
   AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step", // Triggered when Guide "Done" button clicked
+  AGENT_OPEN_CONVERSATION: "agent-open-conversation", // Console → Main (open specific conversation in agent)
 
   // Conversation window (parent-child with agent)
   CONVERSATION_SHOW: "conversation-show", // Agent → Main (show conversation window)
@@ -51,6 +52,14 @@ export const IPC_CHANNELS = {
   CONVERSATION_SEND_MESSAGE: "conversation-send-message", // Agent → Conversation (forward user message)
   CONVERSATION_UPDATE_MESSAGES: "conversation-update-messages", // Conversation → Agent (sync message state)
   CONVERSATION_POSITION_UPDATE: "conversation-position-update", // Main → Conversation (on pill drag)
+
+  // NEW: Conversation state management (collapsed combobox refactor)
+  CONVERSATION_TOGGLE: "conversation-toggle", // Agent → Main (toggle collapsed/hidden)
+  CONVERSATION_SET_STATE: "conversation-set-state", // Renderer → Main (set hidden/collapsed/expanded)
+  CONVERSATION_SWITCH: "conversation-switch", // Conversation → Main (switch to different conversation)
+  CONVERSATION_LIST_REQUEST: "conversation-list-request", // Renderer → Main (request conversation list)
+  CONVERSATION_LIST_RESPONSE: "conversation-list-response", // Main → Renderer (return conversation list)
+  CONVERSATION_GENERATE_TITLE: "conversation-generate-title", // Backend integration for AI titles
 
   // Legacy conversation management (kept for backward compatibility)
   CONVERSATION_NEW: "conversation-new",

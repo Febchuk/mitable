@@ -6,6 +6,12 @@ const IPC_CHANNELS = {
   CONVERSATION_SEND_MESSAGE: "conversation-send-message",
   CONVERSATION_UPDATE_MESSAGES: "conversation-update-messages",
   CONVERSATION_POSITION_UPDATE: "conversation-position-update",
+  // NEW: Conversation state management
+  CONVERSATION_SET_STATE: "conversation-set-state",
+  CONVERSATION_LOAD: "conversation-load",
+  CONVERSATION_SWITCH: "conversation-switch",
+  CONVERSATION_LIST_REQUEST: "conversation-list-request",
+  CONVERSATION_LIST_RESPONSE: "conversation-list-response",
   NUDGE_SHOW: "nudge-show",
   GUIDE_START: "guide-start",
   AUTH_GET_TOKEN: "auth-get-token",
@@ -15,6 +21,46 @@ const IPC_CHANNELS = {
 contextBridge.exposeInMainWorld("conversationAPI", {
   // Window management
   hideWindow: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_HIDE),
+
+  // NEW: State management for collapsed/expanded views
+  setViewState: (state: "hidden" | "collapsed" | "expanded") =>
+    ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SET_STATE, state),
+
+  // NEW: Conversation loading (from Console "send to agent")
+  onConversationLoad: (callback: (conversationId: string) => void) => {
+    const handler = (_event: any, conversationId: string) => {
+      callback(conversationId);
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.CONVERSATION_LOAD, handler);
+
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.CONVERSATION_LOAD, handler);
+    };
+  },
+
+  // NEW: Conversation switching
+  switchConversation: (conversationId: string) =>
+    ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SWITCH, conversationId),
+
+  // NEW: Request conversation list
+  requestConversationList: () =>
+    ipcRenderer.send(IPC_CHANNELS.CONVERSATION_LIST_REQUEST),
+
+  // NEW: Listen for conversation list response
+  onConversationList: (callback: (conversations: any[]) => void) => {
+    const handler = (_event: any, conversations: any[]) => {
+      callback(conversations);
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, handler);
+
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, handler);
+    };
+  },
 
   // Message communication with Agent window
   // Returns cleanup function to remove listener
