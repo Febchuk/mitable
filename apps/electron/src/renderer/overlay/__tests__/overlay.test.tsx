@@ -10,7 +10,6 @@ const mockOnHighlightUpdate = jest.fn();
 const mockGetDisplayMetadata = jest.fn();
 
 beforeEach(() => {
-  // @ts-expect-error - Mock overlayAPI for testing
   global.window.overlayAPI = {
     onHighlightUpdate: mockOnHighlightUpdate,
     show: jest.fn(),
