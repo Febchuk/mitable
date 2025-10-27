@@ -8,3 +8,4 @@ export * from "./source-materials.schema";
 export * from "./roadmap-templates.schema";
 export * from "./user-roadmaps.schema";
 export * from "./analytics.schema";
+export * from "./search-content.schema";

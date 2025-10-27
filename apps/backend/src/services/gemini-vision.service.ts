@@ -422,7 +422,7 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
 
       const supportingContext = solutionObject.supportingData
         .slice(0, 5)
-        .map((data) => `[${data.source}] ${data.text.substring(0, 200)}`)
+        .map((data) => `[${data.title}] ${data.snippet}`)
         .join("\n\n");
 
       const conversationContext = conversationHistory
