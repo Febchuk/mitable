@@ -230,6 +230,11 @@ function createConsoleWindow() {
 }
 
 function createOverlayWindow() {
+  if (!guideWindow || guideWindow.isDestroyed()) {
+    console.error("[Overlay] Cannot create overlay window - guide window not available");
+    return;
+  }
+
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.bounds;
 
@@ -246,6 +251,8 @@ function createOverlayWindow() {
     movable: false,
     focusable: false,
     show: false,
+    parent: guideWindow, // Overlay is child of Guide
+    modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/overlay.cjs"),
       contextIsolation: true,
@@ -267,6 +274,11 @@ function createOverlayWindow() {
 }
 
 function createGuideWindow() {
+  if (!agentWindow || agentWindow.isDestroyed()) {
+    console.error("[Guide] Cannot create guide window - agent window not available");
+    return;
+  }
+
   guideWindow = new BrowserWindow({
     width: 400,
     height: 600,
@@ -274,6 +286,8 @@ function createGuideWindow() {
     transparent: true,
     alwaysOnTop: true,
     show: false,
+    parent: agentWindow, // Guide is child of Agent
+    modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/guide.cjs"),
       contextIsolation: true,
@@ -293,6 +307,11 @@ function createGuideWindow() {
 }
 
 function createNudgeWindow() {
+  if (!agentWindow || agentWindow.isDestroyed()) {
+    console.error("[Nudge] Cannot create nudge window - agent window not available");
+    return;
+  }
+
   nudgeWindow = new BrowserWindow({
     width: 400,
     height: 600,
@@ -300,6 +319,8 @@ function createNudgeWindow() {
     transparent: true,
     alwaysOnTop: true,
     show: false,
+    parent: agentWindow, // Nudge is child of Agent
+    modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/nudge.cjs"),
       contextIsolation: true,
@@ -790,9 +811,9 @@ app.whenReady().then(() => {
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
   createConsoleWindow();
-  createOverlayWindow();
-  createGuideWindow();
-  createNudgeWindow();
+  createGuideWindow(); // Create guide as child of agent
+  createOverlayWindow(); // Create overlay as child of guide (must be after guide)
+  createNudgeWindow(); // Create nudge as child of agent
 
   setupIPC();
   registerGlobalShortcuts();
