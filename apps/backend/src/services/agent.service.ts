@@ -312,6 +312,24 @@ export class AgentService {
         { role: "user", content: userMessage },
       ];
 
+      // Inject context about screenshot availability and workflow intent
+      // This critical information helps OpenAI make informed tool selection decisions
+      if (context.screenshot) {
+        messages.push({
+          role: "system",
+          content: "[CONTEXT] User has provided a screenshot of their current screen. Screenshot is available for visual analysis and UI guidance.",
+        });
+        console.log("[AgentService] Added screenshot context to messages");
+      }
+
+      if (shouldEnterWorkflow) {
+        messages.push({
+          role: "system",
+          content: "[INTENT DETECTED] This appears to be a task guidance request based on trigger phrases in the user message. User is asking for step-by-step help completing an action. When screenshot is available, prioritize visual guidance flow: search_knowledge → show_step_by_step_guide.",
+        });
+        console.log("[AgentService] Added workflow intent context to messages");
+      }
+
       // Get tool definitions
       const tools = this.getToolDefinitions();
 
@@ -503,13 +521,22 @@ export class AgentService {
             toolResult.content.toLowerCase().includes("connect you with") ||
             toolResult.content.toLowerCase().includes("couldn't find");
 
+          // Special case: If search_knowledge succeeded in a workflow context with screenshot,
+          // continue the loop to allow show_step_by_step_guide to be called next
+          const shouldContinueForGuidance =
+            functionName === "search_knowledge" &&
+            shouldEnterWorkflow &&
+            context.screenshot &&
+            !isIncompleteResult; // search succeeded
+
           console.log("[AgentService] Completion decision:", {
             isIncompleteResult,
-            willContinueLoop: isIncompleteResult,
+            shouldContinueForGuidance,
+            willContinueLoop: isIncompleteResult || shouldContinueForGuidance,
             contentPreview: toolResult.content.substring(0, 100) + "...",
           });
 
-          if (!isIncompleteResult) {
+          if (!isIncompleteResult && !shouldContinueForGuidance) {
             // Complete result - stream it and finish
             console.log("[AgentService] Streaming final response:", {
               wordCount: toolResult.content.split(" ").length,
@@ -537,6 +564,18 @@ export class AgentService {
             };
 
             return; // Exit the loop
+          }
+
+          // If we're continuing for guidance, add a hint to help OpenAI make the right next choice
+          if (shouldContinueForGuidance) {
+            console.log(
+              "[AgentService] Continuing loop for UI guidance after successful knowledge search"
+            );
+            messages.push({
+              role: "system",
+              content:
+                "Knowledge search completed successfully. Now use show_step_by_step_guide with these search results (from the 'sources' field) and the available screenshot to provide visual step-by-step guidance to the user.",
+            });
           }
 
           // Continue loop - AI will decide next action based on tool result

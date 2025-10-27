@@ -6,7 +6,7 @@ import type { SolutionObject, EmbeddingMatch } from "@mitable/shared";
 export class ShowStepByStepGuideTool extends BaseTool {
   name = "show_step_by_step_guide";
 
-  description = `Generate step-by-step UI guidance for completing a task.
+  description = `Generate step-by-step UI guidance for completing a task when the user writes a message like "How do I do this?" or "Show me how to do this?" AND there is a screenshot available.
 IMPORTANT: Use this ONLY AFTER calling search_knowledge. You must pass the full search results as supportingData.
 Extract the sources array from search_knowledge response and include ALL fields (title, url, snippet).`;
 
