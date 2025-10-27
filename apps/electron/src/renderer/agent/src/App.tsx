@@ -9,7 +9,14 @@ declare global {
       toggle: () => void;
       showConsole: () => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
-      resizeWindow: (mode: "pill" | "conversation") => void;
+      resizeWindow: (
+        options:
+          | { width?: number; height?: number }
+          | "pill"
+          | "conversation"
+          | "text-mode"
+          | "audio-mode"
+      ) => void;
       showConversation: () => void;
       hideConversation: () => void;
       sendMessageToConversation: (messageData: any, screenshot: string | null) => void;

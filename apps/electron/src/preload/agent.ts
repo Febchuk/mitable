@@ -22,8 +22,14 @@ contextBridge.exposeInMainWorld("agentAPI", {
   showConsole: () => ipcRenderer.send(IPC_CHANNELS.AGENT_SHOW_CONSOLE),
   setIgnoreMouseEvents: (ignore: boolean) =>
     ipcRenderer.send(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, ignore),
-  resizeWindow: (mode: "pill" | "conversation") =>
-    ipcRenderer.send(IPC_CHANNELS.AGENT_RESIZE, mode),
+  resizeWindow: (
+    options:
+      | { width?: number; height?: number }
+      | "pill"
+      | "conversation"
+      | "text-mode"
+      | "audio-mode"
+  ) => ipcRenderer.send(IPC_CHANNELS.AGENT_RESIZE, options),
 
   // Conversation window management
   showConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SHOW),

@@ -101,6 +101,13 @@
   html.transparent-window,
   body.transparent-window {
     background: transparent !important;
+    overflow: hidden; /* Prevent scrollbars on transparent windows (agent/overlay) */
+  }
+
+  /* Prevent scrollbars in transparent window root containers */
+  html.transparent-window #root,
+  body.transparent-window #root {
+    overflow: hidden;
   }
 }
 

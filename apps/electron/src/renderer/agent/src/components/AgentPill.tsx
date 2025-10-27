@@ -36,6 +36,10 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
     if (mode === "audio") {
       setInputValue("");
     }
+
+    // Resize the Electron window to match pill content
+    // Text mode: 740px wide, Audio mode: 280px wide
+    window.agentAPI.resizeWindow(mode === "text" ? "text-mode" : "audio-mode");
   };
 
   return (

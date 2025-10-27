@@ -489,28 +489,79 @@ function setupIPC() {
     }
   });
 
-  // Agent window resize with upward expansion
-  ipcMain.on(IPC_CHANNELS.AGENT_RESIZE, (_event, mode: "pill" | "conversation") => {
-    if (agentWindow && !agentWindow.isDestroyed()) {
-      const currentBounds = agentWindow.getBounds();
-      const newWidth = 740;
-      const newHeight = mode === "pill" ? 80 : 696;
+  // Agent window resize with upward expansion and centered positioning
+  ipcMain.on(
+    IPC_CHANNELS.AGENT_RESIZE,
+    (
+      _event,
+      options:
+        | { width?: number; height?: number }
+        | "pill"
+        | "conversation"
+        | "text-mode"
+        | "audio-mode"
+    ) => {
+      if (agentWindow && !agentWindow.isDestroyed()) {
+        const currentBounds = agentWindow.getBounds();
 
-      // Calculate new Y position to keep bottom edge fixed (expand/shrink upward)
-      const heightDiff = newHeight - currentBounds.height;
-      const newY = currentBounds.y - heightDiff;
+        // Support both legacy mode strings and new flexible options
+        let newWidth: number;
+        let newHeight: number;
 
-      agentWindow.setBounds(
-        {
-          x: currentBounds.x,
-          y: newY,
-          width: newWidth,
-          height: newHeight,
-        },
-        true
-      );
+        if (typeof options === "string") {
+          // Legacy mode parameter
+          switch (options) {
+            case "pill":
+              newWidth = 740;
+              newHeight = 80;
+              break;
+            case "conversation":
+              newWidth = 740;
+              newHeight = 696;
+              break;
+            case "text-mode":
+              newWidth = 740;
+              newHeight = currentBounds.height;
+              break;
+            case "audio-mode":
+              newWidth = 280;
+              newHeight = currentBounds.height;
+              break;
+            default:
+              newWidth = currentBounds.width;
+              newHeight = currentBounds.height;
+          }
+        } else {
+          // New flexible options format
+          newWidth = options.width ?? currentBounds.width;
+          newHeight = options.height ?? currentBounds.height;
+        }
+
+        // Calculate new X position to keep centered horizontally (expand/shrink from center)
+        const widthDiff = newWidth - currentBounds.width;
+        const newX = currentBounds.x - widthDiff / 2;
+
+        // Calculate new Y position to keep bottom edge fixed (expand/shrink upward)
+        const heightDiff = newHeight - currentBounds.height;
+        const newY = currentBounds.y - heightDiff;
+
+        agentWindow.setBounds(
+          {
+            x: Math.round(newX),
+            y: Math.round(newY),
+            width: newWidth,
+            height: newHeight,
+          },
+          true // animate
+        );
+
+        // Reposition conversation window if visible (maintains alignment)
+        if (conversationWindow && !conversationWindow.isDestroyed() && conversationWindow.isVisible()) {
+          positionConversationWindow();
+        }
+      }
     }
-  });
+  );
 
   // Auth Management - Cross-window token sharing
   // Console sets tokens after login
