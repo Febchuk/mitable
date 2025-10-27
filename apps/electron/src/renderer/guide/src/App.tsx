@@ -75,14 +75,6 @@ function App() {
     }
   }, [stepHistory.length]);
 
-  const handleMouseEnter = () => {
-    window.guideAPI?.setIgnoreMouseEvents(false);
-  };
-
-  const handleMouseLeave = () => {
-    window.guideAPI?.setIgnoreMouseEvents(true);
-  };
-
   const toggleCompletedSteps = () => {
     setShowCompletedSteps((prev) => !prev);
   };
@@ -99,12 +91,8 @@ function App() {
   const currentStep = stepHistory[stepHistory.length - 1];
 
   return (
-    <div
-      className="w-full h-full flex items-center justify-center p-4"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      <div className="w-full bg-[#2A2A2A] rounded-2xl p-6 flex flex-col gap-4 h-full overflow-hidden">
+    <div className="w-full h-full flex items-center justify-center p-4">
+      <div className="w-full bg-[#2A2A2A] rounded-2xl p-6 flex flex-col gap-4 h-full overflow-hidden app-drag">
         {/* Header */}
         <div className="flex-shrink-0">
           <h2 className="text-text-tertiary text-sm font-medium">
@@ -119,7 +107,7 @@ function App() {
             <div className="space-y-2">
               <button
                 onClick={toggleCompletedSteps}
-                className="w-full flex items-center justify-between text-text-secondary hover:text-text-primary transition-colors text-sm px-2 py-1 rounded-lg hover:bg-[#3A3A3A]"
+                className="w-full flex items-center justify-between text-text-secondary hover:text-text-primary transition-colors text-sm px-2 py-1 rounded-lg hover:bg-[#3A3A3A] app-no-drag"
               >
                 <span className="font-medium">Completed ({completedSteps.length})</span>
                 {showCompletedSteps ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -209,7 +197,7 @@ function App() {
             {currentStep && !currentStep.completed && (
               <button
                 onClick={() => window.guideAPI?.nextStep()}
-                className="w-full bg-primary hover:bg-primary-hover text-white font-medium py-3 px-6 rounded-lg transition-colors"
+                className="w-full bg-primary hover:bg-primary-hover text-white font-medium py-3 px-6 rounded-lg transition-colors app-no-drag"
               >
                 Done - Next Step
               </button>
