@@ -98,6 +98,8 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const offset = (page - 1) * limit;
+    // Parse includeMessages parameter (default: false for performance)
+    const includeMessages = req.query.includeMessages === "true";
 
     // Get total count of conversations
     const [{ count }] = await db
@@ -138,55 +140,67 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Get all messages for these conversations in a single query (optimized!)
-    const conversationIds = conversationsData.map((conv) => conv.id);
-    const allMessages = await db
-      .select({
-        id: schema.messages.id,
-        conversationId: schema.messages.conversationId,
-        role: schema.messages.role,
-        content: schema.messages.content,
-        messageType: schema.messages.messageType,
-        cardData: schema.messages.cardData,
-        sources: schema.messages.sources,
-        createdAt: schema.messages.createdAt,
-      })
-      .from(schema.messages)
-      .where(inArray(schema.messages.conversationId, conversationIds))
-      .orderBy(schema.messages.createdAt);
+    let messagesByConversation = new Map<string, any[]>();
 
-    // Group messages by conversation ID
-    const messagesByConversation = new Map<string, typeof allMessages>();
-    for (const msg of allMessages) {
-      if (!messagesByConversation.has(msg.conversationId)) {
-        messagesByConversation.set(msg.conversationId, []);
+    // Only fetch messages if requested (for performance)
+    if (includeMessages) {
+      // Get all messages for these conversations in a single query (optimized!)
+      const conversationIds = conversationsData.map((conv) => conv.id);
+      const allMessages = await db
+        .select({
+          id: schema.messages.id,
+          conversationId: schema.messages.conversationId,
+          role: schema.messages.role,
+          content: schema.messages.content,
+          messageType: schema.messages.messageType,
+          cardData: schema.messages.cardData,
+          sources: schema.messages.sources,
+          createdAt: schema.messages.createdAt,
+        })
+        .from(schema.messages)
+        .where(inArray(schema.messages.conversationId, conversationIds))
+        .orderBy(schema.messages.createdAt);
+
+      // Group messages by conversation ID
+      for (const msg of allMessages) {
+        if (!messagesByConversation.has(msg.conversationId)) {
+          messagesByConversation.set(msg.conversationId, []);
+        }
+        messagesByConversation.get(msg.conversationId)!.push(msg);
       }
-      messagesByConversation.get(msg.conversationId)!.push(msg);
     }
 
-    // Build conversation response with messages
+    // Build conversation response
     const conversations = conversationsData.map((conv) => {
       const messagesData = messagesByConversation.get(conv.id) || [];
-      const messages = messagesData.map((msg) => ({
-        id: msg.id,
-        role: msg.role as "user" | "assistant",
-        content: msg.content,
-        timestamp: msg.createdAt,
-        messageType: msg.messageType || undefined,
-        cardData: msg.cardData || undefined,
-        sources: (msg.sources as any[]) || undefined,
-      }));
+      const messages = includeMessages
+        ? messagesData.map((msg) => ({
+            id: msg.id,
+            role: msg.role as "user" | "assistant",
+            content: msg.content,
+            timestamp: msg.createdAt,
+            messageType: msg.messageType || undefined,
+            cardData: msg.cardData || undefined,
+            sources: (msg.sources as any[]) || undefined,
+          }))
+        : undefined;
 
-      const lastMessage = messages[messages.length - 1];
+      const lastMessage = messages ? messages[messages.length - 1] : undefined;
 
-      return {
+      const result: any = {
         id: conv.id,
         title: conv.title || "Untitled Conversation",
         lastMessage: lastMessage?.content || "",
         timestamp: conv.updatedAt,
         unread: false, // TODO: Implement unread status tracking if needed
-        messages,
       };
+
+      // Only include messages array if requested
+      if (includeMessages) {
+        result.messages = messages;
+      }
+
+      return result;
     });
 
     res.json({

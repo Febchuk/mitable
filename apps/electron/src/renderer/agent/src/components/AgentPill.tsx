@@ -42,7 +42,10 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
     window.agentAPI.resizeWindow(mode === "text" ? "text-mode" : "audio-mode");
   };
 
-  const handleLogoClick = () => {
+  const handleLogoClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    console.log("[AgentPill] Logo clicked - toggling conversation");
     // Open collapsed conversation combobox to switch conversations
     window.agentAPI.toggleConversation();
   };

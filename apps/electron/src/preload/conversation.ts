@@ -26,6 +26,20 @@ contextBridge.exposeInMainWorld("conversationAPI", {
   setViewState: (state: "hidden" | "collapsed" | "expanded") =>
     ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SET_STATE, state),
 
+  // NEW: Listen for state changes from main process
+  onViewStateChange: (callback: (state: "hidden" | "collapsed" | "expanded") => void) => {
+    const handler = (_event: any, state: "hidden" | "collapsed" | "expanded") => {
+      callback(state);
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.CONVERSATION_SET_STATE, handler);
+
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.CONVERSATION_SET_STATE, handler);
+    };
+  },
+
   // NEW: Conversation loading (from Console "send to agent")
   onConversationLoad: (callback: (conversationId: string) => void) => {
     const handler = (_event: any, conversationId: string) => {

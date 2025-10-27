@@ -166,6 +166,15 @@ function createConversationWindow() {
     conversationWindow.loadFile(join(__dirname, "../renderer/conversation.html"));
   }
 
+  // Wait for renderer to be ready before allowing IPC
+  conversationWindow.webContents.on("did-finish-load", () => {
+    console.log("[Conversation] Renderer loaded and ready for IPC");
+  });
+
+  conversationWindow.webContents.on("dom-ready", () => {
+    console.log("[Conversation] DOM ready");
+  });
+
   conversationWindow.on("closed", () => {
     conversationWindow = null;
   });
@@ -362,11 +371,16 @@ function setupIPC() {
     }
   });
 
-  // Conversation window show - position and display
+  // Conversation window show - position and display (legacy - shows expanded)
   ipcMain.on(IPC_CHANNELS.CONVERSATION_SHOW, () => {
     if (conversationWindow && !conversationWindow.isDestroyed()) {
-      positionConversationWindow();
+      positionConversationWindow("expanded");
       conversationWindow.show();
+      // Wait for renderer to be ready before sending IPC message
+      setTimeout(() => {
+        // Notify renderer to switch to expanded state
+        conversationWindow?.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "expanded");
+      }, 50); // 50ms delay to ensure renderer has processed show event
     }
   });
 
@@ -392,13 +406,25 @@ function setupIPC() {
   ipcMain.on(IPC_CHANNELS.CONVERSATION_TOGGLE, () => {
     if (!conversationWindow || conversationWindow.isDestroyed()) return;
 
-    if (conversationWindow.isVisible()) {
+    const isCurrentlyVisible = conversationWindow.isVisible();
+    console.log("[Main] CONVERSATION_TOGGLE called, isVisible:", isCurrentlyVisible);
+
+    if (isCurrentlyVisible) {
+      console.log("[Main] Hiding conversation window");
       conversationWindow.hide();
+      // Notify renderer to switch to hidden state
+      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "hidden");
     } else {
+      console.log("[Main] Showing conversation window in collapsed state");
       positionConversationWindow("collapsed"); // 740x120
       conversationWindow.show();
-      // Trigger conversation list fetch
-      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_REQUEST);
+      // Wait for renderer to be ready before sending IPC messages
+      setTimeout(() => {
+        // Notify renderer to switch to collapsed state
+        conversationWindow?.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "collapsed");
+        // Trigger conversation list fetch
+        conversationWindow?.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_REQUEST);
+      }, 50); // 50ms delay to ensure renderer has processed show event
     }
   });
 
@@ -408,15 +434,20 @@ function setupIPC() {
     (_event, state: "hidden" | "collapsed" | "expanded") => {
       if (!conversationWindow || conversationWindow.isDestroyed()) return;
 
+      console.log("[Main] CONVERSATION_SET_STATE called from renderer, state:", state);
+
       switch (state) {
         case "hidden":
+          console.log("[Main] Setting state to hidden");
           conversationWindow.hide();
           break;
         case "collapsed":
+          console.log("[Main] Setting state to collapsed");
           positionConversationWindow("collapsed"); // 740x120
           if (!conversationWindow.isVisible()) conversationWindow.show();
           break;
         case "expanded":
+          console.log("[Main] Setting state to expanded");
           positionConversationWindow("expanded"); // 740x600
           if (!conversationWindow.isVisible()) conversationWindow.show();
           break;
@@ -452,9 +483,9 @@ function setupIPC() {
         return;
       }
 
-      // Fetch from backend
+      // Fetch from backend (without messages for performance)
       const API_BASE_URL = "http://localhost:3000"; // TODO: Move to config
-      const response = await fetch(`${API_BASE_URL}/api/conversations`, {
+      const response = await fetch(`${API_BASE_URL}/api/conversations?includeMessages=false`, {
         headers: { Authorization: `Bearer ${authTokens.accessToken}` },
       });
 
@@ -463,9 +494,19 @@ function setupIPC() {
       }
 
       const conversations = await response.json();
+      console.log("[Main] Fetched conversations from backend:", conversations);
+
+      // Ensure we're sending an array (handle both direct array and object wrapper)
+      const conversationList = Array.isArray(conversations)
+        ? conversations
+        : Array.isArray(conversations?.conversations)
+        ? conversations.conversations
+        : [];
+
+      console.log("[Main] Sending conversation list to renderer:", conversationList.length, "items");
 
       // Send back to renderer
-      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, conversations);
+      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, conversationList);
     } catch (error) {
       console.error("[Conversation] Failed to fetch conversation list:", error);
       conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, []);

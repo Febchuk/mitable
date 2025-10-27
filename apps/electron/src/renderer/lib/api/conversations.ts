@@ -87,21 +87,21 @@ export async function createConversation(
 }
 
 /**
- * Get conversation by ID
+ * Get conversation messages by ID
  */
-export async function getConversation(conversationId: string): Promise<Conversation> {
+export async function getConversationMessages(conversationId: string): Promise<Message[]> {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
     headers,
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to get conversation: ${response.statusText}`);
+    throw new Error(`Failed to get conversation messages: ${response.statusText}`);
   }
 
   const data = await response.json();
-  return data.conversation;
+  return data.messages;
 }
 
 /**

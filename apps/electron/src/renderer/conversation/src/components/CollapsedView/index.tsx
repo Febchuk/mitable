@@ -6,7 +6,7 @@ import ConversationList from "./ConversationList";
 interface Conversation {
   id: string;
   title: string;
-  lastMessageAt: string;
+  timestamp: string; // Changed from lastMessageAt to match backend response
 }
 
 interface CollapsedViewProps {
@@ -33,9 +33,11 @@ export default function CollapsedView({ onSelectConversation, onNewChat }: Colla
     return cleanup;
   }, []);
 
-  const filteredConversations = conversations.filter((conv) =>
-    conv.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredConversations = Array.isArray(conversations)
+    ? conversations.filter((conv) =>
+        conv.title.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
 
   return (
     <div className="w-full h-[120px] bg-[#2a2a2a] rounded-2xl flex flex-col p-3 gap-2 app-drag">

@@ -20,6 +20,7 @@ declare global {
       onAuthTokenUpdated: (callback: (token: string | null) => void) => () => void;
       // NEW: State management
       setViewState: (state: "hidden" | "collapsed" | "expanded") => void;
+      onViewStateChange: (callback: (state: "hidden" | "collapsed" | "expanded") => void) => () => void;
       onConversationLoad: (callback: (conversationId: string) => void) => () => void;
       switchConversation: (conversationId: string) => void;
       requestConversationList: () => void;
@@ -62,6 +63,16 @@ function App() {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, viewState]);
+
+  // Listen for state changes from main process
+  useEffect(() => {
+    const cleanup = window.conversationAPI.onViewStateChange((state) => {
+      console.log("[Conversation] View state changed by main process:", state, "current:", viewState);
+      setViewState(state);
+    });
+
+    return cleanup;
+  }, [viewState]);
 
   // Handle conversation load from Console "send to agent"
   useEffect(() => {
@@ -209,9 +220,31 @@ function App() {
     setCurrentConversationId(selectedConversationId);
     setConversationId(selectedConversationId);
 
-    // TODO: Fetch messages from backend for this conversation
-    // For now, clear messages (will be implemented in Phase 4)
-    setMessages([]);
+    // Fetch messages from backend for this conversation
+    try {
+      console.log("[Conversation] Fetching messages for conversation:", selectedConversationId);
+      const { getConversationMessages } = await import("../../lib/api/conversations");
+      const fetchedMessages = await getConversationMessages(selectedConversationId);
+
+      console.log("[Conversation] Fetched", fetchedMessages.length, "messages");
+
+      // Convert API messages to UI message format
+      const uiMessages = fetchedMessages.map((msg) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        type: msg.cardData ? ("card" as const) : ("text" as const),
+        messageType: msg.messageType,
+        cardData: msg.cardData,
+        sources: msg.sources,
+      }));
+
+      setMessages(uiMessages);
+    } catch (error) {
+      console.error("[Conversation] Failed to fetch messages:", error);
+      // Still expand but with empty messages
+      setMessages([]);
+    }
 
     // Expand to show the conversation
     setViewState("expanded");
