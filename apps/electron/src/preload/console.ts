@@ -11,6 +11,7 @@ const IPC_CHANNELS = {
   GUIDE_DATA: "guide-data",
   CONVERSATION_NEW: "conversation-new",
   CONVERSATION_LOAD: "conversation-load",
+  AGENT_OPEN_CONVERSATION: "agent-open-conversation", // NEW: Send conversation to Agent
   NUDGE_OPEN_CREATOR: "nudge-open-creator",
   AUTH_SET_TOKENS: "auth-set-tokens",
   AUTH_CLEAR: "auth-clear",
@@ -43,6 +44,8 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   // Conversation management
   newConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_NEW),
   loadConversation: (id: string) => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_LOAD, id),
+  sendToAgent: (conversationId: string) =>
+    ipcRenderer.send(IPC_CHANNELS.AGENT_OPEN_CONVERSATION, conversationId), // NEW: Send conversation to Agent window
 
   // Nudge creator
   onNudgeOpenCreator: (callback: (data: unknown) => void) => {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useConversations } from "@/console/src/hooks/queries/chats";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -98,11 +98,25 @@ export default function ChatsView() {
         {filteredChats.map((chat) => (
           <div
             key={chat.id}
-            onClick={() => navigate(`/chats/${chat.id}`)}
-            className="bg-background-elevated rounded-lg border border-border-subtle p-6 hover:bg-background-elevated/80 transition-colors cursor-pointer"
+            className="bg-background-elevated rounded-lg border border-border-subtle p-6 hover:bg-background-elevated/80 transition-colors flex items-start justify-between gap-4"
           >
-            <h3 className="text-text-primary text-lg mb-1">{chat.title}</h3>
-            <p className="text-text-secondary text-sm">{formatTimestamp(chat.timestamp)}</p>
+            <div onClick={() => navigate(`/chats/${chat.id}`)} className="flex-1 cursor-pointer">
+              <h3 className="text-text-primary text-lg mb-1">{chat.title}</h3>
+              <p className="text-text-secondary text-sm">{formatTimestamp(chat.timestamp)}</p>
+            </div>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                window.consoleAPI.sendToAgent(chat.id);
+              }}
+              variant="outline"
+              size="sm"
+              className="gap-2 flex-shrink-0"
+              title="Open in Agent window"
+            >
+              <Send size={16} />
+              <span>Send to Agent</span>
+            </Button>
           </div>
         ))}
       </div>

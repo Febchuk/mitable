@@ -3,7 +3,7 @@ import { MessageSquare } from "lucide-react";
 interface Conversation {
   id: string;
   title: string;
-  lastMessageAt: string;
+  timestamp: string; // Changed from lastMessageAt to match backend response
 }
 
 interface ConversationListProps {
