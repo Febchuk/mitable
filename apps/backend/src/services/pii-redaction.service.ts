@@ -97,9 +97,7 @@ class PIIRedactionService {
     }
 
     if (!config.googleCloud.keyPath) {
-      throw new Error(
-        "GOOGLE_CLOUD_KEY_PATH is not configured. Please set it in your .env file."
-      );
+      throw new Error("GOOGLE_CLOUD_KEY_PATH is not configured. Please set it in your .env file.");
     }
 
     this.projectId = config.googleCloud.projectId;
