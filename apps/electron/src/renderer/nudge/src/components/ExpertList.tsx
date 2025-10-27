@@ -49,7 +49,7 @@ const getInitials = (name: string): string => {
 export default function ExpertList({ experts, isExpanded, onToggle, onEscalate }: ExpertListProps) {
   return (
     <motion.div
-      className="bg-[#2a2a2a] rounded-2xl flex flex-col app-no-drag overflow-hidden"
+      className="bg-[#2a2a2a] rounded-2xl flex flex-col app-drag overflow-hidden"
       style={{ transformOrigin: "left" }}
       initial={false}
       animate={{
@@ -115,7 +115,7 @@ export default function ExpertList({ experts, isExpanded, onToggle, onEscalate }
                   {/* Nudge Button */}
                   <button
                     onClick={() => onEscalate(expert.id)}
-                    className="px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors whitespace-nowrap"
+                    className="px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors whitespace-nowrap app-no-drag"
                   >
                     Nudge
                   </button>
@@ -130,7 +130,7 @@ export default function ExpertList({ experts, isExpanded, onToggle, onEscalate }
       <div className="flex-shrink-0 flex items-center justify-center px-2 pb-2">
         <button
           onClick={onToggle}
-          className="w-full h-6 flex items-center justify-center bg-[#3e3e3e] hover:bg-[#1a1a1a] rounded-lg transition-colors text-gray-400"
+          className="w-full h-6 flex items-center justify-center bg-[#3e3e3e] hover:bg-[#1a1a1a] rounded-lg transition-colors text-gray-400 app-no-drag"
           aria-label={isExpanded ? "Collapse" : "Expand"}
         >
           {isExpanded ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}

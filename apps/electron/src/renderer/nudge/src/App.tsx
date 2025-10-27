@@ -200,20 +200,8 @@ function App() {
     });
   }, []);
 
-  const handleMouseEnter = () => {
-    window.nudgeAPI?.setIgnoreMouseEvents(false);
-  };
-
-  const handleMouseLeave = () => {
-    window.nudgeAPI?.setIgnoreMouseEvents(true);
-  };
-
   return (
-    <div
-      className="w-full h-full flex items-end justify-start p-4 relative"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
+    <div className="w-full h-full flex items-center justify-center relative">
       <ExpertList
         experts={experts}
         isExpanded={isExpanded}
