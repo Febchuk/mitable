@@ -99,20 +99,8 @@ function App() {
     );
   };
 
-  const handleMouseEnter = () => {
-    window.agentAPI.setIgnoreMouseEvents(false);
-  };
-
-  const handleMouseLeave = () => {
-    window.agentAPI.setIgnoreMouseEvents(true);
-  };
-
   return (
-    <div
-      className="w-full h-full flex items-center justify-center p-4"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
+    <div className="w-full h-full flex items-center justify-center p-4">
       <AgentPill onSubmit={handleSubmit} />
     </div>
   );
