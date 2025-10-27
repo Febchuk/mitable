@@ -80,7 +80,7 @@ export function MultiHighlightOverlay({ highlights }: MultiHighlightOverlayProps
     >
       {highlights.map((highlight) => {
         switch (highlight.type) {
-          case "arrow":
+          case "arrow": {
             const arrowPos = getArrowPosition(highlight.boundingBox);
             return (
               <svg
@@ -94,14 +94,11 @@ export function MultiHighlightOverlay({ highlights }: MultiHighlightOverlayProps
                 />
               </svg>
             );
+          }
 
           case "box":
             return (
-              <Box
-                key={highlight.id}
-                boundingBox={highlight.boundingBox}
-                color={highlight.color}
-              />
+              <Box key={highlight.id} boundingBox={highlight.boundingBox} color={highlight.color} />
             );
 
           case "circle":

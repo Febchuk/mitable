@@ -125,7 +125,10 @@ function App() {
         conversationId, // Add conversationId for Generate buttons
       });
     } else if (windowType === "guide") {
-      window.agentAPI.startGuide(data.guide);
+      window.agentAPI.startGuide({
+        ...data,
+        conversationId, // Add conversationId for Next Step button
+      });
     }
   };
 
