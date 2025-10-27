@@ -34,6 +34,7 @@ declare global {
 function App() {
   const [guideData, setGuideData] = useState<GuideData | null>(null);
   const [stepHistory, setStepHistory] = useState<GuideStep[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
   useEffect(() => {
     window.guideAPI?.onGuideData((data: GuideData) => {
@@ -52,8 +53,12 @@ function App() {
           );
           return [...updatedHistory, newStep];
         });
+        // Auto-advance to the newly received step
+        setCurrentStepIndex((prev) => prev + 1);
       } else {
+        // All steps received at once (legacy mode)
         setStepHistory(data.steps);
+        setCurrentStepIndex(0);
       }
 
       setGuideData(data);
@@ -61,23 +66,25 @@ function App() {
   }, []);
 
   const handlePrevStep = () => {
-    if (guideData && guideData.currentStep > 1) {
-      window.guideAPI?.updateStep({
-        ...guideData,
-        currentStep: guideData.currentStep - 1,
-      });
+    if (currentStepIndex > 0) {
+      setCurrentStepIndex(currentStepIndex - 1);
     }
   };
 
   const handleNextStep = () => {
-    window.guideAPI?.nextStep();
+    // Navigate to next step locally (don't send message to backend)
+    if (currentStepIndex < stepHistory.length - 1) {
+      setCurrentStepIndex(currentStepIndex + 1);
+    } else if (currentStepIndex === stepHistory.length - 1) {
+      // On last step, mark workflow as complete
+      window.guideAPI?.complete();
+    }
   };
 
-  const currentStep = stepHistory[stepHistory.length - 1];
-  const totalSteps = stepHistory.length || guideData?.steps.length || 0;
-  const currentStepNumber = currentStep?.stepNumber || 1;
-  const isLastStep = currentStepNumber === totalSteps;
-  const isFirstStep = currentStepNumber === 1;
+  const currentStep = stepHistory[currentStepIndex];
+  const totalSteps = stepHistory.length;
+  const isLastStep = currentStepIndex === stepHistory.length - 1;
+  const isFirstStep = currentStepIndex === 0;
 
   if (!guideData && stepHistory.length === 0) {
     return (
@@ -93,7 +100,7 @@ function App() {
     <div className="flex items-center justify-center h-full bg-transparent">
       <AnimatePresence mode="wait">
         <motion.div
-          key={currentStepNumber}
+          key={currentStepIndex}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
@@ -116,7 +123,7 @@ function App() {
             </button>
 
             <div className="text-gray-400 text-lg">
-              {currentStepNumber} of {totalSteps}
+              {currentStepIndex + 1} of {totalSteps}
             </div>
 
             {isLastStep ? (
