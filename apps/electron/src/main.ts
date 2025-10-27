@@ -563,6 +563,59 @@ function setupIPC() {
     }
   );
 
+  // Nudge window resize with left-to-right expansion
+  ipcMain.on(
+    IPC_CHANNELS.NUDGE_RESIZE,
+    (
+      _event,
+      options: { width?: number; height?: number } | "collapsed" | "expanded"
+    ) => {
+      if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+        const currentBounds = nudgeWindow.getBounds();
+
+        // Support both mode strings and flexible options
+        let newWidth: number;
+        let newHeight: number;
+
+        if (typeof options === "string") {
+          // Mode-based resizing
+          switch (options) {
+            case "collapsed":
+              newWidth = 85;
+              newHeight = 400;
+              break;
+            case "expanded":
+              newWidth = 380;
+              newHeight = 400;
+              break;
+            default:
+              newWidth = currentBounds.width;
+              newHeight = currentBounds.height;
+          }
+        } else {
+          // Flexible options format
+          newWidth = options.width ?? currentBounds.width;
+          newHeight = options.height ?? currentBounds.height;
+        }
+
+        // Left-to-right expansion: keep X position fixed (left edge anchored)
+        // Only adjust Y if height changes (keep vertical center)
+        const heightDiff = newHeight - currentBounds.height;
+        const newY = currentBounds.y - heightDiff / 2;
+
+        nudgeWindow.setBounds(
+          {
+            x: currentBounds.x, // Left edge stays fixed
+            y: Math.round(newY),
+            width: newWidth,
+            height: newHeight,
+          },
+          true // animate
+        );
+      }
+    }
+  );
+
   // Auth Management - Cross-window token sharing
   // Console sets tokens after login
   ipcMain.on(IPC_CHANNELS.AUTH_SET_TOKENS, (_event, accessToken: string, refreshToken: string) => {

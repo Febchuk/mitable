@@ -31,6 +31,7 @@ export const IPC_CHANNELS = {
   NUDGE_OPEN_CREATOR: "nudge-open-creator",
   NUDGE_GENERATE_CONTEXT: "nudge-generate-context", // AI context generation
   NUDGE_GENERATE_QUESTION: "nudge-generate-question", // AI question generation
+  NUDGE_RESIZE: "nudge-resize", // Dynamic window resizing (collapsed/expanded)
 
   // Window management
   WINDOW_SHOW: "window-show",

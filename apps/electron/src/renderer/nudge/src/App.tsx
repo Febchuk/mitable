@@ -94,6 +94,8 @@ declare global {
       dismiss: (nudgeId: string) => void;
       createNudge: (data: unknown) => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
+      // NEW: Dynamic window resizing
+      resizeWindow: (options: { width?: number; height?: number } | "collapsed" | "expanded") => void;
       // NEW: AI generation methods
       generateContext: (conversationId: string) => Promise<{ context: string }>;
       generateQuestion: (conversationId: string) => Promise<{ question: string }>;
@@ -205,7 +207,13 @@ function App() {
       <ExpertList
         experts={experts}
         isExpanded={isExpanded}
-        onToggle={() => setIsExpanded(!isExpanded)}
+        onToggle={() => {
+          const newExpandedState = !isExpanded;
+          setIsExpanded(newExpandedState);
+
+          // Resize window to match panel state (left-to-right expansion)
+          window.nudgeAPI.resizeWindow(newExpandedState ? "expanded" : "collapsed");
+        }}
         onEscalate={handleEscalate}
       />
 
