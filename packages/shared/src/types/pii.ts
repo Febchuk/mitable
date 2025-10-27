@@ -37,13 +37,23 @@ export interface PIIRegion {
  * - Phone numbers
  */
 export type PIIType =
+  // Personal Information
   | "PERSON_NAME"
   | "EMAIL_ADDRESS"
   | "PHONE_NUMBER"
   | "STREET_ADDRESS"
+  // Financial
   | "CREDIT_CARD_NUMBER"
   | "US_SOCIAL_SECURITY_NUMBER" // SSN
-  | "API_KEY" // API keys, secrets, tokens
+  // Secrets & Credentials
+  | "AUTH_TOKEN"
+  | "PASSWORD"
+  | "ENCRYPTION_KEY"
+  | "GCP_API_KEY"
+  | "AWS_CREDENTIALS"
+  | "AZURE_AUTH_TOKEN"
+  | "JSON_WEB_TOKEN"
+  // Fallbacks
   | "CUSTOM_IDENTIFIER"
   | "UNKNOWN";
 
@@ -64,9 +74,17 @@ export const PII_REDACTION_THRESHOLD: PIILikelihood = "POSSIBLE";
  * High-sensitivity data that must be protected
  */
 export const ALWAYS_REDACT_TYPES: PIIType[] = [
+  // Financial
   "US_SOCIAL_SECURITY_NUMBER",
   "CREDIT_CARD_NUMBER",
-  "API_KEY",
+  // Secrets & Credentials (CRITICAL - always redact!)
+  "AUTH_TOKEN",
+  "PASSWORD",
+  "ENCRYPTION_KEY",
+  "GCP_API_KEY",
+  "AWS_CREDENTIALS",
+  "AZURE_AUTH_TOKEN",
+  "JSON_WEB_TOKEN",
 ];
 
 /**
