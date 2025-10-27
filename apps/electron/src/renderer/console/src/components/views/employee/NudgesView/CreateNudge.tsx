@@ -4,7 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCreateNudge } from "@/console/src/hooks/queries/nudges";
 import { useToast } from "@/hooks/use-toast";
-import { NudgeResource } from "@/console/src/services/nudgesService";
+import {
+  NudgeResource,
+  generateNudgeContext,
+  generateNudgeQuestion,
+} from "@/console/src/services/nudgesService";
 import PeopleSelector from "./PeopleSelector";
 import ResourceUploader from "./ResourceUploader";
 
@@ -21,7 +25,7 @@ interface ExpertData {
 interface CreateNudgeData {
   expert?: ExpertData;
   context?: string;
-  question?: string;
+  conversationId?: string;
 }
 
 export default function CreateNudge() {
@@ -35,12 +39,21 @@ export default function CreateNudge() {
   const [context, setContext] = useState("");
   const [question, setQuestion] = useState("");
   const [resources, setResources] = useState<NudgeResource[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isGeneratingContext, setIsGeneratingContext] = useState(false);
+  const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false);
 
   // Pre-populate form from location state (passed from ConsoleLayout via IPC)
   useEffect(() => {
     if (location.state) {
       const nudgeData = location.state as CreateNudgeData;
       console.log("[CreateNudge] Received data from location state:", nudgeData);
+
+      // Store conversationId for context generation
+      if (nudgeData.conversationId) {
+        setConversationId(nudgeData.conversationId);
+        console.log("[CreateNudge] Stored conversationId:", nudgeData.conversationId);
+      }
 
       // Pre-populate expert if provided
       if (nudgeData.expert) {
@@ -57,11 +70,6 @@ export default function CreateNudge() {
       if (nudgeData.context) {
         setContext(nudgeData.context);
       }
-
-      // Pre-populate question if provided
-      if (nudgeData.question) {
-        setQuestion(nudgeData.question);
-      }
     }
   }, [location.state]);
 
@@ -74,6 +82,64 @@ export default function CreateNudge() {
 
   const handleRemovePerson = (personId: string) => {
     setSelectedPeople(selectedPeople.filter((p) => p.id !== personId));
+  };
+
+  const handleGenerateContext = async () => {
+    if (!conversationId) {
+      toast({
+        title: "No conversation found",
+        description: "Start a conversation in the agent window first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingContext(true);
+    try {
+      const response = await generateNudgeContext(conversationId);
+      setContext(response.context);
+      toast({
+        title: "Context generated",
+        description: "You can edit the generated context before sending",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to generate context",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingContext(false);
+    }
+  };
+
+  const handleGenerateQuestion = async () => {
+    if (!conversationId) {
+      toast({
+        title: "No conversation found",
+        description: "Start a conversation in the agent window first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingQuestion(true);
+    try {
+      const response = await generateNudgeQuestion(conversationId);
+      setQuestion(response.question);
+      toast({
+        title: "Question generated",
+        description: "You can edit the generated question before sending",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to generate question",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingQuestion(false);
+    }
   };
 
   const handleSaveDraft = () => {
@@ -186,13 +252,26 @@ export default function CreateNudge() {
 
         {/* Section 2: Context */}
         <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-          <div className="space-y-2">
-            <label className="text-xl font-semibold text-text-primary">
-              Context <span className="text-status-error">*</span>
-            </label>
-            <p className="text-sm text-text-secondary">
-              Describe what you need help with. This will be shared with the selected people.
-            </p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2 flex-1">
+              <label className="text-xl font-semibold text-text-primary">
+                Context <span className="text-status-error">*</span>
+              </label>
+              <p className="text-sm text-text-secondary">
+                Describe what you need help with. This will be shared with the selected people.
+              </p>
+            </div>
+            {conversationId && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleGenerateContext}
+                disabled={isGeneratingContext}
+                className="shrink-0"
+              >
+                {isGeneratingContext ? "Generating..." : "✨ Generate"}
+              </Button>
+            )}
           </div>
           <textarea
             value={context}
@@ -208,13 +287,26 @@ export default function CreateNudge() {
 
         {/* Section 3: Optional Question */}
         <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-          <div className="space-y-2">
-            <label className="text-xl font-semibold text-text-primary">
-              Specific Question (Optional)
-            </label>
-            <p className="text-sm text-text-secondary">
-              Add a specific question if you want to highlight something particular.
-            </p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2 flex-1">
+              <label className="text-xl font-semibold text-text-primary">
+                Specific Question (Optional)
+              </label>
+              <p className="text-sm text-text-secondary">
+                Add a specific question if you want to highlight something particular.
+              </p>
+            </div>
+            {conversationId && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleGenerateQuestion}
+                disabled={isGeneratingQuestion}
+                className="shrink-0"
+              >
+                {isGeneratingQuestion ? "Generating..." : "✨ Generate"}
+              </Button>
+            )}
           </div>
           <input
             type="text"

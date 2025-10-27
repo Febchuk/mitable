@@ -1,12 +1,6 @@
 import { Pinecone } from "@pinecone-database/pinecone";
 import { config } from "../config.js";
 
-const RETRY_CONFIG = {
-  MAX_RETRIES: 3,
-  BACKOFF_MULTIPLIER: 2,
-  INITIAL_DELAY_MS: 1000,
-} as const;
-
 /**
  * Vector metadata structure
  * TODO: Replace index signature with specific typed fields as requirements grow
@@ -70,43 +64,6 @@ class VectorService {
     this.initialized = true;
   }
 
-  private async retryWithBackoff<T>(operation: () => Promise<T>, context: string): Promise<T> {
-    let lastError: Error | undefined;
-
-    for (let attempt = 0; attempt < RETRY_CONFIG.MAX_RETRIES; attempt++) {
-      try {
-        return await operation();
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-
-        const isRateLimitError =
-          error instanceof Error &&
-          (error.message.includes("rate limit") || error.message.includes("429"));
-
-        const isLastAttempt = attempt === RETRY_CONFIG.MAX_RETRIES - 1;
-
-        if (isLastAttempt) {
-          break;
-        }
-
-        if (isRateLimitError) {
-          const delayMs =
-            RETRY_CONFIG.INITIAL_DELAY_MS * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt);
-          console.log(
-            `[VectorService] Rate limit hit, retrying ${context} in ${delayMs}ms (attempt ${attempt + 1}/${RETRY_CONFIG.MAX_RETRIES})`
-          );
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    throw new Error(`${context} failed after ${RETRY_CONFIG.MAX_RETRIES} attempts`, {
-      cause: lastError,
-    });
-  }
-
   /**
    * Upsert vectors into Pinecone index
    * @param vectors - Array of vector records to upsert
@@ -117,10 +74,12 @@ class VectorService {
       throw new Error("VectorService not initialized. Call initialize() first.");
     }
 
-    return this.retryWithBackoff(async () => {
+    try {
       const index = this.client.index(this.indexName);
       await index.namespace(namespace || "").upsert(vectors);
-    }, `upsertVectors (${vectors.length} vectors)`);
+    } catch (error) {
+      throw new Error("Failed to upsert vectors", { cause: error });
+    }
   }
 
   /**
@@ -141,7 +100,7 @@ class VectorService {
       throw new Error("VectorService not initialized. Call initialize() first.");
     }
 
-    return this.retryWithBackoff(async () => {
+    try {
       const index = this.client.index(this.indexName);
       const results = await index.namespace(namespace || "").query({
         vector: embedding,
@@ -157,7 +116,9 @@ class VectorService {
           metadata: (match.metadata as VectorMetadata) || { text: "" },
         })) || []
       );
-    }, `queryVectors (topK=${topK})`);
+    } catch (error) {
+      throw new Error("Failed to query vectors", { cause: error });
+    }
   }
 
   /**
@@ -170,10 +131,12 @@ class VectorService {
       throw new Error("VectorService not initialized. Call initialize() first.");
     }
 
-    return this.retryWithBackoff(async () => {
+    try {
       const index = this.client.index(this.indexName);
       await index.namespace(namespace || "").deleteMany(ids);
-    }, `deleteVectors (${ids.length} ids)`);
+    } catch (error) {
+      throw new Error("Failed to delete vectors", { cause: error });
+    }
   }
 
   /**
@@ -185,10 +148,12 @@ class VectorService {
       throw new Error("VectorService not initialized. Call initialize() first.");
     }
 
-    return this.retryWithBackoff(async () => {
+    try {
       const index = this.client.index(this.indexName);
       await index.namespace(namespace).deleteAll();
-    }, `clearNamespace (${namespace})`);
+    } catch (error) {
+      throw new Error("Failed to clear namespace", { cause: error });
+    }
   }
 
   /**
@@ -199,10 +164,12 @@ class VectorService {
       throw new Error("VectorService not initialized. Call initialize() first.");
     }
 
-    return this.retryWithBackoff(async () => {
+    try {
       const index = this.client.index(this.indexName);
       return await index.describeIndexStats();
-    }, "getStats");
+    } catch (error) {
+      throw new Error("Failed to get index stats", { cause: error });
+    }
   }
 }
 

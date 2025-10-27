@@ -21,6 +21,7 @@ export const IPC_CHANNELS = {
   OVERLAY_SHOW: "overlay-show",
   OVERLAY_HIDE: "overlay-hide",
   OVERLAY_HIGHLIGHT_UPDATE: "overlay-highlight-update",
+  GET_DISPLAY_METADATA: "get-display-metadata",
 
   // Nudge system
   NUDGE_SHOW: "nudge-show",
@@ -29,8 +30,6 @@ export const IPC_CHANNELS = {
   NUDGE_DISMISS: "nudge-dismiss",
   NUDGE_CREATE_REQUEST: "nudge-create-request",
   NUDGE_OPEN_CREATOR: "nudge-open-creator",
-  NUDGE_GENERATE_CONTEXT: "nudge-generate-context", // AI context generation
-  NUDGE_GENERATE_QUESTION: "nudge-generate-question", // AI question generation
 
   // Window management
   WINDOW_SHOW: "window-show",

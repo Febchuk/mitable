@@ -4,7 +4,6 @@ import {
   globalShortcut,
   ipcMain,
   screen,
-  // desktopCapturer, // TODO: Re-enable when UI guidance feature is complete
   shell,
 } from "electron";
 import { join } from "path";
@@ -311,6 +310,56 @@ function setupIPC() {
     }
   });
 
+  ipcMain.handle(
+    IPC_CHANNELS.GUIDE_NEXT_STEP,
+    async (_event, data: { conversationId: string; currentStepIndex: number }) => {
+      console.log("[Main] Guide progress requested:", data);
+
+      try {
+        const screenshot = await captureService.capture({ mode: "full-screen" });
+        if (!screenshot) {
+          console.error("[Main] Screenshot capture failed");
+          return { error: "Screenshot capture failed" };
+        }
+
+        const response = await fetch("http://localhost:3000/api/guides/progress", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authTokens.accessToken}`,
+          },
+          body: JSON.stringify({
+            conversationId: data.conversationId,
+            screenshot: screenshot.dataUrl,
+            currentStepIndex: data.currentStepIndex,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (guideWindow && !guideWindow.isDestroyed()) {
+          guideWindow.webContents.send(IPC_CHANNELS.GUIDE_STEP_UPDATE, result);
+        }
+
+        if (agentWindow && !agentWindow.isDestroyed() && result.visualGuidance) {
+          agentWindow.webContents.send("agent:stream-message", {
+            content: result.visualGuidance.elementDescription,
+          });
+        }
+
+        console.log("[Main] Guide progress complete:", {
+          adjusted: result.adjustmentMade,
+          currentStep: result.adjustedSolution?.currentStepIndex,
+        });
+
+        return result;
+      } catch (error) {
+        console.error("[Main] Guide progress error:", error);
+        return { error: "Failed to progress guide" };
+      }
+    }
+  );
+
   // Nudge system
   ipcMain.on(IPC_CHANNELS.NUDGE_SHOW, (_event, data) => {
     if (nudgeWindow && !nudgeWindow.isDestroyed()) {
@@ -469,82 +518,16 @@ function setupIPC() {
     }
   );
 
-  // AI Generation - Context
-  ipcMain.handle(IPC_CHANNELS.NUDGE_GENERATE_CONTEXT, async (_event, conversationId: string) => {
-    console.log("[Nudge] Generate context requested for conversation:", conversationId);
-
-    // Check if we have an auth token
-    if (!authTokens.accessToken) {
-      console.error("[Nudge] No auth token available");
-      throw new Error("Not authenticated. Please log in first.");
-    }
-
-    try {
-      const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
-      const response = await fetch(`${API_BASE_URL}/api/nudges/generate-context`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authTokens.accessToken}`,
-        },
-        body: JSON.stringify({ conversationId }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({
-          message: response.statusText,
-        }));
-        throw new Error(errorData.message || `HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("[Nudge] Context generated successfully");
-      return data; // Returns { success: true, context: "..." }
-    } catch (error) {
-      console.error("[Nudge] Context generation failed:", error);
-      throw error;
-    }
+  // Display Metadata - for multi-monitor support
+  ipcMain.handle(IPC_CHANNELS.GET_DISPLAY_METADATA, () => {
+    const displays = screen.getAllDisplays();
+    return displays.map((display) => ({
+      bounds: display.bounds,
+      scaleFactor: display.scaleFactor,
+    }));
   });
 
-  // AI Generation - Question
-  ipcMain.handle(IPC_CHANNELS.NUDGE_GENERATE_QUESTION, async (_event, conversationId: string) => {
-    console.log("[Nudge] Generate question requested for conversation:", conversationId);
-
-    // Check if we have an auth token
-    if (!authTokens.accessToken) {
-      console.error("[Nudge] No auth token available");
-      throw new Error("Not authenticated. Please log in first.");
-    }
-
-    try {
-      const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
-      const response = await fetch(`${API_BASE_URL}/api/nudges/generate-question`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authTokens.accessToken}`,
-        },
-        body: JSON.stringify({ conversationId }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({
-          message: response.statusText,
-        }));
-        throw new Error(errorData.message || `HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("[Nudge] Question generated successfully");
-      return data; // Returns { success: true, question: "..." }
-    } catch (error) {
-      console.error("[Nudge] Question generation failed:", error);
-      throw error;
-    }
-  });
-
-  console.log("[IPC] Screenshot capture handler registered successfully");
-  console.log("[IPC] Nudge generation handlers registered successfully");
+  console.log("[IPC] Screenshot capture and display metadata handlers registered successfully");
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)

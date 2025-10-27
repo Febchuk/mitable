@@ -16,7 +16,13 @@ contextBridge.exposeInMainWorld("guideAPI", {
       callback(data)
     );
   },
-  nextStep: () => ipcRenderer.send(IPC_CHANNELS.GUIDE_NEXT_STEP),
+  nextStep: (data: { conversationId: string; currentStepIndex: number }) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GUIDE_NEXT_STEP, data),
+  onStepUpdate: (callback: (data: unknown) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.GUIDE_STEP_UPDATE, (_event: IpcRendererEvent, data: unknown) =>
+      callback(data)
+    );
+  },
   updateStep: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_STEP_UPDATE, data),
   complete: () => ipcRenderer.send(IPC_CHANNELS.GUIDE_COMPLETE),
   cancel: () => ipcRenderer.send(IPC_CHANNELS.GUIDE_CANCEL),
