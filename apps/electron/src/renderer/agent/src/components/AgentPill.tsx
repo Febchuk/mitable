@@ -42,16 +42,21 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
     window.agentAPI.resizeWindow(mode === "text" ? "text-mode" : "audio-mode");
   };
 
+  const handleLogoClick = () => {
+    // Open collapsed conversation combobox to switch conversations
+    window.agentAPI.toggleConversation();
+  };
+
   return (
     <div
       className={`${
         inputMode === "text" ? "w-[740px] px-6" : "w-[280px] px-4"
       } h-full flex items-center py-2 bg-agent-pill rounded-full app-drag transition-all duration-300`}
     >
-      {/* Logo Icon */}
-      <div className="cursor-move">
+      {/* Logo Icon - Click to open conversation switcher */}
+      <button onClick={handleLogoClick} className="cursor-pointer hover:opacity-80 transition-opacity app-no-drag">
         <img src={logoIconSvg} alt="Mitable" className="w-8 h-8 mr-3 flex-shrink-0" />
-      </div>
+      </button>
 
       {/* Input Area (Text mode only) */}
       {inputMode === "text" && (

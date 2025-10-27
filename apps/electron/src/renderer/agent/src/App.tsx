@@ -19,6 +19,7 @@ declare global {
       ) => void;
       showConversation: () => void;
       hideConversation: () => void;
+      toggleConversation: () => void; // NEW: Toggle collapsed combobox
       sendMessageToConversation: (messageData: any, screenshot: string | null) => void;
       showNudge: (data: unknown) => void;
       startGuide: (data: unknown) => void;
