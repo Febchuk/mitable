@@ -64,11 +64,31 @@ const PII_INFO_TYPES = [
  * to reduce API calls and costs.
  */
 class PIIRedactionService {
-  private dlpClient: DlpServiceClient;
-  private projectId: string;
+  private dlpClient: DlpServiceClient | null = null;
   private cache: NodeCache;
+  private projectId: string | null = null;
 
   constructor() {
+    // Initialize cache (always safe)
+    this.cache = new NodeCache({
+      stdTTL: 3600, // 1 hour
+      maxKeys: 100,
+      checkperiod: 600, // Check for expired entries every 10 minutes
+    });
+
+    // Don't validate or initialize DLP client in constructor
+    // This allows tests to import without requiring Google Cloud credentials
+  }
+
+  /**
+   * Lazy initialization of DLP client
+   * Only initializes when actually needed
+   */
+  private initializeDLPClient(): void {
+    if (this.dlpClient) {
+      return; // Already initialized
+    }
+
     // Validate configuration
     if (!config.googleCloud.projectId) {
       throw new Error(
@@ -77,29 +97,20 @@ class PIIRedactionService {
     }
 
     if (!config.googleCloud.keyPath) {
-      throw new Error("GOOGLE_CLOUD_KEY_PATH is not configured. Please set it in your .env file.");
+      throw new Error(
+        "GOOGLE_CLOUD_KEY_PATH is not configured. Please set it in your .env file."
+      );
     }
 
     this.projectId = config.googleCloud.projectId;
 
-    // Initialize DLP client
-    try {
-      this.dlpClient = new DlpServiceClient({
-        projectId: this.projectId,
-        keyFilename: config.googleCloud.keyPath,
-      });
-    } catch (error) {
-      throw new Error("Failed to initialize Google Cloud DLP client", { cause: error });
-    }
-
-    // Initialize cache (1 hour TTL, max 100 screenshots)
-    this.cache = new NodeCache({
-      stdTTL: 3600, // 1 hour
-      maxKeys: 100,
-      checkperiod: 600, // Check for expired entries every 10 min
+    // Initialize Google Cloud DLP client
+    this.dlpClient = new DlpServiceClient({
+      projectId: this.projectId,
+      keyFilename: config.googleCloud.keyPath,
     });
 
-    console.log("[PIIRedactionService] Initialized with project:", this.projectId);
+    console.log(`[PIIRedactionService] Initialized with project: ${this.projectId}`);
   }
 
   /**
@@ -112,7 +123,10 @@ class PIIRedactionService {
     const startTime = Date.now();
 
     try {
-      // Generate cache key (SHA-256 hash of screenshot)
+      // Ensure DLP client is initialized
+      this.initializeDLPClient();
+
+      // Generate cache key from screenshot hash
       const cacheKey = this.generateCacheKey(request.screenshot);
 
       // Check cache
@@ -151,8 +165,8 @@ class PIIRedactionService {
         })),
       };
 
-      // Call DLP API
-      const [response] = await this.dlpClient.redactImage(dlpRequest);
+      // Call DLP API (dlpClient is guaranteed to be initialized by initializeDLPClient)
+      const [response] = await this.dlpClient!.redactImage(dlpRequest);
 
       if (!response.redactedImage) {
         throw new Error("DLP API returned empty redacted image");
