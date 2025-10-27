@@ -14,10 +14,7 @@ export interface DisplayMetadata {
  * Adjust bounding box coordinates for display offset
  * This translates absolute screen coordinates to overlay window coordinates
  */
-export function adjustForDisplay(
-  bbox: BoundingBox,
-  displayMetadata: DisplayMetadata
-): BoundingBox {
+export function adjustForDisplay(bbox: BoundingBox, displayMetadata: DisplayMetadata): BoundingBox {
   const { bounds, scaleFactor } = displayMetadata;
 
   return {

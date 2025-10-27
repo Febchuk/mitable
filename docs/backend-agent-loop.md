@@ -27,6 +27,7 @@ The backend uses an **agentic loop with iterative tool calling** powered by Open
 - Trigger secondary windows (Guide, Nudge) with structured data
 
 **Key Architecture Principles**:
+
 - **Tool-based**: Capabilities are modular, reusable tools
 - **Iterative**: Agent can call tools, receive results, and synthesize natural responses
 - **Streaming**: All responses stream incrementally for better UX
@@ -235,9 +236,9 @@ All tools extend `BaseTool` and implement:
 
 ```typescript
 class BaseTool {
-  name: string;           // Tool identifier (e.g., "search_knowledge_base")
-  description: string;    // When to use this tool (AI reads this)
-  parameters: ToolParameters;  // JSON Schema for arguments
+  name: string; // Tool identifier (e.g., "search_knowledge_base")
+  description: string; // When to use this tool (AI reads this)
+  parameters: ToolParameters; // JSON Schema for arguments
 
   async execute(args: any, context: ToolContext): Promise<ToolResult> {
     // Tool implementation
@@ -249,12 +250,13 @@ class BaseTool {
 
 ```typescript
 interface ToolResult {
-  messageType: string;          // "text" | "workflow" | "expert_match"
-  content: string;              // Response text for chat
-  streamable: boolean;          // Can be streamed word-by-word?
-  cardData?: any;               // Structured data for cards
-  sources?: Source[];           // Knowledge base sources
-  triggerWindow?: {             // Launch secondary window
+  messageType: string; // "text" | "workflow" | "expert_match"
+  content: string; // Response text for chat
+  streamable: boolean; // Can be streamed word-by-word?
+  cardData?: any; // Structured data for cards
+  sources?: Source[]; // Knowledge base sources
+  triggerWindow?: {
+    // Launch secondary window
     window: "guide" | "nudge";
     data: any;
   };
@@ -333,6 +335,7 @@ AgentService continues loop for AI to synthesize natural response
 **When Used**: "What is X?", "Find docs about Y", "Who said Z?"
 
 **Process**:
+
 1. Generate embedding for query (OpenAI text-embedding-3-large)
 2. Semantic search in Pinecone (top 10 results)
 3. Keyword search in PostgreSQL (full-text search)
@@ -346,6 +349,7 @@ AgentService continues loop for AI to synthesize natural response
 **When Used**: "Who can help me with X?", "I need to talk to someone about Y"
 
 **Matching Algorithm**:
+
 - Expertise similarity: 40% (cosine similarity of embeddings)
 - Performance: 30% (response rate + helpfulness rating)
 - Availability: 30% (calendar/status)
@@ -359,6 +363,7 @@ AgentService continues loop for AI to synthesize natural response
 **When Used**: "How do I X?" + screenshot present, "Next" continuation signals
 
 **Key Features**:
+
 - Generates **one step at a time** (not full workflows)
 - Adapts to current screen state
 - Returns coordinates for overlay arrows/highlights
@@ -491,16 +496,16 @@ export async function sendMessageStream(
   content: string,
   screenshot: string | null,
   callbacks: {
-    onChunk: (chunk: string) => void,
-    onComplete: (content, messageId, messageType, cardData, windowTrigger) => void,
-    onWindowTrigger: (window: "guide" | "nudge", data: any) => void,
-    onError: (error: string) => void
+    onChunk: (chunk: string) => void;
+    onComplete: (content, messageId, messageType, cardData, windowTrigger) => void;
+    onWindowTrigger: (window: "guide" | "nudge", data: any) => void;
+    onError: (error: string) => void;
   }
 ) {
   const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-    body: JSON.stringify({ content, screenshot })
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ content, screenshot }),
   });
 
   const reader = response.body.getReader();
@@ -518,8 +523,16 @@ export async function sendMessageStream(
         const data = JSON.parse(line.substring(6));
 
         if (data.type === "chunk") callbacks.onChunk(data.content);
-        if (data.type === "window_trigger") callbacks.onWindowTrigger(data.windowTrigger.window, data.windowTrigger.data);
-        if (data.type === "complete") callbacks.onComplete(data.content, data.messageId, data.messageType, data.cardData, data.windowTrigger);
+        if (data.type === "window_trigger")
+          callbacks.onWindowTrigger(data.windowTrigger.window, data.windowTrigger.data);
+        if (data.type === "complete")
+          callbacks.onComplete(
+            data.content,
+            data.messageId,
+            data.messageType,
+            data.cardData,
+            data.windowTrigger
+          );
         if (data.type === "error") callbacks.onError(data.error);
       }
     }
@@ -538,6 +551,7 @@ export async function sendMessageStream(
 **Purpose**: Detect when user is requesting step-by-step guidance
 
 **Logic**:
+
 ```typescript
 shouldEnterWorkflowMode(message: string, history: Message[]): boolean {
   const patterns = [
@@ -559,12 +573,14 @@ shouldEnterWorkflowMode(message: string, history: Message[]): boolean {
 **Purpose**: Detect "Next", "Done", "Okay" signals during workflows
 
 **Features**:
+
 - Keyword matching ("next", "done", "okay", "continue")
 - Screenshot hash comparison (detects UI changes)
 - Confidence scoring (0-1)
 - Signal types: continuation, completion, rejection
 
 **Example**:
+
 ```typescript
 detectContinuation("Done", lastMessage, currentHash, previousHash) {
   // Returns:
@@ -584,12 +600,14 @@ detectContinuation("Done", lastMessage, currentHash, previousHash) {
 **Purpose**: Analyze screenshots using Google Gemini 2.0 Flash
 
 **Capabilities**:
+
 - UI element detection with bounding boxes
 - Screen description generation
 - Application context identification
 - Element relevance scoring
 
 **Process**:
+
 1. Convert base64 screenshot to image buffer
 2. Send to Gemini Vision API with prompt
 3. Parse JSON response with elements array
@@ -602,6 +620,7 @@ detectContinuation("Done", lastMessage, currentHash, previousHash) {
 **Purpose**: Semantic search in Pinecone vector database
 
 **Features**:
+
 - Upsert document embeddings (1536 dimensions)
 - Query with filters (organizationId, documentType)
 - Top-K similarity search
@@ -614,12 +633,9 @@ detectContinuation("Done", lastMessage, currentHash, previousHash) {
 **Purpose**: Find best experts for user questions
 
 **Scoring Algorithm**:
+
 ```typescript
-finalScore = (
-  expertiseSimilarity * 0.4 +
-  performanceScore * 0.3 +
-  availabilityScore * 0.3
-)
+finalScore = expertiseSimilarity * 0.4 + performanceScore * 0.3 + availabilityScore * 0.3;
 ```
 
 **Returns**: Top 3 experts with match scores > 0.6
@@ -899,7 +915,7 @@ try {
   messages.push({
     role: "tool",
     content: `Error: ${error.message}. Please try a different approach.`,
-    tool_call_id: toolCallId
+    tool_call_id: toolCallId,
   });
 
   // AI will receive error and adapt response

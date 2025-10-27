@@ -2,11 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config";
 import { z } from "zod";
 import { toGeminiSchema } from "../utils/gemini-schema.js";
-import {
-  InterpretationOptionSchema,
-  VisualGuidanceSchema,
-  StepSchema,
-} from "@mitable/shared";
+import { InterpretationOptionSchema, VisualGuidanceSchema, StepSchema } from "@mitable/shared";
 import type { SolutionObject, Step, VisualGuidance, InterpretationOption } from "@mitable/shared";
 import type { Message as DbMessage } from "../db/schema/conversations.schema.js";
 
@@ -533,7 +529,6 @@ Analyze screenshot to determine if plan needs adjustment. Consider:
       return { needsAdjustment: false };
     }
   }
-
 }
 
 // Export singleton instance

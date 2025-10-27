@@ -252,7 +252,9 @@ export class AgentService {
       const continuationSignal = continuationDetectorService.detectContinuation(
         userMessage,
         context.conversationHistory[context.conversationHistory.length - 1]?.content,
-        context.screenshot ? continuationDetectorService.hashScreenshot(context.screenshot) : undefined,
+        context.screenshot
+          ? continuationDetectorService.hashScreenshot(context.screenshot)
+          : undefined,
         undefined // TODO: Track previous screenshot hash in workflow state
       );
 
@@ -365,7 +367,8 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
       if (context.screenshot) {
         messages.push({
           role: "system",
-          content: "[CONTEXT] User has provided a screenshot of their current screen. Screenshot is available for visual analysis and UI guidance.",
+          content:
+            "[CONTEXT] User has provided a screenshot of their current screen. Screenshot is available for visual analysis and UI guidance.",
         });
         console.log("[AgentService] Added screenshot context to messages");
       }
@@ -373,7 +376,8 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
       if (shouldEnterWorkflow) {
         messages.push({
           role: "system",
-          content: "[INTENT DETECTED] This appears to be a task guidance request based on trigger phrases in the user message. User is asking for step-by-step help completing an action. When screenshot is available, prioritize visual guidance flow: search_knowledge → show_step_by_step_guide.",
+          content:
+            "[INTENT DETECTED] This appears to be a task guidance request based on trigger phrases in the user message. User is asking for step-by-step help completing an action. When screenshot is available, prioritize visual guidance flow: search_knowledge → show_step_by_step_guide.",
         });
         console.log("[AgentService] Added workflow intent context to messages");
       }
@@ -427,7 +431,9 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
               // Only process the first tool call (index 0)
               if (toolCall.index !== 0) {
                 if (toolCall?.function?.name) {
-                  console.log(`[AgentService] Ignoring additional tool call at index ${toolCall.index}: ${toolCall.function.name}`);
+                  console.log(
+                    `[AgentService] Ignoring additional tool call at index ${toolCall.index}: ${toolCall.function.name}`
+                  );
                 }
                 continue;
               }
@@ -480,8 +486,10 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             // Trim whitespace that might cause parsing issues
             const trimmedArgs = functionArgs.trim();
 
-            console.log(`[AgentService] Raw function args (length: ${trimmedArgs.length}):`,
-              trimmedArgs.substring(0, 200));
+            console.log(
+              `[AgentService] Raw function args (length: ${trimmedArgs.length}):`,
+              trimmedArgs.substring(0, 200)
+            );
 
             parsedArgs = JSON.parse(trimmedArgs);
           } catch (error) {
@@ -491,8 +499,8 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             // Try to extract just the first complete JSON object
             // This handles cases where OpenAI might be calling multiple tools
             // and we accidentally concatenated arguments
-            const firstBraceIndex = functionArgs.indexOf('{');
-            const lastBraceIndex = functionArgs.lastIndexOf('}');
+            const firstBraceIndex = functionArgs.indexOf("{");
+            const lastBraceIndex = functionArgs.lastIndexOf("}");
 
             if (firstBraceIndex !== -1 && lastBraceIndex !== -1) {
               const extracted = functionArgs.substring(firstBraceIndex, lastBraceIndex + 1);

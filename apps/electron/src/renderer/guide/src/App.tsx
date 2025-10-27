@@ -91,9 +91,7 @@ function App() {
       <div className="w-full bg-[#2A2A2A] rounded-2xl p-6 flex flex-col gap-4 h-full overflow-hidden">
         {/* Header */}
         <div className="flex-shrink-0">
-          <h2 className="text-text-tertiary text-sm font-medium">
-            Step-by-Step Guide
-          </h2>
+          <h2 className="text-text-tertiary text-sm font-medium">Step-by-Step Guide</h2>
           <p className="text-text-secondary text-xs mt-1">
             {guideData.stepList.length} steps total
           </p>
@@ -181,15 +179,16 @@ function App() {
           )}
 
           {/* All steps completed */}
-          {guideData.stepList.length > 0 && guideData.stepList.every((step) => step.status === "completed") && (
-            <div className="bg-green-500/10 rounded-lg p-6 border-2 border-green-500 text-center">
-              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Check size={24} className="text-white" />
+          {guideData.stepList.length > 0 &&
+            guideData.stepList.every((step) => step.status === "completed") && (
+              <div className="bg-green-500/10 rounded-lg p-6 border-2 border-green-500 text-center">
+                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Check size={24} className="text-white" />
+                </div>
+                <p className="text-green-500 text-lg font-bold">All Done!</p>
+                <p className="text-text-secondary text-sm mt-2">You've completed all steps</p>
               </div>
-              <p className="text-green-500 text-lg font-bold">All Done!</p>
-              <p className="text-text-secondary text-sm mt-2">You've completed all steps</p>
-            </div>
-          )}
+            )}
         </div>
 
         {/* Footer - Progress Indicator + Done Button */}

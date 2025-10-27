@@ -1,11 +1,4 @@
-import {
-  app,
-  BrowserWindow,
-  globalShortcut,
-  ipcMain,
-  screen,
-  shell,
-} from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from "electron";
 import { join } from "path";
 import { IPC_CHANNELS } from "@mitable/shared";
 import { captureService, CaptureOptions, CaptureResult } from "./services/captureService";

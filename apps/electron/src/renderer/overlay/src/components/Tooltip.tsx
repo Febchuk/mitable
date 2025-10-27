@@ -9,24 +9,14 @@ interface TooltipProps {
   color?: string;
 }
 
-export function Tooltip({
-  x,
-  y,
-  stepNumber,
-  instruction,
-  color = "#3B82F6",
-}: TooltipProps) {
+export function Tooltip({ x, y, stepNumber, instruction, color = "#3B82F6" }: TooltipProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x, y });
 
   useEffect(() => {
     if (tooltipRef.current) {
       const { offsetWidth, offsetHeight } = tooltipRef.current;
-      const adjustedPosition = preventEdgeClipping(
-        { x, y },
-        offsetWidth,
-        offsetHeight
-      );
+      const adjustedPosition = preventEdgeClipping({ x, y }, offsetWidth, offsetHeight);
       setPosition(adjustedPosition);
     }
   }, [x, y]);

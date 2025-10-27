@@ -46,7 +46,8 @@ Extract the sources array from search_knowledge response and include ALL fields 
           },
           required: ["text", "source", "metadata"],
         },
-        description: "FULL search results from search_knowledge (not snippets). Extract from sources array.",
+        description:
+          "FULL search results from search_knowledge (not snippets). Extract from sources array.",
       },
       stepList: {
         type: "array",
@@ -62,13 +63,17 @@ Extract the sources array from search_knowledge response and include ALL fields 
         description: "Initial estimated steps (3-5 steps typically)",
       },
     },
-    required: ["solution", "solutionExplanation", "supportingDataExplanation", "searchQuery", "supportingData", "stepList"],
+    required: [
+      "solution",
+      "solutionExplanation",
+      "supportingDataExplanation",
+      "searchQuery",
+      "supportingData",
+      "stepList",
+    ],
   };
 
-  async execute(
-    args: Partial<SolutionObject>,
-    context: ToolContext
-  ): Promise<ToolResult> {
+  async execute(args: Partial<SolutionObject>, context: ToolContext): Promise<ToolResult> {
     this.validate(args);
 
     console.log("[ShowStepByStepGuideTool] Execute:", args.solution);
@@ -126,7 +131,11 @@ ${visualGuidance.confidence === "low" && visualGuidance.alternativeElements?.[0]
 
 What questions do you have?`;
 
-    console.log("[ShowStepByStepGuideTool] Guide created with", solutionObject.stepList.length, "steps");
+    console.log(
+      "[ShowStepByStepGuideTool] Guide created with",
+      solutionObject.stepList.length,
+      "steps"
+    );
 
     return {
       messageType: "workflow",

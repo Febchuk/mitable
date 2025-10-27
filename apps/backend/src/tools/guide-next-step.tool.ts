@@ -242,7 +242,8 @@ export class GuideNextStepTool extends BaseTool {
       // If we found a target element, generate guidance
       if (targetElement) {
         // Generate guidance based on whether we have a multi-step plan
-        const currentStepData = allSteps.length > 0 ? allSteps.find((s) => s.element) || allSteps[0] : null;
+        const currentStepData =
+          allSteps.length > 0 ? allSteps.find((s) => s.element) || allSteps[0] : null;
         const stepInstruction = currentStepData
           ? currentStepData.instruction
           : `Click "${targetElement.label}"`;
@@ -256,7 +257,10 @@ export class GuideNextStepTool extends BaseTool {
 Here's your ${allSteps.length}-step plan to ${task}:
 
 ${allSteps
-  .map((s, idx) => `${idx + 1}. ${s.instruction}${s.confidence !== "high" ? ` (${s.confidence} confidence)` : ""}`)
+  .map(
+    (s, idx) =>
+      `${idx + 1}. ${s.instruction}${s.confidence !== "high" ? ` (${s.confidence} confidence)` : ""}`
+  )
   .join("\n")}
 
 Let's start with step 1: ${stepInstruction.toLowerCase()}`;
@@ -362,9 +366,7 @@ Now, ${stepInstruction.toLowerCase()}.`;
       }
 
       // No clear target element - describe what we see and ask for clarification
-      console.log(
-        "[GuideNextStepTool] No target element found - providing screen context instead"
-      );
+      console.log("[GuideNextStepTool] No target element found - providing screen context instead");
 
       return {
         messageType: "text",

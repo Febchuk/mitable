@@ -701,11 +701,7 @@ router.post(
     try {
       // Fetch user and conversation in parallel (optimization)
       const [userResult, conversationResult] = await Promise.all([
-        db
-          .select()
-          .from(schema.users)
-          .where(eq(schema.users.id, userId))
-          .limit(1),
+        db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1),
         db
           .select()
           .from(schema.conversations)
@@ -781,8 +777,7 @@ router.post(
       const conversationHistory = historyData.reverse();
 
       // Reuse user data from earlier query (no need to fetch again!)
-      const fullName =
-        [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
+      const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
 
       console.log("[Conversations] User profile (from cache):", {
         organizationId: user.organizationId,
