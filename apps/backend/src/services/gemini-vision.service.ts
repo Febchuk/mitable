@@ -1,5 +1,24 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config";
+import { z } from "zod";
+import { toGeminiSchema } from "../utils/gemini-schema.js";
+import {
+  InterpretationOptionSchema,
+  VisualGuidanceSchema,
+  StepSchema,
+} from "@mitable/shared";
+import type { SolutionObject, Step, VisualGuidance, InterpretationOption } from "@mitable/shared";
+import type { Message as DbMessage } from "../db/schema/conversations.schema.js";
+
+const InterpretResponseSchema = z.object({
+  interpretations: z.array(InterpretationOptionSchema),
+});
+
+const EvaluateProgressResponseSchema = z.object({
+  needsAdjustment: z.boolean(),
+  adjustedStepList: z.array(StepSchema).optional(),
+  adjustmentReason: z.string().optional(),
+});
 
 /**
  * UI Element detected by Gemini Vision
@@ -65,11 +84,38 @@ export interface MultiStepGuidanceResult {
 class GeminiVisionService {
   private genAI: GoogleGenerativeAI;
   private model: any;
+  private interpretModel: any;
+  private stepGuidanceModel: any;
+  private evaluateModel: any;
 
   constructor() {
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
-    // Use Gemini 2.0 Flash for vision tasks
+
     this.model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+
+    this.interpretModel = this.genAI.getGenerativeModel({
+      model: "gemini-2.0-flash-exp",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: toGeminiSchema(InterpretResponseSchema) as any,
+      },
+    });
+
+    this.stepGuidanceModel = this.genAI.getGenerativeModel({
+      model: "gemini-2.0-flash-exp",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: toGeminiSchema(VisualGuidanceSchema) as any,
+      },
+    });
+
+    this.evaluateModel = this.genAI.getGenerativeModel({
+      model: "gemini-2.0-flash-exp",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: toGeminiSchema(EvaluateProgressResponseSchema) as any,
+      },
+    });
   }
 
   /**
@@ -316,6 +362,175 @@ Return ONLY raw JSON (no markdown code blocks):
         applicationContext: "Unknown",
         screenDescription: "Failed to analyze screenshot",
       };
+    }
+  }
+
+  async interpretVaguePrompt(
+    screenshot: string,
+    vaguePrompt: string
+  ): Promise<{ interpretations: InterpretationOption[] }> {
+    console.log("[GeminiVision] Interpreting vague prompt:", vaguePrompt);
+
+    try {
+      const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
+
+      const prompt = `The user said: "${vaguePrompt}"
+
+This is vague. Based on their current screen, what specific tasks might they be asking about?
+
+Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
+
+      const result = await this.interpretModel.generateContent([
+        prompt,
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: base64Data,
+          },
+        },
+      ]);
+
+      const text = result.response.text();
+      const parsed = InterpretResponseSchema.parse(JSON.parse(text));
+
+      console.log("[GeminiVision] Interpretations:", parsed.interpretations.length);
+      return parsed;
+    } catch (error) {
+      console.error("[GeminiVision] Interpretation failed:", error);
+      return {
+        interpretations: [
+          {
+            task: "Complete the task visible on your screen",
+            confidence: "low",
+            reasoning: "Unable to analyze screenshot",
+          },
+        ],
+      };
+    }
+  }
+
+  async analyzeStepExecution(
+    screenshot: string,
+    solutionObject: SolutionObject,
+    currentStep: Step,
+    conversationHistory: DbMessage[]
+  ): Promise<VisualGuidance> {
+    console.log("[GeminiVision] Analyzing step execution:", currentStep.stepNumber);
+
+    try {
+      const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
+
+      const supportingContext = solutionObject.supportingData
+        .slice(0, 5)
+        .map((data) => `[${data.source}] ${data.text.substring(0, 200)}`)
+        .join("\n\n");
+
+      const conversationContext = conversationHistory
+        .slice(-5)
+        .map((msg) => `${msg.role}: ${msg.content.substring(0, 150)}`)
+        .join("\n");
+
+      const prompt = `Task: "${solutionObject.solution}"
+Current Step: ${currentStep.description}
+
+Company Process Context:
+${supportingContext}
+
+${solutionObject.solutionExplanation}
+
+Recent Conversation:
+${conversationContext}
+
+Analyze the screenshot and provide EXTREMELY PRECISE guidance:
+1. Exact element name/label
+2. Visual indicators (icons, colors)
+3. Precise location (top-right, center, etc.)
+4. Surrounding context
+5. Consider any confusion or questions from the conversation history`;
+
+      const result = await this.stepGuidanceModel.generateContent([
+        prompt,
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: base64Data,
+          },
+        },
+      ]);
+
+      const text = result.response.text();
+      const parsed = VisualGuidanceSchema.parse(JSON.parse(text));
+
+      console.log("[GeminiVision] Guidance confidence:", parsed.confidence);
+      return parsed;
+    } catch (error) {
+      console.error("[GeminiVision] Step analysis failed:", error);
+      return {
+        elementDescription: `Look for elements related to: ${currentStep.description}`,
+        visualContext: "Unable to analyze screenshot",
+        confidence: "low",
+      };
+    }
+  }
+
+  async evaluateProgress(
+    screenshot: string,
+    solutionObject: SolutionObject,
+    conversationHistory: DbMessage[],
+    nextStepIndex: number
+  ): Promise<{
+    needsAdjustment: boolean;
+    adjustedStepList?: Step[];
+    adjustmentReason?: string;
+  }> {
+    console.log("[GeminiVision] Evaluating progress to step:", nextStepIndex + 1);
+
+    try {
+      const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
+
+      const currentPlan = solutionObject.stepList
+        .map((s) => `${s.stepNumber}. ${s.description} [${s.status}]`)
+        .join("\n");
+
+      const conversationContext = conversationHistory
+        .slice(-5)
+        .map((msg) => `${msg.role}: ${msg.content.substring(0, 150)}`)
+        .join("\n");
+
+      const prompt = `Task: "${solutionObject.solution}"
+
+Current Plan:
+${currentPlan}
+
+User was on step ${solutionObject.currentStepIndex + 1}, advancing to step ${nextStepIndex + 1}.
+
+Recent Conversation:
+${conversationContext}
+
+Analyze screenshot to determine if plan needs adjustment. Consider:
+- Did user skip steps?
+- Did new complexity appear?
+- Are remaining steps still valid?
+- Has the user expressed confusion or encountered repeated issues?`;
+
+      const result = await this.evaluateModel.generateContent([
+        prompt,
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: base64Data,
+          },
+        },
+      ]);
+
+      const text = result.response.text();
+      const parsed = EvaluateProgressResponseSchema.parse(JSON.parse(text));
+
+      console.log("[GeminiVision] Needs adjustment:", parsed.needsAdjustment);
+      return parsed;
+    } catch (error) {
+      console.error("[GeminiVision] Evaluation failed:", error);
+      return { needsAdjustment: false };
     }
   }
 

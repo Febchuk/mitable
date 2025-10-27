@@ -310,6 +310,56 @@ function setupIPC() {
     }
   });
 
+  ipcMain.handle(
+    IPC_CHANNELS.GUIDE_NEXT_STEP,
+    async (_event, data: { conversationId: string; currentStepIndex: number }) => {
+      console.log("[Main] Guide progress requested:", data);
+
+      try {
+        const screenshot = await captureService.capture({ mode: "full-screen" });
+        if (!screenshot) {
+          console.error("[Main] Screenshot capture failed");
+          return { error: "Screenshot capture failed" };
+        }
+
+        const response = await fetch("http://localhost:3000/api/guides/progress", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authTokens.accessToken}`,
+          },
+          body: JSON.stringify({
+            conversationId: data.conversationId,
+            screenshot: screenshot.dataUrl,
+            currentStepIndex: data.currentStepIndex,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (guideWindow && !guideWindow.isDestroyed()) {
+          guideWindow.webContents.send(IPC_CHANNELS.GUIDE_STEP_UPDATE, result);
+        }
+
+        if (agentWindow && !agentWindow.isDestroyed() && result.visualGuidance) {
+          agentWindow.webContents.send("agent:stream-message", {
+            content: result.visualGuidance.elementDescription,
+          });
+        }
+
+        console.log("[Main] Guide progress complete:", {
+          adjusted: result.adjustmentMade,
+          currentStep: result.adjustedSolution?.currentStepIndex,
+        });
+
+        return result;
+      } catch (error) {
+        console.error("[Main] Guide progress error:", error);
+        return { error: "Failed to progress guide" };
+      }
+    }
+  );
+
   // Nudge system
   ipcMain.on(IPC_CHANNELS.NUDGE_SHOW, (_event, data) => {
     if (nudgeWindow && !nudgeWindow.isDestroyed()) {

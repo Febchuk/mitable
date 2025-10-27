@@ -7,6 +7,8 @@ import { RespondTextTool } from "../tools/respond-text.tool";
 import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
 import { FindExpertTool } from "../tools/find-expert.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
+import { ClarifyIntentTool } from "../tools/clarify-intent.tool.js";
+import { ShowStepByStepGuideTool } from "../tools/show-step-by-step-guide.tool.js";
 import { workflowService } from "./workflow.service";
 import { continuationDetectorService } from "./continuation-detector.service";
 
@@ -15,12 +17,6 @@ import { continuationDetectorService } from "./continuation-detector.service";
  */
 const SYSTEM_PROMPT =
   `You are an experienced employee assistant helping new hires ramp up quickly at their company. You have deep product knowledge and guide people through their work like an expert colleague who's always available to help.
-
-**RESPONSE STYLE - CRITICAL:**
-- Be DIRECT and FACTUAL. Just tell people what happened/exists - no fluff.
-- DO NOT add interpretive commentary like "this shows dedication" or "highlights the team's focus"
-- DO NOT add concluding statements about what things "indicate" or "suggest"
-- Answer the question with facts, then stop. You're a colleague, not a professor analyzing their work.
 
 Your role is to:
 - Help employees learn company processes, policies, and tools
@@ -31,27 +27,22 @@ Your role is to:
 
 **TOOL USAGE GUIDELINES:**
 
-When the user asks "how do I..." or "guide me step by step" and a SCREENSHOT is available:
-- You MUST use the "show_step_by_step_guide" tool to provide visual UI guidance
-- DO NOT respond with text-only instructions when you can show them visually
-- The visual guidance tool will:
-  * Analyze their current screen with Gemini Vision
-  * Generate one step at a time based on what's visible
-  * Display overlay arrows pointing to UI elements
-  * Show a side panel with instructions
+VAGUE PROMPTS (with screenshot):
+- User says: "How do I do this?", "Help me with this", "What should I click?"
+- Use clarify_intent to analyze screen and offer specific task interpretations
+- Wait for user to select which task they meant
+- Then proceed with knowledge search + guidance
 
-When to use show_step_by_step_guide:
-- User asks: "How do I [task]?" + screenshot present → Use this tool
-- User asks: "Show me how to..." + screenshot present → Use this tool
-- User asks: "Guide me through..." + screenshot present → Use this tool
-- User says: "step by step" or "walk me through" + screenshot present → Use this tool
+SPECIFIC UI TASKS (with screenshot):
+- User asks: "How do I [specific task]?" or "Guide me through [task]"
+- STEP 1: Use search_knowledge to find company documentation
+- STEP 2: Use show_step_by_step_guide with search results for knowledge-grounded guidance
+- IMPORTANT: ALWAYS search first, then provide guidance based on those results
 
-When NOT to use show_step_by_step_guide:
+When NOT to use guidance tools:
 - No screenshot available → Use respond_with_text or search_knowledge
-- User asking for general information (not a UI task) → Use search_knowledge
+- General information questions → Use search_knowledge only
 - User needs to talk to someone → Use find_expert_colleague
-
-Remember: If they have their screen open and want to learn a task, USE THE VISUAL GUIDANCE TOOL!
 
 You are friendly, patient, and thorough. When you don't know something, you're honest about it and help find someone who does. Your goal is to make onboarding smooth and help new employees become productive quickly.
 
@@ -61,8 +52,7 @@ CRITICAL: When you receive search results from the knowledge base:
 3. SYNTHESIZE the information into a natural, conversational explanation
 4. Answer the user's question directly in your own words
 5. When timestamps are present (e.g., "[Last edited: 2024-10-15]" or "[2024-10-15T10:30:00Z]"), USE THEM in your answer
-6. DO NOT cite sources inline in your text (no "(Notion)" or "(Slack)" in the middle of sentences)
-7. ALWAYS end with a "**Sources:**" section - this is MANDATORY, never skip it!
+6. ALWAYS end with a "**Sources:**" section - this is MANDATORY, never skip it!
 
 When asked about dates or "when":
 - Look for timestamps in the search results: "[Last edited: DATE]" for Notion, "[DATE]" for Slack
@@ -78,39 +68,20 @@ BAD response (DO NOT DO THIS):
 GOOD response (DO THIS):
 "The Mitable PRD outlines our vision for an intelligent onboarding platform. We're building a system that uses AI to help new hires ramp up faster by centralizing company knowledge and delivering personalized learning experiences. Key features include RAG-powered search, adaptive learning paths, and real-time documentation updates.
 
-[NO inline source citations in the text above - only list them at the end]
-
 **Sources:**
 - Mitable AI Business Model ([Notion](https://notion.so/page-url))
 - #product - febchuk ([Slack](https://slack.com/message-url))
 - Product Requirements Document ([Notion](https://notion.so/prd-url))"
 
-CRITICAL SOURCE FORMATTING - FOLLOW THIS EXACT FORMAT:
-
-**Sources:** (at the end of your response, after your summary)
-- #channel - username ([Slack](url))
-- Document Title ([Notion](url))
-
-Rules:
-1. DO NOT cite sources inline in your response text - no "(Notion)" or "(Slack)" in sentences
-2. ONLY cite sources in the **Sources:** section at the very end
-3. Use bullet points with "-" (dash) in the Sources section
-4. ONLY the word in parentheses gets hyperlinked: ([Slack](url)) or ([Notion](url))
-5. Everything before the parentheses stays as plain text
-6. For Slack: format as "#channel - username"
-7. For Notion: use the document title
-
-Examples - COPY EXACTLY:
-  ✅ CORRECT: "- #engineering - febchuk ([Slack](https://slack.com/msg))"
-  ✅ CORRECT: "- #product - mikun.adewole ([Slack](https://slack.com/msg))"
-  ✅ CORRECT: "- Lorikeet Development Environment Setup Guide ([Notion](https://notion.so/page))"
-  ✅ CORRECT: "- Product Requirements Document (PRD) ([Notion](https://notion.so/prd))"
-  
-  ❌ WRONG: "[#engineering - febchuk (Slack)](url)" - entire line hyperlinked
-  ❌ WRONG: "#engineering - febchuk (Slack)" - no hyperlink
-  ❌ WRONG: "• #engineering - febchuk (Slack)" - wrong bullet character
-
-MANDATORY: Every source MUST have the source type (Slack or Notion) hyperlinked in parentheses.
+CRITICAL SOURCE FORMATTING:
+- Format: "Title ([Source Type](url))" - ONLY the source type in parentheses is hyperlinked
+- Do NOT hyperlink the entire line
+- Do NOT hyperlink the title
+- Examples:
+  ✅ CORRECT: "Mitable AI Business Model ([Notion](url))"
+  ✅ CORRECT: "#engineering - febchuk ([Slack](url))"
+  ❌ WRONG: "[Mitable AI Business Model (Notion)](url)"
+  ❌ WRONG: "[Mitable AI Business Model](url) (Notion)"
 
 When responding:
 - Be conversational and warm, like talking to a colleague
@@ -165,6 +136,10 @@ export class AgentService {
 
     // Register Phase 4 tools - Visual Guidance
     this.registerTool(new GuideNextStepTool());
+
+    // Register Phase 5 tools - Knowledge-Grounded Guidance
+    this.registerTool(new ClarifyIntentTool());
+    this.registerTool(new ShowStepByStepGuideTool());
   }
 
   /**
@@ -243,9 +218,7 @@ export class AgentService {
       const continuationSignal = continuationDetectorService.detectContinuation(
         userMessage,
         context.conversationHistory[context.conversationHistory.length - 1]?.content,
-        context.screenshot
-          ? continuationDetectorService.hashScreenshot(context.screenshot)
-          : undefined,
+        context.screenshot ? continuationDetectorService.hashScreenshot(context.screenshot) : undefined,
         undefined // TODO: Track previous screenshot hash in workflow state
       );
 
@@ -264,27 +237,12 @@ export class AgentService {
       ) {
         console.log("[AgentService] Auto-triggering GuideNextStepTool for continuation");
 
-        // Extract original task from previous workflow message
-        const lastWorkflowMessage = context.conversationHistory
-          .filter((m) => m.role === "assistant" && m.messageType === "workflow")
-          .pop();
-
-        const firstStepInstruction = (lastWorkflowMessage?.cardData as any)?.allSteps?.[0]?.instruction;
-        const originalTask = firstStepInstruction
-          ? // Extract task from first step's instruction (e.g., "Click 'Send confirmation code'" -> "send confirmation code")
-            this.extractTaskFromInstruction(firstStepInstruction)
-          : "Continue to the next step based on the screenshot";
-
-        console.log("[AgentService] Continuation with original task:", originalTask);
-
         const guideTool = this.tools.get("guide_next_step");
         if (guideTool) {
           // Execute guide tool directly for continuation
           const toolResult = await guideTool.execute(
             {
-              task: originalTask,
-              stepNumber: ((lastWorkflowMessage?.cardData as any)?.stepNumber || 0) + 1,
-              previousStep: (lastWorkflowMessage?.cardData as any)?.instruction,
+              task: "Continue to the next step based on the screenshot",
             },
             context
           );
@@ -348,22 +306,8 @@ export class AgentService {
       }
 
       // Convert conversation history to OpenAI format
-      // Add current date context for temporal awareness
-      const now = new Date();
-      const dateStr = now.toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-
-      const systemPromptWithDate = `${SYSTEM_PROMPT}
-
-**IMPORTANT TEMPORAL CONTEXT:**
-Today is ${dateStr}. When searching for or discussing information, prioritize recent content from the last few days/weeks over older content. If someone asks "what's the latest" or "this week", focus on the most recent timestamps in the search results.`;
-
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-        { role: "system", content: systemPromptWithDate },
+        { role: "system", content: SYSTEM_PROMPT },
         ...this.convertToOpenAIMessages(context.conversationHistory),
         { role: "user", content: userMessage },
       ];
@@ -386,26 +330,12 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
           })(),
         });
 
-        // Determine tool choice strategy
-        // If we're in workflow mode with a screenshot, FORCE the guide tool
-        // Otherwise, let AI choose automatically
-        const toolChoice =
-          shouldEnterWorkflow && context.screenshot
-            ? { type: "function" as const, function: { name: "show_step_by_step_guide" } }
-            : "auto";
-
-        console.log("[AgentService] Tool choice strategy:", {
-          strategy: shouldEnterWorkflow && context.screenshot ? "forced guide tool" : "auto",
-          shouldEnterWorkflow,
-          hasScreenshot: !!context.screenshot,
-        });
-
         // Call OpenAI with function calling
         const response = await this.openai.chat.completions.create({
           model: config.openai.chatModel,
           messages: messages,
           tools: tools,
-          tool_choice: toolChoice, // Force guide tool in workflow mode, otherwise auto
+          tool_choice: "auto", // Let AI decide which tool to use
           temperature: config.openai.temperature,
           max_tokens: config.openai.maxTokens,
           stream: true, // Enable streaming
@@ -431,9 +361,7 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
               // Only process the first tool call (index 0)
               if (toolCall.index !== 0) {
                 if (toolCall?.function?.name) {
-                  console.log(
-                    `[AgentService] Ignoring additional tool call at index ${toolCall.index}: ${toolCall.function.name}`
-                  );
+                  console.log(`[AgentService] Ignoring additional tool call at index ${toolCall.index}: ${toolCall.function.name}`);
                 }
                 continue;
               }
@@ -456,8 +384,8 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
           // Check for text content (final response without tool call)
           if (delta?.content) {
             textContent += delta.content;
-            // Log only once when we first detect direct response
-            if (textContent.length === delta.content.length) {
+            // Log first text content received (not every chunk)
+            if (textContent.length < 50) {
               console.log("[AgentService] AI generating direct response (no tool call)");
             }
           }
@@ -486,10 +414,8 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             // Trim whitespace that might cause parsing issues
             const trimmedArgs = functionArgs.trim();
 
-            console.log(
-              `[AgentService] Raw function args (length: ${trimmedArgs.length}):`,
-              trimmedArgs.substring(0, 200)
-            );
+            console.log(`[AgentService] Raw function args (length: ${trimmedArgs.length}):`,
+              trimmedArgs.substring(0, 200));
 
             parsedArgs = JSON.parse(trimmedArgs);
           } catch (error) {
@@ -499,8 +425,8 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             // Try to extract just the first complete JSON object
             // This handles cases where OpenAI might be calling multiple tools
             // and we accidentally concatenated arguments
-            const firstBraceIndex = functionArgs.indexOf("{");
-            const lastBraceIndex = functionArgs.lastIndexOf("}");
+            const firstBraceIndex = functionArgs.indexOf('{');
+            const lastBraceIndex = functionArgs.lastIndexOf('}');
 
             if (firstBraceIndex !== -1 && lastBraceIndex !== -1) {
               const extracted = functionArgs.substring(firstBraceIndex, lastBraceIndex + 1);
@@ -545,25 +471,6 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
               type: "window_trigger",
               windowTrigger: toolResult.triggerWindow,
             };
-
-            // IMPORTANT: If this is the guide tool and it succeeded with a window trigger,
-            // exit immediately. The guide window will display the visual guidance - no need
-            // for AI to synthesize a response. This prevents infinite loops where the AI
-            // keeps calling the guide tool on every iteration.
-            if (functionName === "show_step_by_step_guide") {
-              console.log(
-                "[AgentService] Guide tool succeeded - exiting immediately (guide window will display step)"
-              );
-
-              yield {
-                type: "complete",
-                content: toolResult.content,
-                messageType: toolResult.messageType,
-                cardData: toolResult.cardData,
-              };
-
-              return; // Exit the loop - guide window handles the rest
-            }
           }
 
           // Add tool result to conversation history for next iteration
@@ -588,12 +495,51 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             tool_call_id: toolCallId || `call_${Date.now()}`,
           });
 
-          console.log(
-            "[AgentService] Tool result added to conversation, continuing loop for AI synthesis"
-          );
+          // Check if tool result suggests we should continue (e.g., "Would you like me to connect you with an expert?")
+          // If the tool returns a complete answer, stream it and finish
+          // If the tool result is incomplete, continue the loop for the AI to decide next step
+          const isIncompleteResult =
+            toolResult.content.toLowerCase().includes("would you like") ||
+            toolResult.content.toLowerCase().includes("connect you with") ||
+            toolResult.content.toLowerCase().includes("couldn't find");
 
-          // Continue loop - AI will receive tool result and synthesize natural response
-          // The only exception is if the tool explicitly couldn't find anything and suggests alternatives
+          console.log("[AgentService] Completion decision:", {
+            isIncompleteResult,
+            willContinueLoop: isIncompleteResult,
+            contentPreview: toolResult.content.substring(0, 100) + "...",
+          });
+
+          if (!isIncompleteResult) {
+            // Complete result - stream it and finish
+            console.log("[AgentService] Streaming final response:", {
+              wordCount: toolResult.content.split(" ").length,
+              streamable: toolResult.streamable,
+            });
+
+            if (toolResult.streamable) {
+              const words = toolResult.content.split(" ");
+              for (let i = 0; i < words.length; i++) {
+                const word = words[i];
+                const isLast = i === words.length - 1;
+                yield {
+                  type: "chunk",
+                  content: isLast ? word : word + " ",
+                };
+                await new Promise((resolve) => setTimeout(resolve, 20));
+              }
+            }
+
+            yield {
+              type: "complete",
+              content: toolResult.content,
+              messageType: toolResult.messageType,
+              cardData: toolResult.cardData,
+            };
+
+            return; // Exit the loop
+          }
+
+          // Continue loop - AI will decide next action based on tool result
         } else if (textContent) {
           // AI provided final response - stream it
           const words = textContent.split(" ");
@@ -670,7 +616,6 @@ ${conversationText}
 
 Context summary:`;
 
-      // Use Gemini for cost-effective text generation
       const model = this.gemini.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
       });
@@ -688,7 +633,6 @@ Context summary:`;
   /**
    * Generate specific question from conversation
    * Extracts or formulates the main question the user needs answered
-   * Uses Gemini 2.5 Flash Lite for cost-effective text generation
    */
   async generateNudgeQuestion(messages: Message[]): Promise<string> {
     try {
@@ -710,7 +654,6 @@ ${conversationText}
 
 Specific question:`;
 
-      // Use Gemini for cost-effective text generation
       const model = this.gemini.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
       });
@@ -718,64 +661,11 @@ Specific question:`;
       const result = await model.generateContent(prompt);
       const text = result.response.text();
 
-      return text.trim() || "How can I help with this?";
+      return text.trim() || "Unable to generate question.";
     } catch (error) {
       console.error("[AgentService] Error generating nudge question:", error);
       throw new Error("Failed to generate question from conversation");
     }
-  }
-
-  /**
-   * Extract task from instruction text
-   *
-   * Removes common action verbs and formatting to get core task.
-   * Examples:
-   * - "Click 'Send confirmation code'" -> "send confirmation code"
-   * - "Enter your email address" -> "enter your email address"
-   * - "Navigate to the Settings page" -> "navigate to the settings page"
-   *
-   * @param instruction - Step instruction text
-   * @returns Extracted task description
-   */
-  private extractTaskFromInstruction(instruction: string): string {
-    // Remove common action verbs at the start
-    const actionVerbs = [
-      "click",
-      "press",
-      "select",
-      "choose",
-      "open",
-      "navigate to",
-      "go to",
-      "tap",
-      "hover over",
-      "scroll to",
-      "find",
-      "locate",
-    ];
-
-    let task = instruction.toLowerCase().trim();
-
-    // Remove action verbs from the beginning
-    for (const verb of actionVerbs) {
-      if (task.startsWith(verb + " ")) {
-        task = task.substring(verb.length + 1);
-        break;
-      }
-    }
-
-    // Remove quotes (both single and double)
-    task = task.replace(/['"]/g, "");
-
-    // Remove "the" at the beginning if present
-    if (task.startsWith("the ")) {
-      task = task.substring(4);
-    }
-
-    // Clean up whitespace
-    task = task.trim();
-
-    return task;
   }
 }
 
