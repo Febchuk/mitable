@@ -7,6 +7,8 @@ import { RespondTextTool } from "../tools/respond-text.tool";
 import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
 import { FindExpertTool } from "../tools/find-expert.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
+import { ClarifyIntentTool } from "../tools/clarify-intent.tool.js";
+import { ShowStepByStepGuideTool } from "../tools/show-step-by-step-guide.tool.js";
 import { workflowService } from "./workflow.service";
 import { continuationDetectorService } from "./continuation-detector.service";
 
@@ -31,14 +33,17 @@ Your role is to:
 
 **TOOL USAGE GUIDELINES:**
 
-When the user asks "how do I..." or "guide me step by step" and a SCREENSHOT is available:
-- You MUST use the "show_step_by_step_guide" tool to provide visual UI guidance
-- DO NOT respond with text-only instructions when you can show them visually
-- The visual guidance tool will:
-  * Analyze their current screen with Gemini Vision
-  * Generate one step at a time based on what's visible
-  * Display overlay arrows pointing to UI elements
-  * Show a side panel with instructions
+VAGUE PROMPTS (with screenshot):
+- User says: "How do I do this?", "Help me with this", "What should I click?"
+- Use clarify_intent to analyze screen and offer specific task interpretations
+- Wait for user to select which task they meant
+- Then proceed with knowledge search + guidance
+
+SPECIFIC UI TASKS (with screenshot):
+- User asks: "How do I [specific task]?" or "Guide me through [task]"
+- STEP 1: Use search_knowledge to find company documentation
+- STEP 2: Use show_step_by_step_guide with search results for knowledge-grounded guidance
+- IMPORTANT: ALWAYS search first, then provide guidance based on those results
 
 When to use show_step_by_step_guide:
 - User asks: "How do I [task]?" + screenshot present → Use this tool
@@ -46,9 +51,9 @@ When to use show_step_by_step_guide:
 - User asks: "Guide me through..." + screenshot present → Use this tool
 - User says: "step by step" or "walk me through" + screenshot present → Use this tool
 
-When NOT to use show_step_by_step_guide:
+When NOT to use guidance tools:
 - No screenshot available → Use respond_with_text or search_knowledge
-- User asking for general information (not a UI task) → Use search_knowledge
+- General information questions → Use search_knowledge only
 - User needs to talk to someone → Use find_expert_colleague
 
 Remember: If they have their screen open and want to learn a task, USE THE VISUAL GUIDANCE TOOL!
@@ -105,7 +110,7 @@ Examples - COPY EXACTLY:
   ✅ CORRECT: "- #product - mikun.adewole ([Slack](https://slack.com/msg))"
   ✅ CORRECT: "- Lorikeet Development Environment Setup Guide ([Notion](https://notion.so/page))"
   ✅ CORRECT: "- Product Requirements Document (PRD) ([Notion](https://notion.so/prd))"
-  
+
   ❌ WRONG: "[#engineering - febchuk (Slack)](url)" - entire line hyperlinked
   ❌ WRONG: "#engineering - febchuk (Slack)" - no hyperlink
   ❌ WRONG: "• #engineering - febchuk (Slack)" - wrong bullet character
@@ -165,6 +170,10 @@ export class AgentService {
 
     // Register Phase 4 tools - Visual Guidance
     this.registerTool(new GuideNextStepTool());
+
+    // Register Phase 5 tools - Knowledge-Grounded Guidance
+    this.registerTool(new ClarifyIntentTool());
+    this.registerTool(new ShowStepByStepGuideTool());
   }
 
   /**
@@ -353,6 +362,26 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
         { role: "user", content: userMessage },
       ];
 
+      // Inject context about screenshot availability and workflow intent
+      // This critical information helps OpenAI make informed tool selection decisions
+      if (context.screenshot) {
+        messages.push({
+          role: "system",
+          content:
+            "[CONTEXT] User has provided a screenshot of their current screen. Screenshot is available for visual analysis and UI guidance.",
+        });
+        console.log("[AgentService] Added screenshot context to messages");
+      }
+
+      if (shouldEnterWorkflow) {
+        messages.push({
+          role: "system",
+          content:
+            "[INTENT DETECTED] This appears to be a task guidance request based on trigger phrases in the user message. User is asking for step-by-step help completing an action. When screenshot is available, prioritize visual guidance flow: search_knowledge → show_step_by_step_guide.",
+        });
+        console.log("[AgentService] Added workflow intent context to messages");
+      }
+
       // Get tool definitions
       const tools = this.getToolDefinitions();
 
@@ -371,26 +400,12 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
           })(),
         });
 
-        // Determine tool choice strategy
-        // If we're in workflow mode with a screenshot, FORCE the guide tool
-        // Otherwise, let AI choose automatically
-        const toolChoice =
-          shouldEnterWorkflow && context.screenshot
-            ? { type: "function" as const, function: { name: "show_step_by_step_guide" } }
-            : "auto";
-
-        console.log("[AgentService] Tool choice strategy:", {
-          strategy: shouldEnterWorkflow && context.screenshot ? "forced guide tool" : "auto",
-          shouldEnterWorkflow,
-          hasScreenshot: !!context.screenshot,
-        });
-
         // Call OpenAI with function calling
         const response = await this.openai.chat.completions.create({
           model: config.openai.chatModel,
           messages: messages,
           tools: tools,
-          tool_choice: toolChoice, // Force guide tool in workflow mode, otherwise auto
+          tool_choice: "auto", // Let AI decide which tool to use
           temperature: config.openai.temperature,
           max_tokens: config.openai.maxTokens,
           stream: true, // Enable streaming
@@ -554,12 +569,72 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             tool_call_id: toolCallId || `call_${Date.now()}`,
           });
 
-          console.log(
-            "[AgentService] Tool result added to conversation, continuing loop for AI synthesis"
-          );
+          // Check if tool result suggests we should continue (e.g., "Would you like me to connect you with an expert?")
+          // If the tool returns a complete answer, stream it and finish
+          // If the tool result is incomplete, continue the loop for the AI to decide next step
+          const isIncompleteResult =
+            toolResult.content.toLowerCase().includes("would you like") ||
+            toolResult.content.toLowerCase().includes("connect you with") ||
+            toolResult.content.toLowerCase().includes("couldn't find");
 
-          // Continue loop - AI will receive tool result and synthesize natural response
-          // The only exception is if the tool explicitly couldn't find anything and suggests alternatives
+          // Special case: If search_knowledge succeeded in a workflow context with screenshot,
+          // continue the loop to allow show_step_by_step_guide to be called next
+          const shouldContinueForGuidance =
+            functionName === "search_knowledge" &&
+            shouldEnterWorkflow &&
+            context.screenshot &&
+            !isIncompleteResult; // search succeeded
+
+          console.log("[AgentService] Completion decision:", {
+            isIncompleteResult,
+            shouldContinueForGuidance,
+            willContinueLoop: isIncompleteResult || shouldContinueForGuidance,
+            contentPreview: toolResult.content.substring(0, 100) + "...",
+          });
+
+          if (!isIncompleteResult && !shouldContinueForGuidance) {
+            // Complete result - stream it and finish
+            console.log("[AgentService] Streaming final response:", {
+              wordCount: toolResult.content.split(" ").length,
+              streamable: toolResult.streamable,
+            });
+
+            if (toolResult.streamable) {
+              const words = toolResult.content.split(" ");
+              for (let i = 0; i < words.length; i++) {
+                const word = words[i];
+                const isLast = i === words.length - 1;
+                yield {
+                  type: "chunk",
+                  content: isLast ? word : word + " ",
+                };
+                await new Promise((resolve) => setTimeout(resolve, 20));
+              }
+            }
+
+            yield {
+              type: "complete",
+              content: toolResult.content,
+              messageType: toolResult.messageType,
+              cardData: toolResult.cardData,
+            };
+
+            return; // Exit the loop
+          }
+
+          // If we're continuing for guidance, add a hint to help OpenAI make the right next choice
+          if (shouldContinueForGuidance) {
+            console.log(
+              "[AgentService] Continuing loop for UI guidance after successful knowledge search"
+            );
+            messages.push({
+              role: "system",
+              content:
+                "Knowledge search completed successfully. Now use show_step_by_step_guide with these search results (from the 'sources' field) and the available screenshot to provide visual step-by-step guidance to the user.",
+            });
+          }
+
+          // Continue loop - AI will decide next action based on tool result
         } else if (textContent) {
           // AI provided final response - stream it
           const words = textContent.split(" ");
@@ -636,7 +711,6 @@ ${conversationText}
 
 Context summary:`;
 
-      // Use Gemini for cost-effective text generation
       const model = this.gemini.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
       });
@@ -654,7 +728,6 @@ Context summary:`;
   /**
    * Generate specific question from conversation
    * Extracts or formulates the main question the user needs answered
-   * Uses Gemini 2.5 Flash Lite for cost-effective text generation
    */
   async generateNudgeQuestion(messages: Message[]): Promise<string> {
     try {
@@ -676,7 +749,6 @@ ${conversationText}
 
 Specific question:`;
 
-      // Use Gemini for cost-effective text generation
       const model = this.gemini.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
       });
@@ -684,7 +756,7 @@ Specific question:`;
       const result = await model.generateContent(prompt);
       const text = result.response.text();
 
-      return text.trim() || "How can I help with this?";
+      return text.trim() || "Unable to generate question.";
     } catch (error) {
       console.error("[AgentService] Error generating nudge question:", error);
       throw new Error("Failed to generate question from conversation");

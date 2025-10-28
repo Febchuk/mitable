@@ -27,9 +27,21 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   },
 
   // Screenshot capture
-  captureScreenshot: (): Promise<string | null> => {
+  captureScreenshot: async (): Promise<string | null> => {
     console.log("[Preload] captureScreenshot() called from renderer");
-    return ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
+    const result = await ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
+
+    // IPC handler returns { dataUrl, metadata } - extract just the dataUrl
+    if (result && typeof result === "object" && "dataUrl" in result) {
+      console.log("[Preload] Screenshot captured successfully:", {
+        dataUrlLength: result.dataUrl?.length || 0,
+        hasMetadata: !!result.metadata,
+      });
+      return result.dataUrl;
+    }
+
+    console.error("[Preload] Screenshot capture failed - invalid result:", result);
+    return null;
   },
 
   // Guide system

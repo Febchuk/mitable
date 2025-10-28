@@ -42,15 +42,72 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const streamingMessageIdRef = useRef<string | null>(null);
 
-  // Listen for Guide "Done" button clicks
+  // Listen for Guide "Next" button clicks
   useEffect(() => {
     window.agentAPI.onGuideNextStep(() => {
-      console.log("[Agent] Guide next step requested - sending 'Next' message");
-      // Send "Next" message to continue workflow
-      handleSubmit("Next");
+      console.log("[Agent] Guide next step requested - capturing screenshot for continuation");
+      // Handle silent continuation (don't show in chat)
+      handleSilentContinuation();
     });
-    // Note: Empty deps array is intentional - we only want to set up the listener once
-  }, []);
+    // Note: Using conversationId in deps to ensure we have it when continuation happens
+  }, [conversationId]);
+
+  /**
+   * Handle silent continuation for Guide "Next" button
+   * Captures screenshot and sends to backend without updating Agent chat
+   */
+  async function handleSilentContinuation() {
+    if (!conversationId) {
+      console.error("[Agent] No conversation ID for continuation");
+      return;
+    }
+
+    console.log("[Agent] Starting silent continuation...");
+
+    // Capture screenshot
+    let screenshot: string | null = null;
+    let screenshotMetadata: any = null;
+    try {
+      const result = await window.agentAPI.captureScreenshot();
+      console.log("[Agent] Screenshot captured for continuation:", {
+        hasScreenshot: !!result,
+        size: result?.dataUrl?.length || 0,
+      });
+      screenshot = result?.dataUrl || null;
+      screenshotMetadata = result?.metadata || null;
+    } catch (error) {
+      console.error("[Agent] Screenshot capture failed:", error);
+      return;
+    }
+
+    // Send "Next" message to backend (silent - no chat UI updates)
+    try {
+      await sendMessageStream(conversationId, "Next", screenshot, screenshotMetadata, {
+        // Don't update chat UI
+        onChunk: undefined,
+        onComplete: undefined,
+        onError: (error) => {
+          console.error("[Agent] Silent continuation error:", error);
+        },
+        onWindowTrigger: (windowType, data) => {
+          console.log("[Agent] Window trigger from continuation:", windowType, data);
+
+          // Route to appropriate window
+          if (windowType === "guide" && data.guide) {
+            console.log("[Agent] Updating Guide window with new step");
+            window.agentAPI.startGuide(data.guide);
+          } else if (windowType === "nudge" && data.experts) {
+            console.log("[Agent] Updating Nudge window");
+            window.agentAPI.showNudge(data);
+          }
+        },
+      });
+
+      console.log("[Agent] Silent continuation message sent");
+    } catch (error) {
+      console.error("[Agent] Failed to send continuation:", error);
+    }
+  }
 
   const handleCardClick = (message: Message) => {
     if (!message.windowTrigger) {
@@ -68,7 +125,10 @@ function App() {
         conversationId, // Add conversationId for Generate buttons
       });
     } else if (windowType === "guide") {
-      window.agentAPI.startGuide(data.guide);
+      window.agentAPI.startGuide({
+        ...data,
+        conversationId, // Add conversationId for Next Step button
+      });
     }
   };
 
@@ -129,6 +189,7 @@ function App() {
     // Capture screenshot for visual guidance
     console.log("[Agent] Attempting to capture screenshot for workflow...");
     let screenshot: string | null = null;
+    let screenshotMetadata: any = null;
     try {
       const result = await window.agentAPI.captureScreenshot();
       console.log("[Agent] Screenshot capture result:", {
@@ -136,8 +197,9 @@ function App() {
         size: result?.dataUrl?.length || 0,
         metadata: result?.metadata,
       });
-      // Extract data URL from result
+      // Extract data URL and metadata from result
       screenshot = result?.dataUrl || null;
+      screenshotMetadata = result?.metadata || null;
     } catch (error) {
       console.error("[Agent] Screenshot capture failed:", error);
       // Continue without screenshot - backend will handle gracefully
@@ -159,7 +221,7 @@ function App() {
 
     // Stream the response with optional screenshot
     try {
-      await sendMessageStream(convId, message, screenshot, {
+      await sendMessageStream(convId, message, screenshot, screenshotMetadata, {
         onChunk: (chunk) => {
           setMessages((prev) =>
             prev.map((msg) =>

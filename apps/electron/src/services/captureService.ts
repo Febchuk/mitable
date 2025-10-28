@@ -89,6 +89,7 @@ export interface CaptureResult {
     height: number;
     originalWidth: number;
     originalHeight: number;
+    scaleFactor: number; // Display scale factor (1 = standard, 2 = Retina, 1.5 = Windows 150%)
     captureMode: string;
     timestamp: number;
     window?: WindowMetadata;
@@ -231,6 +232,7 @@ class CaptureService {
 
       // Extract window metadata
       const display = screen.getPrimaryDisplay();
+      const scaleFactor = display.scaleFactor;
       const windowMetadata: WindowMetadata = {
         title: targetSource.name,
         bounds: {
@@ -258,6 +260,7 @@ class CaptureService {
           height: finalSize.height,
           originalWidth: originalSize.width,
           originalHeight: originalSize.height,
+          scaleFactor: scaleFactor,
           captureMode: "active-window",
           timestamp: Date.now(),
           window: windowMetadata,
@@ -340,6 +343,7 @@ class CaptureService {
           height: finalSize.height,
           originalWidth: originalSize.width,
           originalHeight: originalSize.height,
+          scaleFactor: scaleFactor,
           captureMode: "full-screen",
           timestamp: Date.now(),
         },
@@ -369,6 +373,9 @@ class CaptureService {
         console.error("[CaptureService] Failed to capture full screen for region crop");
         return null;
       }
+
+      // Extract scaleFactor from full screen capture
+      const scaleFactor = fullScreenResult.metadata.scaleFactor;
 
       // Convert data URL back to NativeImage
       const base64Data = fullScreenResult.dataUrl.replace(/^data:image\/\w+;base64,/, "");
@@ -401,6 +408,7 @@ class CaptureService {
           height: finalSize.height,
           originalWidth: originalSize.width,
           originalHeight: originalSize.height,
+          scaleFactor: scaleFactor,
           captureMode: "region",
           timestamp: Date.now(),
         },

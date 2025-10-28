@@ -6,6 +6,7 @@ import nudgesRouter from "./routes/nudges.js";
 import conversationsRouter from "./routes/conversations.js";
 import adminRouter from "./routes/admin.js";
 import integrationsRouter from "./routes/integrations.js";
+import guidesRouter from "./routes/guides.routes.js";
 
 export const router = Router();
 
@@ -27,6 +28,7 @@ router.use("/nudges", nudgesRouter);
 router.use("/conversations", conversationsRouter);
 router.use("/admin", adminRouter);
 router.use("/integrations", integrationsRouter);
+router.use("/guides", guidesRouter);
 
 // Protected routes - require authentication
 router.post("/help", requireAuth, (req, res) => {
