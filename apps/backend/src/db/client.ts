@@ -34,11 +34,19 @@ pool.on("connect", () => {
   }
 });
 
+// Throttle pool stats logging to reduce noise (max once per second)
+let lastPoolLogTime = 0;
+const POOL_LOG_THROTTLE_MS = 1000;
+
 pool.on("acquire", () => {
   if (config.nodeEnv === "development") {
-    console.log(
-      `📊 Pool stats - Total: ${pool.totalCount}, Idle: ${pool.idleCount}, Waiting: ${pool.waitingCount}`
-    );
+    const now = Date.now();
+    if (now - lastPoolLogTime > POOL_LOG_THROTTLE_MS) {
+      console.log(
+        `📊 Pool stats - Total: ${pool.totalCount}, Idle: ${pool.idleCount}, Waiting: ${pool.waitingCount}`
+      );
+      lastPoolLogTime = now;
+    }
   }
 });
 

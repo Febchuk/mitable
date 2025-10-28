@@ -180,42 +180,41 @@ class ContinuationDetectorService {
   }
 
   /**
-   * Create a simple hash of screenshot data for comparison
-   * @param screenshotData - Base64 screenshot data (string or Buffer)
+   * Simple hash function for screenshot comparison
+   *
+   * @param screenshotData - Base64 screenshot data
    * @returns Simple hash string
    */
-  hashScreenshot(screenshotData: string | Buffer | any): string {
-    // Handle null, undefined, or empty
-    if (!screenshotData) {
-      return "empty-screenshot";
+  hashScreenshot(screenshotData: string): string {
+    // Runtime type safety - ensure we have a valid string
+    if (!screenshotData || typeof screenshotData !== "string") {
+      console.warn("[ContinuationDetector] Invalid screenshot data for hashing");
+      return "invalid-screenshot";
     }
 
-    // Handle Buffer
-    if (Buffer.isBuffer(screenshotData)) {
-      if (screenshotData.length === 0) {
-        return "empty-screenshot";
-      }
-      screenshotData = screenshotData.toString("base64");
-    }
-
-    // Handle non-string types (could be object, array, etc)
-    if (typeof screenshotData !== "string") {
-      return "empty-screenshot";
-    }
-
-    // Handle empty or very short strings
     if (screenshotData.length === 0) {
       return "empty-screenshot";
     }
 
     // Take a sample of the screenshot data for quick comparison
     // In production, you might use a proper perceptual hash
-    const sampleSize = Math.min(1000, screenshotData.length);
+    const sampleSize = 1000;
+
+    // Handle short screenshots (< 2000 chars) gracefully
+    if (screenshotData.length < sampleSize * 2) {
+      // For short data, just use the whole string
+      const sample = screenshotData;
+      let hash = screenshotData.length.toString(36);
+      for (let i = 0; i < sample.length; i += 10) {
+        hash += sample.charCodeAt(i).toString(36);
+      }
+      return hash;
+    }
+
+    // Standard case: sample from beginning and end
     const sample =
       screenshotData.substring(0, sampleSize) +
-      (screenshotData.length > sampleSize
-        ? screenshotData.substring(screenshotData.length - sampleSize)
-        : "");
+      screenshotData.substring(screenshotData.length - sampleSize);
 
     // Simple hash based on length and sample content
     let hash = screenshotData.length.toString(36);

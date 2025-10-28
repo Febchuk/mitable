@@ -29,7 +29,17 @@ export interface ToolContext {
   conversationId: string;
   userId: string;
   conversationHistory: Message[];
-  screenshot?: string; // Base64 encoded screenshot (future)
+  screenshot?: string; // Base64 encoded screenshot
+  screenshotMetadata?: {
+    // Screenshot metadata from capture service
+    width: number; // Resized width (typically 1920)
+    height: number; // Resized height (typically 1080)
+    originalWidth: number; // Physical display width
+    originalHeight: number; // Physical display height
+    scaleFactor: number; // Display scale factor (1 = standard, 2 = Retina)
+    captureMode: string;
+    timestamp: number;
+  };
   userProfile?: {
     name: string;
     email: string;

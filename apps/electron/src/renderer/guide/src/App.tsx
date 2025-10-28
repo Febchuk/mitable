@@ -1,29 +1,20 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import type { Step } from "@mitable/shared";
 
-interface GuideStep {
-  id: string;
-  stepNumber: number;
-  instruction: string;
-  completed: boolean;
-}
-
-interface GuideData {
-  id: string;
-  title: string;
-  description: string;
-  steps: GuideStep[];
-  currentStep: number;
-  completed: boolean;
+interface GuideDisplayData {
+  conversationId: string;
+  stepList: Step[];
+  currentStepIndex: number;
 }
 
 declare global {
   interface Window {
     guideAPI: {
-      onGuideData: (callback: (data: GuideData) => void) => void;
-      nextStep: () => void;
-      updateStep: (data: GuideData) => void;
+      onGuideData: (callback: (data: GuideDisplayData) => void) => void;
+      nextStep: (data: { conversationId: string; currentStepIndex: number }) => void;
+      onStepUpdate: (callback: (data: any) => void) => void;
+      updateStep: (data: unknown) => void;
       complete: () => void;
       cancel: () => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
@@ -32,118 +23,213 @@ declare global {
 }
 
 function App() {
-  const [guideData, setGuideData] = useState<GuideData | null>(null);
-  const [stepHistory, setStepHistory] = useState<GuideStep[]>([]);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [guideData, setGuideData] = useState<GuideDisplayData | null>(null);
+  const [showCompletedSteps, setShowCompletedSteps] = useState(true);
+  const currentStepRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    window.guideAPI?.onGuideData((data: GuideData) => {
+    window.guideAPI?.onGuideData((data: GuideDisplayData) => {
       console.log("[Guide] Received guide data:", {
-        title: data.title,
-        stepsCount: data.steps.length,
-        currentStep: data.currentStep,
+        conversationId: data.conversationId,
+        stepsCount: data.stepList.length,
+        currentStepIndex: data.currentStepIndex,
       });
-
-      // For iterative mode: accumulate steps as they arrive
-      if (data.steps.length === 1) {
-        const newStep = data.steps[0];
-        setStepHistory((prev) => {
-          const updatedHistory = prev.map((step, idx) =>
-            idx === prev.length - 1 ? { ...step, completed: true } : step
-          );
-          return [...updatedHistory, newStep];
-        });
-        // Auto-advance to the newly received step
-        setCurrentStepIndex((prev) => prev + 1);
-      } else {
-        // All steps received at once (legacy mode)
-        setStepHistory(data.steps);
-        setCurrentStepIndex(0);
-      }
-
       setGuideData(data);
+    });
+
+    window.guideAPI?.onStepUpdate((updateData: any) => {
+      console.log("[Guide] Received step update:", updateData);
+      if (updateData.adjustedSolution) {
+        setGuideData((prev) => ({
+          conversationId: prev?.conversationId || "",
+          stepList: updateData.adjustedSolution.stepList,
+          currentStepIndex: updateData.adjustedSolution.currentStepIndex,
+        }));
+      }
     });
   }, []);
 
-  const handlePrevStep = () => {
-    if (currentStepIndex > 0) {
-      setCurrentStepIndex(currentStepIndex - 1);
+  useEffect(() => {
+    if (currentStepRef.current) {
+      currentStepRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
     }
+  }, [guideData?.currentStepIndex]);
+
+  const handleMouseEnter = () => {
+    window.guideAPI?.setIgnoreMouseEvents(false);
   };
 
-  const handleNextStep = () => {
-    // Navigate to next step locally (don't send message to backend)
-    if (currentStepIndex < stepHistory.length - 1) {
-      setCurrentStepIndex(currentStepIndex + 1);
-    } else if (currentStepIndex === stepHistory.length - 1) {
-      // On last step, mark workflow as complete
-      window.guideAPI?.complete();
-    }
+  const handleMouseLeave = () => {
+    window.guideAPI?.setIgnoreMouseEvents(true);
   };
 
-  const currentStep = stepHistory[currentStepIndex];
-  const totalSteps = stepHistory.length;
-  const isLastStep = currentStepIndex === stepHistory.length - 1;
-  const isFirstStep = currentStepIndex === 0;
+  const toggleCompletedSteps = () => {
+    setShowCompletedSteps((prev) => !prev);
+  };
 
-  if (!guideData && stepHistory.length === 0) {
+  if (!guideData) {
     return (
-      <div className="flex items-center justify-center h-full bg-transparent">
-        <div className="w-[700px] rounded-2xl bg-[#2C2C2C] text-white overflow-hidden shadow-lg p-8">
-          <div className="text-center text-gray-400 text-lg">Waiting for guide data...</div>
-        </div>
+      <div className="w-full h-full flex items-center justify-center bg-[#2A2A2A] rounded-2xl p-4 text-text-secondary">
+        Waiting for guide data...
       </div>
     );
   }
 
+  const completedSteps = guideData.stepList.filter((step) => step.status === "completed");
+  const currentStep = guideData.stepList.find((step) => step.status === "current");
+  const pendingSteps = guideData.stepList.filter((step) => step.status === "pending");
+
   return (
-    <div className="flex items-center justify-center h-full bg-transparent">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentStepIndex}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-          className="w-[700px] rounded-2xl bg-[#2C2C2C] text-white overflow-hidden shadow-lg app-drag"
-        >
-          {/* Prompt Section */}
-          <div className="p-8 text-center text-2xl font-medium app-drag">
-            {currentStep?.instruction || "Loading..."}
-          </div>
+    <div
+      className="w-full h-full flex items-center justify-center p-4"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div className="w-full bg-[#2A2A2A] rounded-2xl p-6 flex flex-col gap-4 h-full overflow-hidden">
+        {/* Header */}
+        <div className="flex-shrink-0">
+          <h2 className="text-text-tertiary text-sm font-medium">Step-by-Step Guide</h2>
+          <p className="text-text-secondary text-xs mt-1">
+            {guideData.stepList.length} steps total
+          </p>
+        </div>
 
-          {/* Footer Section */}
-          <div className="flex items-center justify-between bg-[#1A1A1A] p-6 app-drag">
-            <button
-              onClick={handlePrevStep}
-              disabled={isFirstStep}
-              className="flex items-center justify-center w-12 h-12 bg-[#2F2F2F] rounded-full hover:bg-[#3A3A3A] transition disabled:opacity-30 disabled:cursor-not-allowed app-no-drag"
+        {/* Step List - Scrollable */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+          {/* Completed Steps - Collapsible */}
+          {completedSteps.length > 0 && (
+            <div className="space-y-2">
+              <button
+                onClick={toggleCompletedSteps}
+                className="w-full flex items-center justify-between text-text-secondary hover:text-text-primary transition-colors text-sm px-2 py-1 rounded-lg hover:bg-[#3A3A3A]"
+              >
+                <span className="font-medium">Completed ({completedSteps.length})</span>
+                {showCompletedSteps ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+
+              {showCompletedSteps && (
+                <div className="space-y-2">
+                  {completedSteps.map((step) => (
+                    <div
+                      key={step.stepNumber}
+                      className="bg-[#3A3A3A] rounded-lg p-4 flex gap-3 opacity-60"
+                    >
+                      <div className="flex-shrink-0 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                        <Check size={14} className="text-white" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="text-text-tertiary text-xs font-medium">
+                          Step {step.stepNumber}
+                        </div>
+                        <div className="text-white text-sm line-through">{step.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Current Step - Highlighted */}
+          {currentStep && (
+            <div
+              ref={currentStepRef}
+              className="bg-primary/10 rounded-lg p-4 border-2 border-primary"
             >
-              <ChevronLeft size={24} />
-            </button>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">{currentStep.stepNumber}</span>
+                  </div>
+                  <span className="text-primary text-xs font-bold uppercase tracking-wide">
+                    Current Step
+                  </span>
+                </div>
+                <p className="text-white text-lg leading-relaxed pl-8">{currentStep.description}</p>
+              </div>
+            </div>
+          )}
 
-            <div className="text-gray-400 text-lg">
-              {currentStepIndex + 1} of {totalSteps}
+          {/* Pending Steps */}
+          {pendingSteps.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-text-secondary text-xs font-medium px-2 py-1">
+                Upcoming ({pendingSteps.length})
+              </div>
+              {pendingSteps.map((step) => (
+                <div
+                  key={step.stepNumber}
+                  className="bg-[#3A3A3A] rounded-lg p-4 flex gap-3 opacity-40"
+                >
+                  <div className="flex-shrink-0 w-6 h-6 bg-[#5A5A5A] rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">{step.stepNumber}</span>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <div className="text-text-tertiary text-xs font-medium">
+                      Step {step.stepNumber}
+                    </div>
+                    <div className="text-white text-sm">{step.description}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* All steps completed */}
+          {guideData.stepList.length > 0 &&
+            guideData.stepList.every((step) => step.status === "completed") && (
+              <div className="bg-green-500/10 rounded-lg p-6 border-2 border-green-500 text-center">
+                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Check size={24} className="text-white" />
+                </div>
+                <p className="text-green-500 text-lg font-bold">All Done!</p>
+                <p className="text-text-secondary text-sm mt-2">You've completed all steps</p>
+              </div>
+            )}
+        </div>
+
+        {/* Footer - Progress Indicator + Done Button */}
+        {guideData.stepList.length > 0 && (
+          <div className="flex-shrink-0 space-y-3">
+            {/* Progress Text */}
+            <div className="text-center">
+              <p className="text-text-tertiary text-xs">
+                {completedSteps.length > 0 && (
+                  <span className="text-green-500 font-medium">
+                    {completedSteps.length} completed
+                  </span>
+                )}
+                {completedSteps.length > 0 && currentStep && (
+                  <span className="text-text-tertiary"> • </span>
+                )}
+                {currentStep && (
+                  <span className="text-text-secondary">
+                    Step {currentStep.stepNumber} of {guideData.stepList.length}
+                  </span>
+                )}
+              </p>
             </div>
 
-            {isLastStep ? (
+            {/* Done Button - Only show when current step is active */}
+            {currentStep && (
               <button
-                onClick={handleNextStep}
-                className="flex items-center justify-center w-12 h-12 bg-green-500 rounded-full hover:bg-green-600 transition app-no-drag"
+                onClick={() =>
+                  window.guideAPI?.nextStep({
+                    conversationId: guideData.conversationId,
+                    currentStepIndex: guideData.currentStepIndex,
+                  })
+                }
+                className="w-full bg-primary hover:bg-primary-hover text-white font-medium py-3 px-6 rounded-lg transition-colors"
               >
-                <Check size={24} />
-              </button>
-            ) : (
-              <button
-                onClick={handleNextStep}
-                className="flex items-center justify-center w-12 h-12 bg-[#2F2F2F] rounded-full hover:bg-[#3A3A3A] transition app-no-drag"
-              >
-                <ChevronRight size={24} />
+                Done - Next Step
               </button>
             )}
           </div>
-        </motion.div>
-      </AnimatePresence>
+        )}
+      </div>
     </div>
   );
 }

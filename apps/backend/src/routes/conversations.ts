@@ -698,7 +698,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id || req.userId;
     const { conversationId } = req.params;
-    const { content, screenshot } = req.body;
+    const { content, screenshot, screenshotMetadata } = req.body;
 
     console.log("[Conversations] Request received:", {
       conversationId,
@@ -706,6 +706,7 @@ router.post(
       contentLength: content?.length || 0,
       hasScreenshot: !!screenshot,
       screenshotLength: screenshot?.length || 0,
+      screenshotMetadata,
     });
 
     if (!userId) {
@@ -725,13 +726,20 @@ router.post(
     }
 
     try {
-      // Fetch user to get organization ID
-      const [user] = await db
-        .select()
-        .from(schema.users)
-        .where(eq(schema.users.id, userId))
-        .limit(1);
+      // Fetch user and conversation in parallel (optimization)
+      const [userResult, conversationResult] = await Promise.all([
+        db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1),
+        db
+          .select()
+          .from(schema.conversations)
+          .where(eq(schema.conversations.id, conversationId))
+          .limit(1),
+      ]);
 
+      const user = userResult[0];
+      const conversation = conversationResult[0];
+
+      // Validate user exists
       if (!user) {
         res.status(404).json({
           error: "Not Found",
@@ -740,13 +748,7 @@ router.post(
         return;
       }
 
-      // Verify conversation belongs to user
-      const [conversation] = await db
-        .select()
-        .from(schema.conversations)
-        .where(eq(schema.conversations.id, conversationId))
-        .limit(1);
-
+      // Validate conversation exists
       if (!conversation) {
         res.status(404).json({
           error: "Not Found",
@@ -755,6 +757,7 @@ router.post(
         return;
       }
 
+      // Validate conversation belongs to user
       if (conversation.userId !== userId) {
         res.status(403).json({
           error: "Forbidden",
@@ -800,43 +803,21 @@ router.post(
       // Reverse to get chronological order (oldest first)
       const conversationHistory = historyData.reverse();
 
-      // Fetch user profile for tool context
-      const [userProfile] = await db
-        .select({
-          id: schema.users.id,
-          email: schema.users.email,
-          firstName: schema.users.firstName,
-          lastName: schema.users.lastName,
-          organizationId: schema.users.organizationId,
-        })
-        .from(schema.users)
-        .where(eq(schema.users.id, userId))
-        .limit(1);
+      // Reuse user data from earlier query (no need to fetch again!)
+      const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
 
-      if (!userProfile) {
-        res.status(404).json({
-          error: "Not Found",
-          message: "User profile not found",
-        });
-        return;
-      }
-
-      const fullName =
-        [userProfile.firstName, userProfile.lastName].filter(Boolean).join(" ") ||
-        userProfile.email;
-
-      console.log("[Conversations] User profile fetched:", {
-        organizationId: userProfile.organizationId,
+      console.log("[Conversations] User profile (from cache):", {
+        organizationId: user.organizationId,
         name: fullName,
-        email: userProfile.email,
+        email: user.email,
       });
 
       console.log("[Conversations] ToolContext created:", {
         conversationId,
         userId,
         historyLength: conversationHistory.length,
-        hasUserProfile: !!userProfile,
-        userProfileOrg: userProfile.organizationId,
+        hasUserProfile: !!user,
+        userProfileOrg: user.organizationId,
       });
 
       // Set up Server-Sent Events (SSE)
@@ -864,6 +845,7 @@ router.post(
           conversationId,
           userId,
           screenshot: screenshot || undefined, // Pass screenshot if provided
+          screenshotMetadata: screenshotMetadata || undefined, // Pass metadata (scaleFactor, dimensions)
           userProfile: {
             name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
             email: user.email,
