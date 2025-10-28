@@ -426,23 +426,66 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
         .map((msg) => `${msg.role}: ${msg.content.substring(0, 150)}`)
         .join("\n");
 
-      const prompt = `Task: "${solutionObject.solution}"
-Current Step: ${currentStep.description}
+      const prompt = `You are analyzing a screenshot to help a user complete ONE SPECIFIC STEP of a multi-step workflow.
 
-Company Process Context:
-${supportingContext}
+OVERALL TASK: "${solutionObject.solution}"
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BACKGROUND CONTEXT (for understanding approach only - DO NOT describe in guidance):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Overall Approach:
 ${solutionObject.solutionExplanation}
 
-Recent Conversation:
+Company Process Documents:
+${supportingContext}
+
+Recent Conversation History:
 ${conversationContext}
 
-Analyze the screenshot and provide EXTREMELY PRECISE guidance:
-1. Exact element name/label
-2. Visual indicators (icons, colors)
-3. Precise location (top-right, center, etc.)
-4. Surrounding context
-5. Consider any confusion or questions from the conversation history`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT STEP ONLY (focus exclusively on this):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step ${currentStep.stepNumber} of ${solutionObject.stepList.length}: ${currentStep.description}
+
+CRITICAL INSTRUCTIONS:
+1. Provide guidance ONLY for the current step above
+2. DO NOT reference or describe actions from future steps
+3. DO NOT mention what happens "next" or "after this"
+4. Focus on what the user should do RIGHT NOW on their current screen
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SCREENSHOT CONTEXT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+AGENT WINDOW: The screenshot may contain a chat interface (typically floating or at bottom).
+This is your AI assistant interface. Understand what it is and don't recommend clicking
+on it since it won't help the user complete their task. Ignore it in your analysis.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Analyze the screenshot and provide:
+
+1. STRUCTURED GUIDANCE (for system logging):
+   - elementDescription: Exact element name/label with multiple identifiers (text, icon, color)
+   - visualContext: Precise location and surrounding context
+   - confidence: high/medium/low
+   - alternativeElements: Fallback options if confidence is low
+
+2. CONVERSATIONAL MESSAGE (for user display):
+   - Natural, warm message (not a template)
+   - Tell them which UI element to click based on screenshot analysis
+   - Adapt tone to conversation history (encouraging if stuck, brief if progressing well)
+   - Sound like a helpful senior teammate
+   - Don't use "Step X of Y" format - be conversational
+   - Offer help warmly
+
+PRECISION REQUIREMENTS for elementDescription:
+- Use multiple visual cues: label text, icon type, color, size, badges
+- Exact location: "top-right corner", "left sidebar, third item down"
+- Surrounding context: "next to the Save button", "below the header"
+- Make it unique enough to identify among similar elements`;
 
       const result = await this.stepGuidanceModel.generateContent([
         prompt,
@@ -465,6 +508,7 @@ Analyze the screenshot and provide EXTREMELY PRECISE guidance:
         elementDescription: `Look for elements related to: ${currentStep.description}`,
         visualContext: "Unable to analyze screenshot",
         confidence: "low",
+        conversationalMessage: `I'm having trouble analyzing your screenshot right now. For this step (${currentStep.description}), look for any UI elements that would help you accomplish this. Let me know if you need help!`,
       };
     }
   }

@@ -106,7 +106,7 @@ function App() {
         }
 
         // Destructure message data
-        const { message, conversationId: convId, userMessage } = messageData;
+        const { message, conversationId: convId, userMessage, polledMessage, messageType, cardData } = messageData;
 
         // Update conversation ID
         if (convId) {
@@ -114,7 +114,24 @@ function App() {
           setCurrentConversationId(convId);
         }
 
-        // Add user message to UI
+        // If this is a polled message (already exists in DB), just display it directly
+        if (polledMessage) {
+          console.log("[Conversation] Displaying polled message:", message);
+
+          const polledMsg: Message = {
+            id: `polled-${Date.now()}`,
+            role: "assistant",
+            content: message,
+            type: cardData ? "card" : "text",
+            messageType,
+            cardData,
+          };
+
+          setMessages((prev) => [...prev, polledMsg]);
+          return; // Don't stream - message is already complete
+        }
+
+        // Add user message to UI (for new user messages only)
         if (userMessage) {
           const userMsg: Message = {
             id: Date.now().toString(),

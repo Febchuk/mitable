@@ -103,6 +103,7 @@ export const VisualGuidanceSchema = z.object({
   visualContext: z.string(), // "The button is in the top-right of the 'Q1 Planning' card..."
   confidence: z.enum(["high", "medium", "low"]),
   alternativeElements: z.array(z.string()).optional(), // Fallback if ambiguous
+  conversationalMessage: z.string(), // AI-generated natural response for user display
 });
 
 export type VisualGuidance = z.infer<typeof VisualGuidanceSchema>;

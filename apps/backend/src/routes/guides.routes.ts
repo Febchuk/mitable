@@ -87,10 +87,11 @@ router.post("/progress", requireAuth, async (req, res) => {
       conversation?.messages || []
     );
 
+    // Use AI-generated conversational message instead of template
     await guideGenerationService.updateSolutionObject(
       conversationId,
-      updatedSolution,
-      `Step ${nextStepIndex + 1} of ${updatedSolution.stepList.length}: ${nextStep.description}`
+      visualGuidance.conversationalMessage,
+      updatedSolution
     );
 
     res.json({
