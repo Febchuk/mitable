@@ -11,6 +11,7 @@ const IPC_CHANNELS = {
   CONVERSATION_HIDE: "conversation-hide",
   CONVERSATION_TOGGLE: "conversation-toggle", // NEW: Toggle collapsed/hidden state
   CONVERSATION_SEND_MESSAGE: "conversation-send-message",
+  CONSOLE_OPEN_CHAT: "console-open-chat",
   NUDGE_SHOW: "nudge-show",
   GUIDE_START: "guide-start",
   CAPTURE_SCREENSHOT: "capture-screenshot",
@@ -38,6 +39,8 @@ contextBridge.exposeInMainWorld("agentAPI", {
   toggleConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_TOGGLE), // NEW: Toggle collapsed state
   sendMessageToConversation: (messageData: any, screenshot: string | null) =>
     ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, messageData, screenshot),
+  openConversationInConsole: (conversationId: string) =>
+    ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHAT, conversationId),
 
   showNudge: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.NUDGE_SHOW, data),
   startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),

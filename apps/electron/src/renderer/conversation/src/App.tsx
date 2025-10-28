@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Code, LucideIcon, Users, Workflow, X } from "lucide-react";
+import { Code, ExternalLink, LucideIcon, Users, Workflow, X } from "lucide-react";
 import UserMessage from "../../components/domain/messages/UserMessage";
 import AIMessage from "../../components/domain/messages/AIMessage";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,6 +25,7 @@ declare global {
       switchConversation: (conversationId: string) => void;
       requestConversationList: () => void;
       onConversationList: (callback: (conversations: any[]) => void) => () => void;
+      openConversationInConsole: (conversationId: string) => void;
     };
   }
 }
@@ -296,10 +297,24 @@ function App() {
           className="w-full h-full flex items-center justify-center p-4"
         >
           <div className="relative w-full h-[600px] flex flex-col bg-background-secondary rounded-2xl overflow-hidden app-drag">
+            {/* Open in Console Button */}
+            <button
+              onClick={() => {
+                if (conversationId) {
+                  console.log("[Conversation] Opening in console:", conversationId);
+                  window.conversationAPI.openConversationInConsole(conversationId);
+                }
+              }}
+              className="absolute top-4 left-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag"
+              aria-label="Open in Console"
+            >
+              <ExternalLink size={16} className="text-white" />
+            </button>
+
             {/* Close Button */}
             <button
               onClick={handleClose}
-              className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-colors app-no-drag"
+              className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag"
               aria-label="Close"
             >
               <X size={16} className="text-white" />

@@ -51,6 +51,13 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   // Window management
   minimizeWindow: () => ipcRenderer.send(IPC_CHANNELS.CONSOLE_MINIMIZE),
 
+  // Navigation - Listen for navigation requests from main process
+  onNavigateToChat: (callback: (conversationId: string) => void) => {
+    ipcRenderer.on("navigate-to-chat", (_event: IpcRendererEvent, conversationId: string) =>
+      callback(conversationId)
+    );
+  },
+
   // Nudge creator
   onNudgeOpenCreator: (callback: (data: unknown) => void) => {
     ipcRenderer.on(IPC_CHANNELS.NUDGE_OPEN_CREATOR, (_event: IpcRendererEvent, data: unknown) =>

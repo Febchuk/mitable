@@ -46,6 +46,7 @@ export const IPC_CHANNELS = {
   AGENT_RESIZE: "agent-resize",
   AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step", // Triggered when Guide "Done" button clicked
   AGENT_OPEN_CONVERSATION: "agent-open-conversation", // Console → Main (open specific conversation in agent)
+  CONSOLE_OPEN_CHAT: "console-open-chat", // Agent/Conversation → Main (open conversation in console)
 
   // Conversation window (parent-child with agent)
   CONVERSATION_SHOW: "conversation-show", // Agent → Main (show conversation window)

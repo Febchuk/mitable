@@ -474,6 +474,26 @@ function setupIPC() {
     conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LOAD, conversationId);
   });
 
+  // NEW: Open specific conversation in Console (from Agent/Conversation window)
+  ipcMain.on(IPC_CHANNELS.CONSOLE_OPEN_CHAT, (_event, conversationId: string) => {
+    if (!consoleWindow || consoleWindow.isDestroyed()) return;
+
+    // Show and focus console window
+    consoleWindow.show();
+    consoleWindow.focus();
+
+    // Send navigation message to console with conversation ID
+    consoleWindow.webContents.send("navigate-to-chat", conversationId);
+
+    // Hide agent and conversation windows
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      agentWindow.hide();
+    }
+    if (conversationWindow && !conversationWindow.isDestroyed()) {
+      conversationWindow.hide();
+    }
+  });
+
   // NEW: Handle conversation list request (fetch from backend)
   ipcMain.on(IPC_CHANNELS.CONVERSATION_LIST_REQUEST, async () => {
     if (!conversationWindow || conversationWindow.isDestroyed()) return;

@@ -20,6 +20,9 @@ interface ConsoleAPI {
   // Window management
   minimizeWindow: () => void;
 
+  // Navigation
+  onNavigateToChat: (callback: (conversationId: string) => void) => void;
+
   // Nudge creator
   onNudgeOpenCreator: (callback: (data: unknown) => void) => void;
 

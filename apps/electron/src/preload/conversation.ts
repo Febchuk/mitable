@@ -12,6 +12,7 @@ const IPC_CHANNELS = {
   CONVERSATION_SWITCH: "conversation-switch",
   CONVERSATION_LIST_REQUEST: "conversation-list-request",
   CONVERSATION_LIST_RESPONSE: "conversation-list-response",
+  CONSOLE_OPEN_CHAT: "console-open-chat",
   NUDGE_SHOW: "nudge-show",
   GUIDE_START: "guide-start",
   AUTH_GET_TOKEN: "auth-get-token",
@@ -113,6 +114,10 @@ contextBridge.exposeInMainWorld("conversationAPI", {
   // Trigger Nudge/Guide windows from cards
   showNudge: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.NUDGE_SHOW, data),
   startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),
+
+  // Open conversation in console
+  openConversationInConsole: (conversationId: string) =>
+    ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHAT, conversationId),
 
   // Auth management - Conversation requests token from main process
   getAuthToken: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_TOKEN),
