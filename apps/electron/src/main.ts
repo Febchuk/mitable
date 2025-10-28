@@ -360,9 +360,18 @@ function setupIPC() {
     if (agentWindow && !agentWindow.isDestroyed()) {
       if (agentWindow.isVisible()) {
         agentWindow.hide();
-        // Also hide conversation window when agent is hidden
+        // Also hide all dependent windows when agent is hidden
         if (conversationWindow && !conversationWindow.isDestroyed()) {
           conversationWindow.hide();
+        }
+        if (guideWindow && !guideWindow.isDestroyed()) {
+          guideWindow.hide();
+        }
+        if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+          nudgeWindow.hide();
+        }
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.hide();
         }
       } else {
         agentWindow.show();
@@ -485,12 +494,21 @@ function setupIPC() {
     // Send navigation message to console with conversation ID
     consoleWindow.webContents.send("navigate-to-chat", conversationId);
 
-    // Hide agent and conversation windows
+    // Hide agent and all dependent windows
     if (agentWindow && !agentWindow.isDestroyed()) {
       agentWindow.hide();
     }
     if (conversationWindow && !conversationWindow.isDestroyed()) {
       conversationWindow.hide();
+    }
+    if (guideWindow && !guideWindow.isDestroyed()) {
+      guideWindow.hide();
+    }
+    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      nudgeWindow.hide();
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.hide();
     }
   });
 

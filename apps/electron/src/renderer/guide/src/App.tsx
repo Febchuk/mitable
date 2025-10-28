@@ -66,10 +66,20 @@ function App() {
 
   const handleNextStep = () => {
     if (guideData) {
-      window.guideAPI?.nextStep({
-        conversationId: guideData.conversationId,
-        currentStepIndex: guideData.currentStepIndex,
-      });
+      const currentStepNumber = guideData.currentStepIndex + 1; // 1-based
+      const totalSteps = guideData.stepList.length;
+      const isLastStep = currentStepNumber === totalSteps;
+
+      if (isLastStep) {
+        // Complete guide and dismiss window
+        window.guideAPI?.complete();
+      } else {
+        // Progress to next step
+        window.guideAPI?.nextStep({
+          conversationId: guideData.conversationId,
+          currentStepIndex: guideData.currentStepIndex,
+        });
+      }
     }
   };
 
