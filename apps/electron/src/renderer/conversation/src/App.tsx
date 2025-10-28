@@ -149,6 +149,12 @@ function App() {
               );
             },
             onComplete: (fullContent, messageId, messageType, cardData, windowTrigger) => {
+              console.log("[Conversation] onComplete received:", {
+                messageId,
+                messageType,
+                hasCardData: !!cardData,
+                windowTrigger,
+              });
               setMessages((prev) =>
                 prev.map((msg) =>
                   msg.id === streamingMessageId
@@ -266,6 +272,14 @@ function App() {
   };
 
   const handleCardClick = (message: Message) => {
+    console.log("[Conversation] Card clicked - message object:", {
+      id: message.id,
+      messageType: message.messageType,
+      hasCardData: !!message.cardData,
+      windowTrigger: message.windowTrigger,
+      fullMessage: message,
+    });
+
     if (!message.windowTrigger) {
       console.warn("Card clicked but no window trigger data");
       return;
@@ -281,7 +295,11 @@ function App() {
         conversationId,
       });
     } else if (windowType === "guide") {
-      window.conversationAPI.startGuide(data.guide);
+      // Pass guide data + conversationId for step progression
+      window.conversationAPI.startGuide({
+        ...data,
+        conversationId,
+      });
     }
   };
 

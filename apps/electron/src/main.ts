@@ -128,7 +128,6 @@ function createConversationWindow() {
     resizable: false,
     skipTaskbar: true,
     show: false,
-    parent: agentWindow, // Key: parent-child relationship
     modal: false, // Non-modal so pill remains interactive
     webPreferences: {
       preload: join(__dirname, "../preload/conversation.cjs"),
@@ -254,13 +253,11 @@ function createOverlayWindow() {
     y: 0,
     transparent: true,
     frame: false,
-    alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
     movable: false,
     focusable: false,
     show: false,
-    parent: guideWindow, // Overlay is child of Guide
     modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/overlay.cjs"),
@@ -295,7 +292,6 @@ function createGuideWindow() {
     transparent: true,
     alwaysOnTop: true,
     show: false,
-    parent: agentWindow, // Guide is child of Agent
     modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/guide.cjs"),
@@ -303,6 +299,14 @@ function createGuideWindow() {
       nodeIntegration: false,
     },
   });
+
+  // Add platform-specific always-on-top for proper z-order
+  if (process.platform === "darwin") {
+    guideWindow.setAlwaysOnTop(true, "modal-panel");
+    guideWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    guideWindow.setAlwaysOnTop(true, "normal", 1);
+  }
 
   if (!app.isPackaged) {
     guideWindow.loadURL("http://localhost:5173/guide/index.html");
@@ -328,7 +332,6 @@ function createNudgeWindow() {
     transparent: true,
     alwaysOnTop: true,
     show: false,
-    parent: agentWindow, // Nudge is child of Agent
     modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/nudge.cjs"),

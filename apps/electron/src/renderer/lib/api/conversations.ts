@@ -223,8 +223,10 @@ export async function sendMessageStream(
                 break;
 
               case "window_trigger":
+                console.log("[API] Received window_trigger event:", chunk.windowTrigger);
                 if (chunk.windowTrigger) {
                   windowTriggerData = chunk.windowTrigger;
+                  console.log("[API] Stored windowTriggerData:", windowTriggerData);
                   callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
                 }
                 break;
@@ -233,6 +235,7 @@ export async function sendMessageStream(
                 if (chunk.messageId) {
                   messageId = chunk.messageId;
                 }
+                console.log("[API] Calling onComplete with windowTriggerData:", windowTriggerData);
                 callbacks.onComplete?.(
                   fullContent,
                   messageId,
