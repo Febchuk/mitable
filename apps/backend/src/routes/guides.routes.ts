@@ -12,6 +12,17 @@ router.post("/progress", requireAuth, async (req, res) => {
   try {
     const { conversationId, screenshot, currentStepIndex } = req.body;
 
+    // Validate required parameters
+    if (!conversationId || typeof conversationId !== "string") {
+      return res.status(400).json({ error: "Invalid or missing conversationId" });
+    }
+    if (!screenshot || typeof screenshot !== "string") {
+      return res.status(400).json({ error: "Invalid or missing screenshot" });
+    }
+    if (typeof currentStepIndex !== "number" || currentStepIndex < 0) {
+      return res.status(400).json({ error: "Invalid currentStepIndex" });
+    }
+
     const solutionObject = await guideGenerationService.retrieveSolutionObject(conversationId);
     if (!solutionObject) {
       return res.status(404).json({ error: "No active guide found" });
@@ -24,6 +35,14 @@ router.post("/progress", requireAuth, async (req, res) => {
 
     const nextStepIndex = currentStepIndex + 1;
 
+    // Validate nextStepIndex is within bounds
+    if (nextStepIndex >= solutionObject.stepList.length) {
+      return res.status(400).json({
+        error: "No more steps available",
+        message: `Guide completed. Current step ${currentStepIndex} is the last step.`,
+      });
+    }
+
     const evaluation = await geminiVisionService.evaluateProgress(
       screenshot,
       solutionObject,
@@ -31,13 +50,14 @@ router.post("/progress", requireAuth, async (req, res) => {
       nextStepIndex
     );
 
+    // Build updated solution immutably (no mutation)
     let updatedSolution = solutionObject;
     if (evaluation.needsAdjustment && evaluation.adjustedStepList) {
       updatedSolution = {
         ...solutionObject,
         stepList: evaluation.adjustedStepList,
         adjustmentHistory: [
-          ...solutionObject.adjustmentHistory,
+          ...(solutionObject.adjustmentHistory || []),
           {
             timestamp: new Date().toISOString(),
             reason: evaluation.adjustmentReason || "Plan adjusted",
@@ -48,12 +68,17 @@ router.post("/progress", requireAuth, async (req, res) => {
       };
     }
 
-    updatedSolution.currentStepIndex = nextStepIndex;
-    updatedSolution.stepList = updatedSolution.stepList.map((s, idx) => ({
-      ...s,
-      status: idx < nextStepIndex ? "completed" : idx === nextStepIndex ? "current" : "pending",
-    }));
+    // Fully immutable update - create new object instead of mutating
+    updatedSolution = {
+      ...updatedSolution,
+      currentStepIndex: nextStepIndex,
+      stepList: updatedSolution.stepList.map((s, idx) => ({
+        ...s,
+        status: idx < nextStepIndex ? "completed" : idx === nextStepIndex ? "current" : "pending",
+      })),
+    };
 
+    // Safe array access - we already validated bounds above
     const nextStep = updatedSolution.stepList[nextStepIndex];
     const visualGuidance = await geminiVisionService.analyzeStepExecution(
       screenshot,
@@ -83,6 +108,12 @@ router.post("/progress", requireAuth, async (req, res) => {
 router.get("/:conversationId", requireAuth, async (req, res) => {
   try {
     const { conversationId } = req.params;
+
+    // Validate conversationId parameter
+    if (!conversationId || typeof conversationId !== "string") {
+      return res.status(400).json({ error: "Invalid or missing conversationId" });
+    }
+
     const solutionObject = await guideGenerationService.retrieveSolutionObject(conversationId);
 
     if (!solutionObject) {

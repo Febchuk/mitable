@@ -186,9 +186,32 @@ class ContinuationDetectorService {
    * @returns Simple hash string
    */
   hashScreenshot(screenshotData: string): string {
+    // Runtime type safety - ensure we have a valid string
+    if (!screenshotData || typeof screenshotData !== "string") {
+      console.warn("[ContinuationDetector] Invalid screenshot data for hashing");
+      return "invalid-screenshot";
+    }
+
+    if (screenshotData.length === 0) {
+      return "empty-screenshot";
+    }
+
     // Take a sample of the screenshot data for quick comparison
     // In production, you might use a proper perceptual hash
     const sampleSize = 1000;
+
+    // Handle short screenshots (< 2000 chars) gracefully
+    if (screenshotData.length < sampleSize * 2) {
+      // For short data, just use the whole string
+      const sample = screenshotData;
+      let hash = screenshotData.length.toString(36);
+      for (let i = 0; i < sample.length; i += 10) {
+        hash += sample.charCodeAt(i).toString(36);
+      }
+      return hash;
+    }
+
+    // Standard case: sample from beginning and end
     const sample =
       screenshotData.substring(0, sampleSize) +
       screenshotData.substring(screenshotData.length - sampleSize);
