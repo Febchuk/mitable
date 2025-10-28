@@ -140,7 +140,7 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    let messagesByConversation = new Map<string, any[]>();
+    const messagesByConversation = new Map<string, any[]>();
 
     // Only fetch messages if requested (for performance)
     if (includeMessages) {

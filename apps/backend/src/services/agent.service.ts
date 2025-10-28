@@ -228,7 +228,7 @@ export class AgentService {
     let iterationCount = 0;
 
     // Track metadata from last tool execution (for including in final response)
-    let lastToolMessageType: string | undefined;
+    let lastToolMessageType: "text" | "workflow" | "experts" | undefined;
     let lastToolCardData: any | undefined;
     let lastToolSources: any[] | undefined;
 

@@ -95,7 +95,9 @@ declare global {
       createNudge: (data: unknown) => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
       // NEW: Dynamic window resizing
-      resizeWindow: (options: { width?: number; height?: number } | "collapsed" | "expanded") => void;
+      resizeWindow: (
+        options: { width?: number; height?: number } | "collapsed" | "expanded"
+      ) => void;
       // NEW: AI generation methods
       generateContext: (conversationId: string) => Promise<{ context: string }>;
       generateQuestion: (conversationId: string) => Promise<{ question: string }>;

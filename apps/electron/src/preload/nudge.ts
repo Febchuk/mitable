@@ -25,9 +25,8 @@ contextBridge.exposeInMainWorld("nudgeAPI", {
     ipcRenderer.send(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, ignore),
 
   // NEW: Dynamic window resizing
-  resizeWindow: (
-    options: { width?: number; height?: number } | "collapsed" | "expanded"
-  ) => ipcRenderer.send(IPC_CHANNELS.NUDGE_RESIZE, options),
+  resizeWindow: (options: { width?: number; height?: number } | "collapsed" | "expanded") =>
+    ipcRenderer.send(IPC_CHANNELS.NUDGE_RESIZE, options),
 
   // NEW: AI generation methods (async - return promises)
   generateContext: (conversationId: string): Promise<{ context: string }> =>

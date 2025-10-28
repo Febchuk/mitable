@@ -5,6 +5,7 @@
 **Goal:** Transform the conversation window from a simple show/hide binary state into a three-state system with a collapsed combobox view for conversation switching.
 
 **Key Features:**
+
 - 🔍 Searchable conversation switcher
 - 📝 "New Chat" creation from combobox
 - 🔄 Seamless conversation switching without closing Agent
@@ -59,15 +60,15 @@
 
 ### State Transitions
 
-| Current State | Action | Next State | Window Size |
-|--------------|--------|------------|-------------|
-| HIDDEN | Click agent pill | COLLAPSED | 740x120 |
-| COLLAPSED | Select conversation | EXPANDED | 740x600 |
-| COLLAPSED | Click "New Chat" | EXPANDED | 740x600 |
-| COLLAPSED | Click away | HIDDEN | - |
-| EXPANDED | Click close (✕) | COLLAPSED | 740x120 |
-| EXPANDED | Press Esc | COLLAPSED | 740x120 |
-| ANY | Console "Send to Agent" | EXPANDED | 740x600 |
+| Current State | Action                  | Next State | Window Size |
+| ------------- | ----------------------- | ---------- | ----------- |
+| HIDDEN        | Click agent pill        | COLLAPSED  | 740x120     |
+| COLLAPSED     | Select conversation     | EXPANDED   | 740x600     |
+| COLLAPSED     | Click "New Chat"        | EXPANDED   | 740x600     |
+| COLLAPSED     | Click away              | HIDDEN     | -           |
+| EXPANDED      | Click close (✕)         | COLLAPSED  | 740x120     |
+| EXPANDED      | Press Esc               | COLLAPSED  | 740x120     |
+| ANY           | Console "Send to Agent" | EXPANDED   | 740x600     |
 
 ---
 
@@ -82,19 +83,19 @@ export const IPC_CHANNELS = {
   // ... existing channels
 
   // Conversation state management
-  CONVERSATION_SET_STATE: 'conversation-set-state',
-  CONVERSATION_LOAD: 'conversation-load',
-  CONVERSATION_SWITCH: 'conversation-switch',
+  CONVERSATION_SET_STATE: "conversation-set-state",
+  CONVERSATION_LOAD: "conversation-load",
+  CONVERSATION_SWITCH: "conversation-switch",
 
   // Console integration
-  AGENT_OPEN_CONVERSATION: 'agent-open-conversation',
+  AGENT_OPEN_CONVERSATION: "agent-open-conversation",
 
   // Conversation list
-  CONVERSATION_LIST_REQUEST: 'conversation-list-request',
-  CONVERSATION_LIST_RESPONSE: 'conversation-list-response',
+  CONVERSATION_LIST_REQUEST: "conversation-list-request",
+  CONVERSATION_LIST_RESPONSE: "conversation-list-response",
 
   // Title generation
-  CONVERSATION_GENERATE_TITLE: 'conversation-generate-title',
+  CONVERSATION_GENERATE_TITLE: "conversation-generate-title",
 } as const;
 ```
 
@@ -154,7 +155,7 @@ ipcMain.on(IPC_CHANNELS.CONVERSATION_TOGGLE, () => {
   if (conversationWindow.isVisible()) {
     conversationWindow.hide();
   } else {
-    positionConversationWindow('collapsed'); // 740x120
+    positionConversationWindow("collapsed"); // 740x120
     conversationWindow.show();
     // Trigger conversation list fetch
     conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_REQUEST);
@@ -162,23 +163,26 @@ ipcMain.on(IPC_CHANNELS.CONVERSATION_TOGGLE, () => {
 });
 
 // NEW: Set conversation state (handles window sizing)
-ipcMain.on(IPC_CHANNELS.CONVERSATION_SET_STATE, (_event, state: 'hidden' | 'collapsed' | 'expanded') => {
-  if (!conversationWindow || conversationWindow.isDestroyed()) return;
+ipcMain.on(
+  IPC_CHANNELS.CONVERSATION_SET_STATE,
+  (_event, state: "hidden" | "collapsed" | "expanded") => {
+    if (!conversationWindow || conversationWindow.isDestroyed()) return;
 
-  switch (state) {
-    case 'hidden':
-      conversationWindow.hide();
-      break;
-    case 'collapsed':
-      positionConversationWindow('collapsed'); // 740x120
-      if (!conversationWindow.isVisible()) conversationWindow.show();
-      break;
-    case 'expanded':
-      positionConversationWindow('expanded'); // 740x600
-      if (!conversationWindow.isVisible()) conversationWindow.show();
-      break;
+    switch (state) {
+      case "hidden":
+        conversationWindow.hide();
+        break;
+      case "collapsed":
+        positionConversationWindow("collapsed"); // 740x120
+        if (!conversationWindow.isVisible()) conversationWindow.show();
+        break;
+      case "expanded":
+        positionConversationWindow("expanded"); // 740x600
+        if (!conversationWindow.isVisible()) conversationWindow.show();
+        break;
+    }
   }
-});
+);
 
 // NEW: Open specific conversation from Console
 ipcMain.on(IPC_CHANNELS.AGENT_OPEN_CONVERSATION, (_event, conversationId: string) => {
@@ -189,7 +193,7 @@ ipcMain.on(IPC_CHANNELS.AGENT_OPEN_CONVERSATION, (_event, conversationId: string
   if (!agentWindow.isVisible()) agentWindow.show();
 
   // Position and show conversation in expanded state
-  positionConversationWindow('expanded');
+  positionConversationWindow("expanded");
   conversationWindow.show();
 
   // Load the specific conversation
@@ -210,7 +214,7 @@ ipcMain.on(IPC_CHANNELS.CONVERSATION_LIST_REQUEST, async () => {
     // Send back to renderer
     conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, conversations);
   } catch (error) {
-    console.error('[Conversation] Failed to fetch conversation list:', error);
+    console.error("[Conversation] Failed to fetch conversation list:", error);
     conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, []);
   }
 });
@@ -219,26 +223,34 @@ ipcMain.on(IPC_CHANNELS.CONVERSATION_LIST_REQUEST, async () => {
 **Update `positionConversationWindow()`:**
 
 ```typescript
-function positionConversationWindow(state: 'collapsed' | 'expanded' = 'expanded') {
-  if (!agentWindow || agentWindow.isDestroyed() || !conversationWindow || conversationWindow.isDestroyed()) {
+function positionConversationWindow(state: "collapsed" | "expanded" = "expanded") {
+  if (
+    !agentWindow ||
+    agentWindow.isDestroyed() ||
+    !conversationWindow ||
+    conversationWindow.isDestroyed()
+  ) {
     return;
   }
 
   const pillBounds = agentWindow.getBounds();
   const conversationWidth = 740;
-  const conversationHeight = state === 'collapsed' ? 120 : 600;
+  const conversationHeight = state === "collapsed" ? 120 : 600;
   const gap = 16;
 
   // Calculate centered position above pill
   const x = pillBounds.x + (pillBounds.width - conversationWidth) / 2;
   const y = pillBounds.y - conversationHeight - gap;
 
-  conversationWindow.setBounds({
-    x: Math.round(x),
-    y: Math.round(y),
-    width: conversationWidth,
-    height: conversationHeight,
-  }, true); // animate: true for smooth transition
+  conversationWindow.setBounds(
+    {
+      x: Math.round(x),
+      y: Math.round(y),
+      width: conversationWidth,
+      height: conversationHeight,
+    },
+    true
+  ); // animate: true for smooth transition
 }
 ```
 
@@ -268,10 +280,10 @@ components/
 **File:** `components/CollapsedView/index.tsx`
 
 ```tsx
-import { useState, useEffect } from 'react';
-import SearchInput from './SearchInput';
-import NewChatOption from './NewChatOption';
-import ConversationList from './ConversationList';
+import { useState, useEffect } from "react";
+import SearchInput from "./SearchInput";
+import NewChatOption from "./NewChatOption";
+import ConversationList from "./ConversationList";
 
 interface Conversation {
   id: string;
@@ -285,7 +297,7 @@ interface CollapsedViewProps {
 }
 
 export default function CollapsedView({ onSelectConversation, onNewChat }: CollapsedViewProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -300,7 +312,7 @@ export default function CollapsedView({ onSelectConversation, onNewChat }: Colla
     });
   }, []);
 
-  const filteredConversations = conversations.filter(conv =>
+  const filteredConversations = conversations.filter((conv) =>
     conv.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -328,7 +340,7 @@ export default function CollapsedView({ onSelectConversation, onNewChat }: Colla
 **File:** `components/CollapsedView/SearchInput.tsx`
 
 ```tsx
-import { Search } from 'lucide-react';
+import { Search } from "lucide-react";
 
 interface SearchInputProps {
   value: string;
@@ -355,7 +367,7 @@ export default function SearchInput({ value, onChange, placeholder }: SearchInpu
 **File:** `components/CollapsedView/NewChatOption.tsx`
 
 ```tsx
-import { Plus } from 'lucide-react';
+import { Plus } from "lucide-react";
 
 interface NewChatOptionProps {
   onClick: () => void;
@@ -377,7 +389,7 @@ export default function NewChatOption({ onClick }: NewChatOptionProps) {
 **File:** `components/CollapsedView/ConversationList.tsx`
 
 ```tsx
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare } from "lucide-react";
 
 interface Conversation {
   id: string;
@@ -391,7 +403,11 @@ interface ConversationListProps {
   loading?: boolean;
 }
 
-export default function ConversationList({ conversations, onSelect, loading }: ConversationListProps) {
+export default function ConversationList({
+  conversations,
+  onSelect,
+  loading,
+}: ConversationListProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-20">
@@ -430,6 +446,7 @@ export default function ConversationList({ conversations, onSelect, loading }: C
 ## Future Phases
 
 See sections Phase 3-8 in implementation for:
+
 - Backend API endpoints
 - Conversation switching & state preservation
 - Console integration
@@ -441,15 +458,15 @@ See sections Phase 3-8 in implementation for:
 
 ## Implementation Timeline
 
-| Phase | Tasks | Duration | Dependencies |
-|-------|-------|----------|--------------|
-| Phase 1 | IPC foundation, state management | 2 days | None |
-| Phase 2 | Collapsed UI components | 3 days | Phase 1 |
-| Phase 3 | Backend API endpoints | 2 days | None (parallel) |
-| Phase 4 | Conversation switching, drafts | 3 days | Phase 1, 2, 3 |
-| Phase 5 | Console integration | 1 day | Phase 1, 4 |
-| Phase 6 | Search implementation | 1 day | Phase 2, 4 |
-| Phase 7 | Polish, animations, edge cases | 3 days | Phase 2, 4 |
-| Phase 8 | Testing | 3 days | All phases |
+| Phase   | Tasks                            | Duration | Dependencies    |
+| ------- | -------------------------------- | -------- | --------------- |
+| Phase 1 | IPC foundation, state management | 2 days   | None            |
+| Phase 2 | Collapsed UI components          | 3 days   | Phase 1         |
+| Phase 3 | Backend API endpoints            | 2 days   | None (parallel) |
+| Phase 4 | Conversation switching, drafts   | 3 days   | Phase 1, 2, 3   |
+| Phase 5 | Console integration              | 1 day    | Phase 1, 4      |
+| Phase 6 | Search implementation            | 1 day    | Phase 2, 4      |
+| Phase 7 | Polish, animations, edge cases   | 3 days   | Phase 2, 4      |
+| Phase 8 | Testing                          | 3 days   | All phases      |
 
 **Total: 18 days (~3.5 weeks)**

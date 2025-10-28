@@ -34,9 +34,7 @@ export default function CollapsedView({ onSelectConversation, onNewChat }: Colla
   }, []);
 
   const filteredConversations = Array.isArray(conversations)
-    ? conversations.filter((conv) =>
-        conv.title.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? conversations.filter((conv) => conv.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : [];
 
   return (

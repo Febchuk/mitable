@@ -92,7 +92,12 @@ function createAgentWindow() {
 
 // Helper function to position conversation window centered above pill
 function positionConversationWindow(state: "collapsed" | "expanded" = "expanded") {
-  if (!agentWindow || agentWindow.isDestroyed() || !conversationWindow || conversationWindow.isDestroyed()) {
+  if (
+    !agentWindow ||
+    agentWindow.isDestroyed() ||
+    !conversationWindow ||
+    conversationWindow.isDestroyed()
+  ) {
     return;
   }
 
@@ -523,13 +528,20 @@ function setupIPC() {
       const conversationList = Array.isArray(conversations)
         ? conversations
         : Array.isArray(conversations?.conversations)
-        ? conversations.conversations
-        : [];
+          ? conversations.conversations
+          : [];
 
-      console.log("[Main] Sending conversation list to renderer:", conversationList.length, "items");
+      console.log(
+        "[Main] Sending conversation list to renderer:",
+        conversationList.length,
+        "items"
+      );
 
       // Send back to renderer
-      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, conversationList);
+      conversationWindow.webContents.send(
+        IPC_CHANNELS.CONVERSATION_LIST_RESPONSE,
+        conversationList
+      );
     } catch (error) {
       console.error("[Conversation] Failed to fetch conversation list:", error);
       conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, []);
@@ -735,7 +747,11 @@ function setupIPC() {
         );
 
         // Reposition conversation window if visible (maintains alignment)
-        if (conversationWindow && !conversationWindow.isDestroyed() && conversationWindow.isVisible()) {
+        if (
+          conversationWindow &&
+          !conversationWindow.isDestroyed() &&
+          conversationWindow.isVisible()
+        ) {
           positionConversationWindow();
         }
       }
@@ -745,10 +761,7 @@ function setupIPC() {
   // Nudge window resize with left-to-right expansion
   ipcMain.on(
     IPC_CHANNELS.NUDGE_RESIZE,
-    (
-      _event,
-      options: { width?: number; height?: number } | "collapsed" | "expanded"
-    ) => {
+    (_event, options: { width?: number; height?: number } | "collapsed" | "expanded") => {
       if (nudgeWindow && !nudgeWindow.isDestroyed()) {
         const currentBounds = nudgeWindow.getBounds();
 

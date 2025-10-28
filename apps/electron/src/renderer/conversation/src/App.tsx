@@ -11,7 +11,9 @@ declare global {
   interface Window {
     conversationAPI: {
       hideWindow: () => void;
-      onMessageReceived: (callback: (message: any, screenshot: string | null) => void) => () => void;
+      onMessageReceived: (
+        callback: (message: any, screenshot: string | null) => void
+      ) => () => void;
       updateMessages: (messages: any[]) => void;
       onPositionUpdate: (callback: (x: number, y: number) => void) => () => void;
       showNudge: (data: unknown) => void;
@@ -20,7 +22,9 @@ declare global {
       onAuthTokenUpdated: (callback: (token: string | null) => void) => () => void;
       // NEW: State management
       setViewState: (state: "hidden" | "collapsed" | "expanded") => void;
-      onViewStateChange: (callback: (state: "hidden" | "collapsed" | "expanded") => void) => () => void;
+      onViewStateChange: (
+        callback: (state: "hidden" | "collapsed" | "expanded") => void
+      ) => () => void;
       onConversationLoad: (callback: (conversationId: string) => void) => () => void;
       switchConversation: (conversationId: string) => void;
       requestConversationList: () => void;
@@ -50,7 +54,7 @@ function App() {
   // View state management
   const [viewState, setViewState] = useState<ViewState>("hidden");
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  const [draftMessages, setDraftMessages] = useState<Map<string, string>>(new Map());
+  const [draftMessages] = useState<Map<string, string>>(new Map());
 
   // Existing message state
   const [messages, setMessages] = useState<Message[]>([]);
@@ -68,7 +72,12 @@ function App() {
   // Listen for state changes from main process
   useEffect(() => {
     const cleanup = window.conversationAPI.onViewStateChange((state) => {
-      console.log("[Conversation] View state changed by main process:", state, "current:", viewState);
+      console.log(
+        "[Conversation] View state changed by main process:",
+        state,
+        "current:",
+        viewState
+      );
       setViewState(state);
     });
 

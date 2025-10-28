@@ -60,8 +60,7 @@ contextBridge.exposeInMainWorld("conversationAPI", {
     ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SWITCH, conversationId),
 
   // NEW: Request conversation list
-  requestConversationList: () =>
-    ipcRenderer.send(IPC_CHANNELS.CONVERSATION_LIST_REQUEST),
+  requestConversationList: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_LIST_REQUEST),
 
   // NEW: Listen for conversation list response
   onConversationList: (callback: (conversations: any[]) => void) => {

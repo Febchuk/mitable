@@ -57,7 +57,10 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
       } h-full flex items-center py-2 bg-agent-pill rounded-full app-drag transition-all duration-300`}
     >
       {/* Logo Icon - Click to open conversation switcher */}
-      <button onClick={handleLogoClick} className="cursor-pointer hover:opacity-80 transition-opacity app-no-drag">
+      <button
+        onClick={handleLogoClick}
+        className="cursor-pointer hover:opacity-80 transition-opacity app-no-drag"
+      >
         <img src={logoIconSvg} alt="Mitable" className="w-8 h-8 mr-3 flex-shrink-0" />
       </button>
 
