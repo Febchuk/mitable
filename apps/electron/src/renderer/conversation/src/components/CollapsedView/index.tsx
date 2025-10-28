@@ -47,7 +47,7 @@ export default function CollapsedView({ onSelectConversation, onNewChat }: Colla
         placeholder="Search conversations..."
       />
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent app-no-drag">
         <NewChatOption onClick={onNewChat} />
         <ConversationList
           conversations={filteredConversations}

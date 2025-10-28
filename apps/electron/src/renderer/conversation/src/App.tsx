@@ -92,7 +92,6 @@ function App() {
 
         // If we're in collapsed state, expand to show the conversation
         if (viewState === "collapsed") {
-          setViewState("expanded");
           window.conversationAPI.setViewState("expanded");
         }
 
@@ -204,7 +203,6 @@ function App() {
     setCurrentConversationId(tempId);
     setConversationId(tempId);
     setMessages([]);
-    setViewState("expanded");
     window.conversationAPI.setViewState("expanded");
   };
 
@@ -247,14 +245,12 @@ function App() {
     }
 
     // Expand to show the conversation
-    setViewState("expanded");
     window.conversationAPI.setViewState("expanded");
   };
 
   const handleClose = () => {
     console.log("[Conversation] Closing to collapsed state");
     // Don't clear messages or conversation - just collapse back to combobox
-    setViewState("collapsed");
     window.conversationAPI.setViewState("collapsed");
   };
 
@@ -309,7 +305,7 @@ function App() {
             </button>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 pt-16">
+            <div className="flex-1 overflow-y-auto p-4 pt-16 app-no-drag">
               {messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center text-gray-400">

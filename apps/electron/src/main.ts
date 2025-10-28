@@ -440,16 +440,19 @@ function setupIPC() {
         case "hidden":
           console.log("[Main] Setting state to hidden");
           conversationWindow.hide();
+          conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "hidden");
           break;
         case "collapsed":
           console.log("[Main] Setting state to collapsed");
           positionConversationWindow("collapsed"); // 740x120
           if (!conversationWindow.isVisible()) conversationWindow.show();
+          conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "collapsed");
           break;
         case "expanded":
           console.log("[Main] Setting state to expanded");
           positionConversationWindow("expanded"); // 740x600
           if (!conversationWindow.isVisible()) conversationWindow.show();
+          conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "expanded");
           break;
       }
     }
