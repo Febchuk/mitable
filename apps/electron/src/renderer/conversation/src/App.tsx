@@ -235,6 +235,7 @@ function App() {
         messageType: msg.messageType,
         cardData: msg.cardData,
         sources: msg.sources,
+        windowTrigger: msg.windowTrigger,
       }));
 
       setMessages(uiMessages);

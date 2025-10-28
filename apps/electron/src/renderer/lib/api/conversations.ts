@@ -15,6 +15,10 @@ export interface Message {
   messageType?: string;
   cardData?: any;
   sources?: any[];
+  windowTrigger?: {
+    window: "nudge" | "guide";
+    data: any;
+  };
 }
 
 export interface Conversation {

@@ -316,15 +316,28 @@ router.get(
         .where(eq(schema.messages.conversationId, conversationId))
         .orderBy(schema.messages.createdAt);
 
-      const messages = messagesData.map((msg) => ({
-        id: msg.id,
-        role: msg.role as "user" | "assistant",
-        content: msg.content,
-        timestamp: msg.createdAt,
-        messageType: msg.messageType || undefined,
-        cardData: msg.cardData || undefined,
-        sources: (msg.sources as any[]) || undefined,
-      }));
+      const messages = messagesData.map((msg) => {
+        // Extract windowTrigger from cardData if it exists
+        const cardData = msg.cardData as any;
+        const windowTrigger = cardData?.windowTrigger;
+
+        // Create clean cardData without windowTrigger (since it's returned separately)
+        const cleanCardData = cardData ? { ...cardData } : undefined;
+        if (cleanCardData && windowTrigger) {
+          delete cleanCardData.windowTrigger;
+        }
+
+        return {
+          id: msg.id,
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+          timestamp: msg.createdAt,
+          messageType: msg.messageType || undefined,
+          cardData: cleanCardData || undefined,
+          sources: (msg.sources as any[]) || undefined,
+          windowTrigger: windowTrigger || undefined,
+        };
+      });
 
       res.json({ messages });
     } catch (error) {
@@ -841,6 +854,7 @@ router.post(
       let assistantMessageType = "text";
       let assistantCardData: any = null;
       let assistantSources: any[] = [];
+      let assistantWindowTrigger: any = undefined;
 
       try {
         console.log("[Conversations] Starting AgentService.processMessage");
@@ -898,10 +912,20 @@ router.post(
             if ((chunk as any).sources) {
               assistantSources = (chunk as any).sources;
             }
+          } else if (chunk.type === "window_trigger") {
+            // Capture windowTrigger for database storage
+            if ((chunk as any).windowTrigger) {
+              assistantWindowTrigger = (chunk as any).windowTrigger;
+            }
           }
         }
 
         // Save complete assistant message to database with metadata
+        // If windowTrigger exists, merge it into cardData for persistence
+        const finalCardData = assistantWindowTrigger
+          ? { ...(assistantCardData || {}), windowTrigger: assistantWindowTrigger }
+          : assistantCardData;
+
         const [assistantMessage] = await db
           .insert(schema.messages)
           .values({
@@ -909,7 +933,7 @@ router.post(
             role: "assistant",
             content: assistantContent,
             messageType: assistantMessageType,
-            cardData: assistantCardData,
+            cardData: finalCardData,
             sources: assistantSources,
           })
           .returning({
