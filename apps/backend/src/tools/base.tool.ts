@@ -80,6 +80,11 @@ export interface StreamChunk {
   messageId?: string;
   messageType?: "text" | "workflow" | "experts";
   cardData?: Record<string, any>;
+  sources?: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+  }>;
   error?: string;
   windowTrigger?: WindowTrigger; // Window trigger for UI coordination
 }

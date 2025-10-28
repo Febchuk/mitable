@@ -15,6 +15,13 @@ interface ConsoleAPI {
   // Conversation management
   newConversation: () => void;
   loadConversation: (id: string) => void;
+  sendToAgent: (conversationId: string) => void; // NEW: Send conversation to Agent window
+
+  // Window management
+  minimizeWindow: () => void;
+
+  // Navigation
+  onNavigateToChat: (callback: (conversationId: string) => void) => void;
 
   // Nudge creator
   onNudgeOpenCreator: (callback: (data: unknown) => void) => void;

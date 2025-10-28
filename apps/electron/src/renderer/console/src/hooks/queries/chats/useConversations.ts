@@ -14,10 +14,12 @@ export function useConversations(page: number = 1, limit: number = 20) {
       const conversations = data.conversations.map((chat) => ({
         ...chat,
         timestamp: new Date(chat.timestamp),
-        messages: chat.messages.map((msg) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp),
-        })),
+        messages: chat.messages
+          ? chat.messages.map((msg) => ({
+              ...msg,
+              timestamp: new Date(msg.timestamp),
+            }))
+          : [],
       }));
 
       return {

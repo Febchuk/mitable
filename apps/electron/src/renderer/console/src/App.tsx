@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
@@ -25,6 +25,22 @@ import CreateTemplate from "./components/views/admin/TemplatesView/CreateTemplat
 import TemplateDetail from "./components/views/admin/TemplatesView/TemplateDetail";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
+import { useEffect } from "react";
+
+// Navigation handler - listens for IPC navigation events from main process
+function NavigationHandler() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Listen for navigation requests from main process (e.g., from Agent window)
+    window.consoleAPI.onNavigateToChat((conversationId: string) => {
+      console.log("[Console] Navigating to chat:", conversationId);
+      navigate(`/chats/${conversationId}`);
+    });
+  }, [navigate]);
+
+  return null;
+}
 
 // Dynamic default route based on user role
 function DefaultRoute() {
@@ -59,6 +75,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <HashRouter>
+        <NavigationHandler />
         <UserProvider>
           <Routes>
             {/* Public routes */}

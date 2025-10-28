@@ -5,6 +5,7 @@ import { captureService, CaptureOptions, CaptureResult } from "./services/captur
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
+let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let guideWindow: BrowserWindow | null = null;
@@ -68,9 +69,110 @@ function createAgentWindow() {
     agentWindow.loadFile(join(__dirname, "../renderer/agent.html"));
   }
 
+  // Listen for pill movement - reposition conversation in real-time
+  agentWindow.on("move", () => {
+    if (conversationWindow && !conversationWindow.isDestroyed() && conversationWindow.isVisible()) {
+      positionConversationWindow();
+    }
+  });
+
   agentWindow.on("closed", () => {
     // Don't set to null - allow recreation via Cmd+H
     agentWindow = null;
+  });
+}
+
+// Helper function to position conversation window centered above pill
+function positionConversationWindow(state: "collapsed" | "expanded" = "expanded") {
+  if (
+    !agentWindow ||
+    agentWindow.isDestroyed() ||
+    !conversationWindow ||
+    conversationWindow.isDestroyed()
+  ) {
+    return;
+  }
+
+  const pillBounds = agentWindow.getBounds();
+  const conversationWidth = 740;
+  const conversationHeight = state === "collapsed" ? 120 : 600; // NEW: Dynamic height
+  const gap = 16;
+
+  // Calculate centered position above pill
+  const x = pillBounds.x + (pillBounds.width - conversationWidth) / 2;
+  const y = pillBounds.y - conversationHeight - gap;
+
+  conversationWindow.setBounds(
+    {
+      x: Math.round(x),
+      y: Math.round(y),
+      width: conversationWidth,
+      height: conversationHeight,
+    },
+    true // animate: true for smooth transition
+  );
+}
+
+function createConversationWindow() {
+  if (!agentWindow || agentWindow.isDestroyed()) {
+    console.error("[Conversation] Cannot create conversation window - agent window not available");
+    return;
+  }
+
+  conversationWindow = new BrowserWindow({
+    width: 740,
+    height: 600,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    show: false,
+    modal: false, // Non-modal so pill remains interactive
+    webPreferences: {
+      preload: join(__dirname, "../preload/conversation.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top behavior (same as agent)
+  if (process.platform === "darwin") {
+    conversationWindow.setAlwaysOnTop(true, "modal-panel");
+    conversationWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    conversationWindow.setAlwaysOnTop(true, "normal", 1);
+  }
+
+  // Position conversation window initially
+  positionConversationWindow();
+
+  // Handle external links - open in default browser
+  conversationWindow.webContents.setWindowOpenHandler(({ url }) => {
+    console.log("[Conversation] External link clicked:", url);
+    shell.openExternal(url).catch((err) => {
+      console.error("[Conversation] Failed to open external link:", err);
+    });
+    return { action: "deny" };
+  });
+
+  if (!app.isPackaged) {
+    conversationWindow.loadURL("http://localhost:5173/conversation/index.html");
+  } else {
+    conversationWindow.loadFile(join(__dirname, "../renderer/conversation.html"));
+  }
+
+  // Wait for renderer to be ready before allowing IPC
+  conversationWindow.webContents.on("did-finish-load", () => {
+    console.log("[Conversation] Renderer loaded and ready for IPC");
+  });
+
+  conversationWindow.webContents.on("dom-ready", () => {
+    console.log("[Conversation] DOM ready");
+  });
+
+  conversationWindow.on("closed", () => {
+    conversationWindow = null;
   });
 }
 
@@ -136,6 +238,11 @@ function createConsoleWindow() {
 }
 
 function createOverlayWindow() {
+  if (!guideWindow || guideWindow.isDestroyed()) {
+    console.error("[Overlay] Cannot create overlay window - guide window not available");
+    return;
+  }
+
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.bounds;
 
@@ -146,12 +253,12 @@ function createOverlayWindow() {
     y: 0,
     transparent: true,
     frame: false,
-    alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
     movable: false,
     focusable: false,
     show: false,
+    modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/overlay.cjs"),
       contextIsolation: true,
@@ -173,6 +280,11 @@ function createOverlayWindow() {
 }
 
 function createGuideWindow() {
+  if (!agentWindow || agentWindow.isDestroyed()) {
+    console.error("[Guide] Cannot create guide window - agent window not available");
+    return;
+  }
+
   guideWindow = new BrowserWindow({
     width: 400,
     height: 600,
@@ -180,12 +292,21 @@ function createGuideWindow() {
     transparent: true,
     alwaysOnTop: true,
     show: false,
+    modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/guide.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+
+  // Add platform-specific always-on-top for proper z-order
+  if (process.platform === "darwin") {
+    guideWindow.setAlwaysOnTop(true, "modal-panel");
+    guideWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    guideWindow.setAlwaysOnTop(true, "normal", 1);
+  }
 
   if (!app.isPackaged) {
     guideWindow.loadURL("http://localhost:5173/guide/index.html");
@@ -199,6 +320,11 @@ function createGuideWindow() {
 }
 
 function createNudgeWindow() {
+  if (!agentWindow || agentWindow.isDestroyed()) {
+    console.error("[Nudge] Cannot create nudge window - agent window not available");
+    return;
+  }
+
   nudgeWindow = new BrowserWindow({
     width: 400,
     height: 600,
@@ -206,6 +332,7 @@ function createNudgeWindow() {
     transparent: true,
     alwaysOnTop: true,
     show: false,
+    modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/nudge.cjs"),
       contextIsolation: true,
@@ -233,9 +360,204 @@ function setupIPC() {
     if (agentWindow && !agentWindow.isDestroyed()) {
       if (agentWindow.isVisible()) {
         agentWindow.hide();
+        // Also hide all dependent windows when agent is hidden
+        if (conversationWindow && !conversationWindow.isDestroyed()) {
+          conversationWindow.hide();
+        }
+        if (guideWindow && !guideWindow.isDestroyed()) {
+          guideWindow.hide();
+        }
+        if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+          nudgeWindow.hide();
+        }
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.hide();
+        }
       } else {
         agentWindow.show();
+        // Conversation window remains hidden unless explicitly shown
       }
+    }
+  });
+
+  // Conversation window show - position and display (legacy - shows expanded)
+  ipcMain.on(IPC_CHANNELS.CONVERSATION_SHOW, () => {
+    if (conversationWindow && !conversationWindow.isDestroyed()) {
+      positionConversationWindow("expanded");
+      conversationWindow.show();
+      // Wait for renderer to be ready before sending IPC message
+      setTimeout(() => {
+        // Notify renderer to switch to expanded state
+        conversationWindow?.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "expanded");
+      }, 50); // 50ms delay to ensure renderer has processed show event
+    }
+  });
+
+  // Conversation window hide
+  ipcMain.on(IPC_CHANNELS.CONVERSATION_HIDE, () => {
+    if (conversationWindow && !conversationWindow.isDestroyed()) {
+      conversationWindow.hide();
+    }
+  });
+
+  // Forward message from Agent to Conversation window
+  ipcMain.on(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, (_event, messageData, screenshot) => {
+    if (conversationWindow && !conversationWindow.isDestroyed()) {
+      conversationWindow.webContents.send(
+        IPC_CHANNELS.CONVERSATION_SEND_MESSAGE,
+        messageData,
+        screenshot
+      );
+    }
+  });
+
+  // NEW: Toggle conversation (collapsed combobox)
+  ipcMain.on(IPC_CHANNELS.CONVERSATION_TOGGLE, () => {
+    if (!conversationWindow || conversationWindow.isDestroyed()) return;
+
+    const isCurrentlyVisible = conversationWindow.isVisible();
+    console.log("[Main] CONVERSATION_TOGGLE called, isVisible:", isCurrentlyVisible);
+
+    if (isCurrentlyVisible) {
+      console.log("[Main] Hiding conversation window");
+      conversationWindow.hide();
+      // Notify renderer to switch to hidden state
+      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "hidden");
+    } else {
+      console.log("[Main] Showing conversation window in collapsed state");
+      positionConversationWindow("collapsed"); // 740x120
+      conversationWindow.show();
+      // Wait for renderer to be ready before sending IPC messages
+      setTimeout(() => {
+        // Notify renderer to switch to collapsed state
+        conversationWindow?.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "collapsed");
+        // Trigger conversation list fetch
+        conversationWindow?.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_REQUEST);
+      }, 50); // 50ms delay to ensure renderer has processed show event
+    }
+  });
+
+  // NEW: Set conversation state (handles window sizing)
+  ipcMain.on(
+    IPC_CHANNELS.CONVERSATION_SET_STATE,
+    (_event, state: "hidden" | "collapsed" | "expanded") => {
+      if (!conversationWindow || conversationWindow.isDestroyed()) return;
+
+      console.log("[Main] CONVERSATION_SET_STATE called from renderer, state:", state);
+
+      switch (state) {
+        case "hidden":
+          console.log("[Main] Setting state to hidden");
+          conversationWindow.hide();
+          conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "hidden");
+          break;
+        case "collapsed":
+          console.log("[Main] Setting state to collapsed");
+          positionConversationWindow("collapsed"); // 740x120
+          if (!conversationWindow.isVisible()) conversationWindow.show();
+          conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "collapsed");
+          break;
+        case "expanded":
+          console.log("[Main] Setting state to expanded");
+          positionConversationWindow("expanded"); // 740x600
+          if (!conversationWindow.isVisible()) conversationWindow.show();
+          conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "expanded");
+          break;
+      }
+    }
+  );
+
+  // NEW: Open specific conversation from Console
+  ipcMain.on(IPC_CHANNELS.AGENT_OPEN_CONVERSATION, (_event, conversationId: string) => {
+    if (!agentWindow || agentWindow.isDestroyed()) return;
+    if (!conversationWindow || conversationWindow.isDestroyed()) return;
+
+    // Show agent if hidden
+    if (!agentWindow.isVisible()) agentWindow.show();
+
+    // Position and show conversation in expanded state
+    positionConversationWindow("expanded");
+    conversationWindow.show();
+
+    // Load the specific conversation
+    conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LOAD, conversationId);
+  });
+
+  // NEW: Open specific conversation in Console (from Agent/Conversation window)
+  ipcMain.on(IPC_CHANNELS.CONSOLE_OPEN_CHAT, (_event, conversationId: string) => {
+    if (!consoleWindow || consoleWindow.isDestroyed()) return;
+
+    // Show and focus console window
+    consoleWindow.show();
+    consoleWindow.focus();
+
+    // Send navigation message to console with conversation ID
+    consoleWindow.webContents.send("navigate-to-chat", conversationId);
+
+    // Hide agent and all dependent windows
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      agentWindow.hide();
+    }
+    if (conversationWindow && !conversationWindow.isDestroyed()) {
+      conversationWindow.hide();
+    }
+    if (guideWindow && !guideWindow.isDestroyed()) {
+      guideWindow.hide();
+    }
+    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      nudgeWindow.hide();
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.hide();
+    }
+  });
+
+  // NEW: Handle conversation list request (fetch from backend)
+  ipcMain.on(IPC_CHANNELS.CONVERSATION_LIST_REQUEST, async () => {
+    if (!conversationWindow || conversationWindow.isDestroyed()) return;
+
+    try {
+      // Check if we have an auth token
+      if (!authTokens.accessToken) {
+        console.log("[Conversation] No auth token, returning empty list");
+        conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, []);
+        return;
+      }
+
+      // Fetch from backend (without messages for performance)
+      const API_BASE_URL = "http://localhost:3000"; // TODO: Move to config
+      const response = await fetch(`${API_BASE_URL}/api/conversations?includeMessages=false`, {
+        headers: { Authorization: `Bearer ${authTokens.accessToken}` },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const conversations = await response.json();
+      console.log("[Main] Fetched conversations from backend:", conversations);
+
+      // Ensure we're sending an array (handle both direct array and object wrapper)
+      const conversationList = Array.isArray(conversations)
+        ? conversations
+        : Array.isArray(conversations?.conversations)
+          ? conversations.conversations
+          : [];
+
+      console.log(
+        "[Main] Sending conversation list to renderer:",
+        conversationList.length,
+        "items"
+      );
+
+      // Send back to renderer
+      conversationWindow.webContents.send(
+        IPC_CHANNELS.CONVERSATION_LIST_RESPONSE,
+        conversationList
+      );
+    } catch (error) {
+      console.error("[Conversation] Failed to fetch conversation list:", error);
+      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, []);
     }
   });
 
@@ -243,6 +565,13 @@ function setupIPC() {
   ipcMain.on(IPC_CHANNELS.AGENT_SHOW_CONSOLE, () => {
     if (consoleWindow && !consoleWindow.isDestroyed()) {
       consoleWindow.show();
+    }
+  });
+
+  // Minimize console window
+  ipcMain.on(IPC_CHANNELS.CONSOLE_MINIMIZE, () => {
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.minimize();
     }
   });
 
@@ -414,28 +743,133 @@ function setupIPC() {
     }
   });
 
-  // Agent window resize with upward expansion
-  ipcMain.on(IPC_CHANNELS.AGENT_RESIZE, (_event, mode: "pill" | "conversation") => {
-    if (agentWindow && !agentWindow.isDestroyed()) {
-      const currentBounds = agentWindow.getBounds();
-      const newWidth = 740;
-      const newHeight = mode === "pill" ? 80 : 696;
+  // Agent window resize with upward expansion and centered positioning
+  ipcMain.on(
+    IPC_CHANNELS.AGENT_RESIZE,
+    (
+      _event,
+      options:
+        | { width?: number; height?: number }
+        | "pill"
+        | "conversation"
+        | "text-mode"
+        | "audio-mode"
+    ) => {
+      if (agentWindow && !agentWindow.isDestroyed()) {
+        const currentBounds = agentWindow.getBounds();
 
-      // Calculate new Y position to keep bottom edge fixed (expand/shrink upward)
-      const heightDiff = newHeight - currentBounds.height;
-      const newY = currentBounds.y - heightDiff;
+        // Support both legacy mode strings and new flexible options
+        let newWidth: number;
+        let newHeight: number;
 
-      agentWindow.setBounds(
-        {
-          x: currentBounds.x,
-          y: newY,
-          width: newWidth,
-          height: newHeight,
-        },
-        true
-      );
+        if (typeof options === "string") {
+          // Legacy mode parameter
+          switch (options) {
+            case "pill":
+              newWidth = 740;
+              newHeight = 80;
+              break;
+            case "conversation":
+              newWidth = 740;
+              newHeight = 696;
+              break;
+            case "text-mode":
+              newWidth = 740;
+              newHeight = currentBounds.height;
+              break;
+            case "audio-mode":
+              newWidth = 280;
+              newHeight = currentBounds.height;
+              break;
+            default:
+              newWidth = currentBounds.width;
+              newHeight = currentBounds.height;
+          }
+        } else {
+          // New flexible options format
+          newWidth = options.width ?? currentBounds.width;
+          newHeight = options.height ?? currentBounds.height;
+        }
+
+        // Calculate new X position to keep centered horizontally (expand/shrink from center)
+        const widthDiff = newWidth - currentBounds.width;
+        const newX = currentBounds.x - widthDiff / 2;
+
+        // Calculate new Y position to keep bottom edge fixed (expand/shrink upward)
+        const heightDiff = newHeight - currentBounds.height;
+        const newY = currentBounds.y - heightDiff;
+
+        agentWindow.setBounds(
+          {
+            x: Math.round(newX),
+            y: Math.round(newY),
+            width: newWidth,
+            height: newHeight,
+          },
+          true // animate
+        );
+
+        // Reposition conversation window if visible (maintains alignment)
+        if (
+          conversationWindow &&
+          !conversationWindow.isDestroyed() &&
+          conversationWindow.isVisible()
+        ) {
+          positionConversationWindow();
+        }
+      }
     }
-  });
+  );
+
+  // Nudge window resize with left-to-right expansion
+  ipcMain.on(
+    IPC_CHANNELS.NUDGE_RESIZE,
+    (_event, options: { width?: number; height?: number } | "collapsed" | "expanded") => {
+      if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+        const currentBounds = nudgeWindow.getBounds();
+
+        // Support both mode strings and flexible options
+        let newWidth: number;
+        let newHeight: number;
+
+        if (typeof options === "string") {
+          // Mode-based resizing
+          switch (options) {
+            case "collapsed":
+              newWidth = 85;
+              newHeight = 400;
+              break;
+            case "expanded":
+              newWidth = 380;
+              newHeight = 400;
+              break;
+            default:
+              newWidth = currentBounds.width;
+              newHeight = currentBounds.height;
+          }
+        } else {
+          // Flexible options format
+          newWidth = options.width ?? currentBounds.width;
+          newHeight = options.height ?? currentBounds.height;
+        }
+
+        // Left-to-right expansion: keep X position fixed (left edge anchored)
+        // Only adjust Y if height changes (keep vertical center)
+        const heightDiff = newHeight - currentBounds.height;
+        const newY = currentBounds.y - heightDiff / 2;
+
+        nudgeWindow.setBounds(
+          {
+            x: currentBounds.x, // Left edge stays fixed
+            y: Math.round(newY),
+            width: newWidth,
+            height: newHeight,
+          },
+          true // animate
+        );
+      }
+    }
+  );
 
   // Auth Management - Cross-window token sharing
   // Console sets tokens after login
@@ -445,7 +879,7 @@ function setupIPC() {
     authTokens.refreshToken = refreshToken;
 
     // Broadcast token update to all windows
-    const allWindows = [agentWindow, guideWindow, nudgeWindow, overlayWindow];
+    const allWindows = [agentWindow, conversationWindow, guideWindow, nudgeWindow, overlayWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, accessToken);
@@ -466,7 +900,7 @@ function setupIPC() {
     authTokens.refreshToken = null;
 
     // Broadcast token clear to all windows
-    const allWindows = [agentWindow, guideWindow, nudgeWindow, overlayWindow];
+    const allWindows = [agentWindow, conversationWindow, guideWindow, nudgeWindow, overlayWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, null);
@@ -543,10 +977,11 @@ function registerGlobalShortcuts() {
 
 app.whenReady().then(() => {
   createAgentWindow();
+  createConversationWindow(); // Create conversation window as child of agent
   createConsoleWindow();
-  createOverlayWindow();
-  createGuideWindow();
-  createNudgeWindow();
+  createGuideWindow(); // Create guide as child of agent
+  createOverlayWindow(); // Create overlay as child of guide (must be after guide)
+  createNudgeWindow(); // Create nudge as child of agent
 
   setupIPC();
   registerGlobalShortcuts();

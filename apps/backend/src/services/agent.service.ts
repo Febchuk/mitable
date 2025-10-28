@@ -235,6 +235,12 @@ export class AgentService {
   async *processMessage(userMessage: string, context: ToolContext): AsyncIterable<StreamChunk> {
     const MAX_ITERATIONS = 5; // Prevent infinite loops
     let iterationCount = 0;
+
+    // Track metadata from last tool execution (for including in final response)
+    let lastToolMessageType: "text" | "workflow" | "experts" | undefined;
+    let lastToolCardData: any | undefined;
+    let lastToolSources: any[] | undefined;
+
     try {
       // Check for workflow mode entry
       const shouldEnterWorkflow = workflowService.shouldEnterWorkflowMode(
@@ -534,6 +540,11 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             streamable: toolResult.streamable,
           });
 
+          // Store metadata from this tool result (will be included in final response)
+          lastToolMessageType = toolResult.messageType;
+          lastToolCardData = toolResult.cardData;
+          lastToolSources = toolResult.sources;
+
           // Send window trigger if present
           if (toolResult.triggerWindow) {
             console.log("[AgentService] Window trigger:", {
@@ -648,11 +659,13 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             await new Promise((resolve) => setTimeout(resolve, 20));
           }
 
+          // Include metadata from last tool execution (if any)
           yield {
             type: "complete",
             content: textContent,
-            messageType: "text",
-            cardData: undefined,
+            messageType: lastToolMessageType || "text",
+            cardData: lastToolCardData,
+            sources: lastToolSources,
           };
 
           return; // Exit the loop
@@ -669,6 +682,7 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
           "I apologize, but I'm having trouble processing your request. Could you please rephrase your question?",
         messageType: "text",
         cardData: undefined,
+        sources: undefined,
       };
     } catch (error) {
       console.error("[AgentService] Error processing message:", error);

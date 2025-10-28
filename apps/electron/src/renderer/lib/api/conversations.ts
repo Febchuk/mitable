@@ -1,7 +1,8 @@
 /**
- * API Client for Conversations
+ * Shared API Client for Conversations
  *
  * Handles communication with the backend streaming API
+ * Works with both Agent and Conversation windows
  */
 
 const API_BASE_URL = "http://localhost:3000/api";
@@ -14,6 +15,10 @@ export interface Message {
   messageType?: string;
   cardData?: any;
   sources?: any[];
+  windowTrigger?: {
+    window: "nudge" | "guide";
+    data: any;
+  };
 }
 
 export interface Conversation {
@@ -31,6 +36,7 @@ export interface StreamChunk {
   error?: string;
   messageType?: string;
   cardData?: any;
+  sources?: any[];
   windowTrigger?: {
     window: "nudge" | "guide";
     data: any;
@@ -39,9 +45,17 @@ export interface StreamChunk {
 
 /**
  * Get auth token from main process
+ * Works with both agentAPI and conversationAPI
  */
 async function getAuthHeaders(): Promise<HeadersInit> {
-  const token = await window.agentAPI.getAuthToken();
+  let token: string | null = null;
+
+  // Check which window API is available
+  if ("agentAPI" in window && window.agentAPI?.getAuthToken) {
+    token = await window.agentAPI.getAuthToken();
+  } else if ("conversationAPI" in window && window.conversationAPI?.getAuthToken) {
+    token = await window.conversationAPI.getAuthToken();
+  }
 
   return {
     "Content-Type": "application/json",
@@ -77,21 +91,21 @@ export async function createConversation(
 }
 
 /**
- * Get conversation by ID
+ * Get conversation messages by ID
  */
-export async function getConversation(conversationId: string): Promise<Conversation> {
+export async function getConversationMessages(conversationId: string): Promise<Message[]> {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
     headers,
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to get conversation: ${response.statusText}`);
+    throw new Error(`Failed to get conversation messages: ${response.statusText}`);
   }
 
   const data = await response.json();
-  return data.conversation;
+  return data.messages;
 }
 
 /**
@@ -100,14 +114,15 @@ export async function getConversation(conversationId: string): Promise<Conversat
  * @param conversationId - Conversation ID
  * @param content - Message content
  * @param screenshot - Optional base64-encoded screenshot for visual guidance
- * @param screenshotMetadata - Optional screenshot metadata (width, height, scaleFactor)
- * @param callbacks - Streaming callbacks
+ * @param onChunk - Callback for each streaming chunk
+ * @param onComplete - Callback when streaming completes
+ * @param onError - Callback for errors
+ * @param onWindowTrigger - Callback for window triggers (Nudge/Guide)
  */
 export async function sendMessageStream(
   conversationId: string,
   content: string,
   screenshot: string | null | undefined,
-  screenshotMetadata: any | null | undefined,
   callbacks: {
     onChunk?: (chunk: string) => void;
     onComplete?: (
@@ -123,18 +138,13 @@ export async function sendMessageStream(
 ): Promise<void> {
   const headers = await getAuthHeaders();
 
-  // Build request body with optional screenshot and metadata
-  const requestBody: { content: string; screenshot?: string; screenshotMetadata?: any } = {
-    content,
-  };
+  // Build request body with optional screenshot
+  const requestBody: { content: string; screenshot?: string } = { content };
   if (screenshot) {
     requestBody.screenshot = screenshot;
-    requestBody.screenshotMetadata = screenshotMetadata;
-    console.log(`[Agent API] Sending message with screenshot (${screenshot.length} bytes)`, {
-      metadata: screenshotMetadata,
-    });
+    console.log(`[API] Sending message with screenshot (${screenshot.length} bytes)`);
   } else {
-    console.log("[Agent API] Sending message without screenshot");
+    console.log("[API] Sending message without screenshot");
   }
 
   const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
@@ -213,8 +223,10 @@ export async function sendMessageStream(
                 break;
 
               case "window_trigger":
+                console.log("[API] Received window_trigger event:", chunk.windowTrigger);
                 if (chunk.windowTrigger) {
                   windowTriggerData = chunk.windowTrigger;
+                  console.log("[API] Stored windowTriggerData:", windowTriggerData);
                   callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
                 }
                 break;
@@ -223,6 +235,7 @@ export async function sendMessageStream(
                 if (chunk.messageId) {
                   messageId = chunk.messageId;
                 }
+                console.log("[API] Calling onComplete with windowTriggerData:", windowTriggerData);
                 callbacks.onComplete?.(
                   fullContent,
                   messageId,

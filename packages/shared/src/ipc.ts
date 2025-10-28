@@ -30,20 +30,41 @@ export const IPC_CHANNELS = {
   NUDGE_DISMISS: "nudge-dismiss",
   NUDGE_CREATE_REQUEST: "nudge-create-request",
   NUDGE_OPEN_CREATOR: "nudge-open-creator",
+  NUDGE_GENERATE_CONTEXT: "nudge-generate-context", // AI context generation
+  NUDGE_GENERATE_QUESTION: "nudge-generate-question", // AI question generation
+  NUDGE_RESIZE: "nudge-resize", // Dynamic window resizing (collapsed/expanded)
 
   // Window management
   WINDOW_SHOW: "window-show",
   WINDOW_HIDE: "window-hide",
   WINDOW_TOGGLE: "window-toggle",
   SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
+  CONSOLE_MINIMIZE: "console-minimize", // Console → Main (minimize console window)
 
   // Agent window
   AGENT_TOGGLE: "agent-toggle",
   AGENT_SHOW_CONSOLE: "agent-show-console",
   AGENT_RESIZE: "agent-resize",
   AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step", // Triggered when Guide "Done" button clicked
+  AGENT_OPEN_CONVERSATION: "agent-open-conversation", // Console → Main (open specific conversation in agent)
+  CONSOLE_OPEN_CHAT: "console-open-chat", // Agent/Conversation → Main (open conversation in console)
 
-  // Conversation management
+  // Conversation window (parent-child with agent)
+  CONVERSATION_SHOW: "conversation-show", // Agent → Main (show conversation window)
+  CONVERSATION_HIDE: "conversation-hide", // Agent/Conversation → Main (hide conversation window)
+  CONVERSATION_SEND_MESSAGE: "conversation-send-message", // Agent → Conversation (forward user message)
+  CONVERSATION_UPDATE_MESSAGES: "conversation-update-messages", // Conversation → Agent (sync message state)
+  CONVERSATION_POSITION_UPDATE: "conversation-position-update", // Main → Conversation (on pill drag)
+
+  // NEW: Conversation state management (collapsed combobox refactor)
+  CONVERSATION_TOGGLE: "conversation-toggle", // Agent → Main (toggle collapsed/hidden)
+  CONVERSATION_SET_STATE: "conversation-set-state", // Renderer → Main (set hidden/collapsed/expanded)
+  CONVERSATION_SWITCH: "conversation-switch", // Conversation → Main (switch to different conversation)
+  CONVERSATION_LIST_REQUEST: "conversation-list-request", // Renderer → Main (request conversation list)
+  CONVERSATION_LIST_RESPONSE: "conversation-list-response", // Main → Renderer (return conversation list)
+  CONVERSATION_GENERATE_TITLE: "conversation-generate-title", // Backend integration for AI titles
+
+  // Legacy conversation management (kept for backward compatibility)
   CONVERSATION_NEW: "conversation-new",
   CONVERSATION_LOAD: "conversation-load",
   CONVERSATION_UPDATE: "conversation-update",

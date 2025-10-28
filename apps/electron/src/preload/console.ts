@@ -11,6 +11,8 @@ const IPC_CHANNELS = {
   GUIDE_DATA: "guide-data",
   CONVERSATION_NEW: "conversation-new",
   CONVERSATION_LOAD: "conversation-load",
+  AGENT_OPEN_CONVERSATION: "agent-open-conversation", // NEW: Send conversation to Agent
+  CONSOLE_MINIMIZE: "console-minimize", // NEW: Minimize console window
   NUDGE_OPEN_CREATOR: "nudge-open-creator",
   AUTH_SET_TOKENS: "auth-set-tokens",
   AUTH_CLEAR: "auth-clear",
@@ -55,6 +57,18 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   // Conversation management
   newConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_NEW),
   loadConversation: (id: string) => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_LOAD, id),
+  sendToAgent: (conversationId: string) =>
+    ipcRenderer.send(IPC_CHANNELS.AGENT_OPEN_CONVERSATION, conversationId), // NEW: Send conversation to Agent window
+
+  // Window management
+  minimizeWindow: () => ipcRenderer.send(IPC_CHANNELS.CONSOLE_MINIMIZE),
+
+  // Navigation - Listen for navigation requests from main process
+  onNavigateToChat: (callback: (conversationId: string) => void) => {
+    ipcRenderer.on("navigate-to-chat", (_event: IpcRendererEvent, conversationId: string) =>
+      callback(conversationId)
+    );
+  },
 
   // Nudge creator
   onNudgeOpenCreator: (callback: (data: unknown) => void) => {

@@ -7,6 +7,11 @@ const IPC_CHANNELS = {
   SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
   AGENT_RESIZE: "agent-resize",
   AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step",
+  CONVERSATION_SHOW: "conversation-show",
+  CONVERSATION_HIDE: "conversation-hide",
+  CONVERSATION_TOGGLE: "conversation-toggle", // NEW: Toggle collapsed/hidden state
+  CONVERSATION_SEND_MESSAGE: "conversation-send-message",
+  CONSOLE_OPEN_CHAT: "console-open-chat",
   NUDGE_SHOW: "nudge-show",
   GUIDE_START: "guide-start",
   CAPTURE_SCREENSHOT: "capture-screenshot",
@@ -19,8 +24,24 @@ contextBridge.exposeInMainWorld("agentAPI", {
   showConsole: () => ipcRenderer.send(IPC_CHANNELS.AGENT_SHOW_CONSOLE),
   setIgnoreMouseEvents: (ignore: boolean) =>
     ipcRenderer.send(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, ignore),
-  resizeWindow: (mode: "pill" | "conversation") =>
-    ipcRenderer.send(IPC_CHANNELS.AGENT_RESIZE, mode),
+  resizeWindow: (
+    options:
+      | { width?: number; height?: number }
+      | "pill"
+      | "conversation"
+      | "text-mode"
+      | "audio-mode"
+  ) => ipcRenderer.send(IPC_CHANNELS.AGENT_RESIZE, options),
+
+  // Conversation window management
+  showConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SHOW),
+  hideConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_HIDE),
+  toggleConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_TOGGLE), // NEW: Toggle collapsed state
+  sendMessageToConversation: (messageData: any, screenshot: string | null) =>
+    ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, messageData, screenshot),
+  openConversationInConsole: (conversationId: string) =>
+    ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHAT, conversationId),
+
   showNudge: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.NUDGE_SHOW, data),
   startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),
 

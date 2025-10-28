@@ -1,0 +1,424 @@
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Code, ExternalLink, LucideIcon, Users, Workflow, X } from "lucide-react";
+import UserMessage from "../../components/domain/messages/UserMessage";
+import AIMessage from "../../components/domain/messages/AIMessage";
+import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+import { sendMessageStream } from "../../lib/api/conversations";
+import CollapsedView from "./components/CollapsedView";
+
+declare global {
+  interface Window {
+    conversationAPI: {
+      hideWindow: () => void;
+      onMessageReceived: (
+        callback: (message: any, screenshot: string | null) => void
+      ) => () => void;
+      updateMessages: (messages: any[]) => void;
+      onPositionUpdate: (callback: (x: number, y: number) => void) => () => void;
+      showNudge: (data: unknown) => void;
+      startGuide: (data: unknown) => void;
+      getAuthToken: () => Promise<string | null>;
+      onAuthTokenUpdated: (callback: (token: string | null) => void) => () => void;
+      // NEW: State management
+      setViewState: (state: "hidden" | "collapsed" | "expanded") => void;
+      onViewStateChange: (
+        callback: (state: "hidden" | "collapsed" | "expanded") => void
+      ) => () => void;
+      onConversationLoad: (callback: (conversationId: string) => void) => () => void;
+      switchConversation: (conversationId: string) => void;
+      requestConversationList: () => void;
+      onConversationList: (callback: (conversations: any[]) => void) => () => void;
+      openConversationInConsole: (conversationId: string) => void;
+    };
+  }
+}
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  type?: "text" | "card";
+  messageType?: string;
+  cardData?: any;
+  sources?: any[];
+  windowTrigger?: {
+    window: "nudge" | "guide";
+    data: any;
+  };
+}
+
+type ViewState = "hidden" | "collapsed" | "expanded";
+
+function App() {
+  // View state management
+  const [viewState, setViewState] = useState<ViewState>("hidden");
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [draftMessages] = useState<Map<string, string>>(new Map());
+
+  // Existing message state
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const streamingMessageIdRef = useRef<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (viewState === "expanded") {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, viewState]);
+
+  // Listen for state changes from main process
+  useEffect(() => {
+    const cleanup = window.conversationAPI.onViewStateChange((state) => {
+      console.log(
+        "[Conversation] View state changed by main process:",
+        state,
+        "current:",
+        viewState
+      );
+      setViewState(state);
+    });
+
+    return cleanup;
+  }, [viewState]);
+
+  // Handle conversation load from Console "send to agent"
+  useEffect(() => {
+    const cleanup = window.conversationAPI.onConversationLoad((conversationId) => {
+      console.log("[Conversation] Loading conversation from Console:", conversationId);
+      handleSelectConversation(conversationId);
+    });
+
+    return cleanup;
+  }, []);
+
+  // Listen for messages from Agent window
+  useEffect(() => {
+    const cleanup = window.conversationAPI.onMessageReceived(
+      async (messageData: any, screenshot: string | null) => {
+        console.log("[Conversation] Message received from Agent:", messageData);
+
+        // If we're in collapsed state, expand to show the conversation
+        if (viewState === "collapsed") {
+          window.conversationAPI.setViewState("expanded");
+        }
+
+        // Destructure message data
+        const { message, conversationId: convId, userMessage } = messageData;
+
+        // Update conversation ID
+        if (convId) {
+          setConversationId(convId);
+          setCurrentConversationId(convId);
+        }
+
+        // Add user message to UI
+        if (userMessage) {
+          const userMsg: Message = {
+            id: Date.now().toString(),
+            role: "user",
+            content: userMessage,
+            type: "text",
+          };
+          setMessages((prev) => [...prev, userMsg]);
+        }
+
+        // Create placeholder for streaming assistant message
+        const streamingMessageId = `streaming-${Date.now()}`;
+        streamingMessageIdRef.current = streamingMessageId;
+
+        const assistantMessage: Message = {
+          id: streamingMessageId,
+          role: "assistant",
+          content: "",
+          type: "text",
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+
+        // Stream the response with optional screenshot
+        try {
+          await sendMessageStream(convId, message, screenshot, {
+            onChunk: (chunk) => {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
+                )
+              );
+            },
+            onComplete: (fullContent, messageId, messageType, cardData, windowTrigger) => {
+              console.log("[Conversation] onComplete received:", {
+                messageId,
+                messageType,
+                hasCardData: !!cardData,
+                windowTrigger,
+              });
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === streamingMessageId
+                    ? {
+                        ...msg,
+                        id: messageId,
+                        content: fullContent,
+                        type: cardData ? "card" : "text",
+                        messageType,
+                        cardData,
+                        windowTrigger,
+                      }
+                    : msg
+                )
+              );
+              streamingMessageIdRef.current = null;
+            },
+            onError: (error) => {
+              console.error("Streaming error:", error);
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === streamingMessageId
+                    ? {
+                        ...msg,
+                        content: `Error: ${error}. Please try again.`,
+                      }
+                    : msg
+                )
+              );
+              streamingMessageIdRef.current = null;
+            },
+            onWindowTrigger: (windowType, data) => {
+              console.log(`Window trigger: ${windowType}`, data);
+              // Window trigger data is stored in message for user to click card
+            },
+          });
+        } catch (error) {
+          console.error("Failed to send message:", error);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === streamingMessageId
+                ? {
+                    ...msg,
+                    content: "Failed to send message. Please try again.",
+                  }
+                : msg
+            )
+          );
+          streamingMessageIdRef.current = null;
+        }
+      }
+    );
+
+    // Cleanup listener on unmount or remount
+    return cleanup;
+  }, [viewState]);
+
+  const handleNewChat = () => {
+    console.log("[Conversation] Creating new chat");
+    // Create temp conversation ID
+    const tempId = `temp-${Date.now()}`;
+    setCurrentConversationId(tempId);
+    setConversationId(tempId);
+    setMessages([]);
+    window.conversationAPI.setViewState("expanded");
+  };
+
+  const handleSelectConversation = async (selectedConversationId: string) => {
+    console.log("[Conversation] Selecting conversation:", selectedConversationId);
+
+    // Save current draft if there is one
+    if (currentConversationId && draftMessages.has(currentConversationId)) {
+      console.log("[Conversation] Draft preserved for:", currentConversationId);
+    }
+
+    // Load the selected conversation
+    setCurrentConversationId(selectedConversationId);
+    setConversationId(selectedConversationId);
+
+    // Fetch messages from backend for this conversation
+    try {
+      console.log("[Conversation] Fetching messages for conversation:", selectedConversationId);
+      const { getConversationMessages } = await import("../../lib/api/conversations");
+      const fetchedMessages = await getConversationMessages(selectedConversationId);
+
+      console.log("[Conversation] Fetched", fetchedMessages.length, "messages");
+
+      // Convert API messages to UI message format
+      const uiMessages = fetchedMessages.map((msg) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        type: msg.cardData ? ("card" as const) : ("text" as const),
+        messageType: msg.messageType,
+        cardData: msg.cardData,
+        sources: msg.sources,
+        windowTrigger: msg.windowTrigger,
+      }));
+
+      setMessages(uiMessages);
+    } catch (error) {
+      console.error("[Conversation] Failed to fetch messages:", error);
+      // Still expand but with empty messages
+      setMessages([]);
+    }
+
+    // Expand to show the conversation
+    window.conversationAPI.setViewState("expanded");
+  };
+
+  const handleClose = () => {
+    console.log("[Conversation] Closing to collapsed state");
+    // Don't clear messages or conversation - just collapse back to combobox
+    window.conversationAPI.setViewState("collapsed");
+  };
+
+  const handleCardClick = (message: Message) => {
+    console.log("[Conversation] Card clicked - message object:", {
+      id: message.id,
+      messageType: message.messageType,
+      hasCardData: !!message.cardData,
+      windowTrigger: message.windowTrigger,
+      fullMessage: message,
+    });
+
+    if (!message.windowTrigger) {
+      console.warn("Card clicked but no window trigger data");
+      return;
+    }
+
+    const { window: windowType, data } = message.windowTrigger;
+    console.log(`Card clicked - launching ${windowType} window`, data);
+
+    if (windowType === "nudge") {
+      // Pass expert data + conversationId for context generation
+      window.conversationAPI.showNudge({
+        ...data,
+        conversationId,
+      });
+    } else if (windowType === "guide") {
+      // Pass guide data + conversationId for step progression
+      window.conversationAPI.startGuide({
+        ...data,
+        conversationId,
+      });
+    }
+  };
+
+  // Render collapsed view (combobox)
+  if (viewState === "collapsed") {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <CollapsedView onSelectConversation={handleSelectConversation} onNewChat={handleNewChat} />
+      </div>
+    );
+  }
+
+  // Render expanded view (full chat)
+  if (viewState === "expanded") {
+    return (
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.85 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          className="w-full h-full flex items-center justify-center p-4"
+        >
+          <div className="relative w-full h-[600px] flex flex-col bg-background-secondary rounded-2xl overflow-hidden app-drag">
+            {/* Open in Console Button */}
+            <button
+              onClick={() => {
+                if (conversationId) {
+                  console.log("[Conversation] Opening in console:", conversationId);
+                  window.conversationAPI.openConversationInConsole(conversationId);
+                }
+              }}
+              className="absolute top-4 left-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag"
+              aria-label="Open in Console"
+            >
+              <ExternalLink size={16} className="text-white" />
+            </button>
+
+            {/* Close Button */}
+            <button
+              onClick={handleClose}
+              className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag"
+              aria-label="Close"
+            >
+              <X size={16} className="text-white" />
+            </button>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 pt-16 app-no-drag">
+              {messages.length === 0 && (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center text-gray-400">
+                    <p className="text-lg font-medium mb-2">Start a conversation</p>
+                    <p className="text-sm">Ask me anything by typing in the agent pill below</p>
+                  </div>
+                </div>
+              )}
+
+              {messages.map((message) => {
+                // Render user messages
+                if (message.role === "user") {
+                  return <UserMessage key={message.id} content={message.content} />;
+                }
+
+                // Render AI messages (assistant)
+                // AI messages can have BOTH text content AND a card
+                // Determine card title/subtitle/icon based on messageType
+                let title = "";
+                let subtitle = "";
+                let Icon: LucideIcon = Code;
+
+                if (message.messageType === "experts" && message.cardData) {
+                  const expertCount = message.cardData.experts?.length || 0;
+                  title = `${expertCount} Expert${expertCount > 1 ? "s" : ""} Available`;
+                  subtitle = "View Experts";
+                  Icon = Users;
+                } else if (message.messageType === "workflow" && message.cardData) {
+                  title = message.cardData.guide?.title || "Interactive Workflow";
+                  subtitle = "Start Guide";
+                  Icon = Workflow;
+                } else if (message.cardData) {
+                  // Fallback for unknown card types
+                  title = message.cardData.title || "Card";
+                  subtitle = message.cardData.subtitle || "Click to view";
+                }
+
+                return (
+                  <div key={message.id} className="space-y-3">
+                    {/* Always show AI text response if it exists */}
+                    {message.content && <AIMessage content={message.content} />}
+
+                    {/* Show card below the text if cardData exists */}
+                    {message.type === "card" && message.cardData && (
+                      <Card
+                        className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors"
+                        onClick={() => handleCardClick(message)}
+                      >
+                        <div className="text-left">
+                          <CardTitle className="text-base mb-1">{title}</CardTitle>
+                          <CardDescription>{subtitle}</CardDescription>
+                        </div>
+                        <div className="w-12 h-12 bg-[#30303e] rounded-lg flex items-center justify-center flex-shrink-0 ml-4">
+                          <Icon size={24} className="text-primary-foreground" />
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
+  // Hidden state - render nothing
+  return null;
+}
+
+export default App;
