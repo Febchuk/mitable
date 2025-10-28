@@ -38,6 +38,7 @@ export const IPC_CHANNELS = {
   WINDOW_HIDE: "window-hide",
   WINDOW_TOGGLE: "window-toggle",
   SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
+  CONSOLE_MINIMIZE: "console-minimize", // Console → Main (minimize console window)
 
   // Agent window
   AGENT_TOGGLE: "agent-toggle",

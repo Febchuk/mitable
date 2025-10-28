@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowUp, ExternalLink, Workflow, Users, Camera } from "lucide-react";
-import { useConversations, useSendMessage } from "@/console/src/hooks/queries/chats";
+import { useConversationMessages, useSendMessage } from "@/console/src/hooks/queries/chats";
 import UserMessage from "../../../../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../../../../components/domain/messages/AIMessage";
 import WorkflowCard from "../../../../../../components/domain/messages/WorkflowCard";
@@ -10,8 +10,7 @@ import { Button } from "@/components/ui/button";
 export default function ChatDetail() {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
-  const { data } = useConversations();
-  const chats = data?.conversations || [];
+  const { data: messages, isLoading: messagesLoading } = useConversationMessages(chatId);
   const [inputValue, setInputValue] = useState("");
   const [streamingContent, setStreamingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -42,14 +41,12 @@ export default function ChatDetail() {
     hasCaptureMethod: typeof window !== "undefined" && !!window.consoleAPI?.captureScreenshot,
   });
 
-  const chat = chats.find((c) => c.id === chatId);
-
   // Auto-scroll to bottom when messages change or streaming content updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chat?.messages, streamingContent]);
+  }, [messages, streamingContent]);
 
-  if (!chat) {
+  if (messagesLoading) {
     return (
       <div className="p-8">
         <button
@@ -59,7 +56,22 @@ export default function ChatDetail() {
           <ArrowLeft size={16} />
           <span className="text-sm">Back to Chats</span>
         </button>
-        <p className="text-text-primary">Chat not found</p>
+        <p className="text-text-primary">Loading messages...</p>
+      </div>
+    );
+  }
+
+  if (!messages || messages.length === 0) {
+    return (
+      <div className="p-8">
+        <button
+          onClick={() => navigate("/chats")}
+          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-4"
+        >
+          <ArrowLeft size={16} />
+          <span className="text-sm">Back to Chats</span>
+        </button>
+        <p className="text-text-primary">No messages found</p>
       </div>
     );
   }
@@ -147,8 +159,11 @@ export default function ChatDetail() {
               variant="ghost"
               className="gap-2 text-text-secondary hover:text-white hover:bg-primary rounded-full px-4 py-2 h-auto"
               onClick={() => {
-                // TODO: Implement agent pill integration
-                console.log("Launch in Pill clicked");
+                if (chatId) {
+                  console.log("Launch in Pill clicked, sending conversation:", chatId);
+                  window.consoleAPI.sendToAgent(chatId);
+                  window.consoleAPI.minimizeWindow();
+                }
               }}
             >
               <ExternalLink size={14} />
@@ -158,14 +173,14 @@ export default function ChatDetail() {
         </div>
 
         <div>
-          <h1 className="text-4xl font-bold text-text-primary">{chat.title}</h1>
+          <h1 className="text-4xl font-bold text-text-primary">Conversation</h1>
         </div>
       </div>
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto app-no-drag custom-scrollbar">
         <div className="max-w-4xl mx-auto px-8 py-4">
-          {chat.messages.map((message) => {
+          {messages.map((message) => {
             // Render workflow or experts cards
             if (
               (message.messageType === "workflow" || message.messageType === "experts") &&

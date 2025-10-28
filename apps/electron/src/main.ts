@@ -523,6 +523,13 @@ function setupIPC() {
     }
   });
 
+  // Minimize console window
+  ipcMain.on(IPC_CHANNELS.CONSOLE_MINIMIZE, () => {
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.minimize();
+    }
+  });
+
   // Guide system
   ipcMain.on(IPC_CHANNELS.GUIDE_START, (_event, data) => {
     // Show and position overlay window
