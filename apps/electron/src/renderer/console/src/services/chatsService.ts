@@ -225,7 +225,7 @@ export async function sendStreamingMessage(
       callbacks.onChunk?.(isLast ? word : word + " ");
 
       // Delay between words for typing effect - slowed down for Groq's speed 😎
-      await new Promise((resolve) => setTimeout(resolve, 60));
+      await new Promise((resolve) => setTimeout(resolve, 30));
     }
 
     // Signal completion

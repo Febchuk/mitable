@@ -266,7 +266,7 @@ export async function sendMessageStream(
       callbacks.onChunk?.(isLast ? word : word + " ");
 
       // Delay between words for typing effect
-      await new Promise((resolve) => setTimeout(resolve, 60));
+      await new Promise((resolve) => setTimeout(resolve, 30));
     }
 
     console.log("[API] ✅ Streaming complete, calling onComplete");
