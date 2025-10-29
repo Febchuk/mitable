@@ -109,7 +109,7 @@ function App() {
     console.log("========================================");
     console.log("[Agent] SUBMIT STARTED - Message:", message);
     console.log("========================================");
-    
+
     // Ensure we have a conversation ID
     let convId: string;
     try {
@@ -148,7 +148,7 @@ function App() {
       userMessage: message,
       hasScreenshot: !!screenshot,
     });
-    
+
     window.agentAPI.sendMessageToConversation(
       {
         message,
@@ -157,7 +157,7 @@ function App() {
       },
       screenshot
     );
-    
+
     console.log("[Agent] ✅ Message forwarded successfully");
     console.log("========================================");
   };
