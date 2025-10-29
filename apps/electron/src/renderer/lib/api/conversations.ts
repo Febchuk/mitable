@@ -71,7 +71,7 @@ export async function createConversation(
   initialMessage?: string
 ): Promise<Conversation> {
   console.log("[API] Creating conversation:", { title, initialMessage });
-  
+
   const headers = await getAuthHeaders();
   console.log("[API] Auth headers obtained");
 
@@ -158,7 +158,7 @@ export async function sendMessageStream(
     contentLength: content.length,
     hasScreenshot: !!screenshot,
   });
-  
+
   const headers = await getAuthHeaders();
   console.log("[API] Auth headers obtained for streaming");
 
@@ -203,11 +203,12 @@ export async function sendMessageStream(
   let windowTriggerData: { window: "nudge" | "guide"; data: any } | undefined;
 
   try {
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       const { done, value } = await reader.read();
-      
+
       if (done) break;
-      
+
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
@@ -219,7 +220,7 @@ export async function sendMessageStream(
 
           try {
             const chunk: StreamChunk = JSON.parse(data);
-            
+
             // Accumulate content from backend
             if (chunk.type === "chunk" && chunk.content) {
               fullContent += chunk.content;
@@ -256,23 +257,22 @@ export async function sendMessageStream(
 
     // Now simulate frontend streaming word-by-word
     const words = fullContent.split(" ");
-    
+
     for (let i = 0; i < words.length; i++) {
       const word = words[i];
       const isLast = i === words.length - 1;
-      
+
       // Add word with space (except for last word)
       callbacks.onChunk?.(isLast ? word : word + " ");
-      
+
       // Delay between words for typing effect
-      await new Promise(resolve => setTimeout(resolve, 60));
+      await new Promise((resolve) => setTimeout(resolve, 30));
     }
 
     console.log("[API] ✅ Streaming complete, calling onComplete");
-    
+
     // Signal completion
     callbacks.onComplete?.(fullContent, messageId, messageType, cardData, windowTriggerData);
-    
   } catch (error) {
     console.error("Stream reading error:", error);
     callbacks.onError?.(error instanceof Error ? error.message : "Stream reading error");

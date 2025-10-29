@@ -150,14 +150,17 @@ export async function sendStreamingMessage(
     }
 
     // Fetch the SSE stream from backend
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/conversations/${conversationId}/messages/stream`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -173,11 +176,12 @@ export async function sendStreamingMessage(
     let buffer = "";
     let fullContent = "";
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       const { done, value } = await reader.read();
-      
+
       if (done) break;
-      
+
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
@@ -189,7 +193,7 @@ export async function sendStreamingMessage(
 
           try {
             const chunk: StreamChunk = JSON.parse(data);
-            
+
             // Accumulate content from backend
             if (chunk.type === "chunk" && chunk.content) {
               fullContent += chunk.content;
@@ -212,21 +216,20 @@ export async function sendStreamingMessage(
 
     // Now simulate frontend streaming word-by-word
     const words = fullContent.split(" ");
-    
+
     for (let i = 0; i < words.length; i++) {
       const word = words[i];
       const isLast = i === words.length - 1;
-      
+
       // Add word with space (except for last word)
       callbacks.onChunk?.(isLast ? word : word + " ");
-      
+
       // Delay between words for typing effect - slowed down for Groq's speed 😎
-      await new Promise(resolve => setTimeout(resolve, 60));
+      await new Promise((resolve) => setTimeout(resolve, 30));
     }
 
     // Signal completion
     callbacks.onComplete?.(fullContent);
-    
   } catch (error) {
     console.error("Message send error:", error);
     callbacks.onError?.(error instanceof Error ? error.message : "Failed to send message");
