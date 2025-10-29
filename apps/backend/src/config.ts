@@ -70,6 +70,11 @@ export const config = {
     keyPath: (process.env.GOOGLE_CLOUD_KEY_PATH || "").trim(),
   },
 
+  // Feature Flags
+  features: {
+    piiRedaction: process.env.ENABLE_PII_REDACTION === "true",
+  },
+
   // Security
   jwtSecret: process.env.JWT_SECRET || "",
 };
@@ -88,9 +93,8 @@ export function validateConfig() {
     { key: "SLACK_CLIENT_SECRET", value: config.slack.clientSecret },
     { key: "NOTION_CLIENT_ID", value: config.notion.clientId },
     { key: "NOTION_CLIENT_SECRET", value: config.notion.clientSecret },
-    { key: "GOOGLE_CLOUD_PROJECT_ID", value: config.googleCloud.projectId },
-    { key: "GOOGLE_CLOUD_KEY_PATH", value: config.googleCloud.keyPath },
     { key: "JWT_SECRET", value: config.jwtSecret },
+    // Google Cloud credentials are optional - only required when PII redaction is enabled
   ];
 
   const missing = required.filter((item) => !item.value);

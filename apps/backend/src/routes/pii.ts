@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth";
+import { config } from "../config.js";
 import {
   piiRedactionService,
   type PIIRedactionRequest,
@@ -80,6 +81,20 @@ router.post("/redact", requireAuth, async (req: Request, res: Response): Promise
       res.status(400).json({
         success: false,
         error: "Invalid screenshot format: must be base64 or data URL",
+      });
+      return;
+    }
+
+    // Guard #1: Check if PII redaction feature is enabled
+    if (!config.features.piiRedaction) {
+      console.log("[PII] Feature disabled, returning original screenshot");
+      res.json({
+        success: true,
+        redactedScreenshot: screenshot, // Return original, unredacted
+        detectionTime: 0,
+        piiCount: 0,
+        cached: false,
+        disabled: true, // Signal that feature is disabled
       });
       return;
     }
