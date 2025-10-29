@@ -25,7 +25,8 @@ export default function ChatDetail() {
       setStreamingContent((prev) => prev + chunk);
     },
     onComplete: (_fullContent: string) => {
-      setStreamingContent("");
+      // Don't clear streaming content immediately - let it stay visible
+      // until the query refetches and the new message appears
       setIsStreaming(false);
     },
     onError: (error: string) => {
@@ -38,6 +39,17 @@ export default function ChatDetail() {
     captureScreenshot: true,
   });
 
+  // Clear streaming content once new messages load (prevents flicker)
+  useEffect(() => {
+    if (!isStreaming && streamingContent && messages && messages.length > 0) {
+      // Wait a tiny bit for the UI to render the new message
+      const timer = setTimeout(() => {
+        setStreamingContent("");
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isStreaming, streamingContent, messages]);
+
   console.log("[ChatDetail] Component loaded", {
     hasSendMutation: !!sendMessageMutation,
     captureScreenshotEnabled: true,
@@ -47,8 +59,20 @@ export default function ChatDetail() {
 
   // Auto-scroll to bottom when messages change or streaming content updates
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent]);
+    if (messagesEndRef.current) {
+      // Use smooth scroll for message changes, but instant for streaming to keep up
+      const behavior = isStreaming ? "auto" : "smooth";
+      messagesEndRef.current.scrollIntoView({ behavior, block: "end" });
+    }
+  }, [messages, streamingContent, isStreaming]);
+
+  // Additional scroll trigger specifically for streaming chunks
+  useEffect(() => {
+    if (isStreaming && streamingContent) {
+      // Scroll to bottom as content streams in
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    }
+  }, [streamingContent, isStreaming]);
 
   if (messagesLoading) {
     return (
@@ -246,7 +270,7 @@ export default function ChatDetail() {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto app-no-drag custom-scrollbar">
-        <div className="max-w-4xl mx-auto px-8 py-4">
+        <div className="max-w-4xl mx-auto px-8 py-4 pb-20">
           {messages.map((message) => {
             // Render workflow messages with rich details
             if (message.messageType === "workflow" && message.cardData) {

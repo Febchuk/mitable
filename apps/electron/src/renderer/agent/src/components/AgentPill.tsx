@@ -10,12 +10,17 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
   const [inputMode, setInputMode] = useState<"text" | "audio">("text");
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [lastSent, setLastSent] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputMode === "text" && inputValue.trim()) {
+      console.log("🔵 [AgentPill] Submitting message:", inputValue);
       onSubmit(inputValue);
       setInputValue("");
+      console.log("🔵 [AgentPill] Input cleared, message sent");
+    } else {
+      console.log("🔴 [AgentPill] Submit blocked - inputMode:", inputMode, "hasValue:", !!inputValue.trim());
     }
   };
 
@@ -72,7 +77,7 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Ask me anything"
-            className="flex-1 bg-transparent text-text-primary placeholder-text-tertiary outline-none text-sm"
+            className="flex-1 bg-transparent text-text-primary placeholder-text-tertiary outline-none text-[15px]"
           />
         </form>
       )}
