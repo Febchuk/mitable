@@ -274,14 +274,20 @@ describe("LLMService", () => {
         );
       });
 
-      it("should include original error message in thrown error", async () => {
-        const mockGenerateContent = jest.fn<any>().mockRejectedValue(new Error("Network timeout"));
+      it("should include original error in cause chain", async () => {
+        const originalError = new Error("Network timeout");
+        const mockGenerateContent = jest.fn<any>().mockRejectedValue(originalError);
 
         (llmService as any).model.generateContent = mockGenerateContent;
 
-        await expect(llmService.extractTasksFromNotionBlocks(sampleNotionBlocks)).rejects.toThrow(
-          "Network timeout"
-        );
+        try {
+          await llmService.extractTasksFromNotionBlocks(sampleNotionBlocks);
+          fail("Should have thrown an error");
+        } catch (error: any) {
+          expect(error.message).toBe("Failed to process Notion content with AI");
+          expect(error.cause).toBe(originalError);
+          expect(error.cause.message).toBe("Network timeout");
+        }
       });
     });
 
