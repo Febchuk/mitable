@@ -201,32 +201,23 @@ NOW EXTRACT TASKS FROM THE NOTION BLOCKS:`;
 
       return validatedTasks;
     } catch (error) {
-      console.error("\n❌ Error in LLM extraction:");
-
       // Handle Zod validation errors
       if (error instanceof z.ZodError) {
-        console.error("Schema validation failed:", JSON.stringify(error.errors, null, 2));
-        throw new Error("AI returned data that doesn't match database schema. Please try again.");
+        throw new Error("AI returned data that doesn't match database schema. Please try again.", {
+          cause: error,
+        });
       }
 
       // Handle JSON parsing errors
       if (error instanceof SyntaxError) {
-        console.error("Failed to parse AI response as JSON:", error.message);
         throw new Error(
-          "AI returned invalid JSON format. Please try again or simplify your Notion page."
+          "AI returned invalid JSON format. Please try again or simplify your Notion page.",
+          { cause: error }
         );
       }
 
       // Handle other errors (API failures, network issues, etc.)
-      console.error("Failed to extract tasks from Notion blocks:");
-      console.error("Error type:", error?.constructor?.name);
-      console.error("Error message:", error instanceof Error ? error.message : String(error));
-      console.error("Full error:", error);
-
-      throw new Error(
-        "Failed to process Notion content with AI. " +
-          (error instanceof Error ? error.message : "Unknown error occurred")
-      );
+      throw new Error("Failed to process Notion content with AI", { cause: error });
     }
   }
 }

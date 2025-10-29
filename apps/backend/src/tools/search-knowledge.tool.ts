@@ -2,6 +2,7 @@ import { BaseTool, ToolContext, ToolResult, ToolParameters } from "./base.tool";
 import { searchService } from "../services/search.service";
 import { intentService } from "../services/intent.service";
 import { trustRankingService } from "../services/trust-ranking.service";
+import { tokenCounter, MAX_CONTEXT_TOKENS } from "../utils/token-counter";
 
 /**
  * SearchKnowledgeTool
@@ -264,27 +265,67 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
         }
       }
 
-      // Step 9: Join all context into a single string
-      const contextText = contextParts.join("\n\n");
+      // Step 9: Apply token limiting to prevent exceeding context window
+      // Join and check total tokens
+      let contextText = contextParts.join("\n\n");
+      let finalSources = sources;
+      let truncatedCount = 0;
 
-      console.log(`[SearchKnowledgeTool] Returning ${sources.length} sources`);
+      const totalTokens = tokenCounter.countTokens(contextText);
+
+      if (totalTokens > MAX_CONTEXT_TOKENS) {
+        console.warn(
+          `[SearchKnowledgeTool] Context exceeds token limit: ${totalTokens} > ${MAX_CONTEXT_TOKENS}. Truncating...`
+        );
+
+        // Truncate by removing results from the end until we fit
+        const currentContextParts = [...contextParts];
+        const currentSources = [...sources];
+
+        while (currentContextParts.length > 0) {
+          const testContext = currentContextParts.join("\n\n");
+          const testTokens = tokenCounter.countTokens(testContext);
+
+          if (testTokens <= MAX_CONTEXT_TOKENS) {
+            contextText = testContext;
+            finalSources = currentSources;
+            truncatedCount = results.length - currentContextParts.length;
+            break;
+          }
+
+          // Remove last item
+          currentContextParts.pop();
+          currentSources.pop();
+        }
+
+        console.log(
+          `[SearchKnowledgeTool] Truncated to ${currentContextParts.length} results (removed ${truncatedCount}), final tokens: ${tokenCounter.countTokens(contextText)}`
+        );
+      }
+
+      console.log(
+        `[SearchKnowledgeTool] Returning ${finalSources.length} sources (${totalTokens} tokens)`
+      );
 
       // Step 10: Return formatted result with sources for AI to cite
       // Format sources as a list at the end for AI to reference
-      const sourcesText = sources.map((s, i) => `${i + 1}. ${s.title} - ${s.url}`).join("\n");
+      const sourcesText = finalSources.map((s, i) => `${i + 1}. ${s.title} - ${s.url}`).join("\n");
 
       const contentWithSources = `${contextText}\n\n---\nAvailable sources to cite:\n${sourcesText}`;
 
       console.log("[SearchKnowledgeTool] Success - returning knowledge:", {
         responseLength: contentWithSources.length,
-        sourcesCount: sources.length,
-        sourceNames: sources.map((s) => s.title),
+        sourcesCount: finalSources.length,
+        sourceNames: finalSources.map((s) => s.title),
+        tokenCount: tokenCounter.countTokens(contentWithSources),
+        truncated: truncatedCount > 0,
+        truncatedCount,
       });
 
       return {
         messageType: "text",
         content: contentWithSources,
-        sources: sources,
+        sources: finalSources,
         streamable: true,
       };
     } catch (error) {
