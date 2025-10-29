@@ -8,8 +8,6 @@ const IPC_CHANNELS = {
   GUIDE_COMPLETE: "guide-complete",
   GUIDE_CANCEL: "guide-cancel",
   SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
-  CAPTURE_SCREENSHOT: "capture-screenshot",
-  PII_DETECTION_START: "pii:detection:start",
 } as const;
 
 contextBridge.exposeInMainWorld("guideAPI", {
@@ -30,16 +28,4 @@ contextBridge.exposeInMainWorld("guideAPI", {
   cancel: () => ipcRenderer.send(IPC_CHANNELS.GUIDE_CANCEL),
   setIgnoreMouseEvents: (ignore: boolean) =>
     ipcRenderer.send(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, ignore),
-});
-
-// Expose PII redaction API
-contextBridge.exposeInMainWorld("piiAPI", {
-  redactScreenshot: (screenshot: string) =>
-    ipcRenderer.invoke(IPC_CHANNELS.PII_DETECTION_START, screenshot),
-});
-
-// Expose screenshot capture API (if needed by guide)
-contextBridge.exposeInMainWorld("captureAPI", {
-  captureScreen: (options?: unknown) =>
-    ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT, options),
 });
