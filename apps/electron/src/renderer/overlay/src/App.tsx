@@ -77,20 +77,30 @@ function App() {
   }, []);
 
   if (!guideData) {
-    return <div className="w-full h-full pointer-events-none" />;
+    return (
+      <div className="overlay-window-container visible w-full h-full">
+        <div className="w-full h-full pointer-events-none" />
+      </div>
+    );
   }
 
   const currentStep = guideData.steps[guideData.currentStep];
 
   if (!currentStep?.targetElement) {
-    return <div className="w-full h-full pointer-events-none" />;
+    return (
+      <div className="overlay-window-container visible w-full h-full">
+        <div className="w-full h-full pointer-events-none" />
+      </div>
+    );
   }
 
   return (
-    <div className="w-full h-full pointer-events-none">
-      <AnimatePresence mode="wait">
-        <HighlightOverlay key={currentStep.id} step={currentStep} />
-      </AnimatePresence>
+    <div className="overlay-window-container visible w-full h-full">
+      <div className="w-full h-full pointer-events-none">
+        <AnimatePresence mode="wait">
+          <HighlightOverlay key={currentStep.id} step={currentStep} />
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

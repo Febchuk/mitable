@@ -10,6 +10,7 @@ let consoleWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let guideWindow: BrowserWindow | null = null;
 let nudgeWindow: BrowserWindow | null = null;
+let statusWindow: BrowserWindow | null = null;
 
 // Auth token storage (shared across all windows)
 const authTokens: {
@@ -128,6 +129,7 @@ function createConversationWindow() {
     resizable: false,
     skipTaskbar: true,
     show: false,
+    parent: agentWindow, // Child of agent - hides when agent hides
     modal: false, // Non-modal so pill remains interactive
     webPreferences: {
       preload: join(__dirname, "../preload/conversation.cjs"),
@@ -258,6 +260,7 @@ function createOverlayWindow() {
     movable: false,
     focusable: false,
     show: false,
+    parent: guideWindow, // Child of guide - hides when guide hides
     modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/overlay.cjs"),
@@ -292,6 +295,7 @@ function createGuideWindow() {
     transparent: true,
     alwaysOnTop: true,
     show: false,
+    parent: agentWindow, // Child of agent - hides when agent hides
     modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/guide.cjs"),
@@ -332,6 +336,7 @@ function createNudgeWindow() {
     transparent: true,
     alwaysOnTop: true,
     show: false,
+    parent: agentWindow, // Child of agent - hides when agent hides
     modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
       preload: join(__dirname, "../preload/nudge.cjs"),
@@ -348,6 +353,52 @@ function createNudgeWindow() {
 
   nudgeWindow.on("closed", () => {
     nudgeWindow = null;
+  });
+}
+
+function createStatusWindow() {
+  // Get screen dimensions for top-center positioning
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth } = primaryDisplay.bounds;
+  const windowWidth = 300;
+  const windowHeight = 60;
+  const topMargin = 20;
+
+  statusWindow = new BrowserWindow({
+    width: windowWidth,
+    height: windowHeight,
+    x: Math.floor((screenWidth - windowWidth) / 2), // Center horizontally
+    y: topMargin, // Position at top with margin
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    show: false,
+    focusable: false, // Prevent focus stealing
+    webPreferences: {
+      preload: join(__dirname, "../preload/status.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top behavior (highest level for visibility)
+  if (process.platform === "darwin") {
+    statusWindow.setAlwaysOnTop(true, "screen-saver");
+    statusWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    statusWindow.setAlwaysOnTop(true, "screen-saver", 1);
+  }
+
+  if (!app.isPackaged) {
+    statusWindow.loadURL("http://localhost:5173/status/index.html");
+  } else {
+    statusWindow.loadFile(join(__dirname, "../renderer/status.html"));
+  }
+
+  statusWindow.on("closed", () => {
+    statusWindow = null;
   });
 }
 
@@ -573,6 +624,55 @@ function setupIPC() {
     if (consoleWindow && !consoleWindow.isDestroyed()) {
       consoleWindow.minimize();
     }
+  });
+
+  // Status window show (screenshot capture indicator)
+  ipcMain.on(IPC_CHANNELS.STATUS_SHOW, () => {
+    if (!statusWindow || statusWindow.isDestroyed()) {
+      createStatusWindow();
+    }
+    if (statusWindow && !statusWindow.isDestroyed()) {
+      statusWindow.show();
+    }
+  });
+
+  // Status window hide
+  ipcMain.on(IPC_CHANNELS.STATUS_HIDE, () => {
+    if (statusWindow && !statusWindow.isDestroyed()) {
+      statusWindow.hide();
+    }
+  });
+
+  // Temporarily hide agent for screenshot (children hide automatically via parent-child)
+  ipcMain.on(IPC_CHANNELS.AGENT_HIDE_TEMP, () => {
+    console.log(
+      "[Screenshot] Hiding agent window (all children hide automatically via parent-child)"
+    );
+
+    // Hide agent - this automatically hides:
+    // - Conversation (child of Agent)
+    // - Guide (child of Agent)
+    //   - Overlay (child of Guide)
+    // - Nudge (child of Agent)
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      agentWindow.hide();
+    }
+
+    console.log("[Screenshot] All Mitable windows hidden");
+  });
+
+  // Restore agent after screenshot (children restore automatically via parent-child)
+  ipcMain.on(IPC_CHANNELS.AGENT_RESTORE, () => {
+    console.log(
+      "[Screenshot] Restoring agent window (all children restore automatically via parent-child)"
+    );
+
+    // Show agent - this automatically restores all children that were visible
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      agentWindow.show();
+    }
+
+    console.log("[Screenshot] All windows restored");
   });
 
   // Guide system
@@ -982,6 +1082,7 @@ app.whenReady().then(() => {
   createGuideWindow(); // Create guide as child of agent
   createOverlayWindow(); // Create overlay as child of guide (must be after guide)
   createNudgeWindow(); // Create nudge as child of agent
+  createStatusWindow(); // Create status window for screenshot capture indicator
 
   setupIPC();
   registerGlobalShortcuts();

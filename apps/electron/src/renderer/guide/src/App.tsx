@@ -85,9 +85,11 @@ function App() {
 
   if (!guideData) {
     return (
-      <div className="flex items-center justify-center h-full bg-transparent">
-        <div className="w-[700px] rounded-2xl bg-[#2C2C2C] text-white overflow-hidden shadow-lg p-8 app-drag">
-          <div className="text-center text-gray-400 text-lg">Waiting for guide data...</div>
+      <div className="guide-window-container visible w-full h-full">
+        <div className="flex items-center justify-center h-full bg-transparent">
+          <div className="w-[700px] rounded-2xl bg-[#2C2C2C] text-white overflow-hidden shadow-lg p-8 app-drag">
+            <div className="text-center text-gray-400 text-lg">Waiting for guide data...</div>
+          </div>
         </div>
       </div>
     );
@@ -100,53 +102,55 @@ function App() {
   const isFirstStep = currentStepNumber === 1;
 
   return (
-    <div className="flex items-center justify-center h-full bg-transparent">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentStepNumber}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-          className="w-[700px] rounded-2xl bg-[#2C2C2C] text-white overflow-hidden shadow-lg app-drag"
-        >
-          {/* Prompt Section */}
-          <div className="p-8 text-center text-2xl font-medium app-drag">
-            {currentStep?.description || "Loading..."}
-          </div>
-
-          {/* Footer Section */}
-          <div className="flex items-center justify-between bg-[#1A1A1A] p-6 app-drag">
-            <button
-              onClick={handlePrevStep}
-              disabled={isFirstStep}
-              className="flex items-center justify-center w-12 h-12 bg-[#2F2F2F] rounded-full hover:bg-[#3A3A3A] transition disabled:opacity-30 disabled:cursor-not-allowed app-no-drag"
-            >
-              <ChevronLeft size={24} />
-            </button>
-
-            <div className="text-gray-400 text-lg">
-              {currentStepNumber} of {totalSteps}
+    <div className="guide-window-container visible w-full h-full">
+      <div className="flex items-center justify-center h-full bg-transparent">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentStepNumber}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="w-[700px] rounded-2xl bg-[#2C2C2C] text-white overflow-hidden shadow-lg app-drag"
+          >
+            {/* Prompt Section */}
+            <div className="p-8 text-center text-2xl font-medium app-drag">
+              {currentStep?.description || "Loading..."}
             </div>
 
-            {isLastStep ? (
+            {/* Footer Section */}
+            <div className="flex items-center justify-between bg-[#1A1A1A] p-6 app-drag">
               <button
-                onClick={handleNextStep}
-                className="flex items-center justify-center w-12 h-12 bg-green-500 rounded-full hover:bg-green-600 transition app-no-drag"
+                onClick={handlePrevStep}
+                disabled={isFirstStep}
+                className="flex items-center justify-center w-12 h-12 bg-[#2F2F2F] rounded-full hover:bg-[#3A3A3A] transition disabled:opacity-30 disabled:cursor-not-allowed app-no-drag"
               >
-                <Check size={24} />
+                <ChevronLeft size={24} />
               </button>
-            ) : (
-              <button
-                onClick={handleNextStep}
-                className="flex items-center justify-center w-12 h-12 bg-[#2F2F2F] rounded-full hover:bg-[#3A3A3A] transition app-no-drag"
-              >
-                <ChevronRight size={24} />
-              </button>
-            )}
-          </div>
-        </motion.div>
-      </AnimatePresence>
+
+              <div className="text-gray-400 text-lg">
+                {currentStepNumber} of {totalSteps}
+              </div>
+
+              {isLastStep ? (
+                <button
+                  onClick={handleNextStep}
+                  className="flex items-center justify-center w-12 h-12 bg-green-500 rounded-full hover:bg-green-600 transition app-no-drag"
+                >
+                  <Check size={24} />
+                </button>
+              ) : (
+                <button
+                  onClick={handleNextStep}
+                  className="flex items-center justify-center w-12 h-12 bg-[#2F2F2F] rounded-full hover:bg-[#3A3A3A] transition app-no-drag"
+                >
+                  <ChevronRight size={24} />
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

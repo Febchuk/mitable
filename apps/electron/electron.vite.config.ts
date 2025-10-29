@@ -24,6 +24,7 @@ export default defineConfig({
           overlay: resolve(__dirname, "src/preload/overlay.ts"),
           guide: resolve(__dirname, "src/preload/guide.ts"),
           nudge: resolve(__dirname, "src/preload/nudge.ts"),
+          status: resolve(__dirname, "src/preload/status.ts"),
         },
         output: {
           format: "cjs",
@@ -49,6 +50,7 @@ export default defineConfig({
           overlay: resolve(__dirname, "src/renderer/overlay/index.html"),
           guide: resolve(__dirname, "src/renderer/guide/index.html"),
           nudge: resolve(__dirname, "src/renderer/nudge/index.html"),
+          status: resolve(__dirname, "src/renderer/status/index.html"),
         },
       },
     },

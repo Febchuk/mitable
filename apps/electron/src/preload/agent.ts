@@ -7,6 +7,8 @@ const IPC_CHANNELS = {
   SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
   AGENT_RESIZE: "agent-resize",
   AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step",
+  AGENT_HIDE_TEMP: "agent-hide-temp",
+  AGENT_RESTORE: "agent-restore",
   CONVERSATION_SHOW: "conversation-show",
   CONVERSATION_HIDE: "conversation-hide",
   CONVERSATION_TOGGLE: "conversation-toggle", // NEW: Toggle collapsed/hidden state
@@ -15,6 +17,8 @@ const IPC_CHANNELS = {
   NUDGE_SHOW: "nudge-show",
   GUIDE_START: "guide-start",
   CAPTURE_SCREENSHOT: "capture-screenshot",
+  STATUS_SHOW: "status-show",
+  STATUS_HIDE: "status-hide",
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
 } as const;
@@ -62,6 +66,14 @@ contextBridge.exposeInMainWorld("agentAPI", {
     console.log("[Agent Preload] captureScreenshot() called from renderer");
     return ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
   },
+
+  // Screenshot animation helpers - hide/restore agent window
+  hideTemporary: () => ipcRenderer.send(IPC_CHANNELS.AGENT_HIDE_TEMP),
+  restore: () => ipcRenderer.send(IPC_CHANNELS.AGENT_RESTORE),
+
+  // Status window control - "Looking at your screen" indicator
+  showStatus: () => ipcRenderer.send(IPC_CHANNELS.STATUS_SHOW),
+  hideStatus: () => ipcRenderer.send(IPC_CHANNELS.STATUS_HIDE),
 
   // Auth management - Agent requests token from main process
   getAuthToken: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_TOKEN),

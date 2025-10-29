@@ -48,6 +48,17 @@ export const IPC_CHANNELS = {
   AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step", // Triggered when Guide "Done" button clicked
   AGENT_OPEN_CONVERSATION: "agent-open-conversation", // Console → Main (open specific conversation in agent)
   CONSOLE_OPEN_CHAT: "console-open-chat", // Agent/Conversation → Main (open conversation in console)
+  AGENT_HIDE_TEMP: "agent-hide-temp", // Temporarily hide Agent for screenshot (no state change)
+  AGENT_RESTORE: "agent-restore", // Restore Agent after screenshot
+
+  // Status window (screenshot capture indicator)
+  STATUS_SHOW: "status-show", // Main → Status (show "Looking at your screen" message)
+  STATUS_HIDE: "status-hide", // Main → Status (hide status message)
+
+  // Screenshot animation coordination
+  SCREENSHOT_START_ANIMATION: "screenshot-start-animation", // Main → All windows (start slide-out animation)
+  SCREENSHOT_ANIMATION_COMPLETE: "screenshot-animation-complete", // Window → Main (animation finished)
+  SCREENSHOT_RESTORE_ANIMATION: "screenshot-restore-animation", // Main → All windows (start slide-in animation)
 
   // Conversation window (parent-child with agent)
   CONVERSATION_SHOW: "conversation-show", // Agent → Main (show conversation window)
