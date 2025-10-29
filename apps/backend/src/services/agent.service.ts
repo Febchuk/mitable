@@ -160,13 +160,16 @@ When responding:
  * Agent Service
  *
  * The central orchestrator for the agentic chat system.
- * Manages tool registration, routing, and execution using OpenAI function calling.
+ * Manages tool registration, routing, and execution using function calling.
+ *
+ * Model: Groq GPT-OSS 120B (131K context, 500 TPS, ~20x cheaper than GPT-4)
+ * API: OpenAI-compatible (seamless migration from OpenAI)
  *
  * Responsibilities:
- * - Initialize and configure OpenAI client
+ * - Initialize and configure Groq client
  * - Register available tools (text response, knowledge search, expert finder, UI guidance)
- * - Convert conversation history to OpenAI message format
- * - Call OpenAI with function calling to let AI choose appropriate tool
+ * - Convert conversation history to message format
+ * - Call Groq with function calling to let AI choose appropriate tool
  * - Execute chosen tool with parsed arguments
  * - Stream responses back to client
  * - Handle errors and fallbacks
@@ -183,9 +186,9 @@ export class AgentService {
   private tools: Map<string, BaseTool> = new Map();
 
   constructor() {
-    // Initialize OpenAI client
-    this.openai = new OpenAI({
-      apiKey: config.openai.apiKey,
+    // Initialize Groq client for chat completions
+    this.groq = new Groq({
+      apiKey: config.groq.apiKey,
     });
 
     // Initialize Gemini client (for cost-effective text generation)
@@ -232,11 +235,11 @@ export class AgentService {
   }
 
   /**
-   * Convert conversation history to OpenAI message format
+   * Convert conversation history to Groq message format (OpenAI-compatible)
    */
-  private convertToOpenAIMessages(
+  private convertToGroqMessages(
     conversationHistory: Message[]
-  ): OpenAI.Chat.ChatCompletionMessageParam[] {
+  ): Groq.Chat.ChatCompletionMessageParam[] {
     return conversationHistory.map((msg) => {
       if (msg.role === "user") {
         return {
@@ -417,9 +420,9 @@ export class AgentService {
 **IMPORTANT TEMPORAL CONTEXT:**
 Today is ${dateStr}. When searching for or discussing information, prioritize recent content from the last few days/weeks over older content. If someone asks "what's the latest" or "this week", focus on the most recent timestamps in the search results.`;
 
-      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      const messages: Groq.Chat.ChatCompletionMessageParam[] = [
         { role: "system", content: systemPromptWithDate },
-        ...this.convertToOpenAIMessages(context.conversationHistory),
+        ...this.convertToGroqMessages(context.conversationHistory),
         { role: "user", content: userMessage },
       ];
 

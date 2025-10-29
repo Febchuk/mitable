@@ -89,8 +89,11 @@ export function useSendMessage(options?: SendMessageOptions) {
 
     // Optimistic update for user message
     onMutate: async ({ chatId, content }) => {
-      await queryClient.cancelQueries({ queryKey: ["conversations", user?.id] });
-      const previousConversations = queryClient.getQueryData(["conversations", user?.id]);
+      // Cancel any outgoing refetches for this conversation
+      await queryClient.cancelQueries({ queryKey: ["conversation-messages", chatId] });
+      
+      // Snapshot the previous value
+      const previousMessages = queryClient.getQueryData(["conversation-messages", chatId]);
 
       const userMessage: Message = {
         id: `temp-user-${Date.now()}`,
@@ -100,31 +103,26 @@ export function useSendMessage(options?: SendMessageOptions) {
         timestamp: new Date(),
       };
 
-      queryClient.setQueryData(["conversations", user?.id], (old: any) =>
-        old?.map((chat: any) => {
-          if (chat.id === chatId) {
-            return {
-              ...chat,
-              messages: [...chat.messages, userMessage],
-              lastMessage: userMessage.content,
-              timestamp: userMessage.timestamp,
-            };
-          }
-          return chat;
-        })
-      );
+      // Optimistically update the conversation messages
+      queryClient.setQueryData(["conversation-messages", chatId], (old: Message[] | undefined) => {
+        if (!old) return [userMessage];
+        return [...old, userMessage];
+      });
 
-      return { previousConversations, tempUserMessage: userMessage };
+      return { previousMessages, tempUserMessage: userMessage };
     },
 
-    onError: (_err, _variables, context) => {
-      if (context?.previousConversations) {
-        queryClient.setQueryData(["conversations", user?.id], context.previousConversations);
+    onError: (_err, variables, context) => {
+      // Rollback the optimistic update on error
+      if (context?.previousMessages) {
+        queryClient.setQueryData(["conversation-messages", variables.chatId], context.previousMessages);
       }
     },
 
-    onSettled: () => {
+    onSettled: (_data, _error, variables) => {
+      // Invalidate both the conversations list and the specific conversation messages
       queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["conversation-messages", variables.chatId] });
     },
   });
 }

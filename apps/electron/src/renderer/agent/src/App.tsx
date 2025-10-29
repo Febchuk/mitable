@@ -46,8 +46,7 @@ function App() {
 
   /**
    * Handle silent continuation for Guide "Next" button
-   * Forwards "Next" message to conversation window
-   * Screenshot capture will be handled by conversation window based on heuristics
+   * Forwards "Next" message to conversation window with screenshot
    */
   async function handleSilentContinuation() {
     if (!conversationId) {
@@ -57,8 +56,22 @@ function App() {
 
     console.log("[Agent] Starting silent continuation...");
 
+    // Capture screenshot
+    let screenshot: string | null = null;
+    try {
+      const result = await window.agentAPI.captureScreenshot();
+      console.log("[Agent] Screenshot captured for continuation:", {
+        hasScreenshot: !!result,
+        size: result?.dataUrl?.length || 0,
+      });
+      screenshot = result?.dataUrl || null;
+    } catch (error) {
+      console.error("[Agent] Screenshot capture failed:", error);
+      return;
+    }
+
     // Forward "Next" message to conversation window
-    // The conversation window will handle conditional screenshot capture
+    // The conversation window will handle the streaming and guide updates
     try {
       window.agentAPI.sendMessageToConversation(
         {
@@ -67,7 +80,7 @@ function App() {
           userMessage: "Next",
           silent: true, // Flag to indicate silent continuation (no user message display)
         },
-        null // No screenshot - let conversation window handle conditional capture
+        screenshot
       );
 
       console.log("[Agent] Silent continuation message forwarded to conversation window");
@@ -93,28 +106,60 @@ function App() {
   };
 
   const handleSubmit = async (message: string) => {
+    console.log("========================================");
+    console.log("[Agent] SUBMIT STARTED - Message:", message);
+    console.log("========================================");
+    
     // Ensure we have a conversation ID
     let convId: string;
     try {
+      console.log("[Agent] Ensuring conversation exists...");
       convId = await ensureConversation();
+      console.log("[Agent] ✅ Conversation ID:", convId);
     } catch (error) {
-      console.error("Failed to create conversation:", error);
+      console.error("[Agent] ❌ Failed to create conversation:", error);
       return;
     }
 
+    // Capture screenshot for visual guidance
+    console.log("[Agent] Attempting to capture screenshot for workflow...");
+    let screenshot: string | null = null;
+    try {
+      const result = await window.agentAPI.captureScreenshot();
+      console.log("[Agent] Screenshot capture result:", {
+        hasScreenshot: !!result,
+        size: result?.dataUrl?.length || 0,
+        metadata: result?.metadata,
+      });
+      screenshot = result?.dataUrl || null;
+    } catch (error) {
+      console.error("[Agent] Screenshot capture failed:", error);
+      // Continue without screenshot - backend will handle gracefully
+    }
+
     // Show conversation window
+    console.log("[Agent] Showing conversation window...");
     window.agentAPI.showConversation();
 
-    // Forward message to conversation window
-    // The conversation window will handle conditional screenshot capture based on heuristics
+    // Forward message to conversation window with all necessary data
+    console.log("[Agent] Forwarding message to conversation window:", {
+      message,
+      conversationId: convId,
+      userMessage: message,
+      hasScreenshot: !!screenshot,
+    });
+    
     window.agentAPI.sendMessageToConversation(
       {
         message,
         conversationId: convId,
         userMessage: message, // For display in conversation window
       },
-      null // No screenshot - let conversation window handle conditional capture
+      screenshot
     );
+    
+    console.log("[Agent] ✅ Message forwarded successfully");
+    console.log("========================================");
   };
 
   return (
