@@ -20,7 +20,6 @@
     "sync-slack": "tsx src/scripts/sync-slack.ts"
   },
   "dependencies": {
-    "@google-cloud/dlp": "^6.5.0",
     "@google/generative-ai": "^0.24.1",
     "@mitable/shared": "*",
     "@notionhq/client": "^5.2.1",
@@ -32,7 +31,6 @@
     "drizzle-orm": "^0.44.6",
     "drizzle-zod": "^0.8.3",
     "express": "^4.18.3",
-    "node-cache": "^5.1.2",
     "openai": "^6.3.0",
     "pg": "^8.13.1",
     "swagger-jsdoc": "^6.2.8",
