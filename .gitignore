@@ -28,6 +28,11 @@ out/
 .env.test.local
 .env.production.local
 
+# Google Cloud credentials (NEVER commit!)
+apps/backend/creds/
+creds/
+*.json
+
 # Logs
 logs
 *.log
