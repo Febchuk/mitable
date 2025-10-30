@@ -1,4 +1,9 @@
 import type { Message } from "../db/schema/conversations.schema";
+import type { SolutionObject, EmbeddingMatch, ExpertMatch } from "@mitable/shared";
+
+// ============================================================================
+// TOOL DEFINITION TYPES
+// ============================================================================
 
 /**
  * Tool parameter definition for OpenAI function calling
@@ -22,12 +27,17 @@ export interface ToolDefinition {
   };
 }
 
+// ============================================================================
+// CONTEXT TYPES
+// ============================================================================
+
 /**
  * Context provided to tools during execution
  */
 export interface ToolContext {
   conversationId: string;
   userId: string;
+  organizationId: string; // Added for multi-agent architecture
   conversationHistory: Message[];
   screenshot?: string; // Base64 encoded screenshot
   screenshotMetadata?: {
@@ -51,6 +61,20 @@ export interface ToolContext {
     selectedOption?: number; // Which option was selected from WorkflowOptions (1, 2, or 3)
     [key: string]: any; // Allow additional metadata fields
   };
+  workflowState?: SolutionObject; // Pre-loaded by orchestrator for workflow context
+}
+
+// ============================================================================
+// SUPPORTING TYPES
+// ============================================================================
+
+/**
+ * Source reference for knowledge-based responses
+ */
+export interface Source {
+  title: string;
+  url: string;
+  snippet: string;
 }
 
 /**
@@ -61,21 +85,72 @@ export interface WindowTrigger {
   data: Record<string, any>;
 }
 
+// ============================================================================
+// MESSAGE TYPES (Discriminated Union)
+// ============================================================================
+
 /**
- * Result returned by tool execution
+ * Base message interface with common fields
  */
-export interface ToolResult {
-  messageType: "text" | "workflow" | "experts";
+export interface BaseMessage {
   content: string;
-  cardData?: Record<string, any>;
-  sources?: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-  }>;
-  streamable: boolean; // Whether this result can be streamed
-  triggerWindow?: WindowTrigger; // Optional window trigger for UI coordination
+  streamable: boolean;
+  sources?: Source[];
+  triggerWindow?: WindowTrigger;
 }
+
+/**
+ * Text-only message (no workflow or expert data)
+ */
+export interface TextMessage extends BaseMessage {
+  messageType: "text";
+  cardData?: never; // Explicitly no cardData for text messages
+}
+
+/**
+ * Workflow message with step-by-step guidance state
+ */
+export interface WorkflowMessage extends BaseMessage {
+  messageType: "workflow";
+  cardData: {
+    // Full SolutionObject (from @mitable/shared)
+    solution: string;
+    supportingData: EmbeddingMatch[];
+    solutionExplanation: string;
+    supportingDataExplanation: string;
+    stepList: Array<{
+      stepNumber: number;
+      description: string;
+      status: "pending" | "current" | "completed";
+    }>;
+    currentStepIndex: number;
+    searchQuery: string;
+    adjustmentHistory: Array<{
+      timestamp: Date;
+      reason: string;
+      oldPlan: any[];
+      newPlan: any[];
+    }>;
+    // Workflow UI state
+    workflowActive: true;
+    workflowPhase: "initial_proposal" | "step_progression" | "custom_question";
+  };
+}
+
+/**
+ * Experts message with colleague recommendations
+ */
+export interface ExpertsMessage extends BaseMessage {
+  messageType: "experts";
+  cardData: {
+    experts: ExpertMatch[];
+  };
+}
+
+/**
+ * Result returned by tool execution (discriminated union)
+ */
+export type ToolResult = TextMessage | WorkflowMessage | ExpertsMessage;
 
 /**
  * Streaming chunk for real-time responses
