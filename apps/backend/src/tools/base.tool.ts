@@ -1,4 +1,10 @@
 import type { Message } from "../db/schema/conversations.schema";
+import type { SolutionObject, EmbeddingMatch, Step, AdjustmentRecord } from "@mitable/shared";
+import type { ExpertMatch } from "../services/expertMatching.service";
+
+// ============================================================================
+// TOOL DEFINITION TYPES
+// ============================================================================
 
 /**
  * Tool parameter definition for OpenAI function calling
@@ -22,12 +28,17 @@ export interface ToolDefinition {
   };
 }
 
+// ============================================================================
+// CONTEXT TYPES
+// ============================================================================
+
 /**
  * Context provided to tools during execution
  */
 export interface ToolContext {
   conversationId: string;
   userId: string;
+  organizationId: string; // Added for multi-agent architecture
   conversationHistory: Message[];
   screenshot?: string; // Base64 encoded screenshot
   screenshotMetadata?: {
@@ -45,6 +56,26 @@ export interface ToolContext {
     email: string;
     organizationId: string;
   };
+  metadata?: {
+    // Metadata from frontend UI interactions
+    workflowAction?: "progress_step" | "custom_question" | "exit_workflow";
+    selectedOption?: number; // Which option was selected from WorkflowOptions (1, 2, or 3)
+    [key: string]: any; // Allow additional metadata fields
+  };
+  workflowState?: SolutionObject; // Pre-loaded by orchestrator for workflow context
+}
+
+// ============================================================================
+// SUPPORTING TYPES
+// ============================================================================
+
+/**
+ * Source reference for knowledge-based responses
+ */
+export interface Source {
+  title: string;
+  url: string;
+  snippet: string;
 }
 
 /**
@@ -55,21 +86,77 @@ export interface WindowTrigger {
   data: Record<string, any>;
 }
 
+// ============================================================================
+// MESSAGE TYPES (Discriminated Union)
+// ============================================================================
+
 /**
- * Result returned by tool execution
+ * Base message interface with common fields
  */
-export interface ToolResult {
-  messageType: "text" | "workflow" | "experts";
+export interface BaseMessage {
   content: string;
-  cardData?: Record<string, any>;
-  sources?: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-  }>;
-  streamable: boolean; // Whether this result can be streamed
-  triggerWindow?: WindowTrigger; // Optional window trigger for UI coordination
+  streamable: boolean;
+  sources?: Source[];
+  triggerWindow?: WindowTrigger;
 }
+
+/**
+ * Text-only message (no workflow or expert data)
+ */
+export interface TextMessage extends BaseMessage {
+  messageType: "text";
+  cardData?: never; // Explicitly no cardData for text messages
+}
+
+/**
+ * Workflow phase types
+ */
+export type WorkflowPhase = "initial_proposal" | "step_progression" | "custom_question";
+
+/**
+ * Workflow message with step-by-step guidance state
+ */
+export interface WorkflowMessage extends BaseMessage {
+  messageType: "workflow";
+  cardData: {
+    // Full SolutionObject (from @mitable/shared)
+    solution: string;
+    supportingData: EmbeddingMatch[];
+    solutionExplanation: string;
+    supportingDataExplanation: string;
+    stepList: Step[];
+    currentStepIndex: number;
+    searchQuery: string;
+    adjustmentHistory: AdjustmentRecord[];
+    // Workflow UI state
+    workflowActive: true;
+    workflowPhase: WorkflowPhase;
+  };
+}
+
+/**
+ * Suggested nudge content generated from conversation
+ */
+export interface SuggestedNudge {
+  context: string; // 300-word summary of what user needs help with
+  question: string; // 1-2 sentence actionable question
+}
+
+/**
+ * Experts message with colleague recommendations
+ */
+export interface ExpertsMessage extends BaseMessage {
+  messageType: "experts";
+  cardData: {
+    experts: ExpertMatch[];
+    suggestedNudge?: SuggestedNudge; // Auto-generated when from conversation
+  };
+}
+
+/**
+ * Result returned by tool execution (discriminated union)
+ */
+export type ToolResult = TextMessage | WorkflowMessage | ExpertsMessage;
 
 /**
  * Streaming chunk for real-time responses

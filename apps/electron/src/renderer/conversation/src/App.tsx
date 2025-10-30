@@ -6,6 +6,9 @@ import AIMessage from "../../components/domain/messages/AIMessage";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { sendMessageStream } from "../../lib/api/conversations";
 import CollapsedView from "./components/CollapsedView";
+import WorkflowOptions, { WorkflowPhase } from "../../components/domain/workflow/WorkflowOptions";
+import StepList from "../../components/domain/workflow/StepList";
+import ExpertsCard from "./components/ExpertsCard";
 
 declare global {
   interface Window {
@@ -30,6 +33,30 @@ declare global {
       requestConversationList: () => void;
       onConversationList: (callback: (conversations: any[]) => void) => () => void;
       openConversationInConsole: (conversationId: string) => void;
+      openNudgeForm: (data: {
+        expert: {
+          id: string;
+          name: string;
+          email: string;
+          role: string;
+          department: string;
+          expertise: string[];
+        };
+        context: string;
+        question: string;
+        conversationId: string;
+      }) => void;
+      captureScreenshot: () => Promise<{
+        dataUrl: string;
+        metadata: {
+          width: number;
+          height: number;
+          originalWidth: number;
+          originalHeight: number;
+          captureMode: string;
+          timestamp: number;
+        };
+      } | null>;
     };
   }
 }
@@ -114,7 +141,7 @@ function App() {
           setCurrentConversationId(convId);
         }
 
-        // Add user message to UI
+        // Add user message to UI (for new user messages only)
         if (userMessage) {
           const userMsg: Message = {
             id: Date.now().toString(),
@@ -303,6 +330,153 @@ function App() {
     }
   };
 
+  const handleWorkflowOptionSelect = async (option: any) => {
+    if (!conversationId) {
+      console.error("[Conversation] No conversation ID available for workflow action");
+      return;
+    }
+
+    // Map option action to metadata and message
+    const { action, label } = option;
+
+    let metadata: any = {};
+    let message = "";
+
+    switch (action) {
+      case "progress_step":
+        metadata = {
+          workflowAction: "progress_step",
+          selectedOption: 1,
+        };
+        message = "Move on to next step";
+        break;
+
+      case "custom_question":
+      case "ask_questions":
+        metadata = {
+          workflowAction: "custom_question",
+          selectedOption: 2,
+        };
+        message = label; // The actual question text
+        break;
+
+      case "exit_workflow":
+        metadata = {
+          workflowAction: "exit_workflow",
+          selectedOption: 3,
+        };
+        message = "Exit workflow";
+        break;
+
+      case "confirm_start":
+        metadata = {
+          workflowAction: "progress_step",
+          selectedOption: 1,
+        };
+        message = "Yes, let's get started!";
+        break;
+
+      default:
+        message = label;
+    }
+
+    console.log("[Conversation] Workflow option selected:", { action, message, metadata });
+
+    // Add user message to UI
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: message,
+      type: "text",
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
+    // Create placeholder for streaming assistant message
+    const streamingMessageId = `streaming-${Date.now()}`;
+    streamingMessageIdRef.current = streamingMessageId;
+
+    const assistantMessage: Message = {
+      id: streamingMessageId,
+      role: "assistant",
+      content: "",
+      type: "text",
+    };
+
+    setMessages((prev) => [...prev, assistantMessage]);
+
+    // Capture screenshot for workflow actions (progress_step and custom_question)
+    let screenshot: string | null = null;
+    if (
+      option.action === "progress_step" ||
+      option.action === "custom_question" ||
+      option.action === "confirm_start"
+    ) {
+      console.log("[Conversation] Capturing screenshot for workflow action:", option.action);
+      const screenshotResult = await window.conversationAPI?.captureScreenshot?.();
+      if (screenshotResult) {
+        screenshot = screenshotResult.dataUrl;
+        console.log("[Conversation] Screenshot captured successfully");
+      } else {
+        console.warn("[Conversation] Screenshot capture failed");
+      }
+    }
+
+    // Stream the response with metadata
+    try {
+      await sendMessageStream(
+        conversationId,
+        message,
+        screenshot,
+        {
+          onChunk: (chunk) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
+              )
+            );
+          },
+          onComplete: (fullContent, messageId, messageType, cardData, windowTrigger) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === streamingMessageId
+                  ? {
+                      ...msg,
+                      id: messageId,
+                      content: fullContent,
+                      type: cardData ? "card" : "text",
+                      messageType,
+                      cardData,
+                      windowTrigger,
+                    }
+                  : msg
+              )
+            );
+            streamingMessageIdRef.current = null;
+          },
+          onError: (error) => {
+            console.error("Workflow streaming error:", error);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === streamingMessageId ? { ...msg, content: `Error: ${error}` } : msg
+              )
+            );
+            streamingMessageIdRef.current = null;
+          },
+          onWindowTrigger: (windowType, data) => {
+            if (windowType === "nudge") {
+              window.conversationAPI?.showNudge(data);
+            } else if (windowType === "guide") {
+              window.conversationAPI?.startGuide(data);
+            }
+          },
+        },
+        metadata // Pass metadata to the API
+      );
+    } catch (error) {
+      console.error("Failed to send workflow message:", error);
+    }
+  };
+
   // Render collapsed view (combobox)
   if (viewState === "collapsed") {
     return (
@@ -365,8 +539,16 @@ function App() {
                 }
 
                 // Render AI messages (assistant)
-                // AI messages can have BOTH text content AND a card
-                // Determine card title/subtitle/icon based on messageType
+                const isWorkflowMessage =
+                  message.messageType === "workflow" && message.cardData?.workflowActive;
+                const workflowPhase = message.cardData?.workflowPhase as WorkflowPhase | undefined;
+
+                // Determine if we should show step list based on phase
+                const shouldShowStepList =
+                  isWorkflowMessage && workflowPhase && workflowPhase !== "custom_question";
+                const shouldShowCheckboxes = workflowPhase === "step_progression";
+
+                // Determine card title/subtitle/icon for non-workflow cards
                 let title = "";
                 let subtitle = "";
                 let Icon: LucideIcon = Code;
@@ -376,11 +558,16 @@ function App() {
                   title = `${expertCount} Expert${expertCount > 1 ? "s" : ""} Available`;
                   subtitle = "View Experts";
                   Icon = Users;
-                } else if (message.messageType === "workflow" && message.cardData) {
+                } else if (
+                  message.messageType === "workflow" &&
+                  message.cardData &&
+                  !isWorkflowMessage
+                ) {
+                  // Old workflow card format (before our changes)
                   title = message.cardData.guide?.title || "Interactive Workflow";
                   subtitle = "Start Guide";
                   Icon = Workflow;
-                } else if (message.cardData) {
+                } else if (message.cardData && !isWorkflowMessage) {
                   // Fallback for unknown card types
                   title = message.cardData.title || "Card";
                   subtitle = message.cardData.subtitle || "Click to view";
@@ -388,24 +575,63 @@ function App() {
 
                 return (
                   <div key={message.id} className="space-y-3">
-                    {/* Always show AI text response if it exists */}
-                    {message.content && <AIMessage content={message.content} />}
+                    {/* Show workflow components for active workflows */}
+                    {isWorkflowMessage && (
+                      <>
+                        {/* 1. FIRST: Show step list for initial_proposal and step_progression phases */}
+                        {shouldShowStepList && message.cardData.stepList && (
+                          <StepList
+                            steps={message.cardData.stepList}
+                            currentStepIndex={message.cardData.currentStepIndex || 0}
+                            showCheckboxes={shouldShowCheckboxes}
+                          />
+                        )}
 
-                    {/* Show card below the text if cardData exists */}
-                    {message.type === "card" && message.cardData && (
-                      <Card
-                        className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors"
-                        onClick={() => handleCardClick(message)}
-                      >
-                        <div className="text-left">
-                          <CardTitle className="text-base mb-1">{title}</CardTitle>
-                          <CardDescription>{subtitle}</CardDescription>
-                        </div>
-                        <div className="w-12 h-12 bg-[#30303e] rounded-lg flex items-center justify-center flex-shrink-0 ml-4">
-                          <Icon size={24} className="text-primary-foreground" />
-                        </div>
-                      </Card>
+                        {/* 2. SECOND: Show AI text response (conversational message) */}
+                        {message.content && <AIMessage content={message.content} />}
+
+                        {/* Always show WorkflowOptions for workflow messages */}
+                        {workflowPhase && (
+                          <WorkflowOptions
+                            phase={workflowPhase}
+                            onOptionSelect={handleWorkflowOptionSelect}
+                          />
+                        )}
+                      </>
                     )}
+
+                    {/* Show AI message for non-workflow messages */}
+                    {!isWorkflowMessage && message.content && (
+                      <AIMessage content={message.content} />
+                    )}
+
+                    {/* Show inline ExpertsCard for experts messages */}
+                    {message.messageType === "experts" && message.cardData?.experts && (
+                      <ExpertsCard
+                        experts={message.cardData.experts}
+                        suggestedNudge={message.cardData.suggestedNudge}
+                        conversationId={conversationId || ""}
+                      />
+                    )}
+
+                    {/* Show card below the text if cardData exists (non-workflow, non-experts cards) */}
+                    {message.type === "card" &&
+                      message.cardData &&
+                      !isWorkflowMessage &&
+                      message.messageType !== "experts" && (
+                        <Card
+                          className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors"
+                          onClick={() => handleCardClick(message)}
+                        >
+                          <div className="text-left">
+                            <CardTitle className="text-base mb-1">{title}</CardTitle>
+                            <CardDescription>{subtitle}</CardDescription>
+                          </div>
+                          <div className="w-12 h-12 bg-[#30303e] rounded-lg flex items-center justify-center flex-shrink-0 ml-4">
+                            <Icon size={24} className="text-primary-foreground" />
+                          </div>
+                        </Card>
+                      )}
                   </div>
                 );
               })}

@@ -16,12 +16,24 @@ export function useSendMessage(options?: SendMessageOptions) {
   const { user } = useUser();
 
   return useMutation({
-    mutationFn: async ({ chatId, content }: { chatId: string; content: string }) => {
+    mutationFn: async ({
+      chatId,
+      content,
+      metadata,
+      screenshot: providedScreenshot,
+    }: {
+      chatId: string;
+      content: string;
+      metadata?: any;
+      screenshot?: string | null;
+    }) => {
       const token = authService.getAccessToken();
 
       console.log("[useSendMessage] Starting mutation", {
         chatId,
         contentLength: content.length,
+        hasMetadata: !!metadata,
+        hasProvidedScreenshot: !!providedScreenshot,
         captureScreenshotOption: options?.captureScreenshot,
         hasWindow: typeof window !== "undefined",
         hasConsoleAPI: typeof window !== "undefined" && !!window.consoleAPI,
@@ -32,9 +44,11 @@ export function useSendMessage(options?: SendMessageOptions) {
         throw new Error("No authentication token");
       }
 
-      // Capture screenshot if requested (for workflow mode)
-      let screenshot: string | undefined;
-      if (options?.captureScreenshot) {
+      // Use provided screenshot or capture if requested (for workflow mode)
+      let screenshot: string | undefined = providedScreenshot || undefined;
+
+      // Only auto-capture if no screenshot provided and option is set
+      if (!screenshot && options?.captureScreenshot) {
         console.log("[useSendMessage] Screenshot capture requested");
 
         if (!window.consoleAPI) {
@@ -54,10 +68,6 @@ export function useSendMessage(options?: SendMessageOptions) {
             // Continue without screenshot
           }
         }
-      } else {
-        console.log(
-          "[useSendMessage] Screenshot capture NOT requested (captureScreenshot option not set)"
-        );
       }
 
       // Define streaming callbacks
@@ -73,8 +83,8 @@ export function useSendMessage(options?: SendMessageOptions) {
         },
       };
 
-      // Start streaming with optional screenshot
-      await sendStreamingMessage(chatId, content, callbacks, token, screenshot);
+      // Start streaming with optional screenshot and metadata
+      await sendStreamingMessage(chatId, content, callbacks, token, screenshot, metadata);
     },
 
     // Optimistic update for user message

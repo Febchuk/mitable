@@ -3,7 +3,10 @@ import { eq, sql, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
-import { agentService } from "../services/agent.service";
+import { OrchestratorService } from "../services/orchestrator.service";
+
+// Initialize orchestrator (replaces old agentService)
+const orchestrator = new OrchestratorService();
 
 const router = Router();
 
@@ -662,6 +665,23 @@ router.post(
  *                 type: string
  *                 description: User message content
  *                 example: How do I submit a pull request?
+ *               screenshot:
+ *                 type: string
+ *                 description: Base64 encoded screenshot (optional)
+ *               screenshotMetadata:
+ *                 type: object
+ *                 description: Screenshot metadata (optional)
+ *               metadata:
+ *                 type: object
+ *                 description: Metadata from WorkflowOptions UI interactions (optional)
+ *                 properties:
+ *                   workflowAction:
+ *                     type: string
+ *                     enum: [progress_step, custom_question, exit_workflow]
+ *                     description: The action selected from WorkflowOptions component
+ *                   selectedOption:
+ *                     type: number
+ *                     description: Which option number was selected (1, 2, or 3)
  *     responses:
  *       200:
  *         description: Streaming response (SSE)
@@ -698,7 +718,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id || req.userId;
     const { conversationId } = req.params;
-    const { content, screenshot, screenshotMetadata } = req.body;
+    const { content, screenshot, screenshotMetadata, metadata } = req.body;
 
     console.log("[Conversations] Request received:", {
       conversationId,
@@ -707,6 +727,7 @@ router.post(
       hasScreenshot: !!screenshot,
       screenshotLength: screenshot?.length || 0,
       screenshotMetadata,
+      metadata,
     });
 
     if (!userId) {
@@ -838,14 +859,16 @@ router.post(
       let assistantWindowTrigger: any = undefined;
 
       try {
-        console.log("[Conversations] Starting AgentService.processMessage");
+        console.log("[Conversations] Starting OrchestratorService.processMessage");
 
-        // Stream AI response
-        const stream = agentService.processMessage(content, {
+        // Stream AI response using multi-agent orchestrator
+        const stream = orchestrator.processMessage({
           conversationId,
           userId,
+          organizationId: user.organizationId, // Required for multi-agent architecture
           screenshot: screenshot || undefined, // Pass screenshot if provided
           screenshotMetadata: screenshotMetadata || undefined, // Pass metadata (scaleFactor, dimensions)
+          metadata: metadata || undefined, // Pass metadata from WorkflowOptions UI interactions
           userProfile: {
             name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
             email: user.email,
@@ -924,11 +947,45 @@ router.post(
 
         console.log(`[Stream] Assistant message saved: ${assistantMessage.id}`);
 
-        // Update conversation's updatedAt timestamp
-        await db
-          .update(schema.conversations)
-          .set({ updatedAt: new Date() })
-          .where(eq(schema.conversations.id, conversationId));
+        // Generate conversation title if this is the first exchange
+        // conversationHistory includes the just-saved user message, so length <= 2 means first exchange
+        if (conversationHistory.length <= 2) {
+          console.log("[Stream] First exchange detected - generating conversation title");
+
+          try {
+            const { titleGenerationService } = await import("../services/titleGeneration.service");
+            const generatedTitle = await titleGenerationService.generateTitle(
+              content,
+              assistantContent
+            );
+
+            console.log("[Stream] Generated title:", generatedTitle);
+
+            // Update conversation with generated title and timestamp
+            await db
+              .update(schema.conversations)
+              .set({
+                title: generatedTitle,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.conversations.id, conversationId));
+
+            console.log("[Stream] Conversation title updated successfully");
+          } catch (titleError) {
+            console.error("[Stream] Error generating title:", titleError);
+            // Continue even if title generation fails - just update timestamp
+            await db
+              .update(schema.conversations)
+              .set({ updatedAt: new Date() })
+              .where(eq(schema.conversations.id, conversationId));
+          }
+        } else {
+          // Not first exchange - just update timestamp
+          await db
+            .update(schema.conversations)
+            .set({ updatedAt: new Date() })
+            .where(eq(schema.conversations.id, conversationId));
+        }
 
         // Send final event with message ID
         res.write(

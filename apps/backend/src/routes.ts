@@ -6,7 +6,8 @@ import nudgesRouter from "./routes/nudges.js";
 import conversationsRouter from "./routes/conversations.js";
 import adminRouter from "./routes/admin.js";
 import integrationsRouter from "./routes/integrations.js";
-import guidesRouter from "./routes/guides.routes.js";
+// DEPRECATED: Guide routes replaced by WorkflowOptions metadata system
+// import guidesRouter from "./routes/guides.routes.js";
 
 export const router = Router();
 
@@ -28,7 +29,27 @@ router.use("/nudges", nudgesRouter);
 router.use("/conversations", conversationsRouter);
 router.use("/admin", adminRouter);
 router.use("/integrations", integrationsRouter);
-router.use("/guides", guidesRouter);
+
+/**
+ * DEPRECATED: /guides routes
+ *
+ * Previously used for:
+ * - POST /guides/progress - Progress to next workflow step (guide window → backend → guide window)
+ * - GET /guides/:conversationId - Retrieve current workflow state
+ *
+ * Replaced by WorkflowOptions metadata system where all workflow progression happens through:
+ * - User clicks button in WorkflowOptions component
+ * - Metadata sent with message to /conversations/:id/messages/stream
+ * - Agent service receives metadata hints and selects appropriate tool:
+ *   * guide_next_step (progress_step action)
+ *   * analyze_workflow_screen (custom_question with visual issue)
+ *   * respond_with_text_in_workflow (custom_question conceptual)
+ *   * search_knowledge_in_workflow (custom_question needing docs)
+ * - Tool returns workflow message back to conversation window (no separate guide window)
+ *
+ * The guide window no longer exists - all workflow UI is now in the conversation window.
+ */
+// router.use("/guides", guidesRouter);
 
 // Protected routes - require authentication
 router.post("/help", requireAuth, (req, res) => {

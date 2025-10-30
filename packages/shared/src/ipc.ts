@@ -30,8 +30,7 @@ export const IPC_CHANNELS = {
   NUDGE_DISMISS: "nudge-dismiss",
   NUDGE_CREATE_REQUEST: "nudge-create-request",
   NUDGE_OPEN_CREATOR: "nudge-open-creator",
-  NUDGE_GENERATE_CONTEXT: "nudge-generate-context", // AI context generation
-  NUDGE_GENERATE_QUESTION: "nudge-generate-question", // AI question generation
+  OPEN_CONSOLE_NUDGE_FORM: "open-console-nudge-form", // Direct Agent → Console nudge creation
   NUDGE_RESIZE: "nudge-resize", // Dynamic window resizing (collapsed/expanded)
 
   // Window management

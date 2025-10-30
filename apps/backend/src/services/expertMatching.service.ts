@@ -6,12 +6,19 @@ import { eq } from "drizzle-orm";
  * Expert match result
  */
 export interface ExpertMatch {
-  userId: string;
-  name: string;
-  email: string;
-  role?: string;
-  department?: string;
-  avatarUrl?: string;
+  expert: {
+    id: string;
+    userId: string;
+    name: string;
+    email: string;
+    department: string;
+    role: string;
+    expertise: string[];
+    avatarUrl?: string;
+    responseRate: number;
+    helpfulnessRating: number;
+    availability: "available" | "away" | "busy" | "offline";
+  };
   matchScore: number;
   matchReasons: string[];
   expertise: {
@@ -24,7 +31,6 @@ export interface ExpertMatch {
     avgResponseTime: string | null;
     totalInteractions: number;
   };
-  availability: "available" | "away" | "busy" | "offline";
 }
 
 /**
@@ -97,14 +103,24 @@ class ExpertMatchingService {
       const matches: ExpertMatch[] = allUsers.map((user, index) => {
         // Construct full name from firstName + lastName
         const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
+        const availability = this.mapAvailability(user.status as string);
+        const responseRate = 85.0;
+        const helpfulnessScore = 4.5;
 
         return {
-          userId: user.userId,
-          name: fullName,
-          email: user.email,
-          role: user.role || "Employee",
-          department: "General", // Hardcoded since field doesn't exist in schema
-          avatarUrl: user.avatarUrl || undefined,
+          expert: {
+            id: user.userId,
+            userId: user.userId,
+            name: fullName,
+            email: user.email,
+            department: "General", // Hardcoded since field doesn't exist in schema
+            role: user.role || "Employee",
+            expertise: ["Team support", "General knowledge"],
+            avatarUrl: user.avatarUrl || undefined,
+            responseRate: responseRate,
+            helpfulnessRating: helpfulnessScore,
+            availability: availability,
+          },
           matchScore: Math.round((0.9 - index * 0.1) * 100) / 100, // Mock decreasing scores: 0.9, 0.8, 0.7, ...
           matchReasons: ["Available to help", "Works in your team", "Experienced team member"],
           expertise: {
@@ -112,18 +128,17 @@ class ExpertMatchingService {
             topics: ["Team support", "General knowledge"],
           },
           performance: {
-            responseRate: 85.0,
-            helpfulnessScore: 4.5,
+            responseRate: responseRate,
+            helpfulnessScore: helpfulnessScore,
             avgResponseTime: null,
             totalInteractions: 0,
           },
-          availability: this.mapAvailability(user.status as string),
         };
       });
 
       console.log("[ExpertMatchingService] Matches created:", {
         matchesCount: matches.length,
-        topMatch: matches[0]?.name,
+        topMatch: matches[0]?.expert.name,
         topScore: matches[0]?.matchScore,
         allScores: matches.map((m) => m.matchScore),
       });

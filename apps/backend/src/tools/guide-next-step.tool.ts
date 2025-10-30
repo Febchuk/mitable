@@ -1,387 +1,222 @@
-import { BaseTool, ToolContext, ToolParameters, ToolResult } from "./base.tool";
-import { geminiVisionService } from "../services/gemini-vision.service";
+import { BaseTool, ToolContext, ToolParameters, ToolResult } from "./base.tool.js";
+import { geminiVisionService } from "../services/gemini-vision.service.js";
+import { guideGenerationService } from "../services/guideGeneration.service.js";
+// import type { SolutionObject } from "@mitable/shared"; // Unused - commented out
 
 /**
  * Guide Next Step Tool
  *
- * Provides ITERATIVE, just-in-time visual UI guidance for completing tasks.
- * Uses Gemini Vision to analyze screenshots and generate ONE step at a time
- * based on current screen state. Supports continuation signals ("Done", "Next")
- * to progress through multi-step workflows dynamically.
+ * Progresses an active UI guidance workflow to the next step.
  *
- * ITERATIVE MODEL:
- * - Generates single steps, not complete workflows
- * - Adapts to what's currently on screen via screenshot analysis
- * - Waits for user confirmation before generating next step
- * - No pre-planning - responds to current context only
+ * TRIGGER MECHANISM:
+ * This tool is called by OpenAI when it receives a system message hint
+ * indicating the user selected "Move on to next step" (option 1) from the
+ * WorkflowOptions component in the conversation renderer.
  *
- * Use cases:
- * - Initial: "How do I submit an expense report?" → Step 1 generated
- * - Continuation: User says "Done" → Screenshot captured → Step 2 generated
- * - Each step is dynamically created based on current UI state
+ * The agent service detects metadata.workflowAction === "progress_step" and
+ * provides a hint to OpenAI to use this tool. OpenAI then calls this tool
+ * with the conversationId.
+ *
+ * WORKFLOW PROGRESSION:
+ * 1. Retrieves current SolutionObject from conversation history
+ * 2. ALWAYS evaluates if plan needs adjustment based on screenshot
+ * 3. Applies adjustments if user's screen shows unexpected state
+ * 4. Marks previous step as completed, current step as current
+ * 5. Generates visual guidance for the next step via Gemini Vision
+ * 6. Returns updated SolutionObject with new state
  *
  * REQUIREMENTS:
- * - Screenshot MUST be provided for all steps
- * - Tracks step numbers for context
- * - Launches Guide + Overlay windows with visual highlights
+ * - Screenshot MUST be provided (automatically captured when user selects option)
+ * - ConversationId MUST be provided (to retrieve SolutionObject)
+ * - Only works during active workflows (after start_ui_guidance_workflow)
  */
 export class GuideNextStepTool extends BaseTool {
-  name = "show_step_by_step_guide";
+  name = "guide_next_step";
 
-  description = `
-    Provide iterative, just-in-time visual guidance for completing a task.
+  description = `Progress an active UI guidance workflow to the next step.
 
-    IMPORTANT - ITERATIVE MODEL:
-    - Generate ONLY ONE STEP at a time based on current screenshot
-    - Do NOT plan ahead or generate complete workflows
-    - Wait for user to complete step before generating next one
+WHEN TO USE:
+This tool is called when the user selects "Move on to next step" from the
+WorkflowOptions component UI. The agent service provides a system hint when
+it detects metadata.workflowAction === "progress_step".
 
-    Use this tool when:
-    - User asks "how do I..." or "show me how to..." (initial step)
-    - User signals continuation: "Done", "Next", "Okay" (subsequent steps)
-    - A screenshot is available showing current UI state
+CRITICAL REQUIREMENTS:
+1. Screenshot MUST be available (automatically captured)
+2. ConversationId MUST be provided (to retrieve workflow state)
+3. Only use when workflow is already active
 
-    Requirements:
-    - Screenshot MUST be provided
-    - Use Gemini Vision to analyze current screen
-    - Generate single actionable step with precise UI element coordinates
+WORKFLOW PROGRESSION:
+1. Retrieve current SolutionObject from conversation
+2. Evaluate if plan needs adjustment based on screenshot
+3. Apply adjustments if necessary (communicate changes to user)
+4. Mark previous step as completed
+5. Generate guidance for next step with visual analysis
+6. Return updated SolutionObject in cardData
 
-    DO NOT use this for:
-    - General questions or information requests (use respond_with_text)
-    - Documentation lookups (use search_knowledge_base)
-    - Tasks without UI interaction
-  `.trim();
+DO NOT USE:
+- To start a new workflow (use start_ui_guidance_workflow instead)
+- When no active workflow exists
+- This tool is ONLY for progressing through existing workflows`.trim();
 
   parameters: ToolParameters = {
     type: "object",
     properties: {
-      task: {
+      conversationId: {
         type: "string",
-        description:
-          "The task the user wants to learn how to do (e.g., 'submit expense report', 'request time off')",
-      },
-      userQuestion: {
-        type: "string",
-        description: "The original user question for context (optional for continuation steps)",
-      },
-      stepNumber: {
-        type: "number",
-        description: "Current step number for iterative workflow (default: 1)",
-      },
-      previousStep: {
-        type: "string",
-        description: "Description of the previous step completed (for context in multi-step flows)",
+        description: "The conversation ID containing the active workflow state",
       },
     },
-    required: ["task"],
+    required: ["conversationId"],
   };
 
-  /**
-   * Execute guide lookup/generation
-   *
-   * @param args - Task description, optional user question, step tracking
-   * @param context - User context and optional screenshot
-   * @returns Tool result with guide data and window trigger
-   */
-  async execute(
-    args: { task: string; userQuestion?: string; stepNumber?: number; previousStep?: string },
-    context: ToolContext
-  ): Promise<ToolResult> {
-    // Validate arguments
+  async execute(args: { conversationId: string }, context: ToolContext): Promise<ToolResult> {
     this.validate(args);
 
-    const { task, userQuestion, stepNumber = 1, previousStep } = args;
-    const screenshot = context.screenshot;
+    const { conversationId } = args;
 
-    console.log(`[GuideNextStepTool] Generating step ${stepNumber} for task: "${task}"`);
-    console.log("[GuideNextStepTool] Request details:", {
-      task,
-      userQuestion: userQuestion?.substring(0, 100),
-      stepNumber,
-      previousStep: previousStep?.substring(0, 50),
-      hasScreenshot: !!screenshot,
-    });
+    console.log("[GuideNextStepTool] Progressing workflow in conversation:", conversationId);
 
-    try {
-      // Screenshot is REQUIRED for iterative workflow
-      if (!screenshot) {
-        console.log("[GuideNextStepTool] No screenshot provided - cannot generate iterative step");
-
-        return {
-          messageType: "text",
-          content:
-            "I need to see your current screen to provide step-by-step guidance. Please make sure screenshot capture is enabled and try again.",
-          streamable: true,
-        };
-      }
-
-      // Extract previous guide data from conversation history for continuation
-      const lastWorkflowMessage = context.conversationHistory
-        .filter((m) => m.role === "assistant" && m.messageType === "workflow")
-        .pop();
-
-      let completedSteps: string[] = [];
-      let remainingPlan: any[] = [];
-
-      if (lastWorkflowMessage?.cardData && (lastWorkflowMessage.cardData as any).allSteps) {
-        const cardData = lastWorkflowMessage.cardData as any;
-        const allSteps = cardData.allSteps;
-
-        console.log("[GuideNextStepTool] Found previous workflow:", {
-          totalSteps: allSteps.length,
-          currentStepNumber: cardData.stepNumber,
-        });
-
-        // Find completed steps (those before current step)
-        completedSteps = allSteps
-          .filter((s: any) => s.completed || s.stepNumber < stepNumber)
-          .map((s: any) => s.instruction);
-
-        // Remaining plan (current + future steps)
-        remainingPlan = allSteps.filter((s: any) => s.stepNumber >= stepNumber);
-
-        console.log("[GuideNextStepTool] Continuation context:", {
-          completedSteps,
-          remainingPlanLength: remainingPlan.length,
-        });
-      }
-
-      // Analyze screenshot with Gemini Vision (multi-step mode)
-      console.log(
-        `[GuideNextStepTool] Screenshot detected - generating multi-step plan using Gemini Vision`
-      );
-
-      const visionResult = await geminiVisionService.analyzeScreenshot(
-        screenshot,
-        task,
-        "multi-step", // Use multi-step planning mode
-        completedSteps,
-        remainingPlan
-      );
-
-      // Type guard to determine which result type we got
-      let targetElement = null;
-      let applicationContext = "";
-      let screenDescription = "";
-      let allSteps: any[] = [];
-
-      if ("steps" in visionResult && Array.isArray(visionResult.steps)) {
-        // Multi-step guidance result
-        applicationContext = visionResult.applicationContext;
-        screenDescription = visionResult.taskUnderstanding;
-        allSteps = visionResult.steps;
-
-        // Get the current step (first step with an element)
-        const currentStep = allSteps.find((s) => s.element) || allSteps[0];
-        if (currentStep) {
-          targetElement = currentStep.element || null;
-
-          console.log("[GuideNextStepTool] Multi-step plan generated:", {
-            applicationContext: visionResult.applicationContext,
-            taskUnderstanding: visionResult.taskUnderstanding,
-            totalSteps: allSteps.length,
-            currentStepNumber: currentStep.stepNumber,
-            currentInstruction: currentStep.instruction,
-            hasTargetElement: !!targetElement,
-          });
-
-          console.log(
-            "[GuideNextStepTool] Full step plan:",
-            allSteps.map((s) => ({
-              stepNumber: s.stepNumber,
-              instruction: s.instruction,
-              hasElement: !!s.element,
-              confidence: s.confidence,
-            }))
-          );
-        }
-      } else if ("recommendedAction" in visionResult) {
-        // Task-focused result with recommended element
-        targetElement = visionResult.recommendedAction.element;
-        applicationContext = visionResult.applicationContext;
-        screenDescription = visionResult.taskUnderstanding;
-
-        console.log("[GuideNextStepTool] Task-focused vision analysis complete:", {
-          applicationContext: visionResult.applicationContext,
-          taskUnderstanding: visionResult.taskUnderstanding,
-          recommendedElement: targetElement.label,
-          reasoning: visionResult.recommendedAction.reasoning,
-          hasAlternatives: !!visionResult.alternatives?.length,
-        });
-
-        console.log("[GuideNextStepTool] Gemini recommended element:", {
-          label: targetElement.label,
-          type: targetElement.type,
-          confidence: targetElement.confidence,
-          boundingBox: targetElement.boundingBox,
-          reasoning: visionResult.recommendedAction.reasoning,
-        });
-      } else if ("screenDescription" in visionResult && "elements" in visionResult) {
-        // Generic result with all elements (fallback)
-        applicationContext = visionResult.applicationContext;
-        screenDescription = visionResult.screenDescription;
-
-        console.log("[GuideNextStepTool] Generic vision analysis (fallback):", {
-          applicationContext: visionResult.applicationContext,
-          elementsFound: visionResult.elements.length,
-          screenDescription: visionResult.screenDescription.substring(0, 100),
-        });
-
-        // Use first element as fallback
-        targetElement = visionResult.elements[0] || null;
-
-        if (targetElement) {
-          console.log("[GuideNextStepTool] Using first element as fallback:", {
-            label: targetElement.label,
-            type: targetElement.type,
-            confidence: targetElement.confidence,
-          });
-        }
-      }
-
-      // If we found a target element, generate guidance
-      if (targetElement) {
-        // Generate guidance based on whether we have a multi-step plan
-        const currentStepData =
-          allSteps.length > 0 ? allSteps.find((s) => s.element) || allSteps[0] : null;
-        const stepInstruction = currentStepData
-          ? currentStepData.instruction
-          : `Click "${targetElement.label}"`;
-
-        // Build context-aware response
-        let responseText = "";
-        if (allSteps.length > 0) {
-          // Multi-step plan response
-          responseText = `I can see you're on ${applicationContext}. ${screenDescription}
-
-Here's your ${allSteps.length}-step plan to ${task}:
-
-${allSteps
-  .map(
-    (s, idx) =>
-      `${idx + 1}. ${s.instruction}${s.confidence !== "high" ? ` (${s.confidence} confidence)` : ""}`
-  )
-  .join("\n")}
-
-Let's start with step 1: ${stepInstruction.toLowerCase()}`;
-        } else if (stepNumber === 1) {
-          // Single step, first time
-          responseText = `I can see you're on ${applicationContext}. ${screenDescription}
-
-To ${task}, ${stepInstruction.toLowerCase()}.`;
-        } else {
-          // Continuation step
-          responseText = `Great! ${previousStep ? `You completed: "${previousStep}". ` : ""}
-
-Now, ${stepInstruction.toLowerCase()}.`;
-        }
-
-        // Scale coordinates by scaleFactor to match physical display resolution
-        // Gemini analyzes resized image (e.g., 1920x1080), but overlay renders on full resolution (e.g., 3840x2160)
-        const scaleFactor = context.screenshotMetadata?.scaleFactor || 1;
-        const scaledBoundingBox = {
-          x: targetElement.boundingBox.x * scaleFactor,
-          y: targetElement.boundingBox.y * scaleFactor,
-          width: targetElement.boundingBox.width * scaleFactor,
-          height: targetElement.boundingBox.height * scaleFactor,
-        };
-
-        console.log("[GuideNextStepTool] Generated step:", {
-          stepNumber,
-          targetLabel: targetElement.label,
-          coordinates: scaledBoundingBox,
-          scaleFactor,
-        });
-
-        // Build steps array for Guide window
-        // Mark steps before current step as completed
-        const currentStepNumber = currentStepData?.stepNumber || stepNumber;
-        const guideSteps =
-          allSteps.length > 0
-            ? allSteps.map((step) => ({
-                id: `step-${step.stepNumber}`,
-                stepNumber: step.stepNumber,
-                instruction: step.instruction,
-                targetElement: step.element
-                  ? {
-                      label: step.element.label,
-                      boundingBox: {
-                        x: step.element.boundingBox.x * scaleFactor,
-                        y: step.element.boundingBox.y * scaleFactor,
-                        width: step.element.boundingBox.width * scaleFactor,
-                        height: step.element.boundingBox.height * scaleFactor,
-                      },
-                    }
-                  : undefined,
-                completed: step.stepNumber < currentStepNumber, // Mark previous steps as completed
-                confidence: step.confidence,
-              }))
-            : [
-                {
-                  id: `step-${stepNumber}`,
-                  stepNumber,
-                  instruction: stepInstruction,
-                  targetElement: {
-                    label: targetElement.label,
-                    boundingBox: scaledBoundingBox,
-                  },
-                  completed: false,
-                },
-              ];
-
-        // Find index of current (first incomplete) step
-        const currentStepIndex = guideSteps.findIndex((s) => !s.completed);
-
-        return {
-          messageType: "workflow",
-          content: responseText,
-          cardData: {
-            stepNumber: currentStepData?.stepNumber || stepNumber,
-            totalSteps: allSteps.length || 1,
-            instruction: stepInstruction,
-            targetElement: {
-              label: targetElement.label,
-              boundingBox: scaledBoundingBox,
-            },
-            allSteps: guideSteps,
-            highlightColor: "blue",
-            arrowPosition: "top-right",
-          },
-          streamable: true,
-          triggerWindow: {
-            window: "guide",
-            data: {
-              guide: {
-                id: `vision-${Date.now()}`,
-                title: task,
-                description: screenDescription,
-                steps: guideSteps,
-                currentStep: currentStepIndex !== -1 ? currentStepIndex : guideSteps.length - 1,
-                totalSteps: guideSteps.length,
-                completed: currentStepIndex === -1, // All steps completed if no incomplete step found
-              },
-            },
-          },
-        };
-      }
-
-      // No clear target element - describe what we see and ask for clarification
-      console.log("[GuideNextStepTool] No target element found - providing screen context instead");
-
-      return {
-        messageType: "text",
-        content: `I can see you're on ${applicationContext}. ${screenDescription}
-
-I'm not sure which specific element to guide you to next for "${task}". Could you describe what you're trying to do, or let me search the knowledge base for documentation?`,
-        streamable: true,
-      };
-    } catch (error) {
-      console.error("[GuideNextStepTool] Error finding guide:", error);
-
+    // Validate screenshot is present
+    if (!context.screenshot) {
+      console.error("[GuideNextStepTool] No screenshot provided");
       return {
         messageType: "text",
         content:
-          "I encountered an error while looking for a guide. Let me search the knowledge base or connect you with an expert instead.",
+          "I need to see your current screen to guide you to the next step. Please make sure screenshot capture is enabled and try again.",
+        streamable: true,
+      };
+    }
+
+    try {
+      // Step 1: Retrieve current SolutionObject from conversation
+      const currentSolution =
+        await guideGenerationService.retrieveLatestSolutionObject(conversationId);
+
+      if (!currentSolution) {
+        console.error("[GuideNextStepTool] No active workflow found in conversation");
+        return {
+          messageType: "text",
+          content:
+            "I couldn't find an active workflow in this conversation. Would you like to start a new task guide?",
+          streamable: true,
+        };
+      }
+
+      console.log("[GuideNextStepTool] Current workflow state:", {
+        currentStepIndex: currentSolution.currentStepIndex,
+        totalSteps: currentSolution.stepList.length,
+        adjustmentHistory: currentSolution.adjustmentHistory.length,
+      });
+
+      // Step 2: Calculate next step index
+      const nextStepIndex = currentSolution.currentStepIndex + 1;
+
+      // Validate we're not past the end
+      if (nextStepIndex >= currentSolution.stepList.length) {
+        console.log("[GuideNextStepTool] Workflow completed - no more steps");
+        return {
+          messageType: "text",
+          content: `Great work! You've completed all ${currentSolution.stepList.length} steps. The task is complete! 🎉`,
+          streamable: true,
+        };
+      }
+
+      // Step 3: ALWAYS evaluate if plan needs adjustment
+      console.log("[GuideNextStepTool] Evaluating if plan needs adjustment...");
+      const evaluation = await geminiVisionService.evaluateProgress(
+        context.screenshot,
+        currentSolution,
+        context.conversationHistory,
+        nextStepIndex
+      );
+
+      console.log("[GuideNextStepTool] Evaluation result:", {
+        needsAdjustment: evaluation.needsAdjustment,
+        reason: evaluation.adjustmentReason,
+        newStepCount: evaluation.adjustedStepList?.length,
+      });
+
+      // Step 4: Apply adjustments if needed
+      let updatedSolution = currentSolution;
+      if (evaluation.needsAdjustment && evaluation.adjustedStepList) {
+        console.log("[GuideNextStepTool] Applying plan adjustments");
+        updatedSolution = {
+          ...currentSolution,
+          stepList: evaluation.adjustedStepList,
+          adjustmentHistory: [
+            ...currentSolution.adjustmentHistory,
+            {
+              timestamp: new Date().toISOString(),
+              reason: evaluation.adjustmentReason || "Plan adjusted based on current screen state",
+              oldStepCount: currentSolution.stepList.length,
+              newStepCount: evaluation.adjustedStepList.length,
+            },
+          ],
+        };
+      }
+
+      // Step 5: Progress to next step (update step statuses)
+      updatedSolution = {
+        ...updatedSolution,
+        currentStepIndex: nextStepIndex,
+        stepList: updatedSolution.stepList.map((s, idx) => ({
+          ...s,
+          status: idx < nextStepIndex ? "completed" : idx === nextStepIndex ? "current" : "pending",
+        })),
+      };
+
+      // Step 6: Get visual guidance for the next step
+      const nextStep = updatedSolution.stepList[nextStepIndex];
+      console.log("[GuideNextStepTool] Analyzing next step:", {
+        stepNumber: nextStep.stepNumber,
+        description: nextStep.description,
+      });
+
+      const visualGuidance = await geminiVisionService.analyzeStepExecution(
+        context.screenshot,
+        updatedSolution,
+        nextStep,
+        context.conversationHistory
+      );
+
+      console.log("[GuideNextStepTool] Visual guidance generated:", {
+        conversationalMessage: visualGuidance.conversationalMessage,
+        conversationalMessageLength: visualGuidance.conversationalMessage?.length || 0,
+        confidence: visualGuidance.confidence,
+      });
+
+      // Step 7: Build conversational message
+      let message = visualGuidance.conversationalMessage;
+
+      // If plan was adjusted, communicate it to the user
+      if (evaluation.needsAdjustment) {
+        message = `📝 *Plan Updated:* ${evaluation.adjustmentReason}\n\n${message}`;
+        console.log("[GuideNextStepTool] Including adjustment notice in response");
+      }
+
+      console.log("[GuideNextStepTool] Workflow progressed successfully:", {
+        newStepIndex: nextStepIndex,
+        totalSteps: updatedSolution.stepList.length,
+        adjustmentMade: evaluation.needsAdjustment,
+      });
+
+      // Step 8: Return with updated SolutionObject
+      return {
+        messageType: "workflow",
+        content: message,
+        cardData: {
+          ...updatedSolution,
+          workflowActive: true,
+          workflowPhase: "step_progression",
+        },
+        streamable: true,
+      };
+    } catch (error) {
+      console.error("[GuideNextStepTool] Error progressing workflow:", error);
+      return {
+        messageType: "text",
+        content:
+          "I encountered an error while trying to progress to the next step. Please try again or let me know if you need help.",
         streamable: true,
       };
     }

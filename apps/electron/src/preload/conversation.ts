@@ -15,8 +15,10 @@ const IPC_CHANNELS = {
   CONSOLE_OPEN_CHAT: "console-open-chat",
   NUDGE_SHOW: "nudge-show",
   GUIDE_START: "guide-start",
+  OPEN_CONSOLE_NUDGE_FORM: "open-console-nudge-form",
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
+  CAPTURE_SCREENSHOT: "capture-screenshot",
 } as const;
 
 contextBridge.exposeInMainWorld("conversationAPI", {
@@ -117,6 +119,37 @@ contextBridge.exposeInMainWorld("conversationAPI", {
   // Open conversation in console
   openConversationInConsole: (conversationId: string) =>
     ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHAT, conversationId),
+
+  // Open nudge creation form in console with pre-filled data
+  openNudgeForm: (data: {
+    expert: {
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      department: string;
+      expertise: string[];
+    };
+    context: string;
+    question: string;
+    conversationId: string;
+  }) => ipcRenderer.send(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, data),
+
+  // Screenshot capture - for workflow visual guidance
+  // Returns {dataUrl: string, metadata: ScreenshotMetadata} or null on failure
+  captureScreenshot: (): Promise<{
+    dataUrl: string;
+    metadata: {
+      width: number;
+      height: number;
+      timestamp: number;
+      boundingBoxes?: unknown[];
+      window?: unknown;
+    };
+  } | null> => {
+    console.log("[Conversation Preload] captureScreenshot() called from renderer");
+    return ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
+  },
 
   // Auth management - Conversation requests token from main process
   getAuthToken: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_TOKEN),

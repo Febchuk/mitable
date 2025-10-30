@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowUp, ExternalLink, Workflow, Users, Camera } from "lucide-react";
+import { ArrowLeft, ArrowUp, ExternalLink, Camera } from "lucide-react";
 import { useConversationMessages, useSendMessage } from "@/console/src/hooks/queries/chats";
 import UserMessage from "../../../../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../../../../components/domain/messages/AIMessage";
-import WorkflowCard from "../../../../../../components/domain/messages/WorkflowCard";
+import ExpertsCard from "../../../../../../conversation/src/components/ExpertsCard";
+import WorkflowOptions, {
+  type WorkflowPhase,
+} from "../../../../../../components/domain/workflow/WorkflowOptions";
+import StepList from "../../../../../../components/domain/workflow/StepList";
 import { Button } from "@/components/ui/button";
 
 export default function ChatDetail() {
@@ -132,6 +136,69 @@ export default function ChatDetail() {
     }
   };
 
+  const handleWorkflowOptionSelect = async (option: any) => {
+    if (!chatId) return;
+
+    const { action, label } = option;
+    let metadata: any = {};
+    let message = "";
+
+    console.log("[ChatDetail] Workflow option selected:", { action, label });
+
+    // Map workflow actions to metadata and message content
+    switch (action) {
+      case "progress_step":
+        metadata = { workflowAction: "progress_step", selectedOption: 1 };
+        message = "Move on to next step";
+        break;
+      case "custom_question":
+      case "ask_questions":
+        metadata = { workflowAction: "custom_question", selectedOption: 2 };
+        message = label || "I have a question";
+        break;
+      case "exit_workflow":
+        metadata = { workflowAction: "exit_workflow", selectedOption: 3 };
+        message = "Exit workflow";
+        break;
+      case "confirm_start":
+        metadata = { workflowAction: "progress_step", selectedOption: 1 };
+        message = "Yes, let's get started!";
+        break;
+      default:
+        message = label || action;
+    }
+
+    // Capture screenshot for workflow actions if available
+    let screenshot: string | null = null;
+    if (["progress_step", "custom_question", "confirm_start"].includes(action)) {
+      if (window.consoleAPI?.captureScreenshot) {
+        try {
+          console.log("[ChatDetail] Capturing screenshot for workflow action...");
+          screenshot = await window.consoleAPI.captureScreenshot();
+          console.log("[ChatDetail] Screenshot captured:", !!screenshot);
+        } catch (error) {
+          console.error("[ChatDetail] Screenshot capture failed:", error);
+        }
+      } else {
+        console.warn("[ChatDetail] captureScreenshot not available in consoleAPI");
+      }
+    }
+
+    // Start streaming
+    setIsStreaming(true);
+    setStreamingContent("");
+
+    // Send message with metadata and screenshot
+    sendMessageMutation.mutate({
+      chatId,
+      content: message,
+      metadata, // Pass workflow metadata
+      screenshot, // Pass screenshot if captured
+    });
+
+    setInputValue("");
+  };
+
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
@@ -181,23 +248,53 @@ export default function ChatDetail() {
       <div className="flex-1 overflow-y-auto app-no-drag custom-scrollbar">
         <div className="max-w-4xl mx-auto px-8 py-4">
           {messages.map((message) => {
-            // Render workflow or experts cards
-            if (
-              (message.messageType === "workflow" || message.messageType === "experts") &&
-              message.cardData
-            ) {
-              const icon = message.cardData.iconType === "workflow" ? Workflow : Users;
+            // Render workflow messages with rich details
+            if (message.messageType === "workflow" && message.cardData) {
+              const isWorkflowActive = message.cardData.workflowActive;
+              const workflowPhase = message.cardData.workflowPhase as WorkflowPhase | undefined;
+              const shouldShowStepList =
+                isWorkflowActive && workflowPhase && workflowPhase !== "custom_question";
+              const shouldShowCheckboxes = workflowPhase === "step_progression";
+
               return (
-                <WorkflowCard
-                  key={message.id}
-                  title={message.cardData.title}
-                  subtitle={message.cardData.subtitle}
-                  icon={icon}
-                  onClick={() => {
-                    // TODO: Handle card click - launch guide or show experts
-                    console.log(`${message.messageType} card clicked:`, message.cardData);
-                  }}
-                />
+                <div key={message.id} className="space-y-3">
+                  {/* 1. Show step list for initial_proposal and step_progression */}
+                  {shouldShowStepList && message.cardData.stepList && (
+                    <StepList
+                      steps={message.cardData.stepList}
+                      currentStepIndex={message.cardData.currentStepIndex || 0}
+                      showCheckboxes={shouldShowCheckboxes}
+                    />
+                  )}
+
+                  {/* 2. Show AI text response */}
+                  {message.content && <AIMessage content={message.content} />}
+
+                  {/* 3. Show workflow options for interaction */}
+                  {isWorkflowActive && workflowPhase && (
+                    <WorkflowOptions
+                      phase={workflowPhase}
+                      onOptionSelect={handleWorkflowOptionSelect}
+                    />
+                  )}
+                </div>
+              );
+            }
+
+            // Render experts messages with rich details
+            if (message.messageType === "experts" && message.cardData?.experts) {
+              return (
+                <div key={message.id} className="space-y-3">
+                  {/* Show AI text response first */}
+                  {message.content && <AIMessage content={message.content} />}
+
+                  {/* Show full experts card with profiles */}
+                  <ExpertsCard
+                    experts={message.cardData.experts}
+                    suggestedNudge={message.cardData.suggestedNudge}
+                    conversationId={chatId || ""}
+                  />
+                </div>
               );
             }
 

@@ -50,7 +50,6 @@ export class ClarifyIntentTool extends BaseTool {
     return {
       messageType: "text",
       content,
-      cardData: { interpretations: result.interpretations },
       streamable: true,
     };
   }

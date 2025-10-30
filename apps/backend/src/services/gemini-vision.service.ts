@@ -416,33 +416,93 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
     try {
       const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
 
-      const supportingContext = solutionObject.supportingData
-        .slice(0, 5)
-        .map((data) => `[${data.title}] ${data.snippet}`)
-        .join("\n\n");
+      const prompt = `You are helping a user complete this specific action:
 
-      const conversationContext = conversationHistory
-        .slice(-5)
-        .map((msg) => `${msg.role}: ${msg.content.substring(0, 150)}`)
-        .join("\n");
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT STEP (your focus):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      const prompt = `Task: "${solutionObject.solution}"
-Current Step: ${currentStep.description}
+Step ${currentStep.stepNumber}: "${currentStep.description}"
 
-Company Process Context:
-${supportingContext}
+Your job: Look at the screenshot and tell the user EXACTLY which UI element to click/interact with to complete this action.
 
-${solutionObject.solutionExplanation}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COMPLETE WORKFLOW CONTEXT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Recent Conversation:
-${conversationContext}
+Overall Task: ${solutionObject.solution}
 
-Analyze the screenshot and provide EXTREMELY PRECISE guidance:
-1. Exact element name/label
-2. Visual indicators (icons, colors)
-3. Precise location (top-right, center, etc.)
-4. Surrounding context
-5. Consider any confusion or questions from the conversation history`;
+Explanation: ${solutionObject.solutionExplanation}
+
+Search Query Used: ${solutionObject.searchQuery}
+
+Supporting Data Explanation: ${solutionObject.supportingDataExplanation}
+
+Complete Step List:
+${solutionObject.stepList.map((s) => `${s.stepNumber}. ${s.description} [${s.status}]`).join("\n")}
+
+Company Documentation (from knowledge base search):
+${solutionObject.supportingData.map((d) => `[${d.title}]\n${d.snippet}\nSource: ${d.url}`).join("\n\n")}
+
+Recent Conversation History:
+${conversationHistory
+  .slice(-5)
+  .map((m) => `${m.role}: ${m.content.substring(0, 200)}`)
+  .join("\n")}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL RULES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Your recommendation must help complete the current step: "${currentStep.description}"
+2. Use the supporting data and step list context to understand the workflow
+3. Identify the specific button, link, or UI element that accomplishes this step
+4. If the required app/page is not visible, tell the user to open/navigate to it first
+5. NEVER suggest clicking unrelated elements just because they're visible
+6. Ignore any chat/agent windows in the screenshot (those are AI assistant interfaces)
+7. DO NOT reference future steps - focus only on the current step
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OUTPUT FORMAT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. elementDescription: The exact UI element that helps complete "${currentStep.description}"
+   - If visible: Describe its precise location (e.g., "Blue 'Save' button in top-right corner")
+   - If NOT visible: Explain what needs to be opened first (e.g., "Notion app needs to be opened")
+
+2. visualContext: Current state of the screen and relevance to the step
+
+3. confidence:
+   - "high" = Correct app/page is visible AND target element is clearly identified
+   - "medium" = Correct context but element location uncertain
+   - "low" = Wrong app/page is currently visible
+
+4. conversationalMessage: Natural guidance in 1-2 sentences telling user what to click
+   - Be specific about the UI element's location
+   - Use conversational tone like a helpful teammate
+   - If wrong app is open, guide them to the correct one
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXAMPLES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Example 1:
+Step: "Navigate to the Mitable PRD document in Notion"
+Screenshot shows: Slack is open
+✅ GOOD conversationalMessage: "I can see Slack is open. Let's switch to Notion - you can open it from your dock or use Cmd+Space to search for the Notion app."
+❌ BAD: "Click on the DM with Aurel in the left sidebar" (Wrong - this doesn't help open Notion!)
+
+Example 2:
+Step: "Click the Save button"
+Screenshot shows: Document editor with visible Save button in top-right
+✅ GOOD conversationalMessage: "Perfect! Click the blue 'Save' button in the top-right corner, next to the Share button."
+❌ BAD: "You're in the right place, keep working on the document" (Wrong - doesn't identify the Save button!)
+
+Example 3:
+Step: "Scroll to the Product Vision section"
+Screenshot shows: Notion document with Product Vision visible below the fold
+✅ GOOD conversationalMessage: "I can see you're in the right document. Scroll down about halfway - the 'Product Vision & Strategy' heading is visible in the middle of the page."
+❌ BAD: "Click on the settings icon" (Wrong - step is about scrolling, not clicking settings!)`;
 
       const result = await this.stepGuidanceModel.generateContent([
         prompt,
@@ -457,6 +517,29 @@ Analyze the screenshot and provide EXTREMELY PRECISE guidance:
       const text = result.response.text();
       const parsed = VisualGuidanceSchema.parse(JSON.parse(text));
 
+      // Comprehensive logging for debugging
+      console.log("[GeminiVision] Visual guidance generated:", {
+        elementDescription: parsed.elementDescription?.substring(0, 100) + "...",
+        visualContext: parsed.visualContext?.substring(0, 100) + "...",
+        conversationalMessage: parsed.conversationalMessage,
+        conversationalMessageLength: parsed.conversationalMessage?.length || 0,
+        confidence: parsed.confidence,
+      });
+
+      // Validate conversationalMessage quality
+      if (!parsed.conversationalMessage || parsed.conversationalMessage.trim().length < 10) {
+        console.warn("[GeminiVision] WARNING: conversationalMessage is too short or missing!", {
+          conversationalMessage: parsed.conversationalMessage,
+          length: parsed.conversationalMessage?.length || 0,
+          stepDescription: currentStep.description,
+        });
+
+        // Generate fallback message using step description
+        const fallbackMessage = `Let's work on step ${currentStep.stepNumber}: ${currentStep.description}. ${parsed.elementDescription || "I'll guide you through this step."}`;
+        console.log("[GeminiVision] Using fallback message:", fallbackMessage);
+        parsed.conversationalMessage = fallbackMessage;
+      }
+
       console.log("[GeminiVision] Guidance confidence:", parsed.confidence);
       return parsed;
     } catch (error) {
@@ -465,6 +548,7 @@ Analyze the screenshot and provide EXTREMELY PRECISE guidance:
         elementDescription: `Look for elements related to: ${currentStep.description}`,
         visualContext: "Unable to analyze screenshot",
         confidence: "low",
+        conversationalMessage: `I'm having trouble analyzing your screenshot right now. For this step (${currentStep.description}), look for any UI elements that would help you accomplish this. Let me know if you need help!`,
       };
     }
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ExpertProfile } from "@mitable/shared";
+import { ExpertProfile, SuggestedNudge } from "@mitable/shared";
 import ExpertList from "./components/ExpertList";
 
 interface ExpertMatch {
@@ -94,13 +94,10 @@ declare global {
       dismiss: (nudgeId: string) => void;
       createNudge: (data: unknown) => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
-      // NEW: Dynamic window resizing
+      // Dynamic window resizing
       resizeWindow: (
         options: { width?: number; height?: number } | "collapsed" | "expanded"
       ) => void;
-      // NEW: AI generation methods
-      generateContext: (conversationId: string) => Promise<{ context: string }>;
-      generateQuestion: (conversationId: string) => Promise<{ question: string }>;
     };
   }
 }
@@ -109,12 +106,9 @@ function App() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [experts, setExperts] = useState<ExpertMatch[]>(mockExperts);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [suggestedNudge, setSuggestedNudge] = useState<SuggestedNudge | null>(null);
 
-  // NEW: Loading and error states for AI generation
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationError, setGenerationError] = useState<string | null>(null);
-
-  const handleEscalate = async (expertId: string) => {
+  const handleEscalate = (expertId: string) => {
     console.log("Escalating to expert:", expertId);
 
     // Find the expert data
@@ -127,46 +121,25 @@ function App() {
     // Check if we have a conversation ID
     if (!conversationId) {
       console.error("[Nudge] No conversationId available");
-      setGenerationError("No conversation found. Please start a chat first.");
       return;
     }
 
-    // Show loading state and clear any previous errors
-    setIsGenerating(true);
-    setGenerationError(null);
+    console.log("[Nudge] Using pre-generated content:", {
+      hasContext: !!suggestedNudge?.context,
+      hasQuestion: !!suggestedNudge?.question,
+      contextLength: suggestedNudge?.context?.length || 0,
+      questionLength: suggestedNudge?.question?.length || 0,
+    });
 
-    try {
-      console.log("[Nudge] Generating context and question...");
-
-      // Call both AI generation methods in parallel for faster performance
-      const [contextResult, questionResult] = await Promise.all([
-        window.nudgeAPI.generateContext(conversationId),
-        window.nudgeAPI.generateQuestion(conversationId),
-      ]);
-
-      console.log("[Nudge] Generation complete:", {
-        contextLength: contextResult.context.length,
-        questionLength: questionResult.question.length,
-      });
-
-      // Send nudge creation request with AI-generated content
-      window.nudgeAPI?.createNudge({
-        expert: expertMatch.expert,
-        matchScore: expertMatch.matchScore,
-        conversationId,
-        context: contextResult.context, // NEW: Pre-filled AI context
-        question: questionResult.question, // NEW: Pre-filled AI question
-      });
-
-      // Success! Clear loading state
-      setIsGenerating(false);
-    } catch (error) {
-      console.error("[Nudge] Generation failed:", error);
-      setIsGenerating(false);
-      setGenerationError(
-        error instanceof Error ? error.message : "Failed to generate content. Please try again."
-      );
-    }
+    // Send nudge creation request with pre-generated content
+    // Fallback to empty strings for manual nudge creation flow
+    window.nudgeAPI?.createNudge({
+      expert: expertMatch.expert,
+      matchScore: expertMatch.matchScore,
+      conversationId,
+      context: suggestedNudge?.context || "",
+      question: suggestedNudge?.question || "",
+    });
   };
 
   // Listen for expert data from Agent window
@@ -174,10 +147,22 @@ function App() {
     window.nudgeAPI?.onNudgeShow((data: any) => {
       console.log("[Nudge] Received expert data:", data);
 
-      // Store conversationId for context generation
+      // Store conversationId for reference
       if (data?.conversationId) {
         setConversationId(data.conversationId);
         console.log("[Nudge] Stored conversationId:", data.conversationId);
+      }
+
+      // Store suggestedNudge (AI-generated context/question)
+      if (data?.suggestedNudge) {
+        setSuggestedNudge(data.suggestedNudge);
+        console.log("[Nudge] Stored suggestedNudge:", {
+          contextLength: data.suggestedNudge.context?.length || 0,
+          questionLength: data.suggestedNudge.question?.length || 0,
+        });
+      } else {
+        console.log("[Nudge] No suggestedNudge in data (manual flow)");
+        setSuggestedNudge(null);
       }
 
       if (data?.experts && Array.isArray(data.experts)) {
@@ -218,33 +203,6 @@ function App() {
         }}
         onEscalate={handleEscalate}
       />
-
-      {/* Loading Overlay - Shows while AI generates content */}
-      {isGenerating && (
-        <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-[#2a2a2a] rounded-2xl p-6 text-center max-w-sm">
-            <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-white font-semibold text-lg">Generating context...</p>
-            <p className="text-white/60 text-sm mt-2">This will only take a moment</p>
-          </div>
-        </div>
-      )}
-
-      {/* Error Overlay - Shows if generation fails */}
-      {generationError && (
-        <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-[#2a2a2a] rounded-2xl p-6 text-center max-w-sm">
-            <p className="text-red-400 font-semibold text-lg mb-4">Generation Failed</p>
-            <p className="text-white/80 text-sm mb-6">{generationError}</p>
-            <button
-              onClick={() => setGenerationError(null)}
-              className="px-6 py-2 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

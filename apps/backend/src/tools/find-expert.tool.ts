@@ -1,5 +1,6 @@
-import { BaseTool, ToolContext, ToolParameters, ToolResult } from "./base.tool";
+import { BaseTool, ToolContext, ToolParameters, ToolResult, SuggestedNudge } from "./base.tool";
 import { expertMatchingService } from "../services/expertMatching.service";
+import { nudgeHelperService } from "../services/nudgeHelper.service";
 
 /**
  * Find Expert Tool
@@ -89,7 +90,7 @@ export class FindExpertTool extends BaseTool {
 
       console.log("[FindExpertTool] Experts found:", {
         count: experts.length,
-        topExpert: experts[0]?.name,
+        topExpert: experts[0]?.expert.name,
         topScore: experts[0]?.matchScore,
       });
 
@@ -106,36 +107,54 @@ export class FindExpertTool extends BaseTool {
       console.log(`[FindExpertTool] Found ${experts.length} expert matches`);
 
       // Format response message
-      const expertNames = experts.map((e) => e.name).join(", ");
+      const expertNames = experts.map((e) => e.expert.name).join(", ");
       const topExpert = experts[0];
 
       const responseText = `I found ${experts.length} expert${experts.length > 1 ? "s" : ""} who can help with this: ${expertNames}.
 
-${topExpert.name} seems like the best match - they have ${topExpert.expertise.topics.slice(0, 2).join(" and ")} expertise with a ${topExpert.performance.helpfulnessScore.toFixed(1)}/5.0 helpfulness rating.
+${topExpert.expert.name} seems like the best match - they have ${topExpert.expertise.topics.slice(0, 2).join(" and ")} expertise with a ${topExpert.performance.helpfulnessScore.toFixed(1)}/5.0 helpfulness rating.
 
 I'm showing you their profiles now so you can reach out!`;
 
-      console.log("[FindExpertTool] Success - triggering Nudge window:", {
+      // Generate suggested nudge content if conversation history exists
+      let suggestedNudge: SuggestedNudge | undefined;
+      if (context.conversationHistory && context.conversationHistory.length > 0) {
+        try {
+          console.log("[FindExpertTool] Generating nudge content from conversation");
+
+          // Generate context and question in parallel for efficiency
+          const [contextText, questionText] = await Promise.all([
+            nudgeHelperService.generateContext(context.conversationHistory),
+            nudgeHelperService.generateQuestion(context.conversationHistory),
+          ]);
+
+          suggestedNudge = {
+            context: contextText,
+            question: questionText,
+          };
+
+          console.log("[FindExpertTool] Nudge content generated successfully");
+        } catch (error) {
+          console.error("[FindExpertTool] Error generating nudge content:", error);
+          // Continue without suggested nudge - not critical
+        }
+      }
+
+      console.log("[FindExpertTool] Success - returning experts for inline display:", {
         expertsCount: experts.length,
-        expertNames: experts.map((e) => e.name),
-        windowTrigger: "nudge",
+        expertNames: experts.map((e) => e.expert.name),
+        hasSuggestedNudge: !!suggestedNudge,
       });
 
-      // Return with window trigger to launch Nudge window
+      // Return experts message for inline rendering in conversation
       return {
         messageType: "experts",
         content: responseText,
         cardData: {
           experts: experts,
+          suggestedNudge: suggestedNudge,
         },
         streamable: true,
-        triggerWindow: {
-          window: "nudge",
-          data: {
-            experts: experts,
-            query: query,
-          },
-        },
       };
     } catch (error) {
       console.error("[FindExpertTool] Error finding experts:", error);

@@ -8,7 +8,8 @@ let agentWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
-let guideWindow: BrowserWindow | null = null;
+// eslint-disable-next-line prefer-const
+let guideWindow: BrowserWindow | null = null; // Not reassigned yet, but used in window management logic
 let nudgeWindow: BrowserWindow | null = null;
 
 // Auth token storage (shared across all windows)
@@ -279,45 +280,54 @@ function createOverlayWindow() {
   });
 }
 
-function createGuideWindow() {
-  if (!agentWindow || agentWindow.isDestroyed()) {
-    console.error("[Guide] Cannot create guide window - agent window not available");
-    return;
-  }
+/**
+ * DEPRECATED: Guide Window
+ *
+ * The guide window has been removed - all workflow UI now appears in the conversation window.
+ * Previously showed step-by-step instructions in a separate floating panel.
+ * Now WorkflowOptions and StepList components render directly in conversation messages.
+ *
+ * Kept for reference only - can be deleted after confirming new system works.
+ */
+// function createGuideWindow() {
+//   if (!agentWindow || agentWindow.isDestroyed()) {
+//     console.error("[Guide] Cannot create guide window - agent window not available");
+//     return;
+//   }
 
-  guideWindow = new BrowserWindow({
-    width: 400,
-    height: 600,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    show: false,
-    modal: false, // Non-modal so other windows remain interactive
-    webPreferences: {
-      preload: join(__dirname, "../preload/guide.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
+//   guideWindow = new BrowserWindow({
+//     width: 400,
+//     height: 600,
+//     frame: false,
+//     transparent: true,
+//     alwaysOnTop: true,
+//     show: false,
+//     modal: false, // Non-modal so other windows remain interactive
+//     webPreferences: {
+//       preload: join(__dirname, "../preload/guide.cjs"),
+//       contextIsolation: true,
+//       nodeIntegration: false,
+//     },
+//   });
 
-  // Add platform-specific always-on-top for proper z-order
-  if (process.platform === "darwin") {
-    guideWindow.setAlwaysOnTop(true, "modal-panel");
-    guideWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  } else {
-    guideWindow.setAlwaysOnTop(true, "normal", 1);
-  }
+//   // Add platform-specific always-on-top for proper z-order
+//   if (process.platform === "darwin") {
+//     guideWindow.setAlwaysOnTop(true, "modal-panel");
+//     guideWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+//   } else {
+//     guideWindow.setAlwaysOnTop(true, "normal", 1);
+//   }
 
-  if (!app.isPackaged) {
-    guideWindow.loadURL("http://localhost:5173/guide/index.html");
-  } else {
-    guideWindow.loadFile(join(__dirname, "../renderer/guide.html"));
-  }
+//   if (!app.isPackaged) {
+//     guideWindow.loadURL("http://localhost:5173/guide/index.html");
+//   } else {
+//     guideWindow.loadFile(join(__dirname, "../renderer/guide.html"));
+//   }
 
-  guideWindow.on("closed", () => {
-    guideWindow = null;
-  });
-}
+//   guideWindow.on("closed", () => {
+//     guideWindow = null;
+//   });
+// }
 
 function createNudgeWindow() {
   if (!agentWindow || agentWindow.isDestroyed()) {
@@ -575,112 +585,142 @@ function setupIPC() {
     }
   });
 
-  // Guide system
-  ipcMain.on(IPC_CHANNELS.GUIDE_START, (_event, data) => {
-    // Show and position overlay window
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
-      overlayWindow.show();
-    }
+  /**
+   * DEPRECATED: Guide System IPC Handlers
+   *
+   * All guide-related IPC has been replaced by WorkflowOptions metadata system.
+   * Guide window no longer exists - workflow UI is now inline in conversation messages.
+   *
+   * OLD FLOW:
+   * - GUIDE_START → show guide window + overlay
+   * - GUIDE_NEXT_STEP → call /guides/progress API → update guide window
+   * - GUIDE_COMPLETE → hide guide window + overlay
+   *
+   * NEW FLOW:
+   * - User clicks WorkflowOptions button in conversation window
+   * - Metadata sent to /conversations/:id/messages/stream
+   * - Agent service selects appropriate tool (guide_next_step, analyze_workflow_screen, etc.)
+   * - Tool response streams back to conversation window (no separate guide window)
+   *
+   * Kept for reference - can be deleted after confirming new system works.
+   */
 
-    // Position and show guide window
-    if (guideWindow && !guideWindow.isDestroyed()) {
-      // Position on left side of screen with some margin
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const { height: screenHeight } = primaryDisplay.bounds;
-      const guideWidth = 400;
-      const guideHeight = 400;
+  // // Guide system
+  // ipcMain.on(IPC_CHANNELS.GUIDE_START, (_event, data) => {
+  //   // Show and position overlay window
+  //   if (overlayWindow && !overlayWindow.isDestroyed()) {
+  //     overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
+  //     overlayWindow.show();
+  //   }
 
-      guideWindow.setBounds({
-        x: 50,
-        y: Math.floor((screenHeight - guideHeight) / 2),
-        width: guideWidth,
-        height: guideHeight,
-      });
+  //   // Position and show guide window
+  //   if (guideWindow && !guideWindow.isDestroyed()) {
+  //     // Position on left side of screen with some margin
+  //     const primaryDisplay = screen.getPrimaryDisplay();
+  //     const { height: screenHeight } = primaryDisplay.bounds;
+  //     const guideWidth = 400;
+  //     const guideHeight = 400;
 
-      guideWindow.webContents.send(IPC_CHANNELS.GUIDE_DATA, data);
-      guideWindow.show();
-    }
+  //     guideWindow.setBounds({
+  //       x: 50,
+  //       y: Math.floor((screenHeight - guideHeight) / 2),
+  //       width: guideWidth,
+  //       height: guideHeight,
+  //     });
 
-    // Hide nudge window if visible
-    if (nudgeWindow && !nudgeWindow.isDestroyed() && nudgeWindow.isVisible()) {
-      nudgeWindow.hide();
-    }
-  });
+  //     guideWindow.webContents.send(IPC_CHANNELS.GUIDE_DATA, data);
+  //     guideWindow.show();
+  //   }
 
-  // Guide step update - forward to overlay
-  ipcMain.on(IPC_CHANNELS.GUIDE_STEP_UPDATE, (_event, data) => {
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
-    }
-  });
+  //   // Hide nudge window if visible
+  //   if (nudgeWindow && !nudgeWindow.isDestroyed() && nudgeWindow.isVisible()) {
+  //     nudgeWindow.hide();
+  //   }
+  // });
 
-  ipcMain.on(IPC_CHANNELS.GUIDE_COMPLETE, () => {
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.hide();
-    }
-    if (guideWindow && !guideWindow.isDestroyed()) {
-      guideWindow.hide();
-    }
-  });
+  // // Guide step update - forward to overlay
+  // ipcMain.on(IPC_CHANNELS.GUIDE_STEP_UPDATE, (_event, data) => {
+  //   if (overlayWindow && !overlayWindow.isDestroyed()) {
+  //     overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
+  //   }
+  // });
 
-  // Guide next step - forward to Agent window to trigger screenshot + "Next" message
-  ipcMain.on(IPC_CHANNELS.GUIDE_NEXT_STEP, () => {
-    if (agentWindow && !agentWindow.isDestroyed()) {
-      console.log("[Main] Guide next step requested - forwarding to Agent window");
-      agentWindow.webContents.send(IPC_CHANNELS.AGENT_GUIDE_NEXT_STEP);
-    }
-  });
+  // ipcMain.on(IPC_CHANNELS.GUIDE_COMPLETE, () => {
+  //   if (overlayWindow && !overlayWindow.isDestroyed()) {
+  //     overlayWindow.hide();
+  //   }
+  //   if (guideWindow && !guideWindow.isDestroyed()) {
+  //     guideWindow.hide();
+  //   }
+  // });
 
-  ipcMain.handle(
-    IPC_CHANNELS.GUIDE_NEXT_STEP,
-    async (_event, data: { conversationId: string; currentStepIndex: number }) => {
-      console.log("[Main] Guide progress requested:", data);
+  // // Guide next step - forward to Agent window to trigger screenshot + "Next" message
+  // ipcMain.on(IPC_CHANNELS.GUIDE_NEXT_STEP, () => {
+  //   if (agentWindow && !agentWindow.isDestroyed()) {
+  //     console.log("[Main] Guide next step requested - forwarding to Agent window");
+  //     agentWindow.webContents.send(IPC_CHANNELS.AGENT_GUIDE_NEXT_STEP);
+  //   }
+  // });
 
-      try {
-        const screenshot = await captureService.capture({ mode: "full-screen" });
-        if (!screenshot) {
-          console.error("[Main] Screenshot capture failed");
-          return { error: "Screenshot capture failed" };
-        }
+  // ipcMain.handle(
+  //   IPC_CHANNELS.GUIDE_NEXT_STEP,
+  //   async (_event, data: { conversationId: string; currentStepIndex: number }) => {
+  //     console.log("[Main] Guide progress requested:", data);
 
-        const response = await fetch("http://localhost:3000/api/guides/progress", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authTokens.accessToken}`,
-          },
-          body: JSON.stringify({
-            conversationId: data.conversationId,
-            screenshot: screenshot.dataUrl,
-            currentStepIndex: data.currentStepIndex,
-          }),
-        });
+  //     try {
+  //       const screenshot = await captureService.capture({ mode: "full-screen" });
+  //       if (!screenshot) {
+  //         console.error("[Main] Screenshot capture failed");
+  //         return { error: "Screenshot capture failed" };
+  //       }
 
-        const result = await response.json();
+  //       const response = await fetch("http://localhost:3000/api/guides/progress", {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //           Authorization: `Bearer ${authTokens.accessToken}`,
+  //         },
+  //         body: JSON.stringify({
+  //           conversationId: data.conversationId,
+  //           screenshot: screenshot.dataUrl,
+  //           currentStepIndex: data.currentStepIndex,
+  //         }),
+  //       });
 
-        if (guideWindow && !guideWindow.isDestroyed()) {
-          guideWindow.webContents.send(IPC_CHANNELS.GUIDE_STEP_UPDATE, result);
-        }
+  //       const result = await response.json();
 
-        if (agentWindow && !agentWindow.isDestroyed() && result.visualGuidance) {
-          agentWindow.webContents.send("agent:stream-message", {
-            content: result.visualGuidance.elementDescription,
-          });
-        }
+  //       // Update the guide window with the new step
+  //       if (guideWindow && !guideWindow.isDestroyed()) {
+  //         guideWindow.webContents.send(IPC_CHANNELS.GUIDE_STEP_UPDATE, result);
+  //       }
 
-        console.log("[Main] Guide progress complete:", {
-          adjusted: result.adjustmentMade,
-          currentStep: result.adjustedSolution?.currentStepIndex,
-        });
+  //       // Forward the conversational message to the conversation window
+  //       // This displays the step guidance in the chat
+  //       if (conversationWindow && !conversationWindow.isDestroyed() && result.visualGuidance) {
+  //         conversationWindow.webContents.send(
+  //           IPC_CHANNELS.CONVERSATION_SEND_MESSAGE,
+  //           {
+  //             message: result.visualGuidance.conversationalMessage,
+  //             conversationId: data.conversationId,
+  //             messageType: "workflow",
+  //             cardData: result.adjustedSolution,
+  //           },
+  //           null  // screenshot parameter (null for step 2+)
+  //         );
+  //       }
 
-        return result;
-      } catch (error) {
-        console.error("[Main] Guide progress error:", error);
-        return { error: "Failed to progress guide" };
-      }
-    }
-  );
+  //       console.log("[Main] Guide progress complete:", {
+  //         adjusted: result.adjustmentMade,
+  //         currentStep: result.adjustedSolution?.currentStepIndex,
+  //       });
+
+  //       return result;
+  //     } catch (error) {
+  //       console.error("[Main] Guide progress error:", error);
+  //       return { error: "Failed to progress guide" };
+  //     }
+  //   }
+  // );
 
   // Nudge system
   ipcMain.on(IPC_CHANNELS.NUDGE_SHOW, (_event, data) => {
@@ -727,6 +767,23 @@ function setupIPC() {
     // Hide nudge window after triggering creation
     if (nudgeWindow && !nudgeWindow.isDestroyed()) {
       nudgeWindow.hide();
+    }
+  });
+
+  // NEW: Direct nudge creation from conversation window (inline expert cards)
+  ipcMain.on(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, (_event, data) => {
+    console.log("[Main] Opening Console nudge form with inline expert data:", data);
+
+    // Show and focus console window
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+
+      // Forward nudge creation data to console
+      // Console will navigate to /nudges/new and populate the form
+      consoleWindow.webContents.send(IPC_CHANNELS.NUDGE_OPEN_CREATOR, data);
+    } else {
+      console.error("[Main] Console window not available for nudge form");
     }
   });
 
@@ -979,7 +1036,8 @@ app.whenReady().then(() => {
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
   createConsoleWindow();
-  createGuideWindow(); // Create guide as child of agent
+  // DEPRECATED: Guide window no longer needed - workflow UI moved to conversation window
+  // createGuideWindow(); // Create guide as child of agent
   createOverlayWindow(); // Create overlay as child of guide (must be after guide)
   createNudgeWindow(); // Create nudge as child of agent
 
