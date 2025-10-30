@@ -98,7 +98,9 @@ export class VisualGuidanceAgent extends BaseAgent {
       // Handle metadata-driven routing (deterministic)
       if (context.metadata?.workflowAction === "progress_step") {
         // User clicked "Move on to next step" - progress workflow
-        const result = await this.guideNextStepTool.execute({}, context);
+        const result = await this.guideNextStepTool.execute({
+          conversationId: context.conversationId,
+        }, context);
 
         yield {
           type: "complete",

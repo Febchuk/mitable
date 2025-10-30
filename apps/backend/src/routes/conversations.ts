@@ -3,7 +3,10 @@ import { eq, sql, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
-import { agentService } from "../services/agent.service";
+import { OrchestratorService } from "../services/orchestrator.service";
+
+// Initialize orchestrator (replaces old agentService)
+const orchestrator = new OrchestratorService();
 
 const router = Router();
 
@@ -856,12 +859,13 @@ router.post(
       let assistantWindowTrigger: any = undefined;
 
       try {
-        console.log("[Conversations] Starting AgentService.processMessage");
+        console.log("[Conversations] Starting OrchestratorService.processMessage");
 
-        // Stream AI response
-        const stream = agentService.processMessage(content, {
+        // Stream AI response using multi-agent orchestrator
+        const stream = orchestrator.processMessage({
           conversationId,
           userId,
+          organizationId: user.organizationId, // Required for multi-agent architecture
           screenshot: screenshot || undefined, // Pass screenshot if provided
           screenshotMetadata: screenshotMetadata || undefined, // Pass metadata (scaleFactor, dimensions)
           metadata: metadata || undefined, // Pass metadata from WorkflowOptions UI interactions

@@ -32,17 +32,17 @@ interface Intent {
  *
  * Routing Strategy:
  * 1. Metadata-driven (deterministic):
- *    - workflowAction = "progress_step" ’ VisualGuidanceAgent
- *    - workflowAction = "exit_workflow" ’ TextResponseAgent
+ *    - workflowAction = "progress_step" ï¿½ VisualGuidanceAgent
+ *    - workflowAction = "exit_workflow" ï¿½ TextResponseAgent
  *
  * 2. Intent-based (LLM classification):
- *    - "workflow_start" + screenshot ’ VisualGuidanceAgent
- *    - "knowledge_search" ’ KnowledgeAgent
- *    - "expert_request" ’ ExpertMatchingAgent
- *    - "general_chat" ’ TextResponseAgent
+ *    - "workflow_start" + screenshot ï¿½ VisualGuidanceAgent
+ *    - "knowledge_search" ï¿½ KnowledgeAgent
+ *    - "expert_request" ï¿½ ExpertMatchingAgent
+ *    - "general_chat" ï¿½ TextResponseAgent
  *
  * 3. Fallback handling:
- *    - Knowledge search returns no results ’ ExpertMatchingAgent
+ *    - Knowledge search returns no results ï¿½ ExpertMatchingAgent
  *
  * Agents:
  * - TextResponseAgent: Simple responses (Gemini Flash)
@@ -80,10 +80,17 @@ export class OrchestratorService {
    */
   async *processMessage(context: ToolContext): AsyncIterable<StreamChunk> {
     try {
-      // Step 1: Pre-load workflow state for all agents
-      const workflowState = await guideGenerationService.retrieveLatestSolutionObject(
-        context.conversationId
-      );
+      // Step 1: Pre-load workflow state for all agents (gracefully handle errors)
+      let workflowState = null;
+      try {
+        workflowState = await guideGenerationService.retrieveLatestSolutionObject(
+          context.conversationId
+        );
+      } catch (error) {
+        // Workflow state retrieval failed - not critical, continue without it
+        console.log("[Orchestrator] Workflow state retrieval failed (non-critical):",
+          error instanceof Error ? error.message : "Unknown error");
+      }
       context.workflowState = workflowState || undefined;
 
       console.log("[Orchestrator] Processing message:", {
@@ -95,13 +102,13 @@ export class OrchestratorService {
 
       // Step 2: Metadata-driven routing (deterministic)
       if (context.metadata?.workflowAction === "progress_step") {
-        console.log("[Orchestrator] Routing: metadata ’ VisualGuidanceAgent (progress_step)");
+        console.log("[Orchestrator] Routing: metadata ï¿½ VisualGuidanceAgent (progress_step)");
         yield* this.visualGuidanceAgent.execute(context);
         return;
       }
 
       if (context.metadata?.workflowAction === "exit_workflow") {
-        console.log("[Orchestrator] Routing: metadata ’ TextResponseAgent (exit_workflow)");
+        console.log("[Orchestrator] Routing: metadata ï¿½ TextResponseAgent (exit_workflow)");
         yield* this.textAgent.execute(context);
         return;
       }
@@ -117,7 +124,7 @@ export class OrchestratorService {
       // Step 4: Route based on intent
       const agent = await this.routeByIntent(intent, context);
 
-      console.log("[Orchestrator] Routing: intent ’ Agent:", agent.name);
+      console.log("[Orchestrator] Routing: intent ï¿½ Agent:", agent.name);
 
       // Step 5: Execute agent and forward responses
       yield* agent.execute(context);
@@ -145,7 +152,7 @@ export class OrchestratorService {
       }
 
       // Use Gemini Flash for classification
-      const model = this.gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = this.gemini.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
       const prompt = `Classify the following user message into ONE of these intents:
 
