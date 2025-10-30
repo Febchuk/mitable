@@ -24,14 +24,14 @@ import type { WorkflowPhase } from "@mitable/shared";
  * };
  *
  * // Smart wrapper decides if wrapping is needed
- * const result = await wrapWithWorkflowState(baseMessage, context);
+ * const result = wrapWithWorkflowState(baseMessage, context);
  * // Type: TextMessage | WorkflowMessage
  */
-export async function wrapWithWorkflowState(
+export function wrapWithWorkflowState(
   baseMessage: TextMessage,
   context: ToolContext,
   workflowPhase: WorkflowPhase = "custom_question"
-): Promise<TextMessage | WorkflowMessage> {
+): TextMessage | WorkflowMessage {
   // Check if workflow state exists (pre-loaded by orchestrator)
   const workflowState = context.workflowState;
 

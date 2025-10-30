@@ -1,5 +1,5 @@
 import type { Message } from "../db/schema/conversations.schema";
-import type { SolutionObject, EmbeddingMatch, ExpertMatch } from "@mitable/shared";
+import type { SolutionObject, EmbeddingMatch, ExpertMatch, Step, AdjustmentRecord } from "@mitable/shared";
 
 // ============================================================================
 // TOOL DEFINITION TYPES
@@ -118,19 +118,10 @@ export interface WorkflowMessage extends BaseMessage {
     supportingData: EmbeddingMatch[];
     solutionExplanation: string;
     supportingDataExplanation: string;
-    stepList: Array<{
-      stepNumber: number;
-      description: string;
-      status: "pending" | "current" | "completed";
-    }>;
+    stepList: Step[];
     currentStepIndex: number;
     searchQuery: string;
-    adjustmentHistory: Array<{
-      timestamp: Date;
-      reason: string;
-      oldPlan: any[];
-      newPlan: any[];
-    }>;
+    adjustmentHistory: AdjustmentRecord[];
     // Workflow UI state
     workflowActive: true;
     workflowPhase: "initial_proposal" | "step_progression" | "custom_question";
