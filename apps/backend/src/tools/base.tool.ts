@@ -45,6 +45,12 @@ export interface ToolContext {
     email: string;
     organizationId: string;
   };
+  metadata?: {
+    // Metadata from frontend UI interactions
+    workflowAction?: "progress_step" | "custom_question" | "exit_workflow";
+    selectedOption?: number; // Which option was selected from WorkflowOptions (1, 2, or 3)
+    [key: string]: any; // Allow additional metadata fields
+  };
 }
 
 /**

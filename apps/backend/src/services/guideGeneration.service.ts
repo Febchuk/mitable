@@ -357,6 +357,15 @@ class GuideGenerationService {
     return result[0].cardData as SolutionObject;
   }
 
+  /**
+   * Retrieve the latest SolutionObject from a conversation
+   * Alias for retrieveSolutionObject with more semantic clarity
+   * Used by guide_next_step tool to get current workflow state
+   */
+  async retrieveLatestSolutionObject(conversationId: string): Promise<SolutionObject | null> {
+    return this.retrieveSolutionObject(conversationId);
+  }
+
   async updateSolutionObject(
     conversationId: string,
     updatedSolution: SolutionObject,

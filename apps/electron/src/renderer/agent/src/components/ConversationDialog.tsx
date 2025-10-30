@@ -2,6 +2,8 @@ import { Code, LucideIcon, Users, Workflow } from "lucide-react";
 import UserMessage from "../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../components/domain/messages/AIMessage";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+import WorkflowOptions, { WorkflowPhase } from "../../../components/domain/workflow/WorkflowOptions";
+import StepList from "../../../components/domain/workflow/StepList";
 
 interface Message {
   id: string;
@@ -19,17 +21,70 @@ interface Message {
 
 interface ConversationDialogProps {
   messages: Message[];
-  onSubmit: (message: string) => void;
+  onSubmit: (message: string, metadata?: any) => void;
   onClose: () => void;
   onCardClick: (message: Message) => void;
 }
 
 export default function ConversationDialog({
   messages,
-  onSubmit: _onSubmit,
+  onSubmit,
   onClose,
   onCardClick,
 }: ConversationDialogProps) {
+  const handleWorkflowOptionSelect = (option: any) => {
+    // Map option action to metadata and message
+    const { action, label } = option;
+
+    let metadata: any = {};
+    let message = "";
+
+    switch (action) {
+      case "progress_step":
+        // User wants to move to next step
+        metadata = {
+          workflowAction: "progress_step",
+          selectedOption: 1,
+        };
+        message = "Move on to next step";
+        break;
+
+      case "custom_question":
+      case "ask_questions":
+        // User typed a custom question
+        metadata = {
+          workflowAction: "custom_question",
+          selectedOption: 2,
+        };
+        message = label; // The actual question text
+        break;
+
+      case "exit_workflow":
+        // User wants to exit the workflow
+        metadata = {
+          workflowAction: "exit_workflow",
+          selectedOption: 3,
+        };
+        message = "Exit workflow";
+        break;
+
+      case "confirm_start":
+        // User confirmed to start the workflow (from initial proposal)
+        metadata = {
+          workflowAction: "progress_step",
+          selectedOption: 1,
+        };
+        message = "Yes, let's get started!";
+        break;
+
+      default:
+        message = label;
+    }
+
+    // Send message with metadata
+    onSubmit(message, metadata);
+  };
+
   return (
     <div className="relative w-full h-[600px] flex flex-col bg-background-secondary rounded-2xl overflow-hidden app-no-drag">
       {/* Close Button */}
@@ -50,8 +105,14 @@ export default function ConversationDialog({
           }
 
           // Render AI messages (assistant)
-          // AI messages can have BOTH text content AND a card
-          // Determine card title/subtitle/icon based on messageType
+          const isWorkflowMessage = message.messageType === "workflow" && message.cardData?.workflowActive;
+          const workflowPhase = message.cardData?.workflowPhase as WorkflowPhase | undefined;
+
+          // Determine if we should show step list based on phase
+          const shouldShowStepList = isWorkflowMessage && workflowPhase && workflowPhase !== "custom_question";
+          const shouldShowCheckboxes = workflowPhase === "step_progression";
+
+          // Determine card title/subtitle/icon for non-workflow cards
           let title = "";
           let subtitle = "";
           let Icon: LucideIcon = Code;
@@ -61,11 +122,12 @@ export default function ConversationDialog({
             title = `${expertCount} Expert${expertCount > 1 ? "s" : ""} Available`;
             subtitle = "View Experts";
             Icon = Users;
-          } else if (message.messageType === "workflow" && message.cardData) {
+          } else if (message.messageType === "workflow" && message.cardData && !isWorkflowMessage) {
+            // Old workflow card format (before our changes)
             title = message.cardData.guide?.title || "Interactive Workflow";
             subtitle = "Start Guide";
             Icon = Workflow;
-          } else if (message.cardData) {
+          } else if (message.cardData && !isWorkflowMessage) {
             // Fallback for unknown card types
             title = message.cardData.title || "Card";
             subtitle = message.cardData.subtitle || "Click to view";
@@ -73,11 +135,36 @@ export default function ConversationDialog({
 
           return (
             <div key={message.id} className="space-y-3">
-              {/* Always show AI text response if it exists */}
-              {message.content && <AIMessage content={message.content} />}
+              {/* Show workflow components for active workflows */}
+              {isWorkflowMessage && (
+                <>
+                  {/* 1. FIRST: Show step list for initial_proposal and step_progression phases */}
+                  {shouldShowStepList && message.cardData.stepList && (
+                    <StepList
+                      steps={message.cardData.stepList}
+                      currentStepIndex={message.cardData.currentStepIndex || 0}
+                      showCheckboxes={shouldShowCheckboxes}
+                    />
+                  )}
 
-              {/* Show card below the text if cardData exists */}
-              {message.type === "card" && message.cardData && (
+                  {/* 2. SECOND: Show AI text response (conversational message) */}
+                  {message.content && <AIMessage content={message.content} />}
+
+                  {/* 3. THIRD: Always show WorkflowOptions for workflow messages */}
+                  {workflowPhase && (
+                    <WorkflowOptions
+                      phase={workflowPhase}
+                      onOptionSelect={handleWorkflowOptionSelect}
+                    />
+                  )}
+                </>
+              )}
+
+              {/* Show AI message for non-workflow messages */}
+              {!isWorkflowMessage && message.content && <AIMessage content={message.content} />}
+
+              {/* Show card below the text if cardData exists (non-workflow cards) */}
+              {message.type === "card" && message.cardData && !isWorkflowMessage && (
                 <Card
                   className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors app-no-drag"
                   onClick={() => onCardClick(message)}

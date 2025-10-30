@@ -17,6 +17,7 @@ const IPC_CHANNELS = {
   GUIDE_START: "guide-start",
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
+  CAPTURE_SCREENSHOT: "capture-screenshot",
 } as const;
 
 contextBridge.exposeInMainWorld("conversationAPI", {
@@ -117,6 +118,22 @@ contextBridge.exposeInMainWorld("conversationAPI", {
   // Open conversation in console
   openConversationInConsole: (conversationId: string) =>
     ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHAT, conversationId),
+
+  // Screenshot capture - for workflow visual guidance
+  // Returns {dataUrl: string, metadata: ScreenshotMetadata} or null on failure
+  captureScreenshot: (): Promise<{
+    dataUrl: string;
+    metadata: {
+      width: number;
+      height: number;
+      timestamp: number;
+      boundingBoxes?: unknown[];
+      window?: unknown;
+    };
+  } | null> => {
+    console.log("[Conversation Preload] captureScreenshot() called from renderer");
+    return ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
+  },
 
   // Auth management - Conversation requests token from main process
   getAuthToken: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_TOKEN),

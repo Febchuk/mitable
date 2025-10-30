@@ -3,35 +3,34 @@ import { geminiVisionService } from "../services/gemini-vision.service.js";
 import { guideGenerationService } from "../services/guideGeneration.service.js";
 import type { SolutionObject, EmbeddingMatch } from "@mitable/shared";
 
-export class ShowStepByStepGuideTool extends BaseTool {
-  name = "show_step_by_step_guide";
+export class StartUIGuidanceWorkflowTool extends BaseTool {
+  name = "start_ui_guidance_workflow";
 
-  description = `Generate step-by-step UI 
-  guidance for completing a task when the user
-  asks something similar to "How do I do [task]?" AND there is a 
-  screenshot available.
+  description = `Start an interactive UI guidance
+  workflow when the user asks "How do I do [task]?"
+  AND a screenshot is available.
+
+  This tool initiates a multi-step workflow where
+  the user progresses through steps one-by-one with
+  visual guidance tailored to their current screen.
 
   WHEN TO USE:
   - User asks: "How do I [task]?" + screenshot present
-  - User asks: "Show me how to..." + 
-  screenshot present  
-  - User asks: "Guide me through..." + 
+  - User asks: "Show me how to..." + screenshot present
+  - User asks: "Guide me through..." + screenshot present
+  - User says: "step by step" or "walk me through" +
   screenshot present
-  - User says: "step by step" or "walk me 
-  through" + screenshot present
 
   CRITICAL REQUIREMENTS:
-  1. Screenshot MUST be available (reject 
-  without screenshot)
-  2. ONLY call this AFTER search_knowledge - 
-  never call it first
-  3. Pass complete search results as 
-  supportingData (extract sources array)
+  1. Screenshot MUST be available (reject without)
+  2. ONLY call this AFTER search_knowledge - never first
+  3. Pass complete search results as supportingData
+  4. This creates the INITIAL workflow proposal
 
-  YOUR ROLE: Act as an intelligent coworker 
-  who synthesizes fragmented company 
-  documentation into actionable step-by-step 
-  guidance through systematic reasoning.`;
+  YOUR ROLE: Act as an intelligent coworker who
+  synthesizes fragmented company documentation into
+  actionable step-by-step guidance through systematic
+  reasoning.`;
 
   parameters: ToolParameters = {
     type: "object",
@@ -59,28 +58,6 @@ Examples:
   ✅ GOOD: "The search results show this is an Electron app with IPC-based communication. To debug profile loading, we need to trace: UserProfile.tsx → IPC channel → backend API → CloudWatch logs. AWS credentials are in 1Password per the team wiki."
   ❌ BAD: "The documentation says to do it this way."
   ❌ BAD: "This is how you fix bugs."`
-      },
-
-      supportingDataExplanation: {
-        type: "string",
-        description: `Explain HOW the specific search results in supportingData support your solution. This proves you actually used the search results to synthesize your steps, not just hallucinated them.
-
-Connect the dots: Show which search results informed which parts of your stepList.
-
-Examples:
-  ✅ GOOD: "The Slack message from #product-team reveals the canvas location (step 1-2), while the Notion transparency doc explains why we notify the team after changes (step 4)."
-  ✅ GOOD: "The GitHub README identifies the Electron architecture (informs steps 1-3), the #engineering Slack shows the API endpoint (step 4), Confluence provides the CloudWatch location (steps 6-8), and the email mentions 1Password credentials (step 5)."
-  ❌ BAD: "These docs are relevant to the task."
-  ❌ BAD: "The search results contain information about the solution."
-  
-This field is your proof of intelligent synthesis - show your work.`
-      },
-
-      searchQuery: {
-        type: "string",
-        description: `The exact query you used in search_knowledge. Include this for transparency and debugging.
-
-Simply provide the query string as-is, e.g., "product roadmap update" or "electron app profile loading debugging"`
       },
 
       supportingData: {
@@ -124,6 +101,28 @@ WHY THIS MATTERS:
 - Shows users where the information came from
 
 Extract directly from the sources array in search_knowledge response and pass through unchanged.`
+      },
+
+      searchQuery: {
+        type: "string",
+        description: `The exact query you used in search_knowledge. Include this for transparency and debugging.
+
+Simply provide the query string as-is, e.g., "product roadmap update" or "electron app profile loading debugging"`
+      },
+
+      supportingDataExplanation: {
+        type: "string",
+        description: `Explain HOW the specific search results in supportingData support your solution. This proves you actually used the search results to synthesize your steps, not just hallucinated them.
+
+Connect the dots: Show which search results informed which parts of your stepList.
+
+Examples:
+  ✅ GOOD: "The Slack message from #product-team reveals the canvas location (step 1-2), while the Notion transparency doc explains why we notify the team after changes (step 4)."
+  ✅ GOOD: "The GitHub README identifies the Electron architecture (informs steps 1-3), the #engineering Slack shows the API endpoint (step 4), Confluence provides the CloudWatch location (steps 6-8), and the email mentions 1Password credentials (step 5)."
+  ❌ BAD: "These docs are relevant to the task."
+  ❌ BAD: "The search results contain information about the solution."
+
+This field is your proof of intelligent synthesis - show your work.`
       },
 
       stepList: {
@@ -291,9 +290,9 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
     required: [
       "solution",
       "solutionExplanation",
-      "supportingDataExplanation",
-      "searchQuery",
       "supportingData",
+      "searchQuery",
+      "supportingDataExplanation",
       "stepList",
     ],
   };
@@ -301,7 +300,25 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
   async execute(args: Partial<SolutionObject>, context: ToolContext): Promise<ToolResult> {
     this.validate(args);
 
-    console.log("[ShowStepByStepGuideTool] Execute:", args.solution);
+    // Defensive validation: Check all required fields are present and non-empty
+    const missingFields: string[] = [];
+    if (!args.solution || args.solution.trim().length === 0) missingFields.push("solution");
+    if (!args.solutionExplanation || args.solutionExplanation.trim().length === 0) missingFields.push("solutionExplanation");
+    if (!args.supportingData || args.supportingData.length === 0) missingFields.push("supportingData");
+    if (!args.searchQuery || args.searchQuery.trim().length === 0) missingFields.push("searchQuery");
+    if (!args.supportingDataExplanation || args.supportingDataExplanation.trim().length === 0) missingFields.push("supportingDataExplanation");
+    if (!args.stepList || args.stepList.length === 0) missingFields.push("stepList");
+
+    if (missingFields.length > 0) {
+      console.error("[StartUIGuidanceWorkflowTool] Missing required fields:", missingFields);
+      return {
+        messageType: "text",
+        content: `Tool call incomplete. Missing or empty required fields: ${missingFields.join(", ")}. Please call start_ui_guidance_workflow again with all required parameters properly filled out.`,
+        streamable: true,
+      };
+    }
+
+    console.log("[StartUIGuidanceWorkflowTool] Execute:", args.solution);
 
     if (!context.screenshot) {
       return {
@@ -319,55 +336,55 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
       };
     }
 
+    // For initial proposal: ALL steps are "pending", currentStepIndex is -1 (not started)
+    // This shows a PREVIEW of the workflow without starting execution
     const solutionObject: SolutionObject = {
       solution: args.solution!,
       supportingData: args.supportingData as EmbeddingMatch[],
       solutionExplanation: args.solutionExplanation!,
       supportingDataExplanation: args.supportingDataExplanation!,
-      stepList: args.stepList!.map((s, idx) => ({
+      stepList: args.stepList!.map((s) => ({
         ...s,
-        status: idx === 0 ? "current" : "pending",
+        status: "pending", // All steps pending for initial proposal
       })),
-      currentStepIndex: 0,
+      currentStepIndex: -1, // -1 means workflow not started yet (preview mode)
       searchQuery: args.searchQuery!,
       adjustmentHistory: [],
     };
 
-    const firstStep = solutionObject.stepList[0];
-    const visualGuidance = await geminiVisionService.analyzeStepExecution(
-      context.screenshot,
-      solutionObject,
-      firstStep,
-      context.conversationHistory
-    );
+    // Calculate estimated time based on number of steps (rough estimate: 2-3 min per step)
+    const estimatedMinutes = solutionObject.stepList.length * 2.5;
+    const timeEstimate = estimatedMinutes < 60
+      ? `${Math.round(estimatedMinutes)} minutes`
+      : `${Math.round(estimatedMinutes / 60)} hour${estimatedMinutes >= 120 ? 's' : ''}`;
 
-    await guideGenerationService.storeSolutionObject(
-      context.conversationId,
-      `Step 1 of ${solutionObject.stepList.length}: ${firstStep.description}`,
-      solutionObject
-    );
+    // Generate a preview message explaining the plan (NO visual analysis yet)
+    const previewMessage = `I'll guide you through updating the product roadmap. This will take approximately ${timeEstimate} and involves ${solutionObject.stepList.length} steps:\n\n${solutionObject.solutionExplanation}\n\nWhen you're ready, click "Yes, let's get started!" below to begin.`;
 
-    // Use AI-generated conversational message instead of template
-    const guidanceText = visualGuidance.conversationalMessage;
+    console.log("[StartUIGuidanceWorkflowTool] Created workflow preview:", {
+      stepCount: solutionObject.stepList.length,
+      estimatedTime: timeEstimate,
+      currentStepIndex: solutionObject.currentStepIndex,
+      allStepsPending: solutionObject.stepList.every(s => s.status === "pending")
+    });
 
-    console.log(
-      "[ShowStepByStepGuideTool] Guide created with",
-      solutionObject.stepList.length,
-      "steps"
-    );
+    // NOTE: We do NOT call storeSolutionObject here because the agent service's
+    // streaming system automatically saves the message to the database with the
+    // cardData (which contains the full SolutionObject). Calling it here would
+    // create duplicate messages.
+    //
+    // The SolutionObject is preserved in cardData and will be retrieved by
+    // guide_next_step tool when user clicks "Yes, let's get started!"
 
     return {
       messageType: "workflow",
-      content: guidanceText,
-      cardData: solutionObject,
-      streamable: true,
-      triggerWindow: {
-        window: "guide",
-        data: {
-          stepList: solutionObject.stepList,
-          currentStepIndex: 0,
-        },
+      content: previewMessage,
+      cardData: {
+        ...solutionObject,
+        workflowActive: true,
+        workflowPhase: "initial_proposal",
       },
+      streamable: true,
     };
   }
 }

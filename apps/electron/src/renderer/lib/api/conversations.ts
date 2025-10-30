@@ -114,6 +114,7 @@ export async function getConversationMessages(conversationId: string): Promise<M
  * @param conversationId - Conversation ID
  * @param content - Message content
  * @param screenshot - Optional base64-encoded screenshot for visual guidance
+ * @param metadata - Optional metadata for workflow actions
  * @param onChunk - Callback for each streaming chunk
  * @param onComplete - Callback when streaming completes
  * @param onError - Callback for errors
@@ -134,17 +135,22 @@ export async function sendMessageStream(
     ) => void;
     onError?: (error: string) => void;
     onWindowTrigger?: (window: "nudge" | "guide", data: any) => void;
-  }
+  },
+  metadata?: any
 ): Promise<void> {
   const headers = await getAuthHeaders();
 
-  // Build request body with optional screenshot
-  const requestBody: { content: string; screenshot?: string } = { content };
+  // Build request body with optional screenshot and metadata
+  const requestBody: { content: string; screenshot?: string; metadata?: any } = { content };
   if (screenshot) {
     requestBody.screenshot = screenshot;
     console.log(`[API] Sending message with screenshot (${screenshot.length} bytes)`);
   } else {
     console.log("[API] Sending message without screenshot");
+  }
+  if (metadata) {
+    requestBody.metadata = metadata;
+    console.log(`[API] Sending message with metadata:`, metadata);
   }
 
   const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {

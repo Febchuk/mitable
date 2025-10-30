@@ -662,6 +662,23 @@ router.post(
  *                 type: string
  *                 description: User message content
  *                 example: How do I submit a pull request?
+ *               screenshot:
+ *                 type: string
+ *                 description: Base64 encoded screenshot (optional)
+ *               screenshotMetadata:
+ *                 type: object
+ *                 description: Screenshot metadata (optional)
+ *               metadata:
+ *                 type: object
+ *                 description: Metadata from WorkflowOptions UI interactions (optional)
+ *                 properties:
+ *                   workflowAction:
+ *                     type: string
+ *                     enum: [progress_step, custom_question, exit_workflow]
+ *                     description: The action selected from WorkflowOptions component
+ *                   selectedOption:
+ *                     type: number
+ *                     description: Which option number was selected (1, 2, or 3)
  *     responses:
  *       200:
  *         description: Streaming response (SSE)
@@ -698,7 +715,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id || req.userId;
     const { conversationId } = req.params;
-    const { content, screenshot, screenshotMetadata } = req.body;
+    const { content, screenshot, screenshotMetadata, metadata } = req.body;
 
     console.log("[Conversations] Request received:", {
       conversationId,
@@ -707,6 +724,7 @@ router.post(
       hasScreenshot: !!screenshot,
       screenshotLength: screenshot?.length || 0,
       screenshotMetadata,
+      metadata,
     });
 
     if (!userId) {
@@ -846,6 +864,7 @@ router.post(
           userId,
           screenshot: screenshot || undefined, // Pass screenshot if provided
           screenshotMetadata: screenshotMetadata || undefined, // Pass metadata (scaleFactor, dimensions)
+          metadata: metadata || undefined, // Pass metadata from WorkflowOptions UI interactions
           userProfile: {
             name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
             email: user.email,

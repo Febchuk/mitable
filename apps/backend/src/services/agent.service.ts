@@ -7,8 +7,14 @@ import { RespondTextTool } from "../tools/respond-text.tool";
 import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
 import { FindExpertTool } from "../tools/find-expert.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
+import { ClarifyIntentTool } from "../tools/clarify-intent.tool.js";
+import { StartUIGuidanceWorkflowTool } from "../tools/start-ui-guidance-workflow.tool.js";
+import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool.js";
+import { RespondTextInWorkflowTool } from "../tools/respond-text-in-workflow.tool.js";
+import { SearchKnowledgeInWorkflowTool } from "../tools/search-knowledge-in-workflow.tool.js";
 import { workflowService } from "./workflow.service";
-import { continuationDetectorService } from "./continuation-detector.service";
+// DEPRECATED: Continuation detector only used in commented-out code (see lines 310-402)
+// import { continuationDetectorService } from "./continuation-detector.service";
 
 /**
  * System prompt that defines the agent's role and personality
@@ -31,24 +37,55 @@ Your role is to:
 
 **TOOL USAGE GUIDELINES:**
 
-When the user asks "how do I..." or "guide me step by step" and a SCREENSHOT is available:
-- You MUST use the "show_step_by_step_guide" tool to provide visual UI guidance
-- DO NOT respond with text-only instructions when you can show them visually
-- The visual guidance tool will:
-  * Analyze their current screen with Gemini Vision
-  * Generate one step at a time based on what's visible
-  * Display overlay arrows pointing to UI elements
-  * Show a side panel with instructions
+VAGUE PROMPTS (with screenshot):
+- User says: "How do I do this?", "Help me with this", "What should I click?"
+- Use clarify_intent to analyze screen and offer specific task interpretations
+- Wait for user to select which task they meant
+- Then proceed with knowledge search + guidance
 
-When to use show_step_by_step_guide:
-- User asks: "How do I [task]?" + screenshot present → Use this tool
-- User asks: "Show me how to..." + screenshot present → Use this tool
-- User asks: "Guide me through..." + screenshot present → Use this tool
-- User says: "step by step" or "walk me through" + screenshot present → Use this tool
+SPECIFIC UI TASKS (with screenshot):
+- User asks: "How do I [specific task]?" or "Guide me through [task]"
+- STEP 1: Use search_knowledge to find company documentation
+- STEP 2: Use start_ui_guidance_workflow with search results for knowledge-grounded guidance
+- IMPORTANT: ALWAYS search first, then provide guidance based on those results
 
-When NOT to use show_step_by_step_guide:
+When to use start_ui_guidance_workflow:
+- User asks: "How do I [task]?" + screenshot present → Use this tool to START workflow
+- User asks: "Show me how to..." + screenshot present → Use this tool to START workflow
+- User asks: "Guide me through..." + screenshot present → Use this tool to START workflow
+- User says: "step by step" or "walk me through" + screenshot present → Use this tool to START workflow
+- NOTE: This tool creates the initial workflow proposal. For progressing through steps, use guide_next_step.
+
+DURING ACTIVE WORKFLOWS:
+When user selects "Type something" (option 2) from WorkflowOptions component and asks a custom question,
+you'll receive their question with an auto-captured screenshot. Intelligently route based on question type:
+
+USE analyze_workflow_screen (visual/UI issues requiring screen analysis):
+- "I don't see the [element]"
+- "Where is the [button/menu/field]?"
+- "The screen looks different"
+- "It's not showing what you described"
+- "I see [X] instead of [Y]"
+
+USE respond_with_text_in_workflow (conceptual questions about the current step):
+- "Why do I need to do this step?"
+- "What happens if I skip this?"
+- "Can I do this differently?"
+- "Is this step required?"
+
+USE search_knowledge_in_workflow (questions about features/concepts needing documentation):
+- "What is the [feature] used for?"
+- "How does [concept] work?"
+- "Can you explain what [term] means?"
+- "What are the benefits of [feature]?"
+
+CRITICAL: All three workflow tools (analyze_workflow_screen, respond_with_text_in_workflow, search_knowledge_in_workflow)
+preserve workflow state by returning workflowPhase: "custom_question" in cardData. This keeps WorkflowOptions visible.
+None of these tools progress the workflow - they only provide help while staying on the current step.
+
+When NOT to use guidance tools:
 - No screenshot available → Use respond_with_text or search_knowledge
-- User asking for general information (not a UI task) → Use search_knowledge
+- General information questions → Use search_knowledge only
 - User needs to talk to someone → Use find_expert_colleague
 
 Remember: If they have their screen open and want to learn a task, USE THE VISUAL GUIDANCE TOOL!
@@ -105,7 +142,7 @@ Examples - COPY EXACTLY:
   ✅ CORRECT: "- #product - mikun.adewole ([Slack](https://slack.com/msg))"
   ✅ CORRECT: "- Lorikeet Development Environment Setup Guide ([Notion](https://notion.so/page))"
   ✅ CORRECT: "- Product Requirements Document (PRD) ([Notion](https://notion.so/prd))"
-  
+
   ❌ WRONG: "[#engineering - febchuk (Slack)](url)" - entire line hyperlinked
   ❌ WRONG: "#engineering - febchuk (Slack)" - no hyperlink
   ❌ WRONG: "• #engineering - febchuk (Slack)" - wrong bullet character
@@ -165,6 +202,15 @@ export class AgentService {
 
     // Register Phase 4 tools - Visual Guidance
     this.registerTool(new GuideNextStepTool());
+
+    // Register Phase 5 tools - Knowledge-Grounded Guidance & Workflows
+    this.registerTool(new ClarifyIntentTool());
+    this.registerTool(new StartUIGuidanceWorkflowTool());
+    this.registerTool(new AnalyzeWorkflowScreenTool());
+
+    // Register Phase 5.1 tools - Workflow-Specific Tool Variants
+    this.registerTool(new RespondTextInWorkflowTool());
+    this.registerTool(new SearchKnowledgeInWorkflowTool());
   }
 
   /**
@@ -224,10 +270,13 @@ export class AgentService {
    * @returns Async iterable of stream chunks
    */
   async *processMessage(userMessage: string, context: ToolContext): AsyncIterable<StreamChunk> {
-    const startTime = Date.now(); // Track total response time for RAG performance
     const MAX_ITERATIONS = 5; // Prevent infinite loops
     let iterationCount = 0;
-    let usedRAG = false; // Track if search tool was used
+
+    // Track metadata from last tool execution (for including in final response)
+    let lastToolMessageType: "text" | "workflow" | "experts" | undefined;
+    let lastToolCardData: any | undefined;
+    let lastToolSources: any[] | undefined;
 
     try {
       // Check for workflow mode entry
@@ -242,98 +291,116 @@ export class AgentService {
         hasScreenshot: !!context.screenshot,
       });
 
-      // Check for continuation signals if we have screenshot (indicates possible workflow)
-      const continuationSignal = continuationDetectorService.detectContinuation(
-        userMessage,
-        context.conversationHistory[context.conversationHistory.length - 1]?.content,
-        context.screenshot
-          ? continuationDetectorService.hashScreenshot(context.screenshot)
-          : undefined,
-        undefined // TODO: Track previous screenshot hash in workflow state
-      );
+      /**
+       * DEPRECATED: Continuation detection via natural language parsing
+       *
+       * This logic was replaced by the WorkflowOptions UI metadata system.
+       * Previously, the system would detect words like "done", "next", "okay" and auto-trigger
+       * the guide_next_step tool. This created unpredictable behavior and race conditions.
+       *
+       * NEW APPROACH: All workflow progression is now explicit via WorkflowOptions UI:
+       * - User clicks "Move on to next step" → metadata.workflowAction = "progress_step"
+       * - User clicks "Type something" → metadata.workflowAction = "custom_question"
+       * - User clicks "Exit workflow" → metadata.workflowAction = "exit_workflow"
+       *
+       * The metadata flows through the entire stack and provides hints to OpenAI for
+       * deterministic tool selection (see lines 410-436 below).
+       *
+       * KEPT FOR REFERENCE - MAY BE REMOVED IN FUTURE CLEANUP
+       */
 
-      console.log("[AgentService] Continuation detection:", {
-        isContinuation: continuationSignal.isContinuation,
-        type: continuationSignal.type,
-        confidence: continuationSignal.confidence,
-        reason: continuationSignal.reason,
-      });
+      // // Check for continuation signals if we have screenshot (indicates possible workflow)
+      // const continuationSignal = continuationDetectorService.detectContinuation(
+      //   userMessage,
+      //   context.conversationHistory[context.conversationHistory.length - 1]?.content,
+      //   context.screenshot
+      //     ? continuationDetectorService.hashScreenshot(context.screenshot)
+      //     : undefined,
+      //   undefined // TODO: Track previous screenshot hash in workflow state
+      // );
 
-      // If it's a continuation with high confidence, automatically trigger guide tool
-      if (
-        continuationSignal.isContinuation &&
-        continuationSignal.confidence > 0.7 &&
-        context.screenshot
-      ) {
-        console.log("[AgentService] Auto-triggering GuideNextStepTool for continuation");
+      // console.log("[AgentService] Continuation detection:", {
+      //   isContinuation: continuationSignal.isContinuation,
+      //   type: continuationSignal.type,
+      //   confidence: continuationSignal.confidence,
+      //   reason: continuationSignal.reason,
+      // });
 
-        const guideTool = this.tools.get("guide_next_step");
-        if (guideTool) {
-          // Execute guide tool directly for continuation
-          const toolResult = await guideTool.execute(
-            {
-              task: "Continue to the next step based on the screenshot",
-            },
-            context
-          );
+      // // If it's a continuation with high confidence, automatically trigger guide tool
+      // if (
+      //   continuationSignal.isContinuation &&
+      //   continuationSignal.confidence > 0.7 &&
+      //   context.screenshot
+      // ) {
+      //   console.log("[AgentService] Auto-triggering GuideNextStepTool for continuation");
 
-          // Send window trigger if present
-          if (toolResult.triggerWindow) {
-            yield {
-              type: "window_trigger",
-              windowTrigger: toolResult.triggerWindow,
-            };
-          }
+      //   const guideTool = this.tools.get("guide_next_step");
+      //   if (guideTool) {
+      //     // Execute guide tool directly for continuation
+      //     const toolResult = await guideTool.execute(
+      //       {
+      //         task: "Continue to the next step based on the screenshot",
+      //       },
+      //       context
+      //     );
 
-          // Stream the response
-          if (toolResult.streamable) {
-            const words = toolResult.content.split(" ");
-            for (let i = 0; i < words.length; i++) {
-              const word = words[i];
-              const isLast = i === words.length - 1;
-              yield {
-                type: "chunk",
-                content: isLast ? word : word + " ",
-              };
-              await new Promise((resolve) => setTimeout(resolve, 20));
-            }
-          }
+      //     // Send window trigger if present
+      //     if (toolResult.triggerWindow) {
+      //       yield {
+      //         type: "window_trigger",
+      //         windowTrigger: toolResult.triggerWindow,
+      //       };
+      //     }
 
-          yield {
-            type: "complete",
-            content: toolResult.content,
-            messageType: toolResult.messageType,
-            cardData: toolResult.cardData,
-          };
+      //     // Stream the response
+      //     if (toolResult.streamable) {
+      //       const words = toolResult.content.split(" ");
+      //       for (let i = 0; i < words.length; i++) {
+      //         const word = words[i];
+      //         const isLast = i === words.length - 1;
+      //         yield {
+      //           type: "chunk",
+      //           content: isLast ? word : word + " ",
+      //         };
+      //         await new Promise((resolve) => setTimeout(resolve, 20));
+      //       }
+      //     }
 
-          return; // Exit - continuation handled
-        }
-      }
+      //     yield {
+      //       type: "complete",
+      //       content: toolResult.content,
+      //       messageType: toolResult.messageType,
+      //       cardData: toolResult.cardData,
+      //     };
 
-      // If it's a completion signal, acknowledge and exit workflow mode
-      if (continuationSignal.type === "completion") {
-        console.log("[AgentService] User signaled completion");
+      //     return; // Exit - continuation handled
+      //   }
+      // }
 
-        yield {
-          type: "chunk",
-          content: "Great job! ",
-        };
-        await new Promise((resolve) => setTimeout(resolve, 20));
+      // // If it's a completion signal, acknowledge and exit workflow mode
+      // if (continuationSignal.type === "completion") {
+      //   console.log("[AgentService] User signaled completion");
 
-        yield {
-          type: "chunk",
-          content: "Let me know if you need help with anything else.",
-        };
+      //   yield {
+      //     type: "chunk",
+      //     content: "Great job! ",
+      //   };
+      //   await new Promise((resolve) => setTimeout(resolve, 20));
 
-        yield {
-          type: "complete",
-          content: "Great job! Let me know if you need help with anything else.",
-          messageType: "text",
-          cardData: undefined,
-        };
+      //   yield {
+      //     type: "chunk",
+      //     content: "Let me know if you need help with anything else.",
+      //   };
 
-        return; // Exit - workflow completed
-      }
+      //   yield {
+      //     type: "complete",
+      //     content: "Great job! Let me know if you need help with anything else.",
+      //     messageType: "text",
+      //     cardData: undefined,
+      //   };
+
+      //   return; // Exit - workflow completed
+      // }
 
       // Convert conversation history to OpenAI format
       // Add current date context for temporal awareness
@@ -356,10 +423,78 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
         { role: "user", content: userMessage },
       ];
 
+      // Inject context about screenshot availability and workflow intent
+      // This critical information helps OpenAI make informed tool selection decisions
+      if (context.screenshot) {
+        messages.push({
+          role: "system",
+          content:
+            "[CONTEXT] User has provided a screenshot of their current screen. Screenshot is available for visual analysis and UI guidance.",
+        });
+        console.log("[AgentService] Added screenshot context to messages");
+      }
+
+      // Inject metadata hints for WorkflowOptions UI interactions
+      if (context.metadata?.workflowAction) {
+        const { workflowAction } = context.metadata;
+
+        if (workflowAction === "progress_step") {
+          messages.push({
+            role: "system",
+            content:
+              "[CRITICAL WORKFLOW ACTION] User clicked 'Move on to next step' button. YOU MUST call the guide_next_step tool NOW with conversationId parameter. DO NOT call any other tool. This is NOT a question - it's a direct command to progress the active workflow.",
+          });
+          console.log("[AgentService] Added workflow progression hint to messages");
+        } else if (workflowAction === "custom_question") {
+          messages.push({
+            role: "system",
+            content:
+              "[CRITICAL WORKFLOW ACTION] User clicked 'Type something' button during active workflow. YOU MUST analyze their question and call EXACTLY ONE of these tools:\n" +
+              "- If visual/UI issue ('I don't see X', 'Where is Y?') → YOU MUST call analyze_workflow_screen tool with conversationId and issue parameters\n" +
+              "- If conceptual question ('Why?', 'What does X mean?') → YOU MUST call respond_with_text_in_workflow tool with conversationId and response parameters\n" +
+              "- If knowledge question ('What is X?', 'How does Y work?') → YOU MUST call search_knowledge_in_workflow tool with conversationId and query parameters\n" +
+              "DO NOT use the non-workflow variants (respond_with_text, search_knowledge). DO NOT call guide_next_step. You MUST preserve workflow state by using the _in_workflow tool variants.",
+          });
+          console.log("[AgentService] Added custom question hint to messages");
+        } else if (workflowAction === "exit_workflow") {
+          messages.push({
+            role: "system",
+            content:
+              "[CRITICAL WORKFLOW ACTION] User clicked 'Exit task workflow' button. YOU MUST call the respond_with_text tool NOW to acknowledge their exit and ask if there's anything else you can help with. DO NOT call any other tool. DO NOT continue the workflow.",
+          });
+          console.log("[AgentService] Added workflow exit hint to messages");
+        }
+      }
+
+      if (shouldEnterWorkflow) {
+        messages.push({
+          role: "system",
+          content:
+            "[INTENT DETECTED] This appears to be a task guidance request based on trigger phrases in the user message. User is asking for step-by-step help completing an action. When screenshot is available, prioritize visual guidance flow: search_knowledge → show_step_by_step_guide.",
+        });
+        console.log("[AgentService] Added workflow intent context to messages");
+      }
+
       // Get tool definitions
       const tools = this.getToolDefinitions();
 
       console.log(`[AgentService] Processing message with ${tools.length} available tools`);
+
+      // Determine tool_choice based on metadata (force specific tool for workflow actions)
+      let toolChoice: "auto" | { type: "function"; function: { name: string } } = "auto";
+
+      const workflowAction = context.metadata?.workflowAction;
+      if (workflowAction === "progress_step") {
+        // Force guide_next_step tool for "Move on to next step" button
+        toolChoice = { type: "function", function: { name: "guide_next_step" } };
+        console.log("[AgentService] FORCING tool_choice to guide_next_step based on metadata");
+      } else if (workflowAction === "exit_workflow") {
+        // Force respond_with_text tool for "Exit task workflow" button
+        toolChoice = { type: "function", function: { name: "respond_with_text" } };
+        console.log("[AgentService] FORCING tool_choice to respond_with_text based on metadata");
+      }
+      // For custom_question, leave as "auto" because we need AI to analyze the question type
+      // and choose between analyze_workflow_screen, respond_with_text_in_workflow, or search_knowledge_in_workflow
 
       // Agentic Loop: Continue until we get a final response or hit max iterations
       while (iterationCount < MAX_ITERATIONS) {
@@ -374,26 +509,12 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
           })(),
         });
 
-        // Determine tool choice strategy
-        // If we're in workflow mode with a screenshot, FORCE the guide tool
-        // Otherwise, let AI choose automatically
-        const toolChoice =
-          shouldEnterWorkflow && context.screenshot
-            ? { type: "function" as const, function: { name: "show_step_by_step_guide" } }
-            : "auto";
-
-        console.log("[AgentService] Tool choice strategy:", {
-          strategy: shouldEnterWorkflow && context.screenshot ? "forced guide tool" : "auto",
-          shouldEnterWorkflow,
-          hasScreenshot: !!context.screenshot,
-        });
-
         // Call OpenAI with function calling
         const response = await this.openai.chat.completions.create({
           model: config.openai.chatModel,
           messages: messages,
           tools: tools,
-          tool_choice: toolChoice, // Force guide tool in workflow mode, otherwise auto
+          tool_choice: toolChoice, // Force specific tool for workflow actions, otherwise auto
           temperature: config.openai.temperature,
           max_tokens: config.openai.maxTokens,
           stream: true, // Enable streaming
@@ -510,11 +631,6 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             JSON.stringify(parsedArgs, null, 2)
           );
 
-          // Track if using RAG (search_knowledge tool)
-          if (functionName === "search_knowledge") {
-            usedRAG = true;
-          }
-
           // Execute tool
           const toolResult = await tool.execute(parsedArgs, context);
 
@@ -526,6 +642,11 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             hasWindowTrigger: !!toolResult.triggerWindow,
             streamable: toolResult.streamable,
           });
+
+          // Store metadata from this tool result (will be included in final response)
+          lastToolMessageType = toolResult.messageType;
+          lastToolCardData = toolResult.cardData;
+          lastToolSources = toolResult.sources;
 
           // Send window trigger if present
           if (toolResult.triggerWindow) {
@@ -562,12 +683,72 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             tool_call_id: toolCallId || `call_${Date.now()}`,
           });
 
-          console.log(
-            "[AgentService] Tool result added to conversation, continuing loop for AI synthesis"
-          );
+          // Check if tool result suggests we should continue (e.g., "Would you like me to connect you with an expert?")
+          // If the tool returns a complete answer, stream it and finish
+          // If the tool result is incomplete, continue the loop for the AI to decide next step
+          const isIncompleteResult =
+            toolResult.content.toLowerCase().includes("would you like") ||
+            toolResult.content.toLowerCase().includes("connect you with") ||
+            toolResult.content.toLowerCase().includes("couldn't find");
 
-          // Continue loop - AI will receive tool result and synthesize natural response
-          // The only exception is if the tool explicitly couldn't find anything and suggests alternatives
+          // Special case: If search_knowledge succeeded in a workflow context with screenshot,
+          // continue the loop to allow show_step_by_step_guide to be called next
+          const shouldContinueForGuidance =
+            functionName === "search_knowledge" &&
+            shouldEnterWorkflow &&
+            context.screenshot &&
+            !isIncompleteResult; // search succeeded
+
+          console.log("[AgentService] Completion decision:", {
+            isIncompleteResult,
+            shouldContinueForGuidance,
+            willContinueLoop: isIncompleteResult || shouldContinueForGuidance,
+            contentPreview: toolResult.content.substring(0, 100) + "...",
+          });
+
+          if (!isIncompleteResult && !shouldContinueForGuidance) {
+            // Complete result - stream it and finish
+            console.log("[AgentService] Streaming final response:", {
+              wordCount: toolResult.content.split(" ").length,
+              streamable: toolResult.streamable,
+            });
+
+            if (toolResult.streamable) {
+              const words = toolResult.content.split(" ");
+              for (let i = 0; i < words.length; i++) {
+                const word = words[i];
+                const isLast = i === words.length - 1;
+                yield {
+                  type: "chunk",
+                  content: isLast ? word : word + " ",
+                };
+                await new Promise((resolve) => setTimeout(resolve, 20));
+              }
+            }
+
+            yield {
+              type: "complete",
+              content: toolResult.content,
+              messageType: toolResult.messageType,
+              cardData: toolResult.cardData,
+            };
+
+            return; // Exit the loop
+          }
+
+          // If we're continuing for guidance, add a hint to help OpenAI make the right next choice
+          if (shouldContinueForGuidance) {
+            console.log(
+              "[AgentService] Continuing loop for UI guidance after successful knowledge search"
+            );
+            messages.push({
+              role: "system",
+              content:
+                "Knowledge search completed successfully. Now use show_step_by_step_guide with these search results (from the 'sources' field) and the available screenshot to provide visual step-by-step guidance to the user.",
+            });
+          }
+
+          // Continue loop - AI will decide next action based on tool result
         } else if (textContent) {
           // AI provided final response - stream it
           const words = textContent.split(" ");
@@ -581,25 +762,14 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             await new Promise((resolve) => setTimeout(resolve, 20));
           }
 
+          // Include metadata from last tool execution (if any)
           yield {
             type: "complete",
             content: textContent,
-            messageType: "text",
-            cardData: undefined,
+            messageType: lastToolMessageType || "text",
+            cardData: lastToolCardData,
+            sources: lastToolSources,
           };
-
-          // Log final RAG performance metrics
-          const totalTime = Date.now() - startTime;
-          console.log("[AgentService] RAG Response Complete:", {
-            totalTimeMs: totalTime,
-            usedRAG,
-            responseLength: textContent.length,
-            exceeded5s: totalTime > 5000,
-          });
-
-          if (totalTime > 5000) {
-            console.warn(`[AgentService] Response time exceeded 5s target: ${totalTime}ms`);
-          }
 
           return; // Exit the loop
         } else {
@@ -608,21 +778,17 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
       }
 
       // Max iterations reached
-      const totalTime = Date.now() - startTime;
-      console.warn(
-        `[AgentService] Max iterations (${MAX_ITERATIONS}) reached after ${totalTime}ms`
-      );
-
+      console.warn(`[AgentService] Max iterations (${MAX_ITERATIONS}) reached`);
       yield {
         type: "complete",
         content:
           "I apologize, but I'm having trouble processing your request. Could you please rephrase your question?",
         messageType: "text",
         cardData: undefined,
+        sources: undefined,
       };
     } catch (error) {
-      const totalTime = Date.now() - startTime;
-      console.error(`[AgentService] Error processing message after ${totalTime}ms:`, error);
+      console.error("[AgentService] Error processing message:", error);
 
       // Send error to client
       yield {
@@ -662,7 +828,6 @@ ${conversationText}
 
 Context summary:`;
 
-      // Use Gemini for cost-effective text generation
       const model = this.gemini.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
       });
@@ -680,7 +845,6 @@ Context summary:`;
   /**
    * Generate specific question from conversation
    * Extracts or formulates the main question the user needs answered
-   * Uses Gemini 2.5 Flash Lite for cost-effective text generation
    */
   async generateNudgeQuestion(messages: Message[]): Promise<string> {
     try {
@@ -702,7 +866,6 @@ ${conversationText}
 
 Specific question:`;
 
-      // Use Gemini for cost-effective text generation
       const model = this.gemini.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
       });
@@ -710,7 +873,7 @@ Specific question:`;
       const result = await model.generateContent(prompt);
       const text = result.response.text();
 
-      return text.trim() || "How can I help with this?";
+      return text.trim() || "Unable to generate question.";
     } catch (error) {
       console.error("[AgentService] Error generating nudge question:", error);
       throw new Error("Failed to generate question from conversation");
