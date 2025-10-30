@@ -127,6 +127,7 @@ export interface StreamCallbacks {
  * @param callbacks - Callbacks for handling stream events
  * @param token - Auth token
  * @param screenshot - Optional base64-encoded screenshot for workflow context
+ * @param metadata - Optional metadata for workflow actions (workflowAction, selectedOption)
  * @returns Promise that resolves when streaming completes
  */
 export async function sendStreamingMessage(
@@ -134,15 +135,19 @@ export async function sendStreamingMessage(
   content: string,
   callbacks: StreamCallbacks,
   token: string,
-  screenshot?: string
+  screenshot?: string,
+  metadata?: any
 ): Promise<void> {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
   return new Promise((resolve, reject) => {
     // Build request body
-    const requestBody: { content: string; screenshot?: string } = { content };
+    const requestBody: { content: string; screenshot?: string; metadata?: any } = { content };
     if (screenshot) {
       requestBody.screenshot = screenshot;
+    }
+    if (metadata) {
+      requestBody.metadata = metadata;
     }
 
     // Use fetch with streaming instead of EventSource for better control

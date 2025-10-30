@@ -947,11 +947,42 @@ router.post(
 
         console.log(`[Stream] Assistant message saved: ${assistantMessage.id}`);
 
-        // Update conversation's updatedAt timestamp
-        await db
-          .update(schema.conversations)
-          .set({ updatedAt: new Date() })
-          .where(eq(schema.conversations.id, conversationId));
+        // Generate conversation title if this is the first exchange
+        // conversationHistory includes the just-saved user message, so length <= 2 means first exchange
+        if (conversationHistory.length <= 2) {
+          console.log("[Stream] First exchange detected - generating conversation title");
+
+          try {
+            const { titleGenerationService } = await import("../services/titleGeneration.service");
+            const generatedTitle = await titleGenerationService.generateTitle(content, assistantContent);
+
+            console.log("[Stream] Generated title:", generatedTitle);
+
+            // Update conversation with generated title and timestamp
+            await db
+              .update(schema.conversations)
+              .set({
+                title: generatedTitle,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.conversations.id, conversationId));
+
+            console.log("[Stream] Conversation title updated successfully");
+          } catch (titleError) {
+            console.error("[Stream] Error generating title:", titleError);
+            // Continue even if title generation fails - just update timestamp
+            await db
+              .update(schema.conversations)
+              .set({ updatedAt: new Date() })
+              .where(eq(schema.conversations.id, conversationId));
+          }
+        } else {
+          // Not first exchange - just update timestamp
+          await db
+            .update(schema.conversations)
+            .set({ updatedAt: new Date() })
+            .where(eq(schema.conversations.id, conversationId));
+        }
 
         // Send final event with message ID
         res.write(
