@@ -1,5 +1,6 @@
-import { BaseTool, ToolContext, ToolParameters, ToolResult } from "./base.tool";
+import { BaseTool, ToolContext, ToolParameters, ToolResult, SuggestedNudge } from "./base.tool";
 import { expertMatchingService } from "../services/expertMatching.service";
+import { nudgeHelperService } from "../services/nudgeHelper.service";
 
 /**
  * Find Expert Tool
@@ -115,9 +116,34 @@ ${topExpert.name} seems like the best match - they have ${topExpert.expertise.to
 
 I'm showing you their profiles now so you can reach out!`;
 
+      // Generate suggested nudge content if conversation history exists
+      let suggestedNudge: SuggestedNudge | undefined;
+      if (context.conversationHistory && context.conversationHistory.length > 0) {
+        try {
+          console.log("[FindExpertTool] Generating nudge content from conversation");
+
+          // Generate context and question in parallel for efficiency
+          const [contextText, questionText] = await Promise.all([
+            nudgeHelperService.generateContext(context.conversationHistory),
+            nudgeHelperService.generateQuestion(context.conversationHistory),
+          ]);
+
+          suggestedNudge = {
+            context: contextText,
+            question: questionText,
+          };
+
+          console.log("[FindExpertTool] Nudge content generated successfully");
+        } catch (error) {
+          console.error("[FindExpertTool] Error generating nudge content:", error);
+          // Continue without suggested nudge - not critical
+        }
+      }
+
       console.log("[FindExpertTool] Success - triggering Nudge window:", {
         expertsCount: experts.length,
         expertNames: experts.map((e) => e.name),
+        hasSuggestedNudge: !!suggestedNudge,
         windowTrigger: "nudge",
       });
 
@@ -127,6 +153,7 @@ I'm showing you their profiles now so you can reach out!`;
         content: responseText,
         cardData: {
           experts: experts,
+          suggestedNudge: suggestedNudge,
         },
         streamable: true,
         triggerWindow: {
@@ -134,6 +161,7 @@ I'm showing you their profiles now so you can reach out!`;
           data: {
             experts: experts,
             query: query,
+            suggestedNudge: suggestedNudge,
           },
         },
       };

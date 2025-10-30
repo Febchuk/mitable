@@ -10,8 +10,8 @@ import { GuideNextStepTool } from "../tools/guide-next-step.tool";
 import { ClarifyIntentTool } from "../tools/clarify-intent.tool.js";
 import { StartUIGuidanceWorkflowTool } from "../tools/start-ui-guidance-workflow.tool.js";
 import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool.js";
-import { RespondTextInWorkflowTool } from "../tools/respond-text-in-workflow.tool.js";
-import { SearchKnowledgeInWorkflowTool } from "../tools/search-knowledge-in-workflow.tool.js";
+// REMOVED: RespondTextInWorkflowTool - replaced by smart wrapper utility
+// REMOVED: SearchKnowledgeInWorkflowTool - replaced by smart wrapper utility
 import { workflowService } from "./workflow.service";
 // DEPRECATED: Continuation detector only used in commented-out code (see lines 310-402)
 // import { continuationDetectorService } from "./continuation-detector.service";
@@ -208,9 +208,9 @@ export class AgentService {
     this.registerTool(new StartUIGuidanceWorkflowTool());
     this.registerTool(new AnalyzeWorkflowScreenTool());
 
-    // Register Phase 5.1 tools - Workflow-Specific Tool Variants
-    this.registerTool(new RespondTextInWorkflowTool());
-    this.registerTool(new SearchKnowledgeInWorkflowTool());
+    // NOTE: Phase 5.1 workflow-specific tool variants removed
+    // RespondTextInWorkflowTool and SearchKnowledgeInWorkflowTool replaced by smart wrapper utility
+    // in the new multi-agent architecture (see: tools/utils/workflow-wrapper.ts)
   }
 
   /**
@@ -798,85 +798,6 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             ? error.message
             : "An error occurred while processing your message",
       };
-    }
-  }
-
-  /**
-   * Generate nudge context from conversation messages
-   * Analyzes the conversation and creates a concise summary for the expert
-   * Uses Gemini 2.5 Flash Lite for cost-effective text generation
-   */
-  async generateNudgeContext(messages: Message[]): Promise<string> {
-    try {
-      // Format conversation for AI
-      const conversationText = messages
-        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-        .join("\n\n");
-
-      const prompt = `Based on this conversation, write a concise context summary (max 300 words) that explains what the user needs help with. This will be shared with an expert who can provide assistance.
-
-Focus on:
-- What the user is trying to accomplish
-- What they've tried so far
-- What specific problems or blockers they're encountering
-- Any relevant technical details
-
-Keep it professional and actionable. Write in third person (e.g., "The user is trying to...").
-
-Conversation:
-${conversationText}
-
-Context summary:`;
-
-      const model = this.gemini.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-      });
-
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-
-      return text.trim() || "Unable to generate context.";
-    } catch (error) {
-      console.error("[AgentService] Error generating nudge context:", error);
-      throw new Error("Failed to generate context from conversation");
-    }
-  }
-
-  /**
-   * Generate specific question from conversation
-   * Extracts or formulates the main question the user needs answered
-   */
-  async generateNudgeQuestion(messages: Message[]): Promise<string> {
-    try {
-      // Format conversation for AI
-      const conversationText = messages
-        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-        .join("\n\n");
-
-      const prompt = `Based on this conversation, formulate a specific, actionable question (1-2 sentences) that captures what the user needs help with. This question will be shared with an expert.
-
-Make it:
-- Direct and clear
-- Focused on the main issue
-- Actionable (the expert should know what to address)
-- Professional tone
-
-Conversation:
-${conversationText}
-
-Specific question:`;
-
-      const model = this.gemini.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-      });
-
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-
-      return text.trim() || "Unable to generate question.";
-    } catch (error) {
-      console.error("[AgentService] Error generating nudge question:", error);
-      throw new Error("Failed to generate question from conversation");
     }
   }
 }

@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+// Suggested nudge content generated from conversation
+export const SuggestedNudgeSchema = z.object({
+  context: z.string().describe("300-word summary of what user needs help with"),
+  question: z.string().describe("1-2 sentence actionable question"),
+});
+
+export type SuggestedNudge = z.infer<typeof SuggestedNudgeSchema>;
+
 // Nudge types for expert recommendations
 export const NudgeTypeSchema = z.enum(["expert_match", "resource_recommendation", "task_reminder"]);
 

@@ -1,5 +1,4 @@
-import type { TextMessage, WorkflowMessage, ToolContext } from "../base.tool";
-import type { WorkflowPhase } from "@mitable/shared";
+import type { TextMessage, WorkflowMessage, ToolContext, WorkflowPhase } from "../base.tool";
 
 /**
  * Smart wrapper that automatically detects workflow state and wraps text messages accordingly.

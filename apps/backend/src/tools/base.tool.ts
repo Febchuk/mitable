@@ -1,5 +1,6 @@
 import type { Message } from "../db/schema/conversations.schema";
-import type { SolutionObject, EmbeddingMatch, ExpertMatch, Step, AdjustmentRecord } from "@mitable/shared";
+import type { SolutionObject, EmbeddingMatch, Step, AdjustmentRecord } from "@mitable/shared";
+import type { ExpertMatch } from "../services/expertMatching.service";
 
 // ============================================================================
 // TOOL DEFINITION TYPES
@@ -108,6 +109,11 @@ export interface TextMessage extends BaseMessage {
 }
 
 /**
+ * Workflow phase types
+ */
+export type WorkflowPhase = "initial_proposal" | "step_progression" | "custom_question";
+
+/**
  * Workflow message with step-by-step guidance state
  */
 export interface WorkflowMessage extends BaseMessage {
@@ -124,8 +130,16 @@ export interface WorkflowMessage extends BaseMessage {
     adjustmentHistory: AdjustmentRecord[];
     // Workflow UI state
     workflowActive: true;
-    workflowPhase: "initial_proposal" | "step_progression" | "custom_question";
+    workflowPhase: WorkflowPhase;
   };
+}
+
+/**
+ * Suggested nudge content generated from conversation
+ */
+export interface SuggestedNudge {
+  context: string;    // 300-word summary of what user needs help with
+  question: string;   // 1-2 sentence actionable question
 }
 
 /**
@@ -135,6 +149,7 @@ export interface ExpertsMessage extends BaseMessage {
   messageType: "experts";
   cardData: {
     experts: ExpertMatch[];
+    suggestedNudge?: SuggestedNudge;  // Auto-generated when from conversation
   };
 }
 
