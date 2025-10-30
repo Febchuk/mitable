@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// import { GoogleGenerativeAI } from "@google/generative-ai"; // Unused - commented out
 import { config } from "../config";
 import type { Message } from "../db/schema/conversations.schema";
 import { BaseTool, ToolContext, StreamChunk, ToolDefinition } from "../tools/base.tool";
@@ -179,7 +179,7 @@ When responding:
  */
 export class AgentService {
   private openai: OpenAI;
-  private gemini: GoogleGenerativeAI;
+  // private gemini: GoogleGenerativeAI; // Unused - kept for future reference
   private tools: Map<string, BaseTool> = new Map();
 
   constructor() {
@@ -189,7 +189,7 @@ export class AgentService {
     });
 
     // Initialize Gemini client (for cost-effective text generation)
-    this.gemini = new GoogleGenerativeAI(config.gemini.apiKey);
+    // this.gemini = new GoogleGenerativeAI(config.gemini.apiKey); // Unused - commented out
 
     // Register Phase 1 tools
     this.registerTool(new RespondTextTool());

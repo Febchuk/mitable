@@ -25,7 +25,7 @@ export interface ExpertMatch {
 }
 
 export interface SuggestedNudge {
-  context: string;  // 300-word summary
+  context: string; // 300-word summary
   question: string; // 1-2 sentence question
 }
 

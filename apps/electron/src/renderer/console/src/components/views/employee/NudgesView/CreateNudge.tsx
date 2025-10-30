@@ -36,19 +36,12 @@ export default function CreateNudge() {
   const [context, setContext] = useState("");
   const [question, setQuestion] = useState("");
   const [resources, setResources] = useState<NudgeResource[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
 
   // Pre-populate form from location state (passed from ConsoleLayout via IPC)
   useEffect(() => {
     if (location.state) {
       const nudgeData = location.state as CreateNudgeData;
       console.log("[CreateNudge] Received data from location state:", nudgeData);
-
-      // Store conversationId for reference
-      if (nudgeData.conversationId) {
-        setConversationId(nudgeData.conversationId);
-        console.log("[CreateNudge] Stored conversationId:", nudgeData.conversationId);
-      }
 
       // Pre-populate expert if provided
       if (nudgeData.expert) {

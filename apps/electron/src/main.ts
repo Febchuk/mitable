@@ -8,7 +8,8 @@ let agentWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
-let guideWindow: BrowserWindow | null = null;
+// eslint-disable-next-line prefer-const
+let guideWindow: BrowserWindow | null = null; // Not reassigned yet, but used in window management logic
 let nudgeWindow: BrowserWindow | null = null;
 
 // Auth token storage (shared across all windows)

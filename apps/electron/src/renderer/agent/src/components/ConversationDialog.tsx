@@ -2,7 +2,9 @@ import { Code, LucideIcon, Users, Workflow } from "lucide-react";
 import UserMessage from "../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../components/domain/messages/AIMessage";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
-import WorkflowOptions, { WorkflowPhase } from "../../../components/domain/workflow/WorkflowOptions";
+import WorkflowOptions, {
+  WorkflowPhase,
+} from "../../../components/domain/workflow/WorkflowOptions";
 import StepList from "../../../components/domain/workflow/StepList";
 
 interface Message {
@@ -105,11 +107,13 @@ export default function ConversationDialog({
           }
 
           // Render AI messages (assistant)
-          const isWorkflowMessage = message.messageType === "workflow" && message.cardData?.workflowActive;
+          const isWorkflowMessage =
+            message.messageType === "workflow" && message.cardData?.workflowActive;
           const workflowPhase = message.cardData?.workflowPhase as WorkflowPhase | undefined;
 
           // Determine if we should show step list based on phase
-          const shouldShowStepList = isWorkflowMessage && workflowPhase && workflowPhase !== "custom_question";
+          const shouldShowStepList =
+            isWorkflowMessage && workflowPhase && workflowPhase !== "custom_question";
           const shouldShowCheckboxes = workflowPhase === "step_progression";
 
           // Determine card title/subtitle/icon for non-workflow cards

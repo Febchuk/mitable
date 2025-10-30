@@ -88,8 +88,10 @@ export class OrchestratorService {
         );
       } catch (error) {
         // Workflow state retrieval failed - not critical, continue without it
-        console.log("[Orchestrator] Workflow state retrieval failed (non-critical):",
-          error instanceof Error ? error.message : "Unknown error");
+        console.log(
+          "[Orchestrator] Workflow state retrieval failed (non-critical):",
+          error instanceof Error ? error.message : "Unknown error"
+        );
       }
       context.workflowState = workflowState || undefined;
 

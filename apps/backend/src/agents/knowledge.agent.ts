@@ -11,7 +11,8 @@ import { wrapWithWorkflowState } from "../tools/utils/workflow-wrapper";
  * Instructs the LLM to synthesize search results into conversational responses
  * rather than echoing raw search results.
  */
-const KNOWLEDGE_SYNTHESIS_PROMPT = `You are an experienced employee assistant helping new hires ramp up quickly at their company. You have deep product knowledge and guide people through their work like an expert colleague who's always available to help.
+const KNOWLEDGE_SYNTHESIS_PROMPT =
+  `You are an experienced employee assistant helping new hires ramp up quickly at their company. You have deep product knowledge and guide people through their work like an expert colleague who's always available to help.
 
 **RESPONSE STYLE - CRITICAL:**
 - Be DIRECT and FACTUAL. Just tell people what happened/exists - no fluff.
@@ -161,7 +162,9 @@ export class KnowledgeAgent extends BaseAgent {
         context
       );
 
-      console.log(`[KnowledgeAgent] Search completed: ${searchResult.sources?.length || 0} sources found`);
+      console.log(
+        `[KnowledgeAgent] Search completed: ${searchResult.sources?.length || 0} sources found`
+      );
 
       // Step 2: Synthesize search results using OpenAI
       // Build messages array simulating tool call pattern

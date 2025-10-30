@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
 import type { StreamChunk, ToolContext, TextMessage } from "../tools/base.tool";
-import { RespondTextTool } from "../tools/respond-text.tool";
+// import { RespondTextTool } from "../tools/respond-text.tool"; // Unused - commented out
 import { wrapWithWorkflowState } from "../tools/utils/workflow-wrapper";
 
 /**
@@ -29,12 +29,12 @@ import { wrapWithWorkflowState } from "../tools/utils/workflow-wrapper";
 export class TextResponseAgent extends BaseAgent {
   readonly name = "text-response";
   private gemini: GoogleGenerativeAI;
-  private respondTextTool: RespondTextTool;
+  // private respondTextTool: RespondTextTool; // Unused - agent uses Gemini directly
 
   constructor() {
     super();
     this.gemini = new GoogleGenerativeAI(config.gemini.apiKey);
-    this.respondTextTool = new RespondTextTool();
+    // this.respondTextTool = new RespondTextTool(); // Unused - commented out
   }
 
   /**
@@ -93,7 +93,6 @@ Be DIRECT and FACTUAL. Answer the question with facts, then stop. You're a colle
         messageType: finalMessage.messageType,
         content: finalMessage.content,
         cardData: "cardData" in finalMessage ? finalMessage.cardData : undefined,
-        streamable: true,
       };
     } catch (error) {
       console.error("[TextResponseAgent] Error:", error);

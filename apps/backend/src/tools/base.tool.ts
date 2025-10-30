@@ -138,8 +138,8 @@ export interface WorkflowMessage extends BaseMessage {
  * Suggested nudge content generated from conversation
  */
 export interface SuggestedNudge {
-  context: string;    // 300-word summary of what user needs help with
-  question: string;   // 1-2 sentence actionable question
+  context: string; // 300-word summary of what user needs help with
+  question: string; // 1-2 sentence actionable question
 }
 
 /**
@@ -149,7 +149,7 @@ export interface ExpertsMessage extends BaseMessage {
   messageType: "experts";
   cardData: {
     experts: ExpertMatch[];
-    suggestedNudge?: SuggestedNudge;  // Auto-generated when from conversation
+    suggestedNudge?: SuggestedNudge; // Auto-generated when from conversation
   };
 }
 

@@ -20,11 +20,12 @@ const TEST_ORG_ID = "00000000-0000-0000-0000-000000000003";
 const orchestrator = new OrchestratorService();
 
 // Mock screenshot (base64 encoded 1x1 pixel PNG)
-const MOCK_SCREENSHOT = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+const MOCK_SCREENSHOT =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
 async function runTests() {
   console.log("\n🧪 Starting Multi-Agent Orchestrator Tests\n");
-  console.log("=" .repeat(60));
+  console.log("=".repeat(60));
 
   // TEST 1: Text Response (simple question)
   console.log("\n[TEST 1] Text Response Agent - Simple Question");

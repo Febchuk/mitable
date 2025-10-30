@@ -1,5 +1,5 @@
-import OpenAI from "openai";
-import { config } from "../config";
+// import OpenAI from "openai"; // Unused - commented out
+// import { config } from "../config"; // Unused - commented out
 import { BaseAgent } from "./base.agent";
 import type { StreamChunk, ToolContext } from "../tools/base.tool";
 import { FindExpertTool } from "../tools/find-expert.tool";
@@ -35,12 +35,12 @@ import { FindExpertTool } from "../tools/find-expert.tool";
  */
 export class ExpertMatchingAgent extends BaseAgent {
   readonly name = "expert-matching";
-  private openai: OpenAI;
+  // private openai: OpenAI; // Unused - kept for future expert summary synthesis
   private findExpertTool: FindExpertTool;
 
   constructor() {
     super();
-    this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+    // this.openai = new OpenAI({ apiKey: config.openai.apiKey }); // Unused - commented out
     this.findExpertTool = new FindExpertTool();
   }
 
@@ -80,8 +80,7 @@ export class ExpertMatchingAgent extends BaseAgent {
         messageType: expertResult.messageType,
         content: expertResult.content,
         cardData: expertResult.cardData,
-        triggerWindow: expertResult.triggerWindow,
-        streamable: true,
+        windowTrigger: expertResult.triggerWindow,
       };
     } catch (error) {
       console.error("[ExpertMatchingAgent] Error:", error);

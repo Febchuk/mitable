@@ -32,7 +32,11 @@ interface WorkflowOptionsProps {
  * - Enter: Confirm selection
  * - Esc: Deselect (if needed)
  */
-export default function WorkflowOptions({ phase, onOptionSelect, disabled = false }: WorkflowOptionsProps) {
+export default function WorkflowOptions({
+  phase,
+  onOptionSelect,
+  disabled = false,
+}: WorkflowOptionsProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showTextInput, setShowTextInput] = useState(false);
   const [customQuestion, setCustomQuestion] = useState("");
@@ -42,21 +46,51 @@ export default function WorkflowOptions({ phase, onOptionSelect, disabled = fals
     switch (phase) {
       case "initial_proposal":
         return [
-          { id: 1, label: "Yes, let's get started!", action: "confirm_start", icon: <ChevronRight size={16} /> },
-          { id: 2, label: "No, I have some more questions first", action: "ask_questions", icon: <MessageSquare size={16} /> },
+          {
+            id: 1,
+            label: "Yes, let's get started!",
+            action: "confirm_start",
+            icon: <ChevronRight size={16} />,
+          },
+          {
+            id: 2,
+            label: "No, I have some more questions first",
+            action: "ask_questions",
+            icon: <MessageSquare size={16} />,
+          },
         ];
 
       case "step_progression":
         return [
-          { id: 1, label: "Move on to next step", action: "progress_step", icon: <ChevronRight size={16} /> },
-          { id: 2, label: "Type something", action: "custom_question", icon: <MessageSquare size={16} /> },
+          {
+            id: 1,
+            label: "Move on to next step",
+            action: "progress_step",
+            icon: <ChevronRight size={16} />,
+          },
+          {
+            id: 2,
+            label: "Type something",
+            action: "custom_question",
+            icon: <MessageSquare size={16} />,
+          },
           { id: 3, label: "Exit task workflow", action: "exit_workflow", icon: <X size={16} /> },
         ];
 
       case "custom_question":
         return [
-          { id: 1, label: "I'm good, on to the next step", action: "progress_step", icon: <ChevronRight size={16} /> },
-          { id: 2, label: "I have more questions", action: "custom_question", icon: <MessageSquare size={16} /> },
+          {
+            id: 1,
+            label: "I'm good, on to the next step",
+            action: "progress_step",
+            icon: <ChevronRight size={16} />,
+          },
+          {
+            id: 2,
+            label: "I have more questions",
+            action: "custom_question",
+            icon: <MessageSquare size={16} />,
+          },
           { id: 3, label: "Exit workflow task", action: "exit_workflow", icon: <X size={16} /> },
         ];
 
@@ -97,7 +131,7 @@ export default function WorkflowOptions({ phase, onOptionSelect, disabled = fals
 
         case "1":
         case "2":
-        case "3":
+        case "3": {
           e.preventDefault();
           const index = parseInt(e.key) - 1;
           if (index < options.length) {
@@ -105,6 +139,7 @@ export default function WorkflowOptions({ phase, onOptionSelect, disabled = fals
             handleOptionSelect(options[index]);
           }
           break;
+        }
       }
     };
 
@@ -146,9 +181,7 @@ export default function WorkflowOptions({ phase, onOptionSelect, disabled = fals
   if (showTextInput) {
     return (
       <div className="mt-4 space-y-2">
-        <div className="text-sm text-muted-foreground mb-2">
-          Type your question:
-        </div>
+        <div className="text-sm text-muted-foreground mb-2">Type your question:</div>
         <div className="flex gap-2">
           <input
             type="text"
@@ -183,18 +216,14 @@ export default function WorkflowOptions({ phase, onOptionSelect, disabled = fals
             Cancel
           </button>
         </div>
-        <div className="text-xs text-muted-foreground">
-          Press Enter to send, Esc to cancel
-        </div>
+        <div className="text-xs text-muted-foreground">Press Enter to send, Esc to cancel</div>
       </div>
     );
   }
 
   return (
     <div className="mt-4 space-y-2">
-      <div className="text-sm text-muted-foreground mb-2">
-        Choose an option:
-      </div>
+      <div className="text-sm text-muted-foreground mb-2">Choose an option:</div>
       {options.map((option, index) => (
         <button
           key={option.id}
@@ -202,9 +231,10 @@ export default function WorkflowOptions({ phase, onOptionSelect, disabled = fals
           disabled={disabled}
           className={`
             w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all
-            ${selectedIndex === index
-              ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
-              : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            ${
+              selectedIndex === index
+                ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
+                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             }
             ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
           `}
@@ -213,9 +243,7 @@ export default function WorkflowOptions({ phase, onOptionSelect, disabled = fals
             {option.icon}
             {option.label}
           </span>
-          <span className="text-xs opacity-70">
-            {index + 1}
-          </span>
+          <span className="text-xs opacity-70">{index + 1}</span>
         </button>
       ))}
       <div className="text-xs text-muted-foreground mt-2">

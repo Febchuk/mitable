@@ -1,7 +1,7 @@
 import { BaseTool, ToolContext, ToolParameters, ToolResult } from "./base.tool.js";
 import { geminiVisionService } from "../services/gemini-vision.service.js";
 import { guideGenerationService } from "../services/guideGeneration.service.js";
-import type { SolutionObject } from "@mitable/shared";
+// import type { SolutionObject } from "@mitable/shared"; // Unused - commented out
 
 /**
  * Analyze Workflow Screen Tool
@@ -34,7 +34,8 @@ import type { SolutionObject } from "@mitable/shared";
 export class AnalyzeWorkflowScreenTool extends BaseTool {
   name = "analyze_workflow_screen";
 
-  description = `Analyze the user's screen to help troubleshoot visual/UI issues during an active workflow.
+  description =
+    `Analyze the user's screen to help troubleshoot visual/UI issues during an active workflow.
 
 WHEN TO USE:
 Use this tool when the user asks a question about a VISUAL or UI-related issue
@@ -75,7 +76,8 @@ BEHAVIOR:
       },
       issue: {
         type: "string",
-        description: "Brief description of what the user is having trouble with (e.g., 'cannot find canvas button', 'screen shows different elements')",
+        description:
+          "Brief description of what the user is having trouble with (e.g., 'cannot find canvas button', 'screen shows different elements')",
       },
     },
     required: ["conversationId", "issue"],
@@ -107,9 +109,8 @@ BEHAVIOR:
 
     try {
       // Step 1: Retrieve current SolutionObject for workflow context
-      const currentSolution = await guideGenerationService.retrieveLatestSolutionObject(
-        conversationId
-      );
+      const currentSolution =
+        await guideGenerationService.retrieveLatestSolutionObject(conversationId);
 
       if (!currentSolution) {
         console.error("[AnalyzeWorkflowScreenTool] No active workflow found");

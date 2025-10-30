@@ -954,7 +954,10 @@ router.post(
 
           try {
             const { titleGenerationService } = await import("../services/titleGeneration.service");
-            const generatedTitle = await titleGenerationService.generateTitle(content, assistantContent);
+            const generatedTitle = await titleGenerationService.generateTitle(
+              content,
+              assistantContent
+            );
 
             console.log("[Stream] Generated title:", generatedTitle);
 

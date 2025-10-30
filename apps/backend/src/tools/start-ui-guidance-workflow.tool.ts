@@ -1,6 +1,6 @@
 import { BaseTool, ToolContext, ToolParameters, ToolResult } from "./base.tool.js";
-import { geminiVisionService } from "../services/gemini-vision.service.js";
-import { guideGenerationService } from "../services/guideGeneration.service.js";
+// import { geminiVisionService } from "../services/gemini-vision.service.js"; // Unused - commented out
+// import { guideGenerationService } from "../services/guideGeneration.service.js"; // Unused - not called to avoid duplicate messages (see line 371)
 import type { SolutionObject, EmbeddingMatch } from "@mitable/shared";
 
 export class StartUIGuidanceWorkflowTool extends BaseTool {
@@ -43,7 +43,7 @@ Examples:
   ✅ GOOD: "Debug why user profiles aren't loading by tracing the data flow from frontend to backend logs"
   ✅ GOOD: "Update the product roadmap canvas in the #product-team Slack channel"
   ❌ BAD: "Fix bug" (too vague)
-  ❌ BAD: "Modify task descriptions in database" (too technical, not user-centric)`
+  ❌ BAD: "Modify task descriptions in database" (too technical, not user-centric)`,
       },
 
       solutionExplanation: {
@@ -57,7 +57,7 @@ Examples:
   ✅ GOOD: "Based on messages in #product-team, the roadmap is maintained as a Slack canvas where the team collaborates openly. This follows the company's transparency culture from the Notion wiki."
   ✅ GOOD: "The search results show this is an Electron app with IPC-based communication. To debug profile loading, we need to trace: UserProfile.tsx → IPC channel → backend API → CloudWatch logs. AWS credentials are in 1Password per the team wiki."
   ❌ BAD: "The documentation says to do it this way."
-  ❌ BAD: "This is how you fix bugs."`
+  ❌ BAD: "This is how you fix bugs."`,
       },
 
       supportingData: {
@@ -67,18 +67,20 @@ Examples:
           properties: {
             text: {
               type: "string",
-              description: "Full text content from the source document - do NOT truncate or summarize"
+              description:
+                "Full text content from the source document - do NOT truncate or summarize",
             },
             source: {
               type: "string",
-              description: "Source title/identifier (e.g., 'Slack #product-team', 'Notion Wiki: Onboarding')"
+              description:
+                "Source title/identifier (e.g., 'Slack #product-team', 'Notion Wiki: Onboarding')",
             },
             metadata: {
               type: "object",
               properties: {
                 score: {
                   type: "number",
-                  description: "Relevance score from search"
+                  description: "Relevance score from search",
                 },
               },
               additionalProperties: true,
@@ -100,14 +102,14 @@ WHY THIS MATTERS:
 - Provides audit trail for debugging incorrect guidance
 - Shows users where the information came from
 
-Extract directly from the sources array in search_knowledge response and pass through unchanged.`
+Extract directly from the sources array in search_knowledge response and pass through unchanged.`,
       },
 
       searchQuery: {
         type: "string",
         description: `The exact query you used in search_knowledge. Include this for transparency and debugging.
 
-Simply provide the query string as-is, e.g., "product roadmap update" or "electron app profile loading debugging"`
+Simply provide the query string as-is, e.g., "product roadmap update" or "electron app profile loading debugging"`,
       },
 
       supportingDataExplanation: {
@@ -122,7 +124,7 @@ Examples:
   ❌ BAD: "These docs are relevant to the task."
   ❌ BAD: "The search results contain information about the solution."
 
-This field is your proof of intelligent synthesis - show your work.`
+This field is your proof of intelligent synthesis - show your work.`,
       },
 
       stepList: {
@@ -132,16 +134,16 @@ This field is your proof of intelligent synthesis - show your work.`
           properties: {
             stepNumber: {
               type: "number",
-              description: "Sequential step number starting from 1"
+              description: "Sequential step number starting from 1",
             },
             description: {
               type: "string",
-              description: "Clear, actionable description of this single step in natural language"
+              description: "Clear, actionable description of this single step in natural language",
             },
             status: {
               type: "string",
               enum: ["pending", "current", "completed"],
-              description: "Initial status - always set to 'pending' since user hasn't started yet"
+              description: "Initial status - always set to 'pending' since user hasn't started yet",
             },
           },
           required: ["stepNumber", "description", "status"],
@@ -284,7 +286,7 @@ STEP COUNT GUIDANCE (based on complexity assessment above):
 
 Quality over brevity - if your reasoning chain has 10 logical levels, your stepList should have ~10 steps. Don't artificially compress.
 
-REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt it to what's actually on screen and update status as user progresses.`
+REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt it to what's actually on screen and update status as user progresses.`,
       },
     },
     required: [
@@ -303,10 +305,14 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
     // Defensive validation: Check all required fields are present and non-empty
     const missingFields: string[] = [];
     if (!args.solution || args.solution.trim().length === 0) missingFields.push("solution");
-    if (!args.solutionExplanation || args.solutionExplanation.trim().length === 0) missingFields.push("solutionExplanation");
-    if (!args.supportingData || args.supportingData.length === 0) missingFields.push("supportingData");
-    if (!args.searchQuery || args.searchQuery.trim().length === 0) missingFields.push("searchQuery");
-    if (!args.supportingDataExplanation || args.supportingDataExplanation.trim().length === 0) missingFields.push("supportingDataExplanation");
+    if (!args.solutionExplanation || args.solutionExplanation.trim().length === 0)
+      missingFields.push("solutionExplanation");
+    if (!args.supportingData || args.supportingData.length === 0)
+      missingFields.push("supportingData");
+    if (!args.searchQuery || args.searchQuery.trim().length === 0)
+      missingFields.push("searchQuery");
+    if (!args.supportingDataExplanation || args.supportingDataExplanation.trim().length === 0)
+      missingFields.push("supportingDataExplanation");
     if (!args.stepList || args.stepList.length === 0) missingFields.push("stepList");
 
     if (missingFields.length > 0) {
@@ -354,9 +360,10 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
 
     // Calculate estimated time based on number of steps (rough estimate: 2-3 min per step)
     const estimatedMinutes = solutionObject.stepList.length * 2.5;
-    const timeEstimate = estimatedMinutes < 60
-      ? `${Math.round(estimatedMinutes)} minutes`
-      : `${Math.round(estimatedMinutes / 60)} hour${estimatedMinutes >= 120 ? 's' : ''}`;
+    const timeEstimate =
+      estimatedMinutes < 60
+        ? `${Math.round(estimatedMinutes)} minutes`
+        : `${Math.round(estimatedMinutes / 60)} hour${estimatedMinutes >= 120 ? "s" : ""}`;
 
     // Generate a preview message explaining the plan (NO visual analysis yet)
     const previewMessage = `I'll guide you through updating the product roadmap. This will take approximately ${timeEstimate} and involves ${solutionObject.stepList.length} steps:\n\n${solutionObject.solutionExplanation}\n\nWhen you're ready, click "Yes, let's get started!" below to begin.`;
@@ -365,7 +372,7 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
       stepCount: solutionObject.stepList.length,
       estimatedTime: timeEstimate,
       currentStepIndex: solutionObject.currentStepIndex,
-      allStepsPending: solutionObject.stepList.every(s => s.status === "pending")
+      allStepsPending: solutionObject.stepList.every((s) => s.status === "pending"),
     });
 
     // NOTE: We do NOT call storeSolutionObject here because the agent service's

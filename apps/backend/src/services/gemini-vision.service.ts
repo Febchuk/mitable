@@ -445,7 +445,10 @@ Company Documentation (from knowledge base search):
 ${solutionObject.supportingData.map((d) => `[${d.title}]\n${d.snippet}\nSource: ${d.url}`).join("\n\n")}
 
 Recent Conversation History:
-${conversationHistory.slice(-5).map((m) => `${m.role}: ${m.content.substring(0, 200)}`).join("\n")}
+${conversationHistory
+  .slice(-5)
+  .map((m) => `${m.role}: ${m.content.substring(0, 200)}`)
+  .join("\n")}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL RULES:

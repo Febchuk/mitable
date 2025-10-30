@@ -24,6 +24,7 @@
 ### Problem Statement
 
 Currently, when users ask for expert help (e.g., "Who can help me with React?"), the system:
+
 1. Shows expert recommendations in a **separate Nudge Window**
 2. User clicks "Escalate" → Nudge Window calls IPC → Console opens with form
 3. Requires managing an additional window (complexity, UX friction)
@@ -70,12 +71,12 @@ Console opens nudge creation form with pre-filled data
 
 ### Key Components (Current)
 
-| Component | Role | Location |
-|-----------|------|----------|
-| ExpertMatchingAgent | Finds experts via FindExpertTool | `apps/backend/src/agents/expert-matching.agent.ts` |
-| FindExpertTool | Generates experts + suggestedNudge + triggerWindow | `apps/backend/src/tools/find-expert.tool.ts` |
-| Nudge Window | Displays expert list, handles escalation | `apps/electron/src/renderer/nudge/` |
-| Console Window | Shows nudge creation form | `apps/electron/src/renderer/console/` |
+| Component           | Role                                               | Location                                           |
+| ------------------- | -------------------------------------------------- | -------------------------------------------------- |
+| ExpertMatchingAgent | Finds experts via FindExpertTool                   | `apps/backend/src/agents/expert-matching.agent.ts` |
+| FindExpertTool      | Generates experts + suggestedNudge + triggerWindow | `apps/backend/src/tools/find-expert.tool.ts`       |
+| Nudge Window        | Displays expert list, handles escalation           | `apps/electron/src/renderer/nudge/`                |
+| Console Window      | Shows nudge creation form                          | `apps/electron/src/renderer/console/`              |
 
 ### Issues with Current Architecture
 
@@ -113,13 +114,13 @@ Console opens nudge creation form with pre-filled data
 
 ### Key Components (Proposed)
 
-| Component | Role | Location |
-|-----------|------|----------|
-| ExpertMatchingAgent | Finds experts via FindExpertTool | `apps/backend/src/agents/expert-matching.agent.ts` (unchanged) |
-| FindExpertTool | Generates experts + suggestedNudge (NO triggerWindow) | `apps/backend/src/tools/find-expert.tool.ts` (modified) |
-| ExpertsCard Component | Displays expert list inline in conversation | `apps/electron/src/renderer/agent/src/components/ExpertsCard.tsx` (NEW) |
-| Agent Conversation | Renders ExpertsCard based on messageType | `apps/electron/src/renderer/agent/src/App.tsx` (modified) |
-| Console Window | Shows nudge creation form | `apps/electron/src/renderer/console/` (unchanged) |
+| Component             | Role                                                  | Location                                                                |
+| --------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------- |
+| ExpertMatchingAgent   | Finds experts via FindExpertTool                      | `apps/backend/src/agents/expert-matching.agent.ts` (unchanged)          |
+| FindExpertTool        | Generates experts + suggestedNudge (NO triggerWindow) | `apps/backend/src/tools/find-expert.tool.ts` (modified)                 |
+| ExpertsCard Component | Displays expert list inline in conversation           | `apps/electron/src/renderer/agent/src/components/ExpertsCard.tsx` (NEW) |
+| Agent Conversation    | Renders ExpertsCard based on messageType              | `apps/electron/src/renderer/agent/src/App.tsx` (modified)               |
+| Console Window        | Shows nudge creation form                             | `apps/electron/src/renderer/console/` (unchanged)                       |
 
 ### Benefits of Proposed Architecture
 
@@ -140,20 +141,23 @@ Console opens nudge creation form with pre-filled data
 **Change**: Remove `triggerWindow` field from return
 
 **Before**:
+
 ```typescript
 return {
   messageType: "experts",
   content: responseText,
   cardData: { experts, suggestedNudge },
   streamable: true,
-  triggerWindow: {  // REMOVE THIS
+  triggerWindow: {
+    // REMOVE THIS
     window: "nudge",
-    data: { experts, query, suggestedNudge }
-  }
+    data: { experts, query, suggestedNudge },
+  },
 };
 ```
 
 **After**:
+
 ```typescript
 return {
   messageType: "experts",
@@ -173,6 +177,7 @@ return {
 **2.1 Create ExpertsCard Component** (`apps/electron/src/renderer/agent/src/components/ExpertsCard.tsx`)
 
 **Requirements**:
+
 - Display list of 3-5 expert matches
 - Show avatar, name, role, department, match score
 - Show top 2 expertise topics
@@ -180,6 +185,7 @@ return {
 - Clicking "Nudge" calls IPC to open Console
 
 **Component Structure**:
+
 ```typescript
 interface ExpertsCardProps {
   experts: ExpertMatch[];
@@ -218,6 +224,7 @@ export function ExpertsCard({ experts, suggestedNudge, conversationId }: Experts
 ```
 
 **Styling Considerations**:
+
 - Match existing message card styling
 - Use existing avatar component if available
 - Match score badge with color coding (green >80%, yellow >60%, gray <60%)
@@ -232,6 +239,7 @@ export function ExpertsCard({ experts, suggestedNudge, conversationId }: Experts
 **Location**: In message rendering logic (likely around line 200-300)
 
 **Add**:
+
 ```typescript
 // Import at top
 import { ExpertsCard } from "./components/ExpertsCard";
@@ -255,6 +263,7 @@ import { ExpertsCard } from "./components/ExpertsCard";
 **Change**: Add `openNudgeForm` method to exposed API
 
 **Add**:
+
 ```typescript
 contextBridge.exposeInMainWorld("agentAPI", {
   // ... existing methods
@@ -269,6 +278,7 @@ contextBridge.exposeInMainWorld("agentAPI", {
 ```
 
 **TypeScript Declaration**:
+
 ```typescript
 // In global.d.ts or inline
 interface Window {
@@ -291,12 +301,13 @@ interface Window {
 **3.1 Add New IPC Channel** (`packages/shared/src/ipc.ts`)
 
 **Add**:
+
 ```typescript
 export const IPC_CHANNELS = {
   // ... existing channels
 
   // Nudge system (updated)
-  OPEN_CONSOLE_NUDGE_FORM: "open-console-nudge-form",  // NEW
+  OPEN_CONSOLE_NUDGE_FORM: "open-console-nudge-form", // NEW
   // Keep existing Console-related channels
 };
 ```
@@ -306,6 +317,7 @@ export const IPC_CHANNELS = {
 **3.2 Add IPC Handler in Main Process** (`apps/electron/src/main.ts`)
 
 **Add** (around line 750-800 where other nudge handlers are):
+
 ```typescript
 // Handle nudge form opening from Agent conversation
 ipcMain.on(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, (_event, data) => {
@@ -340,6 +352,7 @@ ipcMain.on(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, (_event, data) => {
 **Check**: Console already listens for `NUDGE_OPEN_CREATOR` (implemented earlier)
 
 **Expected Code** (around line 50-100):
+
 ```typescript
 useEffect(() => {
   window.consoleAPI?.onNudgeOpenCreator?.((data: any) => {
@@ -358,6 +371,7 @@ useEffect(() => {
 **Check**: Component already pre-fills from location.state (implemented earlier)
 
 **Expected Code** (lines 41-76):
+
 ```typescript
 useEffect(() => {
   if (location.state) {
@@ -381,6 +395,7 @@ useEffect(() => {
 **Change**: ExpertsMessage should NOT have triggerWindow
 
 **Before**:
+
 ```typescript
 export interface ExpertsMessage extends BaseMessage {
   messageType: "experts";
@@ -400,6 +415,7 @@ export interface ExpertsMessage extends BaseMessage {
 **5.2 Update Agent Frontend Types**
 
 **Add** (if not exists) to `apps/electron/src/renderer/agent/src/types.ts`:
+
 ```typescript
 export interface ExpertMatch {
   expert: {
@@ -457,6 +473,7 @@ export interface Message {
 **6.1 Deprecate Nudge Window Files**
 
 **Mark for future removal**:
+
 - `apps/electron/src/renderer/nudge/` (entire directory)
 - `apps/electron/src/preload/nudge.ts`
 - NUDGE_SHOW, NUDGE_HIDE, NUDGE_RESIZE IPC handlers in main.ts
@@ -468,6 +485,7 @@ export interface Message {
 **6.2 Remove from Main Process** (`apps/electron/src/main.ts`)
 
 **Future cleanup** (after Phase 1-5 verified working):
+
 ```typescript
 // REMOVE: Nudge window creation
 // let nudgeWindow: BrowserWindow | null = null;
@@ -481,6 +499,7 @@ export interface Message {
 ```
 
 **Keep**:
+
 - `NUDGE_OPEN_CREATOR` handler (used by Console)
 - `OPEN_CONSOLE_NUDGE_FORM` handler (new, used by Agent)
 
@@ -493,6 +512,7 @@ export interface Message {
 **File**: `apps/electron/src/renderer/agent/src/components/ExpertsCard.tsx`
 
 **Props Interface**:
+
 ```typescript
 interface ExpertsCardProps {
   experts: ExpertMatch[];
@@ -502,6 +522,7 @@ interface ExpertsCardProps {
 ```
 
 **Layout**:
+
 ```
 ┌─────────────────────────────────────────────────┐
 │ 💬 Experts who can help:                        │
@@ -525,14 +546,16 @@ interface ExpertsCardProps {
 ```
 
 **Styling Classes** (Tailwind CSS):
+
 ```tsx
 <div className="bg-background-secondary rounded-lg p-4 space-y-3">
   <h3 className="text-text-primary font-semibold">💬 Experts who can help:</h3>
 
-  {experts.map(expert => (
-    <div key={expert.expert.id}
-         className="flex items-center gap-3 p-3 bg-background-elevated rounded-lg border border-border-subtle hover:border-border-primary transition-colors">
-
+  {experts.map((expert) => (
+    <div
+      key={expert.expert.id}
+      className="flex items-center gap-3 p-3 bg-background-elevated rounded-lg border border-border-subtle hover:border-border-primary transition-colors"
+    >
       {/* Avatar */}
       <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
         {expert.expert.name.charAt(0)}
@@ -542,11 +565,15 @@ interface ExpertsCardProps {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-text-primary font-medium truncate">{expert.expert.name}</p>
-          <span className={`text-xs px-2 py-0.5 rounded ${
-            expert.matchScore > 0.8 ? 'bg-green-500/20 text-green-500' :
-            expert.matchScore > 0.6 ? 'bg-yellow-500/20 text-yellow-500' :
-            'bg-gray-500/20 text-gray-500'
-          }`}>
+          <span
+            className={`text-xs px-2 py-0.5 rounded ${
+              expert.matchScore > 0.8
+                ? "bg-green-500/20 text-green-500"
+                : expert.matchScore > 0.6
+                  ? "bg-yellow-500/20 text-yellow-500"
+                  : "bg-gray-500/20 text-gray-500"
+            }`}
+          >
             {(expert.matchScore * 100).toFixed(0)}% match
           </span>
         </div>
@@ -586,13 +613,14 @@ interface NudgeFormData {
     department: string;
     expertise: string[];
   };
-  context: string;        // AI-generated, editable
-  question: string;       // AI-generated, editable
+  context: string; // AI-generated, editable
+  question: string; // AI-generated, editable
   conversationId: string; // For reference
 }
 ```
 
 **IPC Flow**:
+
 ```typescript
 // Agent Window
 window.agentAPI.openNudgeForm(data);
@@ -615,11 +643,13 @@ window.consoleAPI.onNudgeOpenCreator((data) => {
 ### Scenario 1: User Asks for Help
 
 **Step 1**: User in Agent Conversation Window
+
 ```
 User: "Who can help me understand React hooks?"
 ```
 
 **Step 2**: Assistant responds with expert recommendations
+
 ```
 Assistant: "I found 3 experts who can help with this..."
 
@@ -644,6 +674,7 @@ Assistant: "I found 3 experts who can help with this..."
 **Step 3**: User clicks "Nudge" on Sarah Chen
 
 **Step 4**: Console window opens with pre-filled form
+
 ```
 Console → Nudges → Create New Nudge
 
@@ -743,6 +774,7 @@ Fields will be empty and user fills manually.
 ### Unit Tests
 
 **Agent - ExpertsCard Component**
+
 - ✅ Renders expert list correctly
 - ✅ Shows correct match scores
 - ✅ Displays expertise topics
@@ -750,6 +782,7 @@ Fields will be empty and user fills manually.
 - ✅ Handles missing suggestedNudge gracefully
 
 **Console - CreateNudge Component**
+
 - ✅ Pre-fills form from location.state
 - ✅ Handles missing context/question
 - ✅ Expert pre-selected correctly
@@ -759,6 +792,7 @@ Fields will be empty and user fills manually.
 ### Integration Tests
 
 **End-to-End Flow**
+
 1. ✅ User asks for help in Agent
 2. ✅ Expert recommendations appear inline
 3. ✅ Clicking "Nudge" opens Console
@@ -767,6 +801,7 @@ Fields will be empty and user fills manually.
 6. ✅ Nudge created in database
 
 **IPC Communication**
+
 1. ✅ Agent → Main: OPEN_CONSOLE_NUDGE_FORM
 2. ✅ Main → Console: NUDGE_OPEN_CREATOR
 3. ✅ Data structure preserved across IPC hops
@@ -776,24 +811,28 @@ Fields will be empty and user fills manually.
 ### Manual Testing Scenarios
 
 **Scenario 1**: Expert Match Flow
+
 ```
 Test: Ask "Who can help with billing?"
 Expected: Experts shown inline, clicking Nudge opens Console
 ```
 
 **Scenario 2**: Manual Nudge Creation
+
 ```
 Test: Navigate directly to Console → Create Nudge
 Expected: Form empty, user fills manually
 ```
 
 **Scenario 3**: Conversation History
+
 ```
 Test: Scroll up and see previous expert recommendations
 Expected: Expert cards still visible and functional
 ```
 
 **Scenario 4**: Multiple Experts
+
 ```
 Test: Request help for broad topic (3-5 experts)
 Expected: All experts shown, can nudge any of them
@@ -826,6 +865,7 @@ Expected: All experts shown, can nudge any of them
 **Risk**: Expert cards take up too much conversation space
 
 **Mitigation**:
+
 - Collapsible card UI (expand/collapse)
 - Limit to top 3 experts initially, "Show more" button
 - Compact card design
@@ -837,6 +877,7 @@ Expected: All experts shown, can nudge any of them
 **Risk**: Nudge Window had features not in inline cards
 
 **Mitigation**:
+
 - Review Nudge Window functionality before removal
 - Ensure ExpertsCard has feature parity
 - Keep Nudge Window files in git history
@@ -848,6 +889,7 @@ Expected: All experts shown, can nudge any of them
 **Risk**: New OPEN_CONSOLE_NUDGE_FORM conflicts with existing handlers
 
 **Mitigation**:
+
 - Use unique channel name
 - Test both manual and conversation-based nudge creation
 - Ensure Console handler doesn't break
@@ -857,10 +899,12 @@ Expected: All experts shown, can nudge any of them
 ## Timeline
 
 ### Week 1
+
 - **Days 1-2**: Backend changes (FindExpertTool)
 - **Days 3-5**: Agent frontend (ExpertsCard component)
 
 ### Week 2
+
 - **Days 1-2**: IPC handlers + integration testing
 - **Days 3-5**: Deprecate Nudge Window + final testing
 
@@ -883,27 +927,27 @@ Expected: All experts shown, can nudge any of them
 
 ### Files to Modify
 
-| File | Changes | Lines Changed |
-|------|---------|---------------|
-| `apps/backend/src/tools/find-expert.tool.ts` | Remove triggerWindow | ~5 lines |
-| `apps/electron/src/renderer/agent/src/App.tsx` | Add ExpertsCard rendering | ~10 lines |
-| `apps/electron/src/preload/agent.ts` | Add openNudgeForm method | ~8 lines |
-| `apps/electron/src/main.ts` | Add OPEN_CONSOLE_NUDGE_FORM handler | ~15 lines |
-| `packages/shared/src/ipc.ts` | Add IPC channel constant | ~1 line |
+| File                                           | Changes                             | Lines Changed |
+| ---------------------------------------------- | ----------------------------------- | ------------- |
+| `apps/backend/src/tools/find-expert.tool.ts`   | Remove triggerWindow                | ~5 lines      |
+| `apps/electron/src/renderer/agent/src/App.tsx` | Add ExpertsCard rendering           | ~10 lines     |
+| `apps/electron/src/preload/agent.ts`           | Add openNudgeForm method            | ~8 lines      |
+| `apps/electron/src/main.ts`                    | Add OPEN_CONSOLE_NUDGE_FORM handler | ~15 lines     |
+| `packages/shared/src/ipc.ts`                   | Add IPC channel constant            | ~1 line       |
 
 ### Files to Create
 
-| File | Purpose | Est. Lines |
-|------|---------|-----------|
+| File                                                              | Purpose                | Est. Lines |
+| ----------------------------------------------------------------- | ---------------------- | ---------- |
 | `apps/electron/src/renderer/agent/src/components/ExpertsCard.tsx` | Display experts inline | ~150 lines |
-| `apps/electron/src/renderer/agent/src/types.ts` | Type definitions | ~50 lines |
+| `apps/electron/src/renderer/agent/src/types.ts`                   | Type definitions       | ~50 lines  |
 
 ### Files to Delete (Later)
 
-| File | Purpose | Lines |
-|------|---------|-------|
-| `apps/electron/src/renderer/nudge/` | Entire directory | ~500 lines |
-| `apps/electron/src/preload/nudge.ts` | Nudge preload | ~40 lines |
+| File                                 | Purpose          | Lines      |
+| ------------------------------------ | ---------------- | ---------- |
+| `apps/electron/src/renderer/nudge/`  | Entire directory | ~500 lines |
+| `apps/electron/src/preload/nudge.ts` | Nudge preload    | ~40 lines  |
 
 ---
 
@@ -911,15 +955,35 @@ Expected: All experts shown, can nudge any of them
 
 ```css
 /* Match Score Colors */
-.match-high {    /* >80% */ background: rgba(34, 197, 94, 0.2); color: #22c55e; }
-.match-medium {  /* >60% */ background: rgba(234, 179, 8, 0.2); color: #eab308; }
-.match-low {     /* <60% */ background: rgba(107, 114, 128, 0.2); color: #6b7280; }
+.match-high {
+  /* >80% */
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+.match-medium {
+  /* >60% */
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+.match-low {
+  /* <60% */
+  background: rgba(107, 114, 128, 0.2);
+  color: #6b7280;
+}
 
 /* Availability Colors */
-.available { color: #22c55e; } /* green */
-.away      { color: #eab308; } /* yellow */
-.busy      { color: #ef4444; } /* red */
-.offline   { color: #6b7280; } /* gray */
+.available {
+  color: #22c55e;
+} /* green */
+.away {
+  color: #eab308;
+} /* yellow */
+.busy {
+  color: #ef4444;
+} /* red */
+.offline {
+  color: #6b7280;
+} /* gray */
 ```
 
 ---

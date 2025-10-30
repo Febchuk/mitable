@@ -46,6 +46,17 @@ declare global {
         question: string;
         conversationId: string;
       }) => void;
+      captureScreenshot: () => Promise<{
+        dataUrl: string;
+        metadata: {
+          width: number;
+          height: number;
+          originalWidth: number;
+          originalHeight: number;
+          captureMode: string;
+          timestamp: number;
+        };
+      } | null>;
     };
   }
 }
@@ -122,7 +133,7 @@ function App() {
         }
 
         // Destructure message data
-        const { message, conversationId: convId, userMessage, messageType, cardData } = messageData;
+        const { message, conversationId: convId, userMessage } = messageData;
 
         // Update conversation ID
         if (convId) {
@@ -395,7 +406,11 @@ function App() {
 
     // Capture screenshot for workflow actions (progress_step and custom_question)
     let screenshot: string | null = null;
-    if (option.action === "progress_step" || option.action === "custom_question" || option.action === "confirm_start") {
+    if (
+      option.action === "progress_step" ||
+      option.action === "custom_question" ||
+      option.action === "confirm_start"
+    ) {
       console.log("[Conversation] Capturing screenshot for workflow action:", option.action);
       const screenshotResult = await window.conversationAPI?.captureScreenshot?.();
       if (screenshotResult) {
@@ -442,17 +457,15 @@ function App() {
             console.error("Workflow streaming error:", error);
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === streamingMessageId
-                  ? { ...msg, content: `Error: ${error}` }
-                  : msg
+                msg.id === streamingMessageId ? { ...msg, content: `Error: ${error}` } : msg
               )
             );
             streamingMessageIdRef.current = null;
           },
-          onWindowTrigger: (window, data) => {
-            if (window === "nudge") {
+          onWindowTrigger: (windowType, data) => {
+            if (windowType === "nudge") {
               window.conversationAPI?.showNudge(data);
-            } else if (window === "guide") {
+            } else if (windowType === "guide") {
               window.conversationAPI?.startGuide(data);
             }
           },
@@ -526,11 +539,13 @@ function App() {
                 }
 
                 // Render AI messages (assistant)
-                const isWorkflowMessage = message.messageType === "workflow" && message.cardData?.workflowActive;
+                const isWorkflowMessage =
+                  message.messageType === "workflow" && message.cardData?.workflowActive;
                 const workflowPhase = message.cardData?.workflowPhase as WorkflowPhase | undefined;
 
                 // Determine if we should show step list based on phase
-                const shouldShowStepList = isWorkflowMessage && workflowPhase && workflowPhase !== "custom_question";
+                const shouldShowStepList =
+                  isWorkflowMessage && workflowPhase && workflowPhase !== "custom_question";
                 const shouldShowCheckboxes = workflowPhase === "step_progression";
 
                 // Determine card title/subtitle/icon for non-workflow cards
@@ -543,7 +558,11 @@ function App() {
                   title = `${expertCount} Expert${expertCount > 1 ? "s" : ""} Available`;
                   subtitle = "View Experts";
                   Icon = Users;
-                } else if (message.messageType === "workflow" && message.cardData && !isWorkflowMessage) {
+                } else if (
+                  message.messageType === "workflow" &&
+                  message.cardData &&
+                  !isWorkflowMessage
+                ) {
                   // Old workflow card format (before our changes)
                   title = message.cardData.guide?.title || "Interactive Workflow";
                   subtitle = "Start Guide";
@@ -582,7 +601,9 @@ function App() {
                     )}
 
                     {/* Show AI message for non-workflow messages */}
-                    {!isWorkflowMessage && message.content && <AIMessage content={message.content} />}
+                    {!isWorkflowMessage && message.content && (
+                      <AIMessage content={message.content} />
+                    )}
 
                     {/* Show inline ExpertsCard for experts messages */}
                     {message.messageType === "experts" && message.cardData?.experts && (
@@ -594,20 +615,23 @@ function App() {
                     )}
 
                     {/* Show card below the text if cardData exists (non-workflow, non-experts cards) */}
-                    {message.type === "card" && message.cardData && !isWorkflowMessage && message.messageType !== "experts" && (
-                      <Card
-                        className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors"
-                        onClick={() => handleCardClick(message)}
-                      >
-                        <div className="text-left">
-                          <CardTitle className="text-base mb-1">{title}</CardTitle>
-                          <CardDescription>{subtitle}</CardDescription>
-                        </div>
-                        <div className="w-12 h-12 bg-[#30303e] rounded-lg flex items-center justify-center flex-shrink-0 ml-4">
-                          <Icon size={24} className="text-primary-foreground" />
-                        </div>
-                      </Card>
-                    )}
+                    {message.type === "card" &&
+                      message.cardData &&
+                      !isWorkflowMessage &&
+                      message.messageType !== "experts" && (
+                        <Card
+                          className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors"
+                          onClick={() => handleCardClick(message)}
+                        >
+                          <div className="text-left">
+                            <CardTitle className="text-base mb-1">{title}</CardTitle>
+                            <CardDescription>{subtitle}</CardDescription>
+                          </div>
+                          <div className="w-12 h-12 bg-[#30303e] rounded-lg flex items-center justify-center flex-shrink-0 ml-4">
+                            <Icon size={24} className="text-primary-foreground" />
+                          </div>
+                        </Card>
+                      )}
                   </div>
                 );
               })}

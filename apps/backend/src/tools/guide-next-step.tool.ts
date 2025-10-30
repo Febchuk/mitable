@@ -1,7 +1,7 @@
 import { BaseTool, ToolContext, ToolParameters, ToolResult } from "./base.tool.js";
 import { geminiVisionService } from "../services/gemini-vision.service.js";
 import { guideGenerationService } from "../services/guideGeneration.service.js";
-import type { SolutionObject } from "@mitable/shared";
+// import type { SolutionObject } from "@mitable/shared"; // Unused - commented out
 
 /**
  * Guide Next Step Tool
@@ -69,10 +69,7 @@ DO NOT USE:
     required: ["conversationId"],
   };
 
-  async execute(
-    args: { conversationId: string },
-    context: ToolContext
-  ): Promise<ToolResult> {
+  async execute(args: { conversationId: string }, context: ToolContext): Promise<ToolResult> {
     this.validate(args);
 
     const { conversationId } = args;
@@ -92,9 +89,8 @@ DO NOT USE:
 
     try {
       // Step 1: Retrieve current SolutionObject from conversation
-      const currentSolution = await guideGenerationService.retrieveLatestSolutionObject(
-        conversationId
-      );
+      const currentSolution =
+        await guideGenerationService.retrieveLatestSolutionObject(conversationId);
 
       if (!currentSolution) {
         console.error("[GuideNextStepTool] No active workflow found in conversation");
@@ -165,8 +161,7 @@ DO NOT USE:
         currentStepIndex: nextStepIndex,
         stepList: updatedSolution.stepList.map((s, idx) => ({
           ...s,
-          status:
-            idx < nextStepIndex ? "completed" : idx === nextStepIndex ? "current" : "pending",
+          status: idx < nextStepIndex ? "completed" : idx === nextStepIndex ? "current" : "pending",
         })),
       };
 

@@ -5,7 +5,9 @@ import { useConversationMessages, useSendMessage } from "@/console/src/hooks/que
 import UserMessage from "../../../../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../../../../components/domain/messages/AIMessage";
 import ExpertsCard from "../../../../../../conversation/src/components/ExpertsCard";
-import WorkflowOptions, { type WorkflowPhase } from "../../../../../../components/domain/workflow/WorkflowOptions";
+import WorkflowOptions, {
+  type WorkflowPhase,
+} from "../../../../../../components/domain/workflow/WorkflowOptions";
 import StepList from "../../../../../../components/domain/workflow/StepList";
 import { Button } from "@/components/ui/button";
 

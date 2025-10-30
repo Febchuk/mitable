@@ -29,6 +29,7 @@ Mitable's agentic system has evolved from a **single monolithic agent** to a **m
 ### Why Multi-Agent?
 
 **Problems with Single-Agent Approach**:
+
 - ❌ Token waste: ~2,000 tokens of tool definitions per request, even for simple "Hello" messages
 - ❌ Cognitive overload: GPT-4 chooses from 11 tools, leading to occasional incorrect selections
 - ❌ Cost inefficiency: Using expensive GPT-4 for simple text responses (60% of requests)
@@ -36,6 +37,7 @@ Mitable's agentic system has evolved from a **single monolithic agent** to a **m
 - ❌ System hint anti-pattern: "Begging" GPT-4 to pick the right tool instead of deterministic routing
 
 **Benefits of Multi-Agent Approach**:
+
 - ✅ **40-60% cost reduction**: Use cheaper models (Gemini Flash, GPT-3.5) for simple tasks
 - ✅ **30-50% latency reduction**: Parallel execution of knowledge + vision calls
 - ✅ **Deterministic routing**: Explicit logic instead of hoping AI follows hints
@@ -51,6 +53,7 @@ User Message → Orchestrator Agent → Route to Specialized Agent → Return Re
 ```
 
 **5 Specialized Agents**:
+
 1. **Orchestrator** - Lightweight router (Gemini Flash)
 2. **Text Response** - Simple responses (Gemini Flash)
 3. **Knowledge** - Search & synthesis (GPT-4)
@@ -203,9 +206,9 @@ export interface SolutionObject {
 }
 
 export type WorkflowPhase =
-  | "initial_proposal"    // Showing preview, waiting for "Start"
-  | "step_progression"    // Executing steps one-by-one
-  | "custom_question";    // User asked question during workflow
+  | "initial_proposal" // Showing preview, waiting for "Start"
+  | "step_progression" // Executing steps one-by-one
+  | "custom_question"; // User asked question during workflow
 
 export interface EmbeddingMatch {
   text: string;
@@ -225,9 +228,9 @@ export interface ExpertMatch {
     matchScore: number; // 0.0 - 1.0
   };
   performance: {
-    responseRate: number;     // 0.0 - 1.0
+    responseRate: number; // 0.0 - 1.0
     helpfulnessScore: number; // 1.0 - 5.0
-    avgResponseTime: number;  // minutes
+    avgResponseTime: number; // minutes
   };
   availability: {
     status: "online" | "away" | "offline";
@@ -307,6 +310,7 @@ export function isExpertsMessage(msg: ToolResult): msg is ExpertsMessage {
 **Retrieval**: Orchestrator pre-loads workflow state for all agents via `guideGenerationService.retrieveLatestSolutionObject(conversationId)`.
 
 **Benefits**:
+
 - ✅ Single retrieval per request (orchestrator loads once)
 - ✅ All agents receive `workflowState` in context
 - ✅ Tools use smart wrapper to decide if wrapping needed
@@ -325,6 +329,7 @@ export function isExpertsMessage(msg: ToolResult): msg is ExpertsMessage {
 **File**: `apps/backend/src/services/orchestrator.service.ts`
 
 **Responsibilities**:
+
 - Receive all incoming user messages
 - Classify intent using Gemini Flash
 - Parse UI metadata (workflowAction)
@@ -334,6 +339,7 @@ export function isExpertsMessage(msg: ToolResult): msg is ExpertsMessage {
 - Return final response to user
 
 **Tools Available**:
+
 1. `classify_intent` - Analyzes user message to determine type
 2. `extract_metadata` - Parses UI metadata
 
@@ -379,6 +385,7 @@ async route(message: AgentContext): Promise<AgentResponse> {
 ```
 
 **Communication**:
+
 - **Receives from**: API layer (conversation routes)
 - **Delegates to**: All specialized agents
 - **Returns to**: API layer
@@ -396,6 +403,7 @@ async route(message: AgentContext): Promise<AgentResponse> {
 **File**: `apps/backend/src/agents/text-response.agent.ts`
 
 **Handles**:
+
 - General questions without knowledge base needs
 - Acknowledgments ("Got it", "Sounds good")
 - Clarifications
@@ -403,15 +411,18 @@ async route(message: AgentContext): Promise<AgentResponse> {
 - Workflow conceptual questions ("Why do I need this step?")
 
 **Tools Available**:
+
 1. `respond_with_text` - Generate conversational text response
 
 **When to Use**:
+
 - No screenshot required
 - No knowledge search required
 - No expert matching required
 - Simple Q&A, chitchat
 
 **Communication**:
+
 - **Receives from**: Orchestrator Agent
 - **Delegates to**: None (terminal agent)
 - **Returns to**: Orchestrator Agent
@@ -429,36 +440,42 @@ async route(message: AgentContext): Promise<AgentResponse> {
 **File**: `apps/backend/src/agents/knowledge.agent.ts`
 
 **Handles**:
+
 - Documentation questions
 - Policy/process questions
 - Historical information ("What did we discuss last month?")
 - Company-specific information
 
 **Tools Available**:
+
 1. `search_knowledge` - Hybrid search through Slack messages + Notion pages
 2. `detect_intent` - Classify query type (company/product/operations/technical)
 3. `apply_trust_ranking` - Boost relevant sources based on intent
 4. `parse_temporal_keywords` - Parse "last week", "yesterday", etc.
 
 **Services Used**:
+
 - `searchService` - Hybrid search (Pinecone + PostgreSQL)
 - `intentService` - Intent classification
 - `trustRankingService` - Result ranking
 - `embeddingService` - Generate query embeddings
 
 **Trust Ranking Weights**:
+
 - Company questions → Boost Notion/Google Drive 2.5x
 - Product questions → Boost PRDs/roadmaps 2.0x
 - Operations questions → Boost Slack conversations 2.5x
 - Technical questions → Boost codebase 3.0x, docs 1.5x
 
 **Communication**:
+
 - **Receives from**: Orchestrator Agent OR Visual Guidance Agent
 - **Can be called by**: Visual Guidance Agent (for knowledge-grounded workflows)
 - **Delegates to**: None
 - **Returns to**: Caller (Orchestrator or Visual Guidance Agent)
 
 **Inter-Agent Communication**:
+
 ```typescript
 Visual Guidance Agent → Knowledge Agent.search()
                       ← Returns search results
@@ -476,6 +493,7 @@ Visual Guidance Agent → Uses results as supportingData for workflow
 **File**: `apps/backend/src/agents/visual-guidance.agent.ts`
 
 **Handles**:
+
 - "How do I..." questions with screenshots
 - Step-by-step UI guidance
 - Workflow progression
@@ -483,12 +501,14 @@ Visual Guidance Agent → Uses results as supportingData for workflow
 - Vague prompt clarification
 
 **Tools Available**:
+
 1. `clarify_intent` - Analyze vague prompts with screenshots, offer specific interpretations
 2. `start_ui_guidance_workflow` - Create initial step-by-step plan
 3. `guide_next_step` - Progress to next step, analyze screen, generate visual guidance
 4. `analyze_workflow_screen` - Troubleshoot visual issues during workflow
 
 **Services Used**:
+
 - `geminiVisionService` - Screenshot analysis
   - `analyzeScreenshot()` - UI element detection
   - `evaluateProgress()` - Plan adjustment detection
@@ -498,17 +518,20 @@ Visual Guidance Agent → Uses results as supportingData for workflow
   - `retrieveLatestSolutionObject()` - State retrieval
 
 **Complexity Detection**:
+
 - **LOW (3-5 steps)**: Single app, linear workflow
 - **MEDIUM (5-8 steps)**: Multi-app, nested menus
 - **HIGH (8-12+ steps)**: Debugging, multi-system tracing
 
 **Communication**:
+
 - **Receives from**: Orchestrator Agent
 - **Delegates to**: Knowledge Agent (for knowledge-grounded workflows)
 - **Returns to**: Orchestrator Agent
 - **Triggers**: Guide Window (via triggerWindow mechanism)
 
 **Inter-Agent Communication Pattern**:
+
 ```typescript
 User: "How do I update the roadmap?" + screenshot
 
@@ -524,6 +547,7 @@ Visual Guidance Agent → Synthesizes search results + screenshot analysis
 ```
 
 **State Management**:
+
 - Maintains workflow state in conversation cardData
 - Retrieves state from `context.workflowState` (pre-loaded by orchestrator)
 
@@ -538,32 +562,38 @@ Visual Guidance Agent → Synthesizes search results + screenshot analysis
 **File**: `apps/backend/src/agents/expert-matching.agent.ts`
 
 **Handles**:
+
 - "Who can help with..." questions
 - Expert recommendations
 - Fallback when knowledge search fails
 
 **Tools Available**:
+
 1. `find_expert_colleague` - Score and rank experts
 2. `calculate_expertise_score` - Semantic similarity of expert topics vs query
 3. `calculate_performance_score` - Response rate + helpfulness rating
 4. `calculate_availability_score` - Online status + calendar
 
 **Scoring Algorithm**:
+
 - Expertise similarity (40%): Cosine similarity of embeddings
 - Performance (30%): Response rate + helpfulness score
 - Availability (30%): Online status
 
 **Services Used**:
+
 - `expertMatchingService` - Scoring algorithm
 - `embeddingService` - Generate topic embeddings
 
 **Communication**:
+
 - **Receives from**: Orchestrator Agent OR Knowledge Agent (fallback)
 - **Delegates to**: None
 - **Returns to**: Caller
 - **Triggers**: Nudge Window (via triggerWindow mechanism)
 
 **Inter-Agent Communication Pattern (Fallback)**:
+
 ```typescript
 User: "What is [obscure topic]?"
 
@@ -585,6 +615,7 @@ Orchestrator → Expert Matching Agent.findExperts()
 #### `classify_intent`
 
 **Input**:
+
 ```typescript
 interface ClassifyIntentInput {
   message: string;
@@ -594,6 +625,7 @@ interface ClassifyIntentInput {
 ```
 
 **Output**:
+
 ```typescript
 interface ClassifyIntentOutput {
   type: "general_chat" | "knowledge_search" | "workflow_start" | "expert_request";
@@ -609,6 +641,7 @@ interface ClassifyIntentOutput {
 #### `extract_metadata`
 
 **Input**:
+
 ```typescript
 interface ExtractMetadataInput {
   metadata: Record<string, any>; // Raw metadata from frontend
@@ -616,6 +649,7 @@ interface ExtractMetadataInput {
 ```
 
 **Output**:
+
 ```typescript
 interface ExtractMetadataOutput {
   workflowAction?: "progress_step" | "custom_question" | "exit_workflow";
@@ -633,6 +667,7 @@ interface ExtractMetadataOutput {
 #### `respond_with_text`
 
 **Input**:
+
 ```typescript
 interface RespondWithTextInput {
   response: string; // The text response to send
@@ -640,21 +675,21 @@ interface RespondWithTextInput {
 ```
 
 **Output**:
+
 ```typescript
 type RespondWithTextOutput = TextMessage;
 ```
 
 **Smart Wrapper Behavior**:
+
 - No workflow state → Returns `TextMessage`
 - Has workflow state → Returns `WorkflowMessage` with cardData
 
 **Implementation**:
+
 ```typescript
 class RespondTextTool extends BaseTool {
-  async execute(
-    args: RespondWithTextInput,
-    context: ToolContext
-  ): Promise<TextMessage> {
+  async execute(args: RespondWithTextInput, context: ToolContext): Promise<TextMessage> {
     return {
       messageType: "text",
       content: args.response,
@@ -675,6 +710,7 @@ const finalResult = await wrapWithWorkflowState(baseMessage, context);
 #### `search_knowledge`
 
 **Input**:
+
 ```typescript
 interface SearchKnowledgeInput {
   query: string;
@@ -683,6 +719,7 @@ interface SearchKnowledgeInput {
 ```
 
 **Output**:
+
 ```typescript
 interface SearchKnowledgeOutput extends TextMessage {
   sources: Source[]; // ALWAYS includes sources
@@ -690,27 +727,26 @@ interface SearchKnowledgeOutput extends TextMessage {
 ```
 
 **Smart Wrapper Behavior**:
+
 - No workflow state → Returns `TextMessage` with sources
 - Has workflow state → Returns `WorkflowMessage` with sources + cardData
 
 **Implementation**:
+
 ```typescript
 class SearchKnowledgeTool extends BaseTool {
-  async execute(
-    args: SearchKnowledgeInput,
-    context: ToolContext
-  ): Promise<SearchKnowledgeOutput> {
+  async execute(args: SearchKnowledgeInput, context: ToolContext): Promise<SearchKnowledgeOutput> {
     // 1. Detect intent
     const intent = await intentService.analyzeIntent({
       message: args.query,
-      conversationHistory: context.conversationHistory
+      conversationHistory: context.conversationHistory,
     });
 
     // 2. Hybrid search (Pinecone semantic + PostgreSQL keyword)
     const searchResponse = await searchService.search({
       query: args.query,
       organizationId: context.organizationId,
-      topK: args.topK || 10
+      topK: args.topK || 10,
     });
 
     // 3. Apply trust ranking
@@ -721,10 +757,10 @@ class SearchKnowledgeTool extends BaseTool {
     );
 
     // 4. Format as sources
-    const sources = rankedResults.map(r => ({
+    const sources = rankedResults.map((r) => ({
       title: r.title,
       url: r.url,
-      snippet: r.text.substring(0, 150)
+      snippet: r.text.substring(0, 150),
     }));
 
     return {
@@ -746,6 +782,7 @@ const finalResult = await wrapWithWorkflowState(baseMessage, context);
 #### `detect_intent` (Internal Utility)
 
 **Input**:
+
 ```typescript
 interface DetectIntentInput {
   message: string;
@@ -754,6 +791,7 @@ interface DetectIntentInput {
 ```
 
 **Output**:
+
 ```typescript
 interface DetectIntentOutput {
   type: "company" | "product" | "operations" | "technical" | "greeting" | "general";
@@ -768,6 +806,7 @@ interface DetectIntentOutput {
 #### `apply_trust_ranking` (Internal Utility)
 
 **Input**:
+
 ```typescript
 interface ApplyTrustRankingInput {
   results: SearchResult[];
@@ -777,6 +816,7 @@ interface ApplyTrustRankingInput {
 ```
 
 **Output**:
+
 ```typescript
 interface ApplyTrustRankingOutput {
   rankedResults: SearchResult[]; // Re-ranked based on trust weights
@@ -792,33 +832,33 @@ interface ApplyTrustRankingOutput {
 #### `clarify_intent`
 
 **Input**:
+
 ```typescript
 interface ClarifyIntentInput {
   vaguePrompt: string; // User's vague question like "How do I do this?"
-  screenshot: string;  // Base64 screenshot (REQUIRED)
+  screenshot: string; // Base64 screenshot (REQUIRED)
 }
 ```
 
 **Output**:
+
 ```typescript
 interface ClarifyIntentOutput extends TextMessage {
   cardData: {
     interpretations: Array<{
-      task: string;          // "Submit expense report"
-      confidence: number;    // 0.85
-      reasoning: string;     // "Saw Workday app with expense form"
+      task: string; // "Submit expense report"
+      confidence: number; // 0.85
+      reasoning: string; // "Saw Workday app with expense form"
     }>;
   };
 }
 ```
 
 **Implementation**:
+
 ```typescript
 class ClarifyIntentTool extends BaseTool {
-  async execute(
-    args: ClarifyIntentInput,
-    context: ToolContext
-  ): Promise<ClarifyIntentOutput> {
+  async execute(args: ClarifyIntentInput, context: ToolContext): Promise<ClarifyIntentOutput> {
     // Call Gemini Vision to analyze screenshot
     const interpretations = await geminiVisionService.interpretVaguePrompt(
       args.vaguePrompt,
@@ -840,18 +880,20 @@ class ClarifyIntentTool extends BaseTool {
 #### `start_ui_guidance_workflow`
 
 **Input**:
+
 ```typescript
 interface StartUIGuidanceWorkflowInput {
-  solution: string;                    // High-level goal
-  solutionExplanation: string;         // Why this approach
-  supportingData: EmbeddingMatch[];    // Search results from Knowledge Agent
-  searchQuery: string;                 // Original search query
-  supportingDataExplanation: string;   // How search results support solution
-  stepList: Step[];                    // Generated steps
+  solution: string; // High-level goal
+  solutionExplanation: string; // Why this approach
+  supportingData: EmbeddingMatch[]; // Search results from Knowledge Agent
+  searchQuery: string; // Original search query
+  supportingDataExplanation: string; // How search results support solution
+  stepList: Step[]; // Generated steps
 }
 ```
 
 **Output**:
+
 ```typescript
 interface StartUIGuidanceWorkflowOutput extends WorkflowMessage {
   cardData: {
@@ -860,7 +902,7 @@ interface StartUIGuidanceWorkflowOutput extends WorkflowMessage {
     solutionExplanation: string;
     supportingDataExplanation: string;
     stepList: Step[];
-    currentStepIndex: -1;              // -1 = preview mode (not started)
+    currentStepIndex: -1; // -1 = preview mode (not started)
     searchQuery: string;
     adjustmentHistory: AdjustmentRecord[];
     workflowActive: true;
@@ -872,6 +914,7 @@ interface StartUIGuidanceWorkflowOutput extends WorkflowMessage {
 **Note**: Returns `WorkflowMessage` directly, smart wrapper is bypassed.
 
 **Implementation**:
+
 ```typescript
 class StartUIGuidanceWorkflowTool extends BaseTool {
   async execute(
@@ -883,7 +926,7 @@ class StartUIGuidanceWorkflowTool extends BaseTool {
       supportingData: args.supportingData,
       solutionExplanation: args.solutionExplanation,
       supportingDataExplanation: args.supportingDataExplanation,
-      stepList: args.stepList.map(s => ({ ...s, status: "pending" })),
+      stepList: args.stepList.map((s) => ({ ...s, status: "pending" })),
       currentStepIndex: -1, // Preview mode
       searchQuery: args.searchQuery,
       adjustmentHistory: [],
@@ -908,6 +951,7 @@ class StartUIGuidanceWorkflowTool extends BaseTool {
 #### `guide_next_step`
 
 **Input**:
+
 ```typescript
 interface GuideNextStepInput {
   conversationId: string; // Used to retrieve workflow state
@@ -915,6 +959,7 @@ interface GuideNextStepInput {
 ```
 
 **Output**:
+
 ```typescript
 interface GuideNextStepOutput extends WorkflowMessage {
   cardData: {
@@ -955,12 +1000,10 @@ interface GuideNextStepOutput extends WorkflowMessage {
 **Note**: Returns `WorkflowMessage` directly, smart wrapper is bypassed.
 
 **Implementation**:
+
 ```typescript
 class GuideNextStepTool extends BaseTool {
-  async execute(
-    args: GuideNextStepInput,
-    context: ToolContext
-  ): Promise<GuideNextStepOutput> {
+  async execute(args: GuideNextStepInput, context: ToolContext): Promise<GuideNextStepOutput> {
     // Retrieve workflow state (pre-loaded by orchestrator)
     const workflowState = context.workflowState;
     if (!workflowState) {
@@ -979,8 +1022,12 @@ class GuideNextStepTool extends BaseTool {
       currentStepIndex: workflowState.currentStepIndex + 1,
       stepList: workflowState.stepList.map((step, i) => ({
         ...step,
-        status: i < workflowState.currentStepIndex + 1 ? "completed" :
-                i === workflowState.currentStepIndex + 1 ? "current" : "pending"
+        status:
+          i < workflowState.currentStepIndex + 1
+            ? "completed"
+            : i === workflowState.currentStepIndex + 1
+              ? "current"
+              : "pending",
       })),
     };
 
@@ -1011,14 +1058,16 @@ class GuideNextStepTool extends BaseTool {
 #### `analyze_workflow_screen`
 
 **Input**:
+
 ```typescript
 interface AnalyzeWorkflowScreenInput {
   conversationId: string; // Retrieve workflow state
-  issue: string;          // User's problem: "I don't see the Save button"
+  issue: string; // User's problem: "I don't see the Save button"
 }
 ```
 
 **Output**:
+
 ```typescript
 interface AnalyzeWorkflowScreenOutput extends WorkflowMessage {
   cardData: {
@@ -1040,6 +1089,7 @@ interface AnalyzeWorkflowScreenOutput extends WorkflowMessage {
 **Note**: Returns `WorkflowMessage` directly, smart wrapper is bypassed. Does NOT progress currentStepIndex.
 
 **Implementation**:
+
 ```typescript
 class AnalyzeWorkflowScreenTool extends BaseTool {
   async execute(
@@ -1079,14 +1129,16 @@ class AnalyzeWorkflowScreenTool extends BaseTool {
 #### `find_expert_colleague`
 
 **Input**:
+
 ```typescript
 interface FindExpertColleagueInput {
-  query: string;  // Topic or question
-  topK?: number;  // Default: 3, max: 5
+  query: string; // Topic or question
+  topK?: number; // Default: 3, max: 5
 }
 ```
 
 **Output**:
+
 ```typescript
 interface FindExpertColleagueOutput extends ExpertsMessage {
   cardData: {
@@ -1105,6 +1157,7 @@ interface FindExpertColleagueOutput extends ExpertsMessage {
 **Note**: Returns `ExpertsMessage` directly, smart wrapper is bypassed.
 
 **Implementation**:
+
 ```typescript
 class FindExpertTool extends BaseTool {
   async execute(
@@ -1208,6 +1261,7 @@ Visual Guidance Agent → start_ui_guidance_workflow({
 
 **Agents involved**: Orchestrator, Visual Guidance Agent, Knowledge Agent
 **Communication**:
+
 - Orchestrator → Visual Guidance (delegation)
 - Visual Guidance → Knowledge (direct call)
 
@@ -1290,6 +1344,7 @@ interface AgentResponse {
 ```
 
 **Communication Rules**:
+
 1. ✅ Orchestrator is the only entry point - All user messages go through Orchestrator first
 2. ✅ Agents can call other agents directly - e.g., Visual Guidance → Knowledge Agent
 3. ❌ No circular dependencies - Agents cannot call back to Orchestrator
@@ -1311,6 +1366,7 @@ Orchestrator Agent ──→ Text Agent (returns)
 ```
 
 **Forbidden**:
+
 - ❌ Text Agent → Any other agent
 - ❌ Knowledge Agent → Any other agent (except return to caller)
 - ❌ Expert Agent → Any other agent
@@ -1320,42 +1376,44 @@ Orchestrator Agent ──→ Text Agent (returns)
 
 ## Tool Assignment Matrix
 
-| Tool | Orchestrator | Text | Knowledge | Visual Guidance | Expert |
-|------|--------------|------|-----------|-----------------|--------|
-| `classify_intent` | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `extract_metadata` | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `respond_with_text` | ❌ | ✅ | ❌ | ✅ | ❌ |
-| `search_knowledge` | ❌ | ❌ | ✅ | ✅* | ❌ |
-| `detect_intent` | ❌ | ❌ | ✅ | ❌ | ❌ |
-| `apply_trust_ranking` | ❌ | ❌ | ✅ | ❌ | ❌ |
-| `clarify_intent` | ❌ | ❌ | ❌ | ✅ | ❌ |
-| `start_ui_guidance_workflow` | ❌ | ❌ | ❌ | ✅ | ❌ |
-| `guide_next_step` | ❌ | ❌ | ❌ | ✅ | ❌ |
-| `analyze_workflow_screen` | ❌ | ❌ | ❌ | ✅ | ❌ |
-| `find_expert_colleague` | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Tool                         | Orchestrator | Text | Knowledge | Visual Guidance | Expert |
+| ---------------------------- | ------------ | ---- | --------- | --------------- | ------ |
+| `classify_intent`            | ✅           | ❌   | ❌        | ❌              | ❌     |
+| `extract_metadata`           | ✅           | ❌   | ❌        | ❌              | ❌     |
+| `respond_with_text`          | ❌           | ✅   | ❌        | ✅              | ❌     |
+| `search_knowledge`           | ❌           | ❌   | ✅        | ✅\*            | ❌     |
+| `detect_intent`              | ❌           | ❌   | ✅        | ❌              | ❌     |
+| `apply_trust_ranking`        | ❌           | ❌   | ✅        | ❌              | ❌     |
+| `clarify_intent`             | ❌           | ❌   | ❌        | ✅              | ❌     |
+| `start_ui_guidance_workflow` | ❌           | ❌   | ❌        | ✅              | ❌     |
+| `guide_next_step`            | ❌           | ❌   | ❌        | ✅              | ❌     |
+| `analyze_workflow_screen`    | ❌           | ❌   | ❌        | ✅              | ❌     |
+| `find_expert_colleague`      | ❌           | ❌   | ❌        | ❌              | ✅     |
 
 **\* Visual Guidance Agent** calls Knowledge Agent's tools via agent-to-agent invocation, not direct tool access.
 
 ### Tool Count Summary
 
-| Agent | Tool Count | Notes |
-|-------|------------|-------|
-| Orchestrator | 2 | Routing only |
-| Text Response | 1 | Simple responses |
-| Knowledge | 3 | Search + ranking |
-| Visual Guidance | 4 | Workflow management |
-| Expert Matching | 1 | Expert scoring |
-| **Total** | **11** | **Reduced from 13** |
+| Agent           | Tool Count | Notes               |
+| --------------- | ---------- | ------------------- |
+| Orchestrator    | 2          | Routing only        |
+| Text Response   | 1          | Simple responses    |
+| Knowledge       | 3          | Search + ranking    |
+| Visual Guidance | 4          | Workflow management |
+| Expert Matching | 1          | Expert scoring      |
+| **Total**       | **11**     | **Reduced from 13** |
 
 ### Tools Eliminated by Smart Wrapper
 
 **Before Multi-Agent Architecture**:
+
 - `respond_with_text`
 - `respond_with_text_in_workflow` ❌ DUPLICATE
 - `search_knowledge`
 - `search_knowledge_in_workflow` ❌ DUPLICATE
 
 **After Multi-Agent Architecture**:
+
 - `respond_with_text` (smart wrapper handles both cases)
 - `search_knowledge` (smart wrapper handles both cases)
 
@@ -1489,6 +1547,7 @@ class OrchestratorService {
 ### What Changed
 
 **Before (Single Agent)**:
+
 - ✅ One `AgentService` with 11-13 tools
 - ❌ All tools available to single GPT-4 instance
 - ❌ System hints to guide tool selection
@@ -1497,6 +1556,7 @@ class OrchestratorService {
 - ❌ Workflow-specific tool duplicates
 
 **After (Multi-Agent)**:
+
 - ✅ 5 specialized agents with domain-specific tools
 - ✅ Orchestrator routes to appropriate agent
 - ✅ Model optimization (Gemini Flash, GPT-3.5, GPT-4)
@@ -1507,10 +1567,12 @@ class OrchestratorService {
 ### What Was Eliminated
 
 **Workflow-Specific Duplicates**:
+
 - ❌ `respond_with_text_in_workflow` → Replaced by smart wrapper
 - ❌ `search_knowledge_in_workflow` → Replaced by smart wrapper
 
 **System Hints**:
+
 - ❌ `[CRITICAL WORKFLOW ACTION] User clicked 'Move on to next step'...` → Replaced by deterministic routing
 - ❌ `[CRITICAL] Analyze question type: visual issue → analyze_workflow_screen...` → Replaced by agent selection
 
@@ -1519,16 +1581,19 @@ class OrchestratorService {
 ### Benefits Achieved
 
 **Cost Reduction**:
+
 - Text responses (60% of requests): 10x cheaper with Gemini Flash = **6x savings**
 - Expert matching (5% of requests): 3x cheaper with GPT-3.5 = **0.15x savings**
 - **Total estimated: 40-60% cost reduction**
 
 **Latency Reduction**:
+
 - Parallel knowledge + vision: **50% faster** for workflow starts
 - Lightweight routing: **100ms faster** than full GPT-4 call
 - **Total estimated: 30-50% latency improvement**
 
 **Architecture**:
+
 - ✅ Clear domain boundaries
 - ✅ Type-safe communication
 - ✅ Easier to test (unit test per agent)
@@ -1580,6 +1645,7 @@ apps/backend/src/
 ## Implementation Roadmap
 
 ### Phase 1: Type System (Week 1)
+
 1. Create discriminated union types in `base.tool.ts`
 2. Implement smart wrapper utility
 3. Add type guard functions
@@ -1587,12 +1653,14 @@ apps/backend/src/
 5. Delete workflow-specific duplicates
 
 ### Phase 2: Agent Extraction (Week 2)
+
 1. Create `BaseAgent` abstract class
 2. Implement all 5 agent classes
 3. Reorganize tools by agent
 4. Update tool imports
 
 ### Phase 3: Orchestrator (Week 2-3)
+
 1. Create `OrchestratorService`
 2. Implement intent classification (Gemini Flash)
 3. Implement routing logic
@@ -1600,12 +1668,14 @@ apps/backend/src/
 5. Enable agent-to-agent communication
 
 ### Phase 4: Integration (Week 3)
+
 1. Update API routes to use orchestrator
 2. Update tests for new architecture
 3. Add per-agent metrics
 4. Deployment to staging
 
 ### Phase 5: Optimization (Week 4)
+
 1. Enable parallel execution (knowledge + vision)
 2. Add caching for intent classification
 3. Monitor performance metrics
@@ -1616,20 +1686,24 @@ apps/backend/src/
 ## Success Metrics
 
 **Cost**:
+
 - Target: 40-60% reduction in OpenAI API costs
 - Baseline: ~$3,000/month
 - Goal: ~$1,200-$1,800/month savings
 
 **Latency**:
+
 - Target: 30-50% reduction for workflow starts
 - Baseline: 3-4 seconds end-to-end
 - Goal: <2 seconds for workflow starts
 
 **Routing Accuracy**:
+
 - Target: 95%+ correct agent selection
 - Measurement: Log routing decisions, manual review
 
 **Zero Regressions**:
+
 - Same user experience
 - No broken workflows
 - All existing features work

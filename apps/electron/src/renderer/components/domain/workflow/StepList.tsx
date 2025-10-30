@@ -25,14 +25,18 @@ interface StepListProps {
  * 2. step_progression: Show steps WITH checkboxes (active tracking)
  * 3. custom_question: HIDDEN (not rendered)
  */
-export default function StepList({ steps, currentStepIndex, showCheckboxes = false }: StepListProps) {
+export default function StepList({
+  steps,
+  currentStepIndex,
+  showCheckboxes = false,
+}: StepListProps) {
   return (
     <div className="mt-4 space-y-2 bg-secondary/30 rounded-lg p-4">
       <div className="text-sm font-medium text-foreground mb-3">
         Steps ({currentStepIndex + 1}/{steps.length})
       </div>
       <div className="space-y-2">
-        {steps.map((step, index) => {
+        {steps.map((step, _index) => {
           const isCompleted = step.status === "completed";
           const isCurrent = step.status === "current";
           const isPending = step.status === "pending";

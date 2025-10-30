@@ -1,5 +1,5 @@
-import OpenAI from "openai";
-import { config } from "../config";
+// import OpenAI from "openai"; // Unused - commented out
+// import { config } from "../config"; // Unused - commented out
 import { BaseAgent } from "./base.agent";
 import { KnowledgeAgent } from "./knowledge.agent";
 import type { StreamChunk, ToolContext } from "../tools/base.tool";
@@ -49,7 +49,7 @@ import { wrapWithWorkflowState } from "../tools/utils/workflow-wrapper";
  */
 export class VisualGuidanceAgent extends BaseAgent {
   readonly name = "visual-guidance";
-  private openai: OpenAI;
+  // private openai: OpenAI; // Unused - kept for future LLM synthesis
   private knowledgeAgent: KnowledgeAgent;
   private clarifyIntentTool: ClarifyIntentTool;
   private startWorkflowTool: StartUIGuidanceWorkflowTool;
@@ -58,7 +58,7 @@ export class VisualGuidanceAgent extends BaseAgent {
 
   constructor(knowledgeAgent: KnowledgeAgent) {
     super();
-    this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+    // this.openai = new OpenAI({ apiKey: config.openai.apiKey }); // Unused - commented out
     this.knowledgeAgent = knowledgeAgent;
     this.clarifyIntentTool = new ClarifyIntentTool();
     this.startWorkflowTool = new StartUIGuidanceWorkflowTool();
@@ -76,8 +76,8 @@ export class VisualGuidanceAgent extends BaseAgent {
         yield {
           type: "complete",
           messageType: "text",
-          content: "I need to see your screen to provide step-by-step guidance. Please capture a screenshot.",
-          streamable: true,
+          content:
+            "I need to see your screen to provide step-by-step guidance. Please capture a screenshot.",
         };
         return;
       }
@@ -98,17 +98,19 @@ export class VisualGuidanceAgent extends BaseAgent {
       // Handle metadata-driven routing (deterministic)
       if (context.metadata?.workflowAction === "progress_step") {
         // User clicked "Move on to next step" - progress workflow
-        const result = await this.guideNextStepTool.execute({
-          conversationId: context.conversationId,
-        }, context);
+        const result = await this.guideNextStepTool.execute(
+          {
+            conversationId: context.conversationId,
+          },
+          context
+        );
 
         yield {
           type: "complete",
           messageType: result.messageType,
           content: result.content,
           cardData: result.cardData,
-          triggerWindow: result.triggerWindow,
-          streamable: true,
+          windowTrigger: result.triggerWindow,
         };
         return;
       }
@@ -121,7 +123,6 @@ export class VisualGuidanceAgent extends BaseAgent {
         const result = await this.clarifyIntentTool.execute(
           {
             vaguePrompt: lastUserMessage.content,
-            screenshot: context.screenshot,
           },
           context
         );
@@ -131,7 +132,6 @@ export class VisualGuidanceAgent extends BaseAgent {
           messageType: result.messageType,
           content: result.content,
           cardData: result.cardData,
-          streamable: true,
         };
         return;
       }
@@ -155,7 +155,6 @@ export class VisualGuidanceAgent extends BaseAgent {
             messageType: result.messageType,
             content: result.content,
             cardData: result.cardData,
-            streamable: true,
           };
           return;
         } else {
@@ -169,7 +168,6 @@ export class VisualGuidanceAgent extends BaseAgent {
             content: wrappedResult.content,
             sources: "sources" in wrappedResult ? wrappedResult.sources : undefined,
             cardData: "cardData" in wrappedResult ? wrappedResult.cardData : undefined,
-            streamable: true,
           };
           return;
         }
@@ -186,11 +184,7 @@ export class VisualGuidanceAgent extends BaseAgent {
         {
           solution: `Guide for: ${lastUserMessage.content}`,
           solutionExplanation: "Based on company documentation and screen analysis",
-          supportingData: searchResult.sources?.map((s) => ({
-            text: s.snippet,
-            source: s.title,
-            metadata: { score: 1.0 },
-          })) || [],
+          supportingData: searchResult.sources || [],
           searchQuery: lastUserMessage.content,
           supportingDataExplanation: `Found ${searchResult.sources?.length || 0} relevant documents`,
           stepList: [
@@ -206,8 +200,7 @@ export class VisualGuidanceAgent extends BaseAgent {
         messageType: workflowResult.messageType,
         content: workflowResult.content,
         cardData: workflowResult.cardData,
-        triggerWindow: workflowResult.triggerWindow,
-        streamable: true,
+        windowTrigger: workflowResult.triggerWindow,
       };
     } catch (error) {
       console.error("[VisualGuidanceAgent] Error:", error);
