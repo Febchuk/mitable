@@ -135,7 +135,8 @@ export class VisualGuidanceAgent extends BaseAgent {
       // ========== LLM FUNCTION CALLING #1: Custom Workflow Questions ==========
       // User is in active workflow and asked a custom question
       // Let LLM choose: analyze_workflow_screen | search_knowledge | respond_with_text
-      if (context.workflowState && context.metadata?.workflowAction === "custom_question") {
+      // NOTE: workflowAction metadata is optional - we route based on workflowState alone
+      if (context.workflowState) {
         console.log("[VisualGuidanceAgent] Route: LLM function calling (custom question in workflow)");
         yield* this.handleCustomQuestion(context);
         return;

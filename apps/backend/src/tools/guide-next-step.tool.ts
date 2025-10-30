@@ -102,6 +102,38 @@ DO NOT USE:
         };
       }
 
+      // Validate stepList exists and is not empty
+      if (!currentSolution.stepList || currentSolution.stepList.length === 0) {
+        console.error("[GuideNextStepTool] Workflow has no steps", {
+          conversationId,
+          stepList: currentSolution.stepList,
+        });
+        return {
+          messageType: "text",
+          content:
+            "The workflow appears to be empty or corrupted. Please try starting a new workflow by describing what you need help with.",
+          streamable: true,
+        };
+      }
+
+      // Validate currentStepIndex is within bounds (-1 is valid for preview state)
+      if (
+        currentSolution.currentStepIndex < -1 ||
+        currentSolution.currentStepIndex >= currentSolution.stepList.length
+      ) {
+        console.error("[GuideNextStepTool] Invalid currentStepIndex", {
+          conversationId,
+          currentStepIndex: currentSolution.currentStepIndex,
+          stepListLength: currentSolution.stepList.length,
+        });
+        return {
+          messageType: "text",
+          content:
+            "The workflow state appears to be corrupted. Please try starting a new workflow by describing what you need help with.",
+          streamable: true,
+        };
+      }
+
       console.log("[GuideNextStepTool] Current workflow state:", {
         currentStepIndex: currentSolution.currentStepIndex,
         totalSteps: currentSolution.stepList.length,

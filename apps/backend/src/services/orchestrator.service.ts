@@ -115,7 +115,16 @@ export class OrchestratorService {
         return;
       }
 
-      // Step 3: Intent classification (LLM-based)
+      // Step 2.5: Workflow state detection
+      // If user is in active workflow (workflowState exists), route to VisualGuidanceAgent
+      // The agent will use handleCustomQuestion() to intelligently route to the right tool
+      if (context.workflowState) {
+        console.log("[Orchestrator] Routing: workflow state � VisualGuidanceAgent (custom question)");
+        yield* this.visualGuidanceAgent.execute(context);
+        return;
+      }
+
+      // Step 3: Intent classification (LLM-based) - only for non-workflow scenarios
       const intent = await this.classifyIntent(context);
 
       console.log("[Orchestrator] Intent classified:", {

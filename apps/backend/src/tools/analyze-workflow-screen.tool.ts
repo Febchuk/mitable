@@ -122,6 +122,49 @@ BEHAVIOR:
         };
       }
 
+      // Validate stepList exists and is not empty
+      if (!currentSolution.stepList || currentSolution.stepList.length === 0) {
+        console.error("[AnalyzeWorkflowScreenTool] Workflow has no steps", {
+          conversationId,
+          stepList: currentSolution.stepList,
+        });
+        return {
+          messageType: "text",
+          content:
+            "The workflow appears to be empty or corrupted. Please try starting a new workflow by describing what you need help with.",
+          streamable: true,
+        };
+      }
+
+      // Validate currentStepIndex is within bounds
+      // Special case: -1 means workflow is in preview mode (not started yet)
+      if (currentSolution.currentStepIndex === -1) {
+        console.log("[AnalyzeWorkflowScreenTool] Workflow in preview mode - not started yet");
+        return {
+          messageType: "text",
+          content:
+            "The workflow hasn't started yet. Click 'Yes, let's get started!' to begin the first step, then I can help analyze your screen.",
+          streamable: true,
+        };
+      }
+
+      if (
+        currentSolution.currentStepIndex < -1 ||
+        currentSolution.currentStepIndex >= currentSolution.stepList.length
+      ) {
+        console.error("[AnalyzeWorkflowScreenTool] Invalid currentStepIndex", {
+          conversationId,
+          currentStepIndex: currentSolution.currentStepIndex,
+          stepListLength: currentSolution.stepList.length,
+        });
+        return {
+          messageType: "text",
+          content:
+            "The workflow state appears to be corrupted. Please try starting a new workflow by describing what you need help with.",
+          streamable: true,
+        };
+      }
+
       const currentStep = currentSolution.stepList[currentSolution.currentStepIndex];
 
       console.log("[AnalyzeWorkflowScreenTool] Current workflow context:", {
