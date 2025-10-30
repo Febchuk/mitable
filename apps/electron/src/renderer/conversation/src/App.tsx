@@ -8,6 +8,7 @@ import { sendMessageStream } from "../../lib/api/conversations";
 import CollapsedView from "./components/CollapsedView";
 import WorkflowOptions, { WorkflowPhase } from "../../components/domain/workflow/WorkflowOptions";
 import StepList from "../../components/domain/workflow/StepList";
+import ExpertsCard from "./components/ExpertsCard";
 
 declare global {
   interface Window {
@@ -32,6 +33,19 @@ declare global {
       requestConversationList: () => void;
       onConversationList: (callback: (conversations: any[]) => void) => () => void;
       openConversationInConsole: (conversationId: string) => void;
+      openNudgeForm: (data: {
+        expert: {
+          id: string;
+          name: string;
+          email: string;
+          role: string;
+          department: string;
+          expertise: string[];
+        };
+        context: string;
+        question: string;
+        conversationId: string;
+      }) => void;
     };
   }
 }
@@ -570,8 +584,17 @@ function App() {
                     {/* Show AI message for non-workflow messages */}
                     {!isWorkflowMessage && message.content && <AIMessage content={message.content} />}
 
-                    {/* Show card below the text if cardData exists (non-workflow cards) */}
-                    {message.type === "card" && message.cardData && !isWorkflowMessage && (
+                    {/* Show inline ExpertsCard for experts messages */}
+                    {message.messageType === "experts" && message.cardData?.experts && (
+                      <ExpertsCard
+                        experts={message.cardData.experts}
+                        suggestedNudge={message.cardData.suggestedNudge}
+                        conversationId={conversationId || ""}
+                      />
+                    )}
+
+                    {/* Show card below the text if cardData exists (non-workflow, non-experts cards) */}
+                    {message.type === "card" && message.cardData && !isWorkflowMessage && message.messageType !== "experts" && (
                       <Card
                         className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors"
                         onClick={() => handleCardClick(message)}

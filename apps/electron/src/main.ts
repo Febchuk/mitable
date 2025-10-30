@@ -769,6 +769,23 @@ function setupIPC() {
     }
   });
 
+  // NEW: Direct nudge creation from conversation window (inline expert cards)
+  ipcMain.on(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, (_event, data) => {
+    console.log("[Main] Opening Console nudge form with inline expert data:", data);
+
+    // Show and focus console window
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+
+      // Forward nudge creation data to console
+      // Console will navigate to /nudges/new and populate the form
+      consoleWindow.webContents.send(IPC_CHANNELS.NUDGE_OPEN_CREATOR, data);
+    } else {
+      console.error("[Main] Console window not available for nudge form");
+    }
+  });
+
   // Dynamic mouse events for overlay
   ipcMain.on(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, (_event, ignore: boolean) => {
     if (agentWindow && !agentWindow.isDestroyed()) {

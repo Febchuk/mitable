@@ -90,7 +90,7 @@ export class FindExpertTool extends BaseTool {
 
       console.log("[FindExpertTool] Experts found:", {
         count: experts.length,
-        topExpert: experts[0]?.name,
+        topExpert: experts[0]?.expert.name,
         topScore: experts[0]?.matchScore,
       });
 
@@ -107,12 +107,12 @@ export class FindExpertTool extends BaseTool {
       console.log(`[FindExpertTool] Found ${experts.length} expert matches`);
 
       // Format response message
-      const expertNames = experts.map((e) => e.name).join(", ");
+      const expertNames = experts.map((e) => e.expert.name).join(", ");
       const topExpert = experts[0];
 
       const responseText = `I found ${experts.length} expert${experts.length > 1 ? "s" : ""} who can help with this: ${expertNames}.
 
-${topExpert.name} seems like the best match - they have ${topExpert.expertise.topics.slice(0, 2).join(" and ")} expertise with a ${topExpert.performance.helpfulnessScore.toFixed(1)}/5.0 helpfulness rating.
+${topExpert.expert.name} seems like the best match - they have ${topExpert.expertise.topics.slice(0, 2).join(" and ")} expertise with a ${topExpert.performance.helpfulnessScore.toFixed(1)}/5.0 helpfulness rating.
 
 I'm showing you their profiles now so you can reach out!`;
 
@@ -140,14 +140,13 @@ I'm showing you their profiles now so you can reach out!`;
         }
       }
 
-      console.log("[FindExpertTool] Success - triggering Nudge window:", {
+      console.log("[FindExpertTool] Success - returning experts for inline display:", {
         expertsCount: experts.length,
-        expertNames: experts.map((e) => e.name),
+        expertNames: experts.map((e) => e.expert.name),
         hasSuggestedNudge: !!suggestedNudge,
-        windowTrigger: "nudge",
       });
 
-      // Return with window trigger to launch Nudge window
+      // Return experts message for inline rendering in conversation
       return {
         messageType: "experts",
         content: responseText,
@@ -156,14 +155,6 @@ I'm showing you their profiles now so you can reach out!`;
           suggestedNudge: suggestedNudge,
         },
         streamable: true,
-        triggerWindow: {
-          window: "nudge",
-          data: {
-            experts: experts,
-            query: query,
-            suggestedNudge: suggestedNudge,
-          },
-        },
       };
     } catch (error) {
       console.error("[FindExpertTool] Error finding experts:", error);
