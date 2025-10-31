@@ -3,12 +3,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
 import { KnowledgeAgent } from "./knowledge.agent";
+import { TextResponseAgent } from "./text-response.agent";
 import type { StreamChunk, ToolContext } from "../tools/base.tool";
 import { ClarifyIntentTool } from "../tools/clarify-intent.tool";
 import { StartUIGuidanceWorkflowTool } from "../tools/start-ui-guidance-workflow.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
 import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool";
-import { wrapWithWorkflowState } from "../tools/utils/workflow-wrapper";
 
 /**
  * Visual Guidance Agent
@@ -63,16 +63,18 @@ export class VisualGuidanceAgent extends BaseAgent {
   private openai: OpenAI;
   private gemini: GoogleGenerativeAI;
   private knowledgeAgent: KnowledgeAgent;
+  private textAgent: TextResponseAgent;
   private clarifyIntentTool: ClarifyIntentTool;
   private startWorkflowTool: StartUIGuidanceWorkflowTool;
   private guideNextStepTool: GuideNextStepTool;
   private analyzeScreenTool: AnalyzeWorkflowScreenTool;
 
-  constructor(knowledgeAgent: KnowledgeAgent) {
+  constructor(knowledgeAgent: KnowledgeAgent, textAgent: TextResponseAgent) {
     super();
     this.openai = new OpenAI({ apiKey: config.openai.apiKey });
     this.gemini = new GoogleGenerativeAI(config.gemini.apiKey);
     this.knowledgeAgent = knowledgeAgent;
+    this.textAgent = textAgent;
     this.clarifyIntentTool = new ClarifyIntentTool();
     this.startWorkflowTool = new StartUIGuidanceWorkflowTool();
     this.guideNextStepTool = new GuideNextStepTool();
@@ -151,7 +153,14 @@ export class VisualGuidanceAgent extends BaseAgent {
 
       // Handle custom questions during active workflow
       if (context.workflowState) {
-        const questionType = this.classifyWorkflowQuestion(lastUserMessage.content);
+        const questionType = await this.classifyWorkflowQuestion(lastUserMessage.content);
+
+        console.log(
+          `[VisualGuidanceAgent] Routing workflow question: ${questionType}`,
+          {
+            question: lastUserMessage.content.substring(0, 100),
+          }
+        );
 
         if (questionType === "visual") {
           // Visual/UI issue - use analyze_workflow_screen
@@ -170,20 +179,34 @@ export class VisualGuidanceAgent extends BaseAgent {
             cardData: result.cardData,
           };
           return;
-        } else {
-          // Conceptual question - call KnowledgeAgent and wrap with workflow state
-          const searchResult = await this.knowledgeAgent.search(lastUserMessage.content, context);
-          const wrappedResult = wrapWithWorkflowState(searchResult, context, "custom_question");
+        }
 
-          yield {
-            type: "complete",
-            messageType: wrappedResult.messageType,
-            content: wrappedResult.content,
-            sources: "sources" in wrappedResult ? wrappedResult.sources : undefined,
-            cardData: "cardData" in wrappedResult ? wrappedResult.cardData : undefined,
-          };
+        if (questionType === "directly_answerable") {
+          // Basic question - use TextResponseAgent (workflow-aware)
+          // TextResponseAgent will automatically use context.workflowState and
+          // wrapWithWorkflowState to preserve workflow UI state
+          console.log("[VisualGuidanceAgent] Delegating to TextResponseAgent (workflow-aware)");
+
+          for await (const chunk of this.textAgent.execute(context)) {
+            yield chunk;
+          }
           return;
         }
+
+        // knowledge_search - delegate to KnowledgeAgent for synthesized response
+        // KnowledgeAgent.execute() will:
+        // 1. Search knowledge base
+        // 2. Synthesize results with GPT-4 into conversational response
+        // 3. Wrap with workflow state automatically
+        // 4. Stream the response
+        console.log(
+          "[VisualGuidanceAgent] Delegating to KnowledgeAgent for synthesized knowledge search"
+        );
+
+        for await (const chunk of this.knowledgeAgent.execute(context)) {
+          yield chunk;
+        }
+        return;
       }
 
       // Start new workflow: STEP 1 - Search knowledge, STEP 2 - Synthesize workflow with GPT-4
@@ -600,9 +623,103 @@ Nothing else.`;
   }
 
   /**
-   * Classify workflow question type (visual vs conceptual)
+   * Classify workflow question type (visual/knowledge_search/directly_answerable)
+   *
+   * Uses Gemini Flash to determine how to handle a question during an active workflow.
+   * Falls back to regex patterns if inference fails.
+   *
+   * VISUAL - Requires screenshot analysis:
+   * - "I don't see the canvas button" (can't find UI element)
+   * - "Where is the submit button?" (need to locate on screen)
+   * - "The screen looks different" (mismatch between expectation and reality)
+   * - "I see a menu instead of a button" (unexpected UI state)
+   *
+   * KNOWLEDGE_SEARCH - Requires searching company documentation:
+   * - Questions about company-specific features, policies, or processes
+   * - Questions that might have recent updates or detailed documentation
+   * - "What's our policy on X?"
+   * - "How does [specific feature] work in our company?"
+   *
+   * DIRECTLY_ANSWERABLE - Can answer from cached workflow context:
+   * - "Why do I need to do this step?" (workflow has solutionExplanation)
+   * - "What is this step for?" (can reference current step description)
+   * - "Is this step required?" (can infer from workflow structure)
+   * - "Can I skip this?" (can reason about dependencies)
+   * - Acknowledgments ("ok", "got it", "thanks")
    */
-  private classifyWorkflowQuestion(message: string): "visual" | "conceptual" {
+  private async classifyWorkflowQuestion(
+    message: string
+  ): Promise<"visual" | "knowledge_search" | "directly_answerable"> {
+    try {
+      const model = this.gemini.getGenerativeModel({
+        model: "gemini-2.0-flash-exp",
+      });
+
+      const prompt = `Classify this user question during an active UI workflow.
+
+VISUAL - Requires looking at their screen:
+- Can't find UI element ("I don't see X", "Where is Y?")
+- Screen doesn't match description ("Looks different", "I see A instead of B")
+- Need help locating something ("Which button?", "Can't find X")
+
+KNOWLEDGE_SEARCH - Requires searching company documentation:
+- Asking about company-specific features, policies, or processes not in current workflow context
+- Questions that might have recent updates or detailed documentation elsewhere
+- "How does [feature] work in our company?"
+- "What's our policy on X?"
+- Questions about features or concepts that need more than workflow context
+
+DIRECTLY_ANSWERABLE - Can answer from current workflow context:
+- "Why do I need to do this step?" (workflow has solutionExplanation)
+- "What is this step for?" (can reference current step description)
+- "Is this step required?" (can infer from workflow structure)
+- "Can I skip this?" (can reason about step dependencies)
+- Simple acknowledgments ("ok", "got it", "thanks", "I understand")
+
+User question: "${message}"
+
+Respond with ONLY one of these three words: visual OR knowledge_search OR directly_answerable
+Nothing else.`;
+
+      const result = await model.generateContent(prompt);
+      const response = result.response.text().trim().toLowerCase();
+
+      console.log(
+        `[VisualGuidanceAgent] Workflow question classification: "${message}" → ${response}`
+      );
+
+      // Validate and return response
+      if (response === "visual") return "visual";
+      if (response === "knowledge_search") return "knowledge_search";
+      if (response === "directly_answerable") return "directly_answerable";
+
+      // Default to knowledge_search if invalid response (safer to over-search than under-search)
+      console.warn(
+        `[VisualGuidanceAgent] Invalid classification response: "${response}", defaulting to knowledge_search`
+      );
+      return "knowledge_search";
+    } catch (error) {
+      console.warn(
+        "[VisualGuidanceAgent] Inference failed for workflow question classification, falling back to regex:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
+
+      return this.classifyWorkflowQuestionRegex(message);
+    }
+  }
+
+  /**
+   * Fallback regex-based workflow question classification
+   *
+   * Used when Gemini Flash inference fails (API errors, rate limits, etc.)
+   * Provides basic pattern matching as a safety net.
+   *
+   * Note: Regex can only detect visual patterns reliably.
+   * Defaults to knowledge_search for safety (better to over-search than under-search).
+   */
+  private classifyWorkflowQuestionRegex(
+    message: string
+  ): "visual" | "knowledge_search" | "directly_answerable" {
     const visualPatterns = [
       /i don't see/i,
       /where is/i,
@@ -613,6 +730,19 @@ Nothing else.`;
     ];
 
     const isVisual = visualPatterns.some((pattern) => pattern.test(message));
-    return isVisual ? "visual" : "conceptual";
+
+    if (isVisual) {
+      console.log(
+        `[VisualGuidanceAgent] Workflow question regex fallback: "${message}" → visual`
+      );
+      return "visual";
+    }
+
+    // Default to knowledge_search for safety (can't reliably distinguish between
+    // knowledge_search and directly_answerable with regex)
+    console.log(
+      `[VisualGuidanceAgent] Workflow question regex fallback: "${message}" → knowledge_search (default)`
+    );
+    return "knowledge_search";
   }
 }
