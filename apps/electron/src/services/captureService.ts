@@ -115,6 +115,34 @@ export interface MemoryStats {
   memoryUsageMB: number;
 }
 
+/**
+ * Conversation context for screenshot capture heuristics
+ */
+export interface ConversationContext {
+  /** Whether there is an active workflow in progress */
+  hasActiveWorkflow: boolean;
+  /** Type of the last assistant message */
+  lastMessageType?: string;
+  /** Number of messages in conversation */
+  messageCount: number;
+  /** Whether the last message contained workflow card data */
+  lastMessageHadCardData?: boolean;
+}
+
+/**
+ * Screenshot capture decision result
+ */
+export interface CaptureDecision {
+  /** Whether screenshot should be captured */
+  shouldCapture: boolean;
+  /** Reason for the decision (for logging/debugging) */
+  reason: string;
+  /** Confidence score (0-1) of the decision */
+  confidence: number;
+  /** Which heuristics triggered (for analytics) */
+  triggeredHeuristics: string[];
+}
+
 // ===========================
 // CaptureService Class
 // ===========================
@@ -131,6 +159,233 @@ class CaptureService {
   constructor() {
     this.startCleanupInterval();
     console.log("[CaptureService] Initialized");
+  }
+
+  /**
+   * Evaluate whether a screenshot should be captured based on message content and context
+   *
+   * @param message - User message content
+   * @param context - Conversation context (workflow state, message history, etc.)
+   * @returns Decision object with shouldCapture flag, reason, and confidence
+   */
+  evaluateCaptureNeed(message: string, context: ConversationContext): CaptureDecision {
+    const triggeredHeuristics: string[] = [];
+    let confidence = 0;
+
+    // Normalize message for analysis
+    const normalizedMessage = message.toLowerCase().trim();
+
+    // ============================================
+    // HEURISTIC 1: Active Workflow (HIGHEST PRIORITY)
+    // ============================================
+    // If there's an active workflow, ALWAYS capture to track progress
+    if (context.hasActiveWorkflow) {
+      triggeredHeuristics.push("active_workflow");
+      return {
+        shouldCapture: true,
+        reason: "Active workflow in progress - screenshot required for step tracking",
+        confidence: 1.0,
+        triggeredHeuristics,
+      };
+    }
+
+    // ============================================
+    // HEURISTIC 2: Workflow-Related Last Message
+    // ============================================
+    // If last message was workflow-related, likely continuation
+    if (context.lastMessageType === "workflow" || context.lastMessageHadCardData) {
+      triggeredHeuristics.push("workflow_continuation");
+      confidence += 0.8; // High confidence - workflows need screenshots
+    }
+
+    // ============================================
+    // HEURISTIC 3: Help/Guidance Request Patterns
+    // ============================================
+    // User is asking for help with a task
+    const helpPatterns = [
+      // Direct help requests
+      /\b(how do i|how can i|how to|help me|show me|guide me|walk me through|teach me)\b/i,
+      // Task-oriented questions
+      /\b(where do i|what do i|when do i|which|should i)\b/i,
+      // Instructions/guidance
+      /\b(step by step|instructions|tutorial|walkthrough)\b/i,
+    ];
+
+    for (const pattern of helpPatterns) {
+      if (pattern.test(normalizedMessage)) {
+        triggeredHeuristics.push("help_request");
+        confidence += 0.7; // Strong indicator - help requests usually need visual context
+        break;
+      }
+    }
+
+    // ============================================
+    // HEURISTIC 4: Visual Language Indicators
+    // ============================================
+    // User is talking about visual elements on screen
+    const visualPatterns = [
+      // Visibility issues
+      /\b(don't see|can't see|can't find|don't find|not seeing|not showing|missing|where is|where's)\b/i,
+      // UI element references
+      /\b(button|icon|menu|tab|link|field|box|dialog|window|screen|page|form|dropdown|checkbox)\b/i,
+      // Actions on UI
+      /\b(click|press|tap|select|choose|open|close|expand|collapse|scroll|drag|drop)\b/i,
+      // Visual descriptors
+      /\b(top|bottom|left|right|corner|side|toolbar|sidebar|header|footer|banner)\b/i,
+      // Looking/finding
+      /\b(looking for|trying to find|search for|locate)\b/i,
+    ];
+
+    for (const pattern of visualPatterns) {
+      if (pattern.test(normalizedMessage)) {
+        triggeredHeuristics.push("visual_language");
+        confidence += 0.6; // Clear visual reference - likely needs screenshot
+        break;
+      }
+    }
+
+    // ============================================
+    // HEURISTIC 5: Problem/Error Indicators
+    // ============================================
+    // User is reporting an issue that needs visual inspection
+    const problemPatterns = [
+      /\b(error|issue|problem|wrong|broken|not working|doesn't work|isn't working|stuck|confused)\b/i,
+      /\b(why is|why isn't|why won't|what's wrong|what happened)\b/i,
+    ];
+
+    for (const pattern of problemPatterns) {
+      if (pattern.test(normalizedMessage)) {
+        triggeredHeuristics.push("problem_report");
+        confidence += 0.5; // Problems often need visual diagnosis
+        break;
+      }
+    }
+
+    // ============================================
+    // HEURISTIC 6: Demonstrative Language
+    // ============================================
+    // User is referencing "this" or "here" (likely pointing at screen)
+    const demonstrativePatterns = [
+      /\b(this|these|here|that|those)\b/i,
+    ];
+
+    for (const pattern of demonstrativePatterns) {
+      if (pattern.test(normalizedMessage)) {
+        triggeredHeuristics.push("demonstrative_reference");
+        confidence += 0.3; // Weaker signal - needs combination with other heuristics
+        break;
+      }
+    }
+
+    // ============================================
+    // HEURISTIC 7: Action Verb + Object Patterns
+    // ============================================
+    // User is describing an action they want to perform
+    const actionObjectPatterns = [
+      // Create/Add actions
+      /\b(create|make|add|insert|upload|post|publish|submit|send)\s+(a|an|the)?\s*\w+/i,
+      // Modify actions
+      /\b(edit|change|update|modify|delete|remove|rename)\s+(a|an|the|my)?\s*\w+/i,
+      // View actions
+      /\b(view|see|check|look at|review|inspect|examine)\s+(a|an|the|my)?\s*\w+/i,
+    ];
+
+    for (const pattern of actionObjectPatterns) {
+      if (pattern.test(normalizedMessage)) {
+        triggeredHeuristics.push("action_object_pattern");
+        confidence += 0.3; // Moderate signal - combination preferred
+        break;
+      }
+    }
+
+    // ============================================
+    // NEGATIVE HEURISTICS (reduce confidence)
+    // ============================================
+    // These patterns suggest screenshot is NOT needed
+
+    // Pure knowledge/information queries
+    const knowledgePatterns = [
+      /\b(what is|what are|who is|who are|define|definition|meaning|explain|tell me about)\b/i,
+      /\b(why do we|why does|why should|when should|when do we)\b/i,
+    ];
+
+    for (const pattern of knowledgePatterns) {
+      if (pattern.test(normalizedMessage)) {
+        triggeredHeuristics.push("knowledge_query");
+        confidence -= 0.3;
+        break;
+      }
+    }
+
+    // Simple greetings
+    const greetingPatterns = [
+      /^(hi|hello|hey|good morning|good afternoon|good evening|thanks|thank you|ok|okay|yes|no|sure)$/i,
+    ];
+
+    for (const pattern of greetingPatterns) {
+      if (pattern.test(normalizedMessage)) {
+        triggeredHeuristics.push("greeting");
+        confidence -= 0.5;
+        break;
+      }
+    }
+
+    // ============================================
+    // DECISION LOGIC
+    // ============================================
+    // Confidence threshold: 0.5
+    // If confidence >= 0.5, capture screenshot
+    // Cap confidence between 0 and 1
+    confidence = Math.max(0, Math.min(1, confidence));
+
+    const shouldCapture = confidence >= 0.5;
+
+    return {
+      shouldCapture,
+      reason: shouldCapture
+        ? `Screenshot needed (confidence: ${confidence.toFixed(2)}, triggers: ${triggeredHeuristics.join(", ")})`
+        : `Screenshot not needed (confidence: ${confidence.toFixed(2)}, triggers: ${triggeredHeuristics.join(", ")})`,
+      confidence,
+      triggeredHeuristics,
+    };
+  }
+
+  /**
+   * Conditionally capture screenshot based on message content and context
+   *
+   * @param message - User message content
+   * @param context - Conversation context
+   * @param options - Capture options (mode, display, etc.)
+   * @returns Capture result if screenshot was needed, null otherwise
+   */
+  async conditionalCapture(
+    message: string,
+    context: ConversationContext,
+    options: CaptureOptions = {}
+  ): Promise<{ decision: CaptureDecision; result: CaptureResult | null }> {
+    // Evaluate whether screenshot is needed
+    const decision = this.evaluateCaptureNeed(message, context);
+
+    console.log("[CaptureService] Capture decision:", {
+      shouldCapture: decision.shouldCapture,
+      reason: decision.reason,
+      confidence: decision.confidence,
+      triggeredHeuristics: decision.triggeredHeuristics,
+    });
+
+    // If not needed, return early
+    if (!decision.shouldCapture) {
+      return { decision, result: null };
+    }
+
+    // Capture screenshot
+    const result = await this.capture(options);
+
+    if (!result) {
+      console.error("[CaptureService] Screenshot capture failed despite being needed");
+    }
+
+    return { decision, result };
   }
 
   /**

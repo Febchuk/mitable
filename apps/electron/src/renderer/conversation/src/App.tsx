@@ -152,6 +152,49 @@ function App() {
           setMessages((prev) => [...prev, userMsg]);
         }
 
+        // Conditionally capture screenshot based on message content and conversation context
+        let capturedScreenshot: string | null = screenshot; // Use provided screenshot if available
+
+        if (!capturedScreenshot) {
+          // Build conversation context for heuristics
+          const lastMessage = messages[messages.length - 1];
+          const hasActiveWorkflow = lastMessage?.messageType === "workflow" || !!lastMessage?.cardData?.workflowActive;
+
+          const context = {
+            hasActiveWorkflow,
+            lastMessageType: lastMessage?.messageType,
+            messageCount: messages.length,
+            lastMessageHadCardData: !!lastMessage?.cardData,
+          };
+
+          console.log("[Conversation] Evaluating screenshot capture need:", {
+            message,
+            context,
+          });
+
+          // Capture screenshot conditionally using IPC API with heuristics
+          // The main process will use CaptureService.conditionalCapture() to decide
+          try {
+            const result = await window.conversationAPI.captureScreenshot({
+              message,
+              context,
+            });
+
+            if (result) {
+              capturedScreenshot = result.dataUrl;
+              console.log("[Conversation] Screenshot captured via heuristics:", {
+                size: capturedScreenshot.length,
+                metadata: result.metadata,
+              });
+            } else {
+              console.log("[Conversation] No screenshot captured (heuristics determined not needed)");
+            }
+          } catch (error) {
+            console.error("[Conversation] Screenshot capture failed:", error);
+            // Continue without screenshot - backend will handle gracefully
+          }
+        }
+
         // Create placeholder for streaming assistant message
         const streamingMessageId = `streaming-${Date.now()}`;
         streamingMessageIdRef.current = streamingMessageId;
@@ -165,9 +208,9 @@ function App() {
 
         setMessages((prev) => [...prev, assistantMessage]);
 
-        // Stream the response with optional screenshot
+        // Stream the response with conditionally captured screenshot
         try {
-          await sendMessageStream(convId, message, screenshot, {
+          await sendMessageStream(convId, message, capturedScreenshot, {
             onChunk: (chunk) => {
               setMessages((prev) =>
                 prev.map((msg) =>

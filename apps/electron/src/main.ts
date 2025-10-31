@@ -1,7 +1,12 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from "electron";
 import { join } from "path";
 import { IPC_CHANNELS } from "@mitable/shared";
-import { captureService, CaptureOptions, CaptureResult } from "./services/captureService";
+import {
+  captureService,
+  CaptureOptions,
+  CaptureResult,
+  ConversationContext,
+} from "./services/captureService";
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
@@ -965,18 +970,59 @@ function setupIPC() {
     });
   });
 
-  // Screenshot Capture - using enhanced CaptureService
+  // Screenshot Capture - using enhanced CaptureService with conditional capture
   ipcMain.handle(
     IPC_CHANNELS.CAPTURE_SCREENSHOT,
     async (
       _event,
-      options?: CaptureOptions
+      payload?: {
+        options?: CaptureOptions;
+        message?: string;
+        context?: ConversationContext;
+      }
     ): Promise<Pick<CaptureResult, "dataUrl" | "metadata"> | null> => {
-      console.log("[Screenshot] IPC handler called - capture requested", options);
+      console.log("[Screenshot] IPC handler called", {
+        hasMessage: !!payload?.message,
+        hasContext: !!payload?.context,
+        options: payload?.options,
+      });
 
       try {
-        // Use CaptureService for enhanced capture with all features
-        const result = await captureService.capture(options || { mode: "full-screen" });
+        // If message and context provided, use conditional capture (heuristics)
+        if (payload?.message && payload?.context) {
+          console.log("[Screenshot] Using conditional capture with heuristics");
+          const { decision, result } = await captureService.conditionalCapture(
+            payload.message,
+            payload.context,
+            payload.options || { mode: "full-screen" }
+          );
+
+          console.log("[Screenshot] Conditional capture decision:", {
+            shouldCapture: decision.shouldCapture,
+            confidence: decision.confidence,
+            reason: decision.reason,
+          });
+
+          if (!result) {
+            console.log("[Screenshot] No screenshot captured (heuristics determined not needed)");
+            return null;
+          }
+
+          console.log("[Screenshot] Screenshot captured via heuristics:", {
+            mode: result.metadata.captureMode,
+            width: result.metadata.width,
+            height: result.metadata.height,
+          });
+
+          return {
+            dataUrl: result.dataUrl,
+            metadata: result.metadata,
+          };
+        }
+
+        // Fallback: unconditional capture (legacy behavior)
+        console.log("[Screenshot] Using unconditional capture (no heuristics)");
+        const result = await captureService.capture(payload?.options || { mode: "full-screen" });
 
         if (!result) {
           console.error("[Screenshot] Capture failed - no result returned");
@@ -987,7 +1033,6 @@ function setupIPC() {
           mode: result.metadata.captureMode,
           width: result.metadata.width,
           height: result.metadata.height,
-          hasFile: !!result.filePath,
         });
 
         // Return both data URL and metadata (omit filePath for security)
