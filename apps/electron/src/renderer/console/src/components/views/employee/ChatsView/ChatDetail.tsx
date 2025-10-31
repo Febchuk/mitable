@@ -142,15 +142,16 @@ export default function ChatDetail() {
 
     try {
       console.log("[ChatDetail] Calling captureScreenshot()...");
-      const screenshot = await window.consoleAPI.captureScreenshot();
+      const result = await window.consoleAPI.captureScreenshot();
       console.log("[ChatDetail] Screenshot result:", {
-        hasScreenshot: !!screenshot,
-        size: screenshot?.length || 0,
-        preview: screenshot?.substring(0, 100),
+        hasScreenshot: !!result,
+        size: result?.dataUrl?.length || 0,
+        preview: result?.dataUrl?.substring(0, 100),
+        metadata: result?.metadata,
       });
 
-      if (screenshot) {
-        alert(`SUCCESS! Screenshot captured: ${screenshot.length} bytes`);
+      if (result?.dataUrl) {
+        alert(`SUCCESS! Screenshot captured: ${result.dataUrl.length} bytes`);
       } else {
         alert("Screenshot returned null. Check console and Electron main process logs.");
       }
@@ -198,7 +199,11 @@ export default function ChatDetail() {
       if (window.consoleAPI?.captureScreenshot) {
         try {
           console.log("[ChatDetail] Capturing screenshot for workflow action...");
-          screenshot = await window.consoleAPI.captureScreenshot();
+          const result = await window.consoleAPI.captureScreenshot();
+          if (result) {
+            screenshot = result.dataUrl;
+            console.log("[ChatDetail] Screenshot metadata:", result.metadata);
+          }
           console.log("[ChatDetail] Screenshot captured:", !!screenshot);
         } catch (error) {
           console.error("[ChatDetail] Screenshot capture failed:", error);

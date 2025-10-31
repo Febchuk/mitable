@@ -474,11 +474,50 @@ class CaptureService {
 
       // Get the thumbnail image
       let image = targetSource.thumbnail;
-      const originalSize = image.getSize();
+      let originalSize = image.getSize();
 
-      // Validate image has valid dimensions
+      // Validate image has valid dimensions - retry up to 3 times with progressive delays
+      const retryDelays = [100, 200, 300]; // Progressive delays in ms
+      let retryCount = 0;
+
+      while ((originalSize.width === 0 || originalSize.height === 0) && retryCount < retryDelays.length) {
+        const delay = retryDelays[retryCount];
+        console.warn(`[CaptureService] Captured window image has invalid dimensions, retrying (attempt ${retryCount + 2}/4) after ${delay}ms...`);
+
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        const retrySources = await desktopCapturer.getSources({
+          types: ["window"],
+          thumbnailSize: {
+            width: this.MAX_WIDTH * 2,
+            height: this.MAX_HEIGHT * 2,
+          },
+        });
+
+        const retryTarget = retrySources.find(
+          (source) => !source.name.includes("Mitable") && source.name.trim().length > 0
+        );
+
+        if (!retryTarget) {
+          console.error(`[CaptureService] No suitable window found on retry attempt ${retryCount + 2}`);
+          return null;
+        }
+
+        image = retryTarget.thumbnail;
+        originalSize = image.getSize();
+        retryCount++;
+
+        // Check if retry succeeded
+        if (originalSize.width > 0 && originalSize.height > 0) {
+          console.log(`[CaptureService] Retry ${retryCount} successful - valid dimensions:`, originalSize);
+          break;
+        }
+      }
+
+      // Final validation after all retries
       if (originalSize.width === 0 || originalSize.height === 0) {
-        console.error("[CaptureService] Captured window image has invalid dimensions:", originalSize);
+        console.error("[CaptureService] Captured window image still has invalid dimensions after all retries:", originalSize);
         return null;
       }
 
@@ -566,8 +605,8 @@ class CaptureService {
         scaleFactor,
       });
 
-      // Capture screenshot using desktopCapturer
-      const sources = await desktopCapturer.getSources({
+      // Capture screenshot using desktopCapturer with retry for empty captures
+      let sources = await desktopCapturer.getSources({
         types: ["screen"],
         thumbnailSize: {
           width: width * scaleFactor,
@@ -582,13 +621,49 @@ class CaptureService {
 
       // Use the first screen source (or match by display if possible)
       // Note: desktopCapturer doesn't directly map to display IDs
-      const screenSource = sources[0];
+      let screenSource = sources[0];
       let image = screenSource.thumbnail;
-      const originalSize = image.getSize();
+      let originalSize = image.getSize();
 
-      // Validate image has valid dimensions
+      // Validate image has valid dimensions - retry up to 3 times with progressive delays
+      const retryDelays = [100, 200, 300]; // Progressive delays in ms
+      let retryCount = 0;
+
+      while ((originalSize.width === 0 || originalSize.height === 0) && retryCount < retryDelays.length) {
+        const delay = retryDelays[retryCount];
+        console.warn(`[CaptureService] Captured image has invalid dimensions, retrying (attempt ${retryCount + 2}/4) after ${delay}ms...`);
+
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        sources = await desktopCapturer.getSources({
+          types: ["screen"],
+          thumbnailSize: {
+            width: width * scaleFactor,
+            height: height * scaleFactor,
+          },
+        });
+
+        if (sources.length === 0) {
+          console.error(`[CaptureService] No screen sources found on retry attempt ${retryCount + 2}`);
+          return null;
+        }
+
+        screenSource = sources[0];
+        image = screenSource.thumbnail;
+        originalSize = image.getSize();
+        retryCount++;
+
+        // Check if retry succeeded
+        if (originalSize.width > 0 && originalSize.height > 0) {
+          console.log(`[CaptureService] Retry ${retryCount} successful - valid dimensions:`, originalSize);
+          break;
+        }
+      }
+
+      // Final validation after all retries
       if (originalSize.width === 0 || originalSize.height === 0) {
-        console.error("[CaptureService] Captured image has invalid dimensions:", originalSize);
+        console.error("[CaptureService] Captured image still has invalid dimensions after all retries:", originalSize);
         return null;
       }
 

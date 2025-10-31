@@ -63,13 +63,16 @@ function App() {
 
     // Capture screenshot
     let screenshot: string | null = null;
+    let screenshotMetadata: any = null;
     try {
       const result = await window.agentAPI.captureScreenshot();
       console.log("[Agent] Screenshot captured for continuation:", {
         hasScreenshot: !!result,
         size: result?.dataUrl?.length || 0,
+        metadata: result?.metadata,
       });
       screenshot = result?.dataUrl || null;
+      screenshotMetadata = result?.metadata || null;
     } catch (error) {
       console.error("[Agent] Screenshot capture failed:", error);
       return;
@@ -85,7 +88,8 @@ function App() {
           userMessage: "Next",
           silent: true, // Flag to indicate silent continuation (no user message display)
         },
-        screenshot
+        screenshot,
+        screenshotMetadata
       );
 
       console.log("[Agent] Silent continuation message forwarded to conversation window");
@@ -129,6 +133,7 @@ function App() {
     // Capture screenshot for visual guidance
     console.log("[Agent] Attempting to capture screenshot for workflow...");
     let screenshot: string | null = null;
+    let screenshotMetadata: any = null;
     try {
       const result = await window.agentAPI.captureScreenshot();
       console.log("[Agent] Screenshot capture result:", {
@@ -137,6 +142,7 @@ function App() {
         metadata: result?.metadata,
       });
       screenshot = result?.dataUrl || null;
+      screenshotMetadata = result?.metadata || null;
     } catch (error) {
       console.error("[Agent] Screenshot capture failed:", error);
       // Continue without screenshot - backend will handle gracefully
@@ -146,8 +152,6 @@ function App() {
     console.log("[Agent] Showing conversation window...");
     window.agentAPI.showConversation();
 
-    // Forward message to conversation window
-    // The conversation window will handle conditional screenshot capture based on heuristics
     // Forward message to conversation window with all necessary data
     console.log("[Agent] Forwarding message to conversation window:", {
       message,
@@ -162,7 +166,8 @@ function App() {
         conversationId: convId,
         userMessage: message, // For display in conversation window
       },
-      screenshot
+      screenshot,
+      screenshotMetadata
     );
 
     console.log("[Agent] ✅ Message forwarded successfully");

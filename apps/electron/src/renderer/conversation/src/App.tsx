@@ -167,6 +167,7 @@ function App() {
 
         // Conditionally capture screenshot based on message content and conversation context
         let capturedScreenshot: string | null = screenshot; // Use provided screenshot if available
+        let capturedScreenshotMetadata: any = screenshotMetadata; // Use provided metadata if available
 
         if (!capturedScreenshot) {
           // Build conversation context for heuristics
@@ -196,6 +197,7 @@ function App() {
 
             if (result) {
               capturedScreenshot = result.dataUrl;
+              capturedScreenshotMetadata = result.metadata; // ✅ Extract metadata from conditional capture
               console.log("[Conversation] Screenshot captured via heuristics:", {
                 size: capturedScreenshot.length,
                 metadata: result.metadata,
@@ -284,7 +286,7 @@ function App() {
               },
             },
             undefined,
-            screenshotMetadata
+            capturedScreenshotMetadata
           );
         } catch (error) {
           console.error("Failed to send message:", error);
@@ -490,7 +492,7 @@ function App() {
           screenshotMetadata
         );
       } else {
-        console.warn("[Conversation] Screenshot capture failed");
+        console.log("[Conversation] Screenshot capture unavailable, continuing with text-only guidance");
       }
     }
 
