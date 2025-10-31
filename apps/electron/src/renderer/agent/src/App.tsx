@@ -20,7 +20,11 @@ declare global {
       showConversation: () => void;
       hideConversation: () => void;
       toggleConversation: () => void; // NEW: Toggle collapsed combobox
-      sendMessageToConversation: (messageData: any, screenshot: string | null) => void;
+      sendMessageToConversation: (
+        messageData: any,
+        screenshot: string | null,
+        screenshotMetadata?: any
+      ) => void;
       showNudge: (data: unknown) => void;
       startGuide: (data: unknown) => void;
       captureScreenshot: () => Promise<ScreenshotResult | null>;
@@ -57,6 +61,20 @@ function App() {
 
     console.log("[Agent] Starting silent continuation...");
 
+    // Capture screenshot
+    let screenshot: string | null = null;
+    try {
+      const result = await window.agentAPI.captureScreenshot();
+      console.log("[Agent] Screenshot captured for continuation:", {
+        hasScreenshot: !!result,
+        size: result?.dataUrl?.length || 0,
+      });
+      screenshot = result?.dataUrl || null;
+    } catch (error) {
+      console.error("[Agent] Screenshot capture failed:", error);
+      return;
+    }
+
     // Forward "Next" message to conversation window
     // The conversation window will handle conditional screenshot capture
     try {
@@ -67,7 +85,7 @@ function App() {
           userMessage: "Next",
           silent: true, // Flag to indicate silent continuation (no user message display)
         },
-        null // No screenshot - let conversation window handle conditional capture
+        screenshot
       );
 
       console.log("[Agent] Silent continuation message forwarded to conversation window");
@@ -108,6 +126,22 @@ function App() {
       return;
     }
 
+    // Capture screenshot for visual guidance
+    console.log("[Agent] Attempting to capture screenshot for workflow...");
+    let screenshot: string | null = null;
+    try {
+      const result = await window.agentAPI.captureScreenshot();
+      console.log("[Agent] Screenshot capture result:", {
+        hasScreenshot: !!result,
+        size: result?.dataUrl?.length || 0,
+        metadata: result?.metadata,
+      });
+      screenshot = result?.dataUrl || null;
+    } catch (error) {
+      console.error("[Agent] Screenshot capture failed:", error);
+      // Continue without screenshot - backend will handle gracefully
+    }
+
     // Show conversation window
     console.log("[Agent] Showing conversation window...");
     window.agentAPI.showConversation();
@@ -128,7 +162,7 @@ function App() {
         conversationId: convId,
         userMessage: message, // For display in conversation window
       },
-      null // No screenshot - let conversation window handle conditional capture
+      screenshot
     );
 
     console.log("[Agent] ✅ Message forwarded successfully");

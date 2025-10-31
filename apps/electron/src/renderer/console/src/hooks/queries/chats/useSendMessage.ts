@@ -46,6 +46,7 @@ export function useSendMessage(options?: SendMessageOptions) {
 
       // Use provided screenshot or capture if requested (for workflow mode)
       let screenshot: string | undefined = providedScreenshot || undefined;
+      let screenshotMetadata: any | undefined = undefined;
 
       // Only auto-capture if no screenshot provided and option is set
       if (!screenshot && options?.captureScreenshot) {
@@ -58,10 +59,15 @@ export function useSendMessage(options?: SendMessageOptions) {
         } else {
           try {
             console.log("[useSendMessage] Calling captureScreenshot...");
-            screenshot = (await window.consoleAPI.captureScreenshot()) || undefined;
+            const result = await window.consoleAPI.captureScreenshot();
+            if (result) {
+              screenshot = result.dataUrl;
+              screenshotMetadata = result.metadata;
+            }
             console.log("[useSendMessage] Screenshot captured:", {
               hasScreenshot: !!screenshot,
               size: screenshot?.length || 0,
+              metadata: screenshotMetadata,
             });
           } catch (error) {
             console.error("[useSendMessage] Screenshot capture failed:", error);
@@ -83,8 +89,8 @@ export function useSendMessage(options?: SendMessageOptions) {
         },
       };
 
-      // Start streaming with optional screenshot and metadata
-      await sendStreamingMessage(chatId, content, callbacks, token, screenshot, metadata);
+      // Start streaming with optional screenshot, screenshotMetadata, and metadata
+      await sendStreamingMessage(chatId, content, callbacks, token, screenshot, screenshotMetadata, metadata);
     },
 
     // Optimistic update for user message

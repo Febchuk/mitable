@@ -15,7 +15,7 @@ declare global {
     conversationAPI: {
       hideWindow: () => void;
       onMessageReceived: (
-        callback: (message: any, screenshot: string | null) => void
+        callback: (message: any, screenshot: string | null, screenshotMetadata?: any) => void
       ) => () => void;
       updateMessages: (messages: any[]) => void;
       onPositionUpdate: (callback: (x: number, y: number) => void) => () => void;
@@ -132,8 +132,12 @@ function App() {
   // Listen for messages from Agent window
   useEffect(() => {
     const cleanup = window.conversationAPI.onMessageReceived(
-      async (messageData: any, screenshot: string | null) => {
-        console.log("[Conversation] Message received from Agent:", messageData);
+      async (messageData: any, screenshot: string | null, screenshotMetadata?: any) => {
+        console.log("[Conversation] Message received from Agent:", {
+          messageData,
+          hasScreenshot: !!screenshot,
+          screenshotMetadata,
+        });
 
         // If we're not already expanded, expand to show the conversation
         if (viewState !== "expanded") {
@@ -221,59 +225,67 @@ function App() {
         setMessages((prev) => [...prev, assistantMessage]);
         console.log("[Conversation] Placeholder AI message created, starting stream...");
 
-        // Stream the response with conditionally captured screenshot
+        // Stream the response with optional screenshot and metadata
+
         try {
-          await sendMessageStream(convId, message, capturedScreenshot, {
-            onChunk: (chunk) => {
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
-                )
-              );
+          await sendMessageStream(
+            convId,
+            message,
+            capturedScreenshot,
+            {
+              onChunk: (chunk) => {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
+                  )
+                );
+              },
+              onComplete: (fullContent, messageId, messageType, cardData, windowTrigger) => {
+                console.log("[Conversation] onComplete received:", {
+                  messageId,
+                  messageType,
+                  hasCardData: !!cardData,
+                  windowTrigger,
+                });
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === streamingMessageId
+                      ? {
+                          ...msg,
+                          id: messageId,
+                          content: fullContent,
+                          type: cardData ? "card" : "text",
+                          messageType,
+                          cardData,
+                          windowTrigger,
+                        }
+                      : msg
+                  )
+                );
+                streamingMessageIdRef.current = null;
+              },
+              onError: (error) => {
+                console.error("Streaming error:", error);
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === streamingMessageId
+                      ? {
+                          ...msg,
+                          content: `Error: ${error}. Please try again.`,
+                        }
+                      : msg
+                  )
+                );
+                streamingMessageIdRef.current = null;
+              },
+              onWindowTrigger: (windowType, data) => {
+                console.log(`Window trigger: ${windowType}`, data);
+                // Window trigger data is stored in message for user to click card
+              },
             },
-            onComplete: (fullContent, messageId, messageType, cardData, windowTrigger) => {
-              console.log("[Conversation] onComplete received:", {
-                messageId,
-                messageType,
-                hasCardData: !!cardData,
-                windowTrigger,
-              });
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === streamingMessageId
-                    ? {
-                        ...msg,
-                        id: messageId,
-                        content: fullContent,
-                        type: cardData ? "card" : "text",
-                        messageType,
-                        cardData,
-                        windowTrigger,
-                      }
-                    : msg
-                )
-              );
-              streamingMessageIdRef.current = null;
-            },
-            onError: (error) => {
-              console.error("Streaming error:", error);
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === streamingMessageId
-                    ? {
-                        ...msg,
-                        content: `Error: ${error}. Please try again.`,
-                      }
-                    : msg
-                )
-              );
-              streamingMessageIdRef.current = null;
-            },
-            onWindowTrigger: (windowType, data) => {
-              console.log(`Window trigger: ${windowType}`, data);
-              // Window trigger data is stored in message for user to click card
-            },
-          });
+            undefined,
+            screenshotMetadata
+          );
         } catch (error) {
           console.error("Failed to send message:", error);
           setMessages((prev) =>
@@ -462,6 +474,7 @@ function App() {
 
     // Capture screenshot for workflow actions (progress_step and custom_question)
     let screenshot: string | null = null;
+    let screenshotMetadata: any = null;
     if (
       option.action === "progress_step" ||
       option.action === "custom_question" ||
@@ -471,7 +484,11 @@ function App() {
       const screenshotResult = await window.conversationAPI?.captureScreenshot?.();
       if (screenshotResult) {
         screenshot = screenshotResult.dataUrl;
-        console.log("[Conversation] Screenshot captured successfully");
+        screenshotMetadata = screenshotResult.metadata;
+        console.log(
+          "[Conversation] Screenshot captured successfully with metadata:",
+          screenshotMetadata
+        );
       } else {
         console.warn("[Conversation] Screenshot capture failed");
       }
@@ -526,7 +543,8 @@ function App() {
             }
           },
         },
-        metadata // Pass metadata to the API
+        metadata, // Pass metadata to the API
+        screenshotMetadata // Pass screenshot metadata for coordinate conversion
       );
     } catch (error) {
       console.error("Failed to send workflow message:", error);

@@ -80,9 +80,9 @@ contextBridge.exposeInMainWorld("conversationAPI", {
 
   // Message communication with Agent window
   // Returns cleanup function to remove listener
-  onMessageReceived: (callback: (message: any, screenshot: string | null) => void) => {
-    const handler = (_event: any, message: any, screenshot: string | null) => {
-      callback(message, screenshot);
+  onMessageReceived: (callback: (message: any, screenshot: string | null, screenshotMetadata?: any) => void) => {
+    const handler = (_event: any, message: any, screenshot: string | null, screenshotMetadata?: any) => {
+      callback(message, screenshot, screenshotMetadata);
     };
 
     ipcRenderer.on(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, handler);

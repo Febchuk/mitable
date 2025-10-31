@@ -29,17 +29,18 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   },
 
   // Screenshot capture
-  captureScreenshot: async (): Promise<string | null> => {
+  captureScreenshot: async (): Promise<{ dataUrl: string; metadata: any } | null> => {
     console.log("[Preload] captureScreenshot() called from renderer");
     const result = await ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
 
-    // IPC handler returns { dataUrl, metadata } - extract just the dataUrl
+    // IPC handler returns { dataUrl, metadata } - return full result
     if (result && typeof result === "object" && "dataUrl" in result) {
       console.log("[Preload] Screenshot captured successfully:", {
         dataUrlLength: result.dataUrl?.length || 0,
         hasMetadata: !!result.metadata,
+        metadata: result.metadata,
       });
-      return result.dataUrl;
+      return result;
     }
 
     console.error("[Preload] Screenshot capture failed - invalid result:", result);

@@ -37,8 +37,8 @@ contextBridge.exposeInMainWorld("agentAPI", {
   showConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SHOW),
   hideConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_HIDE),
   toggleConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_TOGGLE), // NEW: Toggle collapsed state
-  sendMessageToConversation: (messageData: any, screenshot: string | null) =>
-    ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, messageData, screenshot),
+  sendMessageToConversation: (messageData: any, screenshot: string | null, screenshotMetadata?: any) =>
+    ipcRenderer.send(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, messageData, screenshot, screenshotMetadata),
   openConversationInConsole: (conversationId: string) =>
     ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHAT, conversationId),
 

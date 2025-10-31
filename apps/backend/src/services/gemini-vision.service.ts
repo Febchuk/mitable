@@ -5,6 +5,7 @@ import { toGeminiSchema } from "../utils/gemini-schema.js";
 import { InterpretationOptionSchema, VisualGuidanceSchema, StepSchema } from "@mitable/shared";
 import type { SolutionObject, Step, VisualGuidance, InterpretationOption } from "@mitable/shared";
 import type { Message as DbMessage } from "../db/schema/conversations.schema.js";
+import { coordinateConverter, type ImageDimensions } from "./coordinate-converter.service.js";
 
 const InterpretResponseSchema = z.object({
   interpretations: z.array(InterpretationOptionSchema),
@@ -122,6 +123,7 @@ class GeminiVisionService {
    * @param mode - Analysis mode: "single-step" (default) or "multi-step"
    * @param completedSteps - Previously completed steps (for refinement)
    * @param remainingPlan - Previous step plan to refine
+   * @param imageDimensions - Screenshot dimensions in pixels (for coordinate conversion)
    * @returns Vision analysis result based on mode
    */
   async analyzeScreenshot(
@@ -129,7 +131,8 @@ class GeminiVisionService {
     task?: string,
     mode: "single-step" | "multi-step" = "single-step",
     completedSteps?: string[],
-    remainingPlan?: any[]
+    remainingPlan?: any[],
+    imageDimensions?: ImageDimensions
   ): Promise<VisionAnalysisResult | TaskFocusedVisionResult | MultiStepGuidanceResult> {
     console.log("[GeminiVision] Starting screenshot analysis", {
       hasTask: !!task,
@@ -147,6 +150,19 @@ class GeminiVisionService {
         // Generic analysis - no task provided
         prompt = `Analyze this screenshot and identify ALL interactive UI elements.
 
+CRITICAL COORDINATE FORMAT REQUIREMENT:
+Return bounding box coordinates as NORMALIZED values (0.0 to 1.0 range):
+- x: horizontal position as percentage (0.0 = left edge, 1.0 = right edge)
+- y: vertical position as percentage (0.0 = top edge, 1.0 = bottom edge)
+- width: width as percentage (0.1 = 10% of image width)
+- height: height as percentage (0.05 = 5% of image height)
+
+Example: {"x": 0.45, "y": 0.12, "width": 0.15, "height": 0.04} means:
+- Element starts at 45% from left, 12% from top
+- Element is 15% of image width, 4% of image height
+
+DO NOT return pixel coordinates. Always use 0.0-1.0 normalized range.
+
 Return a JSON object with:
 - applicationContext: What application/page is this?
 - screenDescription: Brief description of the screen
@@ -163,10 +179,20 @@ Return ONLY raw JSON, no markdown formatting.`;
 
 OBJECTIVE: Generate a step-by-step plan showing the FULL workflow to complete this task.
 
+CRITICAL COORDINATE FORMAT REQUIREMENT:
+Return bounding box coordinates as NORMALIZED values (0.0 to 1.0 range):
+- x: 0.0 = left edge, 1.0 = right edge
+- y: 0.0 = top edge, 1.0 = bottom edge
+- width/height: as fraction of total dimensions
+
+Example: {"x": 0.5, "y": 0.3, "width": 0.1, "height": 0.04} means element at 50% from left, 30% from top, 10% width, 4% height.
+
+DO NOT return pixel coordinates. Always use 0.0-1.0 normalized range.
+
 Analyze the current screenshot and:
 1. Identify the CURRENT step (element visible NOW that should be clicked/interacted with)
 2. Predict the NEXT 2-4 steps that will likely follow
-3. For the current step, provide exact UI element with bounding box coordinates
+3. For the current step, provide exact UI element with bounding box coordinates (NORMALIZED 0-1 range)
 4. For future steps, describe what to expect (predictions)
 
 Return ONLY raw JSON (no markdown):
@@ -181,7 +207,7 @@ Return ONLY raw JSON (no markdown):
       "element": {
         "label": "Element label",
         "type": "button",
-        "boundingBox": { "x": 0, "y": 0, "width": 100, "height": 40 },
+        "boundingBox": { "x": 0.45, "y": 0.12, "width": 0.15, "height": 0.04 },
         "interactable": true,
         "confidence": 0.95
       },
@@ -205,6 +231,14 @@ PROGRESS UPDATE:
 - Completed steps: ${JSON.stringify(completedSteps)}
 - Previous plan was: ${JSON.stringify(remainingPlan)}
 
+CRITICAL COORDINATE FORMAT REQUIREMENT:
+Return bounding box coordinates as NORMALIZED values (0.0 to 1.0 range):
+- x: 0.0 = left edge, 1.0 = right edge
+- y: 0.0 = top edge, 1.0 = bottom edge
+Example: {"x": 0.5, "y": 0.3, "width": 0.1, "height": 0.04}
+
+DO NOT return pixel coordinates. Always use 0.0-1.0 normalized range.
+
 OBJECTIVE: Update the step plan based on the NEW screenshot.
 
 Analyze what ACTUALLY happened vs what we predicted:
@@ -212,7 +246,7 @@ Analyze what ACTUALLY happened vs what we predicted:
 2. Are the remaining steps still valid or do they need adjustment?
 3. What is the NEXT step the user should take right now?
 
-Return updated plan starting from the NEXT step (provide exact UI element for current step, predictions for future):
+Return updated plan starting from the NEXT step (provide exact UI element for current step with NORMALIZED coordinates, predictions for future):
 {
   "applicationContext": "Application name and current page",
   "taskUnderstanding": "What the user is accomplishing",
@@ -221,7 +255,7 @@ Return updated plan starting from the NEXT step (provide exact UI element for cu
     {
       "stepNumber": ${(completedSteps?.length || 0) + 1},
       "instruction": "Next action to take",
-      "element": { /* if visible */ },
+      "element": { "boundingBox": { "x": 0.0-1.0, "y": 0.0-1.0, "width": 0.0-1.0, "height": 0.0-1.0 } },
       "confidence": "high|medium|low",
       "reasoning": "Why this step is needed"
     }
@@ -234,6 +268,19 @@ Return updated plan starting from the NEXT step (provide exact UI element for cu
         prompt = `You are helping a user complete this task: "${task}"
 
 OBJECTIVE: Find the SINGLE MOST RELEVANT UI element the user should interact with to complete this task.
+
+CRITICAL COORDINATE FORMAT REQUIREMENT:
+Return bounding box coordinates as NORMALIZED values (0.0 to 1.0 range):
+- x: horizontal position as percentage (0.0 = left edge, 1.0 = right edge)
+- y: vertical position as percentage (0.0 = top edge, 1.0 = bottom edge)
+- width: width as percentage of image (0.1 = 10% of width)
+- height: height as percentage of image (0.05 = 5% of height)
+
+Example: {"x": 0.45, "y": 0.12, "width": 0.15, "height": 0.04} means:
+- Element starts at 45% from left, 12% from top
+- Element is 15% of image width, 4% of image height
+
+DO NOT return pixel coordinates. Always use 0.0-1.0 normalized range.
 
 Analyze the screenshot considering:
 - Visual hierarchy (button size, position, color, prominence)
@@ -249,7 +296,7 @@ Return ONLY raw JSON (no markdown code blocks):
     "element": {
       "label": "Element label or descriptive text",
       "type": "button|input|link|dropdown|checkbox",
-      "boundingBox": { "x": 0, "y": 0, "width": 100, "height": 40 },
+      "boundingBox": { "x": 0.45, "y": 0.12, "width": 0.15, "height": 0.04 },
       "interactable": true,
       "confidence": 0.95
     },
@@ -281,6 +328,57 @@ Return ONLY raw JSON (no markdown code blocks):
       const jsonText = jsonMatch ? jsonMatch[1] : text;
 
       const parsed = JSON.parse(jsonText);
+
+      // Convert normalized coordinates to pixels if dimensions provided
+      if (imageDimensions) {
+        console.log("[GeminiVision] Converting coordinates to pixels using dimensions:", imageDimensions);
+
+        // Convert single-step task-focused result
+        if (parsed.recommendedAction?.element?.boundingBox) {
+          parsed.recommendedAction.element.boundingBox = coordinateConverter.convertToPixels(
+            parsed.recommendedAction.element.boundingBox,
+            imageDimensions
+          );
+        }
+
+        // Convert alternatives if present
+        if (parsed.alternatives && Array.isArray(parsed.alternatives)) {
+          parsed.alternatives = parsed.alternatives.map((alt: any) => ({
+            ...alt,
+            boundingBox: alt.boundingBox
+              ? coordinateConverter.convertToPixels(alt.boundingBox, imageDimensions)
+              : alt.boundingBox,
+          }));
+        }
+
+        // Convert generic analysis elements
+        if (parsed.elements && Array.isArray(parsed.elements)) {
+          parsed.elements = parsed.elements.map((el: any) => ({
+            ...el,
+            boundingBox: el.boundingBox
+              ? coordinateConverter.convertToPixels(el.boundingBox, imageDimensions)
+              : el.boundingBox,
+          }));
+        }
+
+        // Convert multi-step guidance steps
+        if (parsed.steps && Array.isArray(parsed.steps)) {
+          parsed.steps = parsed.steps.map((step: any) => ({
+            ...step,
+            element: step.element && step.element.boundingBox
+              ? {
+                  ...step.element,
+                  boundingBox: coordinateConverter.convertToPixels(
+                    step.element.boundingBox,
+                    imageDimensions
+                  ),
+                }
+              : step.element,
+          }));
+        }
+      } else {
+        console.warn("[GeminiVision] No image dimensions provided - coordinates will remain in Gemini's format");
+      }
 
       // Determine result type based on fields present
       if (parsed.steps && Array.isArray(parsed.steps)) {

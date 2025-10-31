@@ -416,12 +416,13 @@ function setupIPC() {
   });
 
   // Forward message from Agent to Conversation window
-  ipcMain.on(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, (_event, messageData, screenshot) => {
+  ipcMain.on(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, (_event, messageData, screenshot, screenshotMetadata) => {
     if (conversationWindow && !conversationWindow.isDestroyed()) {
       conversationWindow.webContents.send(
         IPC_CHANNELS.CONVERSATION_SEND_MESSAGE,
         messageData,
-        screenshot
+        screenshot,
+        screenshotMetadata
       );
     }
   });

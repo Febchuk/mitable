@@ -126,6 +126,7 @@ export interface StreamCallbacks {
  * @param callbacks - Callbacks for handling stream events
  * @param token - Auth token
  * @param screenshot - Optional base64-encoded screenshot for workflow context
+ * @param screenshotMetadata - Optional screenshot metadata (dimensions, scale factor)
  * @param metadata - Optional metadata for workflow actions (workflowAction, selectedOption)
  * @returns Promise that resolves when streaming completes
  */
@@ -135,15 +136,19 @@ export async function sendStreamingMessage(
   callbacks: StreamCallbacks,
   token: string,
   screenshot?: string,
+  screenshotMetadata?: any,
   metadata?: any
 ): Promise<void> {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
   try {
     // Build request body
-    const requestBody: { content: string; screenshot?: string; metadata?: any } = { content };
+    const requestBody: { content: string; screenshot?: string; screenshotMetadata?: any; metadata?: any } = { content };
     if (screenshot) {
       requestBody.screenshot = screenshot;
+    }
+    if (screenshotMetadata) {
+      requestBody.screenshotMetadata = screenshotMetadata;
     }
     if (metadata) {
       requestBody.metadata = metadata;

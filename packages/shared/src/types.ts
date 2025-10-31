@@ -58,6 +58,25 @@ export const UIElementSchema = z.object({
 
 export type UIElement = z.infer<typeof UIElementSchema>;
 
+// Extended UI Element with metadata for coordinate system
+export const UIElementWithMetadataSchema = UIElementSchema.extend({
+  normalized: z.boolean().default(false), // Whether coords are 0-1 range
+  imageDimensions: z.object({
+    width: z.number(),
+    height: z.number()
+  }).optional()
+});
+
+export type UIElementWithMetadata = z.infer<typeof UIElementWithMetadataSchema>;
+
+// Image dimensions type for coordinate conversion
+export const ImageDimensionsSchema = z.object({
+  width: z.number().positive(),
+  height: z.number().positive()
+});
+
+export type ImageDimensions = z.infer<typeof ImageDimensionsSchema>;
+
 // Conversation types
 export const MessageSchema = z.object({
   id: z.string(),

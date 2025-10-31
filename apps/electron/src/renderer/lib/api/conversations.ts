@@ -129,11 +129,9 @@ export async function getConversationMessages(conversationId: string): Promise<M
  * @param conversationId - Conversation ID
  * @param content - Message content
  * @param screenshot - Optional base64-encoded screenshot for visual guidance
+ * @param callbacks - Streaming callbacks
  * @param metadata - Optional metadata for workflow actions
- * @param onChunk - Callback for each streaming chunk
- * @param onComplete - Callback when streaming completes
- * @param onError - Callback for errors
- * @param onWindowTrigger - Callback for window triggers (Nudge/Guide)
+ * @param screenshotMetadata - Optional screenshot metadata (width, height, etc.)
  */
 export async function sendMessageStream(
   conversationId: string,
@@ -151,7 +149,8 @@ export async function sendMessageStream(
     onError?: (error: string) => void;
     onWindowTrigger?: (window: "nudge" | "guide", data: any) => void;
   },
-  metadata?: any
+  metadata?: any,
+  screenshotMetadata?: any
 ): Promise<void> {
   console.log("[API] 📨 Starting message stream:", {
     conversationId,
@@ -162,8 +161,8 @@ export async function sendMessageStream(
   const headers = await getAuthHeaders();
   console.log("[API] Auth headers obtained for streaming");
 
-  // Build request body with optional screenshot and metadata
-  const requestBody: { content: string; screenshot?: string; metadata?: any } = { content };
+  // Build request body with optional screenshot, metadata, and screenshotMetadata
+  const requestBody: { content: string; screenshot?: string; metadata?: any; screenshotMetadata?: any } = { content };
   if (screenshot) {
     requestBody.screenshot = screenshot;
     console.log(`[API] Sending message with screenshot (${screenshot.length} bytes)`);
@@ -173,6 +172,10 @@ export async function sendMessageStream(
   if (metadata) {
     requestBody.metadata = metadata;
     console.log(`[API] Sending message with metadata:`, metadata);
+  }
+  if (screenshotMetadata) {
+    requestBody.screenshotMetadata = screenshotMetadata;
+    console.log(`[API] Sending message with screenshotMetadata:`, screenshotMetadata);
   }
 
   const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {

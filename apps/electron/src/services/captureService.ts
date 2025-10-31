@@ -476,9 +476,21 @@ class CaptureService {
       let image = targetSource.thumbnail;
       const originalSize = image.getSize();
 
+      // Validate image has valid dimensions
+      if (originalSize.width === 0 || originalSize.height === 0) {
+        console.error("[CaptureService] Captured window image has invalid dimensions:", originalSize);
+        return null;
+      }
+
       // Resize if needed
       image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
       const finalSize = image.getSize();
+
+      // Final validation after resize
+      if (finalSize.width === 0 || finalSize.height === 0) {
+        console.error("[CaptureService] Resized window image has invalid dimensions:", finalSize);
+        return null;
+      }
 
       // Convert to data URL
       const dataUrl = image.toDataURL();
@@ -574,9 +586,21 @@ class CaptureService {
       let image = screenSource.thumbnail;
       const originalSize = image.getSize();
 
+      // Validate image has valid dimensions
+      if (originalSize.width === 0 || originalSize.height === 0) {
+        console.error("[CaptureService] Captured image has invalid dimensions:", originalSize);
+        return null;
+      }
+
       // Resize if needed
       image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
       const finalSize = image.getSize();
+
+      // Final validation after resize
+      if (finalSize.width === 0 || finalSize.height === 0) {
+        console.error("[CaptureService] Resized image has invalid dimensions:", finalSize);
+        return null;
+      }
 
       // Convert to data URL
       const dataUrl = image.toDataURL();
