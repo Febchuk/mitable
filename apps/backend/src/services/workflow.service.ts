@@ -1,261 +1,373 @@
 import { db } from "../db/client";
-import * as schema from "../db/schema/index";
-import { eq } from "drizzle-orm";
+import { workflowSessions, workflowInteractions } from "../db/schema/index";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 /**
- * Workflow step information
+ * SolutionObject - Complete workflow structure
  */
-export interface WorkflowStep {
-  stepNumber: number;
-  instruction: string;
-  targetElement?: {
-    label: string;
-    boundingBox: {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    };
-  };
-  completed: boolean;
-  timestamp: Date;
+export interface SolutionObject {
+  solution: string;
+  solutionExplanation: string;
+  searchQuery: string;
+  supportingData?: any[];
+  supportingDataExplanation?: string;
+  stepList: Array<{
+    stepNumber: number;
+    stepDescription: string;
+    status: "pending" | "current" | "completed";
+  }>;
+  currentStepIndex: number;
+  adjustmentHistory?: any[];
 }
 
 /**
- * Workflow state stored in conversation metadata
+ * Workflow Session - Database record
  */
-export interface WorkflowState {
-  active: boolean;
-  title: string;
-  currentStepNumber: number;
-  steps: WorkflowStep[];
-  lastScreenshotHash?: string; // To detect screen changes
-  startedAt: Date;
-  lastUpdatedAt: Date;
+export interface WorkflowSession {
+  id: string;
+  organizationId: string;
+  conversationId: string;
+  userId: string;
+  solution: string;
+  solutionExplanation: string;
+  searchQuery: string;
+  summary: string | null;
+  status: "active" | "completed" | "cancelled";
+  currentStepIndex: number;
+  completedAt: Date | null;
+  completionType: string | null;
+  workflowData: SolutionObject;
+  stepsModified: number;
+  lastStepModifiedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Workflow Interaction - Individual interaction record
+ */
+export interface WorkflowInteraction {
+  id: string;
+  workflowSessionId: string;
+  type: "step_progress" | "user_question" | "ai_response" | "step_modified" | "workflow_complete" | "workflow_cancelled";
+  role: "user" | "assistant" | "system";
+  content: string | null;
+  relatedStepIndex: number | null;
+  metadata: any;
+  createdAt: Date;
 }
 
 /**
  * Workflow Service
  *
- * Manages workflow state throughout a conversation's lifecycle.
- * Tracks step progression, detects continuations, and coordinates
- * the iterative just-in-time guidance model.
+ * Manages UI guidance workflows completely isolated from regular chat.
+ * Stores workflows in separate tables with full conversation history.
+ * Supports:
+ * - Creating workflow sessions
+ * - Tracking step progression
+ * - Logging in-workflow Q&A
+ * - Modifying steps dynamically
+ * - Completing/cancelling workflows
+ * - Cross-chat recall for AI
  */
 class WorkflowService {
   /**
-   * Start a new workflow in a conversation
-   *
-   * @param conversationId - The conversation ID
-   * @param title - Workflow title (e.g., "How to submit a PR")
-   * @param firstStep - The initial step
-   * @returns Updated workflow state
+   * Validate configuration on initialization
    */
-  async startWorkflow(
-    conversationId: string,
-    title: string,
-    firstStep: Omit<WorkflowStep, "completed" | "timestamp">
-  ): Promise<WorkflowState> {
-    console.log(
-      `[WorkflowService] Starting workflow: "${title}" in conversation ${conversationId}`
-    );
-
-    const workflowState: WorkflowState = {
-      active: true,
-      title,
-      currentStepNumber: 1,
-      steps: [
-        {
-          ...firstStep,
-          completed: false,
-          timestamp: new Date(),
-        },
-      ],
-      startedAt: new Date(),
-      lastUpdatedAt: new Date(),
-    };
-
-    // Update conversation contextType to 'workflow'
-    await db
-      .update(schema.conversations)
-      .set({
-        contextType: "workflow",
-        // Store workflow state in a metadata column (would need to add this to schema)
-      })
-      .where(eq(schema.conversations.id, conversationId));
-
-    console.log("[WorkflowService] Workflow started:", {
-      conversationId,
-      title,
-      stepNumber: 1,
-    });
-
-    return workflowState;
-  }
-
-  /**
-   * Add a new step to an active workflow
-   *
-   * @param conversationId - The conversation ID
-   * @param currentState - Current workflow state
-   * @param nextStep - The next step to add
-   * @returns Updated workflow state
-   */
-  async addStep(
-    conversationId: string,
-    currentState: WorkflowState,
-    nextStep: Omit<WorkflowStep, "completed" | "timestamp">
-  ): Promise<WorkflowState> {
-    if (!currentState.active) {
-      throw new Error("Cannot add step to inactive workflow");
+  constructor() {
+    if (!db) {
+      throw new Error(
+        "Database client is not initialized. Please check your database configuration."
+      );
     }
-
-    // Mark previous step as completed
-    const updatedSteps = currentState.steps.map((step) =>
-      step.stepNumber === currentState.currentStepNumber ? { ...step, completed: true } : step
-    );
-
-    // Add new step
-    const newStepNumber = currentState.currentStepNumber + 1;
-    updatedSteps.push({
-      ...nextStep,
-      stepNumber: newStepNumber,
-      completed: false,
-      timestamp: new Date(),
-    });
-
-    const updatedState: WorkflowState = {
-      ...currentState,
-      currentStepNumber: newStepNumber,
-      steps: updatedSteps,
-      lastUpdatedAt: new Date(),
-    };
-
-    console.log("[WorkflowService] Step added:", {
-      conversationId,
-      stepNumber: newStepNumber,
-      totalSteps: updatedSteps.length,
-    });
-
-    return updatedState;
   }
-
   /**
-   * Complete the workflow
+   * Create a new workflow session
+   * Called when user confirms they want to start the workflow
    *
-   * @param conversationId - The conversation ID
-   * @param currentState - Current workflow state
-   * @returns Updated workflow state
+   * @param organizationId - Organization ID
+   * @param conversationId - Conversation ID
+   * @param userId - User ID
+   * @param solutionObject - Complete workflow data
+   * @returns Created workflow session
    */
-  async completeWorkflow(
+  async createWorkflowSession(
+    organizationId: string,
     conversationId: string,
-    currentState: WorkflowState
-  ): Promise<WorkflowState> {
-    console.log(`[WorkflowService] Completing workflow in conversation ${conversationId}`);
+    userId: string,
+    solutionObject: SolutionObject
+  ): Promise<WorkflowSession> {
+    try {
+      const [session] = await db
+        .insert(workflowSessions)
+        .values({
+          organizationId,
+          conversationId,
+          userId,
+          solution: solutionObject.solution,
+          solutionExplanation: solutionObject.solutionExplanation,
+          searchQuery: solutionObject.searchQuery,
+          status: "active",
+          currentStepIndex: 0,
+          workflowData: solutionObject,
+        })
+        .returning();
 
-    // Mark all steps as completed
-    const completedSteps = currentState.steps.map((step) => ({ ...step, completed: true }));
+      console.log("[WorkflowService] Workflow session created:", {
+        sessionId: session.id,
+        conversationId,
+        solution: solutionObject.solution,
+      });
 
-    const updatedState: WorkflowState = {
-      ...currentState,
-      active: false,
-      steps: completedSteps,
-      lastUpdatedAt: new Date(),
-    };
-
-    // Update conversation contextType back to 'general'
-    await db
-      .update(schema.conversations)
-      .set({
-        contextType: "general",
-      })
-      .where(eq(schema.conversations.id, conversationId));
-
-    console.log("[WorkflowService] Workflow completed:", {
-      conversationId,
-      totalSteps: completedSteps.length,
-      duration: new Date().getTime() - currentState.startedAt.getTime(),
-    });
-
-    return updatedState;
-  }
-
-  /**
-   * Get workflow state from conversation
-   *
-   * @param conversationId - The conversation ID
-   * @returns Workflow state or null if no active workflow
-   */
-  async getWorkflowState(conversationId: string): Promise<WorkflowState | null> {
-    // In a real implementation, this would fetch from a metadata column
-    // For now, we'll return null to indicate no stored state
-    // The state will be managed in-memory during the conversation
-
-    const [conversation] = await db
-      .select()
-      .from(schema.conversations)
-      .where(eq(schema.conversations.id, conversationId))
-      .limit(1);
-
-    if (!conversation || conversation.contextType !== "workflow") {
-      return null;
+      return session as WorkflowSession;
+    } catch (error) {
+      throw new Error("Failed to create workflow session", { cause: error });
     }
-
-    // TODO: Retrieve from metadata column when schema is updated
-    return null;
   }
 
   /**
-   * Detect if a conversation should enter workflow mode
+   * Add interaction to workflow
+   * Logs user questions, AI responses, step progress, etc.
    *
-   * @param userMessage - The user's message
-   * @param conversationHistory - Recent conversation history
-   * @returns True if should enter workflow mode
+   * @param workflowSessionId - Workflow session ID
+   * @param type - Interaction type
+   * @param role - Who initiated (user/assistant/system)
+   * @param content - Message content
+   * @param relatedStepIndex - Optional step index
+   * @param metadata - Additional data
+   * @returns Created interaction
    */
-  shouldEnterWorkflowMode(
-    userMessage: string,
-    _conversationHistory: { role: string; content: string }[]
-  ): boolean {
-    const messageLower = userMessage.toLowerCase();
+  async addInteraction(
+    workflowSessionId: string,
+    type: WorkflowInteraction["type"],
+    role: WorkflowInteraction["role"],
+    content?: string,
+    relatedStepIndex?: number,
+    metadata?: any
+  ): Promise<WorkflowInteraction> {
+    try {
+      const [interaction] = await db
+        .insert(workflowInteractions)
+        .values({
+          workflowSessionId,
+          type,
+          role,
+          content: content || null,
+          relatedStepIndex: relatedStepIndex ?? null,
+          metadata: metadata || {},
+        })
+        .returning();
 
-    // Explicit workflow triggers
-    const workflowTriggers = [
-      "how do i",
-      "how to",
-      "show me how",
-      "guide me",
-      "walk me through",
-      "help me",
-      "teach me how",
-      "can you show me",
-    ];
+      return interaction as WorkflowInteraction;
+    } catch (error) {
+      throw new Error("Failed to add workflow interaction", { cause: error });
+    }
+  }
 
-    const hasWorkflowTrigger = workflowTriggers.some((trigger) => messageLower.includes(trigger));
+  /**
+   * Progress to next step
+   * Updates current step index and step statuses
+   *
+   * @param sessionId - Workflow session ID
+   * @param newStepIndex - New step index
+   * @returns Updated session
+   */
+  async progressStep(sessionId: string, newStepIndex: number): Promise<WorkflowSession> {
+    try {
+      const [session] = await db
+        .update(workflowSessions)
+        .set({
+          currentStepIndex: newStepIndex,
+          updatedAt: new Date(),
+        })
+        .where(eq(workflowSessions.id, sessionId))
+        .returning();
 
-    // Check if this is a procedural/task-based question
-    const taskKeywords = [
-      "submit",
-      "create",
-      "setup",
-      "configure",
-      "install",
-      "deploy",
-      "request",
-      "approve",
-      "send",
-      "upload",
-      "download",
-      "share",
-      "invite",
-    ];
+      // Log interaction
+      await this.addInteraction(sessionId, "step_progress", "user", undefined, newStepIndex);
 
-    const hasTaskKeyword = taskKeywords.some((keyword) => messageLower.includes(keyword));
+      return session as WorkflowSession;
+    } catch (error) {
+      throw new Error("Failed to progress workflow step", { cause: error });
+    }
+  }
 
-    // Enter workflow mode if:
-    // 1. Has explicit workflow trigger
-    // 2. Has task keyword AND asks a question
-    const isQuestion = messageLower.includes("?") || messageLower.startsWith("how");
+  /**
+   * Modify workflow steps
+   * Called when AI updates steps based on user feedback
+   *
+   * @param sessionId - Workflow session ID
+   * @param updatedWorkflowData - New workflow data
+   * @param modificationReason - Why steps were changed
+   * @param stepIndex - Which step was modified
+   * @returns Updated session
+   */
+  async modifySteps(
+    sessionId: string,
+    updatedWorkflowData: SolutionObject,
+    modificationReason: string,
+    stepIndex?: number
+  ): Promise<WorkflowSession> {
+    try {
+      const [session] = await db
+        .update(workflowSessions)
+        .set({
+          workflowData: updatedWorkflowData,
+          stepsModified: sql`${workflowSessions.stepsModified} + 1`,
+          lastStepModifiedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(workflowSessions.id, sessionId))
+        .returning();
 
-    return hasWorkflowTrigger || (hasTaskKeyword && isQuestion);
+      // Log modification
+      await this.addInteraction(
+        sessionId,
+        "step_modified",
+        "system",
+        modificationReason,
+        stepIndex,
+        { reason: modificationReason }
+      );
+
+      return session as WorkflowSession;
+    } catch (error) {
+      throw new Error("Failed to modify workflow steps", { cause: error });
+    }
+  }
+
+  /**
+   * Complete workflow successfully
+   *
+   * @param sessionId - Workflow session ID
+   * @returns Updated session
+   */
+  async completeWorkflow(sessionId: string): Promise<WorkflowSession> {
+    try {
+      const [session] = await db
+        .update(workflowSessions)
+        .set({
+          status: "completed",
+          completionType: "success",
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(workflowSessions.id, sessionId))
+        .returning();
+
+      // Log completion
+      await this.addInteraction(sessionId, "workflow_complete", "system");
+
+      console.log("[WorkflowService] Workflow completed:", { sessionId });
+      return session as WorkflowSession;
+    } catch (error) {
+      throw new Error("Failed to complete workflow", { cause: error });
+    }
+  }
+
+  /**
+   * Cancel workflow
+   *
+   * @param sessionId - Workflow session ID
+   * @returns Updated session
+   */
+  async cancelWorkflow(sessionId: string): Promise<WorkflowSession> {
+    try {
+      const [session] = await db
+        .update(workflowSessions)
+        .set({
+          status: "cancelled",
+          completionType: "user_cancelled",
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(workflowSessions.id, sessionId))
+        .returning();
+
+      // Log cancellation
+      await this.addInteraction(sessionId, "workflow_cancelled", "system");
+
+      console.log("[WorkflowService] Workflow cancelled:", { sessionId });
+      return session as WorkflowSession;
+    } catch (error) {
+      throw new Error("Failed to cancel workflow", { cause: error });
+    }
+  }
+
+  /**
+   * Get active workflow for a conversation
+   * Now also returns completed/cancelled workflows to show history
+   *
+   * @param conversationId - Conversation ID
+   * @returns Most recent workflow session or null
+   */
+  async getActiveWorkflow(conversationId: string): Promise<WorkflowSession | null> {
+    try {
+      // Get the most recent workflow (active, completed, or cancelled)
+      // to preserve history in the UI
+      const [session] = await db
+        .select()
+        .from(workflowSessions)
+        .where(eq(workflowSessions.conversationId, conversationId))
+        .orderBy(desc(workflowSessions.createdAt))
+        .limit(1);
+
+      return session ? (session as WorkflowSession) : null;
+    } catch (error) {
+      throw new Error("Failed to get active workflow", { cause: error });
+    }
+  }
+
+  /**
+   * Get workflow interactions
+   *
+   * @param sessionId - Workflow session ID
+   * @returns List of interactions
+   */
+  async getInteractions(sessionId: string): Promise<WorkflowInteraction[]> {
+    try {
+      const interactions = await db
+        .select()
+        .from(workflowInteractions)
+        .where(eq(workflowInteractions.workflowSessionId, sessionId))
+        .orderBy(workflowInteractions.createdAt);
+
+      return interactions as WorkflowInteraction[];
+    } catch (error) {
+      throw new Error("Failed to get workflow interactions", { cause: error });
+    }
+  }
+
+  /**
+   * Get user's workflow history (for AI recall)
+   *
+   * @param userId - User ID
+   * @param organizationId - Organization ID
+   * @param limit - Max number of workflows
+   * @returns List of workflow sessions
+   */
+  async getUserWorkflowHistory(
+    userId: string,
+    organizationId: string,
+    limit: number = 10
+  ): Promise<WorkflowSession[]> {
+    try {
+      const sessions = await db
+        .select()
+        .from(workflowSessions)
+        .where(
+          and(
+            eq(workflowSessions.userId, userId),
+            eq(workflowSessions.organizationId, organizationId)
+          )
+        )
+        .orderBy(desc(workflowSessions.createdAt))
+        .limit(limit);
+
+      return sessions as WorkflowSession[];
+    } catch (error) {
+      throw new Error("Failed to get user workflow history", { cause: error });
+    }
   }
 }
 

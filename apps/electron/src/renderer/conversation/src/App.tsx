@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Code, ExternalLink, LucideIcon, Users, Workflow, X } from "lucide-react";
+import { Code, ExternalLink, LucideIcon, Users, X } from "lucide-react";
 import UserMessage from "../../components/domain/messages/UserMessage";
 import AIMessage from "../../components/domain/messages/AIMessage";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { sendMessageStream } from "../../lib/api/conversations";
 import CollapsedView from "./components/CollapsedView";
-import WorkflowOptions, { WorkflowPhase } from "../../components/domain/workflow/WorkflowOptions";
-import StepList from "../../components/domain/workflow/StepList";
 import ExpertsCard from "./components/ExpertsCard";
+import WorkflowAccordion from "./components/WorkflowAccordion";
+import { useWorkflow } from "./hooks/useWorkflow";
 
 declare global {
   interface Window {
@@ -69,6 +69,7 @@ interface Message {
   messageType?: string;
   cardData?: any;
   sources?: any[];
+  isWorkflowButton?: boolean; // Hide from UI if true (workflow button selection)
   windowTrigger?: {
     window: "nudge" | "guide";
     data: any;
@@ -88,6 +89,26 @@ function App() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Workflow state - completely separate from messages
+  const { workflowData } = useWorkflow(conversationId || "", !!conversationId);
+
+  // Debug: Log workflow data
+  useEffect(() => {
+    console.log("[App] Workflow data:", {
+      hasWorkflow: !!workflowData.workflow,
+      workflow: workflowData.workflow,
+      interactionCount: workflowData.interactions.length,
+      conversationId,
+    });
+    console.log("[App] Messages:", messages.map(m => ({
+      id: m.id,
+      role: m.role,
+      messageType: m.messageType,
+      hasCardData: !!m.cardData,
+      workflowSessionId: (m.cardData as any)?.workflowSessionId,
+    })));
+  }, [workflowData, conversationId, messages]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -176,10 +197,7 @@ function App() {
           // Capture screenshot conditionally using IPC API with heuristics
           // The main process will use CaptureService.conditionalCapture() to decide
           try {
-            const result = await window.conversationAPI.captureScreenshot({
-              message,
-              context,
-            });
+            const result = await window.conversationAPI.captureScreenshot();
 
             if (result) {
               capturedScreenshot = result.dataUrl;
@@ -394,6 +412,7 @@ function App() {
           selectedOption: 1,
         };
         message = "Move on to next step";
+        // Workflow continues - activeWorkflowId stays set
         break;
 
       case "custom_question":
@@ -415,7 +434,7 @@ function App() {
 
       case "confirm_start":
         metadata = {
-          workflowAction: "progress_step",
+          workflowAction: "confirm_start",
           selectedOption: 1,
         };
         message = "Yes, let's get started!";
@@ -425,29 +444,17 @@ function App() {
         message = label;
     }
 
-    console.log("[Conversation] Workflow option selected:", { action, message, metadata });
+    console.log("[Conversation] 🔥 Workflow option selected:", { 
+      action, 
+      message, 
+      metadata,
+      willSkipMessageSave: true 
+    });
 
-    // Add user message to UI
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: message,
-      type: "text",
-    };
-    setMessages((prev) => [...prev, userMsg]);
-
-    // Create placeholder for streaming assistant message
+    // CRITICAL: Workflow actions MUST NOT create messages in the messages table
+    // They only interact with workflow_interactions table
     const streamingMessageId = `streaming-${Date.now()}`;
     streamingMessageIdRef.current = streamingMessageId;
-
-    const assistantMessage: Message = {
-      id: streamingMessageId,
-      role: "assistant",
-      content: "",
-      type: "text",
-    };
-
-    setMessages((prev) => [...prev, assistantMessage]);
 
     // Capture screenshot for workflow actions (progress_step and custom_question)
     let screenshot: string | null = null;
@@ -473,29 +480,12 @@ function App() {
         message,
         screenshot,
         {
-          onChunk: (chunk) => {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
-              )
-            );
+          onChunk: () => {
+            // For workflow actions, don't update messages - accordion polls for updates
+            // Chunks will be saved to workflow_interactions table by backend
           },
-          onComplete: (fullContent, messageId, messageType, cardData, windowTrigger) => {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === streamingMessageId
-                  ? {
-                      ...msg,
-                      id: messageId,
-                      content: fullContent,
-                      type: cardData ? "card" : "text",
-                      messageType,
-                      cardData,
-                      windowTrigger,
-                    }
-                  : msg
-              )
-            );
+          onComplete: () => {
+            // Workflow completed - accordion will refresh via polling
             streamingMessageIdRef.current = null;
           },
           onError: (error) => {
@@ -577,22 +567,24 @@ function App() {
                 </div>
               )}
 
+              {/* Regular Chat Messages */}
               {messages.map((message) => {
-                // Render user messages
+                // HIDE workflow session messages (accordion handles those)
+                // BUT show workflow proposal messages (awaiting confirmation)
+                if (
+                  message.messageType === "workflow" && 
+                  message.cardData?.workflowSessionId &&
+                  !message.cardData?._awaitingConfirmation
+                ) {
+                  return null;
+                }
+                
+                // Render user messages (except workflow button clicks)
                 if (message.role === "user") {
                   return <UserMessage key={message.id} content={message.content} />;
                 }
 
                 // Render AI messages (assistant)
-                const isWorkflowMessage =
-                  message.messageType === "workflow" && message.cardData?.workflowActive;
-                const workflowPhase = message.cardData?.workflowPhase as WorkflowPhase | undefined;
-
-                // Determine if we should show step list based on phase
-                const shouldShowStepList =
-                  isWorkflowMessage && workflowPhase && workflowPhase !== "custom_question";
-                const shouldShowCheckboxes = workflowPhase === "step_progression";
-
                 // Determine card title/subtitle/icon for non-workflow cards
                 let title = "";
                 let subtitle = "";
@@ -603,83 +595,63 @@ function App() {
                   title = `${expertCount} Expert${expertCount > 1 ? "s" : ""} Available`;
                   subtitle = "View Experts";
                   Icon = Users;
-                } else if (
-                  message.messageType === "workflow" &&
-                  message.cardData &&
-                  !isWorkflowMessage
-                ) {
-                  // Old workflow card format (before our changes)
-                  title = message.cardData.guide?.title || "Interactive Workflow";
-                  subtitle = "Start Guide";
-                  Icon = Workflow;
-                } else if (message.cardData && !isWorkflowMessage) {
+                } else if (message.cardData) {
                   // Fallback for unknown card types
                   title = message.cardData.title || "Card";
                   subtitle = message.cardData.subtitle || "Click to view";
                 }
 
                 return (
-                  <div key={message.id} className="space-y-3">
-                    {/* Show workflow components for active workflows */}
-                    {isWorkflowMessage && (
-                      <>
-                        {/* 1. FIRST: Show step list for initial_proposal and step_progression phases */}
-                        {shouldShowStepList && message.cardData.stepList && (
-                          <StepList
-                            steps={message.cardData.stepList}
-                            currentStepIndex={message.cardData.currentStepIndex || 0}
-                            showCheckboxes={shouldShowCheckboxes}
-                          />
-                        )}
+                  <div key={message.id}>
+                    <div className="space-y-3">
+                      {/* Show AI message content */}
+                      {message.content && <AIMessage content={message.content} />}
 
-                        {/* 2. SECOND: Show AI text response (conversational message) */}
-                        {message.content && <AIMessage content={message.content} />}
-
-                        {/* Always show WorkflowOptions for workflow messages */}
-                        {workflowPhase && (
-                          <WorkflowOptions
-                            phase={workflowPhase}
-                            onOptionSelect={handleWorkflowOptionSelect}
-                          />
-                        )}
-                      </>
-                    )}
-
-                    {/* Show AI message for non-workflow messages */}
-                    {!isWorkflowMessage && message.content && (
-                      <AIMessage content={message.content} />
-                    )}
-
-                    {/* Show inline ExpertsCard for experts messages */}
-                    {message.messageType === "experts" && message.cardData?.experts && (
-                      <ExpertsCard
-                        experts={message.cardData.experts}
-                        suggestedNudge={message.cardData.suggestedNudge}
-                        conversationId={conversationId || ""}
-                      />
-                    )}
-
-                    {/* Show card below the text if cardData exists (non-workflow, non-experts cards) */}
-                    {message.type === "card" &&
-                      message.cardData &&
-                      !isWorkflowMessage &&
-                      message.messageType !== "experts" && (
-                        <Card
-                          className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors"
-                          onClick={() => handleCardClick(message)}
-                        >
-                          <div className="text-left">
-                            <CardTitle className="text-base mb-1">{title}</CardTitle>
-                            <CardDescription>{subtitle}</CardDescription>
-                          </div>
-                          <div className="w-12 h-12 bg-[#30303e] rounded-lg flex items-center justify-center flex-shrink-0 ml-4">
-                            <Icon size={24} className="text-primary-foreground" />
-                          </div>
-                        </Card>
+                      {/* Show inline ExpertsCard for experts messages */}
+                      {message.messageType === "experts" && message.cardData?.experts && (
+                        <ExpertsCard
+                          experts={message.cardData.experts}
+                          suggestedNudge={message.cardData.suggestedNudge}
+                          conversationId={conversationId || ""}
+                        />
                       )}
+
+                      {/* Show card below the text if cardData exists (non-workflow, non-experts cards) */}
+                      {message.type === "card" &&
+                        message.cardData &&
+                        message.messageType !== "workflow" &&
+                        message.messageType !== "experts" &&
+                        !message.cardData?._awaitingConfirmation && (
+                          <Card
+                            className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors"
+                            onClick={() => handleCardClick(message)}
+                          >
+                            <div className="text-left">
+                              <CardTitle className="text-base mb-1">{title}</CardTitle>
+                              <CardDescription>{subtitle}</CardDescription>
+                            </div>
+                            <div className="w-12 h-12 bg-[#30303e] rounded-lg flex items-center justify-center flex-shrink-0 ml-4">
+                              <Icon size={24} className="text-primary-foreground" />
+                            </div>
+                          </Card>
+                        )}
+                    </div>
                   </div>
                 );
               })}
+              
+              {/* Render accordion AFTER all messages (appears below where user said "yes") */}
+              {workflowData.workflow && (
+                <div key={`workflow-${workflowData.workflow.id}`}>
+                  <WorkflowAccordion
+                    title={workflowData.workflow.solution}
+                    workflow={workflowData.workflow}
+                    interactions={workflowData.interactions}
+                    onOptionSelect={handleWorkflowOptionSelect}
+                  />
+                </div>
+              )}
+              
               <div ref={messagesEndRef} />
             </div>
           </div>

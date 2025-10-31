@@ -4,10 +4,10 @@ import { BaseAgent } from "./base.agent";
 import { KnowledgeAgent } from "./knowledge.agent";
 import type { StreamChunk, ToolContext } from "../tools/base.tool";
 import { ClarifyIntentTool } from "../tools/clarify-intent.tool";
-import { StartUIGuidanceWorkflowTool } from "../tools/start-ui-guidance-workflow.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
 import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool";
 import { wrapWithWorkflowState } from "../tools/utils/workflow-wrapper";
+import { workflowService } from "../services/workflow.service";
 
 /**
  * Visual Guidance Agent
@@ -62,7 +62,6 @@ export class VisualGuidanceAgent extends BaseAgent {
   private openai: OpenAI;
   private knowledgeAgent: KnowledgeAgent;
   private clarifyIntentTool: ClarifyIntentTool;
-  private startWorkflowTool: StartUIGuidanceWorkflowTool;
   private guideNextStepTool: GuideNextStepTool;
   private analyzeScreenTool: AnalyzeWorkflowScreenTool;
 
@@ -71,7 +70,6 @@ export class VisualGuidanceAgent extends BaseAgent {
     this.openai = new OpenAI({ apiKey: config.openai.apiKey });
     this.knowledgeAgent = knowledgeAgent;
     this.clarifyIntentTool = new ClarifyIntentTool();
-    this.startWorkflowTool = new StartUIGuidanceWorkflowTool();
     this.guideNextStepTool = new GuideNextStepTool();
     this.analyzeScreenTool = new AnalyzeWorkflowScreenTool();
   }
@@ -106,8 +104,91 @@ export class VisualGuidanceAgent extends BaseAgent {
       }
 
       // Handle metadata-driven routing (deterministic)
+      if (context.metadata?.workflowAction === "confirm_start") {
+        // User confirmed workflow start - create workflow session in database
+        console.log("[VisualGuidanceAgent] User confirmed workflow start - creating workflow session");
+        
+        // Find the last assistant message with _awaitingConfirmation
+        const proposalMessage = context.conversationHistory
+          .filter((msg) => msg.role === "assistant" && (msg.cardData as any)?._awaitingConfirmation)
+          .pop();
+        
+        const cardData = proposalMessage?.cardData as any;
+        if (!cardData?._pendingWorkflow) {
+          yield {
+            type: "error",
+            error: "Could not find pending workflow data. Please try asking again.",
+          };
+          return;
+        }
+
+        // Build the full SolutionObject with the workflow starting (step 0)
+        const solutionObject = {
+          ...cardData._pendingWorkflow,
+          currentStepIndex: 0, // Start at first step
+          adjustmentHistory: [],
+          stepList: cardData._pendingWorkflow.stepList.map((step: any, index: number) => ({
+            ...step,
+            status: index === 0 ? "current" : "pending",
+          })),
+        };
+
+        // Create workflow session in database (NOT in messages table)
+        console.log("[VisualGuidanceAgent] Creating workflow session with:", {
+          organizationId: context.organizationId,
+          conversationId: context.conversationId,
+          userId: context.userId,
+          solution: solutionObject.solution,
+        });
+
+        const workflowSession = await workflowService.createWorkflowSession(
+          context.organizationId,
+          context.conversationId,
+          context.userId,
+          solutionObject
+        );
+
+        console.log("[VisualGuidanceAgent] ✅ Workflow session created successfully:", {
+          sessionId: workflowSession.id,
+          status: workflowSession.status,
+          currentStepIndex: workflowSession.currentStepIndex,
+        });
+
+        const confirmMessage = "Perfect! Let's get started with step 1.";
+
+        yield {
+          type: "complete",
+          messageType: "workflow",
+          content: confirmMessage,
+          cardData: {
+            ...solutionObject,
+            workflowSessionId: workflowSession.id, // Include session ID for frontend
+            workflowActive: true,
+            workflowPhase: "step_progression",
+          },
+        };
+        return;
+      }
+
       if (context.metadata?.workflowAction === "progress_step") {
         // User clicked "Move on to next step" - progress workflow
+        console.log("[VisualGuidanceAgent] User progressing to next step");
+        
+        // Get active workflow session
+        const activeWorkflow = await workflowService.getActiveWorkflow(context.conversationId);
+        if (!activeWorkflow) {
+          yield {
+            type: "error",
+            error: "No active workflow found. Please start a new workflow.",
+          };
+          return;
+        }
+
+        // Progress to next step
+        const newStepIndex = activeWorkflow.currentStepIndex + 1;
+        await workflowService.progressStep(activeWorkflow.id, newStepIndex);
+
+        // Execute the guide next step tool for AI response
         const result = await this.guideNextStepTool.execute(
           {
             conversationId: context.conversationId,
@@ -115,12 +196,24 @@ export class VisualGuidanceAgent extends BaseAgent {
           context
         );
 
+        // Log AI response as interaction
+        await workflowService.addInteraction(
+          activeWorkflow.id,
+          "ai_response",
+          "assistant",
+          result.content,
+          newStepIndex
+        );
+
+        // DON'T yield a message - accordion updates via polling
+        // Yielding creates duplicate accordion instances
+        console.log("[VisualGuidanceAgent] Step progressed, interaction saved. No message needed - accordion will poll.");
+        
+        // Return empty to end the stream without creating a message
         yield {
           type: "complete",
-          messageType: result.messageType,
-          content: result.content,
-          cardData: result.cardData,
-          windowTrigger: result.triggerWindow,
+          content: "", // Empty content - no message will be saved
+          messageType: "text", // Not "workflow" - prevents accordion duplication
         };
         return;
       }
@@ -147,7 +240,25 @@ export class VisualGuidanceAgent extends BaseAgent {
       }
 
       // Handle custom questions during active workflow
+      // NOTE: This only LOGS the Q&A, does NOT modify steps
+      // Steps should only be modified when AI explicitly detects the workflow needs updating
       if (context.workflowState) {
+        console.log("[VisualGuidanceAgent] User asked question during workflow");
+        
+        // Get active workflow session
+        const activeWorkflow = await workflowService.getActiveWorkflow(context.conversationId);
+        
+        if (activeWorkflow) {
+          // Log user question
+          await workflowService.addInteraction(
+            activeWorkflow.id,
+            "user_question",
+            "user",
+            lastUserMessage.content,
+            activeWorkflow.currentStepIndex
+          );
+        }
+
         const questionType = this.classifyWorkflowQuestion(lastUserMessage.content);
 
         if (questionType === "visual") {
@@ -160,6 +271,17 @@ export class VisualGuidanceAgent extends BaseAgent {
             context
           );
 
+          // Log AI response
+          if (activeWorkflow) {
+            await workflowService.addInteraction(
+              activeWorkflow.id,
+              "ai_response",
+              "assistant",
+              result.content,
+              activeWorkflow.currentStepIndex
+            );
+          }
+
           yield {
             type: "complete",
             messageType: result.messageType,
@@ -168,16 +290,27 @@ export class VisualGuidanceAgent extends BaseAgent {
           };
           return;
         } else {
-          // Conceptual question - call KnowledgeAgent and wrap with workflow state
+          // Conceptual question - call KnowledgeAgent
           const searchResult = await this.knowledgeAgent.search(lastUserMessage.content, context);
-          const wrappedResult = wrapWithWorkflowState(searchResult, context, "custom_question");
 
+          // Log AI response to workflow_interactions (not messages table)
+          if (activeWorkflow) {
+            await workflowService.addInteraction(
+              activeWorkflow.id,
+              "ai_response",
+              "assistant",
+              searchResult.content,
+              activeWorkflow.currentStepIndex
+            );
+          }
+
+          // DON'T yield a message - accordion updates via polling
+          console.log("[VisualGuidanceAgent] Custom question answered, interaction saved. No message needed - accordion will poll.");
+          
           yield {
             type: "complete",
-            messageType: wrappedResult.messageType,
-            content: wrappedResult.content,
-            sources: "sources" in wrappedResult ? wrappedResult.sources : undefined,
-            cardData: "cardData" in wrappedResult ? wrappedResult.cardData : undefined,
+            content: "", // Empty - no message will be saved
+            messageType: "text", // Not "workflow"
           };
           return;
         }
@@ -494,17 +627,29 @@ Generate the complete JSON object now with ALL required fields.`;
         stepList: aiGeneratedParams.stepList,
       };
 
-      console.log("[VisualGuidanceAgent] Executing workflow tool with combined parameters");
+      console.log("[VisualGuidanceAgent] Asking user if they want to start workflow");
 
-      // STEP 5: Execute tool with complete parameters
-      const workflowResult = await this.startWorkflowTool.execute(toolParams, context);
+      // STEP 5: Store the workflow parameters in context for when user confirms
+      // We'll use the conversation history to retrieve this when user says "yes"
+      context.workflowState = {
+        ...toolParams,
+        currentStepIndex: -1,
+        adjustmentHistory: [],
+      };
+
+      const stepCount = aiGeneratedParams.stepList.length;
+      const timeEstimate = stepCount <= 4 ? "~5 minutes" : stepCount <= 8 ? "~15 minutes" : "~30 minutes";
+
+      const confirmationMessage = `Yes, I can help you with that! ${aiGeneratedParams.solutionExplanation}\n\nThis will take approximately ${timeEstimate} and involves ${stepCount} steps. Would you like me to guide you through it step-by-step?`;
 
       yield {
         type: "complete",
-        messageType: workflowResult.messageType,
-        content: workflowResult.content,
-        cardData: workflowResult.cardData,
-        windowTrigger: workflowResult.triggerWindow,
+        messageType: "text",
+        content: confirmationMessage,
+        cardData: {
+          _pendingWorkflow: toolParams, // Store for when user confirms
+          _awaitingConfirmation: true,
+        },
       };
     } catch (error) {
       console.error("[VisualGuidanceAgent] Error:", error);

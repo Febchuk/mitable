@@ -31,8 +31,8 @@ export default function StepList({
   showCheckboxes = false,
 }: StepListProps) {
   return (
-    <div className="mt-4 space-y-2 bg-secondary/30 rounded-lg p-4">
-      <div className="text-sm font-medium text-foreground mb-3">
+    <div className="mt-4 space-y-2 bg-[#2A2A35] rounded-lg p-4">
+      <div className="text-sm font-medium text-white mb-3">
         Steps ({currentStepIndex + 1}/{steps.length})
       </div>
       <div className="space-y-2">
@@ -46,7 +46,7 @@ export default function StepList({
               key={step.stepNumber}
               className={`
                 flex items-start gap-3 p-3 rounded-md transition-all
-                ${isCurrent ? "bg-primary/10 border border-primary/30" : "bg-background/50"}
+                ${isCurrent ? "bg-[#3A3A45] border border-[#4A4A55]" : "bg-[#35353F]"}
                 ${isCompleted ? "opacity-70" : "opacity-100"}
               `}
             >
@@ -59,8 +59,8 @@ export default function StepList({
                     </div>
                   )}
                   {isCurrent && (
-                    <div className="w-5 h-5 rounded-full border-2 border-primary flex items-center justify-center">
-                      <CircleDot size={12} className="text-primary" />
+                    <div className="w-5 h-5 rounded-full border-2 border-[#8B5CF6] flex items-center justify-center">
+                      <CircleDot size={12} className="text-[#8B5CF6]" />
                     </div>
                   )}
                   {isPending && (
@@ -74,7 +74,7 @@ export default function StepList({
                 <div
                   className={`
                     flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium mt-0.5
-                    ${isCurrent ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}
+                    ${isCurrent ? "bg-[#8B5CF6] text-white" : "bg-[#4A4A55] text-white"}
                   `}
                 >
                   {step.stepNumber}
@@ -86,7 +86,7 @@ export default function StepList({
                 <p
                   className={`
                     text-sm leading-relaxed
-                    ${isCurrent ? "font-medium text-foreground" : "text-muted-foreground"}
+                    ${isCurrent ? "font-medium text-white" : "text-gray-300"}
                     ${isCompleted ? "line-through" : ""}
                   `}
                 >

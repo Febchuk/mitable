@@ -14,6 +14,7 @@ interface WorkflowOptionsProps {
   phase: WorkflowPhase;
   onOptionSelect: (option: WorkflowOption) => void;
   disabled?: boolean;
+  isLastStep?: boolean; // Hide "Move on" button on last step
 }
 
 /**
@@ -41,6 +42,7 @@ export default function WorkflowOptions({
   phase,
   onOptionSelect,
   disabled = false,
+  isLastStep = false,
 }: WorkflowOptionsProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showTextInput, setShowTextInput] = useState(false);
@@ -68,21 +70,32 @@ export default function WorkflowOptions({
         ];
 
       case "step_progression":
-        return [
+        // On last step, don't show "Move on" option
+        const baseOptions = [
           {
             id: 1,
             label: "Move on to next step",
-            action: "progress_step",
+            action: "progress_step" as const,
             icon: <ChevronRight size={16} />,
           },
           {
             id: 2,
             label: "Type something",
-            action: "custom_question",
+            action: "custom_question" as const,
             icon: <MessageSquare size={16} />,
           },
-          { id: 3, label: "Exit task workflow", action: "exit_workflow", icon: <X size={16} /> },
+          { 
+            id: 3, 
+            label: "Exit task workflow", 
+            action: "exit_workflow" as const, 
+            icon: <X size={16} /> 
+          },
         ];
+        
+        // Filter out "Move on" button on last step
+        return isLastStep 
+          ? baseOptions.filter(opt => opt.action !== "progress_step")
+          : baseOptions;
 
       case "custom_question":
         return [
@@ -170,17 +183,18 @@ export default function WorkflowOptions({
       return;
     }
 
-    // Otherwise, trigger the action immediately
+    // Trigger the action immediately (no UI feedback needed)
     onOptionSelect(option);
   };
 
   const handleTextSubmit = () => {
     if (!customQuestion.trim()) return;
 
-    const selectedOption = options[selectedIndex];
+    // Always use custom_question action (not the selectedIndex which could be wrong)
     onOptionSelect({
-      ...selectedOption,
-      label: customQuestion, // Pass the custom question as the label
+      id: 2,
+      label: customQuestion,
+      action: "custom_question",
     });
 
     setCustomQuestion("");
@@ -211,14 +225,14 @@ export default function WorkflowOptions({
               }
             }}
             placeholder="Ask a question..."
-            className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]"
             autoFocus
             disabled={disabled}
           />
           <button
             onClick={handleTextSubmit}
             disabled={disabled || !customQuestion.trim()}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-[#8B5CF6] text-white rounded-lg text-sm font-medium hover:bg-[#8B5CF6]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Send
           </button>
@@ -241,32 +255,34 @@ export default function WorkflowOptions({
       tabIndex={disabled ? -1 : 0}
       onFocus={() => setIsFocused(true)}
       onBlur={() => setIsFocused(false)}
-      className="mt-4 space-y-2 outline-none focus:outline-none"
+      className="mt-4 outline-none focus:outline-none"
     >
-      <div className="text-sm text-muted-foreground mb-2">Choose an option:</div>
-      {options.map((option, index) => (
-        <button
-          key={option.id}
-          onClick={() => handleOptionSelect(option)}
-          disabled={disabled}
-          className={`
-            w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all
-            ${
-              selectedIndex === index
-                ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }
-            ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-          `}
-        >
-          <span className="flex items-center gap-2 text-sm font-medium">
-            {option.icon}
-            {option.label}
-          </span>
-          <span className="text-xs opacity-70">{index + 1}</span>
-        </button>
-      ))}
-      <div className="text-xs text-muted-foreground mt-2">
+      <div className="text-sm text-muted-foreground mb-2 text-center">Choose an option:</div>
+      <div className="flex flex-col items-center gap-2">
+        {options.map((option, index) => (
+          <button
+            key={option.id}
+            onClick={() => handleOptionSelect(option)}
+            disabled={disabled}
+            className={`
+              flex items-center gap-3 px-5 py-2.5 rounded-[18px] text-left transition-all duration-200
+              ${
+                selectedIndex === index
+                  ? "bg-[#8B5CF6] text-white ring-2 ring-[#8B5CF6] ring-offset-2 hover:scale-105 hover:shadow-lg"
+                  : "bg-[#3A3A45] text-white hover:bg-[#4A4A55] hover:scale-105 hover:shadow-lg"
+              }
+              ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+            `}
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              {option.icon}
+              {option.label}
+            </span>
+            <span className="text-xs opacity-70">{index + 1}</span>
+          </button>
+        ))}
+      </div>
+      <div className="text-xs text-muted-foreground mt-2 text-center">
         Use arrow keys or number keys (1-{options.length}) to select, Enter to confirm
       </div>
     </div>

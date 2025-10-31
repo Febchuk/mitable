@@ -7,6 +7,7 @@ import { VisualGuidanceAgent } from "../agents/visual-guidance.agent";
 import { ExpertMatchingAgent } from "../agents/expert-matching.agent";
 import { BaseAgent } from "../agents/base.agent";
 import { guideGenerationService } from "./guideGeneration.service";
+import { workflowService } from "./workflow.service";
 
 /**
  * Intent classification types
@@ -103,19 +104,74 @@ export class OrchestratorService {
       });
 
       // Step 2: Metadata-driven routing (deterministic)
+      if (context.metadata?.workflowAction === "confirm_start") {
+        console.log("[Orchestrator] Routing: metadata → VisualGuidanceAgent (confirm_start - begin workflow)");
+        yield* this.visualGuidanceAgent.execute(context);
+        return;
+      }
+
       if (context.metadata?.workflowAction === "progress_step") {
-        console.log("[Orchestrator] Routing: metadata � VisualGuidanceAgent (progress_step)");
+        console.log("[Orchestrator] Routing: metadata → VisualGuidanceAgent (progress_step)");
         yield* this.visualGuidanceAgent.execute(context);
         return;
       }
 
       if (context.metadata?.workflowAction === "exit_workflow") {
-        console.log("[Orchestrator] Routing: metadata � TextResponseAgent (exit_workflow)");
-        yield* this.textAgent.execute(context);
+        console.log("[Orchestrator] User exiting workflow - cancelling session");
+        
+        // Get active workflow and cancel it
+        const activeWorkflow = await workflowService.getActiveWorkflow(context.conversationId);
+        if (activeWorkflow) {
+          await workflowService.cancelWorkflow(activeWorkflow.id);
+          console.log("[Orchestrator] Workflow cancelled:", activeWorkflow.id);
+        }
+        
+        // Return confirmation message
+        yield {
+          type: "complete",
+          messageType: "text",
+          content: "Workflow ended. Feel free to ask me anything else!",
+        };
         return;
       }
 
-      // Step 3: Intent classification (LLM-based)
+      // Step 3: Check if user is confirming a pending workflow
+      const lastAiMessage = context.conversationHistory
+        .filter((msg) => msg.role === "assistant")
+        .pop();
+      
+      const lastUserMessage = context.conversationHistory
+        .filter((msg) => msg.role === "user")
+        .pop();
+      
+      console.log("[Orchestrator] Checking workflow confirmation:", {
+        hasLastAiMessage: !!lastAiMessage,
+        hasCardData: !!lastAiMessage?.cardData,
+        cardData: lastAiMessage?.cardData,
+        lastUserContent: lastUserMessage?.content,
+      });
+      
+      const cardData = lastAiMessage?.cardData as any;
+      const userContent = lastUserMessage?.content || "";
+      const isConfirmingWorkflow = 
+        cardData?._awaitingConfirmation && 
+        /^(yes|yeah|sure|ok|okay|let's do it|start|begin|go ahead)/i.test(userContent);
+
+      console.log("[Orchestrator] Confirmation check result:", {
+        awaitingConfirmation: cardData?._awaitingConfirmation,
+        regexMatch: /^(yes|yeah|sure|ok|okay|let's do it|start|begin|go ahead)/i.test(userContent),
+        isConfirming: isConfirmingWorkflow,
+      });
+
+      if (isConfirmingWorkflow) {
+        console.log("[Orchestrator] User confirmed workflow - starting execution");
+        // Set metadata to trigger workflow execution
+        context.metadata = { workflowAction: "confirm_start" };
+        yield* this.visualGuidanceAgent.execute(context);
+        return;
+      }
+
+      // Step 4: Intent classification (LLM-based)
       const intent = await this.classifyIntent(context);
 
       console.log("[Orchestrator] Intent classified:", {
@@ -123,12 +179,12 @@ export class OrchestratorService {
         confidence: intent.confidence,
       });
 
-      // Step 4: Route based on intent
+      // Step 5: Route based on intent
       const agent = await this.routeByIntent(intent, context);
 
-      console.log("[Orchestrator] Routing: intent � Agent:", agent.name);
+      console.log("[Orchestrator] Routing: intent → Agent:", agent.name);
 
-      // Step 5: Execute agent and forward responses
+      // Step 6: Execute agent and forward responses
       yield* agent.execute(context);
     } catch (error) {
       console.error("[Orchestrator] Error:", error);

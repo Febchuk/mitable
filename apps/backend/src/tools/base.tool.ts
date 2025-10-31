@@ -58,7 +58,7 @@ export interface ToolContext {
   };
   metadata?: {
     // Metadata from frontend UI interactions
-    workflowAction?: "progress_step" | "custom_question" | "exit_workflow";
+    workflowAction?: "confirm_start" | "progress_step" | "custom_question" | "exit_workflow";
     selectedOption?: number; // Which option was selected from WorkflowOptions (1, 2, or 3)
     [key: string]: any; // Allow additional metadata fields
   };
@@ -165,7 +165,7 @@ export interface StreamChunk {
   type: "chunk" | "complete" | "error" | "window_trigger";
   content?: string;
   messageId?: string;
-  messageType?: "text" | "workflow" | "experts";
+  messageType?: "text" | "workflow" | "workflow_proposal" | "experts";
   cardData?: Record<string, any>;
   sources?: Array<{
     title: string;

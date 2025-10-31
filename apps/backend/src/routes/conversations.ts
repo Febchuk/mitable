@@ -787,23 +787,48 @@ router.post(
         return;
       }
 
-      // Save user message to database
-      const [userMessage] = await db
-        .insert(schema.messages)
-        .values({
-          conversationId,
+      // Check if this is a workflow action - if so, don't save to messages table
+      const isWorkflowAction = metadata?.workflowAction;
+      let userMessage: any;
+
+      console.log(`[Stream] 🔥 Checking workflow action:`, { 
+        hasMetadata: !!metadata, 
+        metadata, 
+        isWorkflowAction,
+        content: content.substring(0, 50)
+      });
+
+      if (!isWorkflowAction) {
+        // Only save normal messages to messages table
+        // Workflow actions are saved to workflow_interactions instead
+        console.log(`[Stream] ✅ Saving normal message to messages table`);
+        const [savedMessage] = await db
+          .insert(schema.messages)
+          .values({
+            conversationId,
+            role: "user",
+            content,
+            messageType: "text",
+          })
+          .returning({
+            id: schema.messages.id,
+            role: schema.messages.role,
+            content: schema.messages.content,
+            createdAt: schema.messages.createdAt,
+          });
+
+        userMessage = savedMessage;
+        console.log(`[Stream] User message saved: ${userMessage.id}`);
+      } else {
+        console.log(`[Stream] ⛔ SKIPPING message save - workflow action:`, metadata.workflowAction);
+        // Create a fake message object for context
+        userMessage = {
+          id: `workflow-${Date.now()}`,
           role: "user",
           content,
-          messageType: "text",
-        })
-        .returning({
-          id: schema.messages.id,
-          role: schema.messages.role,
-          content: schema.messages.content,
-          createdAt: schema.messages.createdAt,
-        });
-
-      console.log(`[Stream] User message saved: ${userMessage.id}`);
+          createdAt: new Date(),
+        };
+      }
 
       // Get recent conversation history (last 20 messages for context)
       const historyData = await db

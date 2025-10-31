@@ -359,11 +359,41 @@ class GuideGenerationService {
 
   /**
    * Retrieve the latest SolutionObject from a conversation
-   * Alias for retrieveSolutionObject with more semantic clarity
-   * Used by guide_next_step tool to get current workflow state
+   * ONLY returns workflow state if there's an ACTIVE workflow session
+   * Used by orchestrator to determine if workflow mode is active
+   * 
+   * IMPORTANT: This checks workflow_sessions table, not messages table,
+   * to ensure completed/cancelled workflows don't interfere with normal chat
    */
   async retrieveLatestSolutionObject(conversationId: string): Promise<SolutionObject | null> {
-    return this.retrieveSolutionObject(conversationId);
+    // Import workflowService to check actual session status
+    const { workflowService } = await import("./workflow.service.js");
+    
+    // Get the active workflow session (checks workflow_sessions table)
+    const activeWorkflow = await workflowService.getActiveWorkflow(conversationId);
+    
+    // Only return workflow data if session is actually active
+    if (!activeWorkflow || activeWorkflow.status !== "active") {
+      return null;
+    }
+    
+    // Transform workflowData to match SolutionObject structure
+    // The workflow service uses 'stepDescription' but shared type uses 'description'
+    const workflowData = activeWorkflow.workflowData as any;
+    return {
+      solution: workflowData.solution,
+      solutionExplanation: workflowData.solutionExplanation,
+      searchQuery: workflowData.searchQuery,
+      supportingData: workflowData.supportingData || [],
+      supportingDataExplanation: workflowData.supportingDataExplanation,
+      stepList: (workflowData.stepList || []).map((step: any) => ({
+        stepNumber: step.stepNumber,
+        description: step.description || step.stepDescription,
+        status: step.status,
+      })),
+      currentStepIndex: workflowData.currentStepIndex,
+      adjustmentHistory: workflowData.adjustmentHistory || [],
+    };
   }
 
   async updateSolutionObject(

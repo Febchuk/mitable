@@ -5,10 +5,8 @@ import { useConversationMessages, useSendMessage } from "@/console/src/hooks/que
 import UserMessage from "../../../../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../../../../components/domain/messages/AIMessage";
 import ExpertsCard from "../../../../../../conversation/src/components/ExpertsCard";
-import WorkflowOptions, {
-  type WorkflowPhase,
-} from "../../../../../../components/domain/workflow/WorkflowOptions";
-import StepList from "../../../../../../components/domain/workflow/StepList";
+import WorkflowAccordion from "../../../../../../conversation/src/components/WorkflowAccordion";
+import { useWorkflow } from "../../../../../../conversation/src/hooks/useWorkflow";
 import { Button } from "@/components/ui/button";
 
 export default function ChatDetail() {
@@ -19,6 +17,9 @@ export default function ChatDetail() {
   const [streamingContent, setStreamingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Workflow state - fetched separately from API
+  const { workflowData } = useWorkflow(chatId || null);
 
   const sendMessageMutation = useSendMessage({
     onChunk: (chunk: string) => {
@@ -185,7 +186,7 @@ export default function ChatDetail() {
         message = "Exit workflow";
         break;
       case "confirm_start":
-        metadata = { workflowAction: "progress_step", selectedOption: 1 };
+        metadata = { workflowAction: "confirm_start", selectedOption: 1 };
         message = "Yes, let's get started!";
         break;
       default:
@@ -271,38 +272,29 @@ export default function ChatDetail() {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto app-no-drag custom-scrollbar">
         <div className="max-w-4xl mx-auto px-8 py-4 pb-20">
+          {/* Regular Chat Messages */}
           {messages.map((message) => {
-            // Render workflow messages with rich details
-            if (message.messageType === "workflow" && message.cardData) {
-              const isWorkflowActive = message.cardData.workflowActive;
-              const workflowPhase = message.cardData.workflowPhase as WorkflowPhase | undefined;
-              const shouldShowStepList =
-                isWorkflowActive && workflowPhase && workflowPhase !== "custom_question";
-              const shouldShowCheckboxes = workflowPhase === "step_progression";
-
-              return (
-                <div key={message.id} className="space-y-3">
-                  {/* 1. Show step list for initial_proposal and step_progression */}
-                  {shouldShowStepList && message.cardData.stepList && (
-                    <StepList
-                      steps={message.cardData.stepList}
-                      currentStepIndex={message.cardData.currentStepIndex || 0}
-                      showCheckboxes={shouldShowCheckboxes}
-                    />
-                  )}
-
-                  {/* 2. Show AI text response */}
-                  {message.content && <AIMessage content={message.content} />}
-
-                  {/* 3. Show workflow options for interaction */}
-                  {isWorkflowActive && workflowPhase && (
-                    <WorkflowOptions
-                      phase={workflowPhase}
+            // Handle workflow messages - show accordion after first one
+            if (message.messageType === "workflow") {
+              const isWorkflowStartMessage = message.cardData?.workflowSessionId;
+              
+              if (isWorkflowStartMessage && workflowData.workflow) {
+                return (
+                  <div key={message.id}>
+                    <AIMessage content="Perfect! Let's get started with step 1." />
+                    <WorkflowAccordion
+                      key={workflowData.workflow.id}
+                      title={workflowData.workflow.solution}
+                      workflow={workflowData.workflow}
+                      interactions={workflowData.interactions}
                       onOptionSelect={handleWorkflowOptionSelect}
+                      isLoading={isStreaming}
                     />
-                  )}
-                </div>
-              );
+                  </div>
+                );
+              }
+              // Hide all other workflow messages
+              return null;
             }
 
             // Render experts messages with rich details
@@ -323,15 +315,17 @@ export default function ChatDetail() {
             }
 
             // Render regular text messages
-            return message.role === "user" ? (
+            const messageContent = message.role === "user" ? (
               <UserMessage key={message.id} content={message.content} />
             ) : (
               <AIMessage key={message.id} content={message.content} />
             );
+
+            return messageContent;
           })}
 
-          {/* Streaming message */}
-          {isStreaming && (
+          {/* Streaming message (hide during workflow - shown in accordion instead) */}
+          {isStreaming && !workflowData.workflow && (
             <AIMessage content={streamingContent || "Thinking..."} isStreaming={true} />
           )}
 

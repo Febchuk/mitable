@@ -245,8 +245,10 @@ export async function sendMessageStream(
     }
 
     if (!fullContent) {
-      console.error("[API] ❌ No content received from backend");
-      callbacks.onError?.("No content received from backend");
+      // Empty content is OK for workflow actions - they don't create messages
+      console.log("[API] ℹ️ Empty content received (workflow action - no message needed)");
+      // Just call onComplete to reset loading state
+      callbacks.onComplete?.("", "", undefined, undefined, undefined);
       return;
     }
 
