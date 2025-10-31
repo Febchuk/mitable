@@ -1,4 +1,5 @@
-import OpenAI from "openai";
+// import OpenAI from "openai"; // Unused - embeddings handled by separate service
+import Groq from "groq-sdk";
 // import { GoogleGenerativeAI } from "@google/generative-ai"; // Unused - commented out
 import { config } from "../config";
 import type { Message } from "../db/schema/conversations.schema";
@@ -181,7 +182,8 @@ When responding:
  * - Supports both streaming (text) and non-streaming (cards) responses
  */
 export class AgentService {
-  private openai: OpenAI;
+  // private openai: OpenAI; // Unused - embeddings handled by separate service
+  private groq: Groq;
   // private gemini: GoogleGenerativeAI; // Unused - kept for future reference
   private tools: Map<string, BaseTool> = new Map();
 
@@ -512,14 +514,14 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
           })(),
         });
 
-        // Call OpenAI with function calling
-        const response = await this.openai.chat.completions.create({
-          model: config.openai.chatModel,
+        // Call Groq with function calling
+        const response = await this.groq.chat.completions.create({
+          model: config.groq.chatModel,
           messages: messages,
           tools: tools,
           tool_choice: toolChoice, // Force specific tool for workflow actions, otherwise auto
-          temperature: config.openai.temperature,
-          max_tokens: config.openai.maxTokens,
+          temperature: config.groq.temperature,
+          max_tokens: config.groq.maxTokens,
           stream: true, // Enable streaming
         });
 
