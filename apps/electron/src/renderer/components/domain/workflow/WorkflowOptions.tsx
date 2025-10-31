@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronRight, MessageSquare, X } from "lucide-react";
 
 export type WorkflowPhase = "initial_proposal" | "step_progression" | "custom_question";
@@ -26,11 +26,16 @@ interface WorkflowOptionsProps {
  * - step_progression: 3 options (next step / type something / exit)
  * - custom_question: 3 options (I'm good next step / more questions / exit)
  *
- * Keyboard Navigation:
+ * Focus Behavior:
+ * - Auto-focuses when mounted or when phase changes
+ * - Keyboard navigation only works when THIS specific instance is focused
+ * - Multiple instances on screen won't interfere with each other
+ *
+ * Keyboard Navigation (when focused):
  * - Arrow Up/Down: Navigate options
  * - Number keys (1-3): Select option directly
  * - Enter: Confirm selection
- * - Esc: Deselect (if needed)
+ * - Tab: Move focus to next/previous component
  */
 export default function WorkflowOptions({
   phase,
@@ -40,6 +45,8 @@ export default function WorkflowOptions({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showTextInput, setShowTextInput] = useState(false);
   const [customQuestion, setCustomQuestion] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Define options based on phase
   const getOptions = (): WorkflowOption[] => {
@@ -108,9 +115,16 @@ export default function WorkflowOptions({
     setCustomQuestion("");
   }, [phase]);
 
-  // Keyboard navigation
+  // Auto-focus when component mounts or phase changes
   useEffect(() => {
-    if (disabled || showTextInput) return;
+    if (!disabled && containerRef.current) {
+      containerRef.current.focus();
+    }
+  }, [disabled, phase]);
+
+  // Keyboard navigation - only when this specific component is focused
+  useEffect(() => {
+    if (disabled || showTextInput || !isFocused) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
@@ -143,9 +157,9 @@ export default function WorkflowOptions({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [disabled, showTextInput, selectedIndex, options]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [disabled, showTextInput, selectedIndex, options, isFocused]);
 
   const handleOptionSelect = (option: WorkflowOption) => {
     if (disabled) return;
@@ -197,7 +211,7 @@ export default function WorkflowOptions({
               }
             }}
             placeholder="Ask a question..."
-            className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             autoFocus
             disabled={disabled}
           />
@@ -222,7 +236,13 @@ export default function WorkflowOptions({
   }
 
   return (
-    <div className="mt-4 space-y-2">
+    <div
+      ref={containerRef}
+      tabIndex={disabled ? -1 : 0}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      className="mt-4 space-y-2 outline-none focus:outline-none"
+    >
       <div className="text-sm text-muted-foreground mb-2">Choose an option:</div>
       {options.map((option, index) => (
         <button
