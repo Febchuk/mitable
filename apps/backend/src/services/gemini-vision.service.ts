@@ -446,9 +446,9 @@ ${solutionObject.supportingData.map((d) => `[${d.title}]\n${d.snippet}\nSource: 
 
 Recent Conversation History:
 ${conversationHistory
-  .slice(-5)
-  .map((m) => `${m.role}: ${m.content.substring(0, 200)}`)
-  .join("\n")}
+          .slice(-5)
+          .map((m) => `${m.role}: ${m.content.substring(0, 200)}`)
+          .join("\n")}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL RULES:

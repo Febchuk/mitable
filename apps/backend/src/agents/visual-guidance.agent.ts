@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
 import { KnowledgeAgent } from "./knowledge.agent";
@@ -60,6 +61,7 @@ import { wrapWithWorkflowState } from "../tools/utils/workflow-wrapper";
 export class VisualGuidanceAgent extends BaseAgent {
   readonly name = "visual-guidance";
   private openai: OpenAI;
+  private gemini: GoogleGenerativeAI;
   private knowledgeAgent: KnowledgeAgent;
   private clarifyIntentTool: ClarifyIntentTool;
   private startWorkflowTool: StartUIGuidanceWorkflowTool;
@@ -69,6 +71,7 @@ export class VisualGuidanceAgent extends BaseAgent {
   constructor(knowledgeAgent: KnowledgeAgent) {
     super();
     this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+    this.gemini = new GoogleGenerativeAI(config.gemini.apiKey);
     this.knowledgeAgent = knowledgeAgent;
     this.clarifyIntentTool = new ClarifyIntentTool();
     this.startWorkflowTool = new StartUIGuidanceWorkflowTool();
@@ -126,7 +129,7 @@ export class VisualGuidanceAgent extends BaseAgent {
       }
 
       // Check if user message is vague ("How do I do this?", "Help me with this")
-      const isVaguePrompt = this.isVaguePrompt(lastUserMessage.content);
+      const isVaguePrompt = await this.isVaguePrompt(lastUserMessage.content);
 
       if (isVaguePrompt) {
         // Use clarify_intent to analyze screen and offer interpretations
@@ -517,8 +520,69 @@ Generate the complete JSON object now with ALL required fields.`;
 
   /**
    * Check if user message is vague (needs clarification)
+   *
+   * Uses Gemini Flash to detect if the prompt text itself lacks specificity
+   * about what task the user wants to accomplish. Falls back to regex patterns
+   * if inference fails.
+   *
+   * Vague prompts examples:
+   * - "How do I do this?" (no task specified)
+   * - "Help me" (no context about what they need help with)
+   * - "What should I click?" (no goal stated)
+   *
+   * Specific prompts examples:
+   * - "How do I update the product roadmap?" (clear task)
+   * - "Help me send a Slack message" (clear goal)
+   * - "What should I click to submit my timesheet?" (clear intent)
    */
-  private isVaguePrompt(message: string): boolean {
+  private async isVaguePrompt(message: string): Promise<boolean> {
+    try {
+      const model = this.gemini.getGenerativeModel({
+        model: "gemini-2.0-flash-exp",
+      });
+
+      const prompt = `Analyze if this user prompt is VAGUE or SPECIFIC.
+
+A prompt is VAGUE if:
+- It uses words like "this" or "that" without explaining what they refer to
+- It asks for help without specifying what task or goal they need help with
+- It's extremely short (1-3 words like "help", "how?", "guide me")
+- The user assumes you know their intent but hasn't stated it explicitly
+
+A prompt is SPECIFIC if:
+- It clearly states a task or goal (e.g., "update the roadmap", "send a message", "submit timesheet")
+- It provides enough context that you could understand their intent even without additional information
+- The action they want to take is explicitly mentioned
+
+User prompt: "${message}"
+
+Respond with ONLY one word: vague OR specific
+Nothing else.`;
+
+      const result = await model.generateContent(prompt);
+      const response = result.response.text().trim().toLowerCase();
+
+      console.log(`[VisualGuidanceAgent] Vague prompt inference: "${message}" → ${response}`);
+
+      return response === "vague";
+    } catch (error) {
+      console.warn(
+        "[VisualGuidanceAgent] Inference failed for vague prompt detection, falling back to regex:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
+
+      // Fallback to regex patterns on error
+      return this.isVaguePromptRegex(message);
+    }
+  }
+
+  /**
+   * Fallback regex-based vague prompt detection
+   *
+   * Used when Gemini Flash inference fails (API errors, rate limits, etc.)
+   * Provides basic pattern matching as a safety net.
+   */
+  private isVaguePromptRegex(message: string): boolean {
     const vaguePatterns = [
       /^how do i do this/i,
       /^help me with this/i,
@@ -528,7 +592,11 @@ Generate the complete JSON object now with ALL required fields.`;
       /^guide me$/i,
     ];
 
-    return vaguePatterns.some((pattern) => pattern.test(message.trim()));
+    const isVague = vaguePatterns.some((pattern) => pattern.test(message.trim()));
+
+    console.log(`[VisualGuidanceAgent] Vague prompt regex fallback: "${message}" → ${isVague}`);
+
+    return isVague;
   }
 
   /**

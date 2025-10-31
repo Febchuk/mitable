@@ -272,7 +272,7 @@ class CaptureService {
     for (const pattern of demonstrativePatterns) {
       if (pattern.test(normalizedMessage)) {
         triggeredHeuristics.push("demonstrative_reference");
-        confidence += 0.3; // Weaker signal - needs combination with other heuristics
+        confidence += 0.7; // The user is most likely talking about their screen, so we should categorise this as a vague prompt
         break;
       }
     }
