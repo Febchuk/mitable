@@ -791,11 +791,11 @@ router.post(
       const isWorkflowAction = metadata?.workflowAction;
       let userMessage: any;
 
-      console.log(`[Stream] 🔥 Checking workflow action:`, { 
-        hasMetadata: !!metadata, 
-        metadata, 
+      console.log(`[Stream] 🔥 Checking workflow action:`, {
+        hasMetadata: !!metadata,
+        metadata,
         isWorkflowAction,
-        content: content.substring(0, 50)
+        content: content.substring(0, 50),
       });
 
       if (!isWorkflowAction) {
@@ -820,7 +820,10 @@ router.post(
         userMessage = savedMessage;
         console.log(`[Stream] User message saved: ${userMessage.id}`);
       } else {
-        console.log(`[Stream] ⛔ SKIPPING message save - workflow action:`, metadata.workflowAction);
+        console.log(
+          `[Stream] ⛔ SKIPPING message save - workflow action:`,
+          metadata.workflowAction
+        );
         // Create a fake message object for context
         userMessage = {
           id: `workflow-${Date.now()}`,

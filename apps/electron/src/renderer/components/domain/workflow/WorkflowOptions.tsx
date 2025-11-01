@@ -84,17 +84,17 @@ export default function WorkflowOptions({
             action: "custom_question" as const,
             icon: <MessageSquare size={16} />,
           },
-          { 
-            id: 3, 
-            label: "Exit task workflow", 
-            action: "exit_workflow" as const, 
-            icon: <X size={16} /> 
+          {
+            id: 3,
+            label: "Exit task workflow",
+            action: "exit_workflow" as const,
+            icon: <X size={16} />,
           },
         ];
-        
+
         // Filter out "Move on" button on last step
-        return isLastStep 
-          ? baseOptions.filter(opt => opt.action !== "progress_step")
+        return isLastStep
+          ? baseOptions.filter((opt) => opt.action !== "progress_step")
           : baseOptions;
 
       case "custom_question":

@@ -101,13 +101,16 @@ function App() {
       interactionCount: workflowData.interactions.length,
       conversationId,
     });
-    console.log("[App] Messages:", messages.map(m => ({
-      id: m.id,
-      role: m.role,
-      messageType: m.messageType,
-      hasCardData: !!m.cardData,
-      workflowSessionId: (m.cardData as any)?.workflowSessionId,
-    })));
+    console.log(
+      "[App] Messages:",
+      messages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        messageType: m.messageType,
+        hasCardData: !!m.cardData,
+        workflowSessionId: (m.cardData as any)?.workflowSessionId,
+      }))
+    );
   }, [workflowData, conversationId, messages]);
 
   // Auto-scroll to bottom when new messages arrive
@@ -180,7 +183,8 @@ function App() {
         if (!capturedScreenshot) {
           // Build conversation context for heuristics
           const lastMessage = messages[messages.length - 1];
-          const hasActiveWorkflow = lastMessage?.messageType === "workflow" || !!lastMessage?.cardData?.workflowActive;
+          const hasActiveWorkflow =
+            lastMessage?.messageType === "workflow" || !!lastMessage?.cardData?.workflowActive;
 
           const context = {
             hasActiveWorkflow,
@@ -206,7 +210,9 @@ function App() {
                 metadata: result.metadata,
               });
             } else {
-              console.log("[Conversation] No screenshot captured (heuristics determined not needed)");
+              console.log(
+                "[Conversation] No screenshot captured (heuristics determined not needed)"
+              );
             }
           } catch (error) {
             console.error("[Conversation] Screenshot capture failed:", error);
@@ -444,11 +450,11 @@ function App() {
         message = label;
     }
 
-    console.log("[Conversation] 🔥 Workflow option selected:", { 
-      action, 
-      message, 
+    console.log("[Conversation] 🔥 Workflow option selected:", {
+      action,
+      message,
       metadata,
-      willSkipMessageSave: true 
+      willSkipMessageSave: true,
     });
 
     // CRITICAL: Workflow actions MUST NOT create messages in the messages table
@@ -572,13 +578,13 @@ function App() {
                 // HIDE workflow session messages (accordion handles those)
                 // BUT show workflow proposal messages (awaiting confirmation)
                 if (
-                  message.messageType === "workflow" && 
+                  message.messageType === "workflow" &&
                   message.cardData?.workflowSessionId &&
                   !message.cardData?._awaitingConfirmation
                 ) {
                   return null;
                 }
-                
+
                 // Render user messages (except workflow button clicks)
                 if (message.role === "user") {
                   return <UserMessage key={message.id} content={message.content} />;
@@ -639,7 +645,7 @@ function App() {
                   </div>
                 );
               })}
-              
+
               {/* Render accordion AFTER all messages (appears below where user said "yes") */}
               {workflowData.workflow && (
                 <div key={`workflow-${workflowData.workflow.id}`}>
@@ -651,7 +657,7 @@ function App() {
                   />
                 </div>
               )}
-              
+
               <div ref={messagesEndRef} />
             </div>
           </div>

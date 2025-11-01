@@ -20,7 +20,12 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
       setInputValue("");
       console.log("🔵 [AgentPill] Input cleared, message sent");
     } else {
-      console.log("🔴 [AgentPill] Submit blocked - inputMode:", inputMode, "hasValue:", !!inputValue.trim());
+      console.log(
+        "🔴 [AgentPill] Submit blocked - inputMode:",
+        inputMode,
+        "hasValue:",
+        !!inputValue.trim()
+      );
     }
   };
 

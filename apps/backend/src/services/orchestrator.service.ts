@@ -105,7 +105,9 @@ export class OrchestratorService {
 
       // Step 2: Metadata-driven routing (deterministic)
       if (context.metadata?.workflowAction === "confirm_start") {
-        console.log("[Orchestrator] Routing: metadata → VisualGuidanceAgent (confirm_start - begin workflow)");
+        console.log(
+          "[Orchestrator] Routing: metadata → VisualGuidanceAgent (confirm_start - begin workflow)"
+        );
         yield* this.visualGuidanceAgent.execute(context);
         return;
       }
@@ -118,14 +120,14 @@ export class OrchestratorService {
 
       if (context.metadata?.workflowAction === "exit_workflow") {
         console.log("[Orchestrator] User exiting workflow - cancelling session");
-        
+
         // Get active workflow and cancel it
         const activeWorkflow = await workflowService.getActiveWorkflow(context.conversationId);
         if (activeWorkflow) {
           await workflowService.cancelWorkflow(activeWorkflow.id);
           console.log("[Orchestrator] Workflow cancelled:", activeWorkflow.id);
         }
-        
+
         // Return confirmation message
         yield {
           type: "complete",
@@ -139,22 +141,22 @@ export class OrchestratorService {
       const lastAiMessage = context.conversationHistory
         .filter((msg) => msg.role === "assistant")
         .pop();
-      
+
       const lastUserMessage = context.conversationHistory
         .filter((msg) => msg.role === "user")
         .pop();
-      
+
       console.log("[Orchestrator] Checking workflow confirmation:", {
         hasLastAiMessage: !!lastAiMessage,
         hasCardData: !!lastAiMessage?.cardData,
         cardData: lastAiMessage?.cardData,
         lastUserContent: lastUserMessage?.content,
       });
-      
+
       const cardData = lastAiMessage?.cardData as any;
       const userContent = lastUserMessage?.content || "";
-      const isConfirmingWorkflow = 
-        cardData?._awaitingConfirmation && 
+      const isConfirmingWorkflow =
+        cardData?._awaitingConfirmation &&
         /^(yes|yeah|sure|ok|okay|let's do it|start|begin|go ahead)/i.test(userContent);
 
       console.log("[Orchestrator] Confirmation check result:", {

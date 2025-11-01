@@ -13,7 +13,7 @@ export interface SolutionObject {
   supportingDataExplanation?: string;
   stepList: Array<{
     stepNumber: number;
-    stepDescription: string;
+    description: string; // ✅ Unified field name (was stepDescription)
     status: "pending" | "current" | "completed";
   }>;
   currentStepIndex: number;
@@ -49,7 +49,13 @@ export interface WorkflowSession {
 export interface WorkflowInteraction {
   id: string;
   workflowSessionId: string;
-  type: "step_progress" | "user_question" | "ai_response" | "step_modified" | "workflow_complete" | "workflow_cancelled";
+  type:
+    | "step_progress"
+    | "user_question"
+    | "ai_response"
+    | "step_modified"
+    | "workflow_complete"
+    | "workflow_cancelled";
   role: "user" | "assistant" | "system";
   content: string | null;
   relatedStepIndex: number | null;

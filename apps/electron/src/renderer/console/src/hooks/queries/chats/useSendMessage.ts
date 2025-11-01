@@ -91,7 +91,7 @@ export function useSendMessage(options?: SendMessageOptions) {
     onMutate: async ({ chatId, content }) => {
       // Cancel any outgoing refetches for this conversation
       await queryClient.cancelQueries({ queryKey: ["conversation-messages", chatId] });
-      
+
       // Snapshot the previous value
       const previousMessages = queryClient.getQueryData(["conversation-messages", chatId]);
 
@@ -115,7 +115,10 @@ export function useSendMessage(options?: SendMessageOptions) {
     onError: (_err, variables, context) => {
       // Rollback the optimistic update on error
       if (context?.previousMessages) {
-        queryClient.setQueryData(["conversation-messages", variables.chatId], context.previousMessages);
+        queryClient.setQueryData(
+          ["conversation-messages", variables.chatId],
+          context.previousMessages
+        );
       }
     },
 

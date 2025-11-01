@@ -2,7 +2,8 @@
 
 **Last Updated:** Oct 31, 2025  
 **Status:** Phase 1 Complete, Phase 2 Planning  
-**Related Docs:** 
+**Related Docs:**
+
 - `ui_guidance_architecture.md` - Original iterative guidance design
 - `WORKFLOW_REFACTOR_COMPLETE.md` - Recent separation from messages table
 
@@ -74,6 +75,7 @@ Mitable's UI Guidance system provides step-by-step visual assistance for complet
 ### Backend Components
 
 **1. Database Tables**
+
 ```sql
 -- Source of truth for workflow state
 workflow_sessions (
@@ -97,31 +99,37 @@ workflow_interactions (
 ```
 
 **2. Services**
+
 - `workflow.service.ts` - CRUD operations on workflow tables
 - `guideGeneration.service.ts` - Retrieves workflow state for orchestrator
 - `orchestrator.service.ts` - Routes messages to appropriate agents
 
 **3. Agents**
+
 - `visual-guidance.agent.ts` - Handles workflow creation, progression, Q&A
 - `knowledge.agent.ts` - Searches company docs for workflow context
 
 **4. API Routes**
+
 - `GET /api/workflows/conversation/:conversationId/active` - Fetch active workflow + interactions
 - `POST /api/workflows/:workflowId/cancel` - Cancel workflow
 
 ### Frontend Components
 
 **1. Hooks**
+
 - `useWorkflow.ts` - Polls backend every 2s for workflow updates
 
 **2. Components**
+
 - `WorkflowAccordion.tsx` - Main workflow UI (steps, Q&A, options)
 - `WorkflowOptions.tsx` - Action buttons (Continue, Ask Question, Exit)
 - `App.tsx` - Renders accordion alongside chat messages
 
 **3. Data Flow**
+
 ```typescript
-useWorkflow(conversationId) 
+useWorkflow(conversationId)
   → polls /api/workflows/conversation/:id/active
   → returns { workflow, interactions }
   → WorkflowAccordion renders
@@ -134,12 +142,14 @@ useWorkflow(conversationId)
 ### 🔴 Critical Issue #1: Dual Storage Creates Bugs
 
 **Problem:** Workflows are stored in BOTH places:
+
 1. `workflow_sessions` table (source of truth)
 2. `messages` table (duplicate data from legacy system)
 
 **Bug Found:** When workflow completes, `retrieveLatestSolutionObject()` was checking `messages` table instead of `workflow_sessions`, causing orchestrator to think workflow was still active.
 
 **Symptoms:**
+
 - User completes/exits workflow
 - Asks normal question
 - System keeps routing to VisualGuidanceAgent
@@ -152,20 +162,23 @@ useWorkflow(conversationId)
 ### 🟡 Issue #2: Type Fragmentation
 
 **Problem:** Different field names in different places:
+
 - `workflow_sessions.workflowData` uses `stepDescription`
 - Shared `SolutionObject` type uses `description`
 - Frontend expects `description`
 
 **Current Workaround:** Manual transformation in `retrieveLatestSolutionObject()`
+
 ```typescript
-stepList: workflowData.stepList.map(step => ({
+stepList: workflowData.stepList.map((step) => ({
   stepNumber: step.stepNumber,
-  description: step.description || step.stepDescription,  // ⚠️ Hacky
-  status: step.status
-}))
+  description: step.description || step.stepDescription, // ⚠️ Hacky
+  status: step.status,
+}));
 ```
 
 **Impact:**
+
 - Maintenance burden
 - Type safety compromised
 - Future bugs likely
@@ -173,6 +186,7 @@ stepList: workflowData.stepList.map(step => ({
 ### 🟡 Issue #3: Accordion UX Limitations
 
 **Current State:**
+
 ```
 ┌─────────────────────────────────┐
 │  WORKFLOW ACCORDION             │
@@ -195,12 +209,14 @@ stepList: workflowData.stepList.map(step => ({
 ```
 
 **Missing:**
+
 - Space for AI messages that aren't tied to a specific step
 - Example: "I can't see your Slack screen right now, but here are the steps"
 - Example: General troubleshooting advice during workflow
 - Example: Context switches ("Looks like you switched to a different app")
 
 **User Request:**
+
 > "I want a space for the UI to say, hey, I can't see your Slack screen right now, but here are the steps. I also want normal AI messages that are not related to the steps, like about it seeing your screen or something."
 
 ---
@@ -208,9 +224,11 @@ stepList: workflowData.stepList.map(step => ({
 ## Phase 2: Improvement Plan
 
 ### Goal
+
 Complete the separation of workflows from messages, unify types, and optimize accordion UX for a truly independent workflow experience.
 
 ### Timeline
+
 - **Phase 2A:** Remove dual storage (2-3 hours)
 - **Phase 2B:** Unify types (1 hour)
 - **Phase 2C:** Add AI message space in accordion (2-3 hours)
@@ -220,6 +238,7 @@ Complete the separation of workflows from messages, unify types, and optimize ac
 ## Phase 2A: Remove Dual Storage
 
 ### Objective
+
 Workflows should ONLY exist in `workflow_sessions` + `workflow_interactions`. No workflow data in `messages` table.
 
 ### Changes Required
@@ -227,11 +246,13 @@ Workflows should ONLY exist in `workflow_sessions` + `workflow_interactions`. No
 **1. Stop Writing Workflows to Messages**
 
 Files to modify:
+
 - `apps/backend/src/agents/visual-guidance.agent.ts`
 - `apps/backend/src/tools/start-ui-guidance-workflow.tool.ts`
 - `apps/backend/src/tools/guide-next-step.tool.ts`
 
 Current behavior:
+
 ```typescript
 // ❌ BAD - Creates message with workflow cardData
 yield {
@@ -243,6 +264,7 @@ yield {
 ```
 
 New behavior:
+
 ```typescript
 // ✅ GOOD - Only saves to workflow_sessions
 await workflowService.createWorkflowSession(...);
@@ -256,16 +278,19 @@ yield {
 **2. Remove Deprecated Methods**
 
 Delete from `guideGeneration.service.ts`:
+
 - `storeSolutionObject()` - No longer needed
 - `retrieveSolutionObject()` - No longer needed
 - `updateSolutionObject()` - No longer needed
 
 Keep only:
+
 - `retrieveLatestSolutionObject()` - Checks `workflow_sessions` for active workflows
 
 **3. Update Frontend**
 
 `App.tsx` changes:
+
 ```typescript
 // ❌ OLD - Render accordion based on message.cardData
 {messages.map(msg => {
@@ -286,13 +311,15 @@ Keep only:
 **4. Database Cleanup (Optional)**
 
 Add migration to remove old workflow messages:
+
 ```sql
 -- Clean up legacy workflow messages
-DELETE FROM messages 
+DELETE FROM messages
 WHERE message_type = 'workflow';
 ```
 
 ### Success Criteria
+
 - ✅ No `messageType: "workflow"` anywhere in codebase
 - ✅ Accordion renders only from workflow API
 - ✅ Chat messages completely independent from workflows
@@ -303,6 +330,7 @@ WHERE message_type = 'workflow';
 ## Phase 2B: Unify Types
 
 ### Objective
+
 Single source of truth for workflow data structures. No more field name mismatches.
 
 ### Changes Required
@@ -310,12 +338,13 @@ Single source of truth for workflow data structures. No more field name mismatch
 **1. Update Workflow Schema**
 
 `apps/backend/src/services/workflow.service.ts`:
+
 ```typescript
 // Change from:
 export interface SolutionObject {
   stepList: Array<{
     stepNumber: number;
-    stepDescription: string;  // ❌ Wrong name
+    stepDescription: string; // ❌ Wrong name
     status: "pending" | "current" | "completed";
   }>;
 }
@@ -324,7 +353,7 @@ export interface SolutionObject {
 export interface SolutionObject {
   stepList: Array<{
     stepNumber: number;
-    description: string;  // ✅ Consistent
+    description: string; // ✅ Consistent
     status: "pending" | "current" | "completed";
   }>;
 }
@@ -333,6 +362,7 @@ export interface SolutionObject {
 **2. Update All References**
 
 Search and replace in:
+
 - `visual-guidance.agent.ts`
 - `start-ui-guidance-workflow.tool.ts`
 - `guide-next-step.tool.ts`
@@ -363,16 +393,18 @@ WHERE workflow_data->'stepList' IS NOT NULL;
 **4. Remove Transformation Logic**
 
 Delete from `guideGeneration.service.ts`:
+
 ```typescript
 // ❌ DELETE - No longer needed
 stepList: (workflowData.stepList || []).map((step: any) => ({
   stepNumber: step.stepNumber,
   description: step.description || step.stepDescription,
   status: step.status,
-}))
+}));
 ```
 
 ### Success Criteria
+
 - ✅ Single `description` field everywhere
 - ✅ No transformation logic needed
 - ✅ TypeScript compiles without `as any` casts
@@ -383,11 +415,13 @@ stepList: (workflowData.stepList || []).map((step: any) => ({
 ## Phase 2C: AI Message Space in Accordion
 
 ### Objective
+
 Add dedicated space in accordion for AI messages that aren't tied to specific steps.
 
 ### Use Cases
 
 **1. Screen Visibility Issues**
+
 ```
 AI: "I can't see your Slack screen right now. Here are the steps you can follow:
      1. Open Slack
@@ -396,12 +430,14 @@ AI: "I can't see your Slack screen right now. Here are the steps you can follow:
 ```
 
 **2. Context Switches**
+
 ```
-AI: "I notice you switched to your browser. That's fine! The next step 
+AI: "I notice you switched to your browser. That's fine! The next step
      is to open Slack again."
 ```
 
 **3. Troubleshooting**
+
 ```
 User: "I don't see the button you mentioned"
 AI: "Let me help debug this. Can you try:
@@ -411,6 +447,7 @@ AI: "Let me help debug this. Can you try:
 ```
 
 **4. General Q&A During Workflow**
+
 ```
 User: "Why do we use Canvas instead of regular Slack messages?"
 AI: "Great question! Canvas allows for..."
@@ -467,20 +504,21 @@ AI: "Great question! Canvas allows for..."
 **1. Add New Interaction Type**
 
 `workflow.service.ts`:
+
 ```typescript
 export interface WorkflowInteraction {
   id: string;
   workflowSessionId: string;
-  type: 
-    | "step_progress" 
-    | "user_question" 
+  type:
+    | "step_progress"
+    | "user_question"
     | "ai_response"
-    | "ai_context_message"  // ← NEW
+    | "ai_context_message" // ← NEW
     | "step_modified"
     | "workflow_complete";
   role: "user" | "assistant" | "system";
   content: string | null;
-  relatedStepIndex: number | null;  // NULL for context messages
+  relatedStepIndex: number | null; // NULL for context messages
   metadata: any;
   createdAt: Date;
 }
@@ -489,13 +527,14 @@ export interface WorkflowInteraction {
 **2. Store Context Messages**
 
 When AI provides general context (not tied to a step):
+
 ```typescript
 await workflowService.addInteraction(
   workflowSessionId,
-  "ai_context_message",  // New type
+  "ai_context_message", // New type
   "assistant",
   "I can't see your Slack screen right now, but here are the steps...",
-  null,  // No specific step
+  null, // No specific step
   { reason: "screen_not_visible" }
 );
 ```
@@ -503,6 +542,7 @@ await workflowService.addInteraction(
 **3. Render in Accordion**
 
 `WorkflowAccordion.tsx`:
+
 ```typescript
 // Filter context messages (no relatedStepIndex)
 const contextMessages = interactions.filter(
@@ -520,7 +560,7 @@ return (
         ))}
       </div>
     )}
-    
+
     {/* Existing step sections... */}
   </div>
 );
@@ -529,6 +569,7 @@ return (
 **4. Agent Logic**
 
 When to create context messages vs step-specific:
+
 ```typescript
 // In visual-guidance.agent.ts
 
@@ -539,7 +580,7 @@ if (!context.screenshot) {
     "ai_context_message",
     "assistant",
     "I can't see your screen. Here's what to do next...",
-    null  // Not tied to specific step
+    null // Not tied to specific step
   );
 }
 
@@ -550,12 +591,13 @@ else {
     "ai_response",
     "assistant",
     "Click the button in the top right...",
-    activeWorkflow.currentStepIndex  // Tied to current step
+    activeWorkflow.currentStepIndex // Tied to current step
   );
 }
 ```
 
 ### Success Criteria
+
 - ✅ Context messages appear in dedicated section
 - ✅ Step-specific messages stay with their steps
 - ✅ Q&A still inline with current step
@@ -586,6 +628,7 @@ else {
 ### Rollback Plan
 
 If issues arise:
+
 1. Keep `workflow_sessions` as source of truth
 2. Temporarily re-enable message writes
 3. Fix forward, not backward (no data loss)
@@ -595,23 +638,27 @@ If issues arise:
 ## Testing Strategy
 
 ### Unit Tests
+
 - `workflow.service.ts` - All CRUD operations
 - Type transformations removed
 - Interaction type handling
 
 ### Integration Tests
+
 - Workflow creation flow (no message writes)
 - Step progression (only workflow tables updated)
 - Q&A during workflow (correct interaction types)
 - Context messages vs step messages
 
 ### E2E Tests
+
 - Start workflow → Accordion appears
 - Progress through steps → No chat messages created
 - Ask question mid-workflow → Shows in correct section
 - Exit workflow → Clean state
 
 ### Manual QA Checklist
+
 - [ ] Start workflow with "How do I...?"
 - [ ] Confirm workflow start
 - [ ] Progress through 3 steps
@@ -627,18 +674,21 @@ If issues arise:
 ## Success Metrics
 
 ### Technical
+
 - 🎯 Zero workflow data in `messages` table
 - 🎯 Single source of truth (`workflow_sessions`)
 - 🎯 No type transformations needed
 - 🎯 TypeScript strict mode passes
 
 ### UX
+
 - 🎯 Context messages clearly separated from steps
 - 🎯 Users can ask questions freely during workflow
 - 🎯 No confusion about where AI responses appear
 - 🎯 Accordion feels like independent experience
 
 ### Performance
+
 - 🎯 Polling continues at 2s (acceptable for now)
 - 🎯 No N+1 queries when loading workflow
 - 🎯 Accordion renders <100ms
@@ -648,19 +698,25 @@ If issues arise:
 ## Future Enhancements (Post-Phase 2)
 
 ### WebSockets (Phase 3)
+
 Replace polling with real-time updates:
+
 - Backend emits on workflow changes
 - Frontend listens and updates instantly
 - 95% reduction in API calls
 
 ### Sidebar UI (Phase 4)
+
 Move accordion to persistent sidebar:
+
 - Always visible during workflow
 - Chat and workflow don't compete for space
 - Better UX for long workflows
 
 ### Video Recording (Phase 5)
+
 Capture successful workflows:
+
 - Generate training materials
 - Share with team members
 - Improve workflow templates
@@ -672,6 +728,7 @@ Capture successful workflows:
 ### Related Files
 
 **Backend:**
+
 - `apps/backend/src/services/workflow.service.ts`
 - `apps/backend/src/services/guideGeneration.service.ts`
 - `apps/backend/src/services/orchestrator.service.ts`
@@ -679,27 +736,32 @@ Capture successful workflows:
 - `apps/backend/src/routes/workflows.ts`
 
 **Frontend:**
+
 - `apps/electron/src/renderer/conversation/src/hooks/useWorkflow.ts`
 - `apps/electron/src/renderer/conversation/src/components/WorkflowAccordion.tsx`
 - `apps/electron/src/renderer/conversation/src/App.tsx`
 
 **Database:**
+
 - `apps/backend/src/db/schema/workflow-sessions.schema.ts`
 - `apps/backend/src/db/migrations/0007_add_workflow_tables.sql`
 
 ### Key Decisions
 
 **Why not WebSockets now?**
+
 - Polling works for MVP
 - Want to stabilize data model first
 - Will implement in Phase 3
 
 **Why separate AI messages section?**
+
 - Context switches are common (app switching, screen visibility)
 - Educational Q&A doesn't belong tied to specific steps
 - Users need clear feedback when AI can't see screen
 
 **Why remove from messages table entirely?**
+
 - Single source of truth prevents bugs
 - Cleaner architecture for scaling
 - Easier to maintain long-term

@@ -52,7 +52,7 @@ export default function WorkflowAccordion({
 
   // Calculate completion status
   const stepsCompleted = isCompleted ? totalSteps : currentStepIndex;
-  const progress = isCompleted 
+  const progress = isCompleted
     ? `${workflow.status === "completed" ? "Completed" : "Cancelled"} • ${totalSteps}/${totalSteps} steps`
     : `In Progress • ${currentStepIndex + 1}/${totalSteps} steps`;
 
@@ -91,7 +91,6 @@ export default function WorkflowAccordion({
       {/* Accordion Content */}
       {isExpanded && (
         <div className="px-6 py-4 space-y-4 border-t border-[#3A3A45] max-h-[600px] overflow-y-auto custom-scrollbar">
-          
           {/* COMPLETED STEPS - Show journey with AI guidance */}
           {stepsCompleted > 0 && stepList && (
             <div className="space-y-3">
@@ -99,34 +98,50 @@ export default function WorkflowAccordion({
               {stepList.slice(0, stepsCompleted).map((step: WorkflowStep, index) => {
                 // Find AI response for this step
                 const aiResponse = interactions.find(
-                  int => int.role === "assistant" && int.relatedStepIndex === index
+                  (int) => int.role === "assistant" && int.relatedStepIndex === index
                 );
-                
+
                 return (
                   <div key={index} className="bg-[#2A2A35] rounded-lg p-3 border border-[#3A3A45]">
                     {/* Completed Step */}
                     <div className="flex items-start gap-3 opacity-70">
                       <div className="w-5 h-5 rounded-full bg-status-success flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                       </div>
                       <p className="text-sm text-gray-300 line-through flex-1">
                         {step.stepNumber}. {step.description}
                       </p>
                     </div>
-                    
+
                     {/* AI Guidance for this step */}
                     {aiResponse && aiResponse.content && (
                       <div className="mt-2 ml-8 pl-3 border-l-2 border-green-500/30">
                         <p className="text-xs text-gray-500 mb-1">Answer</p>
-                        <AIMessage content={
-                          // Filter out "Plan Updated:" notices - they're internal model reasoning
-                          aiResponse.content.split('\n\n').filter(para => 
-                            !para.trim().startsWith('📋 Plan Updated:') &&
-                            !para.trim().startsWith('Plan Updated:')
-                          ).join('\n\n')
-                        } />
+                        <AIMessage
+                          content={
+                            // Filter out "Plan Updated:" notices - they're internal model reasoning
+                            aiResponse.content
+                              .split("\n\n")
+                              .filter(
+                                (para) =>
+                                  !para.trim().startsWith("📋 Plan Updated:") &&
+                                  !para.trim().startsWith("Plan Updated:")
+                              )
+                              .join("\n\n")
+                          }
+                        />
                       </div>
                     )}
                   </div>
@@ -146,74 +161,81 @@ export default function WorkflowAccordion({
                     <div className="w-2 h-2 rounded-full bg-[#8B5CF6]"></div>
                   </div>
                   <p className="text-sm font-medium text-white flex-1">
-                    {stepList[currentStepIndex].stepNumber}. {stepList[currentStepIndex].description}
+                    {stepList[currentStepIndex].stepNumber}.{" "}
+                    {stepList[currentStepIndex].description}
                   </p>
                 </div>
-                
+
                 {/* AI Guidance and User Q&A for current step */}
                 {(() => {
                   // Get all interactions for this step
                   const stepInteractions = interactions.filter(
-                    int => int.relatedStepIndex === currentStepIndex
+                    (int) => int.relatedStepIndex === currentStepIndex
                   );
-                  
+
                   // Find initial AI response
                   const initialAiResponse = stepInteractions.find(
-                    int => int.role === "assistant" && int.type === "ai_response"
+                    (int) => int.role === "assistant" && int.type === "ai_response"
                   );
-                  
+
                   // Find user questions
-                  const userQuestions = stepInteractions.filter(
-                    int => int.role === "user"
-                  );
-                  
+                  const userQuestions = stepInteractions.filter((int) => int.role === "user");
+
                   return (
                     <div className="mt-3 space-y-3">
                       {/* Initial AI Guidance */}
                       {initialAiResponse && initialAiResponse.content && (
                         <div className="pl-3 border-l-2 border-[#8B5CF6]/30">
                           <p className="text-xs text-gray-500 mb-1">Answer</p>
-                          <AIMessage content={
-                            // Filter out "Plan Updated:" notices
-                            initialAiResponse.content.split('\n\n').filter(para => 
-                              !para.trim().startsWith('📋 Plan Updated:') &&
-                              !para.trim().startsWith('Plan Updated:')
-                            ).join('\n\n')
-                          } />
+                          <AIMessage
+                            content={
+                              // Filter out "Plan Updated:" notices
+                              initialAiResponse.content
+                                .split("\n\n")
+                                .filter(
+                                  (para) =>
+                                    !para.trim().startsWith("📋 Plan Updated:") &&
+                                    !para.trim().startsWith("Plan Updated:")
+                                )
+                                .join("\n\n")
+                            }
+                          />
                         </div>
                       )}
-                      
+
                       {/* User Questions & Answers inline - only show if questions exist */}
-                      {userQuestions.length > 0 && userQuestions.map((userQ) => {
-                        // Only show if there's actual content
-                        if (!userQ.content || !userQ.content.trim()) {
-                          return null;
-                        }
-                        
-                        const aiAnswer = stepInteractions.find(
-                          int => int.role === "assistant" && 
-                                 int.createdAt > userQ.createdAt &&
-                                 int.type !== "ai_response"
-                        );
-                        
-                        return (
-                          <div key={userQ.id} className="space-y-2">
-                            {/* User Question */}
-                            <div className="pl-3 border-l-2 border-[#8B5CF6]/50">
-                              <p className="text-xs text-gray-500 mb-1">💬 Your Question</p>
-                              <UserMessage content={userQ.content} />
-                            </div>
-                            
-                            {/* AI Answer to question */}
-                            {aiAnswer && aiAnswer.content && (
-                              <div className="pl-3 border-l-2 border-green-500/30">
-                                <p className="text-xs text-gray-500 mb-1">✨ Answer</p>
-                                <AIMessage content={aiAnswer.content} />
+                      {userQuestions.length > 0 &&
+                        userQuestions.map((userQ) => {
+                          // Only show if there's actual content
+                          if (!userQ.content || !userQ.content.trim()) {
+                            return null;
+                          }
+
+                          const aiAnswer = stepInteractions.find(
+                            (int) =>
+                              int.role === "assistant" &&
+                              int.createdAt > userQ.createdAt &&
+                              int.type !== "ai_response"
+                          );
+
+                          return (
+                            <div key={userQ.id} className="space-y-2">
+                              {/* User Question */}
+                              <div className="pl-3 border-l-2 border-[#8B5CF6]/50">
+                                <p className="text-xs text-gray-500 mb-1">💬 Your Question</p>
+                                <UserMessage content={userQ.content} />
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
+
+                              {/* AI Answer to question */}
+                              {aiAnswer && aiAnswer.content && (
+                                <div className="pl-3 border-l-2 border-green-500/30">
+                                  <p className="text-xs text-gray-500 mb-1">✨ Answer</p>
+                                  <AIMessage content={aiAnswer.content} />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                     </div>
                   );
                 })()}
@@ -240,16 +262,21 @@ export default function WorkflowAccordion({
 
           {/* User Q&A is now shown inline with steps above - no need for separate section */}
           <div className="space-y-3">
-            
             {/* Loading indicator for when AI is thinking */}
             {isLoading && (
               <div className="ml-4 border-l-2 border-[#8B5CF6]/30 pl-3">
                 <p className="text-xs text-gray-500 mb-1">Thinking...</p>
                 <div className="flex items-center gap-2 text-gray-400 text-sm">
                   <div className="flex gap-1">
-                    <span className="animate-bounce" style={{ animationDelay: '0ms' }}>●</span>
-                    <span className="animate-bounce" style={{ animationDelay: '150ms' }}>●</span>
-                    <span className="animate-bounce" style={{ animationDelay: '300ms' }}>●</span>
+                    <span className="animate-bounce" style={{ animationDelay: "0ms" }}>
+                      ●
+                    </span>
+                    <span className="animate-bounce" style={{ animationDelay: "150ms" }}>
+                      ●
+                    </span>
+                    <span className="animate-bounce" style={{ animationDelay: "300ms" }}>
+                      ●
+                    </span>
                   </div>
                 </div>
               </div>

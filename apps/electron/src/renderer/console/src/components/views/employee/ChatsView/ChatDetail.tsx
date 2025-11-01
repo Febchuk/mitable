@@ -17,7 +17,7 @@ export default function ChatDetail() {
   const [streamingContent, setStreamingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   // Workflow state - fetched separately from API
   const { workflowData } = useWorkflow(chatId || null);
 
@@ -277,7 +277,7 @@ export default function ChatDetail() {
             // Handle workflow messages - show accordion after first one
             if (message.messageType === "workflow") {
               const isWorkflowStartMessage = message.cardData?.workflowSessionId;
-              
+
               if (isWorkflowStartMessage && workflowData.workflow) {
                 return (
                   <div key={message.id}>
@@ -315,11 +315,12 @@ export default function ChatDetail() {
             }
 
             // Render regular text messages
-            const messageContent = message.role === "user" ? (
-              <UserMessage key={message.id} content={message.content} />
-            ) : (
-              <AIMessage key={message.id} content={message.content} />
-            );
+            const messageContent =
+              message.role === "user" ? (
+                <UserMessage key={message.id} content={message.content} />
+              ) : (
+                <AIMessage key={message.id} content={message.content} />
+              );
 
             return messageContent;
           })}

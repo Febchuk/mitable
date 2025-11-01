@@ -13,7 +13,7 @@ router.get("/conversation/:conversationId/active", async (req, res) => {
     console.log("[WorkflowRoutes] 📥 GET active workflow for conversation:", conversationId);
 
     const activeWorkflow = await workflowService.getActiveWorkflow(conversationId);
-    
+
     if (!activeWorkflow) {
       console.log("[WorkflowRoutes] ❌ No active workflow found");
       return res.json({ workflow: null, interactions: [] });
@@ -40,9 +40,9 @@ router.get("/conversation/:conversationId/active", async (req, res) => {
     });
   } catch (error) {
     console.error("[WorkflowRoutes] ❌ Error fetching active workflow:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to fetch workflow",
-      message: error instanceof Error ? error.message : "Unknown error"
+      message: error instanceof Error ? error.message : "Unknown error",
     });
   }
 });
@@ -61,18 +61,14 @@ router.get("/user/:userId/history", async (req, res) => {
       return res.status(400).json({ error: "organizationId is required" });
     }
 
-    const workflows = await workflowService.getUserWorkflowHistory(
-      userId,
-      organizationId,
-      limit
-    );
+    const workflows = await workflowService.getUserWorkflowHistory(userId, organizationId, limit);
 
     res.json({ workflows });
   } catch (error) {
     console.error("[WorkflowRoutes] Error fetching workflow history:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to fetch workflow history",
-      message: error instanceof Error ? error.message : "Unknown error"
+      message: error instanceof Error ? error.message : "Unknown error",
     });
   }
 });
@@ -93,9 +89,9 @@ router.post("/:workflowId/cancel", async (req, res) => {
     });
   } catch (error) {
     console.error("[WorkflowRoutes] Error cancelling workflow:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to cancel workflow",
-      message: error instanceof Error ? error.message : "Unknown error"
+      message: error instanceof Error ? error.message : "Unknown error",
     });
   }
 });

@@ -12,7 +12,6 @@ import { StartUIGuidanceWorkflowTool } from "../tools/start-ui-guidance-workflow
 import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool.js";
 // REMOVED: RespondTextInWorkflowTool - replaced by smart wrapper utility
 // REMOVED: SearchKnowledgeInWorkflowTool - replaced by smart wrapper utility
-import { workflowService } from "./workflow.service";
 // DEPRECATED: Continuation detector only used in commented-out code (see lines 310-402)
 // import { continuationDetectorService } from "./continuation-detector.service";
 
@@ -160,16 +159,13 @@ When responding:
  * Agent Service
  *
  * The central orchestrator for the agentic chat system.
- * Manages tool registration, routing, and execution using function calling.
- *
- * Model: Groq GPT-OSS 120B (131K context, 500 TPS, ~20x cheaper than GPT-4)
- * API: OpenAI-compatible (seamless migration from OpenAI)
+ * Manages tool registration, routing, and execution using OpenAI function calling.
  *
  * Responsibilities:
- * - Initialize and configure Groq client
+ * - Initialize and configure OpenAI client
  * - Register available tools (text response, knowledge search, expert finder, UI guidance)
- * - Convert conversation history to message format
- * - Call Groq with function calling to let AI choose appropriate tool
+ * - Convert conversation history to OpenAI message format
+ * - Call OpenAI with function calling to let AI choose appropriate tool
  * - Execute chosen tool with parsed arguments
  * - Stream responses back to client
  * - Handle errors and fallbacks
@@ -186,9 +182,9 @@ export class AgentService {
   private tools: Map<string, BaseTool> = new Map();
 
   constructor() {
-    // Initialize Groq client for chat completions
-    this.groq = new Groq({
-      apiKey: config.groq.apiKey,
+    // Initialize OpenAI client
+    this.openai = new OpenAI({
+      apiKey: config.openai.apiKey,
     });
 
     // Initialize Gemini client (for cost-effective text generation)
@@ -235,11 +231,11 @@ export class AgentService {
   }
 
   /**
-   * Convert conversation history to Groq message format (OpenAI-compatible)
+   * Convert conversation history to OpenAI message format
    */
-  private convertToGroqMessages(
+  private convertToOpenAIMessages(
     conversationHistory: Message[]
-  ): Groq.Chat.ChatCompletionMessageParam[] {
+  ): OpenAI.Chat.ChatCompletionMessageParam[] {
     return conversationHistory.map((msg) => {
       if (msg.role === "user") {
         return {
@@ -282,14 +278,8 @@ export class AgentService {
     let lastToolSources: any[] | undefined;
 
     try {
-      // Check for workflow mode entry
-      const shouldEnterWorkflow = workflowService.shouldEnterWorkflowMode(
-        userMessage,
-        context.conversationHistory
-      );
-
-      console.log("[AgentService] Workflow detection:", {
-        shouldEnterWorkflow,
+      // Workflow detection is now handled by orchestrator via metadata
+      console.log("[AgentService] Processing message:", {
         userMessage: userMessage.substring(0, 50),
         hasScreenshot: !!context.screenshot,
       });
@@ -420,9 +410,9 @@ export class AgentService {
 **IMPORTANT TEMPORAL CONTEXT:**
 Today is ${dateStr}. When searching for or discussing information, prioritize recent content from the last few days/weeks over older content. If someone asks "what's the latest" or "this week", focus on the most recent timestamps in the search results.`;
 
-      const messages: Groq.Chat.ChatCompletionMessageParam[] = [
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         { role: "system", content: systemPromptWithDate },
-        ...this.convertToGroqMessages(context.conversationHistory),
+        ...this.convertToOpenAIMessages(context.conversationHistory),
         { role: "user", content: userMessage },
       ];
 
@@ -467,15 +457,6 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
           });
           console.log("[AgentService] Added workflow exit hint to messages");
         }
-      }
-
-      if (shouldEnterWorkflow) {
-        messages.push({
-          role: "system",
-          content:
-            "[INTENT DETECTED] This appears to be a task guidance request based on trigger phrases in the user message. User is asking for step-by-step help completing an action. When screenshot is available, prioritize visual guidance flow: search_knowledge → show_step_by_step_guide.",
-        });
-        console.log("[AgentService] Added workflow intent context to messages");
       }
 
       // Get tool definitions
@@ -694,22 +675,13 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             toolResult.content.toLowerCase().includes("connect you with") ||
             toolResult.content.toLowerCase().includes("couldn't find");
 
-          // Special case: If search_knowledge succeeded in a workflow context with screenshot,
-          // continue the loop to allow show_step_by_step_guide to be called next
-          const shouldContinueForGuidance =
-            functionName === "search_knowledge" &&
-            shouldEnterWorkflow &&
-            context.screenshot &&
-            !isIncompleteResult; // search succeeded
-
           console.log("[AgentService] Completion decision:", {
             isIncompleteResult,
-            shouldContinueForGuidance,
-            willContinueLoop: isIncompleteResult || shouldContinueForGuidance,
+            willContinueLoop: isIncompleteResult,
             contentPreview: toolResult.content.substring(0, 100) + "...",
           });
 
-          if (!isIncompleteResult && !shouldContinueForGuidance) {
+          if (!isIncompleteResult) {
             // Complete result - stream it and finish
             console.log("[AgentService] Streaming final response:", {
               wordCount: toolResult.content.split(" ").length,
@@ -737,18 +709,6 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             };
 
             return; // Exit the loop
-          }
-
-          // If we're continuing for guidance, add a hint to help OpenAI make the right next choice
-          if (shouldContinueForGuidance) {
-            console.log(
-              "[AgentService] Continuing loop for UI guidance after successful knowledge search"
-            );
-            messages.push({
-              role: "system",
-              content:
-                "Knowledge search completed successfully. Now use show_step_by_step_guide with these search results (from the 'sources' field) and the available screenshot to provide visual step-by-step guidance to the user.",
-            });
           }
 
           // Continue loop - AI will decide next action based on tool result

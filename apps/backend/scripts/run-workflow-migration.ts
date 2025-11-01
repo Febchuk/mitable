@@ -13,7 +13,7 @@ dotenv.config();
 
 /**
  * Run Workflow Tables Migration
- * 
+ *
  * Creates workflow_sessions and workflow_interactions tables
  * with proper organization/user/conversation relationships
  */
@@ -23,9 +23,7 @@ async function runMigration() {
   // Validate DATABASE_URL
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error(
-      "DATABASE_URL is not configured. Please set it in your .env file.",
-    );
+    throw new Error("DATABASE_URL is not configured. Please set it in your .env file.");
   }
 
   console.log("✅ Database URL found");
@@ -43,12 +41,7 @@ async function runMigration() {
     console.log("✅ Database connection successful\n");
 
     // Read migration file
-    const migrationPath = path.join(
-      __dirname,
-      "..",
-      "drizzle",
-      "0007_add_workflow_tables.sql",
-    );
+    const migrationPath = path.join(__dirname, "..", "drizzle", "0007_add_workflow_tables.sql");
     console.log(`📄 Reading migration file: ${migrationPath}`);
 
     if (!fs.existsSync(migrationPath)) {
@@ -60,9 +53,9 @@ async function runMigration() {
 
     // Execute migration
     console.log("⚡ Executing migration SQL...\n");
-    console.log("=" .repeat(60));
+    console.log("=".repeat(60));
     console.log(migrationSQL);
-    console.log("=" .repeat(60));
+    console.log("=".repeat(60));
     console.log("");
 
     await pool.query(migrationSQL);
@@ -120,7 +113,6 @@ async function runMigration() {
 
     console.log("🎉 Migration completed successfully!");
     console.log("\n✨ You can now use workflow_sessions and workflow_interactions tables");
-
   } catch (error) {
     console.error("\n❌ Migration failed!");
     if (error instanceof Error) {

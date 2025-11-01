@@ -63,9 +63,9 @@ export function useWorkflow(conversationId: string, shouldPoll: boolean = true) 
         setIsLoading(true);
         const url = `http://localhost:3000/api/workflows/conversation/${conversationId}/active`;
         console.log("[useWorkflow] Fetching workflow from:", url);
-        
+
         const response = await fetch(url);
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch workflow: ${response.status}`);
         }
@@ -73,13 +73,16 @@ export function useWorkflow(conversationId: string, shouldPoll: boolean = true) 
         const data: WorkflowResponse = await response.json();
         console.log("[useWorkflow] Received workflow data:", data);
         setWorkflowData(data);
-        
+
         // Stop polling if workflow is completed or cancelled
-        if (data.workflow && (data.workflow.status === "completed" || data.workflow.status === "cancelled")) {
+        if (
+          data.workflow &&
+          (data.workflow.status === "completed" || data.workflow.status === "cancelled")
+        ) {
           console.log("[useWorkflow] Workflow finished, stopping polling");
           return true; // Signal to stop polling
         }
-        
+
         return false; // Continue polling
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");

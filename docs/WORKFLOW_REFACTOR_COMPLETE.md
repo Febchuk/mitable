@@ -1,11 +1,13 @@
 # Workflow System Refactor - Complete
 
 ## 🎯 Goal
+
 Completely separate UI guidance workflows from regular chat messages, eliminating all the filtering hacks.
 
 ## ✅ What We Built
 
 ### Backend
+
 1. **New API Routes** (`/api/workflows`)
    - `GET /api/workflows/conversation/:conversationId/active` - Get active workflow + interactions
    - `GET /api/workflows/user/:userId/history` - Get user's workflow history
@@ -21,7 +23,8 @@ Completely separate UI guidance workflows from regular chat messages, eliminatin
    - `workflowService.addInteraction()` - Logs Q&A
    - `workflowService.cancelWorkflow()` - Ends workflow
 
-### Frontend  
+### Frontend
+
 1. **New Hook** (`useWorkflow.ts`)
    - Fetches workflow data from API
    - Polls every 2 seconds when workflow is active
@@ -42,6 +45,7 @@ Completely separate UI guidance workflows from regular chat messages, eliminatin
 ## 🔄 Data Flow
 
 ### Before (Hacky):
+
 ```
 User clicks "Continue"
 → Creates message with isWorkflowButton=true
@@ -51,6 +55,7 @@ User clicks "Continue"
 ```
 
 ### After (Clean):
+
 ```
 User clicks "Continue"
 → Sends metadata to backend
@@ -63,6 +68,7 @@ User clicks "Continue"
 ## 📁 Files Changed
 
 ### Backend
+
 - ✅ `apps/backend/src/routes/workflows.ts` - NEW
 - ✅ `apps/backend/src/routes.ts` - Register workflows route
 - ✅ `apps/backend/src/services/workflow.service.ts` - Already created
@@ -70,6 +76,7 @@ User clicks "Continue"
 - ✅ `apps/backend/src/services/orchestrator.service.ts` - Exit handling
 
 ### Frontend
+
 - ✅ `apps/electron/src/renderer/conversation/src/hooks/useWorkflow.ts` - NEW
 - ✅ `apps/electron/src/renderer/conversation/src/components/WorkflowAccordion.tsx` - Rewritten
 - ✅ `apps/electron/src/renderer/conversation/src/App.tsx` - Cleaned up
@@ -114,7 +121,7 @@ User clicks "Continue"
 ✅ Clean Q&A formatting with visual hierarchy  
 ✅ Single "Thinking..." state in accordion  
 ✅ Max height + infinite scroll  
-✅ Graceful exit handling  
+✅ Graceful exit handling
 
 ## 🔧 How It Works
 

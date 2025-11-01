@@ -6,7 +6,6 @@ import type { StreamChunk, ToolContext } from "../tools/base.tool";
 import { ClarifyIntentTool } from "../tools/clarify-intent.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
 import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool";
-import { wrapWithWorkflowState } from "../tools/utils/workflow-wrapper";
 import { workflowService } from "../services/workflow.service";
 
 /**
@@ -106,13 +105,15 @@ export class VisualGuidanceAgent extends BaseAgent {
       // Handle metadata-driven routing (deterministic)
       if (context.metadata?.workflowAction === "confirm_start") {
         // User confirmed workflow start - create workflow session in database
-        console.log("[VisualGuidanceAgent] User confirmed workflow start - creating workflow session");
-        
+        console.log(
+          "[VisualGuidanceAgent] User confirmed workflow start - creating workflow session"
+        );
+
         // Find the last assistant message with _awaitingConfirmation
         const proposalMessage = context.conversationHistory
           .filter((msg) => msg.role === "assistant" && (msg.cardData as any)?._awaitingConfirmation)
           .pop();
-        
+
         const cardData = proposalMessage?.cardData as any;
         if (!cardData?._pendingWorkflow) {
           yield {
@@ -173,7 +174,7 @@ export class VisualGuidanceAgent extends BaseAgent {
       if (context.metadata?.workflowAction === "progress_step") {
         // User clicked "Move on to next step" - progress workflow
         console.log("[VisualGuidanceAgent] User progressing to next step");
-        
+
         // Get active workflow session
         const activeWorkflow = await workflowService.getActiveWorkflow(context.conversationId);
         if (!activeWorkflow) {
@@ -207,8 +208,10 @@ export class VisualGuidanceAgent extends BaseAgent {
 
         // DON'T yield a message - accordion updates via polling
         // Yielding creates duplicate accordion instances
-        console.log("[VisualGuidanceAgent] Step progressed, interaction saved. No message needed - accordion will poll.");
-        
+        console.log(
+          "[VisualGuidanceAgent] Step progressed, interaction saved. No message needed - accordion will poll."
+        );
+
         // Return empty to end the stream without creating a message
         yield {
           type: "complete",
@@ -244,10 +247,10 @@ export class VisualGuidanceAgent extends BaseAgent {
       // Steps should only be modified when AI explicitly detects the workflow needs updating
       if (context.workflowState) {
         console.log("[VisualGuidanceAgent] User asked question during workflow");
-        
+
         // Get active workflow session
         const activeWorkflow = await workflowService.getActiveWorkflow(context.conversationId);
-        
+
         if (activeWorkflow) {
           // Log user question
           await workflowService.addInteraction(
@@ -305,8 +308,10 @@ export class VisualGuidanceAgent extends BaseAgent {
           }
 
           // DON'T yield a message - accordion updates via polling
-          console.log("[VisualGuidanceAgent] Custom question answered, interaction saved. No message needed - accordion will poll.");
-          
+          console.log(
+            "[VisualGuidanceAgent] Custom question answered, interaction saved. No message needed - accordion will poll."
+          );
+
           yield {
             type: "complete",
             content: "", // Empty - no message will be saved
@@ -638,7 +643,8 @@ Generate the complete JSON object now with ALL required fields.`;
       };
 
       const stepCount = aiGeneratedParams.stepList.length;
-      const timeEstimate = stepCount <= 4 ? "~5 minutes" : stepCount <= 8 ? "~15 minutes" : "~30 minutes";
+      const timeEstimate =
+        stepCount <= 4 ? "~5 minutes" : stepCount <= 8 ? "~15 minutes" : "~30 minutes";
 
       const confirmationMessage = `Yes, I can help you with that! ${aiGeneratedParams.solutionExplanation}\n\nThis will take approximately ${timeEstimate} and involves ${stepCount} steps. Would you like me to guide you through it step-by-step?`;
 
