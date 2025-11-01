@@ -155,12 +155,9 @@ export class VisualGuidanceAgent extends BaseAgent {
       if (context.workflowState) {
         const questionType = await this.classifyWorkflowQuestion(lastUserMessage.content);
 
-        console.log(
-          `[VisualGuidanceAgent] Routing workflow question: ${questionType}`,
-          {
-            question: lastUserMessage.content.substring(0, 100),
-          }
-        );
+        console.log(`[VisualGuidanceAgent] Routing workflow question: ${questionType}`, {
+          question: lastUserMessage.content.substring(0, 100),
+        });
 
         if (questionType === "visual") {
           // Visual/UI issue - use analyze_workflow_screen
@@ -732,9 +729,7 @@ Nothing else.`;
     const isVisual = visualPatterns.some((pattern) => pattern.test(message));
 
     if (isVisual) {
-      console.log(
-        `[VisualGuidanceAgent] Workflow question regex fallback: "${message}" → visual`
-      );
+      console.log(`[VisualGuidanceAgent] Workflow question regex fallback: "${message}" → visual`);
       return "visual";
     }
 

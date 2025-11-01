@@ -46,7 +46,15 @@ declare global {
         question: string;
         conversationId: string;
       }) => void;
-      captureScreenshot: () => Promise<{
+      captureScreenshot: (payload?: {
+        message?: string;
+        context?: {
+          hasActiveWorkflow: boolean;
+          lastMessageType?: string;
+          messageCount: number;
+          lastMessageHadCardData?: boolean;
+        };
+      }) => Promise<{
         dataUrl: string;
         metadata: {
           width: number;
@@ -158,7 +166,8 @@ function App() {
         if (!capturedScreenshot) {
           // Build conversation context for heuristics
           const lastMessage = messages[messages.length - 1];
-          const hasActiveWorkflow = lastMessage?.messageType === "workflow" || !!lastMessage?.cardData?.workflowActive;
+          const hasActiveWorkflow =
+            lastMessage?.messageType === "workflow" || !!lastMessage?.cardData?.workflowActive;
 
           const context = {
             hasActiveWorkflow,
@@ -187,7 +196,9 @@ function App() {
                 metadata: result.metadata,
               });
             } else {
-              console.log("[Conversation] No screenshot captured (heuristics determined not needed)");
+              console.log(
+                "[Conversation] No screenshot captured (heuristics determined not needed)"
+              );
             }
           } catch (error) {
             console.error("[Conversation] Screenshot capture failed:", error);

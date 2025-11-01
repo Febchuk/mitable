@@ -80,8 +80,7 @@ Be DIRECT and FACTUAL. Answer the question with facts, then stop. You're a colle
       if (context.workflowState) {
         console.log("[TextResponseAgent] Using workflow context for enhanced response");
 
-        const currentStep =
-          context.workflowState.stepList[context.workflowState.currentStepIndex];
+        const currentStep = context.workflowState.stepList[context.workflowState.currentStepIndex];
 
         // Extract supporting documentation for context (limit to top 5 for token efficiency)
         const supportingContext = context.workflowState.supportingData

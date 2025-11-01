@@ -265,9 +265,7 @@ class CaptureService {
     // HEURISTIC 6: Demonstrative Language
     // ============================================
     // User is referencing "this" or "here" (likely pointing at screen)
-    const demonstrativePatterns = [
-      /\b(this|these|here|that|those)\b/i,
-    ];
+    const demonstrativePatterns = [/\b(this|these|here|that|those)\b/i];
 
     for (const pattern of demonstrativePatterns) {
       if (pattern.test(normalizedMessage)) {
