@@ -156,17 +156,11 @@ ${visualGuidance.confidence === "low" ? "\n\n*Note: I'm having some difficulty a
 
       console.log("[AnalyzeWorkflowScreenTool] Troubleshooting guidance generated");
 
-      // Step 4: Return without progressing workflow
-      // Note: We DON'T update currentStepIndex or step statuses
-      // Return with workflow state preserved so WorkflowOptions remains visible
+      // Step 4: Return troubleshooting response (workflow data is in workflow_sessions table)
+      // ✅ Phase 2A: No cardData needed, accordion polls workflow API for state
       return {
-        messageType: "workflow",
+        messageType: "text",
         content: troubleshootingMessage,
-        cardData: {
-          ...currentSolution,
-          workflowActive: true,
-          workflowPhase: "custom_question", // Triggers Q&A UI mode (hides step list, shows Q&A options)
-        },
         streamable: true,
       };
     } catch (error) {

@@ -7,6 +7,7 @@ export interface Message {
   timestamp: Date;
   messageType?: string;
   cardData?: any;
+  workflowId?: string; // Reference to workflow session
   sources?: any[];
 }
 
@@ -235,4 +236,14 @@ export async function sendStreamingMessage(
     callbacks.onError?.(error instanceof Error ? error.message : "Failed to send message");
     throw error;
   }
+}
+
+/**
+ * Delete a conversation
+ * @param conversationId - The ID of the conversation to delete
+ */
+export async function deleteConversation(conversationId: string): Promise<void> {
+  return apiRequest(`/conversations/${conversationId}`, {
+    method: "DELETE",
+  });
 }

@@ -76,17 +76,6 @@ DO NOT USE:
 
     console.log("[GuideNextStepTool] Progressing workflow in conversation:", conversationId);
 
-    // Validate screenshot is present
-    if (!context.screenshot) {
-      console.error("[GuideNextStepTool] No screenshot provided");
-      return {
-        messageType: "text",
-        content:
-          "I need to see your current screen to guide you to the next step. Please make sure screenshot capture is enabled and try again.",
-        streamable: true,
-      };
-    }
-
     try {
       // Step 1: Retrieve current SolutionObject from conversation
       const currentSolution =
@@ -100,6 +89,46 @@ DO NOT USE:
             "I couldn't find an active workflow in this conversation. Would you like to start a new task guide?",
           streamable: true,
         };
+      }
+
+      // ✅ Phase 2C: Handle missing screenshot with context message
+      if (!context.screenshot) {
+        console.log("[GuideNextStepTool] No screenshot - providing text-based guidance");
+        
+        const nextStepIndex = currentSolution.currentStepIndex + 1;
+        const nextStep = currentSolution.stepList[nextStepIndex];
+        
+        if (!nextStep) {
+          return {
+            messageType: "text",
+            content: "You've completed all the steps! Great work! 🎉",
+            streamable: true,
+          };
+        }
+
+        // Get active workflow to save context message
+        const { workflowService } = await import("../services/workflow.service.js");
+        const activeWorkflow = await workflowService.getActiveWorkflow(conversationId);
+        
+        if (activeWorkflow) {
+          // Save as context message (not tied to specific step)
+          const contextMessage = `I can't see your screen right now, but here's what you need to do next:\n\n**Step ${nextStep.stepNumber}: ${nextStep.description}**\n\nOnce you're on this screen, I'll be able to see it and provide visual guidance!`;
+          
+          await workflowService.addInteraction(
+            activeWorkflow.id,
+            "ai_context_message",
+            "assistant",
+            contextMessage,
+            undefined, // Not tied to a specific step
+            { reason: "no_screenshot" }
+          );
+
+          return {
+            messageType: "text",
+            content: contextMessage,
+            streamable: true,
+          };
+        }
       }
 
       console.log("[GuideNextStepTool] Current workflow state:", {
@@ -124,7 +153,7 @@ DO NOT USE:
       // Step 3: ALWAYS evaluate if plan needs adjustment
       console.log("[GuideNextStepTool] Evaluating if plan needs adjustment...");
       const evaluation = await geminiVisionService.evaluateProgress(
-        context.screenshot,
+        context.screenshot!, // Non-null assertion: screenshot check happened above
         currentSolution,
         context.conversationHistory,
         nextStepIndex
@@ -173,7 +202,7 @@ DO NOT USE:
       });
 
       const visualGuidance = await geminiVisionService.analyzeStepExecution(
-        context.screenshot,
+        context.screenshot!, // Non-null assertion: screenshot check happened above
         updatedSolution,
         nextStep,
         context.conversationHistory
@@ -200,15 +229,11 @@ DO NOT USE:
         adjustmentMade: evaluation.needsAdjustment,
       });
 
-      // Step 8: Return with updated SolutionObject
+      // Step 8: Return AI response (workflow data is in workflow_sessions table)
+      // ✅ Phase 2A: Tool result is saved to workflow_interactions, not messages
       return {
-        messageType: "workflow",
+        messageType: "text",
         content: message,
-        cardData: {
-          ...updatedSolution,
-          workflowActive: true,
-          workflowPhase: "step_progression",
-        },
         streamable: true,
       };
     } catch (error) {

@@ -1,7 +1,4 @@
 import type { Guide, SolutionObject } from "@mitable/shared";
-import { db } from "../db/client.js";
-import { messages } from "../db/schema/index.js";
-import { eq, and, desc } from "drizzle-orm";
 
 /**
  * Guide lookup result
@@ -323,40 +320,6 @@ class GuideGenerationService {
     );
   }
 
-  async storeSolutionObject(
-    conversationId: string,
-    content: string,
-    solutionObject: SolutionObject
-  ): Promise<void> {
-    await db.insert(messages).values({
-      conversationId,
-      role: "assistant",
-      content,
-      messageType: "workflow",
-      cardData: solutionObject as any,
-    });
-
-    console.log("[GuideGenerationService] Stored solution:", {
-      conversationId,
-      steps: solutionObject.stepList.length,
-    });
-  }
-
-  async retrieveSolutionObject(conversationId: string): Promise<SolutionObject | null> {
-    const result = await db
-      .select()
-      .from(messages)
-      .where(and(eq(messages.conversationId, conversationId), eq(messages.messageType, "workflow")))
-      .orderBy(desc(messages.createdAt))
-      .limit(1);
-
-    if (!result[0]?.cardData) {
-      return null;
-    }
-
-    return result[0].cardData as SolutionObject;
-  }
-
   /**
    * Retrieve the latest SolutionObject from a conversation
    * ONLY returns workflow state if there's an ACTIVE workflow session
@@ -389,26 +352,6 @@ class GuideGenerationService {
       currentStepIndex: workflowData.currentStepIndex,
       adjustmentHistory: workflowData.adjustmentHistory || [],
     };
-  }
-
-  async updateSolutionObject(
-    conversationId: string,
-    updatedSolution: SolutionObject,
-    content: string
-  ): Promise<void> {
-    await db.insert(messages).values({
-      conversationId,
-      role: "assistant",
-      content,
-      messageType: "workflow",
-      cardData: updatedSolution as any,
-    });
-
-    console.log("[GuideGenerationService] Updated solution:", {
-      conversationId,
-      currentStep: updatedSolution.currentStepIndex + 1,
-      adjustments: updatedSolution.adjustmentHistory.length,
-    });
   }
 }
 

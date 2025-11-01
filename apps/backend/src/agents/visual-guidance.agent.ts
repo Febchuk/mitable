@@ -157,16 +157,12 @@ export class VisualGuidanceAgent extends BaseAgent {
 
         const confirmMessage = "Perfect! Let's get started with step 1.";
 
+        // ✅ Phase 2A: No longer write workflow to messages table
+        // Workflow data is in workflow_sessions table, accordion polls for it
         yield {
           type: "complete",
-          messageType: "workflow",
+          messageType: "text",
           content: confirmMessage,
-          cardData: {
-            ...solutionObject,
-            workflowSessionId: workflowSession.id, // Include session ID for frontend
-            workflowActive: true,
-            workflowPhase: "step_progression",
-          },
         };
         return;
       }

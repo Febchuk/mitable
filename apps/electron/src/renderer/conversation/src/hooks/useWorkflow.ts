@@ -74,16 +74,17 @@ export function useWorkflow(conversationId: string, shouldPoll: boolean = true) 
         console.log("[useWorkflow] Received workflow data:", data);
         setWorkflowData(data);
 
-        // Stop polling if workflow is completed or cancelled
+        // Only stop polling if workflow is completed or cancelled
+        // Keep polling slowly to detect new workflows
         if (
           data.workflow &&
           (data.workflow.status === "completed" || data.workflow.status === "cancelled")
         ) {
-          console.log("[useWorkflow] Workflow finished, stopping polling");
-          return true; // Signal to stop polling
+          console.log("[useWorkflow] Workflow finished, slowing down polling");
+          return true; // Signal to slow down polling
         }
 
-        return false; // Continue polling
+        return false; // Continue active polling
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
         console.error("[useWorkflow] Error fetching workflow:", err);
@@ -94,20 +95,23 @@ export function useWorkflow(conversationId: string, shouldPoll: boolean = true) 
     };
 
     // Initial fetch
-    fetchWorkflow().then((shouldStop) => {
-      // Only start polling if workflow is active
-      if (!shouldStop) {
-        console.log("[useWorkflow] Starting polling for active workflow");
+    fetchWorkflow().then((shouldSlowDown) => {
+      if (!shouldSlowDown) {
+        // Active workflow - poll every 2 seconds
+        console.log("[useWorkflow] Starting active polling (2s interval)");
         interval = setInterval(async () => {
-          const stop = await fetchWorkflow();
-          if (stop && interval) {
-            console.log("[useWorkflow] Clearing interval");
+          const slowDown = await fetchWorkflow();
+          if (slowDown && interval) {
+            // Slow down to 10 second intervals to detect new workflows
+            console.log("[useWorkflow] Switching to slow polling (10s interval)");
             clearInterval(interval);
-            interval = null;
+            interval = setInterval(fetchWorkflow, 10000);
           }
         }, 2000);
       } else {
-        console.log("[useWorkflow] Workflow already finished, not starting poll");
+        // Finished workflow - poll every 10 seconds to detect new workflows
+        console.log("[useWorkflow] Starting slow polling (10s interval)");
+        interval = setInterval(fetchWorkflow, 10000);
       }
     });
 

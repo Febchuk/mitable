@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowUp, ExternalLink, Camera } from "lucide-react";
-import { useConversationMessages, useSendMessage } from "@/console/src/hooks/queries/chats";
+import { useConversationMessages } from "../../../../hooks/queries/chats/useConversationMessages";
+import { useSendMessage } from "../../../../hooks/queries/chats/useSendMessage";
+import { useWorkflowPolling } from "../../../../../../hooks/useWorkflowPolling";
 import UserMessage from "../../../../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../../../../components/domain/messages/AIMessage";
 import ExpertsCard from "../../../../../../conversation/src/components/ExpertsCard";
 import WorkflowAccordion from "../../../../../../conversation/src/components/WorkflowAccordion";
-import { useWorkflow } from "../../../../../../conversation/src/hooks/useWorkflow";
 import { Button } from "@/components/ui/button";
 
 export default function ChatDetail() {
@@ -18,8 +19,11 @@ export default function ChatDetail() {
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Workflow state - fetched separately from API
-  const { workflowData } = useWorkflow(chatId || null);
+  // Allow empty conversations - user will type first message
+  const displayMessages = messages || [];
+
+  // Use shared workflow polling hook
+  const workflowsData = useWorkflowPolling(displayMessages, chatId || null);
 
   const sendMessageMutation = useSendMessage({
     onChunk: (chunk: string) => {
@@ -42,14 +46,14 @@ export default function ChatDetail() {
 
   // Clear streaming content once new messages load (prevents flicker)
   useEffect(() => {
-    if (!isStreaming && streamingContent && messages && messages.length > 0) {
+    if (!isStreaming && streamingContent && displayMessages && displayMessages.length > 0) {
       // Wait a tiny bit for the UI to render the new message
       const timer = setTimeout(() => {
         setStreamingContent("");
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isStreaming, streamingContent, messages]);
+  }, [isStreaming, streamingContent, displayMessages]);
 
   console.log("[ChatDetail] Component loaded", {
     hasSendMutation: !!sendMessageMutation,
@@ -65,7 +69,7 @@ export default function ChatDetail() {
       const behavior = isStreaming ? "auto" : "smooth";
       messagesEndRef.current.scrollIntoView({ behavior, block: "end" });
     }
-  }, [messages, streamingContent, isStreaming]);
+  }, [displayMessages, streamingContent, isStreaming]);
 
   // Additional scroll trigger specifically for streaming chunks
   useEffect(() => {
@@ -86,21 +90,6 @@ export default function ChatDetail() {
           <span className="text-sm">Back to Chats</span>
         </button>
         <p className="text-text-primary">Loading messages...</p>
-      </div>
-    );
-  }
-
-  if (!messages || messages.length === 0) {
-    return (
-      <div className="p-8">
-        <button
-          onClick={() => navigate("/chats")}
-          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-4"
-        >
-          <ArrowLeft size={16} />
-          <span className="text-sm">Back to Chats</span>
-        </button>
-        <p className="text-text-primary">No messages found</p>
       </div>
     );
   }
@@ -272,39 +261,18 @@ export default function ChatDetail() {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto app-no-drag custom-scrollbar">
         <div className="max-w-4xl mx-auto px-8 py-4 pb-20">
-          {/* Regular Chat Messages */}
-          {messages.map((message) => {
-            // Handle workflow messages - show accordion after first one
+          {/* Render messages in chronological order (workflows are now messages!) */}
+          {displayMessages.map((message: any, index: number) => {
+            // Skip workflow messages - they're just anchors, accordion renders after "Perfect!" message
             if (message.messageType === "workflow") {
-              const isWorkflowStartMessage = message.cardData?.workflowSessionId;
-
-              if (isWorkflowStartMessage && workflowData.workflow) {
-                return (
-                  <div key={message.id}>
-                    <AIMessage content="Perfect! Let's get started with step 1." />
-                    <WorkflowAccordion
-                      key={workflowData.workflow.id}
-                      title={workflowData.workflow.solution}
-                      workflow={workflowData.workflow}
-                      interactions={workflowData.interactions}
-                      onOptionSelect={handleWorkflowOptionSelect}
-                      isLoading={isStreaming}
-                    />
-                  </div>
-                );
-              }
-              // Hide all other workflow messages
               return null;
             }
-
-            // Render experts messages with rich details
+            
+            // Experts messages
             if (message.messageType === "experts" && message.cardData?.experts) {
               return (
                 <div key={message.id} className="space-y-3">
-                  {/* Show AI text response first */}
                   {message.content && <AIMessage content={message.content} />}
-
-                  {/* Show full experts card with profiles */}
                   <ExpertsCard
                     experts={message.cardData.experts}
                     suggestedNudge={message.cardData.suggestedNudge}
@@ -313,20 +281,55 @@ export default function ChatDetail() {
                 </div>
               );
             }
-
-            // Render regular text messages
-            const messageContent =
-              message.role === "user" ? (
-                <UserMessage key={message.id} content={message.content} />
-              ) : (
-                <AIMessage key={message.id} content={message.content} />
-              );
-
-            return messageContent;
+            
+            // Regular text messages
+            const messageElement = message.role === "user" ? (
+              <UserMessage key={message.id} content={message.content} />
+            ) : (
+              <AIMessage key={message.id} content={message.content} />
+            );
+            
+            // Check if we should render workflow accordion after this message
+            // Look for workflow message BEFORE this one and "Perfect!" in this message
+            const shouldRenderWorkflow = 
+              message.role === "assistant" &&
+              (message.content?.includes("Perfect! Let's get started") || 
+               message.content?.includes("Let's get started with step 1"));
+            
+            if (shouldRenderWorkflow) {
+              // Find the workflow message that comes before this
+              const workflowMessage = displayMessages
+                .slice(0, index)
+                .reverse()
+                .find((m: any) => m.messageType === "workflow" && m.workflowId);
+              
+              if (workflowMessage) {
+                const workflowId = workflowMessage.workflowId || workflowMessage.cardData?.workflowId;
+                const workflowData = workflowsData.get(workflowId);
+                
+                if (workflowData) {
+                  return (
+                    <div key={message.id}>
+                      {messageElement}
+                      <WorkflowAccordion
+                        key={`workflow-${workflowId}`}
+                        title={workflowData.workflow.solution}
+                        workflow={workflowData.workflow}
+                        interactions={workflowData.interactions}
+                        onOptionSelect={handleWorkflowOptionSelect}
+                        isLoading={workflowData.workflow.status === "active" && isStreaming}
+                      />
+                    </div>
+                  );
+                }
+              }
+            }
+            
+            return messageElement;
           })}
 
-          {/* Streaming message (hide during workflow - shown in accordion instead) */}
-          {isStreaming && !workflowData.workflow && (
+          {/* Streaming message (hide during ACTIVE workflow - shown in accordion instead) */}
+          {isStreaming && (
             <AIMessage content={streamingContent || "Thinking..."} isStreaming={true} />
           )}
 

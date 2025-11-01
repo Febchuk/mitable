@@ -24,6 +24,7 @@ export const messages = pgTable("messages", {
   content: text("content").notNull(),
   messageType: varchar("message_type", { length: 50 }).default("text"), // 'text' | 'workflow' | 'experts'
   cardData: jsonb("card_data"), // Optional metadata for special message types
+  workflowId: uuid("workflow_id"), // Reference to workflow_sessions (not FK to avoid cascade issues)
   sources: jsonb("sources").default("[]"), // Array of citation objects for RAG
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

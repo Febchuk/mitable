@@ -312,6 +312,7 @@ router.get(
           content: schema.messages.content,
           messageType: schema.messages.messageType,
           cardData: schema.messages.cardData,
+          workflowId: schema.messages.workflowId,
           sources: schema.messages.sources,
           createdAt: schema.messages.createdAt,
         })
@@ -337,6 +338,7 @@ router.get(
           timestamp: msg.createdAt,
           messageType: msg.messageType || undefined,
           cardData: cleanCardData || undefined,
+          workflowId: msg.workflowId || undefined,
           sources: (msg.sources as any[]) || undefined,
           windowTrigger: windowTrigger || undefined,
         };
@@ -841,6 +843,7 @@ router.post(
           content: schema.messages.content,
           messageType: schema.messages.messageType,
           cardData: schema.messages.cardData,
+          workflowId: schema.messages.workflowId,
           sources: schema.messages.sources,
           createdAt: schema.messages.createdAt,
         })
@@ -909,6 +912,7 @@ router.post(
             content: msg.content,
             messageType: msg.messageType || "text",
             cardData: msg.cardData || null,
+            workflowId: msg.workflowId || null,
             sources: (msg.sources as any) || [],
             createdAt: msg.createdAt,
           })),
@@ -1054,5 +1058,88 @@ router.post(
     }
   }
 );
+
+/**
+ * @openapi
+ * /conversations/{id}:
+ *   delete:
+ *     tags:
+ *       - Conversations
+ *     summary: Delete a conversation
+ *     description: Delete a conversation and all associated messages, workflows, and interactions
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Conversation ID
+ *     responses:
+ *       200:
+ *         description: Conversation deleted successfully
+ *       404:
+ *         description: Conversation not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Verify conversation belongs to user
+    const [conversation] = await db
+      .select()
+      .from(schema.conversations)
+      .where(eq(schema.conversations.id, id))
+      .limit(1);
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    if (conversation.userId !== userId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    // Delete in correct order (respecting foreign key constraints)
+    // 1. Delete workflow interactions first
+    const workflowSess = await db
+      .select()
+      .from(schema.workflowSessions)
+      .where(eq(schema.workflowSessions.conversationId, id));
+
+    for (const session of workflowSess) {
+      await db
+        .delete(schema.workflowInteractions)
+        .where(eq(schema.workflowInteractions.workflowSessionId, session.id));
+    }
+
+    // 2. Delete workflow sessions
+    await db
+      .delete(schema.workflowSessions)
+      .where(eq(schema.workflowSessions.conversationId, id));
+
+    // 3. Delete messages
+    await db.delete(schema.messages).where(eq(schema.messages.conversationId, id));
+
+    // 4. Delete conversation
+    await db.delete(schema.conversations).where(eq(schema.conversations.id, id));
+
+    console.log("[Conversations] Deleted conversation:", { conversationId: id, userId });
+
+    res.json({ success: true, message: "Conversation deleted successfully" });
+  } catch (error) {
+    console.error("[Conversations] Error deleting conversation:", error);
+    res.status(500).json({
+      error: "Failed to delete conversation",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
 
 export default router;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useConversations } from "@/console/src/hooks/queries/chats";
-import { Search, Plus } from "lucide-react";
+import { useConversations, useDeleteConversation, useCreateConversation } from "@/console/src/hooks/queries/chats";
+import { Search, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -41,8 +41,40 @@ export default function ChatsView() {
   const limit = 20;
 
   const { data, isLoading, error } = useConversations(page, limit);
+  const deleteMutation = useDeleteConversation();
+  const createConversation = useCreateConversation();
   const chats = data?.conversations || [];
   const pagination = data?.pagination;
+
+  const handleNewChat = async () => {
+    try {
+      // Create empty conversation (no initial message)
+      const result = await createConversation.mutateAsync({
+        title: "New Conversation",
+        contextType: "general",
+        initialMessage: "", // Empty - user will type first message in ChatDetail
+      });
+
+      // Navigate directly to the chat detail page
+      navigate(`/chats/${result.conversation.id}`);
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+      alert("Failed to create new chat. Please try again.");
+    }
+  };
+
+  const handleDelete = async (chatId: string, chatTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent navigation to chat
+
+    if (window.confirm(`Are you sure you want to delete "${chatTitle}"? This action cannot be undone.`)) {
+      try {
+        await deleteMutation.mutateAsync(chatId);
+      } catch (error) {
+        console.error("Failed to delete conversation:", error);
+        alert("Failed to delete conversation. Please try again.");
+      }
+    }
+  };
 
   // Filter chats based on search query
   const filteredChats = chats.filter((chat) =>
@@ -71,11 +103,12 @@ export default function ChatsView() {
       <div className="flex items-center justify-between">
         <h1 className="text-4xl font-bold text-text-primary">Your chat history</h1>
         <Button
-          onClick={() => navigate("/chats/new")}
+          onClick={handleNewChat}
+          disabled={createConversation.isPending}
           className="gap-2 bg-primary text-white hover:bg-primary/90"
         >
           <Plus size={20} />
-          <span>New Chat</span>
+          <span>{createConversation.isPending ? "Creating..." : "New Chat"}</span>
         </Button>
       </div>
 
@@ -99,10 +132,26 @@ export default function ChatsView() {
           <div
             key={chat.id}
             onClick={() => navigate(`/chats/${chat.id}`)}
-            className="bg-background-elevated rounded-lg border border-border-subtle p-6 hover:bg-background-elevated/80 transition-colors cursor-pointer"
+            className="bg-background-elevated rounded-lg border border-border-subtle p-6 hover:bg-background-elevated/80 transition-colors cursor-pointer group relative"
           >
-            <h3 className="text-text-primary text-lg mb-1">{chat.title}</h3>
-            <p className="text-text-secondary text-sm">{formatTimestamp(chat.timestamp)}</p>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-text-primary text-lg mb-1 truncate">{chat.title}</h3>
+                <p className="text-text-secondary text-sm">{formatTimestamp(chat.timestamp)}</p>
+              </div>
+              
+              {/* Delete Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => handleDelete(chat.id, chat.title, e)}
+                disabled={deleteMutation.isPending}
+                className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 hover:text-red-500"
+                title="Delete conversation"
+              >
+                <Trash2 size={16} />
+              </Button>
+            </div>
           </div>
         ))}
       </div>

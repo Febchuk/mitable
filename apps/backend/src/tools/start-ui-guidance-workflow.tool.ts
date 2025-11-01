@@ -375,22 +375,15 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
       allStepsPending: solutionObject.stepList.every((s) => s.status === "pending"),
     });
 
-    // NOTE: We do NOT call storeSolutionObject here because the agent service's
-    // streaming system automatically saves the message to the database with the
-    // cardData (which contains the full SolutionObject). Calling it here would
-    // create duplicate messages.
-    //
-    // The SolutionObject is preserved in cardData and will be retrieved by
-    // guide_next_step tool when user clicks "Yes, let's get started!"
-
+    // ✅ Phase 2A: Return proposal as text with lightweight cardData
+    // Full workflow will be created in workflow_sessions when user confirms
     return {
-      messageType: "workflow",
+      messageType: "text",
       content: previewMessage,
       cardData: {
-        ...solutionObject,
-        workflowActive: true,
-        workflowPhase: "initial_proposal",
-      },
+        _pendingWorkflow: solutionObject,
+        _awaitingConfirmation: true,
+      } as any, // Metadata for workflow proposal, not strict SolutionObject
       streamable: true,
     };
   }

@@ -15,7 +15,6 @@ import NudgeDetail from "./components/views/employee/NudgesView/NudgeDetail";
 import CreateNudge from "./components/views/employee/NudgesView/CreateNudge";
 import ChatsView from "./components/views/employee/ChatsView";
 import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
-import NewChat from "./components/views/employee/ChatsView/NewChat";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
@@ -110,7 +109,6 @@ function App() {
               <Route path="nudges/new" element={<CreateNudge />} />
               <Route path="nudges/:nudgeId" element={<NudgeDetail />} />
               <Route path="chats" element={<ChatsView />} />
-              <Route path="chats/new" element={<NewChat />} />
               <Route path="chats/:chatId" element={<ChatDetail />} />
             </Route>
           </Routes>

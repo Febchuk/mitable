@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, CheckCircle2, Circle } from "lucide-react";
+import { ChevronDown, ChevronUp, CheckCircle2, Circle, XCircle } from "lucide-react";
 import AIMessage from "../../../components/domain/messages/AIMessage";
 import UserMessage from "../../../components/domain/messages/UserMessage";
 import WorkflowOptions from "../../../components/domain/workflow/WorkflowOptions";
@@ -30,7 +30,8 @@ export default function WorkflowAccordion({
   });
 
   const isActive = workflow.status === "active";
-  const isCompleted = workflow.status === "completed" || workflow.status === "cancelled";
+  const isCancelled = workflow.status === "cancelled";
+  const isCompleted = workflow.status === "completed";
   const [isExpanded, setIsExpanded] = useState(false); // Start collapsed to avoid scrolling past long workflows
 
   // Extract data from workflow
@@ -52,8 +53,10 @@ export default function WorkflowAccordion({
 
   // Calculate completion status
   const stepsCompleted = isCompleted ? totalSteps : currentStepIndex;
-  const progress = isCompleted
-    ? `${workflow.status === "completed" ? "Completed" : "Cancelled"} • ${totalSteps}/${totalSteps} steps`
+  const progress = isCancelled
+    ? `Cancelled • ${currentStepIndex}/${totalSteps} steps`
+    : isCompleted
+    ? `Completed • ${totalSteps}/${totalSteps} steps`
     : `In Progress • ${currentStepIndex + 1}/${totalSteps} steps`;
 
   return (
@@ -65,7 +68,9 @@ export default function WorkflowAccordion({
       >
         <div className="flex items-center gap-3">
           {/* Status Icon */}
-          {isCompleted ? (
+          {isCancelled ? (
+            <XCircle size={20} className="text-red-500 flex-shrink-0" />
+          ) : isCompleted ? (
             <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" />
           ) : (
             <Circle size={20} className="text-[#8B5CF6] flex-shrink-0" />
@@ -74,9 +79,7 @@ export default function WorkflowAccordion({
           {/* Title & Progress */}
           <div className="text-left">
             <h3 className="text-base font-semibold text-white">{title}</h3>
-            <p className="text-sm text-gray-400">
-              {isCompleted ? "Completed" : isActive ? "In Progress" : "Paused"} • {progress} steps
-            </p>
+            <p className="text-sm text-gray-400">{progress}</p>
           </div>
         </div>
 
@@ -91,6 +94,26 @@ export default function WorkflowAccordion({
       {/* Accordion Content */}
       {isExpanded && (
         <div className="px-6 py-4 space-y-4 border-t border-[#3A3A45] max-h-[600px] overflow-y-auto custom-scrollbar">
+          {/* AI CONTEXT MESSAGES - General messages not tied to specific steps */}
+          {(() => {
+            const contextMessages = interactions.filter(
+              (int) => int.type === "ai_context_message" && int.relatedStepIndex === null
+            );
+            
+            if (contextMessages.length === 0) return null;
+
+            return (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">💬 AI Messages</p>
+                {contextMessages.map((msg) => (
+                  <div key={msg.id} className="bg-[#2A2A35] rounded-lg p-3 border border-blue-500/30">
+                    <AIMessage content={msg.content || ""} />
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* COMPLETED STEPS - Show journey with AI guidance */}
           {stepsCompleted > 0 && stepList && (
             <div className="space-y-3">
@@ -243,15 +266,23 @@ export default function WorkflowAccordion({
             </div>
           )}
 
-          {/* REMAINING STEPS - Simple list (only show if workflow is active) */}
+          {/* REMAINING/CANCELLED STEPS - Show pending steps */}
           {!isCompleted && currentStepIndex < totalSteps - 1 && stepList && (
             <div className="space-y-2">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Remaining Steps</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
+                {isCancelled ? "Cancelled Steps" : "Remaining Steps"}
+              </p>
               {stepList.slice(currentStepIndex + 1).map((step: WorkflowStep, index) => (
-                <div key={index} className="flex items-start gap-3 opacity-50 pl-3">
-                  <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <div className="w-2 h-2 rounded-full bg-transparent"></div>
-                  </div>
+                <div key={index} className="flex items-start gap-3 pl-3" style={{ opacity: isCancelled ? 0.7 : 0.5 }}>
+                  {isCancelled ? (
+                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <XCircle size={16} className="text-red-500" />
+                    </div>
+                  ) : (
+                    <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <div className="w-2 h-2 rounded-full bg-transparent"></div>
+                    </div>
+                  )}
                   <p className="text-sm text-gray-400">
                     {step.stepNumber}. {step.description}
                   </p>

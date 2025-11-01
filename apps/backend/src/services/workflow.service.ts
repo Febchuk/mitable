@@ -1,5 +1,5 @@
 import { db } from "../db/client";
-import { workflowSessions, workflowInteractions } from "../db/schema/index";
+import { workflowSessions, workflowInteractions, messages } from "../db/schema/index";
 import { eq, and, desc, sql } from "drizzle-orm";
 
 /**
@@ -53,12 +53,13 @@ export interface WorkflowInteraction {
     | "step_progress"
     | "user_question"
     | "ai_response"
+    | "ai_context_message" // ✅ Phase 2C: AI messages not tied to specific steps
     | "step_modified"
     | "workflow_complete"
     | "workflow_cancelled";
   role: "user" | "assistant" | "system";
   content: string | null;
-  relatedStepIndex: number | null;
+  relatedStepIndex: number | null; // NULL for context messages
   metadata: any;
   createdAt: Date;
 }
@@ -125,6 +126,22 @@ class WorkflowService {
         solution: solutionObject.solution,
       });
 
+      // Insert a message into the conversation to anchor the workflow
+      await db.insert(messages).values({
+        conversationId,
+        role: "assistant",
+        content: `Starting workflow: ${solutionObject.solution}`,
+        messageType: "workflow",
+        workflowId: session.id,
+        cardData: {
+          workflowId: session.id,
+          solution: solutionObject.solution,
+          stepCount: solutionObject.stepList?.length || 0,
+        },
+      });
+
+      console.log("[WorkflowService] Workflow message inserted into conversation");
+
       return session as WorkflowSession;
     } catch (error) {
       throw new Error("Failed to create workflow session", { cause: error });
@@ -180,6 +197,26 @@ class WorkflowService {
    */
   async progressStep(sessionId: string, newStepIndex: number): Promise<WorkflowSession> {
     try {
+      // Get current session to check step count
+      const [currentSession] = await db
+        .select()
+        .from(workflowSessions)
+        .where(eq(workflowSessions.id, sessionId))
+        .limit(1);
+
+      if (!currentSession) {
+        throw new Error("Workflow session not found");
+      }
+
+      const totalSteps = (currentSession.workflowData as any)?.stepList?.length || 0;
+
+      // If progressing past the last step, complete the workflow instead
+      if (newStepIndex >= totalSteps) {
+        console.log(`[WorkflowService] Step ${newStepIndex} exceeds total ${totalSteps} - completing workflow`);
+        return await this.completeWorkflow(sessionId);
+      }
+
+      // Normal step progression
       const [session] = await db
         .update(workflowSessions)
         .set({
@@ -301,16 +338,66 @@ class WorkflowService {
   }
 
   /**
+   * Get workflow by ID
+   * 
+   * @param workflowId - Workflow session ID
+   * @returns Workflow session or null
+   */
+  async getWorkflowById(workflowId: string): Promise<WorkflowSession | null> {
+    try {
+      const [session] = await db
+        .select()
+        .from(workflowSessions)
+        .where(eq(workflowSessions.id, workflowId))
+        .limit(1);
+
+      return session ? (session as WorkflowSession) : null;
+    } catch (error) {
+      throw new Error("Failed to get workflow by ID", { cause: error });
+    }
+  }
+
+  /**
    * Get active workflow for a conversation
-   * Now also returns completed/cancelled workflows to show history
+   * Only returns workflows with status="active"
+   * Used by workflow creation logic to check if workflow already exists
    *
    * @param conversationId - Conversation ID
-   * @returns Most recent workflow session or null
+   * @returns Active workflow session or null
    */
   async getActiveWorkflow(conversationId: string): Promise<WorkflowSession | null> {
     try {
-      // Get the most recent workflow (active, completed, or cancelled)
-      // to preserve history in the UI
+      // Get the most recent ACTIVE workflow only
+      // Completed/cancelled workflows won't block new workflow creation
+      const [session] = await db
+        .select()
+        .from(workflowSessions)
+        .where(
+          and(
+            eq(workflowSessions.conversationId, conversationId),
+            eq(workflowSessions.status, "active")
+          )
+        )
+        .orderBy(desc(workflowSessions.createdAt))
+        .limit(1);
+
+      return session ? (session as WorkflowSession) : null;
+    } catch (error) {
+      throw new Error("Failed to get active workflow", { cause: error });
+    }
+  }
+
+  /**
+   * Get most recent workflow for display (any status)
+   * Used for showing workflow history in the UI
+   *
+   * @param conversationId - Conversation ID
+   * @returns Most recent workflow session (any status) or null
+   */
+  async getMostRecentWorkflow(conversationId: string): Promise<WorkflowSession | null> {
+    try {
+      // Get the most recent workflow regardless of status
+      // For UI display purposes (show history)
       const [session] = await db
         .select()
         .from(workflowSessions)
@@ -320,7 +407,28 @@ class WorkflowService {
 
       return session ? (session as WorkflowSession) : null;
     } catch (error) {
-      throw new Error("Failed to get active workflow", { cause: error });
+      throw new Error("Failed to get most recent workflow", { cause: error });
+    }
+  }
+
+  /**
+   * Get all workflows for a conversation (for chat history display)
+   * Returns all workflows regardless of status, ordered by creation time
+   *
+   * @param conversationId - Conversation ID
+   * @returns Array of all workflow sessions
+   */
+  async getAllWorkflowsForConversation(conversationId: string): Promise<WorkflowSession[]> {
+    try {
+      const sessions = await db
+        .select()
+        .from(workflowSessions)
+        .where(eq(workflowSessions.conversationId, conversationId))
+        .orderBy(workflowSessions.createdAt); // Oldest first for chronological display
+
+      return sessions as WorkflowSession[];
+    } catch (error) {
+      throw new Error("Failed to get workflows for conversation", { cause: error });
     }
   }
 

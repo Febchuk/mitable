@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUp, Circle, Square, Type, Mic } from "lucide-react";
+import { ArrowUp, Circle, Square, Type, Mic, ExternalLink, X } from "lucide-react";
 import logoIconSvg from "../../../assets/logo-icon.svg";
 
 interface AgentPillProps {
@@ -10,7 +10,6 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
   const [inputMode, setInputMode] = useState<"text" | "audio">("text");
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
-  const [lastSent, setLastSent] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,6 +119,32 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
           />
         </button>
       </div>
+
+      {/* Conversation Controls (Open in Console + Close) */}
+      <button
+        onClick={() => {
+          console.log("[AgentPill] Opening conversation in console");
+          // Open console AND hide the pill view
+          window.agentAPI.showConsole();
+          window.agentAPI.hideConversation();
+        }}
+        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors mr-2 app-no-drag"
+        aria-label="Open in Console"
+      >
+        <ExternalLink size={14} className="text-white" />
+      </button>
+
+      <button
+        onClick={() => {
+          console.log("[AgentPill] Closing/hiding conversation pill");
+          // Completely hide the pill view
+          window.agentAPI.hideConversation();
+        }}
+        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors mr-3 app-no-drag"
+        aria-label="Close Conversation"
+      >
+        <X size={14} className="text-white" />
+      </button>
 
       {/* Action Button */}
       {inputMode === "text" ? (

@@ -70,8 +70,25 @@ export default function WorkflowOptions({
         ];
 
       case "step_progression":
-        // On last step, don't show "Move on" option
-        const baseOptions = [
+        // On last step, change "Exit" to "Complete" and hide "Move on"
+        if (isLastStep) {
+          return [
+            {
+              id: 2,
+              label: "Type something",
+              action: "custom_question" as const,
+              icon: <MessageSquare size={16} />,
+            },
+            {
+              id: 3,
+              label: "Complete workflow",
+              action: "progress_step" as const,
+              icon: <ChevronRight size={16} />,
+            },
+          ];
+        }
+
+        return [
           {
             id: 1,
             label: "Move on to next step",
@@ -91,11 +108,6 @@ export default function WorkflowOptions({
             icon: <X size={16} />,
           },
         ];
-
-        // Filter out "Move on" button on last step
-        return isLastStep
-          ? baseOptions.filter((opt) => opt.action !== "progress_step")
-          : baseOptions;
 
       case "custom_question":
         return [

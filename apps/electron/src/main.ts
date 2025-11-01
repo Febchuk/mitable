@@ -581,6 +581,10 @@ function setupIPC() {
     if (consoleWindow && !consoleWindow.isDestroyed()) {
       consoleWindow.show();
     }
+    // Hide agent pill when opening console
+    if (agentWindow && !agentWindow.isDestroyed()) {
+      agentWindow.hide();
+    }
   });
 
   // Minimize console window
@@ -970,7 +974,7 @@ function setupIPC() {
     });
   });
 
-  // Screenshot Capture - using enhanced CaptureService with conditional capture
+  // Screenshot Capture - using enhanced CaptureService with conditional capture + targeted app capture
   ipcMain.handle(
     IPC_CHANNELS.CAPTURE_SCREENSHOT,
     async (
@@ -979,15 +983,49 @@ function setupIPC() {
         options?: CaptureOptions;
         message?: string;
         context?: ConversationContext;
+        targetApp?: string; // Optional: specific app to capture (e.g., "Slack")
       }
     ): Promise<Pick<CaptureResult, "dataUrl" | "metadata"> | null> => {
       console.log("[Screenshot] IPC handler called", {
         hasMessage: !!payload?.message,
         hasContext: !!payload?.context,
+        targetApp: payload?.targetApp,
         options: payload?.options,
       });
 
       try {
+        // Try to detect target app from message or payload
+        let targetApp = payload?.targetApp;
+        if (!targetApp && payload?.message) {
+          const detected = captureService.detectAppFromMessage(payload.message);
+          if (detected) {
+            targetApp = detected;
+            console.log("[Screenshot] Auto-detected target app:", targetApp);
+          }
+        }
+
+        // If target app is specified, try to capture that specific window
+        if (targetApp) {
+          console.log("[Screenshot] Attempting targeted app capture:", targetApp);
+          const result = await captureService.captureWindowByApp(targetApp, false);
+
+          if (result) {
+            console.log("[Screenshot] Targeted app capture successful:", {
+              app: targetApp,
+              windowTitle: result.metadata.window?.title,
+              width: result.metadata.width,
+              height: result.metadata.height,
+            });
+
+            return {
+              dataUrl: result.dataUrl,
+              metadata: result.metadata,
+            };
+          } else {
+            console.warn("[Screenshot] Targeted app not found, falling back to heuristics");
+          }
+        }
+
         // If message and context provided, use conditional capture (heuristics)
         if (payload?.message && payload?.context) {
           console.log("[Screenshot] Using conditional capture with heuristics");

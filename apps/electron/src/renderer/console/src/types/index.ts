@@ -49,12 +49,10 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  type?: "text" | "workflow" | "experts";
-  cardData?: {
-    title: string;
-    subtitle: string;
-    iconType: "workflow" | "experts";
-  };
+  messageType?: "text" | "workflow" | "experts";
+  cardData?: any; // Can contain experts data, workflow metadata, etc.
+  workflowId?: string; // Reference to workflow session
+  sources?: any[]; // RAG citation sources
 }
 
 export interface Chat {

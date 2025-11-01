@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Code, ExternalLink, LucideIcon, Users, X } from "lucide-react";
+import { Code, LucideIcon, Users } from "lucide-react";
 import UserMessage from "../../components/domain/messages/UserMessage";
 import AIMessage from "../../components/domain/messages/AIMessage";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { sendMessageStream } from "../../lib/api/conversations";
+import { useWorkflowPolling } from "../../hooks/useWorkflowPolling";
 import CollapsedView from "./components/CollapsedView";
 import ExpertsCard from "./components/ExpertsCard";
 import WorkflowAccordion from "./components/WorkflowAccordion";
-import { useWorkflow } from "./hooks/useWorkflow";
 
 declare global {
   interface Window {
@@ -68,6 +68,7 @@ interface Message {
   type?: "text" | "card";
   messageType?: string;
   cardData?: any;
+  workflowId?: string; // NEW - reference to workflow session
   sources?: any[];
   isWorkflowButton?: boolean; // Hide from UI if true (workflow button selection)
   windowTrigger?: {
@@ -90,28 +91,8 @@ function App() {
   const streamingMessageIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Workflow state - completely separate from messages
-  const { workflowData } = useWorkflow(conversationId || "", !!conversationId);
-
-  // Debug: Log workflow data
-  useEffect(() => {
-    console.log("[App] Workflow data:", {
-      hasWorkflow: !!workflowData.workflow,
-      workflow: workflowData.workflow,
-      interactionCount: workflowData.interactions.length,
-      conversationId,
-    });
-    console.log(
-      "[App] Messages:",
-      messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        messageType: m.messageType,
-        hasCardData: !!m.cardData,
-        workflowSessionId: (m.cardData as any)?.workflowSessionId,
-      }))
-    );
-  }, [workflowData, conversationId, messages]);
+  // Use shared workflow polling hook
+  const workflowsData = useWorkflowPolling(messages, conversationId);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -346,6 +327,7 @@ function App() {
         type: msg.cardData ? ("card" as const) : ("text" as const),
         messageType: msg.messageType,
         cardData: msg.cardData,
+        workflowId: (msg as any).workflowId, // Include workflowId
         sources: msg.sources,
         windowTrigger: msg.windowTrigger,
       }));
@@ -359,12 +341,6 @@ function App() {
 
     // Expand to show the conversation
     window.conversationAPI.setViewState("expanded");
-  };
-
-  const handleClose = () => {
-    console.log("[Conversation] Closing to collapsed state");
-    // Don't clear messages or conversation - just collapse back to combobox
-    window.conversationAPI.setViewState("collapsed");
   };
 
   const handleCardClick = (message: Message) => {
@@ -539,29 +515,6 @@ function App() {
           className="w-full h-full flex items-center justify-center p-4"
         >
           <div className="relative w-full h-[600px] flex flex-col bg-background-secondary rounded-2xl overflow-hidden app-drag">
-            {/* Open in Console Button */}
-            <button
-              onClick={() => {
-                if (conversationId) {
-                  console.log("[Conversation] Opening in console:", conversationId);
-                  window.conversationAPI.openConversationInConsole(conversationId);
-                }
-              }}
-              className="absolute top-4 left-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag"
-              aria-label="Open in Console"
-            >
-              <ExternalLink size={16} className="text-white" />
-            </button>
-
-            {/* Close Button */}
-            <button
-              onClick={handleClose}
-              className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag"
-              aria-label="Close"
-            >
-              <X size={16} className="text-white" />
-            </button>
-
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-6 py-4 pt-16 pb-8 app-no-drag">
               {messages.length === 0 && (
@@ -573,25 +526,19 @@ function App() {
                 </div>
               )}
 
-              {/* Regular Chat Messages */}
-              {messages.map((message) => {
-                // HIDE workflow session messages (accordion handles those)
-                // BUT show workflow proposal messages (awaiting confirmation)
-                if (
-                  message.messageType === "workflow" &&
-                  message.cardData?.workflowSessionId &&
-                  !message.cardData?._awaitingConfirmation
-                ) {
+              {/* Regular Chat Messages + Workflow Accordion (chronological) */}
+              {messages.map((message, index) => {
+                // Skip workflow messages - they're just anchors, accordion renders after "Perfect!" message
+                if (message.messageType === "workflow") {
                   return null;
                 }
 
-                // Render user messages (except workflow button clicks)
+                // Render user messages
                 if (message.role === "user") {
                   return <UserMessage key={message.id} content={message.content} />;
                 }
-
+                
                 // Render AI messages (assistant)
-                // Determine card title/subtitle/icon for non-workflow cards
                 let title = "";
                 let subtitle = "";
                 let Icon: LucideIcon = Code;
@@ -607,7 +554,7 @@ function App() {
                   subtitle = message.cardData.subtitle || "Click to view";
                 }
 
-                return (
+                const messageElement = (
                   <div key={message.id}>
                     <div className="space-y-3">
                       {/* Show AI message content */}
@@ -644,19 +591,43 @@ function App() {
                     </div>
                   </div>
                 );
+                
+                // Check if we should render workflow accordion after this message
+                const shouldRenderWorkflow = 
+                  message.role === "assistant" &&
+                  (message.content?.includes("Perfect! Let's get started") || 
+                   message.content?.includes("Let's get started with step 1"));
+                
+                if (shouldRenderWorkflow) {
+                  // Find the workflow message that comes before this
+                  const workflowMessage = messages
+                    .slice(0, index)
+                    .reverse()
+                    .find((m: any) => m.messageType === "workflow" && m.workflowId);
+                  
+                  if (workflowMessage) {
+                    const workflowId = workflowMessage.workflowId || workflowMessage.cardData?.workflowId;
+                    const workflowData = workflowsData.get(workflowId);
+                    
+                    if (workflowData) {
+                      return (
+                        <div key={message.id}>
+                          {messageElement}
+                          <WorkflowAccordion
+                            key={`workflow-${workflowId}`}
+                            title={workflowData.workflow.solution}
+                            workflow={workflowData.workflow}
+                            interactions={workflowData.interactions}
+                            onOptionSelect={handleWorkflowOptionSelect}
+                          />
+                        </div>
+                      );
+                    }
+                  }
+                }
+                
+                return messageElement;
               })}
-
-              {/* Render accordion AFTER all messages (appears below where user said "yes") */}
-              {workflowData.workflow && (
-                <div key={`workflow-${workflowData.workflow.id}`}>
-                  <WorkflowAccordion
-                    title={workflowData.workflow.solution}
-                    workflow={workflowData.workflow}
-                    interactions={workflowData.interactions}
-                    onOptionSelect={handleWorkflowOptionSelect}
-                  />
-                </div>
-              )}
 
               <div ref={messagesEndRef} />
             </div>

@@ -439,6 +439,178 @@ class CaptureService {
   }
 
   /**
+   * Detect app name from user message or workflow context
+   * E.g., "help me with Slack" → "Slack"
+   *
+   * @param message - User message or workflow description
+   * @returns Detected app name or null
+   */
+  detectAppFromMessage(message: string): string | null {
+    const normalizedMessage = message.toLowerCase();
+
+    // Common app names to detect
+    const appPatterns = [
+      /\b(slack)\b/i,
+      /\b(notion)\b/i,
+      /\b(figma)\b/i,
+      /\b(vscode|visual studio code)\b/i,
+      /\b(chrome|google chrome)\b/i,
+      /\b(firefox)\b/i,
+      /\b(safari)\b/i,
+      /\b(teams|microsoft teams)\b/i,
+      /\b(zoom)\b/i,
+      /\b(discord)\b/i,
+      /\b(outlook)\b/i,
+      /\b(excel)\b/i,
+      /\b(word)\b/i,
+      /\b(powerpoint)\b/i,
+    ];
+
+    for (const pattern of appPatterns) {
+      const match = normalizedMessage.match(pattern);
+      if (match) {
+        // Capitalize first letter
+        const appName = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+        console.log("[CaptureService] Detected app from message:", appName);
+        return appName;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Capture a specific window by app name
+   * Captures even if window is hidden behind others (uses window buffer, not screen)
+   *
+   * @param appName - Application name to capture (e.g., "Slack", "Notion")
+   * @param saveToFile - Whether to save to temp file
+   * @returns Capture result or null if window not found
+   */
+  async captureWindowByApp(appName: string, saveToFile: boolean = false): Promise<CaptureResult | null> {
+    try {
+      console.log("[CaptureService] Looking for window:", appName);
+
+      // Get all window sources
+      const sources = await desktopCapturer.getSources({
+        types: ["window"],
+        thumbnailSize: {
+          width: this.MAX_WIDTH * 2,
+          height: this.MAX_HEIGHT * 2,
+        },
+      });
+
+      // Find window matching the app name (case-insensitive partial match)
+      // Priority: exact app match > browser with app in title > any match
+      const targetName = appName.toLowerCase();
+      
+      // First, try to find exact app match (e.g., "Notion" desktop app)
+      let targetSource = sources.find((source) => {
+        const sourceName = source.name.toLowerCase();
+        // Check if it's the standalone app (not in a browser)
+        return (
+          sourceName.includes(targetName) &&
+          !source.name.includes("Mitable") &&
+          !sourceName.includes("chrome") &&
+          !sourceName.includes("firefox") &&
+          !sourceName.includes("edge") &&
+          !sourceName.includes("safari") &&
+          !sourceName.includes("opera")
+        );
+      });
+      
+      // If no desktop app, look for browser window with app name in tab title
+      if (!targetSource) {
+        targetSource = sources.find((source) => {
+          const sourceName = source.name.toLowerCase();
+          return sourceName.includes(targetName) && !source.name.includes("Mitable");
+        });
+      }
+
+      if (!targetSource) {
+        console.warn(`[CaptureService] No window found for app: ${appName}`);
+        console.log("[CaptureService] Available windows:", sources.map((s) => s.name));
+        
+        // Return null instead of fallback - let AI know the app isn't open
+        // This allows the AI to guide the user to open the app first
+        return null;
+      }
+
+      console.log("[CaptureService] Found target window:", targetSource.name);
+
+      return await this.captureWindowSource(targetSource, saveToFile);
+    } catch (error) {
+      console.error("[CaptureService] Window capture by app failed:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Capture a specific window source (shared logic)
+   *
+   * @param source - Desktop capturer source
+   * @param saveToFile - Whether to save to temp file
+   * @returns Capture result
+   */
+  private async captureWindowSource(
+    source: Electron.DesktopCapturerSource,
+    saveToFile: boolean
+  ): Promise<CaptureResult | null> {
+    try {
+      // Get the thumbnail image
+      let image = source.thumbnail;
+      const originalSize = image.getSize();
+
+      // Resize if needed
+      image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
+      const finalSize = image.getSize();
+
+      // Convert to data URL
+      const dataUrl = image.toDataURL();
+
+      // Extract window metadata
+      const display = screen.getPrimaryDisplay();
+      const scaleFactor = display.scaleFactor;
+      const windowMetadata: WindowMetadata = {
+        title: source.name,
+        bounds: {
+          x: 0,
+          y: 0,
+          width: finalSize.width,
+          height: finalSize.height,
+        },
+        sourceId: source.id,
+        display: this.displayToInfo(display),
+      };
+
+      // Save to temp file if requested
+      let filePath: string | undefined;
+      if (saveToFile) {
+        const fileId = this.generateFileId();
+        filePath = await this.saveToTemp(image, fileId);
+      }
+
+      return {
+        dataUrl,
+        filePath,
+        metadata: {
+          width: finalSize.width,
+          height: finalSize.height,
+          originalWidth: originalSize.width,
+          originalHeight: originalSize.height,
+          scaleFactor: scaleFactor,
+          captureMode: "active-window",
+          timestamp: Date.now(),
+          window: windowMetadata,
+        },
+      };
+    } catch (error) {
+      console.error("[CaptureService] Window source capture failed:", error);
+      return null;
+    }
+  }
+
+  /**
    * Capture the currently active/focused window
    *
    * @param saveToFile - Whether to save to temp file
@@ -472,53 +644,7 @@ class CaptureService {
 
       console.log("[CaptureService] Capturing active window:", targetSource.name);
 
-      // Get the thumbnail image
-      let image = targetSource.thumbnail;
-      const originalSize = image.getSize();
-
-      // Resize if needed
-      image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
-      const finalSize = image.getSize();
-
-      // Convert to data URL
-      const dataUrl = image.toDataURL();
-
-      // Extract window metadata
-      const display = screen.getPrimaryDisplay();
-      const scaleFactor = display.scaleFactor;
-      const windowMetadata: WindowMetadata = {
-        title: targetSource.name,
-        bounds: {
-          x: 0, // Not available from desktopCapturer
-          y: 0,
-          width: finalSize.width,
-          height: finalSize.height,
-        },
-        sourceId: targetSource.id,
-        display: this.displayToInfo(display),
-      };
-
-      // Save to temp file if requested
-      let filePath: string | undefined;
-      if (saveToFile) {
-        const fileId = this.generateFileId();
-        filePath = await this.saveToTemp(image, fileId);
-      }
-
-      return {
-        dataUrl,
-        filePath,
-        metadata: {
-          width: finalSize.width,
-          height: finalSize.height,
-          originalWidth: originalSize.width,
-          originalHeight: originalSize.height,
-          scaleFactor: scaleFactor,
-          captureMode: "active-window",
-          timestamp: Date.now(),
-          window: windowMetadata,
-        },
-      };
+      return await this.captureWindowSource(targetSource, saveToFile);
     } catch (error) {
       console.error("[CaptureService] Active window capture failed:", error);
       return null;

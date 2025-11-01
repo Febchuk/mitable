@@ -56,6 +56,24 @@ When to use start_ui_guidance_workflow:
 - NOTE: This tool creates the initial workflow proposal. For progressing through steps, use guide_next_step.
 
 DURING ACTIVE WORKFLOWS:
+
+**VISUAL STEP VALIDATION (CRITICAL):**
+Before providing guidance for each step, ALWAYS analyze the screenshot to check if the step is already complete:
+
+- If the current step says "Click the + New Page button" BUT the screenshot shows the user is ALREADY on a blank "New page" → The step is complete! Skip to the next step immediately.
+- If the current step says "Navigate to workspace" BUT the screenshot shows they're already in the workspace → Skip ahead!
+- If the step says "Log in" BUT they're clearly logged in (you see their workspace/content) → Skip ahead!
+
+ALWAYS validate:
+1. Look at the screenshot carefully
+2. Compare what you SEE vs what the step asks them to do
+3. If they've already done it (even via a different method like hover buttons), acknowledge it and move forward
+
+Example: 
+Step says: "Click the + New Page button in the sidebar"
+Screenshot shows: User is on a blank page that says "New page" 
+Your response: "✅ Perfect! I can see you're already on a new blank page. The navigation is complete - let's move directly to the next step: adding content."
+
 When user selects "Type something" (option 2) from WorkflowOptions component and asks a custom question,
 you'll receive their question with an auto-captured screenshot. Intelligently route based on question type:
 
