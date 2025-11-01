@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 
 /**
  * Migration: Unify step field names (stepDescription → description)
- * 
+ *
  * This script updates existing workflow_data JSONB to use consistent 'description' field
  * Run with: npx tsx scripts/run-step-field-migration.ts
  */
@@ -25,7 +25,7 @@ async function runMigration() {
     `);
 
     const recordsToUpdate = Number(checkResult.rows[0]?.count || 0);
-    
+
     console.log(`📊 Found ${recordsToUpdate} workflow sessions with 'stepDescription' field`);
 
     if (recordsToUpdate === 0) {

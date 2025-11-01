@@ -99,7 +99,7 @@ export function useSendMessage(options?: SendMessageOptions) {
         id: `temp-user-${Date.now()}`,
         role: "user",
         content,
-        type: "text",
+        messageType: "text",
         timestamp: new Date(),
       };
 

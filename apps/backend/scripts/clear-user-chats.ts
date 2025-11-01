@@ -1,5 +1,11 @@
 import { db } from "../src/db/client";
-import { users, conversations, messages, workflowSessions, workflowInteractions } from "../src/db/schema/index";
+import {
+  users,
+  conversations,
+  messages,
+  workflowSessions,
+  workflowInteractions,
+} from "../src/db/schema/index";
 import { eq, and } from "drizzle-orm";
 
 /**
@@ -14,11 +20,7 @@ async function clearUserChats() {
 
   try {
     // Step 1: Find the user
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, USER_EMAIL))
-      .limit(1);
+    const [user] = await db.select().from(users).where(eq(users.email, USER_EMAIL)).limit(1);
 
     if (!user) {
       console.log(`❌ User not found: ${USER_EMAIL}`);

@@ -487,7 +487,10 @@ class CaptureService {
    * @param saveToFile - Whether to save to temp file
    * @returns Capture result or null if window not found
    */
-  async captureWindowByApp(appName: string, saveToFile: boolean = false): Promise<CaptureResult | null> {
+  async captureWindowByApp(
+    appName: string,
+    saveToFile: boolean = false
+  ): Promise<CaptureResult | null> {
     try {
       console.log("[CaptureService] Looking for window:", appName);
 
@@ -503,7 +506,7 @@ class CaptureService {
       // Find window matching the app name (case-insensitive partial match)
       // Priority: exact app match > browser with app in title > any match
       const targetName = appName.toLowerCase();
-      
+
       // First, try to find exact app match (e.g., "Notion" desktop app)
       let targetSource = sources.find((source) => {
         const sourceName = source.name.toLowerCase();
@@ -518,7 +521,7 @@ class CaptureService {
           !sourceName.includes("opera")
         );
       });
-      
+
       // If no desktop app, look for browser window with app name in tab title
       if (!targetSource) {
         targetSource = sources.find((source) => {
@@ -529,8 +532,11 @@ class CaptureService {
 
       if (!targetSource) {
         console.warn(`[CaptureService] No window found for app: ${appName}`);
-        console.log("[CaptureService] Available windows:", sources.map((s) => s.name));
-        
+        console.log(
+          "[CaptureService] Available windows:",
+          sources.map((s) => s.name)
+        );
+
         // Return null instead of fallback - let AI know the app isn't open
         // This allows the AI to guide the user to open the app first
         return null;

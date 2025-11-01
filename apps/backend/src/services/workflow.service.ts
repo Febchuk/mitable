@@ -212,7 +212,9 @@ class WorkflowService {
 
       // If progressing past the last step, complete the workflow instead
       if (newStepIndex >= totalSteps) {
-        console.log(`[WorkflowService] Step ${newStepIndex} exceeds total ${totalSteps} - completing workflow`);
+        console.log(
+          `[WorkflowService] Step ${newStepIndex} exceeds total ${totalSteps} - completing workflow`
+        );
         return await this.completeWorkflow(sessionId);
       }
 
@@ -339,7 +341,7 @@ class WorkflowService {
 
   /**
    * Get workflow by ID
-   * 
+   *
    * @param workflowId - Workflow session ID
    * @returns Workflow session or null
    */

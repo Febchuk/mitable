@@ -10,11 +10,11 @@ const router = Router();
 router.get("/batch", async (req, res) => {
   try {
     const idsParam = req.query.ids as string;
-    
+
     if (!idsParam) {
       return res.status(400).json({ error: "ids parameter is required" });
     }
-    
+
     const workflowIds = idsParam.split(",").map((id) => id.trim());
     console.log("[WorkflowRoutes] 📥 GET batch workflows:", workflowIds);
 
@@ -37,8 +37,10 @@ router.get("/batch", async (req, res) => {
 
     // Filter out nulls (workflows that weren't found)
     const workflows = results.filter((result) => result !== null);
-    
-    console.log(`[WorkflowRoutes] ✅ Fetched ${workflows.length} of ${workflowIds.length} workflows`);
+
+    console.log(
+      `[WorkflowRoutes] ✅ Fetched ${workflows.length} of ${workflowIds.length} workflows`
+    );
 
     res.json({ workflows });
   } catch (error) {
@@ -91,7 +93,7 @@ router.get("/conversation/:conversationId/all", async (req, res) => {
     console.log("[WorkflowRoutes] 📥 GET all workflows for conversation:", conversationId);
 
     const workflows = await workflowService.getAllWorkflowsForConversation(conversationId);
-    
+
     console.log(`[WorkflowRoutes] ✅ Found ${workflows.length} workflows`);
 
     // Get interactions for each workflow

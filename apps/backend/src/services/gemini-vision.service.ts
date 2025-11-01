@@ -415,23 +415,26 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
 
     try {
       const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
-      
+
       // Extract target application from workflow context
       const combinedText = `${solutionObject.solution} ${solutionObject.searchQuery}`.toLowerCase();
-      let targetApp = 'unknown';
-      
+      let targetApp = "unknown";
+
       // Detect target application
-      if (combinedText.includes('slack')) targetApp = 'Slack';
-      else if (combinedText.includes('notion')) targetApp = 'Notion';
-      else if (combinedText.includes('jira') || combinedText.includes('atlassian')) targetApp = 'Jira';
-      else if (combinedText.includes('figma')) targetApp = 'Figma';
-      else if (combinedText.includes('github')) targetApp = 'GitHub';
-      else if (combinedText.includes('vscode') || combinedText.includes('visual studio code')) targetApp = 'VS Code';
-      else if (combinedText.includes('chrome') || combinedText.includes('browser')) targetApp = 'web browser';
-      else if (combinedText.includes('excel')) targetApp = 'Excel';
-      else if (combinedText.includes('word')) targetApp = 'Word';
-      else if (combinedText.includes('outlook')) targetApp = 'Outlook';
-      
+      if (combinedText.includes("slack")) targetApp = "Slack";
+      else if (combinedText.includes("notion")) targetApp = "Notion";
+      else if (combinedText.includes("jira") || combinedText.includes("atlassian"))
+        targetApp = "Jira";
+      else if (combinedText.includes("figma")) targetApp = "Figma";
+      else if (combinedText.includes("github")) targetApp = "GitHub";
+      else if (combinedText.includes("vscode") || combinedText.includes("visual studio code"))
+        targetApp = "VS Code";
+      else if (combinedText.includes("chrome") || combinedText.includes("browser"))
+        targetApp = "web browser";
+      else if (combinedText.includes("excel")) targetApp = "Excel";
+      else if (combinedText.includes("word")) targetApp = "Word";
+      else if (combinedText.includes("outlook")) targetApp = "Outlook";
+
       console.log("[GeminiVision] Detected target app for context:", targetApp);
 
       const prompt = `You are helping a user complete this specific action:

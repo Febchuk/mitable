@@ -1120,9 +1120,7 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
     }
 
     // 2. Delete workflow sessions
-    await db
-      .delete(schema.workflowSessions)
-      .where(eq(schema.workflowSessions.conversationId, id));
+    await db.delete(schema.workflowSessions).where(eq(schema.workflowSessions.conversationId, id));
 
     // 3. Delete messages
     await db.delete(schema.messages).where(eq(schema.messages.conversationId, id));

@@ -24,7 +24,7 @@ export default function ChatDetail() {
 
   // Use shared workflow polling hook
   const workflowsData = useWorkflowPolling(displayMessages, chatId || null);
-  
+
   // Check if there's an active workflow
   const hasActiveWorkflow = Array.from(workflowsData.values()).some(
     (data) => data.workflow.status === "active"
@@ -196,30 +196,33 @@ export default function ChatDetail() {
           const activeWorkflow = Array.from(workflowsData.values()).find(
             (data) => data.workflow.status === "active"
           );
-          
+
           // Extract target app from workflow solution text
           let targetApp: string | undefined;
           if (activeWorkflow) {
             const solution = activeWorkflow.workflow.solution.toLowerCase();
-            const searchQuery = activeWorkflow.workflow.searchQuery?.toLowerCase() || '';
+            const searchQuery = activeWorkflow.workflow.searchQuery?.toLowerCase() || "";
             const combinedText = `${solution} ${searchQuery}`;
-            
+
             // Detect common apps (order matters - most specific first)
-            if (combinedText.includes('slack')) targetApp = 'Slack';
-            else if (combinedText.includes('notion')) targetApp = 'Notion';
-            else if (combinedText.includes('jira') || combinedText.includes('atlassian')) targetApp = 'Jira';
-            else if (combinedText.includes('figma')) targetApp = 'Figma';
-            else if (combinedText.includes('github')) targetApp = 'GitHub';
-            else if (combinedText.includes('vscode') || combinedText.includes('visual studio code')) targetApp = 'Code';
-            else if (combinedText.includes('chrome') || combinedText.includes('browser')) targetApp = 'Chrome';
-            else if (combinedText.includes('excel')) targetApp = 'Excel';
-            else if (combinedText.includes('word')) targetApp = 'Word';
-            else if (combinedText.includes('outlook')) targetApp = 'Outlook';
-            
+            if (combinedText.includes("slack")) targetApp = "Slack";
+            else if (combinedText.includes("notion")) targetApp = "Notion";
+            else if (combinedText.includes("jira") || combinedText.includes("atlassian"))
+              targetApp = "Jira";
+            else if (combinedText.includes("figma")) targetApp = "Figma";
+            else if (combinedText.includes("github")) targetApp = "GitHub";
+            else if (combinedText.includes("vscode") || combinedText.includes("visual studio code"))
+              targetApp = "Code";
+            else if (combinedText.includes("chrome") || combinedText.includes("browser"))
+              targetApp = "Chrome";
+            else if (combinedText.includes("excel")) targetApp = "Excel";
+            else if (combinedText.includes("word")) targetApp = "Word";
+            else if (combinedText.includes("outlook")) targetApp = "Outlook";
+
             console.log("[ChatDetail] Context-aware capture - detected target app:", targetApp);
             console.log("[ChatDetail] From workflow:", { solution, searchQuery });
           }
-          
+
           console.log("[ChatDetail] Capturing screenshot for workflow action...", { targetApp });
           // Pass targetApp to captureScreenshot for workflow-aware window capture
           screenshot = await window.consoleAPI.captureScreenshot(targetApp);
@@ -301,7 +304,7 @@ export default function ChatDetail() {
             if (message.messageType === "workflow") {
               return null;
             }
-            
+
             // Experts messages
             if (message.messageType === "experts" && message.cardData?.experts) {
               return (
@@ -315,32 +318,34 @@ export default function ChatDetail() {
                 </div>
               );
             }
-            
+
             // Regular text messages
-            const messageElement = message.role === "user" ? (
-              <UserMessage key={message.id} content={message.content} />
-            ) : (
-              <AIMessage key={message.id} content={message.content} />
-            );
-            
+            const messageElement =
+              message.role === "user" ? (
+                <UserMessage key={message.id} content={message.content} />
+              ) : (
+                <AIMessage key={message.id} content={message.content} />
+              );
+
             // Check if we should render workflow accordion after this message
             // Look for workflow message BEFORE this one and "Perfect!" in this message
-            const shouldRenderWorkflow = 
+            const shouldRenderWorkflow =
               message.role === "assistant" &&
-              (message.content?.includes("Perfect! Let's get started") || 
-               message.content?.includes("Let's get started with step 1"));
-            
+              (message.content?.includes("Perfect! Let's get started") ||
+                message.content?.includes("Let's get started with step 1"));
+
             if (shouldRenderWorkflow) {
               // Find the workflow message that comes before this
               const workflowMessage = displayMessages
                 .slice(0, index)
                 .reverse()
                 .find((m: any) => m.messageType === "workflow" && m.workflowId);
-              
+
               if (workflowMessage) {
-                const workflowId = workflowMessage.workflowId || workflowMessage.cardData?.workflowId;
+                const workflowId =
+                  workflowMessage.workflowId || workflowMessage.cardData?.workflowId;
                 const workflowData = workflowsData.get(workflowId);
-                
+
                 if (workflowData) {
                   return (
                     <div key={message.id}>
@@ -358,7 +363,7 @@ export default function ChatDetail() {
                 }
               }
             }
-            
+
             return messageElement;
           })}
 
@@ -379,7 +384,11 @@ export default function ChatDetail() {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={hasActiveWorkflow ? "Use the chat input in the workflow above..." : "Type your message..."}
+              placeholder={
+                hasActiveWorkflow
+                  ? "Use the chat input in the workflow above..."
+                  : "Type your message..."
+              }
               disabled={hasActiveWorkflow}
               className="w-full bg-[#1A1A1A] text-text-primary placeholder-text-tertiary px-lg py-md pr-16 rounded-full border-none outline-none focus:ring-2 focus:ring-primary/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             />

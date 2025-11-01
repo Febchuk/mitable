@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useConversations, useDeleteConversation, useCreateConversation } from "@/console/src/hooks/queries/chats";
+import {
+  useConversations,
+  useDeleteConversation,
+  useCreateConversation,
+} from "@/console/src/hooks/queries/chats";
 import { Search, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +70,11 @@ export default function ChatsView() {
   const handleDelete = async (chatId: string, chatTitle: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent navigation to chat
 
-    if (window.confirm(`Are you sure you want to delete "${chatTitle}"? This action cannot be undone.`)) {
+    if (
+      window.confirm(
+        `Are you sure you want to delete "${chatTitle}"? This action cannot be undone.`
+      )
+    ) {
       try {
         await deleteMutation.mutateAsync(chatId);
       } catch (error) {
@@ -139,7 +147,7 @@ export default function ChatsView() {
                 <h3 className="text-text-primary text-lg mb-1 truncate">{chat.title}</h3>
                 <p className="text-text-secondary text-sm">{formatTimestamp(chat.timestamp)}</p>
               </div>
-              
+
               {/* Delete Button */}
               <Button
                 variant="ghost"

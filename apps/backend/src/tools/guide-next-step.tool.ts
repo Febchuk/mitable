@@ -94,10 +94,10 @@ DO NOT USE:
       // ✅ Phase 2C: Handle missing screenshot with context message
       if (!context.screenshot) {
         console.log("[GuideNextStepTool] No screenshot - providing text-based guidance");
-        
+
         const nextStepIndex = currentSolution.currentStepIndex + 1;
         const nextStep = currentSolution.stepList[nextStepIndex];
-        
+
         if (!nextStep) {
           return {
             messageType: "text",
@@ -109,11 +109,11 @@ DO NOT USE:
         // Get active workflow to save context message
         const { workflowService } = await import("../services/workflow.service.js");
         const activeWorkflow = await workflowService.getActiveWorkflow(conversationId);
-        
+
         if (activeWorkflow) {
           // Save as context message (not tied to specific step)
           const contextMessage = `I can't see your screen right now, but here's what you need to do next:\n\n**Step ${nextStep.stepNumber}: ${nextStep.description}**\n\nOnce you're on this screen, I'll be able to see it and provide visual guidance!`;
-          
+
           await workflowService.addInteraction(
             activeWorkflow.id,
             "ai_context_message",

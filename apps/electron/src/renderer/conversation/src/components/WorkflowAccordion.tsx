@@ -30,11 +30,11 @@ export default function WorkflowAccordion({
   const isCancelled = workflow.status === "cancelled";
   const isCompleted = workflow.status === "completed";
   const [isExpanded, setIsExpanded] = useState(false); // Start collapsed to avoid scrolling past long workflows
-  
+
   // Chat input state
   const [chatInput, setChatInput] = useState("");
   const chatInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Track which step conversations are expanded (Map of stepIndex -> boolean)
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
 
@@ -60,22 +60,22 @@ export default function WorkflowAccordion({
   const progress = isCancelled
     ? `Cancelled • ${currentStepIndex}/${totalSteps} steps`
     : isCompleted
-    ? `Completed • ${totalSteps}/${totalSteps} steps`
-    : `In Progress • ${currentStepIndex + 1}/${totalSteps} steps`;
-  
+      ? `Completed • ${totalSteps}/${totalSteps} steps`
+      : `In Progress • ${currentStepIndex + 1}/${totalSteps} steps`;
+
   // Check if we're on pre-flight step (step 0)
   const isPreFlight = currentStepIndex === 0 && stepList[0]?.description?.includes("Pre-flight");
-  
+
   // Handle chat input submission
   const handleChatSubmit = () => {
     if (!chatInput.trim()) return;
-    
+
     onOptionSelect({
       id: 2,
       label: chatInput,
       action: "custom_question",
     });
-    
+
     setChatInput("");
   };
 
@@ -119,14 +119,17 @@ export default function WorkflowAccordion({
             const contextMessages = interactions.filter(
               (int) => int.type === "ai_context_message" && int.relatedStepIndex === null
             );
-            
+
             if (contextMessages.length === 0) return null;
 
             return (
               <div className="space-y-2">
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">💬 AI Messages</p>
                 {contextMessages.map((msg) => (
-                  <div key={msg.id} className="bg-[#2A2A35] rounded-lg p-3 border border-blue-500/30">
+                  <div
+                    key={msg.id}
+                    className="bg-[#2A2A35] rounded-lg p-3 border border-blue-500/30"
+                  >
                     <p className="text-sm text-gray-300 leading-relaxed">{msg.content || ""}</p>
                   </div>
                 ))}
@@ -151,14 +154,15 @@ export default function WorkflowAccordion({
 
                 // Find user questions
                 const userQuestions = stepInteractions.filter((int) => int.role === "user");
-                const hasConversation = (aiResponse && aiResponse.content) || userQuestions.length > 0;
+                const hasConversation =
+                  (aiResponse && aiResponse.content) || userQuestions.length > 0;
 
                 // Check if this step's conversation is expanded
                 const isConversationExpanded = expandedSteps.has(index);
-                
+
                 // Toggle function for this step
                 const toggleExpanded = () => {
-                  setExpandedSteps(prev => {
+                  setExpandedSteps((prev) => {
                     const newSet = new Set(prev);
                     if (newSet.has(index)) {
                       newSet.delete(index);
@@ -191,14 +195,16 @@ export default function WorkflowAccordion({
                       <p className="text-sm text-gray-300 line-through flex-1">
                         {step.stepNumber}. {step.description}
                       </p>
-                      
+
                       {/* Toggle conversation button */}
                       {hasConversation && (
                         <button
                           onClick={toggleExpanded}
                           className="text-xs text-gray-400 hover:text-gray-300 transition-colors"
                         >
-                          {isConversationExpanded ? "Hide" : `Show (${userQuestions.length > 0 ? userQuestions.length + ' Q' : 'details'})`}
+                          {isConversationExpanded
+                            ? "Hide"
+                            : `Show (${userQuestions.length > 0 ? userQuestions.length + " Q" : "details"})`}
                         </button>
                       )}
                     </div>
@@ -233,7 +239,10 @@ export default function WorkflowAccordion({
                             );
 
                             return (
-                              <div key={userQ.id} className="space-y-1 pt-2 border-t border-gray-700/30">
+                              <div
+                                key={userQ.id}
+                                className="space-y-1 pt-2 border-t border-gray-700/30"
+                              >
                                 {/* User Question - Simple */}
                                 <p className="text-xs text-blue-300">
                                   <span className="opacity-60">Q:</span> {userQ.content}
@@ -319,7 +328,10 @@ export default function WorkflowAccordion({
                           );
 
                           return (
-                            <div key={userQ.id} className="space-y-1 pt-2 border-t border-gray-600/30">
+                            <div
+                              key={userQ.id}
+                              className="space-y-1 pt-2 border-t border-gray-600/30"
+                            >
                               {/* User Question - Simple */}
                               <p className="text-sm text-blue-300">
                                 <span className="opacity-60">Q:</span> {userQ.content}
@@ -348,7 +360,11 @@ export default function WorkflowAccordion({
                 {isCancelled ? "Cancelled Steps" : "Remaining Steps"}
               </p>
               {stepList.slice(currentStepIndex + 1).map((step: WorkflowStep, index) => (
-                <div key={index} className="flex items-start gap-3 pl-3" style={{ opacity: isCancelled ? 0.7 : 0.5 }}>
+                <div
+                  key={index}
+                  className="flex items-start gap-3 pl-3"
+                  style={{ opacity: isCancelled ? 0.7 : 0.5 }}
+                >
                   {isCancelled ? (
                     <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 mt-0.5">
                       <XCircle size={16} className="text-red-500" />
@@ -416,13 +432,15 @@ export default function WorkflowAccordion({
                   Send
                 </button>
               </div>
-              
+
               {/* Workflow action buttons */}
               <div className="flex justify-center gap-2">
                 {isPreFlight ? (
                   /* Pre-flight buttons: Continue only */
                   <button
-                    onClick={() => onOptionSelect({ id: 1, label: "Continue", action: "progress_step" })}
+                    onClick={() =>
+                      onOptionSelect({ id: 1, label: "Continue", action: "progress_step" })
+                    }
                     className="px-5 py-2.5 bg-[#8B5CF6] text-white rounded-[18px] text-sm font-medium hover:bg-[#8B5CF6]/90 transition-all hover:scale-105"
                   >
                     ✓ Ready, Continue
@@ -431,7 +449,13 @@ export default function WorkflowAccordion({
                   /* Last step buttons */
                   <>
                     <button
-                      onClick={() => onOptionSelect({ id: 3, label: "Complete workflow", action: "progress_step" })}
+                      onClick={() =>
+                        onOptionSelect({
+                          id: 3,
+                          label: "Complete workflow",
+                          action: "progress_step",
+                        })
+                      }
                       className="px-5 py-2.5 bg-green-600 text-white rounded-[18px] text-sm font-medium hover:bg-green-600/90 transition-all hover:scale-105"
                     >
                       ✓ Complete Workflow
@@ -441,13 +465,25 @@ export default function WorkflowAccordion({
                   /* Regular step buttons */
                   <>
                     <button
-                      onClick={() => onOptionSelect({ id: 1, label: "Move on to next step", action: "progress_step" })}
+                      onClick={() =>
+                        onOptionSelect({
+                          id: 1,
+                          label: "Move on to next step",
+                          action: "progress_step",
+                        })
+                      }
                       className="px-5 py-2.5 bg-[#8B5CF6] text-white rounded-[18px] text-sm font-medium hover:bg-[#8B5CF6]/90 transition-all hover:scale-105"
                     >
                       → Next Step
                     </button>
                     <button
-                      onClick={() => onOptionSelect({ id: 3, label: "Exit task workflow", action: "exit_workflow" })}
+                      onClick={() =>
+                        onOptionSelect({
+                          id: 3,
+                          label: "Exit task workflow",
+                          action: "exit_workflow",
+                        })
+                      }
                       className="px-5 py-2.5 bg-[#3A3A45] text-white rounded-[18px] text-sm font-medium hover:bg-[#4A4A55] transition-all hover:scale-105"
                     >
                       ✕ Exit

@@ -537,7 +537,7 @@ function App() {
                 if (message.role === "user") {
                   return <UserMessage key={message.id} content={message.content} />;
                 }
-                
+
                 // Render AI messages (assistant)
                 let title = "";
                 let subtitle = "";
@@ -591,24 +591,25 @@ function App() {
                     </div>
                   </div>
                 );
-                
+
                 // Check if we should render workflow accordion after this message
-                const shouldRenderWorkflow = 
+                const shouldRenderWorkflow =
                   message.role === "assistant" &&
-                  (message.content?.includes("Perfect! Let's get started") || 
-                   message.content?.includes("Let's get started with step 1"));
-                
+                  (message.content?.includes("Perfect! Let's get started") ||
+                    message.content?.includes("Let's get started with step 1"));
+
                 if (shouldRenderWorkflow) {
                   // Find the workflow message that comes before this
                   const workflowMessage = messages
                     .slice(0, index)
                     .reverse()
                     .find((m: any) => m.messageType === "workflow" && m.workflowId);
-                  
+
                   if (workflowMessage) {
-                    const workflowId = workflowMessage.workflowId || workflowMessage.cardData?.workflowId;
+                    const workflowId =
+                      workflowMessage.workflowId || workflowMessage.cardData?.workflowId;
                     const workflowData = workflowsData.get(workflowId);
-                    
+
                     if (workflowData) {
                       return (
                         <div key={message.id}>
@@ -625,7 +626,7 @@ function App() {
                     }
                   }
                 }
-                
+
                 return messageElement;
               })}
 
