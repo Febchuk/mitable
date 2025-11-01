@@ -5,8 +5,8 @@ interface ConsoleAPI {
   requestHelp: (data: unknown) => void;
   onHelpResponse: (callback: (data: unknown) => void) => void;
 
-  // Screenshot capture
-  captureScreenshot: () => Promise<string | null>;
+  // Screenshot capture - accepts optional targetApp for workflow-aware capture
+  captureScreenshot: (targetApp?: string) => Promise<string | null>;
 
   // Guide system
   startGuide: (data: unknown) => void;

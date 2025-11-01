@@ -118,6 +118,12 @@ export class OrchestratorService {
         return;
       }
 
+      if (context.metadata?.workflowAction === "custom_question") {
+        console.log("[Orchestrator] Routing: metadata → VisualGuidanceAgent (custom_question)");
+        yield* this.visualGuidanceAgent.execute(context);
+        return;
+      }
+
       if (context.metadata?.workflowAction === "exit_workflow") {
         console.log("[Orchestrator] User exiting workflow - cancelling session");
 

@@ -24,6 +24,11 @@ export default function ChatDetail() {
 
   // Use shared workflow polling hook
   const workflowsData = useWorkflowPolling(displayMessages, chatId || null);
+  
+  // Check if there's an active workflow
+  const hasActiveWorkflow = Array.from(workflowsData.values()).some(
+    (data) => data.workflow.status === "active"
+  );
 
   const sendMessageMutation = useSendMessage({
     onChunk: (chunk: string) => {
@@ -187,9 +192,38 @@ export default function ChatDetail() {
     if (["progress_step", "custom_question", "confirm_start"].includes(action)) {
       if (window.consoleAPI?.captureScreenshot) {
         try {
-          console.log("[ChatDetail] Capturing screenshot for workflow action...");
-          screenshot = await window.consoleAPI.captureScreenshot();
-          console.log("[ChatDetail] Screenshot captured:", !!screenshot);
+          // Get active workflow to extract target app for context-aware capture
+          const activeWorkflow = Array.from(workflowsData.values()).find(
+            (data) => data.workflow.status === "active"
+          );
+          
+          // Extract target app from workflow solution text
+          let targetApp: string | undefined;
+          if (activeWorkflow) {
+            const solution = activeWorkflow.workflow.solution.toLowerCase();
+            const searchQuery = activeWorkflow.workflow.searchQuery?.toLowerCase() || '';
+            const combinedText = `${solution} ${searchQuery}`;
+            
+            // Detect common apps (order matters - most specific first)
+            if (combinedText.includes('slack')) targetApp = 'Slack';
+            else if (combinedText.includes('notion')) targetApp = 'Notion';
+            else if (combinedText.includes('jira') || combinedText.includes('atlassian')) targetApp = 'Jira';
+            else if (combinedText.includes('figma')) targetApp = 'Figma';
+            else if (combinedText.includes('github')) targetApp = 'GitHub';
+            else if (combinedText.includes('vscode') || combinedText.includes('visual studio code')) targetApp = 'Code';
+            else if (combinedText.includes('chrome') || combinedText.includes('browser')) targetApp = 'Chrome';
+            else if (combinedText.includes('excel')) targetApp = 'Excel';
+            else if (combinedText.includes('word')) targetApp = 'Word';
+            else if (combinedText.includes('outlook')) targetApp = 'Outlook';
+            
+            console.log("[ChatDetail] Context-aware capture - detected target app:", targetApp);
+            console.log("[ChatDetail] From workflow:", { solution, searchQuery });
+          }
+          
+          console.log("[ChatDetail] Capturing screenshot for workflow action...", { targetApp });
+          // Pass targetApp to captureScreenshot for workflow-aware window capture
+          screenshot = await window.consoleAPI.captureScreenshot(targetApp);
+          console.log("[ChatDetail] Screenshot captured:", { success: !!screenshot, targetApp });
         } catch (error) {
           console.error("[ChatDetail] Screenshot capture failed:", error);
         }
@@ -345,12 +379,13 @@ export default function ChatDetail() {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Type your message..."
-              className="w-full bg-[#1A1A1A] text-text-primary placeholder-text-tertiary px-lg py-md pr-16 rounded-full border-none outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              placeholder={hasActiveWorkflow ? "Use the chat input in the workflow above..." : "Type your message..."}
+              disabled={hasActiveWorkflow}
+              className="w-full bg-[#1A1A1A] text-text-primary placeholder-text-tertiary px-lg py-md pr-16 rounded-full border-none outline-none focus:ring-2 focus:ring-primary/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
               type="submit"
-              disabled={!inputValue.trim()}
+              disabled={!inputValue.trim() || hasActiveWorkflow}
               className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-primary hover:bg-primary-hover disabled:bg-primary/50 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-colors"
               aria-label="Send message"
             >

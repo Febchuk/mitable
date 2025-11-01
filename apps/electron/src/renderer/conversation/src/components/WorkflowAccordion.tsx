@@ -1,8 +1,5 @@
-import { useState } from "react";
-import { ChevronDown, ChevronUp, CheckCircle2, Circle, XCircle } from "lucide-react";
-import AIMessage from "../../../components/domain/messages/AIMessage";
-import UserMessage from "../../../components/domain/messages/UserMessage";
-import WorkflowOptions from "../../../components/domain/workflow/WorkflowOptions";
+import { useState, useRef } from "react";
+import { ChevronDown, ChevronUp, CheckCircle2, Circle, XCircle, Send } from "lucide-react";
 import type { WorkflowData, WorkflowInteraction, WorkflowStep } from "../hooks/useWorkflow";
 
 interface WorkflowAccordionProps {
@@ -33,6 +30,13 @@ export default function WorkflowAccordion({
   const isCancelled = workflow.status === "cancelled";
   const isCompleted = workflow.status === "completed";
   const [isExpanded, setIsExpanded] = useState(false); // Start collapsed to avoid scrolling past long workflows
+  
+  // Chat input state
+  const [chatInput, setChatInput] = useState("");
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  
+  // Track which step conversations are expanded (Map of stepIndex -> boolean)
+  const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
 
   // Extract data from workflow
   const currentStepIndex = workflow.currentStepIndex;
@@ -58,6 +62,22 @@ export default function WorkflowAccordion({
     : isCompleted
     ? `Completed • ${totalSteps}/${totalSteps} steps`
     : `In Progress • ${currentStepIndex + 1}/${totalSteps} steps`;
+  
+  // Check if we're on pre-flight step (step 0)
+  const isPreFlight = currentStepIndex === 0 && stepList[0]?.description?.includes("Pre-flight");
+  
+  // Handle chat input submission
+  const handleChatSubmit = () => {
+    if (!chatInput.trim()) return;
+    
+    onOptionSelect({
+      id: 2,
+      label: chatInput,
+      action: "custom_question",
+    });
+    
+    setChatInput("");
+  };
 
   return (
     <div className="my-4 border border-[#3A3A45] rounded-2xl overflow-hidden bg-[#2A2A35]">
@@ -107,22 +127,47 @@ export default function WorkflowAccordion({
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">💬 AI Messages</p>
                 {contextMessages.map((msg) => (
                   <div key={msg.id} className="bg-[#2A2A35] rounded-lg p-3 border border-blue-500/30">
-                    <AIMessage content={msg.content || ""} />
+                    <p className="text-sm text-gray-300 leading-relaxed">{msg.content || ""}</p>
                   </div>
                 ))}
               </div>
             );
           })()}
 
-          {/* COMPLETED STEPS - Show journey with AI guidance */}
+          {/* COMPLETED STEPS - Show journey with AI guidance AND user Q&A */}
           {stepsCompleted > 0 && stepList && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Completed Steps</p>
               {stepList.slice(0, stepsCompleted).map((step: WorkflowStep, index) => {
-                // Find AI response for this step
-                const aiResponse = interactions.find(
-                  (int) => int.role === "assistant" && int.relatedStepIndex === index
+                // Get ALL interactions for this completed step
+                const stepInteractions = interactions.filter(
+                  (int) => int.relatedStepIndex === index
                 );
+
+                // Find initial AI response
+                const aiResponse = stepInteractions.find(
+                  (int) => int.role === "assistant" && int.type === "ai_response"
+                );
+
+                // Find user questions
+                const userQuestions = stepInteractions.filter((int) => int.role === "user");
+                const hasConversation = (aiResponse && aiResponse.content) || userQuestions.length > 0;
+
+                // Check if this step's conversation is expanded
+                const isConversationExpanded = expandedSteps.has(index);
+                
+                // Toggle function for this step
+                const toggleExpanded = () => {
+                  setExpandedSteps(prev => {
+                    const newSet = new Set(prev);
+                    if (newSet.has(index)) {
+                      newSet.delete(index);
+                    } else {
+                      newSet.add(index);
+                    }
+                    return newSet;
+                  });
+                };
 
                 return (
                   <div key={index} className="bg-[#2A2A35] rounded-lg p-3 border border-[#3A3A45]">
@@ -146,25 +191,63 @@ export default function WorkflowAccordion({
                       <p className="text-sm text-gray-300 line-through flex-1">
                         {step.stepNumber}. {step.description}
                       </p>
+                      
+                      {/* Toggle conversation button */}
+                      {hasConversation && (
+                        <button
+                          onClick={toggleExpanded}
+                          className="text-xs text-gray-400 hover:text-gray-300 transition-colors"
+                        >
+                          {isConversationExpanded ? "Hide" : `Show (${userQuestions.length > 0 ? userQuestions.length + ' Q' : 'details'})`}
+                        </button>
+                      )}
                     </div>
 
-                    {/* AI Guidance for this step */}
-                    {aiResponse && aiResponse.content && (
-                      <div className="mt-2 ml-8 pl-3 border-l-2 border-green-500/30">
-                        <p className="text-xs text-gray-500 mb-1">Answer</p>
-                        <AIMessage
-                          content={
-                            // Filter out "Plan Updated:" notices - they're internal model reasoning
-                            aiResponse.content
+                    {/* Collapsible Conversation history for this step */}
+                    {hasConversation && isConversationExpanded && (
+                      <div className="mt-2 ml-8 space-y-1.5">
+                        {/* Initial AI Guidance */}
+                        {aiResponse && aiResponse.content && (
+                          <div className="text-xs text-gray-400 leading-relaxed">
+                            {aiResponse.content
                               .split("\n\n")
                               .filter(
                                 (para) =>
                                   !para.trim().startsWith("📋 Plan Updated:") &&
                                   !para.trim().startsWith("Plan Updated:")
                               )
-                              .join("\n\n")
-                          }
-                        />
+                              .join("\n\n")}
+                          </div>
+                        )}
+
+                        {/* User Questions & Answers - Simple text */}
+                        {userQuestions.length > 0 &&
+                          userQuestions.map((userQ) => {
+                            if (!userQ.content || !userQ.content.trim()) return null;
+
+                            const aiAnswer = stepInteractions.find(
+                              (int) =>
+                                int.role === "assistant" &&
+                                int.createdAt > userQ.createdAt &&
+                                int.type !== "ai_response"
+                            );
+
+                            return (
+                              <div key={userQ.id} className="space-y-1 pt-2 border-t border-gray-700/30">
+                                {/* User Question - Simple */}
+                                <p className="text-xs text-blue-300">
+                                  <span className="opacity-60">Q:</span> {userQ.content}
+                                </p>
+
+                                {/* AI Answer - Simple */}
+                                {aiAnswer && aiAnswer.content && (
+                                  <p className="text-xs text-gray-400">
+                                    <span className="opacity-60">A:</span> {aiAnswer.content}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
                       </div>
                     )}
                   </div>
@@ -205,28 +288,22 @@ export default function WorkflowAccordion({
                   const userQuestions = stepInteractions.filter((int) => int.role === "user");
 
                   return (
-                    <div className="mt-3 space-y-3">
-                      {/* Initial AI Guidance */}
+                    <div className="mt-3 space-y-1.5">
+                      {/* Initial AI Guidance - Simple text */}
                       {initialAiResponse && initialAiResponse.content && (
-                        <div className="pl-3 border-l-2 border-[#8B5CF6]/30">
-                          <p className="text-xs text-gray-500 mb-1">Answer</p>
-                          <AIMessage
-                            content={
-                              // Filter out "Plan Updated:" notices
-                              initialAiResponse.content
-                                .split("\n\n")
-                                .filter(
-                                  (para) =>
-                                    !para.trim().startsWith("📋 Plan Updated:") &&
-                                    !para.trim().startsWith("Plan Updated:")
-                                )
-                                .join("\n\n")
-                            }
-                          />
+                        <div className="text-sm text-gray-300 leading-relaxed">
+                          {initialAiResponse.content
+                            .split("\n\n")
+                            .filter(
+                              (para) =>
+                                !para.trim().startsWith("📋 Plan Updated:") &&
+                                !para.trim().startsWith("Plan Updated:")
+                            )
+                            .join("\n\n")}
                         </div>
                       )}
 
-                      {/* User Questions & Answers inline - only show if questions exist */}
+                      {/* User Questions & Answers - Simple text */}
                       {userQuestions.length > 0 &&
                         userQuestions.map((userQ) => {
                           // Only show if there's actual content
@@ -242,19 +319,17 @@ export default function WorkflowAccordion({
                           );
 
                           return (
-                            <div key={userQ.id} className="space-y-2">
-                              {/* User Question */}
-                              <div className="pl-3 border-l-2 border-[#8B5CF6]/50">
-                                <p className="text-xs text-gray-500 mb-1">💬 Your Question</p>
-                                <UserMessage content={userQ.content} />
-                              </div>
+                            <div key={userQ.id} className="space-y-1 pt-2 border-t border-gray-600/30">
+                              {/* User Question - Simple */}
+                              <p className="text-sm text-blue-300">
+                                <span className="opacity-60">Q:</span> {userQ.content}
+                              </p>
 
-                              {/* AI Answer to question */}
+                              {/* AI Answer - Simple */}
                               {aiAnswer && aiAnswer.content && (
-                                <div className="pl-3 border-l-2 border-green-500/30">
-                                  <p className="text-xs text-gray-500 mb-1">✨ Answer</p>
-                                  <AIMessage content={aiAnswer.content} />
-                                </div>
+                                <p className="text-sm text-gray-300">
+                                  <span className="opacity-60">A:</span> {aiAnswer.content}
+                                </p>
                               )}
                             </div>
                           );
@@ -314,13 +389,73 @@ export default function WorkflowAccordion({
             )}
           </div>
 
-          {/* Workflow Options (only if active) */}
+          {/* Always-visible chat input (only if active) */}
           {isActive && (
-            <WorkflowOptions
-              phase="step_progression"
-              onOptionSelect={onOptionSelect}
-              isLastStep={currentStepIndex === totalSteps - 1}
-            />
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <input
+                  ref={chatInputRef}
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleChatSubmit();
+                    }
+                  }}
+                  placeholder="Type your message..."
+                  className="flex-1 px-3 py-2 bg-[#1A1A22] border border-[#3A3A45] rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]"
+                />
+                <button
+                  onClick={handleChatSubmit}
+                  disabled={!chatInput.trim()}
+                  className="px-4 py-2 bg-[#8B5CF6] text-white rounded-lg text-sm font-medium hover:bg-[#8B5CF6]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <Send size={16} />
+                  Send
+                </button>
+              </div>
+              
+              {/* Workflow action buttons */}
+              <div className="flex justify-center gap-2">
+                {isPreFlight ? (
+                  /* Pre-flight buttons: Continue only */
+                  <button
+                    onClick={() => onOptionSelect({ id: 1, label: "Continue", action: "progress_step" })}
+                    className="px-5 py-2.5 bg-[#8B5CF6] text-white rounded-[18px] text-sm font-medium hover:bg-[#8B5CF6]/90 transition-all hover:scale-105"
+                  >
+                    ✓ Ready, Continue
+                  </button>
+                ) : currentStepIndex === totalSteps - 1 ? (
+                  /* Last step buttons */
+                  <>
+                    <button
+                      onClick={() => onOptionSelect({ id: 3, label: "Complete workflow", action: "progress_step" })}
+                      className="px-5 py-2.5 bg-green-600 text-white rounded-[18px] text-sm font-medium hover:bg-green-600/90 transition-all hover:scale-105"
+                    >
+                      ✓ Complete Workflow
+                    </button>
+                  </>
+                ) : (
+                  /* Regular step buttons */
+                  <>
+                    <button
+                      onClick={() => onOptionSelect({ id: 1, label: "Move on to next step", action: "progress_step" })}
+                      className="px-5 py-2.5 bg-[#8B5CF6] text-white rounded-[18px] text-sm font-medium hover:bg-[#8B5CF6]/90 transition-all hover:scale-105"
+                    >
+                      → Next Step
+                    </button>
+                    <button
+                      onClick={() => onOptionSelect({ id: 3, label: "Exit task workflow", action: "exit_workflow" })}
+                      className="px-5 py-2.5 bg-[#3A3A45] text-white rounded-[18px] text-sm font-medium hover:bg-[#4A4A55] transition-all hover:scale-105"
+                    >
+                      ✕ Exit
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}

@@ -57,6 +57,20 @@ export class TextResponseAgent extends BaseAgent {
 
       // Use Gemini Flash for cost-effective generation
       const model = this.gemini.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+      
+      // Check if there's an active workflow and save user question
+      const { workflowService } = await import("../services/workflow.service.js");
+      const activeWorkflow = await workflowService.getActiveWorkflow(context.conversationId);
+      
+      if (activeWorkflow && lastUserMessage) {
+        await workflowService.addInteraction(
+          activeWorkflow.id,
+          "user_question",
+          "user",
+          lastUserMessage.content,
+          activeWorkflow.currentStepIndex
+        );
+      }
 
       // Simple system context
       const systemPrompt = `You are an experienced employee assistant helping new hires ramp up quickly at their company.
@@ -76,6 +90,17 @@ Be DIRECT and FACTUAL. Answer the question with facts, then stop. You're a colle
       const result = await model.generateContent(prompt);
       const response = result.response;
       const text = response.text();
+      
+      // Save AI response to workflow interactions
+      if (activeWorkflow) {
+        await workflowService.addInteraction(
+          activeWorkflow.id,
+          "ai_response",
+          "assistant",
+          text,
+          activeWorkflow.currentStepIndex
+        );
+      }
 
       // Create base message
       const baseMessage: TextMessage = {

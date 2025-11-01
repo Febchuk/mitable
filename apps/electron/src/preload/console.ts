@@ -28,16 +28,19 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     );
   },
 
-  // Screenshot capture
-  captureScreenshot: async (): Promise<string | null> => {
-    console.log("[Preload] captureScreenshot() called from renderer");
-    const result = await ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
+  // Screenshot capture - supports optional targetApp for workflow-aware capture
+  captureScreenshot: async (targetApp?: string): Promise<string | null> => {
+    console.log("[Preload] captureScreenshot() called from renderer", { targetApp });
+    const result = await ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT, {
+      targetApp,
+    });
 
     // IPC handler returns { dataUrl, metadata } - extract just the dataUrl
     if (result && typeof result === "object" && "dataUrl" in result) {
       console.log("[Preload] Screenshot captured successfully:", {
         dataUrlLength: result.dataUrl?.length || 0,
         hasMetadata: !!result.metadata,
+        targetApp,
       });
       return result.dataUrl;
     }

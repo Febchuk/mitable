@@ -415,8 +415,33 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
 
     try {
       const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
+      
+      // Extract target application from workflow context
+      const combinedText = `${solutionObject.solution} ${solutionObject.searchQuery}`.toLowerCase();
+      let targetApp = 'unknown';
+      
+      // Detect target application
+      if (combinedText.includes('slack')) targetApp = 'Slack';
+      else if (combinedText.includes('notion')) targetApp = 'Notion';
+      else if (combinedText.includes('jira') || combinedText.includes('atlassian')) targetApp = 'Jira';
+      else if (combinedText.includes('figma')) targetApp = 'Figma';
+      else if (combinedText.includes('github')) targetApp = 'GitHub';
+      else if (combinedText.includes('vscode') || combinedText.includes('visual studio code')) targetApp = 'VS Code';
+      else if (combinedText.includes('chrome') || combinedText.includes('browser')) targetApp = 'web browser';
+      else if (combinedText.includes('excel')) targetApp = 'Excel';
+      else if (combinedText.includes('word')) targetApp = 'Word';
+      else if (combinedText.includes('outlook')) targetApp = 'Outlook';
+      
+      console.log("[GeminiVision] Detected target app for context:", targetApp);
 
       const prompt = `You are helping a user complete this specific action:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 TARGET APPLICATION: ${targetApp}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CRITICAL: The screenshot should show ${targetApp}. If you see ${targetApp} in the screenshot, analyze it.
+If you DON'T see ${targetApp} (e.g., you see Mitable, a code editor, or wrong app), tell the user to switch to ${targetApp}.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CURRENT STEP (your focus):
@@ -424,7 +449,7 @@ CURRENT STEP (your focus):
 
 Step ${currentStep.stepNumber}: "${currentStep.description}"
 
-Your job: Look at the screenshot and tell the user EXACTLY which UI element to click/interact with to complete this action.
+Your job: Look at the screenshot of ${targetApp} and tell the user EXACTLY which UI element to click/interact with to complete this action.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 COMPLETE WORKFLOW CONTEXT:

@@ -399,10 +399,35 @@ DETAILED INSTRUCTIONS FOR EACH FIELD
    This is the CORE of your synthesis.
 
    Each step MUST have:
-   - stepNumber (number): Sequential starting from 1
+   - stepNumber (number): Sequential starting from 0 (Step 0 is ALWAYS pre-flight)
    - description (string): Clear, actionable instruction
    - status (string): Always "pending" initially
 
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ⚠️ CRITICAL: STEP 0 IS MANDATORY (PRE-FLIGHT CHECK)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   
+   **ALWAYS start with Step 0** as a pre-flight check to verify the target application.
+   
+   Step 0 Template (adapt based on detected app):
+   
+   If app is mentioned in search results or user query:
+   {"stepNumber": 0, "description": "Pre-flight: Let me verify I can see [App Name]. Please make sure [App Name] is open (desktop app or browser tab active).", "status": "pending"}
+   
+   Examples:
+   - Slack workflow: "Pre-flight: Let me verify I can see Slack. Please make sure Slack is open (desktop app or browser tab active)."
+   - Notion workflow: "Pre-flight: Let me verify I can see Notion. Please make sure Notion is open in your browser."
+   - Code editor workflow: "Pre-flight: Let me verify I can see your code editor. Please make sure VSCode or your IDE is open."
+   
+   If no specific app mentioned:
+   {"stepNumber": 0, "description": "Pre-flight: Let me verify I can see your screen. Please make sure the relevant application for this task is open and visible.", "status": "pending"}
+   
+   **WHY Step 0 matters:**
+   - Ensures I can actually see the app before giving guidance
+   - Allows user to open the app if it's not running
+   - Prevents confusion from guidance that doesn't match their screen
+   - Creates a natural checkpoint before starting the actual work
+   
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    ADAPTIVE COMPLEXITY: Analyze task complexity and adjust accordingly
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -423,6 +448,7 @@ DETAILED INSTRUCTIONS FOR EACH FIELD
 
    Example JSON:
    [
+     {"stepNumber": 0, "description": "Pre-flight: Let me verify I can see Workday. Please make sure Workday is open in your browser.", "status": "pending"},
      {"stepNumber": 1, "description": "Open Workday", "status": "pending"},
      {"stepNumber": 2, "description": "Click Time > Enter Time", "status": "pending"},
      {"stepNumber": 3, "description": "Fill in hours and submit", "status": "pending"}
@@ -446,6 +472,7 @@ DETAILED INSTRUCTIONS FOR EACH FIELD
 
    Example JSON:
    [
+     {"stepNumber": 0, "description": "Pre-flight: Let me verify I can see Slack. Please make sure Slack is open (desktop app or browser tab active).", "status": "pending"},
      {"stepNumber": 1, "description": "Open the #product-team channel in Slack", "status": "pending"},
      {"stepNumber": 2, "description": "Click on the roadmap canvas at the top of the channel", "status": "pending"},
      {"stepNumber": 3, "description": "Make your changes directly in the canvas", "status": "pending"},
@@ -472,6 +499,7 @@ DETAILED INSTRUCTIONS FOR EACH FIELD
 
    Example JSON:
    [
+     {"stepNumber": 0, "description": "Pre-flight: Let me verify I can see your code editor. Please make sure VSCode or your IDE is open with the project loaded.", "status": "pending"},
      {"stepNumber": 1, "description": "Open your code editor and navigate to the UserProfile component (UserProfile.tsx)", "status": "pending"},
      {"stepNumber": 2, "description": "Find the ipcRenderer.send call that fetches user data (look for 'fetch-user-data' channel)", "status": "pending"},
      {"stepNumber": 3, "description": "Open the main process code and locate the IPC handler for 'fetch-user-data'", "status": "pending"},
