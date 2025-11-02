@@ -9,3 +9,4 @@ export * from "./roadmap-templates.schema";
 export * from "./user-roadmaps.schema";
 export * from "./analytics.schema";
 export * from "./search-content.schema";
+export * from "./workflows.schema"
