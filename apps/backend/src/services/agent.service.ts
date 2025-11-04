@@ -1,4 +1,5 @@
-import OpenAI from "openai";
+// import OpenAI from "openai"; // Unused - embeddings handled by separate service
+import Groq from "groq-sdk";
 // import { GoogleGenerativeAI } from "@google/generative-ai"; // Unused - commented out
 import { config } from "../config";
 import type { Message } from "../db/schema/conversations.schema";
@@ -160,13 +161,16 @@ When responding:
  * Agent Service
  *
  * The central orchestrator for the agentic chat system.
- * Manages tool registration, routing, and execution using OpenAI function calling.
+ * Manages tool registration, routing, and execution using function calling.
+ *
+ * Model: Groq GPT-OSS 120B (131K context, 500 TPS, ~20x cheaper than GPT-4)
+ * API: OpenAI-compatible (seamless migration from OpenAI)
  *
  * Responsibilities:
- * - Initialize and configure OpenAI client
+ * - Initialize and configure Groq client
  * - Register available tools (text response, knowledge search, expert finder, UI guidance)
- * - Convert conversation history to OpenAI message format
- * - Call OpenAI with function calling to let AI choose appropriate tool
+ * - Convert conversation history to message format
+ * - Call Groq with function calling to let AI choose appropriate tool
  * - Execute chosen tool with parsed arguments
  * - Stream responses back to client
  * - Handle errors and fallbacks
@@ -178,14 +182,15 @@ When responding:
  * - Supports both streaming (text) and non-streaming (cards) responses
  */
 export class AgentService {
-  private openai: OpenAI;
+  // private openai: OpenAI; // Unused - embeddings handled by separate service
+  private groq: Groq;
   // private gemini: GoogleGenerativeAI; // Unused - kept for future reference
   private tools: Map<string, BaseTool> = new Map();
 
   constructor() {
-    // Initialize OpenAI client
-    this.openai = new OpenAI({
-      apiKey: config.openai.apiKey,
+    // Initialize Groq client for chat completions
+    this.groq = new Groq({
+      apiKey: config.groq.apiKey,
     });
 
     // Initialize Gemini client (for cost-effective text generation)
@@ -232,11 +237,11 @@ export class AgentService {
   }
 
   /**
-   * Convert conversation history to OpenAI message format
+   * Convert conversation history to Groq message format (OpenAI-compatible)
    */
-  private convertToOpenAIMessages(
+  private convertToGroqMessages(
     conversationHistory: Message[]
-  ): OpenAI.Chat.ChatCompletionMessageParam[] {
+  ): Groq.Chat.ChatCompletionMessageParam[] {
     return conversationHistory.map((msg) => {
       if (msg.role === "user") {
         return {
@@ -417,9 +422,9 @@ export class AgentService {
 **IMPORTANT TEMPORAL CONTEXT:**
 Today is ${dateStr}. When searching for or discussing information, prioritize recent content from the last few days/weeks over older content. If someone asks "what's the latest" or "this week", focus on the most recent timestamps in the search results.`;
 
-      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      const messages: Groq.Chat.ChatCompletionMessageParam[] = [
         { role: "system", content: systemPromptWithDate },
-        ...this.convertToOpenAIMessages(context.conversationHistory),
+        ...this.convertToGroqMessages(context.conversationHistory),
         { role: "user", content: userMessage },
       ];
 
@@ -509,14 +514,14 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
           })(),
         });
 
-        // Call OpenAI with function calling
-        const response = await this.openai.chat.completions.create({
-          model: config.openai.chatModel,
+        // Call Groq with function calling
+        const response = await this.groq.chat.completions.create({
+          model: config.groq.chatModel,
           messages: messages,
           tools: tools,
           tool_choice: toolChoice, // Force specific tool for workflow actions, otherwise auto
-          temperature: config.openai.temperature,
-          max_tokens: config.openai.maxTokens,
+          temperature: config.groq.temperature,
+          max_tokens: config.groq.maxTokens,
           stream: true, // Enable streaming
         });
 

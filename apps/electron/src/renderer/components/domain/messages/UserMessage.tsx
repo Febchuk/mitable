@@ -4,14 +4,14 @@ interface UserMessageProps {
 
 export default function UserMessage({ content }: UserMessageProps) {
   return (
-    <div className="flex items-start gap-3 mb-4 justify-end">
+    <div className="flex items-start gap-3 mb-6 justify-end">
       {/* Message Bubble - Right Aligned */}
-      <div className="bg-primary text-white px-4 py-3 rounded-lg max-w-[600px]">
-        <p className="text-sm leading-relaxed">{content}</p>
+      <div className="bg-[#8B5CF6] text-white px-5 py-3.5 rounded-[18px] max-w-[600px] shadow-sm">
+        <p className="text-[15px] leading-[1.6]">{content}</p>
       </div>
 
       {/* Avatar on Right */}
-      <div className="w-10 h-10 rounded-full bg-text-tertiary flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
+      <div className="w-10 h-10 rounded-full bg-[#3E3D3D] flex items-center justify-center text-sm font-medium text-white flex-shrink-0 mt-1">
         FC
       </div>
     </div>
