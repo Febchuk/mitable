@@ -77,8 +77,7 @@ Be DIRECT and FACTUAL. Answer the question with facts, then stop. You're a colle
       let prompt: string;
 
       // Check if we're answering a question during an active workflow
-      // Only use workflow context if workflow is ACTIVE (not paused)
-      if (context.workflowState && context.workflowState.status === "active") {
+      if (context.workflowState) {
         console.log("[TextResponseAgent] Using workflow context for enhanced response");
 
         const currentStep = context.workflowState.stepList[context.workflowState.currentStepIndex];

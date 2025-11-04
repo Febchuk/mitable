@@ -14,7 +14,6 @@ interface WorkflowOptionsProps {
   phase: WorkflowPhase;
   onOptionSelect: (option: WorkflowOption) => void;
   disabled?: boolean;
-  hidden?: boolean; // Hide options when awaiting custom question input
 }
 
 /**
@@ -42,9 +41,10 @@ export default function WorkflowOptions({
   phase,
   onOptionSelect,
   disabled = false,
-  hidden = false,
 }: WorkflowOptionsProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showTextInput, setShowTextInput] = useState(false);
+  const [customQuestion, setCustomQuestion] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -111,6 +111,8 @@ export default function WorkflowOptions({
   // Reset selection when phase changes
   useEffect(() => {
     setSelectedIndex(0);
+    setShowTextInput(false);
+    setCustomQuestion("");
   }, [phase]);
 
   // Auto-focus when component mounts or phase changes
@@ -122,7 +124,7 @@ export default function WorkflowOptions({
 
   // Keyboard navigation - only when this specific component is focused
   useEffect(() => {
-    if (disabled || !isFocused) return;
+    if (disabled || showTextInput || !isFocused) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
@@ -157,15 +159,14 @@ export default function WorkflowOptions({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [disabled, selectedIndex, options, isFocused]);
+  }, [disabled, showTextInput, selectedIndex, options, isFocused]);
 
   const handleOptionSelect = (option: WorkflowOption) => {
     if (disabled) return;
 
-    // For custom questions, just notify parent and hide WorkflowOptions
-    // User will type in the agent pill instead of showing a separate input
+    // If option requires text input, show input field
     if (option.action === "custom_question" || option.action === "ask_questions") {
-      onOptionSelect(option);
+      setShowTextInput(true);
       return;
     }
 
@@ -173,12 +174,65 @@ export default function WorkflowOptions({
     onOptionSelect(option);
   };
 
-  // No longer using showTextInput - user types in agent pill instead
+  const handleTextSubmit = () => {
+    if (!customQuestion.trim()) return;
 
-  // Hide component when awaiting custom question input
-  // IMPORTANT: This must come AFTER all hooks to avoid React hooks rule violations
-  if (hidden) {
-    return null;
+    const selectedOption = options[selectedIndex];
+    onOptionSelect({
+      ...selectedOption,
+      label: customQuestion, // Pass the custom question as the label
+    });
+
+    setCustomQuestion("");
+    setShowTextInput(false);
+  };
+
+  const handleTextCancel = () => {
+    setCustomQuestion("");
+    setShowTextInput(false);
+  };
+
+  if (showTextInput) {
+    return (
+      <div className="mt-4 space-y-2">
+        <div className="text-sm text-muted-foreground mb-2">Type your question:</div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={customQuestion}
+            onChange={(e) => setCustomQuestion(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleTextSubmit();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                handleTextCancel();
+              }
+            }}
+            placeholder="Ask a question..."
+            className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            autoFocus
+            disabled={disabled}
+          />
+          <button
+            onClick={handleTextSubmit}
+            disabled={disabled || !customQuestion.trim()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Send
+          </button>
+          <button
+            onClick={handleTextCancel}
+            disabled={disabled}
+            className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium hover:bg-secondary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+        <div className="text-xs text-muted-foreground">Press Enter to send, Esc to cancel</div>
+      </div>
+    );
   }
 
   return (

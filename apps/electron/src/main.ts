@@ -8,15 +8,6 @@ import {
   ConversationContext,
 } from "./services/captureService";
 
-// Port configuration for multi-instance support
-// Read from environment variables set by npm scripts or shell
-const PORTS = {
-  backend: parseInt(process.env.BACKEND_PORT || process.env.PORT || "3000", 10),
-  frontend: parseInt(process.env.VITE_PORT || "5173", 10),
-};
-
-console.log(`[Main Process] Using ports - Backend: ${PORTS.backend}, Frontend: ${PORTS.frontend}`);
-
 // Window references
 let agentWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
@@ -79,7 +70,7 @@ function createAgentWindow() {
   });
 
   if (!app.isPackaged) {
-    agentWindow.loadURL(`http://localhost:${PORTS.frontend}/agent/index.html`);
+    agentWindow.loadURL("http://localhost:5173/agent/index.html");
   } else {
     agentWindow.loadFile(join(__dirname, "../renderer/agent.html"));
   }
@@ -172,7 +163,7 @@ function createConversationWindow() {
   });
 
   if (!app.isPackaged) {
-    conversationWindow.loadURL(`http://localhost:${PORTS.frontend}/conversation/index.html`);
+    conversationWindow.loadURL("http://localhost:5173/conversation/index.html");
   } else {
     conversationWindow.loadFile(join(__dirname, "../renderer/conversation.html"));
   }
@@ -240,8 +231,8 @@ function createConsoleWindow() {
   }
 
   if (!app.isPackaged) {
-    console.log(`[Console] Loading dev URL: http://localhost:${PORTS.frontend}/console/index.html`);
-    consoleWindow.loadURL(`http://localhost:${PORTS.frontend}/console/index.html`);
+    console.log("[Console] Loading dev URL: http://localhost:5173/console/index.html");
+    consoleWindow.loadURL("http://localhost:5173/console/index.html");
     consoleWindow.webContents.openDevTools();
   } else {
     consoleWindow.loadFile(join(__dirname, "../renderer/console.html"));
@@ -253,7 +244,10 @@ function createConsoleWindow() {
 }
 
 function createOverlayWindow() {
-  console.log("[Overlay] Creating overlay window...");
+  if (!guideWindow || guideWindow.isDestroyed()) {
+    console.error("[Overlay] Cannot create overlay window - guide window not available");
+    return;
+  }
 
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.bounds;
@@ -281,7 +275,7 @@ function createOverlayWindow() {
   overlayWindow.setIgnoreMouseEvents(true, { forward: true });
 
   if (!app.isPackaged) {
-    overlayWindow.loadURL(`http://localhost:${PORTS.frontend}/overlay/index.html`);
+    overlayWindow.loadURL("http://localhost:5173/overlay/index.html");
   } else {
     overlayWindow.loadFile(join(__dirname, "../renderer/overlay.html"));
   }
@@ -362,7 +356,7 @@ function createNudgeWindow() {
   });
 
   if (!app.isPackaged) {
-    nudgeWindow.loadURL(`http://localhost:${PORTS.frontend}/nudge/index.html`);
+    nudgeWindow.loadURL("http://localhost:5173/nudge/index.html");
   } else {
     nudgeWindow.loadFile(join(__dirname, "../renderer/nudge.html"));
   }
@@ -546,7 +540,7 @@ function setupIPC() {
       }
 
       // Fetch from backend (without messages for performance)
-      const API_BASE_URL = `http://localhost:${PORTS.backend}`;
+      const API_BASE_URL = "http://localhost:3000"; // TODO: Move to config
       const response = await fetch(`${API_BASE_URL}/api/conversations?includeMessages=false`, {
         headers: { Authorization: `Bearer ${authTokens.accessToken}` },
       });
@@ -594,44 +588,6 @@ function setupIPC() {
     if (consoleWindow && !consoleWindow.isDestroyed()) {
       consoleWindow.minimize();
     }
-  });
-
-  // Show overlay with bounding box data
-  ipcMain.on(IPC_CHANNELS.OVERLAY_SHOW, (_event, data) => {
-    console.log("[Main] OVERLAY_SHOW received with data:", data);
-
-    if (!overlayWindow || overlayWindow.isDestroyed()) {
-      console.error("[Main] Overlay window not available");
-      return;
-    }
-
-    // Show overlay window first
-    overlayWindow.show();
-    overlayWindow.focus();
-
-    // Open DevTools when overlay is shown (dev mode only, first time)
-    if (!app.isPackaged && !overlayWindow.webContents.isDevToolsOpened()) {
-      overlayWindow.webContents.openDevTools({ mode: 'detach' });
-    }
-
-    // Wait for renderer to be ready, then send data
-    // If already loaded, this fires immediately
-    if (overlayWindow.webContents.isLoading()) {
-      console.log("[Main] Overlay still loading, waiting for did-finish-load...");
-      overlayWindow.webContents.once('did-finish-load', () => {
-        console.log("[Main] Overlay loaded, sending data now");
-        overlayWindow.webContents.send("overlay-data", data);
-      });
-    } else {
-      // Already loaded, add small delay for React to mount and set up listeners
-      console.log("[Main] Overlay already loaded, sending data with 100ms delay");
-      setTimeout(() => {
-        overlayWindow.webContents.send("overlay-data", data);
-        console.log("[Main] Overlay data sent");
-      }, 100);
-    }
-
-    console.log("[Main] Overlay window shown");
   });
 
   /**
@@ -1127,7 +1083,7 @@ app.whenReady().then(() => {
   createConsoleWindow();
   // DEPRECATED: Guide window no longer needed - workflow UI moved to conversation window
   // createGuideWindow(); // Create guide as child of agent
-  createOverlayWindow(); // Create overlay for bounding box visual guidance
+  createOverlayWindow(); // Create overlay as child of guide (must be after guide)
   createNudgeWindow(); // Create nudge as child of agent
 
   setupIPC();
