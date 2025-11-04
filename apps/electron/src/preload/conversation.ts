@@ -136,8 +136,17 @@ contextBridge.exposeInMainWorld("conversationAPI", {
   }) => ipcRenderer.send(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, data),
 
   // Screenshot capture - for workflow visual guidance
-  // Returns {dataUrl: string, metadata: ScreenshotMetadata} or null on failure
-  captureScreenshot: (): Promise<{
+  // Supports conditional capture with heuristics when message and context provided
+  // Returns {dataUrl: string, metadata: ScreenshotMetadata} or null on failure/not needed
+  captureScreenshot: (payload?: {
+    message?: string;
+    context?: {
+      hasActiveWorkflow: boolean;
+      lastMessageType?: string;
+      messageCount: number;
+      lastMessageHadCardData?: boolean;
+    };
+  }): Promise<{
     dataUrl: string;
     metadata: {
       width: number;
@@ -147,8 +156,11 @@ contextBridge.exposeInMainWorld("conversationAPI", {
       window?: unknown;
     };
   } | null> => {
-    console.log("[Conversation Preload] captureScreenshot() called from renderer");
-    return ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
+    console.log("[Conversation Preload] captureScreenshot() called from renderer", {
+      hasMessage: !!payload?.message,
+      hasContext: !!payload?.context,
+    });
+    return ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT, payload);
   },
 
   // Auth management - Conversation requests token from main process

@@ -71,8 +71,8 @@ export class OrchestratorService {
     this.knowledgeAgent = new KnowledgeAgent();
     this.expertMatchingAgent = new ExpertMatchingAgent();
 
-    // Visual Guidance Agent depends on Knowledge Agent
-    this.visualGuidanceAgent = new VisualGuidanceAgent(this.knowledgeAgent);
+    // Visual Guidance Agent depends on Knowledge Agent and Text Response Agent
+    this.visualGuidanceAgent = new VisualGuidanceAgent(this.knowledgeAgent, this.textAgent);
   }
 
   /**
