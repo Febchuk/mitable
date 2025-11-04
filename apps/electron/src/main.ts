@@ -244,11 +244,7 @@ function createConsoleWindow() {
 }
 
 function createOverlayWindow() {
-  if (!guideWindow || guideWindow.isDestroyed()) {
-    console.error("[Overlay] Cannot create overlay window - guide window not available");
-    return;
-  }
-
+  // Overlay window is independent - no longer depends on deprecated guide window
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.bounds;
 
@@ -283,6 +279,8 @@ function createOverlayWindow() {
   overlayWindow.on("closed", () => {
     overlayWindow = null;
   });
+
+  console.log("[Overlay] Overlay window created successfully");
 }
 
 /**
@@ -611,54 +609,80 @@ function setupIPC() {
    * Kept for reference - can be deleted after confirming new system works.
    */
 
-  // // Guide system
-  // ipcMain.on(IPC_CHANNELS.GUIDE_START, (_event, data) => {
-  //   // Show and position overlay window
-  //   if (overlayWindow && !overlayWindow.isDestroyed()) {
-  //     overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
-  //     overlayWindow.show();
-  //   }
+  // Guide system
+  // GUIDE_START now only shows overlay with bounding boxes (guide window deprecated)
+  // Workflow UI is rendered directly in conversation window
+  ipcMain.on(IPC_CHANNELS.GUIDE_START, (_event, data) => {
+    console.log("[Main] Guide start requested (overlay mode):", {
+      hasVisualGuidance: !!data.visualGuidance,
+      hasBoundingBox: !!data.visualGuidance?.targetElement?.boundingBox,
+    });
 
-  //   // Position and show guide window
-  //   if (guideWindow && !guideWindow.isDestroyed()) {
-  //     // Position on left side of screen with some margin
-  //     const primaryDisplay = screen.getPrimaryDisplay();
-  //     const { height: screenHeight } = primaryDisplay.bounds;
-  //     const guideWidth = 400;
-  //     const guideHeight = 400;
+    // Show overlay window if visual guidance has valid bounding box
+    if (!overlayWindow || overlayWindow.isDestroyed()) {
+      console.log("[Main] Overlay window not available - cannot show bounding box");
+      return;
+    }
 
-  //     guideWindow.setBounds({
-  //       x: 50,
-  //       y: Math.floor((screenHeight - guideHeight) / 2),
-  //       width: guideWidth,
-  //       height: guideHeight,
-  //     });
+    if (!data.visualGuidance?.targetElement?.boundingBox) {
+      console.log("[Main] No bounding box data - overlay not shown");
+      return;
+    }
 
-  //     guideWindow.webContents.send(IPC_CHANNELS.GUIDE_DATA, data);
-  //     guideWindow.show();
-  //   }
+    const bbox = data.visualGuidance.targetElement.boundingBox;
 
-  //   // Hide nudge window if visible
-  //   if (nudgeWindow && !nudgeWindow.isDestroyed() && nudgeWindow.isVisible()) {
-  //     nudgeWindow.hide();
-  //   }
-  // });
+    // Validate bounding box has non-zero dimensions
+    if (bbox.width <= 0 || bbox.height <= 0) {
+      console.log("[Main] Invalid bounding box dimensions, overlay not shown:", bbox);
+      return;
+    }
 
-  // // Guide step update - forward to overlay
-  // ipcMain.on(IPC_CHANNELS.GUIDE_STEP_UPDATE, (_event, data) => {
-  //   if (overlayWindow && !overlayWindow.isDestroyed()) {
-  //     overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
-  //   }
-  // });
+    // Valid bounding box - show overlay
+    const currentStep = data.stepList?.[data.currentStepIndex];
 
-  // ipcMain.on(IPC_CHANNELS.GUIDE_COMPLETE, () => {
-  //   if (overlayWindow && !overlayWindow.isDestroyed()) {
-  //     overlayWindow.hide();
-  //   }
-  //   if (guideWindow && !guideWindow.isDestroyed()) {
-  //     guideWindow.hide();
-  //   }
-  // });
+    const overlayData = {
+      title: currentStep?.description || "Step-by-step guide",
+      currentStep: data.currentStepIndex,
+      steps: [
+        {
+          id: `step-${data.currentStepIndex}`,
+          stepNumber: data.currentStepIndex + 1,
+          instruction: data.visualGuidance.conversationalMessage,
+          targetElement: data.visualGuidance.targetElement,
+        },
+      ],
+    };
+
+    console.log("[Main] Showing overlay with bounding box:", {
+      bbox,
+      stepNumber: overlayData.steps[0].stepNumber,
+    });
+
+    overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, overlayData);
+    overlayWindow.show();
+
+    // Hide nudge window if visible
+    if (nudgeWindow && !nudgeWindow.isDestroyed() && nudgeWindow.isVisible()) {
+      nudgeWindow.hide();
+    }
+  });
+
+  // Guide step update - forward to overlay
+  ipcMain.on(IPC_CHANNELS.GUIDE_STEP_UPDATE, (_event, data) => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
+    }
+  });
+
+  ipcMain.on(IPC_CHANNELS.GUIDE_COMPLETE, () => {
+    console.log("[Main] Guide complete - hiding overlay and guide windows");
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.hide();
+    }
+    if (guideWindow && !guideWindow.isDestroyed()) {
+      guideWindow.hide();
+    }
+  });
 
   // // Guide next step - forward to Agent window to trigger screenshot + "Next" message
   // ipcMain.on(IPC_CHANNELS.GUIDE_NEXT_STEP, () => {
@@ -1084,7 +1108,7 @@ app.whenReady().then(() => {
   createConsoleWindow();
   // DEPRECATED: Guide window no longer needed - workflow UI moved to conversation window
   // createGuideWindow(); // Create guide as child of agent
-  createOverlayWindow(); // Create overlay as child of guide (must be after guide)
+  createOverlayWindow(); // Create overlay for bounding box highlighting (independent window)
   createNudgeWindow(); // Create nudge as child of agent
 
   setupIPC();

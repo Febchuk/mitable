@@ -137,7 +137,8 @@ BEHAVIOR:
         context.screenshot,
         currentSolution,
         currentStep,
-        context.conversationHistory
+        context.conversationHistory,
+        context.screenshotMetadata // Pass metadata for coordinate conversion
       );
 
       console.log("[AnalyzeWorkflowScreenTool] Visual analysis complete:", {

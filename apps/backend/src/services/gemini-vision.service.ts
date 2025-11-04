@@ -507,9 +507,13 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
     screenshot: string,
     solutionObject: SolutionObject,
     currentStep: Step,
-    conversationHistory: DbMessage[]
+    conversationHistory: DbMessage[],
+    screenshotMetadata?: { width: number; height: number }
   ): Promise<VisualGuidance> {
-    console.log("[GeminiVision] Analyzing step execution:", currentStep.stepNumber);
+    console.log("[GeminiVision] Analyzing step execution:", currentStep.stepNumber, {
+      hasMetadata: !!screenshotMetadata,
+      dimensions: screenshotMetadata ? `${screenshotMetadata.width}x${screenshotMetadata.height}` : "N/A",
+    });
 
     try {
       const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
@@ -580,6 +584,22 @@ OUTPUT FORMAT:
    - Use conversational tone like a helpful teammate
    - If wrong app is open, guide them to the correct one
 
+5. targetElement (OPTIONAL - include ONLY if element is visible on current screen):
+   - label: Brief description of the element (e.g., "Save button", "Settings icon")
+   - boundingBox: Coordinates in NORMALIZED format (0.0-1.0 range):
+     * x: horizontal position (0.0 = left edge, 1.0 = right edge)
+     * y: vertical position (0.0 = top edge, 1.0 = bottom edge)
+     * width: element width as fraction (0.1 = 10% of screen width)
+     * height: element height as fraction (0.05 = 5% of screen height)
+
+   CRITICAL: Bounding box MUST be normalized 0-1 range, NOT pixel coordinates!
+   Example: {"label": "Submit button", "boundingBox": {"x": 0.85, "y": 0.12, "width": 0.08, "height": 0.04}}
+
+   DO NOT include targetElement if:
+   - Element is not visible on current screen
+   - Wrong app/page is open
+   - Confidence is "low"
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EXAMPLES:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -614,6 +634,23 @@ Screenshot shows: Notion document with Product Vision visible below the fold
 
       const text = result.response.text();
       const parsed = VisualGuidanceSchema.parse(JSON.parse(text));
+
+      // Convert normalized coordinates to pixels if bounding box present and metadata available
+      if (parsed.targetElement?.boundingBox && screenshotMetadata) {
+        console.log("[GeminiVision] Converting normalized coordinates to pixels:", {
+          normalized: parsed.targetElement.boundingBox,
+          imageDimensions: screenshotMetadata,
+        });
+
+        parsed.targetElement.boundingBox = coordinateConverter.convertToPixels(
+          parsed.targetElement.boundingBox,
+          screenshotMetadata
+        );
+
+        console.log("[GeminiVision] Converted to pixel coordinates:", parsed.targetElement.boundingBox);
+      } else if (parsed.targetElement?.boundingBox && !screenshotMetadata) {
+        console.warn("[GeminiVision] Bounding box present but no screenshot metadata - cannot convert coordinates");
+      }
 
       // Comprehensive logging for debugging
       console.log("[GeminiVision] Visual guidance generated:", {

@@ -113,8 +113,22 @@ contextBridge.exposeInMainWorld("conversationAPI", {
   },
 
   // Trigger Nudge/Guide windows from cards
-  showNudge: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.NUDGE_SHOW, data),
-  startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),
+  showNudge: (data: unknown) => {
+    console.log("[Preload] showNudge called with data:", data);
+    ipcRenderer.send(IPC_CHANNELS.NUDGE_SHOW, data);
+  },
+  startGuide: (data: unknown) => {
+    console.log("[Preload] startGuide called with data:", {
+      hasData: !!data,
+      // @ts-ignore
+      hasVisualGuidance: !!data?.visualGuidance,
+      // @ts-ignore
+      hasBoundingBox: !!data?.visualGuidance?.targetElement?.boundingBox,
+      data,
+    });
+    console.log("[Preload] Sending IPC to channel:", IPC_CHANNELS.GUIDE_START);
+    ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data);
+  },
 
   // Open conversation in console
   openConversationInConsole: (conversationId: string) =>

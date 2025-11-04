@@ -897,6 +897,19 @@ router.post(
             });
           }
 
+          // If complete chunk has windowTrigger, send separate window_trigger event first
+          if (chunk.type === "complete" && (chunk as any).windowTrigger) {
+            const windowTriggerEvent = {
+              type: "window_trigger",
+              windowTrigger: (chunk as any).windowTrigger,
+            };
+            console.log("[Conversations] Sending separate window_trigger event:", windowTriggerEvent);
+            res.write(`data: ${JSON.stringify(windowTriggerEvent)}\n\n`);
+
+            // Capture for database storage
+            assistantWindowTrigger = (chunk as any).windowTrigger;
+          }
+
           // Send chunk to client
           res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 

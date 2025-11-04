@@ -155,7 +155,17 @@ DO NOT USE:
         };
       }
 
-      // Step 5: Progress to next step (update step statuses)
+      // Step 5: Validate nextStepIndex is still within bounds after adjustment
+      if (nextStepIndex >= updatedSolution.stepList.length) {
+        console.log("[GuideNextStepTool] Workflow completed after plan adjustment - no more steps");
+        return {
+          messageType: "text",
+          content: `Great work! After reviewing your progress, I can see you've completed all the necessary steps. The task is complete! 🎉`,
+          streamable: true,
+        };
+      }
+
+      // Step 6: Progress to next step (update step statuses)
       updatedSolution = {
         ...updatedSolution,
         currentStepIndex: nextStepIndex,
@@ -165,7 +175,7 @@ DO NOT USE:
         })),
       };
 
-      // Step 6: Get visual guidance for the next step
+      // Step 7: Get visual guidance for the next step
       const nextStep = updatedSolution.stepList[nextStepIndex];
       console.log("[GuideNextStepTool] Analyzing next step:", {
         stepNumber: nextStep.stepNumber,
@@ -176,7 +186,8 @@ DO NOT USE:
         context.screenshot,
         updatedSolution,
         nextStep,
-        context.conversationHistory
+        context.conversationHistory,
+        context.screenshotMetadata // Pass metadata for coordinate conversion
       );
 
       console.log("[GuideNextStepTool] Visual guidance generated:", {
@@ -185,7 +196,7 @@ DO NOT USE:
         confidence: visualGuidance.confidence,
       });
 
-      // Step 7: Build conversational message
+      // Step 8: Build conversational message
       let message = visualGuidance.conversationalMessage;
 
       // If plan was adjusted, communicate it to the user
@@ -198,9 +209,10 @@ DO NOT USE:
         newStepIndex: nextStepIndex,
         totalSteps: updatedSolution.stepList.length,
         adjustmentMade: evaluation.needsAdjustment,
+        hasBoundingBox: !!visualGuidance.targetElement?.boundingBox,
       });
 
-      // Step 8: Return with updated SolutionObject
+      // Step 9: Return with updated SolutionObject and trigger overlay display
       return {
         messageType: "workflow",
         content: message,
@@ -208,6 +220,16 @@ DO NOT USE:
           ...updatedSolution,
           workflowActive: true,
           workflowPhase: "step_progression",
+          visualGuidance, // Include visual guidance in cardData for frontend access
+        },
+        triggerWindow: {
+          window: "guide",
+          data: {
+            conversationId,
+            stepList: updatedSolution.stepList,
+            currentStepIndex: nextStepIndex,
+            visualGuidance, // Pass bounding box data to guide window (will forward to overlay)
+          },
         },
         streamable: true,
       };

@@ -96,7 +96,7 @@ export type SolutionObject = z.infer<typeof SolutionObjectSchema>;
 
 /**
  * Visual guidance response from Gemini Vision
- * Precise conversational descriptions (no bounding boxes in MVP)
+ * Includes bounding box coordinates for overlay rendering
  */
 export const VisualGuidanceSchema = z.object({
   elementDescription: z.string(), // "Click the Edit button (pencil icon) in the top-right corner..."
@@ -104,6 +104,10 @@ export const VisualGuidanceSchema = z.object({
   confidence: z.enum(["high", "medium", "low"]),
   alternativeElements: z.array(z.string()).optional(), // Fallback if ambiguous
   conversationalMessage: z.string(), // AI-generated natural response for user display
+  targetElement: z.object({
+    label: z.string(),
+    boundingBox: BoundingBoxSchema, // Pixel coordinates for overlay rendering
+  }).optional(), // Optional because element might not be visible on current screen
 });
 
 export type VisualGuidance = z.infer<typeof VisualGuidanceSchema>;

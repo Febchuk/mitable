@@ -538,9 +538,19 @@ function App() {
             streamingMessageIdRef.current = null;
           },
           onWindowTrigger: (windowType, data) => {
+            console.log(`[Conversation] onWindowTrigger called:`, {
+              windowType,
+              hasData: !!data,
+              hasVisualGuidance: !!data?.visualGuidance,
+              hasBoundingBox: !!data?.visualGuidance?.targetElement?.boundingBox,
+              boundingBox: data?.visualGuidance?.targetElement?.boundingBox,
+              data,
+            });
+
             if (windowType === "nudge") {
               window.conversationAPI?.showNudge(data);
             } else if (windowType === "guide") {
+              console.log("[Conversation] Calling startGuide with data:", JSON.stringify(data, null, 2));
               window.conversationAPI?.startGuide(data);
             }
           },

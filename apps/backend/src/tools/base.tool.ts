@@ -1,5 +1,5 @@
 import type { Message } from "../db/schema/conversations.schema";
-import type { SolutionObject, EmbeddingMatch, Step, AdjustmentRecord } from "@mitable/shared";
+import type { SolutionObject, EmbeddingMatch, Step, AdjustmentRecord, VisualGuidance } from "@mitable/shared";
 import type { ExpertMatch } from "../services/expertMatching.service";
 
 // ============================================================================
@@ -131,6 +131,8 @@ export interface WorkflowMessage extends BaseMessage {
     // Workflow UI state
     workflowActive: true;
     workflowPhase: WorkflowPhase;
+    // Visual guidance data (optional - includes bounding box for overlay rendering)
+    visualGuidance?: VisualGuidance;
   };
 }
 
