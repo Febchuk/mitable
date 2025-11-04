@@ -726,7 +726,21 @@ Analyze screenshot to determine if plan needs adjustment. Consider:
 - Did user skip steps?
 - Did new complexity appear?
 - Are remaining steps still valid?
-- Has the user expressed confusion or encountered repeated issues?`;
+- Has the user expressed confusion or encountered repeated issues?
+
+CRITICAL GUIDELINES FOR PLAN ADJUSTMENT:
+1. Be CONSERVATIVE - prefer keeping extra steps over reducing step count
+2. ONLY reduce step count if remaining steps are clearly unnecessary or already completed
+3. NEVER reduce step count if it would leave fewer than 2 steps remaining after current step
+4. If uncertain, keep the original plan (needsAdjustment: false)
+5. Better to have one extra step than to complete workflow prematurely
+
+Example scenarios:
+- User on step 2 of 4, screen shows steps 3-4 completed → Reduce to 2 steps (valid)
+- User on step 2 of 4, screen unclear if steps 3-4 needed → Keep 4 steps (safer)
+- User on step 3 of 4, one step remaining → Keep 4 steps (don't reduce to 3)
+
+Remember: The user should always get visual guidance for the NEXT step. Premature completion is worse than having an extra step.`;
 
       const result = await this.evaluateModel.generateContent([
         prompt,
@@ -741,7 +755,26 @@ Analyze screenshot to determine if plan needs adjustment. Consider:
       const text = result.response.text();
       const parsed = EvaluateProgressResponseSchema.parse(JSON.parse(text));
 
-      console.log("[GeminiVision] Needs adjustment:", parsed.needsAdjustment);
+      console.log("[GeminiVision] Evaluation complete:", {
+        needsAdjustment: parsed.needsAdjustment,
+        adjustmentReason: parsed.adjustmentReason || "N/A",
+        originalStepCount: solutionObject.stepList.length,
+        adjustedStepCount: parsed.adjustedStepList?.length || solutionObject.stepList.length,
+        nextStepIndex: nextStepIndex,
+        wouldCauseCompletion: parsed.adjustedStepList && nextStepIndex >= parsed.adjustedStepList.length,
+      });
+
+      // Additional warning if adjustment would cause immediate completion
+      if (parsed.needsAdjustment && parsed.adjustedStepList && nextStepIndex >= parsed.adjustedStepList.length) {
+        console.warn("[GeminiVision] WARNING: Gemini's plan adjustment would cause immediate workflow completion!", {
+          reason: parsed.adjustmentReason,
+          originalSteps: solutionObject.stepList.length,
+          adjustedSteps: parsed.adjustedStepList.length,
+          nextStepIndex,
+          advice: "Consider tuning the evaluation prompt to be more conservative",
+        });
+      }
+
       return parsed;
     } catch (error) {
       console.error("[GeminiVision] Evaluation failed:", error);

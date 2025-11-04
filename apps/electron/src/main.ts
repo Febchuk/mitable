@@ -270,11 +270,35 @@ function createOverlayWindow() {
 
   overlayWindow.setIgnoreMouseEvents(true, { forward: true });
 
+  // Platform-specific always-on-top configuration for overlay visibility
+  // Use highest z-order level to ensure overlay appears above all application windows
+  if (process.platform === "darwin") {
+    // macOS: Use screen-saver level (highest) + fullscreen visibility
+    overlayWindow.setAlwaysOnTop(true, "screen-saver");
+    overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    // Windows/Linux: Use screen-saver level with highest numeric priority
+    overlayWindow.setAlwaysOnTop(true, "screen-saver", 1);
+  }
+
   if (!app.isPackaged) {
     overlayWindow.loadURL("http://localhost:5173/overlay/index.html");
   } else {
     overlayWindow.loadFile(join(__dirname, "../renderer/overlay.html"));
   }
+
+  // Add load event handlers for debugging
+  overlayWindow.webContents.on("did-finish-load", () => {
+    console.log("[Overlay] Overlay window loaded successfully");
+  });
+
+  overlayWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
+    console.error("[Overlay] Failed to load overlay window:", {
+      errorCode,
+      errorDescription,
+      url: overlayWindow?.webContents.getURL(),
+    });
+  });
 
   overlayWindow.on("closed", () => {
     overlayWindow = null;
@@ -641,7 +665,9 @@ function setupIPC() {
     const currentStep = data.stepList?.[data.currentStepIndex];
 
     const overlayData = {
+      id: data.conversationId || `overlay-${Date.now()}`, // Unique ID for this guide session
       title: currentStep?.description || "Step-by-step guide",
+      description: data.visualGuidance.conversationalMessage || "", // Description from AI
       currentStep: data.currentStepIndex,
       steps: [
         {
@@ -649,8 +675,10 @@ function setupIPC() {
           stepNumber: data.currentStepIndex + 1,
           instruction: data.visualGuidance.conversationalMessage,
           targetElement: data.visualGuidance.targetElement,
+          completed: false, // Current step is not yet completed
         },
       ],
+      completed: false, // Guide is not completed (we're showing a step)
     };
 
     console.log("[Main] Showing overlay with bounding box:", {

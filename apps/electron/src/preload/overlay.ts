@@ -10,10 +10,16 @@ const IPC_CHANNELS = {
 
 contextBridge.exposeInMainWorld("overlayAPI", {
   onHighlightUpdate: (callback: (data: unknown) => void) => {
-    ipcRenderer.on(
-      IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE,
-      (_event: IpcRendererEvent, data: unknown) => callback(data)
-    );
+    const handler = (_event: IpcRendererEvent, data: unknown) => {
+      callback(data);
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, handler);
+
+    // Return cleanup function to remove this specific listener
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, handler);
+    };
   },
   show: () => ipcRenderer.send(IPC_CHANNELS.OVERLAY_SHOW),
   hide: () => ipcRenderer.send(IPC_CHANNELS.OVERLAY_HIDE),

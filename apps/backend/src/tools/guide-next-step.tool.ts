@@ -140,6 +140,34 @@ DO NOT USE:
       let updatedSolution = currentSolution;
       if (evaluation.needsAdjustment && evaluation.adjustedStepList) {
         console.log("[GuideNextStepTool] Applying plan adjustments");
+
+        // BOUNDARY PROTECTION: Prevent plan adjustments that would immediately complete workflow
+        // Ensure at least one more step exists so user gets visual guidance for current step
+        if (nextStepIndex >= evaluation.adjustedStepList.length) {
+          console.warn("[GuideNextStepTool] Plan adjustment would cause immediate completion:", {
+            nextStepIndex,
+            adjustedStepCount: evaluation.adjustedStepList.length,
+            originalStepCount: currentSolution.stepList.length,
+            adjustmentReason: evaluation.adjustmentReason,
+          });
+
+          // Keep at least one more step to ensure visual guidance is generated
+          // Add a final confirmation step using the current step's data
+          const currentStep = currentSolution.stepList[nextStepIndex] || currentSolution.stepList[currentSolution.stepList.length - 1];
+          const confirmationStep = {
+            ...currentStep,
+            stepNumber: evaluation.adjustedStepList.length + 1,
+            description: currentStep.description + " (Final verification)",
+            status: "pending" as const,
+          };
+
+          evaluation.adjustedStepList.push(confirmationStep);
+          console.log("[GuideNextStepTool] Added confirmation step to prevent premature completion:", {
+            newStepCount: evaluation.adjustedStepList.length,
+            confirmationStep: confirmationStep.description,
+          });
+        }
+
         updatedSolution = {
           ...currentSolution,
           stepList: evaluation.adjustedStepList,

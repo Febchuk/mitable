@@ -69,11 +69,51 @@ function App() {
         currentStep: data.currentStep,
         totalSteps: data.steps.length,
         hasTargetElement: !!data.steps[data.currentStep]?.targetElement,
+        boundingBox: data.steps[data.currentStep]?.targetElement?.boundingBox,
+        rawData: data, // Full data for debugging
       });
+
+      // Validate data structure before setting state
+      if (!data.id || !data.title) {
+        console.error("[Overlay] Invalid guide data structure - missing required fields:", {
+          hasId: !!data.id,
+          hasTitle: !!data.title,
+          hasSteps: !!data.steps,
+          data,
+        });
+        return;
+      }
+
+      if (!data.steps || data.steps.length === 0) {
+        console.error("[Overlay] Invalid guide data - no steps provided:", data);
+        return;
+      }
+
+      if (data.currentStep < 0 || data.currentStep >= data.steps.length) {
+        console.error("[Overlay] Invalid currentStep index:", {
+          currentStep: data.currentStep,
+          totalSteps: data.steps.length,
+          data,
+        });
+        return;
+      }
+
+      const currentStep = data.steps[data.currentStep];
+      if (!currentStep.targetElement?.boundingBox) {
+        console.warn("[Overlay] Current step missing targetElement or boundingBox:", {
+          stepId: currentStep.id,
+          hasTargetElement: !!currentStep.targetElement,
+          hasBoundingBox: !!currentStep.targetElement?.boundingBox,
+        });
+      }
+
       setGuideData(data);
     };
 
-    window.overlayAPI?.onHighlightUpdate(handleHighlightUpdate);
+    const cleanup = window.overlayAPI?.onHighlightUpdate(handleHighlightUpdate);
+
+    // Return cleanup function to remove listener on unmount/re-render
+    return cleanup;
   }, []);
 
   if (!guideData) {
