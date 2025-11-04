@@ -129,8 +129,8 @@ function App() {
       async (messageData: any, screenshot: string | null) => {
         console.log("[Conversation] Message received from Agent:", messageData);
 
-        // If we're in collapsed state, expand to show the conversation
-        if (viewState === "collapsed") {
+        // If we're not already expanded, expand to show the conversation
+        if (viewState !== "expanded") {
           window.conversationAPI.setViewState("expanded");
         }
 
@@ -155,6 +155,7 @@ function App() {
             relatedStepIndex: awaitingCustomQuestion?.relatedStepIndex ?? undefined,
           };
           setMessages((prev) => [...prev, userMsg]);
+          console.log("[Conversation] User message added to UI:", userMsg);
         }
 
         // Conditionally capture screenshot based on message content and conversation context
@@ -217,6 +218,7 @@ function App() {
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
+        console.log("[Conversation] Placeholder AI message created, starting stream...");
 
         // Prepare metadata if this is a custom question during workflow
         const metadata = awaitingCustomQuestion
@@ -702,7 +704,7 @@ function App() {
             </button>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 pt-16 app-no-drag">
+            <div className="flex-1 overflow-y-auto px-6 py-4 pt-16 pb-8 app-no-drag">
               {messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center text-gray-400">

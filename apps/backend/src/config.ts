@@ -47,13 +47,21 @@ export const config = {
     serviceRoleKey: (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim(),
   },
 
-  // OpenAI Configuration
+  // OpenAI Configuration (for embeddings only)
   openai: {
     apiKey: (process.env.OPENAI_API_KEY || "").trim(),
     embeddingModel: "text-embedding-3-small", // 1536 dimensions
     chatModel: (process.env.OPENAI_CHAT_MODEL || "gpt-4-turbo-preview").trim(),
     maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS || "2000", 10),
     temperature: parseFloat(process.env.OPENAI_TEMPERATURE || "0.7"),
+  },
+
+  // Groq Configuration (for chat completions)
+  groq: {
+    apiKey: (process.env.GROQ_API_KEY || "").trim(),
+    chatModel: (process.env.GROQ_CHAT_MODEL || "openai/gpt-oss-120b").trim(),
+    maxTokens: parseInt(process.env.GROQ_MAX_TOKENS || "8000", 10),
+    temperature: parseFloat(process.env.GROQ_TEMPERATURE || "0.7"),
   },
 
   // Pinecone Configuration
@@ -103,6 +111,7 @@ export function validateConfig() {
     { key: "SUPABASE_URL", value: config.supabase.url },
     { key: "SUPABASE_ANON_KEY", value: config.supabase.anonKey },
     { key: "OPENAI_API_KEY", value: config.openai.apiKey },
+    { key: "GROQ_API_KEY", value: config.groq.apiKey },
     { key: "PINECONE_API_KEY", value: config.pinecone.apiKey },
     { key: "PINECONE_INDEX_NAME", value: config.pinecone.indexName },
     { key: "GEMINI_API_KEY", value: config.gemini.apiKey },

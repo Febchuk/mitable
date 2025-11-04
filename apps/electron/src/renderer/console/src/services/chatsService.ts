@@ -99,14 +99,10 @@ export async function sendMessage(
  * Stream chunk from SSE
  */
 export interface StreamChunk {
-  type: "chunk" | "complete" | "error" | "done" | "window_trigger";
+  type: "chunk" | "complete" | "error" | "done";
   content?: string;
   messageId?: string;
   error?: string;
-  windowTrigger?: {
-    window: string;
-    data: any;
-  };
 }
 
 /**
@@ -117,15 +113,13 @@ export interface StreamCallbacks {
   onComplete?: (fullContent: string) => void;
   onDone?: (messageId: string) => void;
   onError?: (error: string) => void;
-  onWindowTrigger?: (window: string, data: any) => void;
 }
 
 /**
- * Send a message and stream the AI response
+ * Send a message and get the full AI response, then simulate streaming on frontend
  *
- * Uses Server-Sent Events (SSE) to receive real-time streaming responses.
- * The user message is saved immediately, and the assistant response is streamed
- * word-by-word as it's generated.
+ * Simplified approach: Backend returns complete response, frontend streams it word-by-word.
+ * This is more reliable and gives us full control over the streaming UX.
  *
  * @param conversationId - The conversation ID
  * @param content - The user message content
@@ -133,7 +127,6 @@ export interface StreamCallbacks {
  * @param token - Auth token
  * @param screenshot - Optional base64-encoded screenshot for workflow context
  * @param metadata - Optional metadata for workflow actions (workflowAction, selectedOption)
- * @param screenshotMetadata - Optional screenshot metadata (dimensions, scaleFactor, etc.)
  * @returns Promise that resolves when streaming completes
  */
 export async function sendStreamingMessage(
@@ -142,107 +135,104 @@ export async function sendStreamingMessage(
   callbacks: StreamCallbacks,
   token: string,
   screenshot?: string,
-  metadata?: any,
-  screenshotMetadata?: any
+  metadata?: any
 ): Promise<void> {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
-  return new Promise((resolve, reject) => {
+  try {
     // Build request body
-    const requestBody: { content: string; screenshot?: string; metadata?: any; screenshotMetadata?: any } = { content };
+    const requestBody: { content: string; screenshot?: string; metadata?: any } = { content };
     if (screenshot) {
       requestBody.screenshot = screenshot;
     }
     if (metadata) {
       requestBody.metadata = metadata;
     }
-    if (screenshotMetadata) {
-      requestBody.screenshotMetadata = screenshotMetadata;
+
+    // Fetch the SSE stream from backend
+    const response = await fetch(
+      `${API_BASE_URL}/conversations/${conversationId}/messages/stream`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    // Use fetch with streaming instead of EventSource for better control
-    fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestBody),
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+    if (!response.body) {
+      throw new Error("No response body");
+    }
 
-        if (!response.body) {
-          throw new Error("No response body");
-        }
+    // Read the entire SSE stream and collect the full content
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let fullContent = "";
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { done, value } = await reader.read();
 
-        // Read stream
-        const read = (): Promise<void> => {
-          return reader.read().then(({ done, value }) => {
-            if (done) {
-              resolve();
-              return;
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          if (data === "" || data.startsWith(":")) continue;
+
+          try {
+            const chunk: StreamChunk = JSON.parse(data);
+
+            // Accumulate content from backend
+            if (chunk.type === "chunk" && chunk.content) {
+              fullContent += chunk.content;
+            } else if (chunk.type === "complete" && chunk.content) {
+              fullContent = chunk.content;
+            } else if (chunk.type === "done") {
+              // Stream completed
+              break;
             }
+          } catch (e) {
+            // Skip parse errors
+          }
+        }
+      }
+    }
 
-            // Decode chunk
-            buffer += decoder.decode(value, { stream: true });
+    if (!fullContent) {
+      throw new Error("No content received from backend");
+    }
 
-            // Process complete SSE messages
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || ""; // Keep incomplete line in buffer
+    // Now simulate frontend streaming word-by-word
+    const words = fullContent.split(" ");
 
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const data = line.slice(6); // Remove "data: " prefix
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      const isLast = i === words.length - 1;
 
-                if (data === "") continue; // Empty data line
-                if (data.startsWith(":")) continue; // Comment (ping)
+      // Add word with space (except for last word)
+      callbacks.onChunk?.(isLast ? word : word + " ");
 
-                try {
-                  const chunk: StreamChunk = JSON.parse(data);
+      // Delay between words for typing effect - slowed down for Groq's speed 😎
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
 
-                  if (chunk.type === "chunk" && chunk.content) {
-                    callbacks.onChunk?.(chunk.content);
-                  } else if (chunk.type === "complete" && chunk.content) {
-                    callbacks.onComplete?.(chunk.content);
-                    // Also process embedded windowTrigger in complete chunks
-                    if ((chunk as any).windowTrigger) {
-                      callbacks.onWindowTrigger?.(
-                        (chunk as any).windowTrigger.window,
-                        (chunk as any).windowTrigger.data
-                      );
-                    }
-                  } else if (chunk.type === "done" && chunk.messageId) {
-                    callbacks.onDone?.(chunk.messageId);
-                  } else if (chunk.type === "error" && chunk.error) {
-                    callbacks.onError?.(chunk.error);
-                    reject(new Error(chunk.error));
-                  } else if (chunk.type === "window_trigger" && chunk.windowTrigger) {
-                    callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
-                  }
-                } catch (parseError) {
-                  console.error("Error parsing SSE data:", parseError, data);
-                }
-              }
-            }
-
-            // Continue reading
-            return read();
-          });
-        };
-
-        return read();
-      })
-      .catch((error) => {
-        console.error("Streaming error:", error);
-        callbacks.onError?.(error instanceof Error ? error.message : "Streaming failed");
-        reject(error);
-      });
-  });
+    // Signal completion
+    callbacks.onComplete?.(fullContent);
+  } catch (error) {
+    console.error("Message send error:", error);
+    callbacks.onError?.(error instanceof Error ? error.message : "Failed to send message");
+    throw error;
+  }
 }

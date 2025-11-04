@@ -154,7 +154,7 @@ export const Response = memo(
     const content = shouldParseIncomplete ? parseIncompleteMarkdown(children) : children;
 
     return (
-      <div className={cn("prose prose-invert prose-sm max-w-none", className)} {...props}>
+      <div className={cn("prose prose-invert max-w-none", className)} {...props}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath, ...((options?.remarkPlugins as any[]) || [])]}
           rehypePlugins={[rehypeKatex, ...((options?.rehypePlugins as any[]) || [])]}
@@ -181,13 +181,13 @@ export const Response = memo(
 
             // Paragraphs
             p: ({ ...props }) => (
-              <p className="text-sm text-text-primary leading-relaxed mb-4" {...props} />
+              <p className="text-text-primary leading-relaxed mb-4" {...props} />
             ),
 
             // Lists
             ul: ({ ...props }) => <ul className="list-disc pl-6 mb-4 space-y-2" {...props} />,
             ol: ({ ...props }) => <ol className="list-decimal pl-6 mb-4 space-y-2" {...props} />,
-            li: ({ ...props }) => <li className="text-sm text-text-primary" {...props} />,
+            li: ({ ...props }) => <li className="text-text-primary" {...props} />,
 
             // Tables
             table: ({ ...props }) => (
@@ -205,11 +205,11 @@ export const Response = memo(
             tr: ({ ...props }) => <tr {...props} />,
             th: ({ ...props }) => (
               <th
-                className="px-4 py-2 text-left text-xs font-semibold text-text-primary uppercase tracking-wider"
+                className="px-4 py-2 text-left font-semibold text-text-primary uppercase tracking-wider"
                 {...props}
               />
             ),
-            td: ({ ...props }) => <td className="px-4 py-2 text-sm text-text-primary" {...props} />,
+            td: ({ ...props }) => <td className="px-4 py-2 text-text-primary" {...props} />,
 
             // Code
             code: ({ className, ...props }: ComponentProps<"code">) => {
