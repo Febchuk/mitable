@@ -106,12 +106,18 @@ function App() {
   };
 
   const handleSubmit = async (message: string) => {
+    console.log("========================================");
+    console.log("[Agent] SUBMIT STARTED - Message:", message);
+    console.log("========================================");
+
     // Ensure we have a conversation ID
     let convId: string;
     try {
+      console.log("[Agent] Ensuring conversation exists...");
       convId = await ensureConversation();
+      console.log("[Agent] ✅ Conversation ID:", convId);
     } catch (error) {
-      console.error("Failed to create conversation:", error);
+      console.error("[Agent] ❌ Failed to create conversation:", error);
       return;
     }
 
@@ -132,9 +138,17 @@ function App() {
     }
 
     // Show conversation window
+    console.log("[Agent] Showing conversation window...");
     window.agentAPI.showConversation();
 
     // Forward message to conversation window with all necessary data
+    console.log("[Agent] Forwarding message to conversation window:", {
+      message,
+      conversationId: convId,
+      userMessage: message,
+      hasScreenshot: !!screenshot,
+    });
+
     window.agentAPI.sendMessageToConversation(
       {
         message,
@@ -143,6 +157,9 @@ function App() {
       },
       screenshot
     );
+
+    console.log("[Agent] ✅ Message forwarded successfully");
+    console.log("========================================");
   };
 
   return (
