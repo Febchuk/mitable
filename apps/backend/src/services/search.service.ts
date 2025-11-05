@@ -51,6 +51,8 @@ export interface SearchResult {
   userId?: string;
   username?: string;
   messageUrl?: string;
+  messageTs?: string; // Message timestamp
+  threadTs?: string; // Parent thread timestamp (if reply)
 
   // Notion metadata
   pageId?: string;
@@ -441,6 +443,115 @@ class SearchService {
   }
 
   /**
+   * Fetch thread context for Slack thread replies
+   * When a result is a thread reply, fetch parent + all replies for complete context
+   */
+  async fetchThreadContext(
+    results: SearchResult[],
+    organizationId: string
+  ): Promise<SearchResult[]> {
+    // Find all unique thread_ts values from thread replies
+    const threadReplies = results.filter(
+      (r) => r.source === "slack" && r.threadTs && r.sourceType === "thread_reply"
+    );
+
+    if (threadReplies.length === 0) {
+      return results; // No threads to expand
+    }
+
+    // Group by thread_ts to avoid duplicate fetches
+    const uniqueThreads = new Map<string, SearchResult[]>();
+    for (const reply of threadReplies) {
+      if (!reply.threadTs) continue;
+
+      const key = `${reply.channelId}-${reply.threadTs}`;
+      if (!uniqueThreads.has(key)) {
+        uniqueThreads.set(key, []);
+      }
+      uniqueThreads.get(key)!.push(reply);
+    }
+
+    console.log(
+      `[SearchService] Fetching context for ${uniqueThreads.size} thread(s) with ${threadReplies.length} reply/replies`
+    );
+
+    // Fetch all messages for each thread from Pinecone
+    const namespace = `org-${organizationId}`;
+    const threadContextMap = new Map<string, SearchResult[]>();
+
+    for (const [key, replies] of uniqueThreads.entries()) {
+      const firstReply = replies[0];
+      const threadTs = firstReply.threadTs!;
+      const channelId = firstReply.channelId!;
+
+      try {
+        // Query Pinecone for all messages with this thread_ts
+        // This includes parent (where message_ts == thread_ts) and all replies
+        // Note: Pinecone requires a valid embedding vector even for metadata-only queries
+        // Use a dummy zero vector since we're filtering by metadata
+        const dummyEmbedding = new Array(1536).fill(0);
+
+        const threadResults = await vectorService.queryVectors(
+          dummyEmbedding, // Dummy embedding for metadata-only query
+          50, // Fetch up to 50 messages per thread
+          namespace,
+          {
+            channel_id: channelId,
+            thread_ts: threadTs,
+          }
+        );
+
+        // Transform and sort by timestamp
+        const threadMessages = threadResults
+          .map((r) => this.transformPineconeResult(r))
+          .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+        threadContextMap.set(key, threadMessages);
+
+        console.log(
+          `[SearchService] Fetched ${threadMessages.length} messages for thread ${threadTs} in #${firstReply.channelName}`
+        );
+      } catch (error) {
+        console.error(`[SearchService] Failed to fetch thread context for ${key}:`, error);
+        // Continue with other threads
+      }
+    }
+
+    // Build final results: Replace thread replies with full thread context
+    const expandedResults: SearchResult[] = [];
+    const processedThreads = new Set<string>();
+
+    for (const result of results) {
+      if (result.source === "slack" && result.threadTs && result.sourceType === "thread_reply") {
+        const key = `${result.channelId}-${result.threadTs}`;
+
+        // Only add thread context once (for first reply from that thread)
+        if (!processedThreads.has(key)) {
+          const threadMessages = threadContextMap.get(key);
+          if (threadMessages && threadMessages.length > 0) {
+            // Add all thread messages (parent + replies)
+            expandedResults.push(...threadMessages);
+            processedThreads.add(key);
+          } else {
+            // Fallback: keep original reply if thread fetch failed
+            expandedResults.push(result);
+          }
+        }
+        // Skip duplicate replies from same thread
+      } else {
+        // Keep non-thread messages as-is
+        expandedResults.push(result);
+      }
+    }
+
+    console.log(
+      `[SearchService] Thread expansion: ${results.length} → ${expandedResults.length} results`
+    );
+
+    return expandedResults;
+  }
+
+  /**
    * Transform Pinecone result to SearchResult
    */
   private transformPineconeResult(result: QueryResult): SearchResult {
@@ -456,6 +567,9 @@ class SearchService {
       channelName: metadata.channel_name,
       userId: metadata.user_id,
       username: metadata.username,
+      messageUrl: metadata.message_url,
+      messageTs: metadata.message_ts,
+      threadTs: metadata.thread_ts,
       pageId: metadata.page_id,
       pageTitle: metadata.page_title,
       pageUrl: metadata.page_url,

@@ -657,9 +657,13 @@ function App() {
                     )}
 
                     {/* Show AI message for non-workflow messages */}
-                    {!isWorkflowMessage && message.content && (
-                      <AIMessage content={message.content} />
-                    )}
+                    {!isWorkflowMessage &&
+                      (() => {
+                        const isCurrentStreaming =
+                          message.id === streamingMessageIdRef.current && !message.content;
+                        const content = isCurrentStreaming ? "Thinking..." : message.content || "";
+                        return <AIMessage content={content} isStreaming={isCurrentStreaming} />;
+                      })()}
 
                     {/* Show inline ExpertsCard for experts messages */}
                     {message.messageType === "experts" && message.cardData?.experts && (

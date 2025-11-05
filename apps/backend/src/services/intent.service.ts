@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { config } from "../config.js";
 import type { IntentAnalysis, IntentOptions } from "../types/trust.types.js";
 
@@ -6,7 +6,7 @@ import type { IntentAnalysis, IntentOptions } from "../types/trust.types.js";
  * Intent Detection Service
  *
  * Analyzes user queries to determine intent category and whether
- * knowledge base context is needed. Uses OpenAI for fast classification.
+ * knowledge base context is needed. Uses Groq for fast classification.
  *
  * Intent categories:
  * - company: Business model, mission, what Mitable does
@@ -17,15 +17,15 @@ import type { IntentAnalysis, IntentOptions } from "../types/trust.types.js";
  * - general: General knowledge questions
  */
 class IntentService {
-  private openai: OpenAI;
+  private groq: Groq;
 
   constructor() {
-    if (!config.openai.apiKey) {
-      throw new Error("OPENAI_API_KEY is not configured. Please set it in your .env file.");
+    if (!config.groq.apiKey) {
+      throw new Error("GROQ_API_KEY is not configured. Please set it in your .env file.");
     }
 
-    this.openai = new OpenAI({
-      apiKey: config.openai.apiKey,
+    this.groq = new Groq({
+      apiKey: config.groq.apiKey,
     });
   }
 
@@ -68,14 +68,14 @@ Examples:
 - "What is REST API?" → {"type":"general","confidence":0.95,"needsContext":false,"reasoning":"General definition"}
 - "Hi" → {"type":"greeting","confidence":1.0,"needsContext":false,"reasoning":"Greeting"}`;
 
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    const messages: Groq.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt },
       ...conversationHistory.slice(-3).map(
         (msg) =>
           ({
             role: msg.role as "user" | "assistant",
             content: msg.content,
-          }) as OpenAI.Chat.ChatCompletionMessageParam
+          }) as Groq.Chat.ChatCompletionMessageParam
       ),
       {
         role: "user",
@@ -84,8 +84,8 @@ Examples:
     ];
 
     try {
-      const response = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini", // Fast, cheap model for classification
+      const response = await this.groq.chat.completions.create({
+        model: config.groq.chatModel, // openai/gpt-oss-120b
         messages,
         temperature: 0.3, // Lower temp for consistent classification
         response_format: { type: "json_object" },

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useConversations } from "@/console/src/hooks/queries/chats";
+import { useConversations, useCreateConversation } from "@/console/src/hooks/queries/chats";
 import { Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ export default function ChatsView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const limit = 20;
+  const createConversationMutation = useCreateConversation();
 
   const { data, isLoading, error } = useConversations(page, limit);
   const chats = data?.conversations || [];
@@ -71,7 +72,17 @@ export default function ChatsView() {
       <div className="flex items-center justify-between">
         <h1 className="text-4xl font-bold text-text-primary">Your chat history</h1>
         <Button
-          onClick={() => navigate("/chats/new")}
+          onClick={async () => {
+            try {
+              const result = await createConversationMutation.mutateAsync({
+                title: "New Chat",
+                contextType: "general",
+              });
+              navigate(`/chats/${result.conversation.id}`);
+            } catch (e) {
+              // no-op; optionally toast later
+            }
+          }}
           className="gap-2 bg-primary text-white hover:bg-primary/90"
         >
           <Plus size={20} />

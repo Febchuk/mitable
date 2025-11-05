@@ -119,7 +119,6 @@ function App() {
       message,
       conversationId: convId,
       userMessage: message,
-      hasScreenshot: !!screenshot,
     });
 
     window.agentAPI.sendMessageToConversation(
