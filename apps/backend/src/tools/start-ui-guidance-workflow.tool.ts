@@ -1,6 +1,7 @@
 import { BaseTool, ToolContext, ToolParameters, ToolResult } from "./base.tool.js";
 // import { geminiVisionService } from "../services/gemini-vision.service.js"; // Unused - commented out
 // import { guideGenerationService } from "../services/guideGeneration.service.js"; // Unused - not called to avoid duplicate messages (see line 371)
+import { workflowService } from "../services/workflow.service.js";
 import type { SolutionObject, EmbeddingMatch } from "@mitable/shared";
 
 export class StartUIGuidanceWorkflowTool extends BaseTool {
@@ -383,13 +384,28 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
     // The SolutionObject is preserved in cardData and will be retrieved by
     // guide_next_step tool when user clicks "Yes, let's get started!"
 
+    // Create workflow session in database
+    const workflowSession = await workflowService.createWorkflowSession(
+      context.organizationId,
+      context.conversationId,
+      context.userId,
+      solutionObject
+    );
+
+    console.log("[StartUIGuidanceWorkflowTool] Created workflow session:", {
+      workflowSessionId: workflowSession.id,
+      conversationId: context.conversationId,
+      status: workflowSession.status,
+    });
+
     return {
       messageType: "workflow",
       content: previewMessage,
       cardData: {
         ...solutionObject,
+        workflowSessionId: workflowSession.id, // Add session ID to cardData
         workflowActive: true,
-        workflowPhase: "initial_proposal",
+        workflowPhase: "initial_proposal"
       },
       streamable: true,
     };

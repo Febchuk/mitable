@@ -12,7 +12,6 @@ import { StartUIGuidanceWorkflowTool } from "../tools/start-ui-guidance-workflow
 import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool.js";
 // REMOVED: RespondTextInWorkflowTool - replaced by smart wrapper utility
 // REMOVED: SearchKnowledgeInWorkflowTool - replaced by smart wrapper utility
-import { workflowService } from "./workflow.service";
 // DEPRECATED: Continuation detector only used in commented-out code (see lines 310-402)
 // import { continuationDetectorService } from "./continuation-detector.service";
 
@@ -279,11 +278,8 @@ export class AgentService {
     let lastToolSources: any[] | undefined;
 
     try {
-      // Check for workflow mode entry
-      const shouldEnterWorkflow = workflowService.shouldEnterWorkflowMode(
-        userMessage,
-        context.conversationHistory
-      );
+      // Workflow detection removed - agent service is deprecated
+      const shouldEnterWorkflow = false;
 
       console.log("[AgentService] Workflow detection:", {
         shouldEnterWorkflow,

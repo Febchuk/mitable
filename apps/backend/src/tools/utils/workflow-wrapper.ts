@@ -34,8 +34,8 @@ export function wrapWithWorkflowState(
   // Check if workflow state exists (pre-loaded by orchestrator)
   const workflowState = context.workflowState;
 
-  // No workflow → return as-is
-  if (!workflowState) {
+  // No workflow OR workflow is paused → return as-is (don't wrap)
+  if (!workflowState || workflowState.status !== "active") {
     return baseMessage;
   }
 

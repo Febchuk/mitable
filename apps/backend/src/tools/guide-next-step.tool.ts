@@ -1,6 +1,7 @@
 import { BaseTool, ToolContext, ToolParameters, ToolResult } from "./base.tool.js";
 import { geminiVisionService } from "../services/gemini-vision.service.js";
 import { guideGenerationService } from "../services/guideGeneration.service.js";
+import { workflowService } from "../services/workflow.service.js";
 // import type { SolutionObject } from "@mitable/shared"; // Unused - commented out
 
 /**
@@ -188,8 +189,9 @@ DO NOT USE:
       // Step 7: Build conversational message
       let message = visualGuidance.conversationalMessage;
 
-      // If plan was adjusted, communicate it to the user
-      if (evaluation.needsAdjustment) {
+      // If plan was ACTUALLY adjusted (new steps provided), communicate it to the user
+      // Don't show adjustment notice if Gemini just confirmed no changes needed
+      if (evaluation.needsAdjustment && evaluation.adjustedStepList) {
         message = `📝 *Plan Updated:* ${evaluation.adjustmentReason}\n\n${message}`;
         console.log("[GuideNextStepTool] Including adjustment notice in response");
       }
@@ -200,14 +202,19 @@ DO NOT USE:
         adjustmentMade: evaluation.needsAdjustment,
       });
 
-      // Step 8: Return with updated SolutionObject
+      // Step 8: Get workflow session to include metadata in cardData
+      const workflowSession = await workflowService.getActiveWorkflow(conversationId);
+
+      // Step 9: Return with updated SolutionObject
       return {
         messageType: "workflow",
         content: message,
         cardData: {
           ...updatedSolution,
-          workflowActive: true,
-          workflowPhase: "step_progression",
+          workflowSessionId: workflowSession?.id || context.workflowState?.workflowSessionId,
+          status: workflowSession?.status || "active", // Workflow is active during step progression
+          workflowActive: true, // Used by agent window
+          workflowPhase: "step_progression", // Used by agent window
         },
         streamable: true,
       };

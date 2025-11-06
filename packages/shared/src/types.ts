@@ -66,6 +66,10 @@ export const MessageSchema = z.object({
   content: z.string(),
   timestamp: z.string().datetime(),
   uiElements: z.array(UIElementSchema).optional(),
+
+  // Workflow relationship fields (optional - for linking messages to workflow sessions)
+  workflowSessionId: z.string().uuid().nullable().optional(),
+  relatedStepIndex: z.number().int().nullable().optional(),
 });
 
 export type Message = z.infer<typeof MessageSchema>;

@@ -4,6 +4,7 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
 import { OrchestratorService } from "../services/orchestrator.service";
+import { workflowService } from "../services/workflow.service";
 
 // Initialize orchestrator (replaces old agentService)
 const orchestrator = new OrchestratorService();
@@ -313,6 +314,8 @@ router.get(
           messageType: schema.messages.messageType,
           cardData: schema.messages.cardData,
           sources: schema.messages.sources,
+          workflowSessionId: schema.messages.workflowSessionId,
+          relatedStepIndex: schema.messages.relatedStepIndex,
           createdAt: schema.messages.createdAt,
         })
         .from(schema.messages)
@@ -339,6 +342,8 @@ router.get(
           cardData: cleanCardData || undefined,
           sources: (msg.sources as any[]) || undefined,
           windowTrigger: windowTrigger || undefined,
+          workflowSessionId: msg.workflowSessionId || undefined,
+          relatedStepIndex: msg.relatedStepIndex ?? undefined,
         };
       });
 
@@ -787,7 +792,12 @@ router.post(
         return;
       }
 
-      // Save user message to database
+      // Check if there's an active workflow for this conversation
+      const activeWorkflow = await workflowService.getActiveWorkflow(conversationId);
+      const workflowSessionId = activeWorkflow?.id || metadata?.workflowSessionId || null;
+      const currentStepIndex = activeWorkflow?.currentStepIndex || metadata?.currentStepIndex || null;
+
+      // Save user message to database with workflow fields
       const [userMessage] = await db
         .insert(schema.messages)
         .values({
@@ -795,6 +805,8 @@ router.post(
           role: "user",
           content,
           messageType: "text",
+          workflowSessionId, // Add workflow session ID if present
+          relatedStepIndex: currentStepIndex, // Add step index if present
         })
         .returning({
           id: schema.messages.id,
@@ -805,6 +817,19 @@ router.post(
 
       console.log(`[Stream] User message saved: ${userMessage.id}`);
 
+      // Dual-write to workflow_interactions if this is a workflow question
+      if (workflowSessionId && metadata?.workflowAction === "custom_question") {
+        await workflowService.addWorkflowInteraction(
+          workflowSessionId,
+          "user_question",
+          "user",
+          content,
+          currentStepIndex,
+          { screenshot, screenshotMetadata }
+        );
+        console.log(`[Stream] Workflow interaction saved for user question`);
+      }
+
       // Get recent conversation history (last 20 messages for context)
       const historyData = await db
         .select({
@@ -814,6 +839,8 @@ router.post(
           messageType: schema.messages.messageType,
           cardData: schema.messages.cardData,
           sources: schema.messages.sources,
+          workflowSessionId: schema.messages.workflowSessionId,
+          relatedStepIndex: schema.messages.relatedStepIndex,
           createdAt: schema.messages.createdAt,
         })
         .from(schema.messages)
@@ -882,6 +909,8 @@ router.post(
             messageType: msg.messageType || "text",
             cardData: msg.cardData || null,
             sources: (msg.sources as any) || [],
+            workflowSessionId: msg.workflowSessionId || null,
+            relatedStepIndex: msg.relatedStepIndex || null,
             createdAt: msg.createdAt,
           })),
         });
@@ -897,8 +926,16 @@ router.post(
             });
           }
 
-          // Send chunk to client
-          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+          // Inject workflow metadata into every chunk so frontend knows where to route it
+          // If no active workflow, these will be null and message renders normally
+          const enrichedChunk = {
+            ...chunk,
+            workflowSessionId: workflowSessionId,
+            relatedStepIndex: currentStepIndex,
+          };
+
+          // Send enriched chunk to client
+          res.write(`data: ${JSON.stringify(enrichedChunk)}\n\n`);
 
           // Accumulate content and metadata for database save
           if (chunk.type === "chunk" && chunk.content) {
@@ -931,6 +968,10 @@ router.post(
           ? { ...(assistantCardData || {}), windowTrigger: assistantWindowTrigger }
           : assistantCardData;
 
+        // Extract workflow fields from cardData
+        const assistantWorkflowSessionId = finalCardData?.workflowSessionId || workflowSessionId || null;
+        const assistantStepIndex = finalCardData?.currentStepIndex ?? currentStepIndex ?? null;
+
         const [assistantMessage] = await db
           .insert(schema.messages)
           .values({
@@ -940,12 +981,31 @@ router.post(
             messageType: assistantMessageType,
             cardData: finalCardData,
             sources: assistantSources,
+            workflowSessionId: assistantWorkflowSessionId, // Add workflow session ID
+            relatedStepIndex: assistantStepIndex, // Add step index
           })
           .returning({
             id: schema.messages.id,
           });
 
         console.log(`[Stream] Assistant message saved: ${assistantMessage.id}`);
+
+        // Dual-write to workflow_interactions if this is a workflow response
+        if (assistantWorkflowSessionId) {
+          const interactionType = metadata?.workflowAction === "progress_step"
+            ? "step_progress"
+            : "ai_response";
+
+          await workflowService.addWorkflowInteraction(
+            assistantWorkflowSessionId,
+            interactionType,
+            "assistant",
+            assistantContent,
+            assistantStepIndex,
+            { cardData: finalCardData, sources: assistantSources, workflowAction: metadata?.workflowAction }
+          );
+          console.log(`[Stream] Workflow interaction saved for assistant response (${interactionType})`);
+        }
 
         // Generate conversation title if this is the first exchange
         // conversationHistory includes the just-saved user message, so length <= 2 means first exchange
@@ -987,11 +1047,13 @@ router.post(
             .where(eq(schema.conversations.id, conversationId));
         }
 
-        // Send final event with message ID
+        // Send final event with message ID and workflow fields
         res.write(
           `data: ${JSON.stringify({
             type: "done",
             messageId: assistantMessage.id,
+            workflowSessionId: assistantWorkflowSessionId,
+            relatedStepIndex: assistantStepIndex,
           })}\n\n`
         );
 
@@ -1023,6 +1085,65 @@ router.post(
           message: error instanceof Error ? error.message : "Failed to process message",
         });
       }
+    }
+  }
+);
+
+/**
+ * Pause an active workflow
+ * POST /api/conversations/:conversationId/workflow/pause
+ */
+router.post(
+  "/:conversationId/workflow/pause",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { conversationId } = req.params;
+
+    try {
+      // Verify conversation belongs to user
+      const conversation = await db.query.conversations.findFirst({
+        where: eq(schema.conversations.id, conversationId),
+      });
+
+      if (!conversation) {
+        res.status(404).json({ error: "Not Found", message: "Conversation not found" });
+        return;
+      }
+
+      if (conversation.userId !== userId) {
+        res.status(403).json({ error: "Forbidden", message: "Access denied" });
+        return;
+      }
+
+      // Get active workflow for this conversation
+      const activeWorkflow = await workflowService.getActiveWorkflow(conversationId);
+
+      if (!activeWorkflow) {
+        res.status(404).json({ error: "Not Found", message: "No active workflow found" });
+        return;
+      }
+
+      // Pause the workflow
+      const pausedWorkflow = await workflowService.pauseWorkflow(activeWorkflow.id);
+
+      console.log("[Conversations] Workflow paused:", activeWorkflow.id);
+
+      // Return the updated workflow state (SolutionObject + metadata)
+      // Frontend will use this to update WorkflowAccordion's cardData
+      res.json({
+        success: true,
+        workflowSessionId: pausedWorkflow.id,
+        status: pausedWorkflow.status,
+        workflowData: pausedWorkflow.workflowData, // Full SolutionObject with steps
+        currentStepIndex: pausedWorkflow.currentStepIndex,
+      });
+    } catch (error) {
+      console.error("[Conversations] Error pausing workflow:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to pause workflow",
+      });
     }
   }
 );

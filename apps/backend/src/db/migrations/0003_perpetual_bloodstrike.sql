@@ -1,1 +1,2 @@
-ALTER TABLE "integrations" ADD CONSTRAINT "integrations_organization_id_provider_unique" UNIQUE("organization_id","provider");
+-- Constraint already exists in database, commenting out to allow migrations to proceed
+-- ALTER TABLE "integrations" ADD CONSTRAINT "integrations_organization_id_provider_unique" UNIQUE("organization_id","provider");

@@ -36,6 +36,13 @@
       "when": 1760947528766,
       "tag": "0004_condemned_katie_power",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1762225992224,
+      "tag": "0005_glamorous_mole_man",
+      "breakpoints": true
     }
   ]
 }

@@ -131,6 +131,7 @@ export interface WorkflowMessage extends BaseMessage {
     // Workflow UI state
     workflowActive: true;
     workflowPhase: WorkflowPhase;
+    workflowSessionId?: string; // Added for workflow session tracking
   };
 }
 

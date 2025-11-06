@@ -5,21 +5,12 @@
  * Works with both Agent and Conversation windows
  */
 
+import type { Message as MessageType } from "../../conversation/src/types";
+
 const API_BASE_URL = "http://localhost:3000/api";
 
-export interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp?: Date;
-  messageType?: string;
-  cardData?: any;
-  sources?: any[];
-  windowTrigger?: {
-    window: "nudge" | "guide";
-    data: any;
-  };
-}
+// Re-export Message type for convenience
+export type Message = MessageType;
 
 export interface Conversation {
   id: string;
@@ -34,9 +25,11 @@ export interface StreamChunk {
   content?: string;
   messageId?: string;
   error?: string;
-  messageType?: string;
+  messageType?: "text" | "workflow" | "experts";
   cardData?: any;
   sources?: any[];
+  workflowSessionId?: string | null;
+  relatedStepIndex?: number | null;
   windowTrigger?: {
     window: "nudge" | "guide";
     data: any;
@@ -109,6 +102,31 @@ export async function getConversationMessages(conversationId: string): Promise<M
 }
 
 /**
+ * Pause an active workflow
+ * Returns the updated workflow state with status: "paused"
+ */
+export async function pauseWorkflow(conversationId: string): Promise<{
+  success: boolean;
+  workflowSessionId: string;
+  status: string;
+  workflowData: any;
+  currentStepIndex: number;
+}> {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/workflow/pause`, {
+    method: "POST",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to pause workflow: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+/**
  * Send a message and stream the response
  *
  * @param conversationId - Conversation ID
@@ -125,13 +143,15 @@ export async function sendMessageStream(
   content: string,
   screenshot: string | null | undefined,
   callbacks: {
-    onChunk?: (chunk: string) => void;
+    onChunk?: (chunk: string, workflowSessionId?: string | null, relatedStepIndex?: number | null) => void;
     onComplete?: (
       fullContent: string,
       messageId: string,
       messageType?: string,
       cardData?: any,
-      windowTrigger?: { window: "nudge" | "guide"; data: any }
+      windowTrigger?: { window: "nudge" | "guide"; data: any },
+      workflowSessionId?: string | null,
+      relatedStepIndex?: number | null
     ) => void;
     onError?: (error: string) => void;
     onWindowTrigger?: (window: "nudge" | "guide", data: any) => void;
@@ -178,6 +198,8 @@ export async function sendMessageStream(
   let messageType: string | undefined;
   let cardData: any = undefined;
   let windowTriggerData: { window: "nudge" | "guide"; data: any } | undefined;
+  let workflowSessionId: string | null | undefined;
+  let relatedStepIndex: number | null | undefined;
 
   try {
     // eslint-disable-next-line no-constant-condition
@@ -210,9 +232,17 @@ export async function sendMessageStream(
 
             switch (chunk.type) {
               case "chunk":
+                // Extract workflow metadata from first chunk
+                // Backend enriches ALL chunks with these fields (either null or actual values)
+                if (workflowSessionId === undefined) {
+                  workflowSessionId = chunk.workflowSessionId;
+                  relatedStepIndex = chunk.relatedStepIndex;
+                }
+
                 if (chunk.content) {
                   fullContent += chunk.content;
-                  callbacks.onChunk?.(chunk.content);
+                  // Pass workflow metadata to onChunk so frontend can route chunks during streaming
+                  callbacks.onChunk?.(chunk.content, workflowSessionId, relatedStepIndex);
                 }
                 break;
 
@@ -241,13 +271,25 @@ export async function sendMessageStream(
                 if (chunk.messageId) {
                   messageId = chunk.messageId;
                 }
-                console.log("[API] Calling onComplete with windowTriggerData:", windowTriggerData);
+                if (chunk.workflowSessionId !== undefined) {
+                  workflowSessionId = chunk.workflowSessionId;
+                }
+                if (chunk.relatedStepIndex !== undefined) {
+                  relatedStepIndex = chunk.relatedStepIndex;
+                }
+                console.log("[API] Calling onComplete with workflow fields:", {
+                  windowTriggerData,
+                  workflowSessionId,
+                  relatedStepIndex,
+                });
                 callbacks.onComplete?.(
                   fullContent,
                   messageId,
                   messageType,
                   cardData,
-                  windowTriggerData
+                  windowTriggerData,
+                  workflowSessionId,
+                  relatedStepIndex
                 );
                 break;
 

@@ -35,9 +35,13 @@ export interface Message {
   content: string;
   type?: "text" | "card";
   messageType?: "text" | "workflow" | "experts";
+  workflowSessionId?: string | null; // Links to workflow session
+  relatedStepIndex?: number | null; // Which step this message relates to
   cardData?: {
     // For workflow messages
     solution?: string;
+    workflowSessionId?: string; // Session ID in cardData
+    currentStepIndex?: number; // Current step index in cardData
     stepList?: any[];
     workflowActive?: boolean;
     currentPhase?: string;

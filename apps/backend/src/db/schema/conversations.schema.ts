@@ -1,6 +1,7 @@
-import { pgTable, uuid, varchar, text, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, jsonb, timestamp, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "./users.schema";
+import { workflowSessions } from "./workflows.schema";
 
 // Conversations
 export const conversations = pgTable("conversations", {
@@ -25,6 +26,12 @@ export const messages = pgTable("messages", {
   messageType: varchar("message_type", { length: 50 }).default("text"), // 'text' | 'workflow' | 'experts'
   cardData: jsonb("card_data"), // Optional metadata for special message types
   sources: jsonb("sources").default("[]"), // Array of citation objects for RAG
+
+  // Workflow relationship fields (optional for backward compatibility)
+  workflowSessionId: uuid("workflow_session_id")
+    .references(() => workflowSessions.id, { onDelete: "set null" }), // Links to workflow_sessions.id
+  relatedStepIndex: integer("related_step_index"), // Which workflow step this message relates to
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
