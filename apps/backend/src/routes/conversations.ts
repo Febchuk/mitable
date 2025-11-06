@@ -5,6 +5,7 @@ import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
 import { OrchestratorService } from "../services/orchestrator.service";
 import { workflowService } from "../services/workflow.service";
+import { ScreenshotAnnotator } from "../utils/screenshot-annotator";
 
 // Initialize orchestrator (replaces old agentService)
 const orchestrator = new OrchestratorService();
@@ -1005,6 +1006,35 @@ router.post(
             { cardData: finalCardData, sources: assistantSources, workflowAction: metadata?.workflowAction }
           );
           console.log(`[Stream] Workflow interaction saved for assistant response (${interactionType})`);
+        }
+
+        // Debug: Save annotated screenshot if enabled and has visual guidance
+        if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true' && screenshot && screenshotMetadata) {
+          try {
+            // Check if the response has visual guidance data with bounding box
+            const visualGuidance = finalCardData?.visualGuidance;
+            if (visualGuidance?.element?.boundingBox) {
+              const annotator = new ScreenshotAnnotator();
+
+              await annotator.annotate(
+                screenshot,
+                visualGuidance.element.boundingBox,
+                {
+                  width: screenshotMetadata.width,
+                  height: screenshotMetadata.height,
+                },
+                {
+                  label: visualGuidance.element.description || visualGuidance.element.label || 'Target Element',
+                  confidence: visualGuidance.element.confidence || 0.5,
+                  instruction: content,
+                  elementType: visualGuidance.element.type,
+                }
+              );
+            }
+          } catch (debugError) {
+            console.error('[DEBUG SCREENSHOT] Failed to save annotated screenshot:', debugError);
+            // Don't fail the request, just log the error
+          }
         }
 
         // Generate conversation title if this is the first exchange

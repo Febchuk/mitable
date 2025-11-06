@@ -34,6 +34,7 @@
     "node-cache": "^5.1.2",
     "openai": "^6.3.0",
     "pg": "^8.13.1",
+    "sharp": "^0.33.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "tiktoken": "^1.0.22",
