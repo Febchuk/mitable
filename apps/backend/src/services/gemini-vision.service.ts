@@ -6,6 +6,7 @@ import { InterpretationOptionSchema, VisualGuidanceSchema, StepSchema } from "@m
 import type { SolutionObject, Step, VisualGuidance, InterpretationOption } from "@mitable/shared";
 import type { Message as DbMessage } from "../db/schema/conversations.schema.js";
 import { coordinateConverter, type ImageDimensions } from "./coordinate-converter.service.js";
+import { renderDebugScreenshot } from "../utils/bounding-box-renderer.js";
 
 const InterpretResponseSchema = z.object({
   interpretations: z.array(InterpretationOptionSchema),
@@ -518,7 +519,24 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
     try {
       const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
 
-      const prompt = `You are helping a user complete this specific action:
+      const prompt = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 CRITICAL: VISUAL DETECTION CONSTRAINT 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ONLY DETECT ELEMENTS THAT ARE ACTUALLY VISIBLE IN THE SCREENSHOT.
+
+DO NOT hallucinate or assume elements exist based on:
+- The step description
+- Workflow context
+- General knowledge about applications
+- What "should" be there
+
+Your analysis must be based SOLELY on what you can SEE in the image.
+
+If the element mentioned in the step is NOT visible:
+1. Set confidence: "low"
+2. DO NOT include targetElement (set it to null/undefined)
+3. Explain in conversationalMessage what the user needs to do first (e.g., "open the app", "navigate to the page", "scroll to show the menu")
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CURRENT STEP (your focus):
@@ -526,7 +544,7 @@ CURRENT STEP (your focus):
 
 Step ${currentStep.stepNumber}: "${currentStep.description}"
 
-Your job: Look at the screenshot and tell the user EXACTLY which UI element to click/interact with to complete this action.
+Your job: Look at the screenshot and tell the user EXACTLY which UI element to click/interact with to complete this action - BUT ONLY if that element is VISIBLE in the screenshot.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 COMPLETE WORKFLOW CONTEXT:
@@ -558,11 +576,12 @@ CRITICAL RULES:
 
 1. Your recommendation must help complete the current step: "${currentStep.description}"
 2. Use the supporting data and step list context to understand the workflow
-3. Identify the specific button, link, or UI element that accomplishes this step
+3. Identify the specific button, link, or UI element that accomplishes this step - ONLY if it's visible
 4. If the required app/page is not visible, tell the user to open/navigate to it first
 5. NEVER suggest clicking unrelated elements just because they're visible
-6. Ignore any chat/agent windows in the screenshot (those are AI assistant interfaces)
-7. DO NOT reference future steps - focus only on the current step
+6. NEVER return bounding boxes for elements you cannot see in the screenshot
+7. Ignore any chat/agent windows in the screenshot (those are AI assistant interfaces)
+8. DO NOT reference future steps - focus only on the current step
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT FORMAT:
@@ -608,19 +627,27 @@ Example 1:
 Step: "Navigate to the Mitable PRD document in Notion"
 Screenshot shows: Slack is open
 ✅ GOOD conversationalMessage: "I can see Slack is open. Let's switch to Notion - you can open it from your dock or use Cmd+Space to search for the Notion app."
+✅ GOOD: confidence="low", targetElement=null
 ❌ BAD: "Click on the DM with Aurel in the left sidebar" (Wrong - this doesn't help open Notion!)
 
 Example 2:
 Step: "Click the Save button"
 Screenshot shows: Document editor with visible Save button in top-right
 ✅ GOOD conversationalMessage: "Perfect! Click the blue 'Save' button in the top-right corner, next to the Share button."
+✅ GOOD: confidence="high", targetElement with bounding box
 ❌ BAD: "You're in the right place, keep working on the document" (Wrong - doesn't identify the Save button!)
 
 Example 3:
 Step: "Scroll to the Product Vision section"
 Screenshot shows: Notion document with Product Vision visible below the fold
 ✅ GOOD conversationalMessage: "I can see you're in the right document. Scroll down about halfway - the 'Product Vision & Strategy' heading is visible in the middle of the page."
-❌ BAD: "Click on the settings icon" (Wrong - step is about scrolling, not clicking settings!)`;
+❌ BAD: "Click on the settings icon" (Wrong - step is about scrolling, not clicking settings!)
+
+Example 4 - HALLUCINATION PREVENTION:
+Step: "Click on the 'File' menu at the top of the screen"
+Screenshot shows: Safari browser with NO visible menu bar (it's hidden or in full-screen mode)
+✅ GOOD: confidence="low", targetElement=null, conversationalMessage: "I can see Safari is open, but the menu bar isn't visible in the screenshot. The app might be in full-screen mode. Try pressing Fn+Control+F2 to access the menu bar, or move your mouse to the very top of the screen to reveal it."
+❌ BAD: Returns bounding box with coordinates for File menu (THIS IS HALLUCINATION - menu is NOT visible in the screenshot!)`;
 
       const result = await this.stepGuidanceModel.generateContent([
         prompt,
@@ -650,6 +677,39 @@ Screenshot shows: Notion document with Product Vision visible below the fold
         console.log("[GeminiVision] Converted to pixel coordinates:", parsed.targetElement.boundingBox);
       } else if (parsed.targetElement?.boundingBox && !screenshotMetadata) {
         console.warn("[GeminiVision] Bounding box present but no screenshot metadata - cannot convert coordinates");
+      }
+
+      // VALIDATION: Reject low-confidence detections with bounding boxes (likely hallucinations)
+      if (parsed.targetElement?.boundingBox && parsed.confidence === "low") {
+        console.warn("[GeminiVision] ⚠️  HALLUCINATION DETECTED: Removing bounding box from low-confidence detection", {
+          element: parsed.targetElement.label,
+          confidence: parsed.confidence,
+          stepDescription: currentStep.description,
+          boundingBox: parsed.targetElement.boundingBox,
+        });
+        parsed.targetElement = undefined; // Remove to prevent hallucinated overlays
+      }
+
+      // DEBUG: Save screenshot with bounding box visualization if enabled
+      if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true' && parsed.targetElement?.boundingBox && screenshotMetadata) {
+        try {
+          const debugPath = await renderDebugScreenshot({
+            screenshot,
+            boundingBox: parsed.targetElement.boundingBox,
+            label: parsed.targetElement.label,
+            confidence: parsed.confidence,
+            stepDescription: currentStep.description,
+            metadata: {
+              width: screenshotMetadata.width,
+              height: screenshotMetadata.height,
+              stepNumber: currentStep.stepNumber,
+            },
+          });
+          console.log("[GeminiVision] 🖼️  Debug screenshot saved:", debugPath);
+        } catch (debugError) {
+          console.error("[GeminiVision] Failed to save debug screenshot:", debugError);
+          // Don't throw - debug screenshots are optional
+        }
       }
 
       // Comprehensive logging for debugging

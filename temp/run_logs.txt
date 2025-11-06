@@ -1,22 +1,665 @@
-@mitable/backend:dev: [Conversations] Sending separate window_trigger event: {
-@mitable/backend:dev:   type: 'window_trigger',
-@mitable/backend:dev:   windowTrigger: {
-@mitable/backend:dev:     window: 'guide',
-@mitable/backend:dev:     data: {
-@mitable/backend:dev:       conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:       stepList: [Array],
-@mitable/backend:dev:       currentStepIndex: 0,
-@mitable/backend:dev:       visualGuidance: [Object]
+chunk-IFMQGFG6.js?v=ceb5fa75:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+VM4 sandbox_bundle:2 Electron Security Warning (Insecure Content-Security-Policy) This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+warnAboutInsecureCSP @ VM4 sandbox_bundle:2
+App.tsx:136 [Conversation] Message received from Agent: Object
+App.tsx:165 [Conversation] User message added to UI: Object
+App.tsx:228 [Conversation] Placeholder AI message created, starting stream...
+conversations.ts:155 [API] 📨 Starting message stream: Object
+App.tsx:110 [Conversation] View state changed by main process: expanded current: hidden
+conversations.ts:162 [API] Auth headers obtained for streaming
+conversations.ts:168 [API] Sending message with screenshot (806174 bytes)
+conversations.ts:178 [API] Sending message with screenshotMetadata: Object
+App.tsx:110 [Conversation] View state changed by main process: expanded current: expanded
+conversations.ts:256 [API] ✅ Full content received, starting frontend streaming: Object
+conversations.ts:275 [API] ✅ Streaming complete, calling onComplete
+App.tsx:246 [Conversation] onComplete received: Object
+App.tsx:453 [Conversation] Workflow option selected: Object
+App.tsx:485 [Conversation] Capturing screenshot for workflow action: confirm_start
+VM5:111 [Conversation Preload] captureScreenshot() called from renderer Object
+App.tsx:490 [Conversation] Screenshot captured successfully with metadata: Object
+conversations.ts:155 [API] 📨 Starting message stream: Object
+conversations.ts:162 [API] Auth headers obtained for streaming
+conversations.ts:168 [API] Sending message with screenshot (970586 bytes)
+conversations.ts:174 [API] Sending message with metadata: Object
+conversations.ts:178 [API] Sending message with screenshotMetadata: Object
+App.tsx:541 [Conversation] onWindowTrigger called: Object
+App.tsx:553 [Conversation] Calling startGuide with data: {
+  "conversationId": "1f8a8aec-c57a-4130-8444-c91e8b5f11e3",
+  "stepList": [
+    {
+      "stepNumber": 1,
+      "description": "Open the company's communication application on your computer or web browser. [pending]",
+      "status": "current"
+    },
+    {
+      "stepNumber": 2,
+      "description": "Look for a 'Messages' or 'Chat' icon on the main navigation menu, which is usually located on the left-hand side or at the top of the interface. [pending]",
+      "status": "pending"
+    },
+    {
+      "stepNumber": 3,
+      "description": "Click on the 'Messaging' icon at the top of the interface. It has a number '1' on it to indicate one unread message.",
+      "status": "pending"
+    },
+    {
+      "stepNumber": 4,
+      "description": "If you have any unread messages, they should be highlighted or marked with an indicator, such as a number or a dot. [pending]",
+      "status": "pending"
+    },
+    {
+      "stepNumber": 5,
+      "description": "Select a conversation to view your messages. You can usually click directly on the conversation to open it. [pending]",
+      "status": "pending"
+    }
+  ],
+  "currentStepIndex": 0,
+  "visualGuidance": {
+    "elementDescription": "The company's communication application is already open in the form of the LinkedIn website. You are ready to proceed to the next step.",
+    "visualContext": "LinkedIn is open in a web browser.",
+    "confidence": "high",
+    "conversationalMessage": "It looks like LinkedIn is already open in your web browser. You can now proceed to the next step to find the 'Messages' or 'Chat' icon.",
+    "targetElement": {
+      "label": "LinkedIn website",
+      "boundingBox": {
+        "x": 0,
+        "y": 0,
+        "width": 1661.337,
+        "height": 1078.92
+      }
+    }
+  }
+}
+VM5:92 [Preload] startGuide called with data: Object
+VM5:100 [Preload] Sending IPC to channel: guide-start
+conversations.ts:256 [API] ✅ Full content received, starting frontend streaming: Object
+conversations.ts:275 [API] ✅ Streaming complete, calling onComplete
+App.tsx:453 [Conversation] Workflow option selected: Object
+App.tsx:485 [Conversation] Capturing screenshot for workflow action: progress_step
+VM5:111 [Conversation Preload] captureScreenshot() called from renderer Object
+App.tsx:490 [Conversation] Screenshot captured successfully with metadata: Object
+conversations.ts:155 [API] 📨 Starting message stream: Object
+conversations.ts:162 [API] Auth headers obtained for streaming
+conversations.ts:168 [API] Sending message with screenshot (985998 bytes)
+conversations.ts:174 [API] Sending message with metadata: Object
+conversations.ts:178 [API] Sending message with screenshotMetadata: Object
+App.tsx:541 [Conversation] onWindowTrigger called: Object
+App.tsx:553 [Conversation] Calling startGuide with data: {
+  "conversationId": "1f8a8aec-c57a-4130-8444-c91e8b5f11e3",
+  "stepList": [
+    {
+      "stepNumber": 1,
+      "description": "Open the company's communication application on your computer or web browser.",
+      "status": "completed"
+    },
+    {
+      "stepNumber": 2,
+      "description": "Look for a 'Messages' or 'Chat' icon on the main navigation menu, which is usually located on the left-hand side or at the top of the interface.",
+      "status": "current"
+    },
+    {
+      "stepNumber": 3,
+      "description": "Click on the 'Messaging' icon at the top of the interface. It has a number '1' on it to indicate one unread message.",
+      "status": "pending"
+    },
+    {
+      "stepNumber": 4,
+      "description": "If you have any unread messages, they should be highlighted or marked with an indicator, such as a number or a dot.",
+      "status": "pending"
+    },
+    {
+      "stepNumber": 5,
+      "description": "Select a conversation to view your messages. You can usually click directly on the conversation to open it.",
+      "status": "pending"
+    }
+  ],
+  "currentStepIndex": 1,
+  "visualGuidance": {
+    "elementDescription": "The 'Messaging' icon is located at the top of the interface.",
+    "visualContext": "The LinkedIn page is open, and the top navigation bar is visible, including the 'Messaging' icon.",
+    "confidence": "high",
+    "conversationalMessage": "I can see the 'Messaging' icon with a number '1' on it at the top of the interface, indicating one unread message. Proceed to click on the 'Messaging' icon.",
+    "targetElement": {
+      "label": "Messaging",
+      "boundingBox": {
+        "x": 941.2579999999999,
+        "y": 109.08000000000001,
+        "width": 76.498,
+        "height": 30.240000000000002
+      }
+    }
+  }
+}
+VM5:92 [Preload] startGuide called with data: Object
+VM5:100 [Preload] Sending IPC to channel: guide-start
+conversations.ts:256 [API] ✅ Full content received, starting frontend streaming: Object
+conversations.ts:275 [API] ✅ Streaming complete, calling onComplete
+App.tsx:453 [Conversation] Workflow option selected: {action: 'progress_step', message: 'Move on to next step', metadata: {…}}
+App.tsx:485 [Conversation] Capturing screenshot for workflow action: progress_step
+VM5:111 [Conversation Preload] captureScreenshot() called from renderer {hasMessage: false, hasContext: false}
+App.tsx:490 [Conversation] Screenshot captured successfully with metadata: {width: 1663, height: 1080, originalWidth: 3024, originalHeight: 1964, scaleFactor: 2, …}
+conversations.ts:155 [API] 📨 Starting message stream: {conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3', contentLength: 20, hasScreenshot: true}
+conversations.ts:162 [API] Auth headers obtained for streaming
+conversations.ts:168 [API] Sending message with screenshot (868786 bytes)
+conversations.ts:174 [API] Sending message with metadata: {workflowAction: 'progress_step', selectedOption: 1}
+conversations.ts:178 [API] Sending message with screenshotMetadata: {width: 1663, height: 1080, originalWidth: 3024, originalHeight: 1964, scaleFactor: 2, …}
+App.tsx:541 [Conversation] onWindowTrigger called: {windowType: 'guide', hasData: true, hasVisualGuidance: true, hasBoundingBox: true, boundingBox: {…}, …}
+App.tsx:553 [Conversation] Calling startGuide with data: {
+  "conversationId": "1f8a8aec-c57a-4130-8444-c91e8b5f11e3",
+  "stepList": [
+    {
+      "stepNumber": 1,
+      "description": "Open the company's communication application on your computer or web browser.",
+      "status": "completed"
+    },
+    {
+      "stepNumber": 2,
+      "description": "Look for a 'Messages' or 'Chat' icon on the main navigation menu, which is usually located on the left-hand side or at the top of the interface.",
+      "status": "completed"
+    },
+    {
+      "stepNumber": 3,
+      "description": "Click on the 'Messaging' icon at the top of the interface. It has a number '18' on it to indicate eighteen unread messages.",
+      "status": "current"
+    },
+    {
+      "stepNumber": 4,
+      "description": "If you have any unread messages, they should be highlighted or marked with an indicator, such as a number or a dot.",
+      "status": "pending"
+    },
+    {
+      "stepNumber": 5,
+      "description": "Select a conversation to view your messages. You can usually click directly on the conversation to open it.",
+      "status": "pending"
+    }
+  ],
+  "currentStepIndex": 2,
+  "visualGuidance": {
+    "elementDescription": "The 'Messaging' icon is located at the top navigation bar, slightly right of the center. It has a number '18' on it, indicating eighteen unread messages.",
+    "visualContext": "The LinkedIn page is open and the top navigation bar is visible, including the 'Messaging' icon with the number '18' on it.",
+    "confidence": "high",
+    "conversationalMessage": "Great! Click on the 'Messaging' icon at the top of the interface. It has a number '18' on it, indicating eighteen unread messages.",
+    "targetElement": {
+      "label": "Messaging",
+      "boundingBox": {
+        "x": 883.053,
+        "y": 133.92,
+        "width": 98.11699999999999,
+        "height": 29.16
+      }
+    }
+  }
+}
+VM5:92 [Preload] startGuide called with data: {hasData: true, hasVisualGuidance: true, hasBoundingBox: true, data: {…}}
+VM5:100 [Preload] Sending IPC to channel: guide-start
+conversations.ts:256 [API] ✅ Full content received, starting frontend streaming: {contentLength: 253, wordCount: 48}
+conversations.ts:275 [API] ✅ Streaming complete, calling onComplete
+
+@mitable/backend:dev:     "conversationalMessage": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "targetElement": {
+@mitable/backend:dev:       "type": "object",
+@mitable/backend:dev:       "properties": {
+@mitable/backend:dev:         "label": {
+@mitable/backend:dev:           "type": "string"
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "boundingBox": {
+@mitable/backend:dev:           "type": "object",
+@mitable/backend:dev:           "properties": {
+@mitable/backend:dev:             "x": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "y": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "width": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "height": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             }
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "required": [
+@mitable/backend:dev:             "x",
+@mitable/backend:dev:             "y",
+@mitable/backend:dev:             "width",
+@mitable/backend:dev:             "height"
+@mitable/backend:dev:           ],
+@mitable/backend:dev:           "additionalProperties": false
+@mitable/backend:dev:         }
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "required": [
+@mitable/backend:dev:         "label",
+@mitable/backend:dev:         "boundingBox"
+@mitable/backend:dev:       ],
+@mitable/backend:dev:       "additionalProperties": false
 @mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "elementDescription",
+@mitable/backend:dev:     "visualContext",
+@mitable/backend:dev:     "confidence",
+@mitable/backend:dev:     "conversationalMessage"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "elementDescription": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "visualContext": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "confidence": {
+@mitable/backend:dev:       "type": "string",
+@mitable/backend:dev:       "enum": [
+@mitable/backend:dev:         "high",
+@mitable/backend:dev:         "medium",
+@mitable/backend:dev:         "low"
+@mitable/backend:dev:       ]
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "alternativeElements": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "conversationalMessage": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "targetElement": {
+@mitable/backend:dev:       "type": "object",
+@mitable/backend:dev:       "properties": {
+@mitable/backend:dev:         "label": {
+@mitable/backend:dev:           "type": "string"
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "boundingBox": {
+@mitable/backend:dev:           "type": "object",
+@mitable/backend:dev:           "properties": {
+@mitable/backend:dev:             "x": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "y": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "width": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "height": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             }
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "required": [
+@mitable/backend:dev:             "x",
+@mitable/backend:dev:             "y",
+@mitable/backend:dev:             "width",
+@mitable/backend:dev:             "height"
+@mitable/backend:dev:           ]
+@mitable/backend:dev:         }
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "required": [
+@mitable/backend:dev:         "label",
+@mitable/backend:dev:         "boundingBox"
+@mitable/backend:dev:       ]
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "elementDescription",
+@mitable/backend:dev:     "visualContext",
+@mitable/backend:dev:     "confidence",
+@mitable/backend:dev:     "conversationalMessage"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "needsAdjustment": {
+@mitable/backend:dev:       "type": "boolean"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustedStepList": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "stepNumber": {
+@mitable/backend:dev:             "type": "integer",
+@mitable/backend:dev:             "exclusiveMinimum": 0
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "description": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "status": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "pending",
+@mitable/backend:dev:               "current",
+@mitable/backend:dev:               "completed"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "stepNumber",
+@mitable/backend:dev:           "description",
+@mitable/backend:dev:           "status"
+@mitable/backend:dev:         ],
+@mitable/backend:dev:         "additionalProperties": false
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustmentReason": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "needsAdjustment"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "needsAdjustment": {
+@mitable/backend:dev:       "type": "boolean"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustedStepList": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "stepNumber": {
+@mitable/backend:dev:             "type": "integer"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "description": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "status": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "pending",
+@mitable/backend:dev:               "current",
+@mitable/backend:dev:               "completed"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "stepNumber",
+@mitable/backend:dev:           "description",
+@mitable/backend:dev:           "status"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustmentReason": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "needsAdjustment"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideGenerationService] Initialized 3 pre-defined guides
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "array",
+@mitable/backend:dev:   "items": {
+@mitable/backend:dev:     "type": "object",
+@mitable/backend:dev:     "properties": {
+@mitable/backend:dev:       "weekNumber": {
+@mitable/backend:dev:         "type": "integer",
+@mitable/backend:dev:         "minimum": 1
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "title": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "minLength": 1,
+@mitable/backend:dev:         "maxLength": 255
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "description": {
+@mitable/backend:dev:         "type": [
+@mitable/backend:dev:           "string",
+@mitable/backend:dev:           "null"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "timeEstimate": {
+@mitable/backend:dev:         "anyOf": [
+@mitable/backend:dev:           {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "maxLength": 50
+@mitable/backend:dev:           },
+@mitable/backend:dev:           {
+@mitable/backend:dev:             "type": "null"
+@mitable/backend:dev:           }
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "orderIndex": {
+@mitable/backend:dev:         "type": "integer",
+@mitable/backend:dev:         "minimum": 0
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "required": [
+@mitable/backend:dev:       "weekNumber",
+@mitable/backend:dev:       "title",
+@mitable/backend:dev:       "description",
+@mitable/backend:dev:       "timeEstimate",
+@mitable/backend:dev:       "orderIndex"
+@mitable/backend:dev:     ],
+@mitable/backend:dev:     "additionalProperties": false
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔄 Converting type array: ["string","null"]
+@mitable/backend:dev:   ✓ Converted to: type="string", nullable=true
+@mitable/backend:dev: 🔄 Converting anyOf nullable: [{"type":"string","maxLength":50},{"type":"null"}]
+@mitable/backend:dev:   ✓ Converted to: {"type":"string","nullable":true}
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "array",
+@mitable/backend:dev:   "items": {
+@mitable/backend:dev:     "type": "object",
+@mitable/backend:dev:     "properties": {
+@mitable/backend:dev:       "weekNumber": {
+@mitable/backend:dev:         "type": "integer"
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "title": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "description": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "nullable": true
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "timeEstimate": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "nullable": true
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "orderIndex": {
+@mitable/backend:dev:         "type": "integer"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "required": [
+@mitable/backend:dev:       "weekNumber",
+@mitable/backend:dev:       "title",
+@mitable/backend:dev:       "description",
+@mitable/backend:dev:       "timeEstimate",
+@mitable/backend:dev:       "orderIndex"
+@mitable/backend:dev:     ]
 @mitable/backend:dev:   }
 @mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Validating configuration...
+@mitable/backend:dev: 🔌 Testing database connection...
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/electron:dev: [Overlay] Overlay window loaded successfully
+@mitable/backend:dev: ✅ Database connected: 2025-11-05T07:33:54.889Z
+@mitable/backend:dev: 📊 Initial pool stats: { total: 1, idle: 0, waiting: 0 }
+@mitable/backend:dev: 🔧 Initializing vector service...
+@mitable/backend:dev: ✅ Vector service initialized
+@mitable/backend:dev: 🚀 Mitable Backend API running on http://localhost:3000
+@mitable/backend:dev: 📊 Environment: development
+@mitable/electron:dev: [Conversation] DOM ready
+@mitable/electron:dev: [Conversation] Renderer loaded and ready for IPC
+@mitable/electron:dev: [Console] DOM ready - window.consoleAPI should be available now
+@mitable/electron:dev: [Console] Window finished loading - preload script should be ready
+@mitable/electron:dev: [Auth] Tokens set from Console window
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/electron:dev: [Auth] Tokens set from Console window
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: false, hasContext: false, options: undefined }
+@mitable/electron:dev: [Screenshot] Using unconditional capture (no heuristics)
+@mitable/electron:dev: [CaptureService] Starting capture: {
+@mitable/electron:dev:   mode: 'full-screen',
+@mitable/electron:dev:   displayId: undefined,
+@mitable/electron:dev:   hasBounds: false,
+@mitable/electron:dev:   saveToFile: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 1, width: 1512, height: 982, scaleFactor: 2 }
+@mitable/electron:dev: [CaptureService] Resizing image: {
+@mitable/electron:dev:   original: { width: 3024, height: 1964 },
+@mitable/electron:dev:   resized: { width: 1663, height: 1080 }
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1663, height: 1080, hasFile: false }
+@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1663, height: 1080 }
+@mitable/electron:dev: [Main] CONVERSATION_SET_STATE called from renderer, state: expanded
+@mitable/electron:dev: [Main] Setting state to expanded
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: [Conversations] Request received: {
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   contentLength: 26,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   screenshotLength: 806174,
+@mitable/backend:dev:   screenshotMetadata: {
+@mitable/backend:dev:     width: 1663,
+@mitable/backend:dev:     height: 1080,
+@mitable/backend:dev:     originalWidth: 3024,
+@mitable/backend:dev:     originalHeight: 1964,
+@mitable/backend:dev:     scaleFactor: 2,
+@mitable/backend:dev:     captureMode: 'full-screen',
+@mitable/backend:dev:     timestamp: 1762328059967
+@mitable/backend:dev:   },
+@mitable/backend:dev:   metadata: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔌 New database connection established
 @mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
-@mitable/electron:dev: [Main] Guide start requested (overlay mode): { hasVisualGuidance: true, hasBoundingBox: true }
-@mitable/electron:dev: [Main] Showing overlay with bounding box: { bbox: { x: 0, y: 0, width: 1887.36, height: 58.32 }, stepNumber: 1 }
-@mitable/backend:dev: [Stream] Assistant message saved: 75b01eee-d8e8-4b40-8ba3-acd16dd23a25
+@mitable/backend:dev: [Stream] User message saved: 23d662e7-f496-4cc2-bcfd-f70462aa8f9e
+@mitable/backend:dev: [Conversations] User profile (from cache): {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   name: 'Emily Rodriguez',
+@mitable/backend:dev:   email: 'emily@lorikeet.ai'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] ToolContext created: {
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   historyLength: 1,
+@mitable/backend:dev:   hasUserProfile: true,
+@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
+@mitable/backend:dev: [Orchestrator] Processing message: {
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasWorkflowState: false,
+@mitable/backend:dev:   workflowAction: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [Orchestrator] Intent classified: { type: 'workflow_start', confidence: 0.95 }
+@mitable/backend:dev: [Orchestrator] Routing: intent � Agent: visual-guidance
+@mitable/backend:dev: [VisualGuidanceAgent] Vague prompt inference: "How do I go to my messages" → specific
+@mitable/backend:dev: [VisualGuidanceAgent] Starting knowledge-grounded workflow
+@mitable/backend:dev: [SearchKnowledgeTool] Searching for: "How do I go to my messages"
+@mitable/backend:dev: [SearchKnowledgeTool] Organization context: {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   topK: 10,
+@mitable/backend:dev:   fetchLimit: 50
+@mitable/backend:dev: }
+@mitable/backend:dev: [IntentService] Intent: general (confidence: 0.85, needsContext: false)
+@mitable/backend:dev: [IntentService] Reasoning: The question is about navigating to messages and does not provide company-specific context.
+@mitable/backend:dev: [SearchKnowledgeTool] Detected intent: general (confidence: 0.85)
+@mitable/backend:dev: [SearchKnowledgeTool] Performing hybrid search: {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   query: 'How do I go to my messages',
+@mitable/backend:dev:   fetchLimit: 50,
+@mitable/backend:dev:   dateFilters: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [SearchService] Pinecone filter: {"organization_id":"86c996f4-d997-44cf-8bdf-b00607e619ee"}
+@mitable/backend:dev: [SearchKnowledgeTool] Hybrid search complete: {
+@mitable/backend:dev:   totalResults: 50,
+@mitable/backend:dev:   semanticResults: 100,
+@mitable/backend:dev:   keywordResults: 2,
+@mitable/backend:dev:   searchTime: '4001ms'
+@mitable/backend:dev: }
+@mitable/backend:dev: [TrustRanking] Applying trust ranking for intent: general
+@mitable/backend:dev: [TrustRanking] Multipliers - codebase: 1x, document: 1x, chat: 1x
+@mitable/backend:dev: [TrustRanking] Top 5 after trust ranking:
+@mitable/backend:dev:   1. [chat/slack] score: 0.016 × 1x = 0.016
+@mitable/backend:dev:   2. [chat/slack] score: 0.016 × 1x = 0.016
+@mitable/backend:dev:   3. [chat/slack] score: 0.015 × 1x = 0.015
+@mitable/backend:dev:   4. [chat/slack] score: 0.014 × 1x = 0.014
+@mitable/backend:dev:   5. [chat/slack] score: 0.013 × 1x = 0.013
+@mitable/backend:dev: [SearchKnowledgeTool] Returning top 10 of 50 ranked results
+@mitable/backend:dev: [SearchKnowledgeTool] Returning 10 sources (1139 tokens)
+@mitable/backend:dev: [SearchKnowledgeTool] Success - returning knowledge: {
+@mitable/backend:dev:   responseLength: 4750,
+@mitable/backend:dev:   sourcesCount: 10,
+@mitable/backend:dev:   sourceNames: [
+@mitable/backend:dev:     '#meeting-notes - mikun.adewole',
+@mitable/backend:dev:     '#product - mikun.adewole',
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#engineering - febchuk',
+@mitable/backend:dev:     '#engineering - aurel.npounengnong',
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#all-mitable-ai - aurel.npounengnong'
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   tokenCount: 1276,
+@mitable/backend:dev:   truncated: false,
+@mitable/backend:dev:   truncatedCount: 0
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Search complete: { query: 'How do I go to my messages', sourcesFound: 10 }
+@mitable/backend:dev: [VisualGuidanceAgent] Calling GPT-4 for workflow synthesis
+@mitable/backend:dev: [VisualGuidanceAgent] GPT-4 synthesis received: {
+@mitable/backend:dev:   hasSolution: true,
+@mitable/backend:dev:   hasExplanation: true,
+@mitable/backend:dev:   hasSupportingDataExplanation: true,
+@mitable/backend:dev:   stepCount: 5
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Validation passed, preparing tool parameters: {
+@mitable/backend:dev:   solution: "Access your messages through the company's chat interface...",
+@mitable/backend:dev:   stepCount: 5,
+@mitable/backend:dev:   supportingDataFromSearch: 10
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Executing workflow tool with combined parameters
+@mitable/backend:dev: [StartUIGuidanceWorkflowTool] Execute: Access your messages through the company's chat interface
+@mitable/backend:dev: [StartUIGuidanceWorkflowTool] Created workflow preview: {
+@mitable/backend:dev:   stepCount: 5,
+@mitable/backend:dev:   estimatedTime: '13 minutes',
+@mitable/backend:dev:   currentStepIndex: -1,
+@mitable/backend:dev:   allStepsPending: true
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'complete',
+@mitable/backend:dev:   hasContent: true,
+@mitable/backend:dev:   hasWindowTrigger: false,
+@mitable/backend:dev:   windowType: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [Stream] Assistant message saved: 92786986-4ef8-4fa1-b68c-b4c18fbcef64
+@mitable/backend:dev: [Stream] First exchange detected - generating conversation title
+@mitable/backend:dev: [TitleGenerationService] Generating title for conversation
+@mitable/backend:dev: [TitleGenerationService] Title generated: Accessing my messages
+@mitable/backend:dev: [Stream] Generated title: Accessing my messages
+@mitable/backend:dev: [Stream] Conversation title updated successfully
 @mitable/backend:dev: [Conversations] Streaming completed successfully: {
-@mitable/backend:dev:   messageId: '75b01eee-d8e8-4b40-8ba3-acd16dd23a25',
-@mitable/backend:dev:   contentLength: 231
+@mitable/backend:dev:   messageId: '92786986-4ef8-4fa1-b68c-b4c18fbcef64',
+@mitable/backend:dev:   contentLength: 558
 @mitable/backend:dev: }
 @mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: false, hasContext: false, options: undefined }
 @mitable/electron:dev: [Screenshot] Using unconditional capture (no heuristics)
@@ -26,129 +669,119 @@
 @mitable/electron:dev:   hasBounds: false,
 @mitable/electron:dev:   saveToFile: undefined
 @mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 5, width: 1920, height: 1080, scaleFactor: 2 }
+@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 1, width: 1512, height: 982, scaleFactor: 2 }
 @mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1920, height: 1080 }
+@mitable/electron:dev:   original: { width: 3024, height: 1964 },
+@mitable/electron:dev:   resized: { width: 1663, height: 1080 }
 @mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1920, height: 1080, hasFile: false }
-@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1920, height: 1080 }
+@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1663, height: 1080, hasFile: false }
+@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1663, height: 1080 }
 @mitable/electron:dev: [Auth] Token requested, returning: present
 @mitable/backend:dev: [Conversations] Request received: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
 @mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
-@mitable/backend:dev:   contentLength: 20,
+@mitable/backend:dev:   contentLength: 23,
 @mitable/backend:dev:   hasScreenshot: true,
-@mitable/backend:dev:   screenshotLength: 1427430,
+@mitable/backend:dev:   screenshotLength: 970586,
 @mitable/backend:dev:   screenshotMetadata: {
-@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     width: 1663,
 @mitable/backend:dev:     height: 1080,
-@mitable/backend:dev:     originalWidth: 3840,
-@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     originalWidth: 3024,
+@mitable/backend:dev:     originalHeight: 1964,
 @mitable/backend:dev:     scaleFactor: 2,
 @mitable/backend:dev:     captureMode: 'full-screen',
-@mitable/backend:dev:     timestamp: 1762249557771
+@mitable/backend:dev:     timestamp: 1762328085174
 @mitable/backend:dev:   },
 @mitable/backend:dev:   metadata: { workflowAction: 'progress_step', selectedOption: 1 }
 @mitable/backend:dev: }
 @mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 1
-@mitable/backend:dev: [Stream] User message saved: ae5f01bd-8d3e-48ef-91ed-5d5b76a21379
+@mitable/backend:dev: [Stream] User message saved: cddded0f-6710-479d-b6c8-31e65c1e406b
 @mitable/backend:dev: [Conversations] User profile (from cache): {
 @mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
 @mitable/backend:dev:   name: 'Emily Rodriguez',
 @mitable/backend:dev:   email: 'emily@lorikeet.ai'
 @mitable/backend:dev: }
 @mitable/backend:dev: [Conversations] ToolContext created: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
 @mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
-@mitable/backend:dev:   historyLength: 5,
+@mitable/backend:dev:   historyLength: 3,
 @mitable/backend:dev:   hasUserProfile: true,
 @mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
 @mitable/backend:dev: }
 @mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
 @mitable/backend:dev: [Orchestrator] Processing message: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
 @mitable/backend:dev:   hasScreenshot: true,
 @mitable/backend:dev:   hasWorkflowState: true,
 @mitable/backend:dev:   workflowAction: 'progress_step'
 @mitable/backend:dev: }
 @mitable/backend:dev: [Orchestrator] Routing: metadata � VisualGuidanceAgent (progress_step)
-@mitable/backend:dev: [GuideNextStepTool] Progressing workflow in conversation: f3957cd3-e049-42ad-addb-1f777f8aeba7
-@mitable/backend:dev: [GuideNextStepTool] Current workflow state: { currentStepIndex: 0, totalSteps: 4, adjustmentHistory: 1 }
+@mitable/backend:dev: [GuideNextStepTool] Progressing workflow in conversation: 1f8a8aec-c57a-4130-8444-c91e8b5f11e3
+@mitable/backend:dev: [GuideNextStepTool] Current workflow state: { currentStepIndex: -1, totalSteps: 5, adjustmentHistory: 0 }
 @mitable/backend:dev: [GuideNextStepTool] Evaluating if plan needs adjustment...
-@mitable/backend:dev: [GeminiVision] Evaluating progress to step: 2
+@mitable/backend:dev: [GeminiVision] Evaluating progress to step: 1
 @mitable/backend:dev: [GeminiVision] Evaluation complete: {
 @mitable/backend:dev:   needsAdjustment: true,
-@mitable/backend:dev:   adjustmentReason: 'User moved to the next step.',
-@mitable/backend:dev:   originalStepCount: 4,
-@mitable/backend:dev:   adjustedStepCount: 4,
-@mitable/backend:dev:   nextStepIndex: 1,
+@mitable/backend:dev:   adjustmentReason: 'The user has already completed steps 1 and 2 based on the screenshot, and the next step should be to click on the messaging icon.',
+@mitable/backend:dev:   originalStepCount: 5,
+@mitable/backend:dev:   adjustedStepCount: 5,
+@mitable/backend:dev:   nextStepIndex: 0,
 @mitable/backend:dev:   wouldCauseCompletion: false
 @mitable/backend:dev: }
 @mitable/backend:dev: [GuideNextStepTool] Evaluation result: {
 @mitable/backend:dev:   needsAdjustment: true,
-@mitable/backend:dev:   reason: 'User moved to the next step.',
-@mitable/backend:dev:   newStepCount: 4
+@mitable/backend:dev:   reason: 'The user has already completed steps 1 and 2 based on the screenshot, and the next step should be to click on the messaging icon.',
+@mitable/backend:dev:   newStepCount: 5
 @mitable/backend:dev: }
 @mitable/backend:dev: [GuideNextStepTool] Applying plan adjustments
 @mitable/backend:dev: [GuideNextStepTool] Analyzing next step: {
-@mitable/backend:dev:   stepNumber: 2,
-@mitable/backend:dev:   description: "Look for a '+' icon or an empty tab space at the end of your tab list. It is usually located to the right of the last open tab."
+@mitable/backend:dev:   stepNumber: 1,
+@mitable/backend:dev:   description: "Open the company's communication application on your computer or web browser. [pending]"
 @mitable/backend:dev: }
-@mitable/backend:dev: [GeminiVision] Analyzing step execution: 2 { hasMetadata: true, dimensions: '1920x1080' }
+@mitable/backend:dev: [GeminiVision] Analyzing step execution: 1 { hasMetadata: true, dimensions: '1663x1080' }
 @mitable/backend:dev: [GeminiVision] Converting normalized coordinates to pixels: {
-@mitable/backend:dev:   normalized: { x: 0.941, y: 0.076, width: 0.015, height: 0.028 },
+@mitable/backend:dev:   normalized: { x: 0, y: 0, width: 0.999, height: 0.999 },
 @mitable/backend:dev:   imageDimensions: {
-@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     width: 1663,
 @mitable/backend:dev:     height: 1080,
-@mitable/backend:dev:     originalWidth: 3840,
-@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     originalWidth: 3024,
+@mitable/backend:dev:     originalHeight: 1964,
 @mitable/backend:dev:     scaleFactor: 2,
 @mitable/backend:dev:     captureMode: 'full-screen',
-@mitable/backend:dev:     timestamp: 1762249557771
+@mitable/backend:dev:     timestamp: 1762328085174
 @mitable/backend:dev:   }
 @mitable/backend:dev: }
 @mitable/backend:dev: [CoordinateConverter] Converted normalized to pixels: {
-@mitable/backend:dev:   input: { x: 0.941, y: 0.076, width: 0.015, height: 0.028 },
-@mitable/backend:dev:   output: {
-@mitable/backend:dev:     x: 1806.7199999999998,
-@mitable/backend:dev:     y: 82.08,
-@mitable/backend:dev:     width: 28.799999999999997,
-@mitable/backend:dev:     height: 30.240000000000002
-@mitable/backend:dev:   },
+@mitable/backend:dev:   input: { x: 0, y: 0, width: 0.999, height: 0.999 },
+@mitable/backend:dev:   output: { x: 0, y: 0, width: 1661.337, height: 1078.92 },
 @mitable/backend:dev:   imageDimensions: {
-@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     width: 1663,
 @mitable/backend:dev:     height: 1080,
-@mitable/backend:dev:     originalWidth: 3840,
-@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     originalWidth: 3024,
+@mitable/backend:dev:     originalHeight: 1964,
 @mitable/backend:dev:     scaleFactor: 2,
 @mitable/backend:dev:     captureMode: 'full-screen',
-@mitable/backend:dev:     timestamp: 1762249557771
+@mitable/backend:dev:     timestamp: 1762328085174
 @mitable/backend:dev:   }
 @mitable/backend:dev: }
-@mitable/backend:dev: [GeminiVision] Converted to pixel coordinates: {
-@mitable/backend:dev:   x: 1806.7199999999998,
-@mitable/backend:dev:   y: 82.08,
-@mitable/backend:dev:   width: 28.799999999999997,
-@mitable/backend:dev:   height: 30.240000000000002
-@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Converted to pixel coordinates: { x: 0, y: 0, width: 1661.337, height: 1078.92 }
 @mitable/backend:dev: [GeminiVision] Visual guidance generated: {
-@mitable/backend:dev:   elementDescription: "Look for the '+' icon located on the tab bar, to the right of the last open tab....",
-@mitable/backend:dev:   visualContext: "The browser's tab bar is visible at the top of the screen....",
-@mitable/backend:dev:   conversationalMessage: "Okay, now check the top of your screen, specifically the right side of your last opened tab. You should see a '+' icon there, which is the 'new tab' button.",
-@mitable/backend:dev:   conversationalMessageLength: 156,
+@mitable/backend:dev:   elementDescription: "The company's communication application is already open in the form of the LinkedIn website. You are...",
+@mitable/backend:dev:   visualContext: 'LinkedIn is open in a web browser....',
+@mitable/backend:dev:   conversationalMessage: "It looks like LinkedIn is already open in your web browser. You can now proceed to the next step to find the 'Messages' or 'Chat' icon.",
+@mitable/backend:dev:   conversationalMessageLength: 135,
 @mitable/backend:dev:   confidence: 'high'
 @mitable/backend:dev: }
 @mitable/backend:dev: [GeminiVision] Guidance confidence: high
 @mitable/backend:dev: [GuideNextStepTool] Visual guidance generated: {
-@mitable/backend:dev:   conversationalMessage: "Okay, now check the top of your screen, specifically the right side of your last opened tab. You should see a '+' icon there, which is the 'new tab' button.",
-@mitable/backend:dev:   conversationalMessageLength: 156,
+@mitable/backend:dev:   conversationalMessage: "It looks like LinkedIn is already open in your web browser. You can now proceed to the next step to find the 'Messages' or 'Chat' icon.",
+@mitable/backend:dev:   conversationalMessageLength: 135,
 @mitable/backend:dev:   confidence: 'high'
 @mitable/backend:dev: }
 @mitable/backend:dev: [GuideNextStepTool] Including adjustment notice in response
 @mitable/backend:dev: [GuideNextStepTool] Workflow progressed successfully: {
-@mitable/backend:dev:   newStepIndex: 1,
-@mitable/backend:dev:   totalSteps: 4,
+@mitable/backend:dev:   newStepIndex: 0,
+@mitable/backend:dev:   totalSteps: 5,
 @mitable/backend:dev:   adjustmentMade: true,
 @mitable/backend:dev:   hasBoundingBox: true
 @mitable/backend:dev: }
@@ -163,7 +796,172 @@
 @mitable/backend:dev:   windowTrigger: {
 @mitable/backend:dev:     window: 'guide',
 @mitable/backend:dev:     data: {
-@mitable/backend:dev:       conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
+@mitable/backend:dev:       conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
+@mitable/backend:dev:       stepList: [Array],
+@mitable/backend:dev:       currentStepIndex: 0,
+@mitable/backend:dev:       visualGuidance: [Object]
+@mitable/backend:dev:     }
+@mitable/backend:dev:   }
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/electron:dev: [Main] Guide start requested (overlay mode): { hasVisualGuidance: true, hasBoundingBox: true }
+@mitable/electron:dev: [Main] Showing overlay with bounding box: {
+@mitable/electron:dev:   bbox: { x: 0, y: 0, width: 1661.337, height: 1078.92 },
+@mitable/electron:dev:   stepNumber: 1
+@mitable/electron:dev: }
+@mitable/backend:dev: [Stream] Assistant message saved: 7921d676-5325-4911-b648-55fe5aee3fe7
+@mitable/backend:dev: [Conversations] Streaming completed successfully: {
+@mitable/backend:dev:   messageId: '7921d676-5325-4911-b648-55fe5aee3fe7',
+@mitable/backend:dev:   contentLength: 285
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔌 Database connection removed from pool
+@mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: false, hasContext: false, options: undefined }
+@mitable/electron:dev: [Screenshot] Using unconditional capture (no heuristics)
+@mitable/electron:dev: [CaptureService] Starting capture: {
+@mitable/electron:dev:   mode: 'full-screen',
+@mitable/electron:dev:   displayId: undefined,
+@mitable/electron:dev:   hasBounds: false,
+@mitable/electron:dev:   saveToFile: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 1, width: 1512, height: 982, scaleFactor: 2 }
+@mitable/electron:dev: [CaptureService] Resizing image: {
+@mitable/electron:dev:   original: { width: 3024, height: 1964 },
+@mitable/electron:dev:   resized: { width: 1663, height: 1080 }
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1663, height: 1080, hasFile: false }
+@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1663, height: 1080 }
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: [Conversations] Request received: {
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   contentLength: 20,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   screenshotLength: 985998,
+@mitable/backend:dev:   screenshotMetadata: {
+@mitable/backend:dev:     width: 1663,
+@mitable/backend:dev:     height: 1080,
+@mitable/backend:dev:     originalWidth: 3024,
+@mitable/backend:dev:     originalHeight: 1964,
+@mitable/backend:dev:     scaleFactor: 2,
+@mitable/backend:dev:     captureMode: 'full-screen',
+@mitable/backend:dev:     timestamp: 1762328122901
+@mitable/backend:dev:   },
+@mitable/backend:dev:   metadata: { workflowAction: 'progress_step', selectedOption: 1 }
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 1
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: [Stream] User message saved: 4ab452de-f2ff-4a12-b4f7-1ff9b8a8bc0f
+@mitable/backend:dev: [Conversations] User profile (from cache): {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   name: 'Emily Rodriguez',
+@mitable/backend:dev:   email: 'emily@lorikeet.ai'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] ToolContext created: {
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   historyLength: 5,
+@mitable/backend:dev:   hasUserProfile: true,
+@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
+@mitable/backend:dev: [Orchestrator] Processing message: {
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasWorkflowState: true,
+@mitable/backend:dev:   workflowAction: 'progress_step'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Orchestrator] Routing: metadata � VisualGuidanceAgent (progress_step)
+@mitable/backend:dev: [GuideNextStepTool] Progressing workflow in conversation: 1f8a8aec-c57a-4130-8444-c91e8b5f11e3
+@mitable/backend:dev: [GuideNextStepTool] Current workflow state: { currentStepIndex: 0, totalSteps: 5, adjustmentHistory: 1 }
+@mitable/backend:dev: [GuideNextStepTool] Evaluating if plan needs adjustment...
+@mitable/backend:dev: [GeminiVision] Evaluating progress to step: 2
+@mitable/backend:dev: [GeminiVision] Evaluation complete: {
+@mitable/backend:dev:   needsAdjustment: true,
+@mitable/backend:dev:   adjustmentReason: 'The user has already completed steps 1 and 2 based on the screenshot, and the next step should be to click on the messaging icon.',
+@mitable/backend:dev:   originalStepCount: 5,
+@mitable/backend:dev:   adjustedStepCount: 5,
+@mitable/backend:dev:   nextStepIndex: 1,
+@mitable/backend:dev:   wouldCauseCompletion: false
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Evaluation result: {
+@mitable/backend:dev:   needsAdjustment: true,
+@mitable/backend:dev:   reason: 'The user has already completed steps 1 and 2 based on the screenshot, and the next step should be to click on the messaging icon.',
+@mitable/backend:dev:   newStepCount: 5
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Applying plan adjustments
+@mitable/backend:dev: [GuideNextStepTool] Analyzing next step: {
+@mitable/backend:dev:   stepNumber: 2,
+@mitable/backend:dev:   description: "Look for a 'Messages' or 'Chat' icon on the main navigation menu, which is usually located on the left-hand side or at the top of the interface."
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Analyzing step execution: 2 { hasMetadata: true, dimensions: '1663x1080' }
+@mitable/backend:dev: [GeminiVision] Converting normalized coordinates to pixels: {
+@mitable/backend:dev:   normalized: { x: 0.566, y: 0.101, width: 0.046, height: 0.028 },
+@mitable/backend:dev:   imageDimensions: {
+@mitable/backend:dev:     width: 1663,
+@mitable/backend:dev:     height: 1080,
+@mitable/backend:dev:     originalWidth: 3024,
+@mitable/backend:dev:     originalHeight: 1964,
+@mitable/backend:dev:     scaleFactor: 2,
+@mitable/backend:dev:     captureMode: 'full-screen',
+@mitable/backend:dev:     timestamp: 1762328122901
+@mitable/backend:dev:   }
+@mitable/backend:dev: }
+@mitable/backend:dev: [CoordinateConverter] Converted normalized to pixels: {
+@mitable/backend:dev:   input: { x: 0.566, y: 0.101, width: 0.046, height: 0.028 },
+@mitable/backend:dev:   output: {
+@mitable/backend:dev:     x: 941.2579999999999,
+@mitable/backend:dev:     y: 109.08000000000001,
+@mitable/backend:dev:     width: 76.498,
+@mitable/backend:dev:     height: 30.240000000000002
+@mitable/backend:dev:   },
+@mitable/backend:dev:   imageDimensions: {
+@mitable/backend:dev:     width: 1663,
+@mitable/backend:dev:     height: 1080,
+@mitable/backend:dev:     originalWidth: 3024,
+@mitable/backend:dev:     originalHeight: 1964,
+@mitable/backend:dev:     scaleFactor: 2,
+@mitable/backend:dev:     captureMode: 'full-screen',
+@mitable/backend:dev:     timestamp: 1762328122901
+@mitable/backend:dev:   }
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Converted to pixel coordinates: {
+@mitable/backend:dev:   x: 941.2579999999999,
+@mitable/backend:dev:   y: 109.08000000000001,
+@mitable/backend:dev:   width: 76.498,
+@mitable/backend:dev:   height: 30.240000000000002
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Visual guidance generated: {
+@mitable/backend:dev:   elementDescription: "The 'Messaging' icon is located at the top of the interface....",
+@mitable/backend:dev:   visualContext: "The LinkedIn page is open, and the top navigation bar is visible, including the 'Messaging' icon....",
+@mitable/backend:dev:   conversationalMessage: "I can see the 'Messaging' icon with a number '1' on it at the top of the interface, indicating one unread message. Proceed to click on the 'Messaging' icon.",
+@mitable/backend:dev:   conversationalMessageLength: 156,
+@mitable/backend:dev:   confidence: 'high'
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Guidance confidence: high
+@mitable/backend:dev: [GuideNextStepTool] Visual guidance generated: {
+@mitable/backend:dev:   conversationalMessage: "I can see the 'Messaging' icon with a number '1' on it at the top of the interface, indicating one unread message. Proceed to click on the 'Messaging' icon.",
+@mitable/backend:dev:   conversationalMessageLength: 156,
+@mitable/backend:dev:   confidence: 'high'
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Including adjustment notice in response
+@mitable/backend:dev: [GuideNextStepTool] Workflow progressed successfully: {
+@mitable/backend:dev:   newStepIndex: 1,
+@mitable/backend:dev:   totalSteps: 5,
+@mitable/backend:dev:   adjustmentMade: true,
+@mitable/backend:dev:   hasBoundingBox: true
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'complete',
+@mitable/backend:dev:   hasContent: true,
+@mitable/backend:dev:   hasWindowTrigger: true,
+@mitable/backend:dev:   windowType: 'guide'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Sending separate window_trigger event: {
+@mitable/backend:dev:   type: 'window_trigger',
+@mitable/backend:dev:   windowTrigger: {
+@mitable/backend:dev:     window: 'guide',
+@mitable/backend:dev:     data: {
+@mitable/backend:dev:       conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
 @mitable/backend:dev:       stepList: [Array],
 @mitable/backend:dev:       currentStepIndex: 1,
 @mitable/backend:dev:       visualGuidance: [Object]
@@ -174,18 +972,19 @@
 @mitable/electron:dev: [Main] Guide start requested (overlay mode): { hasVisualGuidance: true, hasBoundingBox: true }
 @mitable/electron:dev: [Main] Showing overlay with bounding box: {
 @mitable/electron:dev:   bbox: {
-@mitable/electron:dev:     x: 1806.7199999999998,
-@mitable/electron:dev:     y: 82.08,
-@mitable/electron:dev:     width: 28.799999999999997,
+@mitable/electron:dev:     x: 941.2579999999999,
+@mitable/electron:dev:     y: 109.08000000000001,
+@mitable/electron:dev:     width: 76.498,
 @mitable/electron:dev:     height: 30.240000000000002
 @mitable/electron:dev:   },
 @mitable/electron:dev:   stepNumber: 2
 @mitable/electron:dev: }
-@mitable/backend:dev: [Stream] Assistant message saved: e383e9c5-d786-4cdd-9c58-eb1d85a85710
+@mitable/backend:dev: [Stream] Assistant message saved: 1302c9ff-d244-4698-8272-fdf53eefda56
 @mitable/backend:dev: [Conversations] Streaming completed successfully: {
-@mitable/backend:dev:   messageId: 'e383e9c5-d786-4cdd-9c58-eb1d85a85710',
-@mitable/backend:dev:   contentLength: 205
+@mitable/backend:dev:   messageId: '1302c9ff-d244-4698-8272-fdf53eefda56',
+@mitable/backend:dev:   contentLength: 306
 @mitable/backend:dev: }
+@mitable/electron:dev: [46183:1104/233538.402156:ERROR:CONSOLE(1)] "Request Autofill.enable failed. {"code":-32601,"message":"'Autofill.enable' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
 @mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: false, hasContext: false, options: undefined }
 @mitable/electron:dev: [Screenshot] Using unconditional capture (no heuristics)
 @mitable/electron:dev: [CaptureService] Starting capture: {
@@ -194,50 +993,40 @@
 @mitable/electron:dev:   hasBounds: false,
 @mitable/electron:dev:   saveToFile: undefined
 @mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 5, width: 1920, height: 1080, scaleFactor: 2 }
+@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 1, width: 1512, height: 982, scaleFactor: 2 }
 @mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1920, height: 1080 }
+@mitable/electron:dev:   original: { width: 3024, height: 1964 },
+@mitable/electron:dev:   resized: { width: 1663, height: 1080 }
 @mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1920, height: 1080, hasFile: false }
-@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1920, height: 1080 }
+@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1663, height: 1080, hasFile: false }
+@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1663, height: 1080 }
 @mitable/electron:dev: [Auth] Token requested, returning: present
 @mitable/backend:dev: [Conversations] Request received: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
 @mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
 @mitable/backend:dev:   contentLength: 20,
 @mitable/backend:dev:   hasScreenshot: true,
-@mitable/backend:dev:   screenshotLength: 1381074,
+@mitable/backend:dev:   screenshotLength: 868786,
 @mitable/backend:dev:   screenshotMetadata: {
-@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     width: 1663,
 @mitable/backend:dev:     height: 1080,
-@mitable/backend:dev:     originalWidth: 3840,
-@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     originalWidth: 3024,
+@mitable/backend:dev:     originalHeight: 1964,
 @mitable/backend:dev:     scaleFactor: 2,
 @mitable/backend:dev:     captureMode: 'full-screen',
-@mitable/backend:dev:     timestamp: 1762249572628
+@mitable/backend:dev:     timestamp: 1762328150597
 @mitable/backend:dev:   },
 @mitable/backend:dev:   metadata: { workflowAction: 'progress_step', selectedOption: 1 }
 @mitable/backend:dev: }
 @mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 1
-@mitable/electron:dev: [Auth] Token requested, returning: present
-@mitable/backend:dev: [Stream] User message saved: 94465122-aad1-4875-80ee-1317bd46db29
-@mitable/backend:dev: [Conversations] Request received: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
-@mitable/backend:dev:   contentLength: 13,
-@mitable/backend:dev:   hasScreenshot: false,
-@mitable/backend:dev:   screenshotLength: 0,
-@mitable/backend:dev:   screenshotMetadata: undefined,
-@mitable/backend:dev:   metadata: { workflowAction: 'exit_workflow', selectedOption: 3 }
-@mitable/backend:dev: }
+@mitable/backend:dev: [Stream] User message saved: 88094af5-9e59-432b-ac0f-dda8f779cec3
 @mitable/backend:dev: [Conversations] User profile (from cache): {
 @mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
 @mitable/backend:dev:   name: 'Emily Rodriguez',
 @mitable/backend:dev:   email: 'emily@lorikeet.ai'
 @mitable/backend:dev: }
 @mitable/backend:dev: [Conversations] ToolContext created: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
 @mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
 @mitable/backend:dev:   historyLength: 7,
 @mitable/backend:dev:   hasUserProfile: true,
@@ -245,468 +1034,78 @@
 @mitable/backend:dev: }
 @mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
 @mitable/backend:dev: [Orchestrator] Processing message: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
+@mitable/backend:dev:   conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
 @mitable/backend:dev:   hasScreenshot: true,
 @mitable/backend:dev:   hasWorkflowState: true,
 @mitable/backend:dev:   workflowAction: 'progress_step'
 @mitable/backend:dev: }
 @mitable/backend:dev: [Orchestrator] Routing: metadata � VisualGuidanceAgent (progress_step)
-@mitable/backend:dev: [GuideNextStepTool] Progressing workflow in conversation: f3957cd3-e049-42ad-addb-1f777f8aeba7
-@mitable/backend:dev: [GuideNextStepTool] Current workflow state: { currentStepIndex: 1, totalSteps: 4, adjustmentHistory: 2 }
+@mitable/backend:dev: [GuideNextStepTool] Progressing workflow in conversation: 1f8a8aec-c57a-4130-8444-c91e8b5f11e3
+@mitable/backend:dev: [GuideNextStepTool] Current workflow state: { currentStepIndex: 1, totalSteps: 5, adjustmentHistory: 2 }
 @mitable/backend:dev: [GuideNextStepTool] Evaluating if plan needs adjustment...
 @mitable/backend:dev: [GeminiVision] Evaluating progress to step: 3
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: [Stream] User message saved: ca4c406e-0164-4966-8301-0930ea97f4fc
-@mitable/backend:dev: [Conversations] User profile (from cache): {
-@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
-@mitable/backend:dev:   name: 'Emily Rodriguez',
-@mitable/backend:dev:   email: 'emily@lorikeet.ai'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Conversations] ToolContext created: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
-@mitable/backend:dev:   historyLength: 8,
-@mitable/backend:dev:   hasUserProfile: true,
-@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
-@mitable/backend:dev: [Orchestrator] Processing message: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   hasScreenshot: false,
-@mitable/backend:dev:   hasWorkflowState: true,
-@mitable/backend:dev:   workflowAction: 'exit_workflow'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Orchestrator] Routing: metadata � TextResponseAgent (exit_workflow)
-@mitable/backend:dev: [TextResponseAgent] Using workflow context for enhanced response
-@mitable/backend:dev: [TextResponseAgent] Response generated: { length: 22, hasWorkflowContext: true }
-@mitable/backend:dev: [Conversations] Streaming chunk sent: {
-@mitable/backend:dev:   type: 'complete',
-@mitable/backend:dev:   hasContent: true,
-@mitable/backend:dev:   hasWindowTrigger: false,
-@mitable/backend:dev:   windowType: undefined
-@mitable/backend:dev: }
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/backend:dev: [Stream] Assistant message saved: df0db357-013f-4388-9573-4a0fbc0e1476
-@mitable/backend:dev: [Conversations] Streaming completed successfully: {
-@mitable/backend:dev:   messageId: 'df0db357-013f-4388-9573-4a0fbc0e1476',
-@mitable/backend:dev:   contentLength: 22
-@mitable/backend:dev: }
-@mitable/electron:dev: [Auth] Token requested, returning: present
-@mitable/backend:dev: [Conversations] Request received: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
-@mitable/backend:dev:   contentLength: 13,
-@mitable/backend:dev:   hasScreenshot: false,
-@mitable/backend:dev:   screenshotLength: 0,
-@mitable/backend:dev:   screenshotMetadata: undefined,
-@mitable/backend:dev:   metadata: { workflowAction: 'exit_workflow', selectedOption: 3 }
-@mitable/backend:dev: }
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 1
-@mitable/backend:dev: [Stream] User message saved: f45aaebe-e7bc-4d12-b417-59742e13cb7e
-@mitable/backend:dev: [Conversations] User profile (from cache): {
-@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
-@mitable/backend:dev:   name: 'Emily Rodriguez',
-@mitable/backend:dev:   email: 'emily@lorikeet.ai'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Conversations] ToolContext created: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
-@mitable/backend:dev:   historyLength: 10,
-@mitable/backend:dev:   hasUserProfile: true,
-@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
 @mitable/backend:dev: [GeminiVision] Evaluation complete: {
 @mitable/backend:dev:   needsAdjustment: true,
-@mitable/backend:dev:   adjustmentReason: 'User advanced to the next step.',
-@mitable/backend:dev:   originalStepCount: 4,
-@mitable/backend:dev:   adjustedStepCount: 4,
+@mitable/backend:dev:   adjustmentReason: 'The user has completed steps 1 and 2 and is now on step 3. The number of unread messages is 18, not 1.',
+@mitable/backend:dev:   originalStepCount: 5,
+@mitable/backend:dev:   adjustedStepCount: 5,
 @mitable/backend:dev:   nextStepIndex: 2,
 @mitable/backend:dev:   wouldCauseCompletion: false
 @mitable/backend:dev: }
 @mitable/backend:dev: [GuideNextStepTool] Evaluation result: {
 @mitable/backend:dev:   needsAdjustment: true,
-@mitable/backend:dev:   reason: 'User advanced to the next step.',
-@mitable/backend:dev:   newStepCount: 4
+@mitable/backend:dev:   reason: 'The user has completed steps 1 and 2 and is now on step 3. The number of unread messages is 18, not 1.',
+@mitable/backend:dev:   newStepCount: 5
 @mitable/backend:dev: }
 @mitable/backend:dev: [GuideNextStepTool] Applying plan adjustments
 @mitable/backend:dev: [GuideNextStepTool] Analyzing next step: {
 @mitable/backend:dev:   stepNumber: 3,
-@mitable/backend:dev:   description: "Click the '+' icon or the empty tab space to open a new tab."
+@mitable/backend:dev:   description: "Click on the 'Messaging' icon at the top of the interface. It has a number '18' on it to indicate eighteen unread messages."
 @mitable/backend:dev: }
-@mitable/backend:dev: [GeminiVision] Analyzing step execution: 3 { hasMetadata: true, dimensions: '1920x1080' }
-@mitable/backend:dev: [Orchestrator] Processing message: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   hasScreenshot: false,
-@mitable/backend:dev:   hasWorkflowState: true,
-@mitable/backend:dev:   workflowAction: 'exit_workflow'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Orchestrator] Routing: metadata � TextResponseAgent (exit_workflow)
-@mitable/backend:dev: [TextResponseAgent] Using workflow context for enhanced response
-@mitable/backend:dev: [TextResponseAgent] Response generated: { length: 22, hasWorkflowContext: true }
-@mitable/backend:dev: [Conversations] Streaming chunk sent: {
-@mitable/backend:dev:   type: 'complete',
-@mitable/backend:dev:   hasContent: true,
-@mitable/backend:dev:   hasWindowTrigger: false,
-@mitable/backend:dev:   windowType: undefined
-@mitable/backend:dev: }
-@mitable/backend:dev: [Stream] Assistant message saved: e3a4a944-628d-465c-bcd6-546161ac6317
-@mitable/backend:dev: [Conversations] Streaming completed successfully: {
-@mitable/backend:dev:   messageId: 'e3a4a944-628d-465c-bcd6-546161ac6317',
-@mitable/backend:dev:   contentLength: 22
-@mitable/backend:dev: }
-@mitable/electron:dev: [Main] CONVERSATION_SET_STATE called from renderer, state: collapsed
-@mitable/electron:dev: [Main] Setting state to collapsed
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/electron:dev: [Main] Fetched conversations from backend: {
-@mitable/electron:dev:   conversations: [
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/electron:dev:       title: 'How to open a new tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T09:46:17.475Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'fb106325-3253-4a66-899e-bc4889b1c127',
-@mitable/electron:dev:       title: 'How to open a new tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T09:37:33.040Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'd87fefec-2777-4401-92bb-9233388753d6',
-@mitable/electron:dev:       title: 'How to open a new tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T09:09:44.644Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '6efff237-72ee-4391-a403-7bb32722afe5',
-@mitable/electron:dev:       title: 'How to open a new tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T08:59:53.210Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '76410210-982b-4c8d-8643-d0345284834c',
-@mitable/electron:dev:       title: 'Schedule a product demo',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T08:24:04.607Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'f62aa899-5a0e-4346-8aa2-0a22f7a8741a',
-@mitable/electron:dev:       title: 'Logging into the Mitable app',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:57:05.471Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'e2cf65c4-0a53-4e34-a44f-53a540084782',
-@mitable/electron:dev:       title: 'Opening a new tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:48:20.550Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '41761c75-3b79-4c92-9e37-56db098129e4',
-@mitable/electron:dev:       title: 'Starting a new request',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:44:04.539Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'ef09780f-298d-4e22-8df3-f70bc16ca1d4',
-@mitable/electron:dev:       title: 'Getting Started with Assistance',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:42:09.327Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'c965482a-fc7e-44da-8491-822ccf2b8233',
-@mitable/electron:dev:       title: 'Accessing the Product Roadmap in Mitable',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:32:08.091Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'febe423f-df4d-4626-b5cd-c2681575921a',
-@mitable/electron:dev:       title: 'How to login to the Mitable app',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:27:07.002Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '23909ac3-a58c-4235-a14c-a71c21e041ad',
-@mitable/electron:dev:       title: 'How to open a new browser tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:25:36.386Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'ebe827a2-f2b9-48bd-97b2-d110bf5b2937',
-@mitable/electron:dev:       title: 'Logging into the Mitable app',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:01:53.517Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '913c6901-833a-456d-acb6-c56d32bdd7fd',
-@mitable/electron:dev:       title: 'Updating the product roadmap',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T05:52:32.545Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '708aa8f4-78e4-41ec-a752-92b37efab2a1',
-@mitable/electron:dev:       title: 'Update the Product Roadmap',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T05:44:32.359Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '8e16cb22-c290-471d-a5e3-91f02194298b',
-@mitable/electron:dev:       title: 'Update the product roadmap',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T04:27:55.675Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '115a9801-c299-43b4-b684-a2cc3296d9bc',
-@mitable/electron:dev:       title: 'Agent Conversation',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T04:24:50.206Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '79f09148-788f-4208-a5a2-a75614894531',
-@mitable/electron:dev:       title: 'Agent Conversation',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T04:23:34.028Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '2efb7c02-bda5-49d9-a11e-ee97909574e8',
-@mitable/electron:dev:       title: 'Agent Conversation',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T04:19:25.750Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'a93ff03a-c59a-4cb9-90ec-98ecf3db073b',
-@mitable/electron:dev:       title: 'Agent Conversation',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T04:07:35.241Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     }
-@mitable/electron:dev:   ],
-@mitable/electron:dev:   pagination: {
-@mitable/electron:dev:     page: 1,
-@mitable/electron:dev:     limit: 20,
-@mitable/electron:dev:     total: 318,
-@mitable/electron:dev:     totalPages: 16,
-@mitable/electron:dev:     hasNext: true,
-@mitable/electron:dev:     hasPrev: false
-@mitable/electron:dev:   }
-@mitable/electron:dev: }
-@mitable/electron:dev: [Main] Sending conversation list to renderer: 20 items
-@mitable/electron:dev: [Main] Fetched conversations from backend: {
-@mitable/electron:dev:   conversations: [
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/electron:dev:       title: 'How to open a new tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T09:46:17.475Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'fb106325-3253-4a66-899e-bc4889b1c127',
-@mitable/electron:dev:       title: 'How to open a new tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T09:37:33.040Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'd87fefec-2777-4401-92bb-9233388753d6',
-@mitable/electron:dev:       title: 'How to open a new tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T09:09:44.644Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '6efff237-72ee-4391-a403-7bb32722afe5',
-@mitable/electron:dev:       title: 'How to open a new tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T08:59:53.210Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '76410210-982b-4c8d-8643-d0345284834c',
-@mitable/electron:dev:       title: 'Schedule a product demo',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T08:24:04.607Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'f62aa899-5a0e-4346-8aa2-0a22f7a8741a',
-@mitable/electron:dev:       title: 'Logging into the Mitable app',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:57:05.471Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'e2cf65c4-0a53-4e34-a44f-53a540084782',
-@mitable/electron:dev:       title: 'Opening a new tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:48:20.550Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '41761c75-3b79-4c92-9e37-56db098129e4',
-@mitable/electron:dev:       title: 'Starting a new request',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:44:04.539Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'ef09780f-298d-4e22-8df3-f70bc16ca1d4',
-@mitable/electron:dev:       title: 'Getting Started with Assistance',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:42:09.327Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'c965482a-fc7e-44da-8491-822ccf2b8233',
-@mitable/electron:dev:       title: 'Accessing the Product Roadmap in Mitable',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:32:08.091Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'febe423f-df4d-4626-b5cd-c2681575921a',
-@mitable/electron:dev:       title: 'How to login to the Mitable app',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:27:07.002Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '23909ac3-a58c-4235-a14c-a71c21e041ad',
-@mitable/electron:dev:       title: 'How to open a new browser tab',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:25:36.386Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'ebe827a2-f2b9-48bd-97b2-d110bf5b2937',
-@mitable/electron:dev:       title: 'Logging into the Mitable app',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T06:01:53.517Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '913c6901-833a-456d-acb6-c56d32bdd7fd',
-@mitable/electron:dev:       title: 'Updating the product roadmap',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T05:52:32.545Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '708aa8f4-78e4-41ec-a752-92b37efab2a1',
-@mitable/electron:dev:       title: 'Update the Product Roadmap',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T05:44:32.359Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '8e16cb22-c290-471d-a5e3-91f02194298b',
-@mitable/electron:dev:       title: 'Update the product roadmap',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T04:27:55.675Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '115a9801-c299-43b4-b684-a2cc3296d9bc',
-@mitable/electron:dev:       title: 'Agent Conversation',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T04:24:50.206Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '79f09148-788f-4208-a5a2-a75614894531',
-@mitable/electron:dev:       title: 'Agent Conversation',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T04:23:34.028Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: '2efb7c02-bda5-49d9-a11e-ee97909574e8',
-@mitable/electron:dev:       title: 'Agent Conversation',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T04:19:25.750Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     },
-@mitable/electron:dev:     {
-@mitable/electron:dev:       id: 'a93ff03a-c59a-4cb9-90ec-98ecf3db073b',
-@mitable/electron:dev:       title: 'Agent Conversation',
-@mitable/electron:dev:       lastMessage: '',
-@mitable/electron:dev:       timestamp: '2025-11-04T04:07:35.241Z',
-@mitable/electron:dev:       unread: false
-@mitable/electron:dev:     }
-@mitable/electron:dev:   ],
-@mitable/electron:dev:   pagination: {
-@mitable/electron:dev:     page: 1,
-@mitable/electron:dev:     limit: 20,
-@mitable/electron:dev:     total: 318,
-@mitable/electron:dev:     totalPages: 16,
-@mitable/electron:dev:     hasNext: true,
-@mitable/electron:dev:     hasPrev: false
-@mitable/electron:dev:   }
-@mitable/electron:dev: }
-@mitable/electron:dev: [Main] Sending conversation list to renderer: 20 items
+@mitable/backend:dev: [GeminiVision] Analyzing step execution: 3 { hasMetadata: true, dimensions: '1663x1080' }
 @mitable/backend:dev: [GeminiVision] Converting normalized coordinates to pixels: {
-@mitable/backend:dev:   normalized: { x: 0.902, y: 0.043, width: 0.02, height: 0.029 },
+@mitable/backend:dev:   normalized: { x: 0.531, y: 0.124, width: 0.059, height: 0.027 },
 @mitable/backend:dev:   imageDimensions: {
-@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     width: 1663,
 @mitable/backend:dev:     height: 1080,
-@mitable/backend:dev:     originalWidth: 3840,
-@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     originalWidth: 3024,
+@mitable/backend:dev:     originalHeight: 1964,
 @mitable/backend:dev:     scaleFactor: 2,
 @mitable/backend:dev:     captureMode: 'full-screen',
-@mitable/backend:dev:     timestamp: 1762249572628
+@mitable/backend:dev:     timestamp: 1762328150597
 @mitable/backend:dev:   }
 @mitable/backend:dev: }
 @mitable/backend:dev: [CoordinateConverter] Converted normalized to pixels: {
-@mitable/backend:dev:   input: { x: 0.902, y: 0.043, width: 0.02, height: 0.029 },
-@mitable/backend:dev:   output: { x: 1731.8400000000001, y: 46.44, width: 38.4, height: 31.32 },
+@mitable/backend:dev:   input: { x: 0.531, y: 0.124, width: 0.059, height: 0.027 },
+@mitable/backend:dev:   output: { x: 883.053, y: 133.92, width: 98.11699999999999, height: 29.16 },
 @mitable/backend:dev:   imageDimensions: {
-@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     width: 1663,
 @mitable/backend:dev:     height: 1080,
-@mitable/backend:dev:     originalWidth: 3840,
-@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     originalWidth: 3024,
+@mitable/backend:dev:     originalHeight: 1964,
 @mitable/backend:dev:     scaleFactor: 2,
 @mitable/backend:dev:     captureMode: 'full-screen',
-@mitable/backend:dev:     timestamp: 1762249572628
+@mitable/backend:dev:     timestamp: 1762328150597
 @mitable/backend:dev:   }
 @mitable/backend:dev: }
-@mitable/backend:dev: [GeminiVision] Converted to pixel coordinates: { x: 1731.8400000000001, y: 46.44, width: 38.4, height: 31.32 }
+@mitable/backend:dev: [GeminiVision] Converted to pixel coordinates: { x: 883.053, y: 133.92, width: 98.11699999999999, height: 29.16 }
 @mitable/backend:dev: [GeminiVision] Visual guidance generated: {
-@mitable/backend:dev:   elementDescription: "Click the '+' icon on the tab bar to open a new tab....",
-@mitable/backend:dev:   visualContext: 'The browser tab bar is visible at the top of the screen....',
-@mitable/backend:dev:   conversationalMessage: "Okay, look at the top of the screen. Find the '+' icon on the tab bar, it's next to the last opened tab, and click it to open a new tab.",
-@mitable/backend:dev:   conversationalMessageLength: 136,
+@mitable/backend:dev:   elementDescription: "The 'Messaging' icon is located at the top navigation bar, slightly right of the center. It has a nu...",
+@mitable/backend:dev:   visualContext: "The LinkedIn page is open and the top navigation bar is visible, including the 'Messaging' icon with...",
+@mitable/backend:dev:   conversationalMessage: "Great! Click on the 'Messaging' icon at the top of the interface. It has a number '18' on it, indicating eighteen unread messages.",
+@mitable/backend:dev:   conversationalMessageLength: 130,
 @mitable/backend:dev:   confidence: 'high'
 @mitable/backend:dev: }
 @mitable/backend:dev: [GeminiVision] Guidance confidence: high
 @mitable/backend:dev: [GuideNextStepTool] Visual guidance generated: {
-@mitable/backend:dev:   conversationalMessage: "Okay, look at the top of the screen. Find the '+' icon on the tab bar, it's next to the last opened tab, and click it to open a new tab.",
-@mitable/backend:dev:   conversationalMessageLength: 136,
+@mitable/backend:dev:   conversationalMessage: "Great! Click on the 'Messaging' icon at the top of the interface. It has a number '18' on it, indicating eighteen unread messages.",
+@mitable/backend:dev:   conversationalMessageLength: 130,
 @mitable/backend:dev:   confidence: 'high'
 @mitable/backend:dev: }
 @mitable/backend:dev: [GuideNextStepTool] Including adjustment notice in response
 @mitable/backend:dev: [GuideNextStepTool] Workflow progressed successfully: {
 @mitable/backend:dev:   newStepIndex: 2,
-@mitable/backend:dev:   totalSteps: 4,
+@mitable/backend:dev:   totalSteps: 5,
 @mitable/backend:dev:   adjustmentMade: true,
 @mitable/backend:dev:   hasBoundingBox: true
 @mitable/backend:dev: }
@@ -721,298 +1120,9 @@
 @mitable/backend:dev:   windowTrigger: {
 @mitable/backend:dev:     window: 'guide',
 @mitable/backend:dev:     data: {
-@mitable/backend:dev:       conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
+@mitable/backend:dev:       conversationId: '1f8a8aec-c57a-4130-8444-c91e8b5f11e3',
 @mitable/backend:dev:       stepList: [Array],
 @mitable/backend:dev:       currentStepIndex: 2,
-@mitable/backend:dev:       visualGuidance: [Object]
-@mitable/backend:dev:     }
-@mitable/backend:dev:   }
-@mitable/backend:dev: }
-@mitable/electron:dev: [Main] Guide start requested (overlay mode): { hasVisualGuidance: true, hasBoundingBox: true }
-@mitable/electron:dev: [Main] Showing overlay with bounding box: {
-@mitable/electron:dev:   bbox: { x: 1731.8400000000001, y: 46.44, width: 38.4, height: 31.32 },
-@mitable/electron:dev:   stepNumber: 3
-@mitable/electron:dev: }
-@mitable/backend:dev: [Stream] Assistant message saved: 57e92886-df6a-4216-b249-3cbda0a0c859
-@mitable/backend:dev: [Conversations] Streaming completed successfully: {
-@mitable/backend:dev:   messageId: '57e92886-df6a-4216-b249-3cbda0a0c859',
-@mitable/backend:dev:   contentLength: 188
-@mitable/backend:dev: }
-@mitable/electron:dev: [Main] CONVERSATION_SET_STATE called from renderer, state: expanded
-@mitable/electron:dev: [Main] Setting state to expanded
-@mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: false, hasContext: false, options: undefined }
-@mitable/electron:dev: [Screenshot] Using unconditional capture (no heuristics)
-@mitable/electron:dev: [CaptureService] Starting capture: {
-@mitable/electron:dev:   mode: 'full-screen',
-@mitable/electron:dev:   displayId: undefined,
-@mitable/electron:dev:   hasBounds: false,
-@mitable/electron:dev:   saveToFile: undefined
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 5, width: 1920, height: 1080, scaleFactor: 2 }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1920, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1920, height: 1080, hasFile: false }
-@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1920, height: 1080 }
-@mitable/electron:dev: [Auth] Token requested, returning: present
-@mitable/backend:dev: [Conversations] Request received: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
-@mitable/backend:dev:   contentLength: 16,
-@mitable/backend:dev:   hasScreenshot: true,
-@mitable/backend:dev:   screenshotLength: 1243378,
-@mitable/backend:dev:   screenshotMetadata: {
-@mitable/backend:dev:     width: 1920,
-@mitable/backend:dev:     height: 1080,
-@mitable/backend:dev:     originalWidth: 3840,
-@mitable/backend:dev:     originalHeight: 2160,
-@mitable/backend:dev:     scaleFactor: 2,
-@mitable/backend:dev:     captureMode: 'full-screen',
-@mitable/backend:dev:     timestamp: 1762249587631
-@mitable/backend:dev:   },
-@mitable/backend:dev:   metadata: undefined
-@mitable/backend:dev: }
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 1
-@mitable/backend:dev: [Stream] User message saved: 178132c3-9c49-444b-8882-ce8e97cf8cbd
-@mitable/backend:dev: [Conversations] User profile (from cache): {
-@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
-@mitable/backend:dev:   name: 'Emily Rodriguez',
-@mitable/backend:dev:   email: 'emily@lorikeet.ai'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Conversations] ToolContext created: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
-@mitable/backend:dev:   historyLength: 13,
-@mitable/backend:dev:   hasUserProfile: true,
-@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
-@mitable/backend:dev: [Orchestrator] Processing message: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   hasScreenshot: true,
-@mitable/backend:dev:   hasWorkflowState: true,
-@mitable/backend:dev:   workflowAction: undefined
-@mitable/backend:dev: }
-@mitable/backend:dev: [Orchestrator] Intent classified: { type: 'workflow_start', confidence: 0.95 }
-@mitable/backend:dev: [Orchestrator] Routing: intent � Agent: visual-guidance
-@mitable/backend:dev: [VisualGuidanceAgent] Inference failed for vague prompt detection, falling back to regex: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent: [429 Too Many Requests] You exceeded your current quota. Please migrate to Gemini 2.0 Flash Preview (Image Generation) (models/gemini-2.0-flash-preview-image-generation) for higher quota limits. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. [{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Learn more about Gemini API quotas","url":"https://ai.google.dev/gemini-api/docs/rate-limits"}]},{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[{"quotaMetric":"generativelanguage.googleapis.com/generate_requests_per_model","quotaId":"GenerateRequestsPerMinutePerProjectPerModel","quotaDimensions":{"location":"global","model":"gemini-2.0-flash-exp"},"quotaValue":"10"}]},{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"31s"}]
-@mitable/backend:dev: [VisualGuidanceAgent] Vague prompt regex fallback: "How do I sign in" → false
-@mitable/backend:dev: [VisualGuidanceAgent] Workflow question classification: "How do I sign in" → knowledge_search
-@mitable/backend:dev: [VisualGuidanceAgent] Routing workflow question: knowledge_search { question: 'How do I sign in' }
-@mitable/backend:dev: [VisualGuidanceAgent] Delegating to KnowledgeAgent for synthesized knowledge search
-@mitable/backend:dev: [KnowledgeAgent] Processing query: "How do I sign in"
-@mitable/backend:dev: [SearchKnowledgeTool] Searching for: "How do I sign in"
-@mitable/backend:dev: [SearchKnowledgeTool] Organization context: {
-@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
-@mitable/backend:dev:   topK: 10,
-@mitable/backend:dev:   fetchLimit: 50
-@mitable/backend:dev: }
-@mitable/backend:dev: [IntentService] Intent: general (confidence: 0.9, needsContext: false)
-@mitable/backend:dev: [IntentService] Reasoning: General question about a process without company context
-@mitable/backend:dev: [SearchKnowledgeTool] Detected intent: general (confidence: 0.9)
-@mitable/backend:dev: [SearchKnowledgeTool] Performing hybrid search: {
-@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
-@mitable/backend:dev:   query: 'How do I sign in',
-@mitable/backend:dev:   fetchLimit: 50,
-@mitable/backend:dev:   dateFilters: undefined
-@mitable/backend:dev: }
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/backend:dev: [SearchService] Pinecone filter: {"organization_id":"86c996f4-d997-44cf-8bdf-b00607e619ee"}
-@mitable/backend:dev: [SearchKnowledgeTool] Hybrid search complete: {
-@mitable/backend:dev:   totalResults: 50,
-@mitable/backend:dev:   semanticResults: 100,
-@mitable/backend:dev:   keywordResults: 1,
-@mitable/backend:dev:   searchTime: '802ms'
-@mitable/backend:dev: }
-@mitable/backend:dev: [TrustRanking] Applying trust ranking for intent: general
-@mitable/backend:dev: [TrustRanking] Multipliers - codebase: 1x, document: 1x, chat: 1x
-@mitable/backend:dev: [TrustRanking] Top 5 after trust ranking:
-@mitable/backend:dev:   1. [chat/slack] score: 0.015 × 1x = 0.015
-@mitable/backend:dev:   2. [chat/slack] score: 0.014 × 1x = 0.014
-@mitable/backend:dev:   3. [chat/slack] score: 0.014 × 1x = 0.014
-@mitable/backend:dev:   4. [chat/slack] score: 0.012 × 1x = 0.012
-@mitable/backend:dev:   5. [chat/slack] score: 0.011 × 1x = 0.011
-@mitable/backend:dev: [SearchKnowledgeTool] Returning top 10 of 50 ranked results
-@mitable/backend:dev: [SearchKnowledgeTool] Returning 10 sources (1987 tokens)
-@mitable/backend:dev: [SearchKnowledgeTool] Success - returning knowledge: {
-@mitable/backend:dev:   responseLength: 6382,
-@mitable/backend:dev:   sourcesCount: 10,
-@mitable/backend:dev:   sourceNames: [
-@mitable/backend:dev:     '#engineering - aurel.npounengnong',
-@mitable/backend:dev:     '#engineering - aurel.npounengnong',
-@mitable/backend:dev:     '#engineering - mikun.adewole',
-@mitable/backend:dev:     '#engineering - aurel.npounengnong',
-@mitable/backend:dev:     '#engineering - aurel.npounengnong',
-@mitable/backend:dev:     'Mitable PRD (Notion)',
-@mitable/backend:dev:     '#engineering - febchuk',
-@mitable/backend:dev:     '#engineering - aurel.npounengnong',
-@mitable/backend:dev:     '#product - aurel.npounengnong',
-@mitable/backend:dev:     '#engineering - febchuk'
-@mitable/backend:dev:   ],
-@mitable/backend:dev:   tokenCount: 2158,
-@mitable/backend:dev:   truncated: false,
-@mitable/backend:dev:   truncatedCount: 0
-@mitable/backend:dev: }
-@mitable/backend:dev: [KnowledgeAgent] Search completed: 10 sources found
-@mitable/backend:dev: [KnowledgeAgent] Calling OpenAI for synthesis...
-@mitable/backend:dev: [KnowledgeAgent] Synthesis complete
-@mitable/backend:dev: [Conversations] Streaming chunk sent: {
-@mitable/backend:dev:   type: 'complete',
-@mitable/backend:dev:   hasContent: true,
-@mitable/backend:dev:   hasWindowTrigger: false,
-@mitable/backend:dev:   windowType: undefined
-@mitable/backend:dev: }
-@mitable/backend:dev: [KnowledgeAgent] Response complete: 1171 chars
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/backend:dev: [Stream] Assistant message saved: e5170a9b-5bc9-4851-baaa-ceb8b9df98d4
-@mitable/backend:dev: [Conversations] Streaming completed successfully: {
-@mitable/backend:dev:   messageId: 'e5170a9b-5bc9-4851-baaa-ceb8b9df98d4',
-@mitable/backend:dev:   contentLength: 1171
-@mitable/backend:dev: }
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: false, hasContext: false, options: undefined }
-@mitable/electron:dev: [Screenshot] Using unconditional capture (no heuristics)
-@mitable/electron:dev: [CaptureService] Starting capture: {
-@mitable/electron:dev:   mode: 'full-screen',
-@mitable/electron:dev:   displayId: undefined,
-@mitable/electron:dev:   hasBounds: false,
-@mitable/electron:dev:   saveToFile: undefined
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 5, width: 1920, height: 1080, scaleFactor: 2 }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1920, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1920, height: 1080, hasFile: false }
-@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1920, height: 1080 }
-@mitable/electron:dev: [Auth] Token requested, returning: present
-@mitable/backend:dev: [Conversations] Request received: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
-@mitable/backend:dev:   contentLength: 20,
-@mitable/backend:dev:   hasScreenshot: true,
-@mitable/backend:dev:   screenshotLength: 1353678,
-@mitable/backend:dev:   screenshotMetadata: {
-@mitable/backend:dev:     width: 1920,
-@mitable/backend:dev:     height: 1080,
-@mitable/backend:dev:     originalWidth: 3840,
-@mitable/backend:dev:     originalHeight: 2160,
-@mitable/backend:dev:     scaleFactor: 2,
-@mitable/backend:dev:     captureMode: 'full-screen',
-@mitable/backend:dev:     timestamp: 1762249670065
-@mitable/backend:dev:   },
-@mitable/backend:dev:   metadata: { workflowAction: 'progress_step', selectedOption: 1 }
-@mitable/backend:dev: }
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 0, Waiting: 0
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: [Stream] User message saved: ac25293d-e7bf-4698-ab1e-ca26867557a0
-@mitable/backend:dev: [Conversations] User profile (from cache): {
-@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
-@mitable/backend:dev:   name: 'Emily Rodriguez',
-@mitable/backend:dev:   email: 'emily@lorikeet.ai'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Conversations] ToolContext created: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
-@mitable/backend:dev:   historyLength: 15,
-@mitable/backend:dev:   hasUserProfile: true,
-@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
-@mitable/backend:dev: [Orchestrator] Processing message: {
-@mitable/backend:dev:   conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:   hasScreenshot: true,
-@mitable/backend:dev:   hasWorkflowState: true,
-@mitable/backend:dev:   workflowAction: 'progress_step'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Orchestrator] Routing: metadata � VisualGuidanceAgent (progress_step)
-@mitable/backend:dev: [GuideNextStepTool] Progressing workflow in conversation: f3957cd3-e049-42ad-addb-1f777f8aeba7
-@mitable/backend:dev: [GuideNextStepTool] Current workflow state: { currentStepIndex: 2, totalSteps: 4, adjustmentHistory: 3 }
-@mitable/backend:dev: [GuideNextStepTool] Evaluating if plan needs adjustment...
-@mitable/backend:dev: [GeminiVision] Evaluating progress to step: 4
-@mitable/backend:dev: [GeminiVision] Evaluation complete: {
-@mitable/backend:dev:   needsAdjustment: true,
-@mitable/backend:dev:   adjustmentReason: 'User advanced to the next step.',
-@mitable/backend:dev:   originalStepCount: 4,
-@mitable/backend:dev:   adjustedStepCount: 4,
-@mitable/backend:dev:   nextStepIndex: 3,
-@mitable/backend:dev:   wouldCauseCompletion: false
-@mitable/backend:dev: }
-@mitable/backend:dev: [GuideNextStepTool] Evaluation result: {
-@mitable/backend:dev:   needsAdjustment: true,
-@mitable/backend:dev:   reason: 'User advanced to the next step.',
-@mitable/backend:dev:   newStepCount: 4
-@mitable/backend:dev: }
-@mitable/backend:dev: [GuideNextStepTool] Applying plan adjustments
-@mitable/backend:dev: [GuideNextStepTool] Analyzing next step: {
-@mitable/backend:dev:   stepNumber: 4,
-@mitable/backend:dev:   description: 'Your new tab will open, displaying either a blank page, your home page, or a new tab page, depending on your browser settings.'
-@mitable/backend:dev: }
-@mitable/backend:dev: [GeminiVision] Analyzing step execution: 4 { hasMetadata: true, dimensions: '1920x1080' }
-@mitable/backend:dev: [GeminiVision] Converting normalized coordinates to pixels: {
-@mitable/backend:dev:   normalized: { x: 0.024, y: 0.031, width: 0.955, height: 0.049 },
-@mitable/backend:dev:   imageDimensions: {
-@mitable/backend:dev:     width: 1920,
-@mitable/backend:dev:     height: 1080,
-@mitable/backend:dev:     originalWidth: 3840,
-@mitable/backend:dev:     originalHeight: 2160,
-@mitable/backend:dev:     scaleFactor: 2,
-@mitable/backend:dev:     captureMode: 'full-screen',
-@mitable/backend:dev:     timestamp: 1762249670065
-@mitable/backend:dev:   }
-@mitable/backend:dev: }
-@mitable/backend:dev: [CoordinateConverter] Converted normalized to pixels: {
-@mitable/backend:dev:   input: { x: 0.024, y: 0.031, width: 0.955, height: 0.049 },
-@mitable/backend:dev:   output: { x: 46.08, y: 33.48, width: 1833.6, height: 52.92 },
-@mitable/backend:dev:   imageDimensions: {
-@mitable/backend:dev:     width: 1920,
-@mitable/backend:dev:     height: 1080,
-@mitable/backend:dev:     originalWidth: 3840,
-@mitable/backend:dev:     originalHeight: 2160,
-@mitable/backend:dev:     scaleFactor: 2,
-@mitable/backend:dev:     captureMode: 'full-screen',
-@mitable/backend:dev:     timestamp: 1762249670065
-@mitable/backend:dev:   }
-@mitable/backend:dev: }
-@mitable/backend:dev: [GeminiVision] Converted to pixel coordinates: { x: 46.08, y: 33.48, width: 1833.6, height: 52.92 }
-@mitable/backend:dev: [GeminiVision] Visual guidance generated: {
-@mitable/backend:dev:   elementDescription: 'The new tab has already been opened as indicated in the instructions. No further action is needed on...',
-@mitable/backend:dev:   visualContext: 'The screen shows a webpage with tabs displayed at the top, indicating that a new tab should be open ...',
-@mitable/backend:dev:   conversationalMessage: 'Okay! The new tab should now be open, displaying a blank page, your homepage, or a new tab page, depending on your browser settings.',
-@mitable/backend:dev:   conversationalMessageLength: 132,
-@mitable/backend:dev:   confidence: 'high'
-@mitable/backend:dev: }
-@mitable/backend:dev: [GeminiVision] Guidance confidence: high
-@mitable/backend:dev: [GuideNextStepTool] Visual guidance generated: {
-@mitable/backend:dev:   conversationalMessage: 'Okay! The new tab should now be open, displaying a blank page, your homepage, or a new tab page, depending on your browser settings.',
-@mitable/backend:dev:   conversationalMessageLength: 132,
-@mitable/backend:dev:   confidence: 'high'
-@mitable/backend:dev: }
-@mitable/backend:dev: [GuideNextStepTool] Including adjustment notice in response
-@mitable/backend:dev: [GuideNextStepTool] Workflow progressed successfully: {
-@mitable/backend:dev:   newStepIndex: 3,
-@mitable/backend:dev:   totalSteps: 4,
-@mitable/backend:dev:   adjustmentMade: true,
-@mitable/backend:dev:   hasBoundingBox: true
-@mitable/backend:dev: }
-@mitable/backend:dev: [Conversations] Streaming chunk sent: {
-@mitable/backend:dev:   type: 'complete',
-@mitable/backend:dev:   hasContent: true,
-@mitable/backend:dev:   hasWindowTrigger: true,
-@mitable/backend:dev:   windowType: 'guide'
-@mitable/backend:dev: }
-@mitable/backend:dev: [Conversations] Sending separate window_trigger event: {
-@mitable/backend:dev:   type: 'window_trigger',
-@mitable/backend:dev:   windowTrigger: {
-@mitable/backend:dev:     window: 'guide',
-@mitable/backend:dev:     data: {
-@mitable/backend:dev:       conversationId: 'f3957cd3-e049-42ad-addb-1f777f8aeba7',
-@mitable/backend:dev:       stepList: [Array],
-@mitable/backend:dev:       currentStepIndex: 3,
 @mitable/backend:dev:       visualGuidance: [Object]
 @mitable/backend:dev:     }
 @mitable/backend:dev:   }
@@ -1020,11 +1130,20 @@
 @mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
 @mitable/electron:dev: [Main] Guide start requested (overlay mode): { hasVisualGuidance: true, hasBoundingBox: true }
 @mitable/electron:dev: [Main] Showing overlay with bounding box: {
-@mitable/electron:dev:   bbox: { x: 46.08, y: 33.48, width: 1833.6, height: 52.92 },
-@mitable/electron:dev:   stepNumber: 4
+@mitable/electron:dev:   bbox: { x: 883.053, y: 133.92, width: 98.11699999999999, height: 29.16 },
+@mitable/electron:dev:   stepNumber: 3
 @mitable/electron:dev: }
-@mitable/backend:dev: [Stream] Assistant message saved: f0b85322-604a-4323-9cbe-ad14d4d37585
+@mitable/backend:dev: [Stream] Assistant message saved: cb92d990-dd9f-4793-8958-31b283051fd7
 @mitable/backend:dev: [Conversations] Streaming completed successfully: {
-@mitable/backend:dev:   messageId: 'f0b85322-604a-4323-9cbe-ad14d4d37585',
-@mitable/backend:dev:   contentLength: 184
+@mitable/backend:dev:   messageId: 'cb92d990-dd9f-4793-8958-31b283051fd7',
+@mitable/backend:dev:   contentLength: 253
 @mitable/backend:dev: }
+@mitable/backend:dev: 🔌 Database connection removed from pool
+@mitable/backend:dev: 🔌 Database connection removed from pool
+^C    ...Finishing writing to cache...                                                    
+@mitable/backend:dev: Database pool closed
+
+
+@mitable/backend:dev: 11:36:38 PM [tsx] Previous process hasn't exited yet. Force killing...
+
+febechukwuma@Febes-MBP mitable %  ERROR  run failed: command  exited (1)
