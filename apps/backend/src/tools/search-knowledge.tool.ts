@@ -364,17 +364,26 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
               title = "";
             }
 
-            // Append digest line regardless (it’s part of narrative)
+            // Append digest line regardless (it's part of narrative)
             const displayTitle = title || it.source || "Source";
             contextParts.push(`• ${displayTitle}: ${snippet}`);
 
-            // Only collect valid sources with an absolute http(s) URL
-            if (url && /^https?:\/\//i.test(url)) {
-              const key = `${displayTitle}|${url}`;
+            // Only collect valid sources with proper URLs
+            // Filter out: localhost, empty fragments, invalid domains, missing titles
+            const isValidUrl =
+              url &&
+              /^https?:\/\//i.test(url) &&
+              !url.includes("localhost") &&
+              !url.includes("127.0.0.1") &&
+              !url.endsWith("#") &&
+              title; // Must have a proper title (not fallback "Source")
+
+            if (isValidUrl && title && url) {
+              const key = `${title}|${url}`;
               if (!seen.has(key)) {
                 seen.add(key);
                 sources.push({
-                  title: displayTitle,
+                  title,
                   url,
                   snippet: snippet.substring(0, 150) + (snippet.length > 150 ? "..." : ""),
                 });
@@ -408,11 +417,23 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
           const parentMessage = bundle.messages[0];
           const username = parentMessage.username || "Unknown";
           const snippetText = parentMessage.text || "";
-          sources.push({
-            title: `#${bundle.channelName} - ${username}`,
-            url: bundle.permalink,
-            snippet: snippetText.substring(0, 150) + (snippetText.length > 150 ? "..." : ""),
-          });
+
+          // Only add if valid URL (not localhost, not empty fragment)
+          const url = bundle.permalink;
+          const isValidUrl =
+            url &&
+            /^https?:\/\//i.test(url) &&
+            !url.includes("localhost") &&
+            !url.includes("127.0.0.1") &&
+            !url.endsWith("#");
+
+          if (isValidUrl) {
+            sources.push({
+              title: `#${bundle.channelName} - ${username}`,
+              url,
+              snippet: snippetText.substring(0, 150) + (snippetText.length > 150 ? "..." : ""),
+            });
+          }
         }
 
         // Format Notion results (Slack already handled by thread bundles)
@@ -425,11 +446,23 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
           const timestampStr = lastEdited ? ` [Last edited: ${lastEdited}]` : "";
           contextParts.push(`[Notion - ${pageTitle}]${timestampStr} (${blockType}): ${text}`);
 
-          sources.push({
-            title: `${pageTitle} (Notion)`,
-            url: result.pageUrl || "#",
-            snippet: text.substring(0, 150) + (text.length > 150 ? "..." : ""),
-          });
+          // Only add if valid URL (not localhost, not empty, not just "#")
+          const url = result.pageUrl;
+          const isValidUrl =
+            url &&
+            /^https?:\/\//i.test(url) &&
+            !url.includes("localhost") &&
+            !url.includes("127.0.0.1") &&
+            !url.endsWith("#") &&
+            url !== "#";
+
+          if (isValidUrl) {
+            sources.push({
+              title: `${pageTitle} (Notion)`,
+              url,
+              snippet: text.substring(0, 150) + (text.length > 150 ? "..." : ""),
+            });
+          }
         }
       }
 
@@ -448,7 +481,6 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
 
         // Truncate by removing results from the end until we fit
         const currentContextParts = [...contextParts];
-        const currentSources = [...sources];
 
         while (currentContextParts.length > 0) {
           const testContext = currentContextParts.join("\n\n");
@@ -456,14 +488,14 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
 
           if (testTokens <= MAX_CONTEXT_TOKENS) {
             contextText = testContext;
-            finalSources = currentSources;
+            // Keep all sources - they're metadata for citation, not consuming context tokens
+            finalSources = sources;
             truncatedCount = results.length - currentContextParts.length;
             break;
           }
 
-          // Remove last item
+          // Remove last context item
           currentContextParts.pop();
-          currentSources.pop();
         }
 
         console.log(
@@ -471,34 +503,65 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
         );
       }
 
+      const finalTokens = tokenCounter.countTokens(contextText);
       console.log(
-        `[SearchKnowledgeTool] Returning ${finalSources.length} sources (${totalTokens} tokens)`
+        `[SearchKnowledgeTool] Returning ${finalSources.length} sources (${finalTokens} tokens)`
+      );
+
+      // Step 9.5: Final validation - filter out ANY invalid URLs regardless of path
+      const validatedSources = finalSources.filter((source) => {
+        const url = source.url;
+        const isValid =
+          url &&
+          typeof url === "string" &&
+          /^https?:\/\//i.test(url) &&
+          !url.includes("localhost") &&
+          !url.includes("127.0.0.1") &&
+          !url.endsWith("#") &&
+          url !== "#" &&
+          source.title &&
+          source.title !== "Unknown" &&
+          source.title !== "Source";
+
+        if (!isValid) {
+          console.warn(
+            `[SearchKnowledgeTool] Filtered out invalid source: ${source.title} - ${url}`
+          );
+        }
+
+        return isValid;
+      });
+
+      console.log(
+        `[SearchKnowledgeTool] After validation: ${validatedSources.length}/${finalSources.length} sources`
       );
 
       // Step 10: Return formatted result with sources for AI to cite
       // Format sources as a list at the end for AI to reference
-      const sourcesText = finalSources.map((s, i) => `${i + 1}. ${s.title} - ${s.url}`).join("\n");
+      const sourcesText = validatedSources
+        .map((s, i) => `${i + 1}. ${s.title} - ${s.url}`)
+        .join("\n");
 
       const contentWithSources = `${contextText}\n\n---\nAvailable sources to cite:\n${sourcesText}`;
 
       console.log("[SearchKnowledgeTool] Success - returning knowledge:", {
         responseLength: contentWithSources.length,
-        sourcesCount: finalSources.length,
-        sourceNames: finalSources.map((s) => s.title),
+        sourcesCount: validatedSources.length,
+        sourceNames: validatedSources.map((s) => s.title),
         tokenCount: tokenCounter.countTokens(contentWithSources),
         truncated: truncatedCount > 0,
         truncatedCount,
       });
 
       console.log(
-        `[SearchKnowledgeTool] Returning ${finalSources.length} sources:`,
-        finalSources.map((s) => `"${s.title}" - ${s.url}`)
+        `[SearchKnowledgeTool] Returning ${validatedSources.length} sources:`,
+        validatedSources.map((s) => `"${s.title}" - ${s.url}`)
       );
 
       return {
         messageType: "text",
         content: contentWithSources,
-        sources: finalSources,
+        sources: validatedSources,
         streamable: true,
         metadata: {
           isTemporal,
@@ -695,7 +758,20 @@ Returns relevant excerpts from Slack conversations and Notion pages with source 
           queryLower.match(new RegExp(`\\blast\\s+${monthName}`, "i"))?.[0] || ""
         );
 
-        const year = isLast ? now.getFullYear() - 1 : now.getFullYear();
+        let year = now.getFullYear();
+
+        // Smart year selection:
+        // - "last October" → previous year
+        // - "October" in November → this year (last month)
+        // - "October" in September → assume they mean upcoming October (wait, no - assume last year's)
+        // Actually, let's be smart: if the month hasn't happened yet this year, use last year
+        if (isLast) {
+          year = year - 1;
+        } else if (i > now.getMonth()) {
+          // Month is in the future this year → assume they mean last year
+          year = year - 1;
+        }
+
         const startOfMonth = new Date(year, i, 1);
         const endOfMonth = new Date(year, i + 1, 0, 23, 59, 59, 999);
 

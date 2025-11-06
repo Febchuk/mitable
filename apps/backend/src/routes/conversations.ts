@@ -724,6 +724,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id || req.userId;
+
     const { conversationId } = req.params;
     const { content, screenshot, screenshotMetadata, metadata } = req.body;
 
