@@ -1,0 +1,81 @@
+/**
+ * PII Detection Types
+ */
+export interface PIIRegion {
+  type: string;
+  likelihood: PIILikelihood;
+  bounds: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+}
+
+export type PIIType =
+  | "PERSON_NAME"
+  | "EMAIL_ADDRESS"
+  | "PHONE_NUMBER"
+  | "STREET_ADDRESS"
+  | "CREDIT_CARD_NUMBER"
+  | "US_SOCIAL_SECURITY_NUMBER"
+  | "API_KEY"
+  | "AUTH_TOKEN"
+  | "PASSWORD"
+  | "CUSTOM_API_KEY"
+  | "ENV_SECRET";
+
+export type PIILikelihood = "VERY_UNLIKELY" | "UNLIKELY" | "POSSIBLE" | "LIKELY" | "VERY_LIKELY";
+
+/**
+ * PII Detection Request (sent to backend)
+ */
+export interface PIIDetectionRequest {
+  screenshot: string; // Base64 data URL
+}
+
+/**
+ * PII Detection Response (from backend)
+ */
+export interface PIIDetectionResponse {
+  success: boolean;
+  redactedScreenshot: string; // Base64 data URL with PII redacted
+  detectionTime: number; // milliseconds
+  piiCount: number;
+  cached: boolean;
+  metadata?: {
+    originalWidth: number;
+    originalHeight: number;
+    processedWidth: number;
+    processedHeight: number;
+  };
+  error?: string;
+}
+
+/**
+ * Redaction Threshold
+ * Only PII with likelihood >= this threshold will be redacted
+ */
+export const PII_REDACTION_THRESHOLD: PIILikelihood = "POSSIBLE";
+
+/**
+ * High-sensitivity types that are ALWAYS redacted regardless of likelihood
+ */
+export const ALWAYS_REDACT_TYPES: PIIType[] = [
+  "CREDIT_CARD_NUMBER",
+  "US_SOCIAL_SECURITY_NUMBER",
+  "API_KEY",
+  "AUTH_TOKEN",
+  "PASSWORD",
+  "CUSTOM_API_KEY",
+  "ENV_SECRET",
+];
+
+/**
+ * Blur Options (for client-side blurring if needed)
+ */
+export interface BlurOptions {
+  blurRadius: number; // px
+  boxPadding: number; // px
+  color?: string; // Optional background color instead of blur
+}
