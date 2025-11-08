@@ -5,21 +5,12 @@
  * Works with both Agent and Conversation windows
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import type { Message as MessageType } from "../../conversation/src/types";
 
-export interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp?: Date;
-  messageType?: string;
-  cardData?: any;
-  sources?: any[];
-  windowTrigger?: {
-    window: "nudge" | "guide";
-    data: any;
-  };
-}
+const API_BASE_URL = "http://localhost:3000/api";
+
+// Re-export Message type for convenience
+export type Message = MessageType;
 
 export interface Conversation {
   id: string;
@@ -30,16 +21,22 @@ export interface Conversation {
 }
 
 export interface StreamChunk {
-  type: "chunk" | "complete" | "error" | "window_trigger" | "done";
+  type: "chunk" | "complete" | "error" | "window_trigger" | "done" | "progress";
   content?: string;
   messageId?: string;
   error?: string;
-  messageType?: string;
+  messageType?: "text" | "workflow" | "experts";
   cardData?: any;
   sources?: any[];
+  workflowSessionId?: string | null;
+  relatedStepIndex?: number | null;
   windowTrigger?: {
-    window: "nudge" | "guide";
+    window: "nudge" | "guide" | "overlay";
     data: any;
+  };
+  progress?: {
+    phase: string;
+    message: string;
   };
 }
 
@@ -70,12 +67,9 @@ export async function createConversation(
   title: string = "New Conversation",
   initialMessage?: string
 ): Promise<Conversation> {
-  console.log("[API] Creating conversation:", { title, initialMessage });
-
   const headers = await getAuthHeaders();
-  console.log("[API] Auth headers obtained");
 
-  const response = await fetch(`${API_BASE_URL}/api/conversations`, {
+  const response = await fetch(`${API_BASE_URL}/conversations`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -85,23 +79,11 @@ export async function createConversation(
     }),
   });
 
-  console.log("[API] Conversation creation response:", {
-    status: response.status,
-    ok: response.ok,
-  });
-
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error("[API] ❌ Failed to create conversation:", {
-      status: response.status,
-      statusText: response.statusText,
-      error: errorText,
-    });
-    throw new Error(`Failed to create conversation: ${response.statusText} - ${errorText}`);
+    throw new Error(`Failed to create conversation: ${response.statusText}`);
   }
 
   const data = await response.json();
-  console.log("[API] ✅ Conversation created:", data.conversation);
   return data.conversation;
 }
 
@@ -111,7 +93,7 @@ export async function createConversation(
 export async function getConversationMessages(conversationId: string): Promise<Message[]> {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(`${API_BASE_URL}/api/conversations/${conversationId}/messages`, {
+  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
     headers,
   });
 
@@ -121,6 +103,31 @@ export async function getConversationMessages(conversationId: string): Promise<M
 
   const data = await response.json();
   return data.messages;
+}
+
+/**
+ * Pause an active workflow
+ * Returns the updated workflow state with status: "paused"
+ */
+export async function pauseWorkflow(conversationId: string): Promise<{
+  success: boolean;
+  workflowSessionId: string;
+  status: string;
+  workflowData: any;
+  currentStepIndex: number;
+}> {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/workflow/pause`, {
+    method: "POST",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to pause workflow: ${response.statusText}`);
+  }
+
+  return await response.json();
 }
 
 /**
@@ -140,49 +147,67 @@ export async function sendMessageStream(
   content: string,
   screenshot: string | null | undefined,
   callbacks: {
-    onChunk?: (chunk: string) => void;
+    onChunk?: (
+      chunk: string,
+      workflowSessionId?: string | null,
+      relatedStepIndex?: number | null
+    ) => void;
     onComplete?: (
       fullContent: string,
       messageId: string,
       messageType?: string,
       cardData?: any,
-      windowTrigger?: { window: "nudge" | "guide"; data: any }
+      windowTrigger?: { window: "nudge" | "guide" | "overlay"; data: any },
+      workflowSessionId?: string | null,
+      relatedStepIndex?: number | null
     ) => void;
     onError?: (error: string) => void;
-    onWindowTrigger?: (window: "nudge" | "guide", data: any) => void;
+    onWindowTrigger?: (window: "nudge" | "guide" | "overlay", data: any) => void;
+    onProgress?: (phase: string, message: string) => void;
   },
-  metadata?: any
+  metadata?: any,
+  screenshotMetadata?: {
+    width: number;
+    height: number;
+    originalWidth: number;
+    originalHeight: number;
+    captureMode: string;
+    timestamp: number;
+    scaleFactor?: number;
+  }
 ): Promise<void> {
-  console.log("[API] 📨 Starting message stream:", {
-    conversationId,
-    contentLength: content.length,
-    hasScreenshot: !!screenshot,
-  });
-
   const headers = await getAuthHeaders();
-  console.log("[API] Auth headers obtained for streaming");
 
-  // Build request body with optional screenshot and metadata
-  const requestBody: { content: string; screenshot?: string; metadata?: any } = { content };
+  // Build request body with optional screenshot, metadata, and screenshotMetadata
+  const requestBody: {
+    content: string;
+    screenshot?: string;
+    metadata?: any;
+    screenshotMetadata?: any;
+  } = { content };
+
   if (screenshot) {
     requestBody.screenshot = screenshot;
     console.log(`[API] Sending message with screenshot (${screenshot.length} bytes)`);
+
+    if (screenshotMetadata) {
+      requestBody.screenshotMetadata = screenshotMetadata;
+      console.log(`[API] Sending screenshot metadata:`, screenshotMetadata);
+    }
   } else {
     console.log("[API] Sending message without screenshot");
   }
+
   if (metadata) {
     requestBody.metadata = metadata;
     console.log(`[API] Sending message with metadata:`, metadata);
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/conversations/${conversationId}/messages/stream`,
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(requestBody),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -195,7 +220,6 @@ export async function sendMessageStream(
     return;
   }
 
-  // Read the entire SSE stream and collect the full content
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -203,61 +227,127 @@ export async function sendMessageStream(
   let messageId = "";
   let messageType: string | undefined;
   let cardData: any = undefined;
-  let windowTriggerData: { window: "nudge" | "guide"; data: any } | undefined;
+  let windowTriggerData: { window: "nudge" | "guide" | "overlay"; data: any } | undefined;
+  let workflowSessionId: string | null | undefined;
+  let relatedStepIndex: number | null | undefined;
 
   try {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const { done, value } = await reader.read();
 
-      if (done) break;
+      if (done) {
+        break;
+      }
 
+      // Decode the chunk
       buffer += decoder.decode(value, { stream: true });
+
+      // Process complete lines
       const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      buffer = lines.pop() || ""; // Keep incomplete line in buffer
 
       for (const line of lines) {
+        // Skip empty lines and ping messages
+        if (!line.trim() || line.startsWith(":")) {
+          continue;
+        }
+
+        // Parse SSE data
         if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          if (data === "" || data.startsWith(":")) continue;
+          const data = line.slice(6); // Remove "data: " prefix
+          console.log("[API] SSE data received:", data.substring(0, 150));
 
           try {
             const chunk: StreamChunk = JSON.parse(data);
+            console.log("[API] Parsed chunk:", { type: chunk.type, keys: Object.keys(chunk) });
 
-            // Stream chunks directly to UI as they arrive (real-time!)
-            if (chunk.type === "chunk" && chunk.content) {
-              fullContent += chunk.content;
-              callbacks.onChunk?.(chunk.content);
-            } else if (chunk.type === "complete") {
-              if (chunk.content) fullContent = chunk.content;
-              if (chunk.messageType) messageType = chunk.messageType;
-              if (chunk.cardData) cardData = chunk.cardData;
-            } else if (chunk.type === "window_trigger" && chunk.windowTrigger) {
-              windowTriggerData = chunk.windowTrigger;
-              callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
-            } else if (chunk.type === "done" && chunk.messageId) {
-              messageId = chunk.messageId;
-            } else if (chunk.type === "error") {
-              callbacks.onError?.(chunk.error || "Unknown error");
-              return;
+            switch (chunk.type) {
+              case "chunk":
+                // Extract workflow metadata from first chunk
+                // Backend enriches ALL chunks with these fields (either null or actual values)
+                if (workflowSessionId === undefined) {
+                  workflowSessionId = chunk.workflowSessionId;
+                  relatedStepIndex = chunk.relatedStepIndex;
+                }
+
+                if (chunk.content) {
+                  fullContent += chunk.content;
+                  // Pass workflow metadata to onChunk so frontend can route chunks during streaming
+                  callbacks.onChunk?.(chunk.content, workflowSessionId, relatedStepIndex);
+                }
+                break;
+
+              case "complete":
+                if (chunk.content) {
+                  fullContent = chunk.content;
+                }
+                if (chunk.messageType) {
+                  messageType = chunk.messageType;
+                }
+                if (chunk.cardData) {
+                  cardData = chunk.cardData;
+                }
+                break;
+
+              case "window_trigger":
+                console.log("[API] Window trigger case MATCHED");
+                console.log("[API] Received window_trigger event:", chunk.windowTrigger);
+                if (chunk.windowTrigger) {
+                  windowTriggerData = chunk.windowTrigger;
+                  console.log("[API] Stored windowTriggerData:", windowTriggerData);
+                  console.log("[API] Calling onWindowTrigger callback...");
+                  callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
+                  console.log("[API] onWindowTrigger callback called");
+                }
+                break;
+
+              case "done":
+                if (chunk.messageId) {
+                  messageId = chunk.messageId;
+                }
+                if (chunk.workflowSessionId !== undefined) {
+                  workflowSessionId = chunk.workflowSessionId;
+                }
+                if (chunk.relatedStepIndex !== undefined) {
+                  relatedStepIndex = chunk.relatedStepIndex;
+                }
+                console.log("[API] Calling onComplete with workflow fields:", {
+                  windowTriggerData,
+                  workflowSessionId,
+                  relatedStepIndex,
+                });
+                callbacks.onComplete?.(
+                  fullContent,
+                  messageId,
+                  messageType,
+                  cardData,
+                  windowTriggerData,
+                  workflowSessionId,
+                  relatedStepIndex
+                );
+                break;
+
+              case "error":
+                callbacks.onError?.(chunk.error || "Unknown error");
+                break;
+
+              case "progress":
+                if (chunk.progress) {
+                  callbacks.onProgress?.(chunk.progress.phase, chunk.progress.message);
+                }
+                break;
+
+              default:
+                console.warn("[API] Unknown chunk type received:", chunk.type, "Full chunk:", chunk);
+                break;
             }
-          } catch (e) {
-            // Skip parse errors
+          } catch (parseError) {
+            console.error("Failed to parse SSE data:", parseError, data);
           }
         }
       }
     }
-
-    if (!fullContent) {
-      console.error("[API] ❌ No content received from backend");
-      callbacks.onError?.("No content received from backend");
-      return;
-    }
-
-    console.log("[API] ✅ Real-time streaming complete, calling onComplete");
-
-    // Signal completion
-    callbacks.onComplete?.(fullContent, messageId, messageType, cardData, windowTriggerData);
   } catch (error) {
     console.error("Stream reading error:", error);
     callbacks.onError?.(error instanceof Error ? error.message : "Stream reading error");

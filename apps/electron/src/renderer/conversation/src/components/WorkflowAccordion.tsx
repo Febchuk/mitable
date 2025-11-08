@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { ChevronDown, ChevronRight, PlayCircle, CheckCircle, Check, Circle, CircleDot } from "lucide-react";
 import WorkflowOptions, { WorkflowPhase } from "../../../components/domain/workflow/WorkflowOptions";
 import AIMessage from "../../../components/domain/messages/AIMessage";
+import LoadingMessage from "./LoadingMessage";
 import { cn } from "../../../lib/utils";
 import type { Message } from "../types";
 import type { SolutionObject } from "@mitable/shared";
@@ -22,6 +23,7 @@ interface WorkflowAccordionProps {
   onOptionSelect: (option: any) => void;
   isStreaming: boolean;
   awaitingCustomQuestion?: boolean; // Whether user clicked "Type something" and we're waiting for input
+  workflowLoadingMessage?: string | null; // Loading message for workflow-specific operations
 }
 
 export function WorkflowAccordion({
@@ -30,6 +32,7 @@ export function WorkflowAccordion({
   onOptionSelect,
   isStreaming,
   awaitingCustomQuestion = false,
+  workflowLoadingMessage = null,
 }: WorkflowAccordionProps) {
   // Determine if we're in pre-flight mode (workflow not started yet)
   const isPreFlight = workflow.currentStepIndex === -1;
@@ -251,6 +254,25 @@ export function WorkflowAccordion({
                           AI is thinking...
                         </div>
                       )}
+
+                      {/* Loading message - show when workflow operation is in progress */}
+                      {isCurrentStep && workflowLoadingMessage && (
+                        <div className="mt-3">
+                          <LoadingMessage message={workflowLoadingMessage} />
+                        </div>
+                      )}
+
+                      {/* WorkflowOptions - ONLY in current step when active and not loading */}
+                      {isCurrentStep && workflow.status === "active" && !workflowLoadingMessage && (
+                        <div className="mt-3">
+                          <WorkflowOptions
+                            phase={"step_progression" as WorkflowPhase}
+                            onOptionSelect={onOptionSelect}
+                            disabled={isStreaming}
+                            hidden={awaitingCustomQuestion}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -258,37 +280,32 @@ export function WorkflowAccordion({
             })}
           </div>
 
-          {/* Workflow options or resume/complete button */}
-          <div className="p-4 border-t border-border-subtle">
-            {isPreFlight ? (
-              <WorkflowOptions
-                phase={"initial_proposal" as WorkflowPhase}
-                onOptionSelect={onOptionSelect}
-                disabled={isStreaming}
-                hidden={awaitingCustomQuestion}
-              />
-            ) : workflow.status === "active" ? (
-              <WorkflowOptions
-                phase={"step_progression" as WorkflowPhase}
-                onOptionSelect={onOptionSelect}
-                disabled={isStreaming}
-                hidden={awaitingCustomQuestion}
-              />
-            ) : workflow.status === "paused" ? (
-              <button
-                className="resume-workflow-btn w-full flex items-center justify-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover transition-colors"
-                onClick={() => onOptionSelect({ action: "resume_workflow" })}
-              >
-                <PlayCircle className="w-5 h-5" />
-                Resume from Step {workflow.currentStepIndex + 1}
-              </button>
-            ) : (
-              <div className="completed-indicator flex items-center justify-center gap-2 text-status-success">
-                <CheckCircle className="w-5 h-5" />
-                <span className="font-medium">Workflow Completed</span>
-              </div>
-            )}
-          </div>
+          {/* Workflow options (pre-flight only) or resume/complete button */}
+          {(isPreFlight || workflow.status === "paused" || workflow.status === "completed") && (
+            <div className="p-4 border-t border-border-subtle">
+              {isPreFlight ? (
+                <WorkflowOptions
+                  phase={"initial_proposal" as WorkflowPhase}
+                  onOptionSelect={onOptionSelect}
+                  disabled={isStreaming}
+                  hidden={awaitingCustomQuestion}
+                />
+              ) : workflow.status === "paused" ? (
+                <button
+                  className="resume-workflow-btn w-full flex items-center justify-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover transition-colors"
+                  onClick={() => onOptionSelect({ action: "resume_workflow" })}
+                >
+                  <PlayCircle className="w-5 h-5" />
+                  Resume from Step {workflow.currentStepIndex + 1}
+                </button>
+              ) : (
+                <div className="completed-indicator flex items-center justify-center gap-2 text-status-success">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="font-medium">Workflow Completed</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
