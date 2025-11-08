@@ -6,6 +6,7 @@ import { requireAuth } from "../middleware/auth";
 import { OrchestratorService } from "../services/orchestrator.service";
 import { workflowService } from "../services/workflow.service";
 import { ScreenshotAnnotator } from "../utils/screenshot-annotator";
+import { coordinateConverterService } from "../services/coordinate-converter.service";
 
 // Initialize orchestrator (replaces old agentService)
 const orchestrator = new OrchestratorService();
@@ -1043,9 +1044,24 @@ router.post(
                 console.log('[DEBUG SCREENSHOT] All conditions met, saving annotated screenshot');
                 const annotator = new ScreenshotAnnotator();
 
+                // Convert pixel coordinates back to normalized for annotation
+                // (gemini-vision.service.ts already converted normalized → pixels for overlay rendering)
+                const normalizedBoundingBox = coordinateConverterService.convertToNormalized(
+                  visualGuidance.element.boundingBox,
+                  {
+                    width: screenshotMetadata.width,
+                    height: screenshotMetadata.height,
+                  }
+                );
+
+                console.log('[DEBUG SCREENSHOT] Coordinate conversion for annotation:', {
+                  pixels: visualGuidance.element.boundingBox,
+                  normalized: normalizedBoundingBox,
+                });
+
                 const result = await annotator.annotate(
                   screenshot,
-                  visualGuidance.element.boundingBox,
+                  normalizedBoundingBox,
                   {
                     width: screenshotMetadata.width,
                     height: screenshotMetadata.height,

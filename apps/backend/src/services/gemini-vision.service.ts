@@ -488,11 +488,28 @@ OUTPUT FORMAT:
    - label: Short descriptive label for the element (e.g., "Save Button")
    - type: Element type (button, input, link, dropdown, checkbox, text)
    - boundingBox: Normalized coordinates (0.0-1.0 range) OR null if not visible
-     * If element IS visible: Provide normalized coordinates relative to image dimensions
+
+     CRITICAL BOUNDING BOX RULES:
+     * NEVER highlight entire application windows - only specific interactive elements
+     * Application-level bounding boxes (covering >50% of screen) are NOT helpful
+     * If the step asks to "open an app" but the app is already open:
+       - Set boundingBox to null
+       - Set confidence to "high"
+       - conversationalMessage should say "The app is already open! You're ready for the next step."
+
+     * If element IS visible: Provide normalized coordinates for the SPECIFIC UI element
        - x: horizontal position as fraction (0.0 = left edge, 1.0 = right edge)
        - y: vertical position as fraction (0.0 = top edge, 1.0 = bottom edge)
-       - width: width as fraction of image width (e.g., 0.1 = 10% of width)
-       - height: height as fraction of image height (e.g., 0.05 = 5% of height)
+       - width: width as fraction of image width (typically 0.05-0.25 for buttons)
+       - height: height as fraction of image height (typically 0.02-0.10 for buttons)
+
+     * Sanity check - Most interactive elements are SMALL:
+       - Buttons/Links: width 5-25%, height 2-10%
+       - Input fields: width 10-40%, height 2-5%
+       - Icons: width 2-8%, height 2-8%
+       - Dropdowns: width 10-30%, height 2-5%
+       - If your bounding box is >50% width OR >30% height, it's probably wrong!
+
      * If element NOT visible: Set boundingBox to null
    - confidence: Detection confidence (0.0-1.0)
 
@@ -500,6 +517,7 @@ OUTPUT FORMAT:
    - Wrong app is open
    - Element requires scrolling to be visible
    - Element is off-screen or obscured
+   - The step asks to "open/launch" an app that is already open
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EXAMPLES:
@@ -574,6 +592,48 @@ Note: boundingBox is null because element requires scrolling to be visible
           pixels: parsed.element.boundingBox,
           imageDimensions,
         });
+
+        // Filter out application-type elements (they represent entire windows, not specific UI elements)
+        if (parsed.element.type === "application") {
+          console.log(
+            "[GeminiVision] Element type is 'application' - setting boundingBox to null (application windows should not have bounding boxes)"
+          );
+          parsed.element.boundingBox = null;
+        }
+
+        // Validate bounding box size (catch oversized boxes from Gemini)
+        // Only validate if boundingBox is still present (not nullified above)
+        if (parsed.element.boundingBox) {
+          const bbox = parsed.element.boundingBox;
+          const widthPercent = (bbox.width / imageDimensions.width) * 100;
+          const heightPercent = (bbox.height / imageDimensions.height) * 100;
+
+        // Warn if bounding box is suspiciously large (>50% width or >50% height)
+        if (widthPercent > 50 || heightPercent > 50) {
+          console.warn("[GeminiVision] WARNING: Bounding box is very large!", {
+            widthPercent: widthPercent.toFixed(1) + "%",
+            heightPercent: heightPercent.toFixed(1) + "%",
+            elementType: parsed.element.type,
+            elementLabel: parsed.element.label,
+            normalizedWidth: normalized.width.toFixed(3),
+            normalizedHeight: normalized.height.toFixed(3),
+          });
+
+          // If it's marked as "application" type and covers >30% of screen, set to null
+          if (parsed.element.type === "application" && (widthPercent > 30 || heightPercent > 30)) {
+            console.warn(
+              "[GeminiVision] Nullifying application-level bounding box (too large to be useful)"
+            );
+            parsed.element.boundingBox = null;
+          }
+          // For other element types, warn but don't auto-nullify (let it through for debugging)
+          else {
+            console.warn(
+              "[GeminiVision] Large bounding box detected but not auto-nullified. Review Gemini prompt effectiveness."
+            );
+          }
+        }
+        } // End of bounding box validation
       }
 
       // Comprehensive logging for debugging
