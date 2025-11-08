@@ -118,51 +118,10 @@ class PIIRedactionService {
     console.log(`[PIIRedactionService] Initialized with project: ${this.projectId}`);
   }
 
-  /**
-   * Preprocess image for better OCR accuracy
-   * Following ChatGPT's recommendations:
-   * 1. Upscale 1.5x for better text recognition
-   * 2. Grayscale to reduce noise
-   * 3. Normalize contrast
-   * 4. Keep as lossless PNG
-   */
-  private async preprocessImage(imageBuffer: Buffer): Promise<{
-    processedBuffer: Buffer;
-    originalWidth: number;
-    originalHeight: number;
-    processedWidth: number;
-    processedHeight: number;
-  }> {
-    const metadata = await sharp(imageBuffer).metadata();
-    const origW = metadata.width || 1920;
-    const origH = metadata.height || 1080;
-
-    // Upscale 1.5x (unless already very large)
-    const targetW = Math.min(2200, Math.round(origW * 1.5));
-
-    const processedBuffer = await sharp(imageBuffer)
-      .resize({ width: targetW, kernel: "lanczos3" }) // High-quality upscaling
-      .grayscale() // Better OCR on grayscale
-      .normalise() // Contrast stretch
-      .linear(1.2, -10) // Minor contrast tweak
-      .toFormat("png") // Lossless PNG
-      .toBuffer();
-
-    const processedMetadata = await sharp(processedBuffer).metadata();
-
-    console.log("[PIIRedactionService] Image preprocessing:", {
-      original: { width: origW, height: origH },
-      processed: { width: processedMetadata.width, height: processedMetadata.height },
-    });
-
-    return {
-      processedBuffer,
-      originalWidth: origW,
-      originalHeight: origH,
-      processedWidth: processedMetadata.width || targetW,
-      processedHeight: processedMetadata.height || Math.round((origH * targetW) / origW),
-    };
-  }
+  // NOTE: Image preprocessing disabled
+  // Was causing quality issues on HDR displays and upscaling artifacts
+  // DLP's OCR works well enough on original images
+  // If needed in future, re-enable with adjustments for HDR color spaces
 
   /**
    * Redact PII from a screenshot using Google Cloud DLP
@@ -204,9 +163,13 @@ class PIIRedactionService {
       const base64Data = this.extractBase64Data(request.screenshot);
       const imageBuffer = Buffer.from(base64Data, "base64");
 
-      // Preprocess image for better OCR
-      const { processedBuffer, originalWidth, originalHeight, processedWidth, processedHeight } =
-        await this.preprocessImage(imageBuffer);
+      // Get original dimensions but don't preprocess
+      const imageMetadata = await sharp(imageBuffer).metadata();
+      const originalWidth = imageMetadata.width || 1920;
+      const originalHeight = imageMetadata.height || 1080;
+      const processedBuffer = imageBuffer; // Use original
+      const processedWidth = originalWidth;
+      const processedHeight = originalHeight;
 
       // Configure DLP request (use PREPROCESSED buffer)
       const dlpRequest: protos.google.privacy.dlp.v2.IRedactImageRequest = {
@@ -218,11 +181,31 @@ class PIIRedactionService {
         inspectConfig: {
           infoTypes: PII_INFO_TYPES.map((name) => ({ name })),
           minLikelihood: protos.google.privacy.dlp.v2.Likelihood.POSSIBLE, // 40%+ confidence
+          // Add custom regex patterns for common API key formats
+          customInfoTypes: [
+            {
+              infoType: { name: "CUSTOM_API_KEY" },
+              regex: {
+                pattern: "[A-Za-z0-9_-]{20,}", // Generic long alphanumeric strings (API keys)
+              },
+            },
+            {
+              infoType: { name: "ENV_SECRET" },
+              regex: {
+                pattern: "(?:SECRET|KEY|TOKEN|PASSWORD)=[A-Za-z0-9_\\-\\.]+", // ENV var format
+              },
+            },
+          ],
         },
-        imageRedactionConfigs: PII_INFO_TYPES.map((name) => ({
-          infoType: { name },
-          // Black rectangle (default color)
-        })),
+        imageRedactionConfigs: [
+          // Redact built-in PII types
+          ...PII_INFO_TYPES.map((name) => ({
+            infoType: { name },
+          })),
+          // Redact custom patterns
+          { infoType: { name: "CUSTOM_API_KEY" } },
+          { infoType: { name: "ENV_SECRET" } },
+        ],
       };
 
       // Call DLP API (dlpClient is guaranteed to be initialized by initializeDLPClient)
@@ -233,7 +216,7 @@ class PIIRedactionService {
       }
 
       // Convert Buffer back to base64 data URL
-      const redactedBase64 = response.redactedImage.toString("base64");
+      const redactedBase64 = Buffer.from(response.redactedImage).toString("base64");
       const redactedScreenshot = `data:image/png;base64,${redactedBase64}`;
 
       // Count PII regions (approximate - DLP doesn't return exact count in redactImage)
