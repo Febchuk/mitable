@@ -64,6 +64,12 @@ export const config = {
     apiVersion: "2022-06-28",
   },
 
+  // Google Cloud DLP Configuration (for PII redaction)
+  googleCloud: {
+    projectId: (process.env.GOOGLE_CLOUD_PROJECT_ID || "").trim(),
+    keyPath: (process.env.GOOGLE_CLOUD_KEY_PATH || "").trim(),
+  },
+
   // Security
   jwtSecret: process.env.JWT_SECRET || "",
 };

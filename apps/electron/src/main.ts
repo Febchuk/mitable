@@ -26,6 +26,35 @@ const authTokens: {
   refreshToken: null,
 };
 
+// PII Redaction Helper - calls backend API
+async function redactPII(screenshot: string): Promise<string> {
+  try {
+    console.log("[PII] Redacting screenshot...");
+    const response = await fetch("http://localhost:3000/api/pii/redact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ screenshot }),
+    });
+
+    if (!response.ok) {
+      console.error("[PII] Redaction failed:", response.status, response.statusText);
+      return screenshot; // Return original on failure (graceful degradation)
+    }
+
+    const data = await response.json();
+    console.log("[PII] Redaction complete:", {
+      piiCount: data.piiCount,
+      cached: data.cached,
+      detectionTime: data.detectionTime,
+    });
+
+    return data.redactedScreenshot || screenshot;
+  } catch (error) {
+    console.error("[PII] Redaction error:", error);
+    return screenshot; // Return original on error (graceful degradation)
+  }
+}
+
 function createAgentWindow() {
   // Get screen dimensions for bottom-center positioning
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -611,14 +640,18 @@ function setupIPC() {
       console.log("[Main] Overlay still loading, waiting for did-finish-load...");
       overlayWindow.webContents.once('did-finish-load', () => {
         console.log("[Main] Overlay loaded, sending data now");
-        overlayWindow.webContents.send("overlay-data", data);
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send("overlay-data", data);
+        }
       });
     } else {
       // Already loaded, add small delay for React to mount and set up listeners
       console.log("[Main] Overlay already loaded, sending data with 100ms delay");
       setTimeout(() => {
-        overlayWindow.webContents.send("overlay-data", data);
-        console.log("[Main] Overlay data sent");
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send("overlay-data", data);
+          console.log("[Main] Overlay data sent");
+        }
       }, 100);
     }
 
@@ -1049,8 +1082,11 @@ function setupIPC() {
             height: result.metadata.height,
           });
 
+          // Redact PII before returning
+          const redactedDataUrl = await redactPII(result.dataUrl);
+
           return {
-            dataUrl: result.dataUrl,
+            dataUrl: redactedDataUrl,
             metadata: result.metadata,
           };
         }
@@ -1070,9 +1106,12 @@ function setupIPC() {
           height: result.metadata.height,
         });
 
+        // Redact PII before returning
+        const redactedDataUrl = await redactPII(result.dataUrl);
+
         // Return both data URL and metadata (omit filePath for security)
         return {
-          dataUrl: result.dataUrl,
+          dataUrl: redactedDataUrl,
           metadata: result.metadata,
         };
       } catch (error) {
