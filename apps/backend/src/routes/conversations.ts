@@ -938,6 +938,21 @@ router.post(
           // Send enriched chunk to client
           res.write(`data: ${JSON.stringify(enrichedChunk)}\n\n`);
 
+          // Emit separate window_trigger event if windowTrigger is embedded in complete chunk
+          if (chunk.type === "complete" && (chunk as any).windowTrigger) {
+            const windowTriggerEvent = {
+              type: "window_trigger",
+              windowTrigger: (chunk as any).windowTrigger,
+            };
+
+            console.log("[Conversations] Emitting window_trigger event:", {
+              window: (chunk as any).windowTrigger.window,
+              hasData: !!(chunk as any).windowTrigger.data,
+            });
+
+            res.write(`data: ${JSON.stringify(windowTriggerEvent)}\n\n`);
+          }
+
           // Accumulate content and metadata for database save
           if (chunk.type === "chunk" && chunk.content) {
             assistantContent += chunk.content;
@@ -1009,31 +1024,52 @@ router.post(
         }
 
         // Debug: Save annotated screenshot if enabled and has visual guidance
-        if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true' && screenshot && screenshotMetadata) {
-          try {
-            // Check if the response has visual guidance data with bounding box
-            const visualGuidance = finalCardData?.visualGuidance;
-            if (visualGuidance?.element?.boundingBox) {
-              const annotator = new ScreenshotAnnotator();
+        if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true') {
+          console.log('[DEBUG SCREENSHOT] Debug mode active, checking conditions:', {
+            envVariableSet: process.env.DEBUG_SAVE_SCREENSHOTS === 'true',
+            hasScreenshot: !!screenshot,
+            hasMetadata: !!screenshotMetadata,
+            hasVisualGuidance: !!finalCardData?.visualGuidance,
+            hasElement: !!finalCardData?.visualGuidance?.element,
+            hasBoundingBox: !!finalCardData?.visualGuidance?.element?.boundingBox,
+            boundingBoxValue: finalCardData?.visualGuidance?.element?.boundingBox,
+          });
 
-              await annotator.annotate(
-                screenshot,
-                visualGuidance.element.boundingBox,
-                {
-                  width: screenshotMetadata.width,
-                  height: screenshotMetadata.height,
-                },
-                {
-                  label: visualGuidance.element.description || visualGuidance.element.label || 'Target Element',
-                  confidence: visualGuidance.element.confidence || 0.5,
-                  instruction: content,
-                  elementType: visualGuidance.element.type,
-                }
-              );
+          if (screenshot && screenshotMetadata) {
+            try {
+              // Check if the response has visual guidance data with bounding box
+              const visualGuidance = finalCardData?.visualGuidance;
+              if (visualGuidance?.element?.boundingBox) {
+                console.log('[DEBUG SCREENSHOT] All conditions met, saving annotated screenshot');
+                const annotator = new ScreenshotAnnotator();
+
+                const result = await annotator.annotate(
+                  screenshot,
+                  visualGuidance.element.boundingBox,
+                  {
+                    width: screenshotMetadata.width,
+                    height: screenshotMetadata.height,
+                  },
+                  {
+                    label: visualGuidance.elementDescription || visualGuidance.element.label || 'Target Element',
+                    confidence: visualGuidance.element.confidence || 0.5,
+                    instruction: content,
+                    elementType: visualGuidance.element.type,
+                  }
+                );
+                console.log('[DEBUG SCREENSHOT] Screenshot saved successfully:', result);
+              } else {
+                console.warn('[DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response');
+              }
+            } catch (debugError) {
+              console.error('[DEBUG SCREENSHOT] Failed to save annotated screenshot:', debugError);
+              // Don't fail the request, just log the error
             }
-          } catch (debugError) {
-            console.error('[DEBUG SCREENSHOT] Failed to save annotated screenshot:', debugError);
-            // Don't fail the request, just log the error
+          } else {
+            console.warn('[DEBUG SCREENSHOT] Skipping annotation - missing screenshot or metadata', {
+              hasScreenshot: !!screenshot,
+              hasMetadata: !!screenshotMetadata,
+            });
           }
         }
 

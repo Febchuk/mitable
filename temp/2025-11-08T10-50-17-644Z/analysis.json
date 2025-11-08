@@ -1,0 +1,34 @@
+{
+  "timestamp": "2025-11-08T10:50:17.767Z",
+  "instruction": "Move on to next step",
+  "element": {
+    "label": "To navigate to the 'Library' section, please click on the leftmost icon in the bottom navigation bar. It appears to be an icon with three horizontal lines and a vertical line.",
+    "type": "button",
+    "confidence": 0.9,
+    "boundingBox": {
+      "normalized": {
+        "x": 0.063,
+        "y": 0.246,
+        "width": 0.044,
+        "height": 0.093
+      },
+      "pixels": {
+        "x": 120.96000000000001,
+        "y": 265.68,
+        "width": 84.47999999999999,
+        "height": 100.44
+      }
+    }
+  },
+  "screenshot": {
+    "dimensions": {
+      "width": 1920,
+      "height": 1080
+    },
+    "files": {
+      "original": "original.png",
+      "annotated": "annotated.png",
+      "analysis": "analysis.json"
+    }
+  }
+}

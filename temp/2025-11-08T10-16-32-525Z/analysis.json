@@ -1,0 +1,34 @@
+{
+  "timestamp": "2025-11-08T10:16:32.645Z",
+  "instruction": "Move on to next step",
+  "element": {
+    "label": "Click on the 'Move on to next step' button in the pop-up window to proceed to the next step.",
+    "type": "button",
+    "confidence": 0.95,
+    "boundingBox": {
+      "normalized": {
+        "x": 0.307,
+        "y": 0.593,
+        "width": 0.398,
+        "height": 0.045
+      },
+      "pixels": {
+        "x": 589.4399999999999,
+        "y": 640.4399999999999,
+        "width": 764.1600000000001,
+        "height": 48.6
+      }
+    }
+  },
+  "screenshot": {
+    "dimensions": {
+      "width": 1920,
+      "height": 1080
+    },
+    "files": {
+      "original": "original.png",
+      "annotated": "annotated.png",
+      "analysis": "analysis.json"
+    }
+  }
+}

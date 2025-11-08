@@ -177,7 +177,10 @@ DO NOT USE:
         context.screenshot,
         updatedSolution,
         nextStep,
-        context.conversationHistory
+        context.conversationHistory,
+        context.screenshotMetadata
+          ? { width: context.screenshotMetadata.width, height: context.screenshotMetadata.height }
+          : undefined
       );
 
       console.log("[GuideNextStepTool] Visual guidance generated:", {
@@ -205,7 +208,24 @@ DO NOT USE:
       // Step 8: Get workflow session to include metadata in cardData
       const workflowSession = await workflowService.getActiveWorkflow(conversationId);
 
-      // Step 9: Return with updated SolutionObject
+      // Step 9: Prepare window trigger for overlay if bounding boxes present
+      const windowTrigger = visualGuidance?.element?.boundingBox ? {
+        window: "overlay" as const,
+        data: {
+          boundingBox: visualGuidance.element.boundingBox,
+          label: visualGuidance.element.label,
+          instruction: visualGuidance.conversationalMessage,
+          elementType: visualGuidance.element.type,
+        },
+      } : undefined;
+
+      console.log("[GuideNextStepTool] Window trigger:", {
+        hasWindowTrigger: !!windowTrigger,
+        hasBoundingBox: !!visualGuidance?.element?.boundingBox,
+        boundingBox: visualGuidance?.element?.boundingBox,
+      });
+
+      // Step 10: Return with updated SolutionObject and window trigger
       return {
         messageType: "workflow",
         content: message,
@@ -215,7 +235,9 @@ DO NOT USE:
           status: workflowSession?.status || "active", // Workflow is active during step progression
           workflowActive: true, // Used by agent window
           workflowPhase: "step_progression", // Used by agent window
+          visualGuidance: visualGuidance, // Include full visual guidance with bounding boxes
         },
+        triggerWindow: windowTrigger, // Trigger overlay if bounding boxes present
         streamable: true,
       };
     } catch (error) {

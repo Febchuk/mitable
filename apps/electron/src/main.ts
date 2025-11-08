@@ -244,10 +244,7 @@ function createConsoleWindow() {
 }
 
 function createOverlayWindow() {
-  if (!guideWindow || guideWindow.isDestroyed()) {
-    console.error("[Overlay] Cannot create overlay window - guide window not available");
-    return;
-  }
+  console.log("[Overlay] Creating overlay window...");
 
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.bounds;
@@ -588,6 +585,44 @@ function setupIPC() {
     if (consoleWindow && !consoleWindow.isDestroyed()) {
       consoleWindow.minimize();
     }
+  });
+
+  // Show overlay with bounding box data
+  ipcMain.on(IPC_CHANNELS.OVERLAY_SHOW, (_event, data) => {
+    console.log("[Main] OVERLAY_SHOW received with data:", data);
+
+    if (!overlayWindow || overlayWindow.isDestroyed()) {
+      console.error("[Main] Overlay window not available");
+      return;
+    }
+
+    // Show overlay window first
+    overlayWindow.show();
+    overlayWindow.focus();
+
+    // Open DevTools when overlay is shown (dev mode only, first time)
+    if (!app.isPackaged && !overlayWindow.webContents.isDevToolsOpened()) {
+      overlayWindow.webContents.openDevTools({ mode: 'detach' });
+    }
+
+    // Wait for renderer to be ready, then send data
+    // If already loaded, this fires immediately
+    if (overlayWindow.webContents.isLoading()) {
+      console.log("[Main] Overlay still loading, waiting for did-finish-load...");
+      overlayWindow.webContents.once('did-finish-load', () => {
+        console.log("[Main] Overlay loaded, sending data now");
+        overlayWindow.webContents.send("overlay-data", data);
+      });
+    } else {
+      // Already loaded, add small delay for React to mount and set up listeners
+      console.log("[Main] Overlay already loaded, sending data with 100ms delay");
+      setTimeout(() => {
+        overlayWindow.webContents.send("overlay-data", data);
+        console.log("[Main] Overlay data sent");
+      }, 100);
+    }
+
+    console.log("[Main] Overlay window shown");
   });
 
   /**
@@ -1083,7 +1118,7 @@ app.whenReady().then(() => {
   createConsoleWindow();
   // DEPRECATED: Guide window no longer needed - workflow UI moved to conversation window
   // createGuideWindow(); // Create guide as child of agent
-  createOverlayWindow(); // Create overlay as child of guide (must be after guide)
+  createOverlayWindow(); // Create overlay for bounding box visual guidance
   createNudgeWindow(); // Create nudge as child of agent
 
   setupIPC();

@@ -15,6 +15,13 @@ contextBridge.exposeInMainWorld("overlayAPI", {
       (_event: IpcRendererEvent, data: unknown) => callback(data)
     );
   },
+  onOverlayData: (callback: (data: unknown) => void) => {
+    console.log("[Overlay Preload] Setting up onOverlayData listener");
+    ipcRenderer.on("overlay-data", (_event: IpcRendererEvent, data: unknown) => {
+      console.log("[Overlay Preload] Received overlay-data:", data);
+      callback(data);
+    });
+  },
   show: () => ipcRenderer.send(IPC_CHANNELS.OVERLAY_SHOW),
   hide: () => ipcRenderer.send(IPC_CHANNELS.OVERLAY_HIDE),
   getDisplayMetadata: () => ipcRenderer.invoke(IPC_CHANNELS.GET_DISPLAY_METADATA),

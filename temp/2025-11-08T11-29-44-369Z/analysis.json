@@ -1,0 +1,34 @@
+{
+  "timestamp": "2025-11-08T11:29:44.517Z",
+  "instruction": "Yes, let's get started!",
+  "element": {
+    "label": "Spotify application window.",
+    "type": "application",
+    "confidence": 0.95,
+    "boundingBox": {
+      "normalized": {
+        "x": 0,
+        "y": 0,
+        "width": 705,
+        "height": 1077
+      },
+      "pixels": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      }
+    }
+  },
+  "screenshot": {
+    "dimensions": {
+      "width": 1920,
+      "height": 1080
+    },
+    "files": {
+      "original": "original.png",
+      "annotated": "annotated.png",
+      "analysis": "analysis.json"
+    }
+  }
+}

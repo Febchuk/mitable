@@ -1,0 +1,1007 @@
+@mitable/backend:dev:           "reasoning"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       }
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "interpretations"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "elementDescription": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "visualContext": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "confidence": {
+@mitable/backend:dev:       "type": "string",
+@mitable/backend:dev:       "enum": [
+@mitable/backend:dev:         "high",
+@mitable/backend:dev:         "medium",
+@mitable/backend:dev:         "low"
+@mitable/backend:dev:       ]
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "alternativeElements": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "conversationalMessage": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "element": {
+@mitable/backend:dev:       "type": "object",
+@mitable/backend:dev:       "properties": {
+@mitable/backend:dev:         "label": {
+@mitable/backend:dev:           "type": "string"
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "type": {
+@mitable/backend:dev:           "type": "string"
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "boundingBox": {
+@mitable/backend:dev:           "anyOf": [
+@mitable/backend:dev:             {
+@mitable/backend:dev:               "type": "object",
+@mitable/backend:dev:               "properties": {
+@mitable/backend:dev:                 "x": {
+@mitable/backend:dev:                   "type": "number"
+@mitable/backend:dev:                 },
+@mitable/backend:dev:                 "y": {
+@mitable/backend:dev:                   "type": "number"
+@mitable/backend:dev:                 },
+@mitable/backend:dev:                 "width": {
+@mitable/backend:dev:                   "type": "number"
+@mitable/backend:dev:                 },
+@mitable/backend:dev:                 "height": {
+@mitable/backend:dev:                   "type": "number"
+@mitable/backend:dev:                 }
+@mitable/backend:dev:               },
+@mitable/backend:dev:               "required": [
+@mitable/backend:dev:                 "x",
+@mitable/backend:dev:                 "y",
+@mitable/backend:dev:                 "width",
+@mitable/backend:dev:                 "height"
+@mitable/backend:dev:               ],
+@mitable/backend:dev:               "additionalProperties": false
+@mitable/backend:dev:             },
+@mitable/backend:dev:             {
+@mitable/backend:dev:               "type": "null"
+@mitable/backend:dev:             }
+@mitable/backend:dev:           ]
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "confidence": {
+@mitable/backend:dev:           "type": "number"
+@mitable/backend:dev:         }
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "required": [
+@mitable/backend:dev:         "label",
+@mitable/backend:dev:         "type",
+@mitable/backend:dev:         "boundingBox",
+@mitable/backend:dev:         "confidence"
+@mitable/backend:dev:       ],
+@mitable/backend:dev:       "additionalProperties": false
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "elementDescription",
+@mitable/backend:dev:     "visualContext",
+@mitable/backend:dev:     "confidence",
+@mitable/backend:dev:     "conversationalMessage",
+@mitable/backend:dev:     "element"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔄 Converting anyOf nullable: [{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"},"width":{"type":"number"},"height":{"type":"number"}},"required":["x","y","width","height"],"additionalProperties":false},{"type":"null"}]
+@mitable/backend:dev:   ✓ Converted to: {"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"},"width":{"type":"number"},"height":{"type":"number"}},"required":["x","y","width","height"],"nullable":true}
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "elementDescription": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "visualContext": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "confidence": {
+@mitable/backend:dev:       "type": "string",
+@mitable/backend:dev:       "enum": [
+@mitable/backend:dev:         "high",
+@mitable/backend:dev:         "medium",
+@mitable/backend:dev:         "low"
+@mitable/backend:dev:       ]
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "alternativeElements": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "conversationalMessage": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "element": {
+@mitable/backend:dev:       "type": "object",
+@mitable/backend:dev:       "properties": {
+@mitable/backend:dev:         "label": {
+@mitable/backend:dev:           "type": "string"
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "type": {
+@mitable/backend:dev:           "type": "string"
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "boundingBox": {
+@mitable/backend:dev:           "type": "object",
+@mitable/backend:dev:           "properties": {
+@mitable/backend:dev:             "x": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "y": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "width": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "height": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             }
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "required": [
+@mitable/backend:dev:             "x",
+@mitable/backend:dev:             "y",
+@mitable/backend:dev:             "width",
+@mitable/backend:dev:             "height"
+@mitable/backend:dev:           ],
+@mitable/backend:dev:           "nullable": true
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "confidence": {
+@mitable/backend:dev:           "type": "number"
+@mitable/backend:dev:         }
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "required": [
+@mitable/backend:dev:         "label",
+@mitable/backend:dev:         "type",
+@mitable/backend:dev:         "boundingBox",
+@mitable/backend:dev:         "confidence"
+@mitable/backend:dev:       ]
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "elementDescription",
+@mitable/backend:dev:     "visualContext",
+@mitable/backend:dev:     "confidence",
+@mitable/backend:dev:     "conversationalMessage",
+@mitable/backend:dev:     "element"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "needsAdjustment": {
+@mitable/backend:dev:       "type": "boolean"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustedStepList": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "stepNumber": {
+@mitable/backend:dev:             "type": "integer",
+@mitable/backend:dev:             "exclusiveMinimum": 0
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "description": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "status": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "pending",
+@mitable/backend:dev:               "current",
+@mitable/backend:dev:               "completed"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "stepNumber",
+@mitable/backend:dev:           "description",
+@mitable/backend:dev:           "status"
+@mitable/backend:dev:         ],
+@mitable/backend:dev:         "additionalProperties": false
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustmentReason": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "needsAdjustment"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "needsAdjustment": {
+@mitable/backend:dev:       "type": "boolean"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustedStepList": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "stepNumber": {
+@mitable/backend:dev:             "type": "integer"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "description": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "status": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "pending",
+@mitable/backend:dev:               "current",
+@mitable/backend:dev:               "completed"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "stepNumber",
+@mitable/backend:dev:           "description",
+@mitable/backend:dev:           "status"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustmentReason": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "needsAdjustment"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideGenerationService] Initialized 3 pre-defined guides
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "array",
+@mitable/backend:dev:   "items": {
+@mitable/backend:dev:     "type": "object",
+@mitable/backend:dev:     "properties": {
+@mitable/backend:dev:       "weekNumber": {
+@mitable/backend:dev:         "type": "integer",
+@mitable/backend:dev:         "minimum": 1
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "title": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "minLength": 1,
+@mitable/backend:dev:         "maxLength": 255
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "description": {
+@mitable/backend:dev:         "type": [
+@mitable/backend:dev:           "string",
+@mitable/backend:dev:           "null"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "timeEstimate": {
+@mitable/backend:dev:         "anyOf": [
+@mitable/backend:dev:           {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "maxLength": 50
+@mitable/backend:dev:           },
+@mitable/backend:dev:           {
+@mitable/backend:dev:             "type": "null"
+@mitable/backend:dev:           }
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "orderIndex": {
+@mitable/backend:dev:         "type": "integer",
+@mitable/backend:dev:         "minimum": 0
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "required": [
+@mitable/backend:dev:       "weekNumber",
+@mitable/backend:dev:       "title",
+@mitable/backend:dev:       "description",
+@mitable/backend:dev:       "timeEstimate",
+@mitable/backend:dev:       "orderIndex"
+@mitable/backend:dev:     ],
+@mitable/backend:dev:     "additionalProperties": false
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔄 Converting type array: ["string","null"]
+@mitable/backend:dev:   ✓ Converted to: type="string", nullable=true
+@mitable/backend:dev: 🔄 Converting anyOf nullable: [{"type":"string","maxLength":50},{"type":"null"}]
+@mitable/backend:dev:   ✓ Converted to: {"type":"string","nullable":true}
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "array",
+@mitable/backend:dev:   "items": {
+@mitable/backend:dev:     "type": "object",
+@mitable/backend:dev:     "properties": {
+@mitable/backend:dev:       "weekNumber": {
+@mitable/backend:dev:         "type": "integer"
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "title": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "description": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "nullable": true
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "timeEstimate": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "nullable": true
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "orderIndex": {
+@mitable/backend:dev:         "type": "integer"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "required": [
+@mitable/backend:dev:       "weekNumber",
+@mitable/backend:dev:       "title",
+@mitable/backend:dev:       "description",
+@mitable/backend:dev:       "timeEstimate",
+@mitable/backend:dev:       "orderIndex"
+@mitable/backend:dev:     ]
+@mitable/backend:dev:   }
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Validating configuration...
+@mitable/backend:dev: 🔌 Testing database connection...
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/backend:dev: ✅ Database connected: 2025-11-08T11:28:37.232Z
+@mitable/backend:dev: 📊 Initial pool stats: { total: 1, idle: 0, waiting: 0 }
+@mitable/backend:dev: 🔧 Initializing vector service...
+@mitable/backend:dev: ✅ Vector service initialized
+@mitable/backend:dev: 🚀 Mitable Backend API running on http://localhost:3000
+@mitable/backend:dev: 📊 Environment: development
+@mitable/electron:dev: [Conversation] DOM ready
+@mitable/electron:dev: [Conversation] Renderer loaded and ready for IPC
+@mitable/electron:dev: [Console] DOM ready - window.consoleAPI should be available now
+@mitable/electron:dev: [Console] Window finished loading - preload script should be ready
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/electron:dev: [Auth] Tokens set from Console window
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: true, hasContext: true, options: undefined }
+@mitable/electron:dev: [Screenshot] Using conditional capture with heuristics
+@mitable/electron:dev: [CaptureService] Capture decision: {
+@mitable/electron:dev:   shouldCapture: true,
+@mitable/electron:dev:   reason: 'Screenshot needed (confidence: 1.00, triggers: help_request, visual_language)',
+@mitable/electron:dev:   confidence: 1,
+@mitable/electron:dev:   triggeredHeuristics: [ 'help_request', 'visual_language' ]
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Starting capture: {
+@mitable/electron:dev:   mode: 'full-screen',
+@mitable/electron:dev:   displayId: undefined,
+@mitable/electron:dev:   hasBounds: false,
+@mitable/electron:dev:   saveToFile: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 5, width: 1920, height: 1080, scaleFactor: 2 }
+@mitable/electron:dev: [CaptureService] Resizing image: {
+@mitable/electron:dev:   original: { width: 3840, height: 2160 },
+@mitable/electron:dev:   resized: { width: 1920, height: 1080 }
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1920, height: 1080, hasFile: false }
+@mitable/electron:dev: [Screenshot] Conditional capture decision: {
+@mitable/electron:dev:   shouldCapture: true,
+@mitable/electron:dev:   confidence: 1,
+@mitable/electron:dev:   reason: 'Screenshot needed (confidence: 1.00, triggers: help_request, visual_language)'
+@mitable/electron:dev: }
+@mitable/electron:dev: [Screenshot] Screenshot captured via heuristics: { mode: 'full-screen', width: 1920, height: 1080 }
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: [Conversations] Request received: {
+@mitable/backend:dev:   conversationId: 'b6f56378-1e21-41b3-a315-a34e6648dda0',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   contentLength: 28,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   screenshotLength: 1775278,
+@mitable/backend:dev:   screenshotMetadata: {
+@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     height: 1080,
+@mitable/backend:dev:     originalWidth: 3840,
+@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     scaleFactor: 2,
+@mitable/backend:dev:     captureMode: 'full-screen',
+@mitable/backend:dev:     timestamp: 1762601358351
+@mitable/backend:dev:   },
+@mitable/backend:dev:   metadata: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [Stream] User message saved: 733b6b51-d090-4273-ac50-e621676afa65
+@mitable/backend:dev: [Conversations] User profile (from cache): {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   name: 'Emily Rodriguez',
+@mitable/backend:dev:   email: 'emily@lorikeet.ai'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] ToolContext created: {
+@mitable/backend:dev:   conversationId: 'b6f56378-1e21-41b3-a315-a34e6648dda0',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   historyLength: 1,
+@mitable/backend:dev:   hasUserProfile: true,
+@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
+@mitable/backend:dev: [Orchestrator] Processing message: {
+@mitable/backend:dev:   conversationId: 'b6f56378-1e21-41b3-a315-a34e6648dda0',
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasWorkflowState: false,
+@mitable/backend:dev:   workflowAction: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [Orchestrator] Intent classified: { type: 'workflow_start', confidence: 0.95 }
+@mitable/backend:dev: [Orchestrator] Routing: intent � Agent: visual-guidance
+@mitable/backend:dev: [VisualGuidanceAgent] Vague prompt inference: "How do I open my liked songs" → specific
+@mitable/backend:dev: [VisualGuidanceAgent] Starting knowledge-grounded workflow
+@mitable/backend:dev: [SearchKnowledgeTool] Searching for: "How do I open my liked songs"
+@mitable/backend:dev: [SearchKnowledgeTool] Organization context: {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   topK: 10,
+@mitable/backend:dev:   fetchLimit: 50
+@mitable/backend:dev: }
+@mitable/backend:dev: [IntentService] Intent: general (confidence: 0.9, needsContext: false)
+@mitable/backend:dev: [IntentService] Reasoning: General question about a feature without company context
+@mitable/backend:dev: [SearchKnowledgeTool] Detected intent: general (confidence: 0.9)
+@mitable/backend:dev: [SearchKnowledgeTool] Performing hybrid search: {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   query: 'How do I open my liked songs',
+@mitable/backend:dev:   fetchLimit: 50,
+@mitable/backend:dev:   dateFilters: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [SearchService] Pinecone filter: {"organization_id":"86c996f4-d997-44cf-8bdf-b00607e619ee"}
+@mitable/backend:dev: [SearchKnowledgeTool] Hybrid search complete: {
+@mitable/backend:dev:   totalResults: 50,
+@mitable/backend:dev:   semanticResults: 100,
+@mitable/backend:dev:   keywordResults: 0,
+@mitable/backend:dev:   searchTime: '2121ms'
+@mitable/backend:dev: }
+@mitable/backend:dev: [TrustRanking] Applying trust ranking for intent: general
+@mitable/backend:dev: [TrustRanking] Multipliers - codebase: 1x, document: 1x, chat: 1x
+@mitable/backend:dev: [TrustRanking] Top 5 after trust ranking:
+@mitable/backend:dev:   1. [chat/slack] score: 0.017 × 1x = 0.017
+@mitable/backend:dev:   2. [chat/slack] score: 0.017 × 1x = 0.017
+@mitable/backend:dev:   3. [chat/slack] score: 0.016 × 1x = 0.016
+@mitable/backend:dev:   4. [chat/slack] score: 0.015 × 1x = 0.015
+@mitable/backend:dev:   5. [chat/slack] score: 0.012 × 1x = 0.012
+@mitable/backend:dev: [SearchKnowledgeTool] Returning top 10 of 50 ranked results
+@mitable/backend:dev: [SearchKnowledgeTool] Returning 10 sources (402 tokens)
+@mitable/backend:dev: [SearchKnowledgeTool] Success - returning knowledge: {
+@mitable/backend:dev:   responseLength: 1366,
+@mitable/backend:dev:   sourcesCount: 10,
+@mitable/backend:dev:   sourceNames: [
+@mitable/backend:dev:     '#meeting-notes - aurel.npounengnong',
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#cool-resources - aurel.npounengnong',
+@mitable/backend:dev:     '#engineering - aurel.npounengnong',
+@mitable/backend:dev:     '#product - mikun.adewole',
+@mitable/backend:dev:     '#product - mikun.adewole',
+@mitable/backend:dev:     '#product - aurel.npounengnong',
+@mitable/backend:dev:     '#engineering - febchuk',
+@mitable/backend:dev:     '#cool-resources - aurel.npounengnong',
+@mitable/backend:dev:     '#product - aurel.npounengnong'
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   tokenCount: 549,
+@mitable/backend:dev:   truncated: false,
+@mitable/backend:dev:   truncatedCount: 0
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Search complete: { query: 'How do I open my liked songs', sourcesFound: 10 }
+@mitable/backend:dev: [VisualGuidanceAgent] Calling GPT-4 for workflow synthesis
+@mitable/backend:dev: [VisualGuidanceAgent] GPT-4 synthesis received: {
+@mitable/backend:dev:   hasSolution: true,
+@mitable/backend:dev:   hasExplanation: true,
+@mitable/backend:dev:   hasSupportingDataExplanation: true,
+@mitable/backend:dev:   stepCount: 5
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Validation passed, preparing tool parameters: {
+@mitable/backend:dev:   solution: 'Access your liked songs on the music streaming platform...',
+@mitable/backend:dev:   stepCount: 5,
+@mitable/backend:dev:   supportingDataFromSearch: 10
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Executing workflow tool with combined parameters
+@mitable/backend:dev: [StartUIGuidanceWorkflowTool] Execute: Access your liked songs on the music streaming platform
+@mitable/backend:dev: [StartUIGuidanceWorkflowTool] Created workflow preview: {
+@mitable/backend:dev:   stepCount: 5,
+@mitable/backend:dev:   estimatedTime: '13 minutes',
+@mitable/backend:dev:   currentStepIndex: -1,
+@mitable/backend:dev:   allStepsPending: true
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [StartUIGuidanceWorkflowTool] Created workflow session: {
+@mitable/backend:dev:   workflowSessionId: '318d6ef3-d24f-4b82-b515-00791b613e45',
+@mitable/backend:dev:   conversationId: 'b6f56378-1e21-41b3-a315-a34e6648dda0',
+@mitable/backend:dev:   status: 'active'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'complete',
+@mitable/backend:dev:   hasContent: true,
+@mitable/backend:dev:   hasWindowTrigger: false,
+@mitable/backend:dev:   windowType: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [Stream] Assistant message saved: 35fd5d40-42fb-4d0a-aec5-abeb5c76e860
+@mitable/backend:dev: [Stream] Workflow interaction saved for assistant response (ai_response)
+@mitable/backend:dev: [DEBUG SCREENSHOT] Debug mode active, checking conditions: {
+@mitable/backend:dev:   envVariableSet: true,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasMetadata: true,
+@mitable/backend:dev:   hasVisualGuidance: false,
+@mitable/backend:dev:   hasElement: false,
+@mitable/backend:dev:   hasBoundingBox: false,
+@mitable/backend:dev:   boundingBoxValue: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response
+@mitable/backend:dev: [Stream] First exchange detected - generating conversation title
+@mitable/backend:dev: [TitleGenerationService] Generating title for conversation
+@mitable/backend:dev: [TitleGenerationService] Title generated: Opening my liked songs
+@mitable/backend:dev: [Stream] Generated title: Opening my liked songs
+@mitable/backend:dev: [Stream] Conversation title updated successfully
+@mitable/backend:dev: [Conversations] Streaming completed successfully: {
+@mitable/backend:dev:   messageId: '35fd5d40-42fb-4d0a-aec5-abeb5c76e860',
+@mitable/backend:dev:   contentLength: 554
+@mitable/backend:dev: }
+@mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: false, hasContext: false, options: undefined }
+@mitable/electron:dev: [Screenshot] Using unconditional capture (no heuristics)
+@mitable/electron:dev: [CaptureService] Starting capture: {
+@mitable/electron:dev:   mode: 'full-screen',
+@mitable/electron:dev:   displayId: undefined,
+@mitable/electron:dev:   hasBounds: false,
+@mitable/electron:dev:   saveToFile: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 5, width: 1920, height: 1080, scaleFactor: 2 }
+@mitable/electron:dev: [CaptureService] Resizing image: {
+@mitable/electron:dev:   original: { width: 3840, height: 2160 },
+@mitable/electron:dev:   resized: { width: 1920, height: 1080 }
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1920, height: 1080, hasFile: false }
+@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1920, height: 1080 }
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: [Conversations] Request received: {
+@mitable/backend:dev:   conversationId: 'b6f56378-1e21-41b3-a315-a34e6648dda0',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   contentLength: 23,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   screenshotLength: 1643058,
+@mitable/backend:dev:   screenshotMetadata: {
+@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     height: 1080,
+@mitable/backend:dev:     originalWidth: 3840,
+@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     scaleFactor: 2,
+@mitable/backend:dev:     captureMode: 'full-screen',
+@mitable/backend:dev:     timestamp: 1762601377286
+@mitable/backend:dev:   },
+@mitable/backend:dev:   metadata: { workflowAction: 'progress_step', selectedOption: 1 }
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 1
+@mitable/backend:dev: [Stream] User message saved: 44089f08-2017-427f-af68-96c7d65a2cab
+@mitable/backend:dev: [Conversations] User profile (from cache): {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   name: 'Emily Rodriguez',
+@mitable/backend:dev:   email: 'emily@lorikeet.ai'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] ToolContext created: {
+@mitable/backend:dev:   conversationId: 'b6f56378-1e21-41b3-a315-a34e6648dda0',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   historyLength: 3,
+@mitable/backend:dev:   hasUserProfile: true,
+@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
+@mitable/backend:dev: [Orchestrator] Processing message: {
+@mitable/backend:dev:   conversationId: 'b6f56378-1e21-41b3-a315-a34e6648dda0',
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasWorkflowState: true,
+@mitable/backend:dev:   workflowAction: 'progress_step'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Orchestrator] Routing: metadata � VisualGuidanceAgent (progress_step)
+@mitable/backend:dev: [GuideNextStepTool] Progressing workflow in conversation: b6f56378-1e21-41b3-a315-a34e6648dda0
+@mitable/backend:dev: [GuideNextStepTool] Current workflow state: { currentStepIndex: -1, totalSteps: 5, adjustmentHistory: 0 }
+@mitable/backend:dev: [GuideNextStepTool] Evaluating if plan needs adjustment...
+@mitable/backend:dev: [GeminiVision] Evaluating progress to step: 1
+@mitable/backend:dev: [GeminiVision] Needs adjustment: true
+@mitable/backend:dev: [GuideNextStepTool] Evaluation result: {
+@mitable/backend:dev:   needsAdjustment: true,
+@mitable/backend:dev:   reason: 'The user has already completed steps 1, 2 and 3 based on the screenshot. Step 4 is the current step.',
+@mitable/backend:dev:   newStepCount: 5
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Applying plan adjustments
+@mitable/backend:dev: [GuideNextStepTool] Analyzing next step: {
+@mitable/backend:dev:   stepNumber: 1,
+@mitable/backend:dev:   description: 'Open the music streaming app on your device.'
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Analyzing step execution: 1
+@mitable/backend:dev: [GeminiVision] Converted bounding box coordinates: {
+@mitable/backend:dev:   normalized: { x: 0, y: 0, width: 0.367, height: 0.997 },
+@mitable/backend:dev:   pixels: { x: 0, y: 0, width: 705, height: 1077 },
+@mitable/backend:dev:   imageDimensions: { width: 1920, height: 1080 }
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Visual guidance generated: {
+@mitable/backend:dev:   elementDescription: 'Spotify application window....',
+@mitable/backend:dev:   visualContext: 'The Spotify app appears to be already open on your computer....',
+@mitable/backend:dev:   conversationalMessage: "It looks like Spotify is already open! If it's not, you'll need to open it from your applications.",
+@mitable/backend:dev:   conversationalMessageLength: 98,
+@mitable/backend:dev:   confidence: 'high',
+@mitable/backend:dev:   hasElement: true,
+@mitable/backend:dev:   hasBoundingBox: true,
+@mitable/backend:dev:   boundingBox: { x: 0, y: 0, width: 705, height: 1077 },
+@mitable/backend:dev:   elementLabel: 'Spotify App',
+@mitable/backend:dev:   elementType: 'application',
+@mitable/backend:dev:   elementConfidence: 0.95
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Guidance confidence: high
+@mitable/backend:dev: [GuideNextStepTool] Visual guidance generated: {
+@mitable/backend:dev:   conversationalMessage: "It looks like Spotify is already open! If it's not, you'll need to open it from your applications.",
+@mitable/backend:dev:   conversationalMessageLength: 98,
+@mitable/backend:dev:   confidence: 'high'
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Including adjustment notice in response
+@mitable/backend:dev: [GuideNextStepTool] Workflow progressed successfully: { newStepIndex: 0, totalSteps: 5, adjustmentMade: true }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [GuideNextStepTool] Window trigger: {
+@mitable/backend:dev:   hasWindowTrigger: true,
+@mitable/backend:dev:   hasBoundingBox: true,
+@mitable/backend:dev:   boundingBox: { x: 0, y: 0, width: 705, height: 1077 }
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'complete',
+@mitable/backend:dev:   hasContent: true,
+@mitable/backend:dev:   hasWindowTrigger: true,
+@mitable/backend:dev:   windowType: 'overlay'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Emitting window_trigger event: { window: 'overlay', hasData: true }
+@mitable/electron:dev: [Main] OVERLAY_SHOW received with data: {
+@mitable/electron:dev:   boundingBox: { x: 0, y: 0, width: 705, height: 1077 },
+@mitable/electron:dev:   label: 'Spotify App',
+@mitable/electron:dev:   instruction: "It looks like Spotify is already open! If it's not, you'll need to open it from your applications.",
+@mitable/electron:dev:   elementType: 'application'
+@mitable/electron:dev: }
+@mitable/electron:dev: [Main] Overlay already loaded, sending data with 100ms delay
+@mitable/electron:dev: [Main] Overlay window shown
+@mitable/backend:dev: [Stream] Assistant message saved: e250fab9-5458-4e84-9936-62fd16b0a503
+@mitable/electron:dev: [Main] Overlay data sent
+@mitable/backend:dev: [Stream] Workflow interaction saved for assistant response (step_progress)
+@mitable/backend:dev: [DEBUG SCREENSHOT] Debug mode active, checking conditions: {
+@mitable/backend:dev:   envVariableSet: true,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasMetadata: true,
+@mitable/backend:dev:   hasVisualGuidance: true,
+@mitable/backend:dev:   hasElement: true,
+@mitable/backend:dev:   hasBoundingBox: true,
+@mitable/backend:dev:   boundingBoxValue: { x: 0, y: 0, width: 705, height: 1077 }
+@mitable/backend:dev: }
+@mitable/backend:dev: [DEBUG SCREENSHOT] All conditions met, saving annotated screenshot
+@mitable/electron:dev: [27494:1108/032944.454777:ERROR:CONSOLE(1)] "Request Autofill.enable failed. {"code":-32601,"message":"'Autofill.enable' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
+@mitable/backend:dev: 
+@mitable/backend:dev: [DEBUG SCREENSHOT]
+@mitable/backend:dev:   Session:   /Users/febechukwuma/Documents/mitable/temp/2025-11-08T11-29-44-369Z
+@mitable/backend:dev:   Element:   Spotify application window. (95%)
+@mitable/backend:dev:   Files:     original.png, annotated.png, analysis.json
+@mitable/backend:dev: 
+@mitable/backend:dev: [DEBUG SCREENSHOT] Screenshot saved successfully: {
+@mitable/backend:dev:   sessionDir: '/Users/febechukwuma/Documents/mitable/temp/2025-11-08T11-29-44-369Z',
+@mitable/backend:dev:   originalPath: '/Users/febechukwuma/Documents/mitable/temp/2025-11-08T11-29-44-369Z/original.png',
+@mitable/backend:dev:   annotatedPath: '/Users/febechukwuma/Documents/mitable/temp/2025-11-08T11-29-44-369Z/annotated.png',
+@mitable/backend:dev:   jsonPath: '/Users/febechukwuma/Documents/mitable/temp/2025-11-08T11-29-44-369Z/analysis.json'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Streaming completed successfully: {
+@mitable/backend:dev:   messageId: 'e250fab9-5458-4e84-9936-62fd16b0a503',
+@mitable/backend:dev:   contentLength: 219
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔌 Database connection removed from pool
+@mitable/backend:dev: 🔌 Database connection removed from pool
+@mitable/electron:dev: [27494:1108/033030.228036:ERROR:CONSOLE(1)] "Request Autofill.enable failed. {"code":-32601,"message":"'Autofill.enable' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
+@mitable/electron:dev: [Main] CONVERSATION_SET_STATE called from renderer, state: collapsed
+@mitable/electron:dev: [Main] Setting state to collapsed
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 0, Waiting: 0
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/electron:dev: [Main] Fetched conversations from backend: {
+@mitable/electron:dev:   conversations: [
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'b6f56378-1e21-41b3-a315-a34e6648dda0',
+@mitable/electron:dev:       title: 'Opening my liked songs',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T11:29:44.518Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'f760230d-19c6-4476-ac20-a0b89dbf4e40',
+@mitable/electron:dev:       title: 'Updating the product roadmap',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T10:50:17.767Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '800c45f5-071c-4c35-b6b5-c27a004c8ca8',
+@mitable/electron:dev:       title: 'Open liked songs playlist',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T10:37:36.270Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '90f5e4f1-86d6-463f-bc4b-e40f2f6db0a5',
+@mitable/electron:dev:       title: 'Opening liked songs playlist',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T10:31:58.804Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'db09cc3a-2f53-4065-a814-3131798eb357',
+@mitable/electron:dev:       title: 'Open Liked Songs Playlist in Spotify',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T10:17:58.760Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '1af9a62f-89ba-4247-8d34-c448e2d5c26e',
+@mitable/electron:dev:       title: 'Open Liked Songs Playlist',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T10:07:43.104Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '60d66410-d3ac-45c9-86db-5f11bffc4868',
+@mitable/electron:dev:       title: 'Open Liked Songs playlist in Spotify',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T09:49:26.919Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '4870f8b3-7377-47ed-8a9f-5b5b819a9765',
+@mitable/electron:dev:       title: 'Opening Liked Songs',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T09:40:26.369Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'dc2250fc-a6dd-4fd2-8cc4-f7fffba0f1f2',
+@mitable/electron:dev:       title: 'Updating the product roadmap',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T09:31:37.028Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '790e5a74-6072-4245-9b0b-8e7256b898d3',
+@mitable/electron:dev:       title: 'Open my liked songs playlist',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T09:04:27.380Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '65ed6088-3038-4c67-8485-64ee9c51b392',
+@mitable/electron:dev:       title: 'Modify the product roadmap',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-07T19:39:34.865Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'e220bfd3-8cdf-4a44-b694-e4029ca90d11',
+@mitable/electron:dev:       title: 'How to open a new tab in a browser',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T11:12:22.707Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'c08e4ba7-0029-4f18-9ec9-84fae9f6aa2a',
+@mitable/electron:dev:       title: 'How to open a new tab',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T10:54:35.991Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '7732aa64-2004-42ac-945b-a14492156711',
+@mitable/electron:dev:       title: 'Signing into company Groq account',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T10:26:44.907Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'e62192a4-ff5c-48d0-813c-5524281b22aa',
+@mitable/electron:dev:       title: 'Nudging a teammate in Mitable',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T02:25:22.729Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'ee46c7e6-8d54-488a-a535-e3e357427840',
+@mitable/electron:dev:       title: 'How to log in to the Mitable app',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T01:12:09.753Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '7537258a-8f5b-4e3e-8649-757ac85aba9e',
+@mitable/electron:dev:       title: 'Nudging a teammate: Best practices',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T00:43:57.137Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'ba69cd85-06c3-4637-a2ea-ca5df35f1d61',
+@mitable/electron:dev:       title: 'Nudging an expert via chat',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-05T22:46:17.145Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '0489cb81-70d6-405c-bffd-6cbf46845e05',
+@mitable/electron:dev:       title: 'Chatting with the Mitable agent',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-05T18:18:55.324Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '990ea110-220a-4932-9ce5-be7a0727f4f5',
+@mitable/electron:dev:       title: 'How to open the product roadmap',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-05T18:10:09.433Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     }
+@mitable/electron:dev:   ],
+@mitable/electron:dev:   pagination: {
+@mitable/electron:dev:     page: 1,
+@mitable/electron:dev:     limit: 20,
+@mitable/electron:dev:     total: 355,
+@mitable/electron:dev:     totalPages: 18,
+@mitable/electron:dev:     hasNext: true,
+@mitable/electron:dev:     hasPrev: false
+@mitable/electron:dev:   }
+@mitable/electron:dev: }
+@mitable/electron:dev: [Main] Sending conversation list to renderer: 20 items
+@mitable/electron:dev: [Main] Fetched conversations from backend: {
+@mitable/electron:dev:   conversations: [
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'b6f56378-1e21-41b3-a315-a34e6648dda0',
+@mitable/electron:dev:       title: 'Opening my liked songs',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T11:29:44.518Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'f760230d-19c6-4476-ac20-a0b89dbf4e40',
+@mitable/electron:dev:       title: 'Updating the product roadmap',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T10:50:17.767Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '800c45f5-071c-4c35-b6b5-c27a004c8ca8',
+@mitable/electron:dev:       title: 'Open liked songs playlist',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T10:37:36.270Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '90f5e4f1-86d6-463f-bc4b-e40f2f6db0a5',
+@mitable/electron:dev:       title: 'Opening liked songs playlist',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T10:31:58.804Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'db09cc3a-2f53-4065-a814-3131798eb357',
+@mitable/electron:dev:       title: 'Open Liked Songs Playlist in Spotify',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T10:17:58.760Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '1af9a62f-89ba-4247-8d34-c448e2d5c26e',
+@mitable/electron:dev:       title: 'Open Liked Songs Playlist',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T10:07:43.104Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '60d66410-d3ac-45c9-86db-5f11bffc4868',
+@mitable/electron:dev:       title: 'Open Liked Songs playlist in Spotify',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T09:49:26.919Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '4870f8b3-7377-47ed-8a9f-5b5b819a9765',
+@mitable/electron:dev:       title: 'Opening Liked Songs',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T09:40:26.369Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'dc2250fc-a6dd-4fd2-8cc4-f7fffba0f1f2',
+@mitable/electron:dev:       title: 'Updating the product roadmap',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T09:31:37.028Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '790e5a74-6072-4245-9b0b-8e7256b898d3',
+@mitable/electron:dev:       title: 'Open my liked songs playlist',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-08T09:04:27.380Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '65ed6088-3038-4c67-8485-64ee9c51b392',
+@mitable/electron:dev:       title: 'Modify the product roadmap',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-07T19:39:34.865Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'e220bfd3-8cdf-4a44-b694-e4029ca90d11',
+@mitable/electron:dev:       title: 'How to open a new tab in a browser',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T11:12:22.707Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'c08e4ba7-0029-4f18-9ec9-84fae9f6aa2a',
+@mitable/electron:dev:       title: 'How to open a new tab',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T10:54:35.991Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '7732aa64-2004-42ac-945b-a14492156711',
+@mitable/electron:dev:       title: 'Signing into company Groq account',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T10:26:44.907Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'e62192a4-ff5c-48d0-813c-5524281b22aa',
+@mitable/electron:dev:       title: 'Nudging a teammate in Mitable',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T02:25:22.729Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'ee46c7e6-8d54-488a-a535-e3e357427840',
+@mitable/electron:dev:       title: 'How to log in to the Mitable app',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T01:12:09.753Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '7537258a-8f5b-4e3e-8649-757ac85aba9e',
+@mitable/electron:dev:       title: 'Nudging a teammate: Best practices',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-06T00:43:57.137Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: 'ba69cd85-06c3-4637-a2ea-ca5df35f1d61',
+@mitable/electron:dev:       title: 'Nudging an expert via chat',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-05T22:46:17.145Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '0489cb81-70d6-405c-bffd-6cbf46845e05',
+@mitable/electron:dev:       title: 'Chatting with the Mitable agent',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-05T18:18:55.324Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     },
+@mitable/electron:dev:     {
+@mitable/electron:dev:       id: '990ea110-220a-4932-9ce5-be7a0727f4f5',
+@mitable/electron:dev:       title: 'How to open the product roadmap',
+@mitable/electron:dev:       lastMessage: '',
+@mitable/electron:dev:       timestamp: '2025-11-05T18:10:09.433Z',
+@mitable/electron:dev:       unread: false
+@mitable/electron:dev:     }
+@mitable/electron:dev:   ],
+@mitable/electron:dev:   pagination: {
+@mitable/electron:dev:     page: 1,
+@mitable/electron:dev:     limit: 20,
+@mitable/electron:dev:     total: 355,
+@mitable/electron:dev:     totalPages: 18,
+@mitable/electron:dev:     hasNext: true,
+@mitable/electron:dev:     hasPrev: false
+@mitable/electron:dev:   }
+@mitable/electron:dev: }
+@mitable/electron:dev: [Main] Sending conversation list to renderer: 20 items
+@mitable/backend:dev: 🔌 Database connection removed from pool
+@mitable/backend:dev: 🔌 Database connection removed from pool

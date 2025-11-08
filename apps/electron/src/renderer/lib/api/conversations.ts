@@ -31,7 +31,7 @@ export interface StreamChunk {
   workflowSessionId?: string | null;
   relatedStepIndex?: number | null;
   windowTrigger?: {
-    window: "nudge" | "guide";
+    window: "nudge" | "guide" | "overlay";
     data: any;
   };
 }
@@ -143,31 +143,56 @@ export async function sendMessageStream(
   content: string,
   screenshot: string | null | undefined,
   callbacks: {
-    onChunk?: (chunk: string, workflowSessionId?: string | null, relatedStepIndex?: number | null) => void;
+    onChunk?: (
+      chunk: string,
+      workflowSessionId?: string | null,
+      relatedStepIndex?: number | null
+    ) => void;
     onComplete?: (
       fullContent: string,
       messageId: string,
       messageType?: string,
       cardData?: any,
-      windowTrigger?: { window: "nudge" | "guide"; data: any },
+      windowTrigger?: { window: "nudge" | "guide" | "overlay"; data: any },
       workflowSessionId?: string | null,
       relatedStepIndex?: number | null
     ) => void;
     onError?: (error: string) => void;
-    onWindowTrigger?: (window: "nudge" | "guide", data: any) => void;
+    onWindowTrigger?: (window: "nudge" | "guide" | "overlay", data: any) => void;
   },
-  metadata?: any
+  metadata?: any,
+  screenshotMetadata?: {
+    width: number;
+    height: number;
+    originalWidth: number;
+    originalHeight: number;
+    captureMode: string;
+    timestamp: number;
+    scaleFactor?: number;
+  }
 ): Promise<void> {
   const headers = await getAuthHeaders();
 
-  // Build request body with optional screenshot and metadata
-  const requestBody: { content: string; screenshot?: string; metadata?: any } = { content };
+  // Build request body with optional screenshot, metadata, and screenshotMetadata
+  const requestBody: {
+    content: string;
+    screenshot?: string;
+    metadata?: any;
+    screenshotMetadata?: any;
+  } = { content };
+
   if (screenshot) {
     requestBody.screenshot = screenshot;
     console.log(`[API] Sending message with screenshot (${screenshot.length} bytes)`);
+
+    if (screenshotMetadata) {
+      requestBody.screenshotMetadata = screenshotMetadata;
+      console.log(`[API] Sending screenshot metadata:`, screenshotMetadata);
+    }
   } else {
     console.log("[API] Sending message without screenshot");
   }
+
   if (metadata) {
     requestBody.metadata = metadata;
     console.log(`[API] Sending message with metadata:`, metadata);
@@ -197,7 +222,7 @@ export async function sendMessageStream(
   let messageId = "";
   let messageType: string | undefined;
   let cardData: any = undefined;
-  let windowTriggerData: { window: "nudge" | "guide"; data: any } | undefined;
+  let windowTriggerData: { window: "nudge" | "guide" | "overlay"; data: any } | undefined;
   let workflowSessionId: string | null | undefined;
   let relatedStepIndex: number | null | undefined;
 
@@ -226,9 +251,11 @@ export async function sendMessageStream(
         // Parse SSE data
         if (line.startsWith("data: ")) {
           const data = line.slice(6); // Remove "data: " prefix
+          console.log("[API] SSE data received:", data.substring(0, 150));
 
           try {
             const chunk: StreamChunk = JSON.parse(data);
+            console.log("[API] Parsed chunk:", { type: chunk.type, keys: Object.keys(chunk) });
 
             switch (chunk.type) {
               case "chunk":
@@ -259,11 +286,14 @@ export async function sendMessageStream(
                 break;
 
               case "window_trigger":
+                console.log("[API] Window trigger case MATCHED");
                 console.log("[API] Received window_trigger event:", chunk.windowTrigger);
                 if (chunk.windowTrigger) {
                   windowTriggerData = chunk.windowTrigger;
                   console.log("[API] Stored windowTriggerData:", windowTriggerData);
+                  console.log("[API] Calling onWindowTrigger callback...");
                   callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
+                  console.log("[API] onWindowTrigger callback called");
                 }
                 break;
 
@@ -295,6 +325,10 @@ export async function sendMessageStream(
 
               case "error":
                 callbacks.onError?.(chunk.error || "Unknown error");
+                break;
+
+              default:
+                console.warn("[API] Unknown chunk type received:", chunk.type, "Full chunk:", chunk);
                 break;
             }
           } catch (parseError) {

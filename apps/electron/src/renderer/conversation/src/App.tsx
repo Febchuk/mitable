@@ -21,6 +21,7 @@ declare global {
       onPositionUpdate: (callback: (x: number, y: number) => void) => () => void;
       showNudge: (data: unknown) => void;
       startGuide: (data: unknown) => void;
+      showOverlay?: (data: unknown) => void;
       getAuthToken: () => Promise<string | null>;
       onAuthTokenUpdated: (callback: (token: string | null) => void) => () => void;
       // NEW: State management
@@ -158,6 +159,7 @@ function App() {
 
         // Conditionally capture screenshot based on message content and conversation context
         let capturedScreenshot: string | null = screenshot; // Use provided screenshot if available
+        let capturedMetadata: any = null;
 
         if (!capturedScreenshot) {
           // Build conversation context for heuristics
@@ -187,6 +189,7 @@ function App() {
 
             if (result) {
               capturedScreenshot = result.dataUrl;
+              capturedMetadata = result.metadata;
               console.log("[Conversation] Screenshot captured via heuristics:", {
                 size: capturedScreenshot.length,
                 metadata: result.metadata,
@@ -229,83 +232,114 @@ function App() {
 
         // Stream the response with conditionally captured screenshot
         try {
-          await sendMessageStream(convId, message, capturedScreenshot, {
-            onChunk: (chunk, workflowSessionId, relatedStepIndex) => {
-              setMessages((prev) =>
-                prev.map((msg): Message =>
-                  msg.id === streamingMessageId
-                    ? {
-                        ...msg,
-                        content: msg.content + chunk,
-                        // Add workflow routing metadata from first chunk
-                        workflowSessionId: msg.workflowSessionId ?? workflowSessionId,
-                        relatedStepIndex: msg.relatedStepIndex ?? relatedStepIndex,
-                      }
-                    : msg
-                )
-              );
-            },
-            onComplete: (fullContent, messageId, messageType, cardData, windowTrigger, workflowSessionId, relatedStepIndex) => {
-              console.log("[Conversation] onComplete received:", {
+          await sendMessageStream(
+            convId,
+            message,
+            capturedScreenshot,
+            {
+              onChunk: (chunk, workflowSessionId, relatedStepIndex) => {
+                setMessages((prev) =>
+                  prev.map(
+                    (msg): Message =>
+                      msg.id === streamingMessageId
+                        ? {
+                            ...msg,
+                            content: msg.content + chunk,
+                            // Add workflow routing metadata from first chunk
+                            workflowSessionId: msg.workflowSessionId ?? workflowSessionId,
+                            relatedStepIndex: msg.relatedStepIndex ?? relatedStepIndex,
+                          }
+                        : msg
+                  )
+                );
+              },
+              onComplete: (
+                fullContent,
                 messageId,
                 messageType,
-                hasCardData: !!cardData,
+                cardData,
                 windowTrigger,
                 workflowSessionId,
-                relatedStepIndex,
-              });
-              setMessages((prev) =>
-                prev.map((msg): Message =>
-                  msg.id === streamingMessageId
-                    ? {
-                      ...msg,
-                      id: messageId,
-                      content: fullContent,
-                      type: cardData ? "card" : "text",
-                      messageType: messageType as "workflow" | "experts" | "text",
-                      cardData,
-                      windowTrigger,
-                      workflowSessionId,
-                      relatedStepIndex,
-                    }
-                    : msg
-                )
-              );
-              streamingMessageIdRef.current = null;
-              // Clear awaiting custom question state after successful completion
-              if (awaitingCustomQuestion) {
-                setAwaitingCustomQuestion(null);
-              }
+                relatedStepIndex
+              ) => {
+                console.log("[Conversation] onComplete received:", {
+                  messageId,
+                  messageType,
+                  hasCardData: !!cardData,
+                  windowTrigger,
+                  workflowSessionId,
+                  relatedStepIndex,
+                });
+                setMessages((prev) =>
+                  prev.map(
+                    (msg): Message =>
+                      msg.id === streamingMessageId
+                        ? {
+                            ...msg,
+                            id: messageId,
+                            content: fullContent,
+                            type: cardData ? "card" : "text",
+                            messageType: messageType as "workflow" | "experts" | "text",
+                            cardData,
+                            windowTrigger,
+                            workflowSessionId,
+                            relatedStepIndex,
+                          }
+                        : msg
+                  )
+                );
+                streamingMessageIdRef.current = null;
+                // Clear awaiting custom question state after successful completion
+                if (awaitingCustomQuestion) {
+                  setAwaitingCustomQuestion(null);
+                }
+              },
+              onError: (error) => {
+                console.error("Streaming error:", error);
+                setMessages((prev) =>
+                  prev.map(
+                    (msg): Message =>
+                      msg.id === streamingMessageId
+                        ? {
+                            ...msg,
+                            content: `Error: ${error}. Please try again.`,
+                          }
+                        : msg
+                  )
+                );
+                streamingMessageIdRef.current = null;
+              },
+              onWindowTrigger: (windowType, data) => {
+                console.log(`[Conversation] Window trigger received: ${windowType}`, {
+                  hasData: !!data,
+                  dataKeys: data ? Object.keys(data) : [],
+                });
+                if (windowType === "nudge") {
+                  window.conversationAPI?.showNudge(data);
+                } else if (windowType === "guide") {
+                  window.conversationAPI?.startGuide(data);
+                } else if (windowType === "overlay") {
+                  console.log("[Conversation] Triggering overlay via conversationAPI.showOverlay");
+                  window.conversationAPI?.showOverlay?.(data);
+                } else {
+                  console.warn("[Conversation] Unknown window trigger type:", windowType);
+                }
+              },
             },
-            onError: (error) => {
-              console.error("Streaming error:", error);
-              setMessages((prev) =>
-                prev.map((msg): Message =>
-                  msg.id === streamingMessageId
-                    ? {
-                      ...msg,
-                      content: `Error: ${error}. Please try again.`,
-                    }
-                    : msg
-                )
-              );
-              streamingMessageIdRef.current = null;
-            },
-            onWindowTrigger: (windowType, data) => {
-              console.log(`Window trigger: ${windowType}`, data);
-              // Window trigger data is stored in message for user to click card
-            },
-          }, metadata);
+            metadata,
+            capturedMetadata
+          );
         } catch (error) {
           console.error("Failed to send message:", error);
           setMessages((prev) =>
-            prev.map((msg): Message =>
-              msg.id === streamingMessageId
-                ? {
-                  ...msg,
-                  content: "Failed to send message. Please try again.",
-                }
-                : msg
+            prev.map(
+              (msg): Message =>
+                msg.id === streamingMessageId
+                  ? {
+                      ...msg,
+                      content: "Failed to send message. Please try again.",
+                    }
+                  : msg
             )
           );
           streamingMessageIdRef.current = null;
@@ -475,7 +509,7 @@ function App() {
       message,
       metadata,
       workflowSessionId,
-      currentStepIndex
+      currentStepIndex,
     });
 
     // Handle "Type something" / "ask questions" actions - enable custom input mode
@@ -522,6 +556,7 @@ function App() {
 
     // Capture screenshot for workflow actions (progress_step and custom_question)
     let screenshot: string | null = null;
+    let screenshotMetadata: any = null;
     if (
       option.action === "progress_step" ||
       option.action === "custom_question" ||
@@ -531,7 +566,13 @@ function App() {
       const screenshotResult = await window.conversationAPI?.captureScreenshot?.();
       if (screenshotResult) {
         screenshot = screenshotResult.dataUrl;
-        console.log("[Conversation] Screenshot captured successfully");
+        screenshotMetadata = screenshotResult.metadata;
+        console.log("[Conversation] Screenshot captured successfully", {
+          hasMetadata: !!screenshotMetadata,
+          dimensions: screenshotMetadata
+            ? `${screenshotMetadata.width}x${screenshotMetadata.height}`
+            : "N/A",
+        });
       } else {
         console.warn("[Conversation] Screenshot capture failed");
       }
@@ -546,27 +587,37 @@ function App() {
         {
           onChunk: (chunk) => {
             setMessages((prev) =>
-              prev.map((msg): Message =>
-                msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
+              prev.map(
+                (msg): Message =>
+                  msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
               )
             );
           },
-          onComplete: (fullContent, messageId, messageType, cardData, windowTrigger, workflowSessionId, relatedStepIndex) => {
+          onComplete: (
+            fullContent,
+            messageId,
+            messageType,
+            cardData,
+            windowTrigger,
+            workflowSessionId,
+            relatedStepIndex
+          ) => {
             setMessages((prev) =>
-              prev.map((msg): Message =>
-                msg.id === streamingMessageId
-                  ? {
-                    ...msg,
-                    id: messageId,
-                    content: fullContent,
-                    type: cardData ? "card" : "text",
-                    messageType: messageType as "workflow" | "experts" | "text",
-                    cardData,
-                    windowTrigger,
-                    workflowSessionId,
-                    relatedStepIndex,
-                  }
-                  : msg
+              prev.map(
+                (msg): Message =>
+                  msg.id === streamingMessageId
+                    ? {
+                        ...msg,
+                        id: messageId,
+                        content: fullContent,
+                        type: cardData ? "card" : "text",
+                        messageType: messageType as "workflow" | "experts" | "text",
+                        cardData,
+                        windowTrigger,
+                        workflowSessionId,
+                        relatedStepIndex,
+                      }
+                    : msg
               )
             );
             streamingMessageIdRef.current = null;
@@ -574,21 +625,32 @@ function App() {
           onError: (error) => {
             console.error("Workflow streaming error:", error);
             setMessages((prev) =>
-              prev.map((msg): Message =>
-                msg.id === streamingMessageId ? { ...msg, content: `Error: ${error}` } : msg
+              prev.map(
+                (msg): Message =>
+                  msg.id === streamingMessageId ? { ...msg, content: `Error: ${error}` } : msg
               )
             );
             streamingMessageIdRef.current = null;
           },
           onWindowTrigger: (windowType, data) => {
+            console.log(`[Conversation] Workflow window trigger received: ${windowType}`, {
+              hasData: !!data,
+              dataKeys: data ? Object.keys(data) : [],
+            });
             if (windowType === "nudge") {
               window.conversationAPI?.showNudge(data);
             } else if (windowType === "guide") {
               window.conversationAPI?.startGuide(data);
+            } else if (windowType === "overlay") {
+              console.log("[Conversation] Triggering overlay via conversationAPI.showOverlay");
+              window.conversationAPI?.showOverlay?.(data);
+            } else {
+              console.warn("[Conversation] Unknown workflow window trigger:", windowType);
             }
           },
         },
-        metadata // Pass metadata to the API
+        metadata, // Pass workflow metadata to the API
+        screenshotMetadata // Pass screenshot metadata for debug and coordinate conversion
       );
     } catch (error) {
       console.error("Failed to send workflow message:", error);
@@ -692,7 +754,8 @@ function App() {
                       .reverse()
                       .find((m) => m.messageType === "workflow" && m.cardData);
                     // Type assertion: backend guarantees workflow messages have complete SolutionObject in cardData
-                    const currentWorkflowState = (latestWorkflowMessage?.cardData || message.cardData) as any;
+                    const currentWorkflowState = (latestWorkflowMessage?.cardData ||
+                      message.cardData) as any;
 
                     // Check if ANY message in this workflow is currently streaming
                     const isCurrentlyStreaming = workflowMessages.some(
