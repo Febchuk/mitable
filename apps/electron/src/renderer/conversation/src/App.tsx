@@ -8,6 +8,7 @@ import { sendMessageStream, pauseWorkflow } from "../../lib/api/conversations";
 import CollapsedView from "./components/CollapsedView";
 import ExpertsCard from "./components/ExpertsCard";
 import { WorkflowAccordion } from "./components/WorkflowAccordion";
+import LoadingMessage from "./components/LoadingMessage";
 import type { Message } from "./types";
 
 declare global {
@@ -83,6 +84,12 @@ function App() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Loading state for progress messages
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+
+  // Workflow-specific loading state (for inline loading in WorkflowAccordion)
+  const [workflowLoadingMessage, setWorkflowLoadingMessage] = useState<string | null>(null);
 
   // Workflow custom question state (for "Type something" button)
   const [awaitingCustomQuestion, setAwaitingCustomQuestion] = useState<{
@@ -221,14 +228,17 @@ function App() {
         // Prepare metadata if this is a custom question during workflow
         const metadata = awaitingCustomQuestion
           ? {
-              workflowAction: "custom_question",
-              selectedOption: 2,
-              workflowSessionId: awaitingCustomQuestion.workflowSessionId,
-              currentStepIndex: awaitingCustomQuestion.relatedStepIndex,
-            }
+            workflowAction: "custom_question",
+            selectedOption: 2,
+            workflowSessionId: awaitingCustomQuestion.workflowSessionId,
+            currentStepIndex: awaitingCustomQuestion.relatedStepIndex,
+          }
           : undefined;
 
         console.log("[Conversation] Sending message with metadata:", metadata);
+
+        // Set initial loading state
+        setLoadingMessage("Thinking...");
 
         // Stream the response with conditionally captured screenshot
         try {
@@ -238,17 +248,19 @@ function App() {
             capturedScreenshot,
             {
               onChunk: (chunk, workflowSessionId, relatedStepIndex) => {
+                // Clear loading message on first chunk
+                setLoadingMessage(null);
                 setMessages((prev) =>
                   prev.map(
                     (msg): Message =>
                       msg.id === streamingMessageId
                         ? {
-                            ...msg,
-                            content: msg.content + chunk,
-                            // Add workflow routing metadata from first chunk
-                            workflowSessionId: msg.workflowSessionId ?? workflowSessionId,
-                            relatedStepIndex: msg.relatedStepIndex ?? relatedStepIndex,
-                          }
+                          ...msg,
+                          content: msg.content + chunk,
+                          // Add workflow routing metadata from first chunk
+                          workflowSessionId: msg.workflowSessionId ?? workflowSessionId,
+                          relatedStepIndex: msg.relatedStepIndex ?? relatedStepIndex,
+                        }
                         : msg
                   )
                 );
@@ -270,21 +282,25 @@ function App() {
                   workflowSessionId,
                   relatedStepIndex,
                 });
+
+                // Clear loading message on complete (in case onChunk never fired)
+                setLoadingMessage(null);
+
                 setMessages((prev) =>
                   prev.map(
                     (msg): Message =>
                       msg.id === streamingMessageId
                         ? {
-                            ...msg,
-                            id: messageId,
-                            content: fullContent,
-                            type: cardData ? "card" : "text",
-                            messageType: messageType as "workflow" | "experts" | "text",
-                            cardData,
-                            windowTrigger,
-                            workflowSessionId,
-                            relatedStepIndex,
-                          }
+                          ...msg,
+                          id: messageId,
+                          content: fullContent,
+                          type: cardData ? "card" : "text",
+                          messageType: messageType as "workflow" | "experts" | "text",
+                          cardData,
+                          windowTrigger,
+                          workflowSessionId,
+                          relatedStepIndex,
+                        }
                         : msg
                   )
                 );
@@ -296,14 +312,18 @@ function App() {
               },
               onError: (error) => {
                 console.error("Streaming error:", error);
+
+                // Clear loading message on error
+                setLoadingMessage(null);
+
                 setMessages((prev) =>
                   prev.map(
                     (msg): Message =>
                       msg.id === streamingMessageId
                         ? {
-                            ...msg,
-                            content: `Error: ${error}. Please try again.`,
-                          }
+                          ...msg,
+                          content: `Error: ${error}. Please try again.`,
+                        }
                         : msg
                   )
                 );
@@ -325,6 +345,10 @@ function App() {
                   console.warn("[Conversation] Unknown window trigger type:", windowType);
                 }
               },
+              onProgress: (phase, message) => {
+                console.log(`[Conversation] Progress update: ${phase} - ${message}`);
+                setLoadingMessage(message);
+              },
             },
             metadata,
             capturedMetadata
@@ -336,9 +360,9 @@ function App() {
               (msg): Message =>
                 msg.id === streamingMessageId
                   ? {
-                      ...msg,
-                      content: "Failed to send message. Please try again.",
-                    }
+                    ...msg,
+                    content: "Failed to send message. Please try again.",
+                  }
                   : msg
             )
           );
@@ -554,6 +578,9 @@ function App() {
 
     setMessages((prev) => [...prev, assistantMessage]);
 
+    // Set workflow-specific loading state
+    setWorkflowLoadingMessage("Thinking...");
+
     // Capture screenshot for workflow actions (progress_step and custom_question)
     let screenshot: string | null = null;
     let screenshotMetadata: any = null;
@@ -586,6 +613,9 @@ function App() {
         screenshot,
         {
           onChunk: (chunk) => {
+            // Clear workflow loading state on first chunk
+            setWorkflowLoadingMessage(null);
+
             setMessages((prev) =>
               prev.map(
                 (msg): Message =>
@@ -602,21 +632,24 @@ function App() {
             workflowSessionId,
             relatedStepIndex
           ) => {
+            // Clear workflow loading state on complete (in case onChunk never fired)
+            setWorkflowLoadingMessage(null);
+
             setMessages((prev) =>
               prev.map(
                 (msg): Message =>
                   msg.id === streamingMessageId
                     ? {
-                        ...msg,
-                        id: messageId,
-                        content: fullContent,
-                        type: cardData ? "card" : "text",
-                        messageType: messageType as "workflow" | "experts" | "text",
-                        cardData,
-                        windowTrigger,
-                        workflowSessionId,
-                        relatedStepIndex,
-                      }
+                      ...msg,
+                      id: messageId,
+                      content: fullContent,
+                      type: cardData ? "card" : "text",
+                      messageType: messageType as "workflow" | "experts" | "text",
+                      cardData,
+                      windowTrigger,
+                      workflowSessionId,
+                      relatedStepIndex,
+                    }
                     : msg
               )
             );
@@ -624,6 +657,10 @@ function App() {
           },
           onError: (error) => {
             console.error("Workflow streaming error:", error);
+
+            // Clear workflow loading state on error
+            setWorkflowLoadingMessage(null);
+
             setMessages((prev) =>
               prev.map(
                 (msg): Message =>
@@ -647,6 +684,10 @@ function App() {
             } else {
               console.warn("[Conversation] Unknown workflow window trigger:", windowType);
             }
+          },
+          onProgress: (phase, message) => {
+            console.log(`[Conversation] Workflow progress update: ${phase} - ${message}`);
+            setWorkflowLoadingMessage(message);
           },
         },
         metadata, // Pass workflow metadata to the API
@@ -784,6 +825,7 @@ function App() {
                             onOptionSelect={handleWorkflowOptionSelect}
                             isStreaming={isCurrentlyStreaming}
                             awaitingCustomQuestion={isAwaitingCustomQuestion}
+                            workflowLoadingMessage={workflowLoadingMessage}
                           />
                         </ErrorBoundary>
                       </div>
@@ -809,6 +851,10 @@ function App() {
                   );
                 });
               })()}
+
+              {/* Loading message - show when backend is processing */}
+              {loadingMessage && <LoadingMessage message={loadingMessage} />}
+
               <div ref={messagesEndRef} />
             </div>
           </div>

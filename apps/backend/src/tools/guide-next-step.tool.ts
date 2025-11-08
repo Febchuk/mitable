@@ -190,14 +190,9 @@ DO NOT USE:
       });
 
       // Step 7: Build conversational message
+      // Note: Don't include adjustment notice here - it's shown in the warning banner
+      // on the frontend (WorkflowAccordion reads from adjustmentHistory)
       let message = visualGuidance.conversationalMessage;
-
-      // If plan was ACTUALLY adjusted (new steps provided), communicate it to the user
-      // Don't show adjustment notice if Gemini just confirmed no changes needed
-      if (evaluation.needsAdjustment && evaluation.adjustedStepList) {
-        message = `📝 *Plan Updated:* ${evaluation.adjustmentReason}\n\n${message}`;
-        console.log("[GuideNextStepTool] Including adjustment notice in response");
-      }
 
       console.log("[GuideNextStepTool] Workflow progressed successfully:", {
         newStepIndex: nextStepIndex,

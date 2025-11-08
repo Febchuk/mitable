@@ -163,7 +163,7 @@ export type ToolResult = TextMessage | WorkflowMessage | ExpertsMessage;
  * Streaming chunk for real-time responses
  */
 export interface StreamChunk {
-  type: "chunk" | "complete" | "error" | "window_trigger";
+  type: "chunk" | "complete" | "error" | "window_trigger" | "progress";
   content?: string;
   messageId?: string;
   messageType?: "text" | "workflow" | "experts";
@@ -175,6 +175,10 @@ export interface StreamChunk {
   }>;
   error?: string;
   windowTrigger?: WindowTrigger; // Window trigger for UI coordination
+  progress?: {
+    phase: string; // e.g., "searching", "analyzing", "generating"
+    message: string; // e.g., "Searching knowledge base..."
+  };
 }
 
 /**

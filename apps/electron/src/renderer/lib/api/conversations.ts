@@ -21,7 +21,7 @@ export interface Conversation {
 }
 
 export interface StreamChunk {
-  type: "chunk" | "complete" | "error" | "window_trigger" | "done";
+  type: "chunk" | "complete" | "error" | "window_trigger" | "done" | "progress";
   content?: string;
   messageId?: string;
   error?: string;
@@ -33,6 +33,10 @@ export interface StreamChunk {
   windowTrigger?: {
     window: "nudge" | "guide" | "overlay";
     data: any;
+  };
+  progress?: {
+    phase: string;
+    message: string;
   };
 }
 
@@ -159,6 +163,7 @@ export async function sendMessageStream(
     ) => void;
     onError?: (error: string) => void;
     onWindowTrigger?: (window: "nudge" | "guide" | "overlay", data: any) => void;
+    onProgress?: (phase: string, message: string) => void;
   },
   metadata?: any,
   screenshotMetadata?: {
@@ -325,6 +330,12 @@ export async function sendMessageStream(
 
               case "error":
                 callbacks.onError?.(chunk.error || "Unknown error");
+                break;
+
+              case "progress":
+                if (chunk.progress) {
+                  callbacks.onProgress?.(chunk.progress.phase, chunk.progress.message);
+                }
                 break;
 
               default:
