@@ -1,9 +1,6 @@
 import { useState, useMemo } from "react";
-import { ChevronDown, ChevronRight, PlayCircle, CheckCircle } from "lucide-react";
-import WorkflowOptions, {
-  WorkflowPhase,
-} from "../../../components/domain/workflow/WorkflowOptions";
-import StepList from "../../../components/domain/workflow/StepList";
+import { ChevronDown, ChevronRight, PlayCircle, CheckCircle, Check, Circle, CircleDot } from "lucide-react";
+import WorkflowOptions, { WorkflowPhase } from "../../../components/domain/workflow/WorkflowOptions";
 import AIMessage from "../../../components/domain/messages/AIMessage";
 import { cn } from "../../../lib/utils";
 import type { Message } from "../types";
@@ -34,10 +31,11 @@ export function WorkflowAccordion({
   isStreaming,
   awaitingCustomQuestion = false,
 }: WorkflowAccordionProps) {
-  // Determine initial expanded state based on workflow status
-  const [isExpanded, setIsExpanded] = useState(
-    workflow.status === "active" || workflow.currentStepIndex === -1
-  );
+  // Determine if we're in pre-flight mode (workflow not started yet)
+  const isPreFlight = workflow.currentStepIndex === -1;
+
+  // Accordion is always expanded by default (and non-collapsible in pre-flight)
+  const [isExpanded, setIsExpanded] = useState(true);
 
   // Track which steps are expanded to show their conversations
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(
@@ -68,77 +66,58 @@ export function WorkflowAccordion({
     });
   };
 
-  // Pre-flight mode (workflow not started yet)
-  if (workflow.currentStepIndex === -1) {
-    return (
-      <div className="workflow-accordion workflow-preflight bg-background-secondary rounded-lg border border-border-subtle p-4 mb-4">
-        <AIMessage content={workflow.solutionExplanation} />
-
-        <div className="mt-4">
-          <StepList steps={workflow.stepList} currentStepIndex={-1} showCheckboxes={false} />
-        </div>
-
-        <div className="mt-4">
-          <WorkflowOptions
-            phase={"initial_proposal" as WorkflowPhase}
-            onOptionSelect={onOptionSelect}
-            disabled={isStreaming}
-            hidden={awaitingCustomQuestion}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // Active or paused workflow
+  // Unified render for both pre-flight and active modes
   return (
     <div className="workflow-accordion bg-background-secondary rounded-lg border border-border-subtle mb-4">
-      {/* Accordion Header */}
-      <button
-        className="accordion-header w-full flex items-center justify-between p-4 hover:bg-background-elevated transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-center gap-3">
-          {isExpanded ? (
-            <ChevronDown className="w-5 h-5 text-text-secondary" />
-          ) : (
-            <ChevronRight className="w-5 h-5 text-text-secondary" />
-          )}
+      {/* Accordion Header - only show when workflow is active */}
+      {!isPreFlight && (
+        <button
+          className="accordion-header w-full flex items-center justify-between p-4 hover:bg-background-elevated transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            {isExpanded ? (
+              <ChevronDown className="w-5 h-5 text-text-secondary" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-text-secondary" />
+            )}
 
-          <span className="workflow-title font-medium text-text-primary">{workflow.solution}</span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <span className="workflow-progress text-sm text-text-secondary">
-            Step {workflow.currentStepIndex + 1} of {workflow.stepList.length}
-          </span>
-
-          {workflow.status === "paused" && (
-            <span className="workflow-status px-2 py-1 text-xs font-medium bg-status-warning/20 text-status-warning rounded">
-              Paused
+            <span className="workflow-title font-medium text-text-primary">
+              {workflow.solution}
             </span>
-          )}
+          </div>
 
-          {workflow.status === "completed" && (
-            <CheckCircle className="w-5 h-5 text-status-success" />
-          )}
-        </div>
-      </button>
+          <div className="flex items-center gap-3">
+            <span className="workflow-progress text-sm text-text-secondary">
+              Step {workflow.currentStepIndex + 1} of {workflow.stepList.length}
+            </span>
 
-      {/* Accordion Body */}
-      {isExpanded && (
-        <div className="accordion-body border-t border-border-subtle">
-          {/* Full step list with progress */}
-          <div className="p-4">
-            <StepList
-              steps={workflow.stepList}
-              currentStepIndex={workflow.currentStepIndex}
-              showCheckboxes={true}
-            />
+            {workflow.status === "paused" && (
+              <span className="workflow-status px-2 py-1 text-xs font-medium bg-status-warning/20 text-status-warning rounded">
+                Paused
+              </span>
+            )}
+
+            {workflow.status === "completed" && (
+              <CheckCircle className="w-5 h-5 text-status-success" />
+            )}
+          </div>
+        </button>
+      )}
+
+      {/* Accordion Body - always visible in pre-flight, collapsible when active */}
+      {(isPreFlight || isExpanded) && (
+        <div className={cn(
+          "accordion-body",
+          !isPreFlight && "border-t border-border-subtle"
+        )}>
+          {/* Persistent explanation message */}
+          <div className="p-4 pb-2">
+            <AIMessage content={workflow.solutionExplanation} />
           </div>
 
           {/* Steps with inline conversations */}
-          <div className="workflow-steps px-4 pb-4">
+          <div className="workflow-steps px-4 pb-4 pt-2">
             {workflow.stepList.map((step: any, idx: number) => {
               const isCurrentStep = idx === workflow.currentStepIndex;
               const isCompleted = idx < workflow.currentStepIndex;
@@ -146,47 +125,79 @@ export function WorkflowAccordion({
               const stepMessages = messagesByStep[idx] || [];
               const hasMessages = stepMessages.length > 0;
 
+              // In pre-flight mode, nothing is expandable
+              const isExpandable = !isPreFlight && (hasMessages || isCurrentStep);
+
               return (
                 <div
                   key={idx}
                   className={cn(
-                    "workflow-step-section border-l-2 ml-3 pl-4",
-                    isCurrentStep && "border-primary bg-primary/10",
-                    isCompleted && "border-status-success opacity-60",
-                    isPending && "border-border-subtle opacity-40"
+                    "workflow-step-section rounded-md mb-3 transition-all",
+                    isCurrentStep && "bg-primary/10 border-2 border-primary/30",
+                    !isCurrentStep && "bg-background/50 border border-border-subtle",
+                    isCompleted && "opacity-70"
                   )}
                 >
-                  {/* Step Header - clickable if has messages */}
-                  {(hasMessages || isCurrentStep) && (
-                    <button
-                      className="step-header w-full text-left py-2 flex items-center justify-between group"
-                      onClick={() => hasMessages && toggleStepExpansion(idx)}
-                      disabled={!hasMessages}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-text-primary">
-                          Step {idx + 1}: {step.description}
-                        </span>
+                  {/* Step Header - always visible, clickable if expandable */}
+                  <button
+                    className={cn(
+                      "step-header w-full text-left p-3 flex items-center gap-3 transition-colors",
+                      isExpandable && "hover:bg-background-elevated cursor-pointer",
+                      !isExpandable && "cursor-default"
+                    )}
+                    onClick={() => isExpandable && toggleStepExpansion(idx)}
+                    disabled={!isExpandable}
+                  >
+                    {/* Status Icon */}
+                    <div className="flex-shrink-0">
+                      {isCompleted && (
+                        <div className="w-5 h-5 rounded-full bg-status-success flex items-center justify-center">
+                          <Check size={14} className="text-white" />
+                        </div>
+                      )}
+                      {isCurrentStep && (
+                        <div className="w-5 h-5 rounded-full border-2 border-primary flex items-center justify-center">
+                          <CircleDot size={12} className="text-primary" />
+                        </div>
+                      )}
+                      {isPending && (
+                        <div className="w-5 h-5 rounded-full border-2 border-border-subtle flex items-center justify-center">
+                          <Circle size={12} className="text-text-secondary" />
+                        </div>
+                      )}
+                    </div>
 
-                        {hasMessages && (
-                          <span className="message-count text-xs text-text-secondary bg-background-elevated px-2 py-0.5 rounded-full">
-                            {stepMessages.length} message{stepMessages.length !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
+                    {/* Step Description */}
+                    <div className="flex-1 min-w-0">
+                      <span className={cn(
+                        "text-sm leading-relaxed",
+                        isCurrentStep ? "font-medium text-text-primary" : "text-text-secondary",
+                        isCompleted && "line-through"
+                      )}>
+                        Step {idx + 1}: {step.description}
+                      </span>
+                    </div>
 
-                      {hasMessages &&
-                        (expandedSteps.has(idx) ? (
-                          <ChevronDown className="w-4 h-4 text-text-secondary" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-text-secondary" />
-                        ))}
-                    </button>
-                  )}
+                    {/* Message Count Badge - only show in active mode */}
+                    {!isPreFlight && hasMessages && (
+                      <span className="message-count text-xs text-text-secondary bg-background-elevated px-2 py-0.5 rounded-full flex-shrink-0">
+                        {stepMessages.length} message{stepMessages.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
 
-                  {/* Step content - show for current step or if expanded */}
-                  {(isCurrentStep || expandedSteps.has(idx)) && (
-                    <div className="step-messages pl-2 pb-2">
+                    {/* Expand/Collapse Icon - only show in active mode when expandable */}
+                    {!isPreFlight && isExpandable && (
+                      expandedSteps.has(idx) ? (
+                        <ChevronDown className="w-4 h-4 text-text-secondary flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-text-secondary flex-shrink-0" />
+                      )
+                    )}
+                  </button>
+
+                  {/* Step content - never show in pre-flight, show in active when current or expanded */}
+                  {!isPreFlight && (isCurrentStep || expandedSteps.has(idx)) && (
+                    <div className="step-content border-t border-border-subtle px-3 pb-3 pt-2">
                       {/* Plan adjustment notice if applicable */}
                       {isCurrentStep && workflow.adjustmentHistory.length > 0 && (
                         <div className="plan-adjustment-notice bg-status-warning/20 border border-status-warning/40 rounded p-3 mb-3">
@@ -247,9 +258,16 @@ export function WorkflowAccordion({
             })}
           </div>
 
-          {/* Workflow options or resume button */}
+          {/* Workflow options or resume/complete button */}
           <div className="p-4 border-t border-border-subtle">
-            {workflow.status === "active" ? (
+            {isPreFlight ? (
+              <WorkflowOptions
+                phase={"initial_proposal" as WorkflowPhase}
+                onOptionSelect={onOptionSelect}
+                disabled={isStreaming}
+                hidden={awaitingCustomQuestion}
+              />
+            ) : workflow.status === "active" ? (
               <WorkflowOptions
                 phase={"step_progression" as WorkflowPhase}
                 onOptionSelect={onOptionSelect}
