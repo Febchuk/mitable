@@ -28,8 +28,9 @@ export const messages = pgTable("messages", {
   sources: jsonb("sources").default("[]"), // Array of citation objects for RAG
 
   // Workflow relationship fields (optional for backward compatibility)
-  workflowSessionId: uuid("workflow_session_id")
-    .references(() => workflowSessions.id, { onDelete: "set null" }), // Links to workflow_sessions.id
+  workflowSessionId: uuid("workflow_session_id").references(() => workflowSessions.id, {
+    onDelete: "set null",
+  }), // Links to workflow_sessions.id
   relatedStepIndex: integer("related_step_index"), // Which workflow step this message relates to
 
   createdAt: timestamp("created_at").defaultNow().notNull(),

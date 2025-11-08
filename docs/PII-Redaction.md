@@ -3,11 +3,19 @@
 **Feature:** Automatic PII Detection & Redaction in UI Guidance Screenshots  
 **Service:** Google Cloud Sensitive Data Protection (DLP API)  
 **Branch:** `feature/pii-redaction`  
-**Status:** ✅ **COMPLETE** - All phases implemented and tested  
-**Last Updated:** Oct 27, 2025
+**Status:** ✅ **SERVICE COMPLETE** - Backend API ready, UI integration pending  
+**Last Updated:** Nov 8, 2025
 
 **Architecture Decision (Oct 27, 2025):**  
 After CEO review, we're using **DLP's full capability** for both detection AND redaction. The separate Canvas blur ticket is **not needed** - DLP's server-side black box redaction is sufficient since screenshots are AI-only (never user-facing).
+
+**Latest Changes (Nov 8, 2025):**
+
+- Removed image preprocessing (was causing quality issues on HDR displays)
+- Added custom regex patterns for .env file secrets and API keys
+- Preserves original image quality for UI guidance
+- Backend service complete and tested
+- **TODO:** Integration with UI guidance workflow (Mikun)
 
 ---
 
@@ -88,15 +96,23 @@ We use **Google Cloud DLP's full capability** for both detection AND redaction. 
 
 Google Cloud DLP can detect **150+ built-in infoTypes**. We focus on:
 
-| InfoType                    | Example                   | Mitable Configuration |
-| --------------------------- | ------------------------- | --------------------- |
-| `PERSON_NAME`               | "John Doe"                | POSSIBLE threshold    |
-| `EMAIL_ADDRESS`             | "john@example.com"        | POSSIBLE threshold    |
-| `PHONE_NUMBER`              | "(555) 123-4567"          | POSSIBLE threshold    |
-| `STREET_ADDRESS`            | "123 Main St"             | POSSIBLE threshold    |
-| `CREDIT_CARD_NUMBER`        | "4532-\***\*-\*\***-1234" | **Always redact**     |
-| `US_SOCIAL_SECURITY_NUMBER` | "**\*-**-1234"            | **Always redact**     |
-| `API_KEY`                   | "sk_live_abc123..."       | **Always redact**     |
+| InfoType                    | Example                        | Mitable Configuration |
+| --------------------------- | ------------------------------ | --------------------- |
+| `PERSON_NAME`               | "John Doe"                     | POSSIBLE threshold    |
+| `EMAIL_ADDRESS`             | "john@example.com"             | POSSIBLE threshold    |
+| `PHONE_NUMBER`              | "(555) 123-4567"               | POSSIBLE threshold    |
+| `STREET_ADDRESS`            | "123 Main St"                  | POSSIBLE threshold    |
+| `CREDIT_CARD_NUMBER`        | "4532-\***\*-\*\***-1234"      | **Always redact**     |
+| `US_SOCIAL_SECURITY_NUMBER` | "**\*-**-1234"                 | **Always redact**     |
+| `GCP_API_KEY`               | "AIzaSyABC..."                 | **Always redact**     |
+| `AWS_CREDENTIALS`           | "AKIAIOSFODNN7EXAMPLE"         | **Always redact**     |
+| `CUSTOM_API_KEY`            | Any 20+ char alphanumeric      | **Custom regex**      |
+| `ENV_SECRET`                | "SECRET=xyz" or "TOKEN=abc..." | **Custom regex**      |
+
+**Custom Patterns (Nov 8, 2025):**
+
+- `CUSTOM_API_KEY`: Matches generic API keys (20+ character alphanumeric strings)
+- `ENV_SECRET`: Matches .env file format (`KEY=value`, `TOKEN=value`, `SECRET=value`, `PASSWORD=value`)
 
 **Full List:** https://cloud.google.com/sensitive-data-protection/docs/infotypes-reference
 

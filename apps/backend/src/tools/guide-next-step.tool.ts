@@ -212,7 +212,6 @@ DO NOT USE:
         cardData: {
           ...updatedSolution,
           workflowSessionId: workflowSession?.id || context.workflowState?.workflowSessionId,
-          status: workflowSession?.status || "active", // Workflow is active during step progression
           workflowActive: true, // Used by agent window
           workflowPhase: "step_progression", // Used by agent window
         },

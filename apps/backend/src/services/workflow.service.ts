@@ -65,7 +65,13 @@ class WorkflowService {
    */
   async addWorkflowInteraction(
     workflowSessionId: string,
-    type: "step_progress" | "user_question" | "ai_response" | "step_modified" | "workflow_complete" | "workflow_cancelled",
+    type:
+      | "step_progress"
+      | "user_question"
+      | "ai_response"
+      | "step_modified"
+      | "workflow_complete"
+      | "workflow_cancelled",
     role: "user" | "assistant" | "system",
     content: string | null,
     relatedStepIndex?: number | null,

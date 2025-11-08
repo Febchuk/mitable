@@ -90,6 +90,8 @@ export const SolutionObjectSchema = z.object({
   currentStepIndex: z.number().int().min(0), // 0-based index
   searchQuery: z.string(), // Original query for reference
   adjustmentHistory: z.array(AdjustmentRecordSchema), // Track plan changes
+  status: z.enum(["active", "completed", "abandoned", "paused"]).optional(), // Workflow status
+  workflowSessionId: z.string().optional(), // Reference to workflow_sessions table
 });
 
 export type SolutionObject = z.infer<typeof SolutionObjectSchema>;

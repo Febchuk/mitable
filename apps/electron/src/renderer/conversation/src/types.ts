@@ -45,6 +45,7 @@ export interface Message {
     stepList?: any[];
     workflowActive?: boolean;
     currentPhase?: string;
+    status?: "active" | "completed" | "abandoned" | "paused"; // Workflow status
 
     // For experts messages
     experts?: ExpertMatch[];

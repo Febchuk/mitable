@@ -143,7 +143,11 @@ export async function sendMessageStream(
   content: string,
   screenshot: string | null | undefined,
   callbacks: {
-    onChunk?: (chunk: string, workflowSessionId?: string | null, relatedStepIndex?: number | null) => void;
+    onChunk?: (
+      chunk: string,
+      workflowSessionId?: string | null,
+      relatedStepIndex?: number | null
+    ) => void;
     onComplete?: (
       fullContent: string,
       messageId: string,

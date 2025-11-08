@@ -795,7 +795,8 @@ router.post(
       // Check if there's an active workflow for this conversation
       const activeWorkflow = await workflowService.getActiveWorkflow(conversationId);
       const workflowSessionId = activeWorkflow?.id || metadata?.workflowSessionId || null;
-      const currentStepIndex = activeWorkflow?.currentStepIndex || metadata?.currentStepIndex || null;
+      const currentStepIndex =
+        activeWorkflow?.currentStepIndex || metadata?.currentStepIndex || null;
 
       // Save user message to database with workflow fields
       const [userMessage] = await db
@@ -969,7 +970,8 @@ router.post(
           : assistantCardData;
 
         // Extract workflow fields from cardData
-        const assistantWorkflowSessionId = finalCardData?.workflowSessionId || workflowSessionId || null;
+        const assistantWorkflowSessionId =
+          finalCardData?.workflowSessionId || workflowSessionId || null;
         const assistantStepIndex = finalCardData?.currentStepIndex ?? currentStepIndex ?? null;
 
         const [assistantMessage] = await db
@@ -992,9 +994,8 @@ router.post(
 
         // Dual-write to workflow_interactions if this is a workflow response
         if (assistantWorkflowSessionId) {
-          const interactionType = metadata?.workflowAction === "progress_step"
-            ? "step_progress"
-            : "ai_response";
+          const interactionType =
+            metadata?.workflowAction === "progress_step" ? "step_progress" : "ai_response";
 
           await workflowService.addWorkflowInteraction(
             assistantWorkflowSessionId,
@@ -1002,9 +1003,15 @@ router.post(
             "assistant",
             assistantContent,
             assistantStepIndex,
-            { cardData: finalCardData, sources: assistantSources, workflowAction: metadata?.workflowAction }
+            {
+              cardData: finalCardData,
+              sources: assistantSources,
+              workflowAction: metadata?.workflowAction,
+            }
           );
-          console.log(`[Stream] Workflow interaction saved for assistant response (${interactionType})`);
+          console.log(
+            `[Stream] Workflow interaction saved for assistant response (${interactionType})`
+          );
         }
 
         // Generate conversation title if this is the first exchange
