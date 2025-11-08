@@ -6,6 +6,7 @@ import nudgesRouter from "./routes/nudges.js";
 import conversationsRouter from "./routes/conversations.js";
 import adminRouter from "./routes/admin.js";
 import integrationsRouter from "./routes/integrations.js";
+import piiRouter from "./routes/pii.js";
 // DEPRECATED: Guide routes replaced by WorkflowOptions metadata system
 // import guidesRouter from "./routes/guides.routes.js";
 
@@ -29,6 +30,7 @@ router.use("/nudges", nudgesRouter);
 router.use("/conversations", conversationsRouter);
 router.use("/admin", adminRouter);
 router.use("/integrations", integrationsRouter);
+router.use("/pii", piiRouter);
 
 /**
  * DEPRECATED: /guides routes

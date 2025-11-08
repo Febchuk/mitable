@@ -73,6 +73,8 @@ export interface CaptureOptions {
   bounds?: Rectangle;
   /** Whether to save to temp file (default: false, returns base64) */
   saveToFile?: boolean;
+  /** Skip resize - keep original dimensions (for PII redaction) */
+  skipResize?: boolean;
 }
 
 /**
@@ -407,16 +409,20 @@ class CaptureService {
 
       switch (mode) {
         case "active-window":
-          result = await this.captureActiveWindow(options.saveToFile);
+          result = await this.captureActiveWindow(options.saveToFile, options.skipResize);
           break;
         case "full-screen":
-          result = await this.captureFullScreen(options.displayId, options.saveToFile);
+          result = await this.captureFullScreen(
+            options.displayId,
+            options.saveToFile,
+            options.skipResize
+          );
           break;
         case "region":
           if (!options.bounds) {
             throw new Error("Region capture requires bounds parameter");
           }
-          result = await this.captureRegion(options.bounds, options.saveToFile);
+          result = await this.captureRegion(options.bounds, options.saveToFile, options.skipResize);
           break;
         default:
           throw new Error(`Unknown capture mode: ${mode}`);
@@ -442,9 +448,13 @@ class CaptureService {
    * Capture the currently active/focused window
    *
    * @param saveToFile - Whether to save to temp file
+   * @param skipResize - Skip resizing (for PII redaction)
    * @returns Capture result or null on failure
    */
-  async captureActiveWindow(saveToFile: boolean = false): Promise<CaptureResult | null> {
+  async captureActiveWindow(
+    saveToFile: boolean = false,
+    skipResize: boolean = false
+  ): Promise<CaptureResult | null> {
     try {
       // Get all window sources
       const sources = await desktopCapturer.getSources({
@@ -476,8 +486,10 @@ class CaptureService {
       let image = targetSource.thumbnail;
       const originalSize = image.getSize();
 
-      // Resize if needed
-      image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
+      // Resize if needed (unless skipResize = true)
+      if (!skipResize) {
+        image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
+      }
       const finalSize = image.getSize();
 
       // Convert to data URL
@@ -530,11 +542,13 @@ class CaptureService {
    *
    * @param displayId - Display ID (defaults to primary display)
    * @param saveToFile - Whether to save to temp file
+   * @param skipResize - Skip resizing (for PII redaction)
    * @returns Capture result or null on failure
    */
   async captureFullScreen(
     displayId?: number,
-    saveToFile: boolean = false
+    saveToFile: boolean = false,
+    skipResize: boolean = false
   ): Promise<CaptureResult | null> {
     try {
       // Get target display
@@ -574,8 +588,10 @@ class CaptureService {
       let image = screenSource.thumbnail;
       const originalSize = image.getSize();
 
-      // Resize if needed
-      image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
+      // Resize if needed (unless skipResize = true)
+      if (!skipResize) {
+        image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
+      }
       const finalSize = image.getSize();
 
       // Convert to data URL
@@ -612,11 +628,13 @@ class CaptureService {
    *
    * @param bounds - Region bounds (x, y, width, height)
    * @param saveToFile - Whether to save to temp file
+   * @param skipResize - Skip resizing (for PII redaction)
    * @returns Capture result or null on failure
    */
   async captureRegion(
     bounds: Rectangle,
-    saveToFile: boolean = false
+    saveToFile: boolean = false,
+    skipResize: boolean = false
   ): Promise<CaptureResult | null> {
     try {
       // First capture full screen, then crop to region
@@ -639,8 +657,10 @@ class CaptureService {
       image = image.crop(bounds);
       const originalSize = image.getSize();
 
-      // Resize if needed
-      image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
+      // Resize if needed (unless skipResize = true)
+      if (!skipResize) {
+        image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
+      }
       const finalSize = image.getSize();
 
       // Convert to data URL
