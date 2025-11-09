@@ -60,9 +60,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <div className="error-boundary-fallback flex flex-col items-center justify-center p-6 bg-status-error/10 border border-status-error/30 rounded-lg">
           <AlertTriangle className="w-12 h-12 text-status-error mb-3" />
-          <h3 className="text-lg font-semibold text-text-primary mb-2">
-            Something went wrong
-          </h3>
+          <h3 className="text-lg font-semibold text-text-primary mb-2">Something went wrong</h3>
           <p className="text-sm text-text-secondary text-center mb-4">
             {this.state.error?.message || "An unexpected error occurred"}
           </p>

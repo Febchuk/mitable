@@ -50,7 +50,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       console.log("[Preload] Screenshot captured successfully:", {
         dataUrlLength: result.dataUrl?.length || 0,
         hasMetadata: !!result.metadata,
-        dimensions: result.metadata ? `${result.metadata.width}x${result.metadata.height}` : 'N/A',
+        dimensions: result.metadata ? `${result.metadata.width}x${result.metadata.height}` : "N/A",
       });
       return result;
     }

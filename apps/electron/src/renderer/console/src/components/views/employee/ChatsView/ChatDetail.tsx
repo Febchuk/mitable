@@ -194,7 +194,9 @@ export default function ChatDetail() {
             console.log("[ChatDetail] Screenshot captured successfully:", {
               hasScreenshot: !!screenshot,
               hasMetadata: !!screenshotMetadata,
-              dimensions: screenshotMetadata ? `${screenshotMetadata.width}x${screenshotMetadata.height}` : 'N/A',
+              dimensions: screenshotMetadata
+                ? `${screenshotMetadata.width}x${screenshotMetadata.height}`
+                : "N/A",
             });
           }
         } catch (error) {

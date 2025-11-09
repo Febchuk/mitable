@@ -228,11 +228,11 @@ function App() {
         // Prepare metadata if this is a custom question during workflow
         const metadata = awaitingCustomQuestion
           ? {
-            workflowAction: "custom_question",
-            selectedOption: 2,
-            workflowSessionId: awaitingCustomQuestion.workflowSessionId,
-            currentStepIndex: awaitingCustomQuestion.relatedStepIndex,
-          }
+              workflowAction: "custom_question",
+              selectedOption: 2,
+              workflowSessionId: awaitingCustomQuestion.workflowSessionId,
+              currentStepIndex: awaitingCustomQuestion.relatedStepIndex,
+            }
           : undefined;
 
         console.log("[Conversation] Sending message with metadata:", metadata);
@@ -255,12 +255,12 @@ function App() {
                     (msg): Message =>
                       msg.id === streamingMessageId
                         ? {
-                          ...msg,
-                          content: msg.content + chunk,
-                          // Add workflow routing metadata from first chunk
-                          workflowSessionId: msg.workflowSessionId ?? workflowSessionId,
-                          relatedStepIndex: msg.relatedStepIndex ?? relatedStepIndex,
-                        }
+                            ...msg,
+                            content: msg.content + chunk,
+                            // Add workflow routing metadata from first chunk
+                            workflowSessionId: msg.workflowSessionId ?? workflowSessionId,
+                            relatedStepIndex: msg.relatedStepIndex ?? relatedStepIndex,
+                          }
                         : msg
                   )
                 );
@@ -291,16 +291,16 @@ function App() {
                     (msg): Message =>
                       msg.id === streamingMessageId
                         ? {
-                          ...msg,
-                          id: messageId,
-                          content: fullContent,
-                          type: cardData ? "card" : "text",
-                          messageType: messageType as "workflow" | "experts" | "text",
-                          cardData,
-                          windowTrigger,
-                          workflowSessionId,
-                          relatedStepIndex,
-                        }
+                            ...msg,
+                            id: messageId,
+                            content: fullContent,
+                            type: cardData ? "card" : "text",
+                            messageType: messageType as "workflow" | "experts" | "text",
+                            cardData,
+                            windowTrigger,
+                            workflowSessionId,
+                            relatedStepIndex,
+                          }
                         : msg
                   )
                 );
@@ -321,9 +321,9 @@ function App() {
                     (msg): Message =>
                       msg.id === streamingMessageId
                         ? {
-                          ...msg,
-                          content: `Error: ${error}. Please try again.`,
-                        }
+                            ...msg,
+                            content: `Error: ${error}. Please try again.`,
+                          }
                         : msg
                   )
                 );
@@ -360,9 +360,9 @@ function App() {
               (msg): Message =>
                 msg.id === streamingMessageId
                   ? {
-                    ...msg,
-                    content: "Failed to send message. Please try again.",
-                  }
+                      ...msg,
+                      content: "Failed to send message. Please try again.",
+                    }
                   : msg
             )
           );
@@ -640,16 +640,16 @@ function App() {
                 (msg): Message =>
                   msg.id === streamingMessageId
                     ? {
-                      ...msg,
-                      id: messageId,
-                      content: fullContent,
-                      type: cardData ? "card" : "text",
-                      messageType: messageType as "workflow" | "experts" | "text",
-                      cardData,
-                      windowTrigger,
-                      workflowSessionId,
-                      relatedStepIndex,
-                    }
+                        ...msg,
+                        id: messageId,
+                        content: fullContent,
+                        type: cardData ? "card" : "text",
+                        messageType: messageType as "workflow" | "experts" | "text",
+                        cardData,
+                        windowTrigger,
+                        workflowSessionId,
+                        relatedStepIndex,
+                      }
                     : msg
               )
             );

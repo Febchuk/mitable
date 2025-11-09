@@ -204,15 +204,17 @@ DO NOT USE:
       const workflowSession = await workflowService.getActiveWorkflow(conversationId);
 
       // Step 9: Prepare window trigger for overlay if bounding boxes present
-      const windowTrigger = visualGuidance?.element?.boundingBox ? {
-        window: "overlay" as const,
-        data: {
-          boundingBox: visualGuidance.element.boundingBox,
-          label: visualGuidance.element.label,
-          instruction: visualGuidance.conversationalMessage,
-          elementType: visualGuidance.element.type,
-        },
-      } : undefined;
+      const windowTrigger = visualGuidance?.element?.boundingBox
+        ? {
+          window: "overlay" as const,
+          data: {
+            boundingBox: visualGuidance.element.boundingBox,
+            label: visualGuidance.element.label,
+            instruction: visualGuidance.conversationalMessage,
+            elementType: visualGuidance.element.type,
+          },
+        }
+        : undefined;
 
       console.log("[GuideNextStepTool] Window trigger:", {
         hasWindowTrigger: !!windowTrigger,

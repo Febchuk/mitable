@@ -107,12 +107,14 @@ export const VisualGuidanceSchema = z.object({
   element: z.object({
     label: z.string(), // Element label or descriptive text
     type: z.string(), // button|input|link|dropdown|checkbox|text
-    boundingBox: z.object({
-      x: z.number(), // Normalized 0-1 (left edge position)
-      y: z.number(), // Normalized 0-1 (top edge position)
-      width: z.number(), // Normalized 0-1 (width as fraction of image)
-      height: z.number(), // Normalized 0-1 (height as fraction of image)
-    }).nullable(), // Can be null if element not visible
+    boundingBox: z
+      .object({
+        x: z.number(), // Normalized 0-1 (left edge position)
+        y: z.number(), // Normalized 0-1 (top edge position)
+        width: z.number(), // Normalized 0-1 (width as fraction of image)
+        height: z.number(), // Normalized 0-1 (height as fraction of image)
+      })
+      .nullable(), // Can be null if element not visible
     confidence: z.number(), // 0-1 confidence score
   }), // REQUIRED field - always return element info
 });

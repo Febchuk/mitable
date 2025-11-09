@@ -91,7 +91,15 @@ export function useSendMessage(options?: SendMessageOptions) {
       };
 
       // Start streaming with optional screenshot, metadata, and screenshotMetadata
-      await sendStreamingMessage(chatId, content, callbacks, token, screenshot, metadata, screenshotMetadata);
+      await sendStreamingMessage(
+        chatId,
+        content,
+        callbacks,
+        token,
+        screenshot,
+        metadata,
+        screenshotMetadata
+      );
     },
 
     // Optimistic update for user message

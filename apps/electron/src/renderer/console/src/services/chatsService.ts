@@ -149,7 +149,12 @@ export async function sendStreamingMessage(
 
   return new Promise((resolve, reject) => {
     // Build request body
-    const requestBody: { content: string; screenshot?: string; metadata?: any; screenshotMetadata?: any } = { content };
+    const requestBody: {
+      content: string;
+      screenshot?: string;
+      metadata?: any;
+      screenshotMetadata?: any;
+    } = { content };
     if (screenshot) {
       requestBody.screenshot = screenshot;
     }
@@ -224,7 +229,10 @@ export async function sendStreamingMessage(
                     callbacks.onError?.(chunk.error);
                     reject(new Error(chunk.error));
                   } else if (chunk.type === "window_trigger" && chunk.windowTrigger) {
-                    callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
+                    callbacks.onWindowTrigger?.(
+                      chunk.windowTrigger.window,
+                      chunk.windowTrigger.data
+                    );
                   }
                 } catch (parseError) {
                   console.error("Error parsing SSE data:", parseError, data);

@@ -797,7 +797,8 @@ router.post(
       // Check if there's an active workflow for this conversation
       const activeWorkflow = await workflowService.getActiveWorkflow(conversationId);
       const workflowSessionId = activeWorkflow?.id || metadata?.workflowSessionId || null;
-      const currentStepIndex = activeWorkflow?.currentStepIndex || metadata?.currentStepIndex || null;
+      const currentStepIndex =
+        activeWorkflow?.currentStepIndex || metadata?.currentStepIndex || null;
 
       // Save user message to database with workflow fields
       const [userMessage] = await db
@@ -986,7 +987,8 @@ router.post(
           : assistantCardData;
 
         // Extract workflow fields from cardData
-        const assistantWorkflowSessionId = finalCardData?.workflowSessionId || workflowSessionId || null;
+        const assistantWorkflowSessionId =
+          finalCardData?.workflowSessionId || workflowSessionId || null;
         const assistantStepIndex = finalCardData?.currentStepIndex ?? currentStepIndex ?? null;
 
         const [assistantMessage] = await db
@@ -1009,9 +1011,8 @@ router.post(
 
         // Dual-write to workflow_interactions if this is a workflow response
         if (assistantWorkflowSessionId) {
-          const interactionType = metadata?.workflowAction === "progress_step"
-            ? "step_progress"
-            : "ai_response";
+          const interactionType =
+            metadata?.workflowAction === "progress_step" ? "step_progress" : "ai_response";
 
           await workflowService.addWorkflowInteraction(
             assistantWorkflowSessionId,
@@ -1019,15 +1020,21 @@ router.post(
             "assistant",
             assistantContent,
             assistantStepIndex,
-            { cardData: finalCardData, sources: assistantSources, workflowAction: metadata?.workflowAction }
+            {
+              cardData: finalCardData,
+              sources: assistantSources,
+              workflowAction: metadata?.workflowAction,
+            }
           );
-          console.log(`[Stream] Workflow interaction saved for assistant response (${interactionType})`);
+          console.log(
+            `[Stream] Workflow interaction saved for assistant response (${interactionType})`
+          );
         }
 
         // Debug: Save annotated screenshot if enabled and has visual guidance
-        if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true') {
-          console.log('[DEBUG SCREENSHOT] Debug mode active, checking conditions:', {
-            envVariableSet: process.env.DEBUG_SAVE_SCREENSHOTS === 'true',
+        if (process.env.DEBUG_SAVE_SCREENSHOTS === "true") {
+          console.log("[DEBUG SCREENSHOT] Debug mode active, checking conditions:", {
+            envVariableSet: process.env.DEBUG_SAVE_SCREENSHOTS === "true",
             hasScreenshot: !!screenshot,
             hasMetadata: !!screenshotMetadata,
             hasVisualGuidance: !!finalCardData?.visualGuidance,
@@ -1041,7 +1048,7 @@ router.post(
               // Check if the response has visual guidance data with bounding box
               const visualGuidance = finalCardData?.visualGuidance;
               if (visualGuidance?.element?.boundingBox) {
-                console.log('[DEBUG SCREENSHOT] All conditions met, saving annotated screenshot');
+                console.log("[DEBUG SCREENSHOT] All conditions met, saving annotated screenshot");
                 const annotator = new ScreenshotAnnotator();
 
                 // Convert pixel coordinates back to normalized for annotation
@@ -1054,7 +1061,7 @@ router.post(
                   }
                 );
 
-                console.log('[DEBUG SCREENSHOT] Coordinate conversion for annotation:', {
+                console.log("[DEBUG SCREENSHOT] Coordinate conversion for annotation:", {
                   pixels: visualGuidance.element.boundingBox,
                   normalized: normalizedBoundingBox,
                 });
@@ -1067,25 +1074,33 @@ router.post(
                     height: screenshotMetadata.height,
                   },
                   {
-                    label: visualGuidance.elementDescription || visualGuidance.element.label || 'Target Element',
+                    label:
+                      visualGuidance.elementDescription ||
+                      visualGuidance.element.label ||
+                      "Target Element",
                     confidence: visualGuidance.element.confidence || 0.5,
                     instruction: content,
                     elementType: visualGuidance.element.type,
                   }
                 );
-                console.log('[DEBUG SCREENSHOT] Screenshot saved successfully:', result);
+                console.log("[DEBUG SCREENSHOT] Screenshot saved successfully:", result);
               } else {
-                console.warn('[DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response');
+                console.warn(
+                  "[DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response"
+                );
               }
             } catch (debugError) {
-              console.error('[DEBUG SCREENSHOT] Failed to save annotated screenshot:', debugError);
+              console.error("[DEBUG SCREENSHOT] Failed to save annotated screenshot:", debugError);
               // Don't fail the request, just log the error
             }
           } else {
-            console.warn('[DEBUG SCREENSHOT] Skipping annotation - missing screenshot or metadata', {
-              hasScreenshot: !!screenshot,
-              hasMetadata: !!screenshotMetadata,
-            });
+            console.warn(
+              "[DEBUG SCREENSHOT] Skipping annotation - missing screenshot or metadata",
+              {
+                hasScreenshot: !!screenshot,
+                hasMetadata: !!screenshotMetadata,
+              }
+            );
           }
         }
 

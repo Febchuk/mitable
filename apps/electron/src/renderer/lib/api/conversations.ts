@@ -339,7 +339,12 @@ export async function sendMessageStream(
                 break;
 
               default:
-                console.warn("[API] Unknown chunk type received:", chunk.type, "Full chunk:", chunk);
+                console.warn(
+                  "[API] Unknown chunk type received:",
+                  chunk.type,
+                  "Full chunk:",
+                  chunk
+                );
                 break;
             }
           } catch (parseError) {

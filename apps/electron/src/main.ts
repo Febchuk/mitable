@@ -602,14 +602,14 @@ function setupIPC() {
 
     // Open DevTools when overlay is shown (dev mode only, first time)
     if (!app.isPackaged && !overlayWindow.webContents.isDevToolsOpened()) {
-      overlayWindow.webContents.openDevTools({ mode: 'detach' });
+      overlayWindow.webContents.openDevTools({ mode: "detach" });
     }
 
     // Wait for renderer to be ready, then send data
     // If already loaded, this fires immediately
     if (overlayWindow.webContents.isLoading()) {
       console.log("[Main] Overlay still loading, waiting for did-finish-load...");
-      overlayWindow.webContents.once('did-finish-load', () => {
+      overlayWindow.webContents.once("did-finish-load", () => {
         console.log("[Main] Overlay loaded, sending data now");
         overlayWindow.webContents.send("overlay-data", data);
       });
