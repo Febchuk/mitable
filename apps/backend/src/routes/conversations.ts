@@ -1060,6 +1060,13 @@ router.post(
                   normalized: normalizedBoundingBox,
                 });
 
+                console.log('[DEBUG SCREENSHOT] Annotation metadata:', {
+                  instruction: visualGuidance.clarifiedDescription || visualGuidance.elementDescription,
+                  clarifiedDescription: visualGuidance.clarifiedDescription,
+                  elementDescription: visualGuidance.elementDescription,
+                  userOriginalMessage: content,
+                });
+
                 const result = await annotator.annotate(
                   screenshot,
                   normalizedBoundingBox,
@@ -1070,7 +1077,8 @@ router.post(
                   {
                     label: visualGuidance.elementDescription || visualGuidance.element.label || 'Target Element',
                     confidence: visualGuidance.element.confidence || 0.5,
-                    instruction: content,
+                    instruction: visualGuidance.clarifiedDescription || visualGuidance.elementDescription, // Use clarified description (Phase 1 output)
+                    clarifiedDescription: visualGuidance.clarifiedDescription, // Store clarified description
                     elementType: visualGuidance.element.type,
                   }
                 );

@@ -104,6 +104,7 @@ export const VisualGuidanceSchema = z.object({
   confidence: z.enum(["high", "medium", "low"]),
   alternativeElements: z.array(z.string()).optional(), // Fallback if ambiguous
   conversationalMessage: z.string(), // AI-generated natural response for user display
+  clarifiedDescription: z.string().optional(), // Phase 1 output: detailed visual description of what to look for
   element: z.object({
     label: z.string(), // Element label or descriptive text
     type: z.string(), // button|input|link|dropdown|checkbox|text
