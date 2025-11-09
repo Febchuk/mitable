@@ -69,42 +69,47 @@ export function WorkflowAccordion({
     });
   };
 
+  // Calculate progress text
+  const progressText = workflow.status === "completed"
+    ? `Completed • ${workflow.stepList.length}/${workflow.stepList.length} steps`
+    : workflow.status === "paused"
+    ? `Paused • ${workflow.currentStepIndex + 1}/${workflow.stepList.length} steps`
+    : `In Progress • ${workflow.currentStepIndex + 1}/${workflow.stepList.length} steps`;
+
   // Unified render for both pre-flight and active modes
   return (
-    <div className="workflow-accordion bg-background-secondary rounded-lg border border-border-subtle mb-4">
+    <div className="workflow-accordion my-4 border border-[#3A3A45] rounded-2xl overflow-hidden bg-[#2A2A35]">
       {/* Accordion Header - only show when workflow is active */}
       {!isPreFlight && (
         <button
-          className="accordion-header w-full flex items-center justify-between p-4 hover:bg-background-elevated transition-colors"
+          className="accordion-header w-full px-6 py-4 flex items-center justify-between hover:bg-[#2F2F3A] transition-colors"
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-3">
-            {isExpanded ? (
-              <ChevronDown className="w-5 h-5 text-text-secondary" />
+            {/* Status Icon */}
+            {workflow.status === "completed" ? (
+              <CheckCircle size={20} className="text-green-500 flex-shrink-0" />
+            ) : workflow.status === "paused" ? (
+              <Circle size={20} className="text-yellow-500 flex-shrink-0" />
             ) : (
-              <ChevronRight className="w-5 h-5 text-text-secondary" />
+              <Circle size={20} className="text-[#8B5CF6] flex-shrink-0" />
             )}
 
-            <span className="workflow-title font-medium text-text-primary">
-              {workflow.solution}
-            </span>
+            {/* Title & Progress */}
+            <div className="text-left">
+              <h3 className="text-base font-semibold text-white">
+                {workflow.solution}
+              </h3>
+              <p className="text-sm text-gray-400">{progressText}</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="workflow-progress text-sm text-text-secondary">
-              Step {workflow.currentStepIndex + 1} of {workflow.stepList.length}
-            </span>
-
-            {workflow.status === "paused" && (
-              <span className="workflow-status px-2 py-1 text-xs font-medium bg-status-warning/20 text-status-warning rounded">
-                Paused
-              </span>
-            )}
-
-            {workflow.status === "completed" && (
-              <CheckCircle className="w-5 h-5 text-status-success" />
-            )}
-          </div>
+          {/* Expand/Collapse Icon */}
+          {isExpanded ? (
+            <ChevronDown size={20} className="text-gray-400" />
+          ) : (
+            <ChevronRight size={20} className="text-gray-400" />
+          )}
         </button>
       )}
 
@@ -112,15 +117,15 @@ export function WorkflowAccordion({
       {(isPreFlight || isExpanded) && (
         <div className={cn(
           "accordion-body",
-          !isPreFlight && "border-t border-border-subtle"
+          !isPreFlight && "border-t border-[#3A3A45]"
         )}>
           {/* Persistent explanation message */}
-          <div className="p-4 pb-2">
+          <div className="px-6 py-4">
             <AIMessage content={workflow.solutionExplanation} />
           </div>
 
           {/* Steps with inline conversations */}
-          <div className="workflow-steps px-4 pb-4 pt-2">
+          <div className="workflow-steps px-6 pb-4">
             {workflow.stepList.map((step: any, idx: number) => {
               const isCurrentStep = idx === workflow.currentStepIndex;
               const isCompleted = idx < workflow.currentStepIndex;
@@ -135,17 +140,17 @@ export function WorkflowAccordion({
                 <div
                   key={idx}
                   className={cn(
-                    "workflow-step-section rounded-md mb-3 transition-all",
-                    isCurrentStep && "bg-primary/10 border-2 border-primary/30",
-                    !isCurrentStep && "bg-background/50 border border-border-subtle",
+                    "workflow-step-section rounded-lg mb-3 transition-all",
+                    isCurrentStep && "bg-[#3A3A45] border-2 border-[#8B5CF6]",
+                    !isCurrentStep && "bg-[#2A2A35] border border-[#3A3A45]",
                     isCompleted && "opacity-70"
                   )}
                 >
                   {/* Step Header - always visible, clickable if expandable */}
                   <button
                     className={cn(
-                      "step-header w-full text-left p-3 flex items-center gap-3 transition-colors",
-                      isExpandable && "hover:bg-background-elevated cursor-pointer",
+                      "step-header w-full text-left p-4 flex items-center gap-3 transition-colors",
+                      isExpandable && "hover:bg-[#3A3A45]/50 cursor-pointer",
                       !isExpandable && "cursor-default"
                     )}
                     onClick={() => isExpandable && toggleStepExpansion(idx)}
@@ -154,18 +159,18 @@ export function WorkflowAccordion({
                     {/* Status Icon */}
                     <div className="flex-shrink-0">
                       {isCompleted && (
-                        <div className="w-5 h-5 rounded-full bg-status-success flex items-center justify-center">
-                          <Check size={14} className="text-white" />
+                        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                          <Check size={12} className="text-white" />
                         </div>
                       )}
                       {isCurrentStep && (
-                        <div className="w-5 h-5 rounded-full border-2 border-primary flex items-center justify-center">
-                          <CircleDot size={12} className="text-primary" />
+                        <div className="w-5 h-5 rounded-full border-2 border-[#8B5CF6] flex items-center justify-center">
+                          <div className="w-2 h-2 rounded-full bg-[#8B5CF6]"></div>
                         </div>
                       )}
                       {isPending && (
-                        <div className="w-5 h-5 rounded-full border-2 border-border-subtle flex items-center justify-center">
-                          <Circle size={12} className="text-text-secondary" />
+                        <div className="w-5 h-5 rounded-full border-2 border-gray-600 flex items-center justify-center">
+                          <div className="w-2 h-2 rounded-full bg-transparent"></div>
                         </div>
                       )}
                     </div>
@@ -174,8 +179,8 @@ export function WorkflowAccordion({
                     <div className="flex-1 min-w-0">
                       <span className={cn(
                         "text-sm leading-relaxed",
-                        isCurrentStep ? "font-medium text-text-primary" : "text-text-secondary",
-                        isCompleted && "line-through"
+                        isCurrentStep ? "font-medium text-white" : "text-gray-300",
+                        isCompleted && "line-through text-gray-400"
                       )}>
                         Step {idx + 1}: {step.description}
                       </span>
@@ -183,7 +188,7 @@ export function WorkflowAccordion({
 
                     {/* Message Count Badge - only show in active mode */}
                     {!isPreFlight && hasMessages && (
-                      <span className="message-count text-xs text-text-secondary bg-background-elevated px-2 py-0.5 rounded-full flex-shrink-0">
+                      <span className="message-count text-xs text-gray-400 bg-[#1A1A22] px-2 py-0.5 rounded-full flex-shrink-0">
                         {stepMessages.length} message{stepMessages.length !== 1 ? "s" : ""}
                       </span>
                     )}
@@ -191,25 +196,21 @@ export function WorkflowAccordion({
                     {/* Expand/Collapse Icon - only show in active mode when expandable */}
                     {!isPreFlight && isExpandable && (
                       expandedSteps.has(idx) ? (
-                        <ChevronDown className="w-4 h-4 text-text-secondary flex-shrink-0" />
+                        <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                       ) : (
-                        <ChevronRight className="w-4 h-4 text-text-secondary flex-shrink-0" />
+                        <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
                       )
                     )}
                   </button>
 
                   {/* Step content - never show in pre-flight, show in active when current or expanded */}
                   {!isPreFlight && (isCurrentStep || expandedSteps.has(idx)) && (
-                    <div className="step-content border-t border-border-subtle px-3 pb-3 pt-2">
+                    <div className="step-content border-t border-[#3A3A45] px-4 pb-4 pt-3">
                       {/* Plan adjustment notice if applicable */}
                       {isCurrentStep && workflow.adjustmentHistory.length > 0 && (
                         <div className="plan-adjustment-notice bg-status-warning/20 border border-status-warning/40 rounded p-3 mb-3">
                           <p className="text-sm text-status-warning">
-                            📝 <strong>Plan updated:</strong>{" "}
-                            {
-                              workflow.adjustmentHistory[workflow.adjustmentHistory.length - 1]
-                                .reason
-                            }
+                            📝 <strong>Plan updated:</strong> {workflow.adjustmentHistory[workflow.adjustmentHistory.length - 1].reason}
                           </p>
                         </div>
                       )}
@@ -221,35 +222,28 @@ export function WorkflowAccordion({
                         </div>
                       )}
 
-                      {/* Inline conversation for this step */}
+                      {/* Inline conversation for this step - keeping message bubbles */}
                       {stepMessages.map((msg, msgIdx) => (
                         <div
                           key={msgIdx}
                           className={cn(
-                            "step-message mb-2 p-2 rounded",
-                            msg.role === "user" ? "bg-primary/20 ml-4" : "bg-background-elevated"
+                            "step-message mb-2 p-3 rounded-lg",
+                            msg.role === "user"
+                              ? "bg-[#8B5CF6]/20 ml-4 border border-[#8B5CF6]/30"
+                              : "bg-[#1A1A22] border border-[#3A3A45]"
                           )}
                         >
-                          <p className="text-sm text-text-primary">{msg.content}</p>
+                          <p className="text-sm text-gray-200">{msg.content}</p>
                         </div>
                       ))}
 
                       {/* Streaming indicator */}
                       {isCurrentStep && isStreaming && (
-                        <div className="streaming-indicator flex items-center gap-2 text-sm text-text-secondary mt-2">
+                        <div className="streaming-indicator flex items-center gap-2 text-sm text-gray-400 mt-2">
                           <div className="loading-dots flex gap-1">
-                            <span
-                              className="w-2 h-2 bg-primary rounded-full animate-bounce"
-                              style={{ animationDelay: "0ms" }}
-                            ></span>
-                            <span
-                              className="w-2 h-2 bg-primary rounded-full animate-bounce"
-                              style={{ animationDelay: "150ms" }}
-                            ></span>
-                            <span
-                              className="w-2 h-2 bg-primary rounded-full animate-bounce"
-                              style={{ animationDelay: "300ms" }}
-                            ></span>
+                            <span className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                            <span className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                            <span className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
                           </div>
                           AI is thinking...
                         </div>
@@ -282,7 +276,7 @@ export function WorkflowAccordion({
 
           {/* Workflow options (pre-flight only) or resume/complete button */}
           {(isPreFlight || workflow.status === "paused" || workflow.status === "completed") && (
-            <div className="p-4 border-t border-border-subtle">
+            <div className="px-6 py-4 border-t border-[#3A3A45]">
               {isPreFlight ? (
                 <WorkflowOptions
                   phase={"initial_proposal" as WorkflowPhase}
@@ -292,14 +286,14 @@ export function WorkflowAccordion({
                 />
               ) : workflow.status === "paused" ? (
                 <button
-                  className="resume-workflow-btn w-full flex items-center justify-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover transition-colors"
+                  className="resume-workflow-btn w-full flex items-center justify-center gap-2 bg-[#8B5CF6] text-white px-5 py-2.5 rounded-[18px] hover:bg-[#8B5CF6]/90 transition-all hover:scale-105 font-medium text-sm"
                   onClick={() => onOptionSelect({ action: "resume_workflow" })}
                 >
                   <PlayCircle className="w-5 h-5" />
                   Resume from Step {workflow.currentStepIndex + 1}
                 </button>
               ) : (
-                <div className="completed-indicator flex items-center justify-center gap-2 text-status-success">
+                <div className="completed-indicator flex items-center justify-center gap-2 text-green-500">
                   <CheckCircle className="w-5 h-5" />
                   <span className="font-medium">Workflow Completed</span>
                 </div>
