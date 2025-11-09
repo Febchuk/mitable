@@ -220,10 +220,87 @@ export class VisualGuidanceAgent extends BaseAgent {
         sourcesFound: searchResult.sources?.length || 0,
       });
 
+      // STEP 1.5: Quick screen analysis - What app is visible?
+      console.log("[VisualGuidanceAgent] Analyzing visible application on screen...");
+
+      let visibleApp = "Unknown";
+      try {
+        const visionModel = this.gemini.getGenerativeModel({
+          model: "gemini-2.0-flash-exp",
+        });
+
+        const base64Data = context.screenshot.replace(/^data:image\/\w+;base64,/, "");
+
+        const screenAnalysisPrompt = `Look at this screenshot and identify:
+1. What application/program is currently visible and focused?
+2. Is it a desktop/finder view or an application?
+
+Return ONLY the app name (e.g., "Spotify", "Slack", "Chrome", "Desktop", "Finder"), nothing else.`;
+
+        const screenAnalysis = await visionModel.generateContent([
+          screenAnalysisPrompt,
+          {
+            inlineData: {
+              mimeType: "image/png",
+              data: base64Data,
+            },
+          },
+        ]);
+
+        visibleApp = screenAnalysis.response.text().trim();
+        console.log("[VisualGuidanceAgent] ✅ Visible app detected:", visibleApp);
+      } catch (error) {
+        console.warn(
+          "[VisualGuidanceAgent] ⚠️ Screen analysis failed, continuing without app context:",
+          error instanceof Error ? error.message : "Unknown error"
+        );
+        visibleApp = "Unknown";
+      }
+
       // STEP 2: Use GPT-4 to synthesize search results into structured workflow
       // Note: We only ask GPT-4 to generate fields requiring synthesis
       // (solution, explanations, steps). We'll pass supportingData and searchQuery directly.
       const synthesisPrompt = `You are creating step-by-step UI guidance for an employee based on company documentation.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 CRITICAL CONTEXT - CURRENT SCREEN STATE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VISIBLE APPLICATION: ${visibleApp}
+
+⚠️ MANDATORY RULES FOR APP SELECTION:
+
+1. **PRIORITIZE VISIBLE APP** - If the visible app (${visibleApp}) CAN accomplish the user's task, USE IT
+   - Example: User asks about "playlist" + Spotify is visible → CREATE SPOTIFY WORKFLOW
+   - Example: User asks about "message" + Slack is visible → CREATE SLACK WORKFLOW
+   - DO NOT redirect to another app just because search results mention it
+
+2. **SEMANTIC CONTEXT MATTERS** - Understand what apps naturally handle which tasks:
+   - "playlist", "music", "song", "album" → Spotify, Apple Music, etc.
+   - "message", "channel", "DM" → Slack, Teams, Email, etc.
+   - "document", "doc", "sheet" → Google Drive, Notion, etc.
+   - If ${visibleApp} matches the semantic domain of the task, USE IT
+
+3. **SEARCH RESULTS ARE CONTEXT, NOT COMMANDS**:
+   - If search mentions "Slack message about playlists" but Spotify is visible → USE SPOTIFY
+   - Search results provide background information, not workflow instructions
+   - Don't create workflows in the wrong app just because search found it there
+
+4. **ONLY SUGGEST SWITCHING APPS IF**:
+   - The visible app CANNOT accomplish the task at all
+   - The task explicitly requires a different specific app (e.g., "update my Jira ticket")
+   - The user explicitly mentions a different app in their question
+
+5. **IF WRONG APP IS VISIBLE**:
+   - Step 1 MUST be: "Open [correct app name]"
+   - Then proceed with the rest of the workflow in the correct app
+   - Example: User asks about "Jira ticket" but Spotify visible → Step 1: "Open Jira"
+
+6. **CONFIDENCE IN APP DETECTION**:
+   - If visibleApp is "Unknown" or "Desktop", rely more heavily on search results
+   - If visibleApp is a specific application, STRONGLY PREFER using it if semantically relevant
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Generate a JSON object with the following structure:
 
@@ -453,6 +530,13 @@ Generate the complete JSON object now with ALL required fields.`;
         hasExplanation: !!aiGeneratedParams.solutionExplanation,
         hasSupportingDataExplanation: !!aiGeneratedParams.supportingDataExplanation,
         stepCount: aiGeneratedParams.stepList?.length || 0,
+      });
+
+      console.log("[VisualGuidanceAgent] 📊 Synthesis context used:", {
+        userQuestion: lastUserMessage.content,
+        visibleApp: visibleApp,
+        searchResultCount: searchResult.sources?.length || 0,
+        firstStepUsesVisibleApp: aiGeneratedParams.stepList?.[0]?.description.toLowerCase().includes(visibleApp.toLowerCase()) || false,
       });
 
       // STEP 3: Validate required fields (only those GPT-4 should generate)
