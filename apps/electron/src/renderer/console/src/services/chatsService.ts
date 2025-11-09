@@ -228,11 +228,47 @@ export async function sendStreamingMessage(
       throw new Error("No content received from backend");
     }
 
-    // Final completion signal
-    callbacks.onComplete?.(fullContent);
-  } catch (error) {
-    console.error("Message send error:", error);
-    callbacks.onError?.(error instanceof Error ? error.message : "Failed to send message");
-    throw error;
-  }
+            // Process complete SSE messages
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6); // Remove "data: " prefix
+
+                if (data === "") continue; // Empty data line
+                if (data.startsWith(":")) continue; // Comment (ping)
+
+                try {
+                  const chunk: StreamChunk = JSON.parse(data);
+
+                  if (chunk.type === "chunk" && chunk.content) {
+                    callbacks.onChunk?.(chunk.content);
+                  } else if (chunk.type === "complete" && chunk.content) {
+                    callbacks.onComplete?.(chunk.content);
+                  } else if (chunk.type === "done" && chunk.messageId) {
+                    callbacks.onDone?.(chunk.messageId);
+                  } else if (chunk.type === "error" && chunk.error) {
+                    callbacks.onError?.(chunk.error);
+                    reject(new Error(chunk.error));
+                  }
+                } catch (parseError) {
+                  console.error("Error parsing SSE data:", parseError, data);
+                }
+              }
+            }
+
+            // Continue reading
+            return read();
+          });
+        };
+
+        return read();
+      })
+      .catch((error) => {
+        console.error("Streaming error:", error);
+        callbacks.onError?.(error instanceof Error ? error.message : "Streaming failed");
+        reject(error);
+      });
+  });
 }

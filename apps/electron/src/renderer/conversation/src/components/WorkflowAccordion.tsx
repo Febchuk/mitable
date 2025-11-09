@@ -1,6 +1,15 @@
 import { useState, useMemo } from "react";
-import { ChevronDown, ChevronRight, PlayCircle, CheckCircle, Check, Circle, CircleDot } from "lucide-react";
-import WorkflowOptions, { WorkflowPhase } from "../../../components/domain/workflow/WorkflowOptions";
+import {
+  ChevronDown,
+  ChevronRight,
+  PlayCircle,
+  CheckCircle,
+  Check,
+  Circle,
+} from "lucide-react";
+import WorkflowOptions, {
+  WorkflowPhase,
+} from "../../../components/domain/workflow/WorkflowOptions";
 import AIMessage from "../../../components/domain/messages/AIMessage";
 import LoadingMessage from "./LoadingMessage";
 import { cn } from "../../../lib/utils";
@@ -70,11 +79,12 @@ export function WorkflowAccordion({
   };
 
   // Calculate progress text
-  const progressText = workflow.status === "completed"
-    ? `Completed • ${workflow.stepList.length}/${workflow.stepList.length} steps`
-    : workflow.status === "paused"
-    ? `Paused • ${workflow.currentStepIndex + 1}/${workflow.stepList.length} steps`
-    : `In Progress • ${workflow.currentStepIndex + 1}/${workflow.stepList.length} steps`;
+  const progressText =
+    workflow.status === "completed"
+      ? `Completed • ${workflow.stepList.length}/${workflow.stepList.length} steps`
+      : workflow.status === "paused"
+        ? `Paused • ${workflow.currentStepIndex + 1}/${workflow.stepList.length} steps`
+        : `In Progress • ${workflow.currentStepIndex + 1}/${workflow.stepList.length} steps`;
 
   // Unified render for both pre-flight and active modes
   return (
@@ -97,9 +107,7 @@ export function WorkflowAccordion({
 
             {/* Title & Progress */}
             <div className="text-left">
-              <h3 className="text-base font-semibold text-white">
-                {workflow.solution}
-              </h3>
+              <h3 className="text-base font-semibold text-white">{workflow.solution}</h3>
               <p className="text-sm text-gray-400">{progressText}</p>
             </div>
           </div>
@@ -115,10 +123,7 @@ export function WorkflowAccordion({
 
       {/* Accordion Body - always visible in pre-flight, collapsible when active */}
       {(isPreFlight || isExpanded) && (
-        <div className={cn(
-          "accordion-body",
-          !isPreFlight && "border-t border-[#3A3A45]"
-        )}>
+        <div className={cn("accordion-body", !isPreFlight && "border-t border-[#3A3A45]")}>
           {/* Persistent explanation message */}
           <div className="px-6 py-4">
             <AIMessage content={workflow.solutionExplanation} />
@@ -177,11 +182,13 @@ export function WorkflowAccordion({
 
                     {/* Step Description */}
                     <div className="flex-1 min-w-0">
-                      <span className={cn(
-                        "text-sm leading-relaxed",
-                        isCurrentStep ? "font-medium text-white" : "text-gray-300",
-                        isCompleted && "line-through text-gray-400"
-                      )}>
+                      <span
+                        className={cn(
+                          "text-sm leading-relaxed",
+                          isCurrentStep ? "font-medium text-white" : "text-gray-300",
+                          isCompleted && "line-through text-gray-400"
+                        )}
+                      >
                         Step {idx + 1}: {step.description}
                       </span>
                     </div>
@@ -194,13 +201,13 @@ export function WorkflowAccordion({
                     )}
 
                     {/* Expand/Collapse Icon - only show in active mode when expandable */}
-                    {!isPreFlight && isExpandable && (
-                      expandedSteps.has(idx) ? (
+                    {!isPreFlight &&
+                      isExpandable &&
+                      (expandedSteps.has(idx) ? (
                         <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                       ) : (
                         <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      )
-                    )}
+                      ))}
                   </button>
 
                   {/* Step content - never show in pre-flight, show in active when current or expanded */}
@@ -210,7 +217,11 @@ export function WorkflowAccordion({
                       {isCurrentStep && workflow.adjustmentHistory.length > 0 && (
                         <div className="plan-adjustment-notice bg-status-warning/20 border border-status-warning/40 rounded p-3 mb-3">
                           <p className="text-sm text-status-warning">
-                            📝 <strong>Plan updated:</strong> {workflow.adjustmentHistory[workflow.adjustmentHistory.length - 1].reason}
+                            📝 <strong>Plan updated:</strong>{" "}
+                            {
+                              workflow.adjustmentHistory[workflow.adjustmentHistory.length - 1]
+                                .reason
+                            }
                           </p>
                         </div>
                       )}
@@ -241,9 +252,18 @@ export function WorkflowAccordion({
                       {isCurrentStep && isStreaming && (
                         <div className="streaming-indicator flex items-center gap-2 text-sm text-gray-400 mt-2">
                           <div className="loading-dots flex gap-1">
-                            <span className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                            <span className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                            <span className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                            <span
+                              className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce"
+                              style={{ animationDelay: "0ms" }}
+                            ></span>
+                            <span
+                              className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce"
+                              style={{ animationDelay: "150ms" }}
+                            ></span>
+                            <span
+                              className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce"
+                              style={{ animationDelay: "300ms" }}
+                            ></span>
                           </div>
                           AI is thinking...
                         </div>

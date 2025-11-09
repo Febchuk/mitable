@@ -21,8 +21,8 @@ export default function LoadingMessage({ message }: LoadingMessageProps) {
       <div
         className="loading-text animate-gradient bg-gradient-to-r from-text-secondary via-text-primary to-text-secondary bg-[length:200%_auto] bg-clip-text text-transparent text-sm font-medium"
         style={{
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
         }}
       >
         {message}
