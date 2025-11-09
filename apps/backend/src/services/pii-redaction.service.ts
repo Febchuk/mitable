@@ -3,31 +3,7 @@ import NodeCache from "node-cache";
 import crypto from "crypto";
 import sharp from "sharp";
 import { config } from "../config.js";
-
-/**
- * PII Redaction Request
- */
-export interface PIIRedactionRequest {
-  screenshot: string; // Base64 data URL
-}
-
-/**
- * PII Redaction Response
- */
-export interface PIIRedactionResponse {
-  success: boolean;
-  redactedScreenshot: string; // Base64 data URL with PII redacted
-  detectionTime: number; // milliseconds
-  piiCount: number; // Number of PII regions redacted
-  cached: boolean;
-  metadata?: {
-    originalWidth: number;
-    originalHeight: number;
-    processedWidth: number;
-    processedHeight: number;
-  };
-  error?: string;
-}
+import type { PIIDetectionRequest, PIIDetectionResponse } from "@mitable/shared";
 
 /**
  * PII types to detect and redact
@@ -124,12 +100,12 @@ class PIIRedactionService {
   // If needed in future, re-enable with adjustments for HDR color spaces
 
   /**
-   * Redact PII from a screenshot using Google Cloud DLP
+   * Redact PII from screenshot using Google Cloud DLP
    *
    * @param request - Screenshot as base64 data URL
    * @returns Fully redacted screenshot with black rectangles over PII
    */
-  async redactScreenshot(request: PIIRedactionRequest): Promise<PIIRedactionResponse> {
+  async redactScreenshot(request: PIIDetectionRequest): Promise<PIIDetectionResponse> {
     const startTime = Date.now();
 
     try {

@@ -1,10 +1,7 @@
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth.js";
-import {
-  piiRedactionService,
-  type PIIRedactionRequest,
-  type PIIRedactionResponse,
-} from "../services/pii-redaction.service.js";
+import { piiRedactionService } from "../services/pii-redaction.service.js";
+import type { PIIDetectionRequest, PIIDetectionResponse } from "@mitable/shared";
 
 const router = Router();
 
@@ -65,7 +62,7 @@ const router = Router();
 // TODO: Re-enable requireAuth in production
 router.post("/redact", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { screenshot } = req.body as PIIRedactionRequest;
+    const { screenshot } = req.body as PIIDetectionRequest;
 
     // Validate request
     if (!screenshot || typeof screenshot !== "string") {
@@ -86,7 +83,7 @@ router.post("/redact", async (req: Request, res: Response): Promise<void> => {
     }
 
     // Call PII redaction service
-    const result: PIIRedactionResponse = await piiRedactionService.redactScreenshot({
+    const result: PIIDetectionResponse = await piiRedactionService.redactScreenshot({
       screenshot,
     });
 
@@ -109,7 +106,7 @@ router.post("/redact", async (req: Request, res: Response): Promise<void> => {
       detectionTime: 0,
       piiCount: 0,
       cached: false,
-    } as PIIRedactionResponse);
+    } as PIIDetectionResponse);
   }
 });
 
