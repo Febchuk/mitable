@@ -1,5 +1,5 @@
 import { app } from "./app.js";
-import { config, validateConfig } from "./config.js";
+import { config, validateConfig, checkPortAvailability } from "./config.js";
 import { testConnection } from "./db/client.js";
 import { vectorService } from "./services/vector.service.js";
 
@@ -15,6 +15,19 @@ async function startServer() {
     } else {
       process.exit(1);
     }
+  }
+
+  // Check if port is available
+  console.log(`🔍 Checking port ${config.port} availability...`);
+  const portAvailable = await checkPortAvailability(config.port);
+
+  if (!portAvailable) {
+    console.error(
+      `❌ Port ${config.port} is already in use. ` +
+        `Please try a different port using --backend-port flag or PORT environment variable.\n` +
+        `Example: npm run dev -- --backend-port=${config.port + 1}`
+    );
+    process.exit(1);
   }
 
   // Test database connection

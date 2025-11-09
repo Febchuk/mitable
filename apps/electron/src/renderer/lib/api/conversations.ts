@@ -7,7 +7,7 @@
 
 import type { Message as MessageType } from "../../conversation/src/types";
 
-const API_BASE_URL = "http://localhost:3000/api";
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000") + "/api";
 
 // Re-export Message type for convenience
 export type Message = MessageType;

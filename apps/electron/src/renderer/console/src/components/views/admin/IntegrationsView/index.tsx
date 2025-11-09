@@ -18,6 +18,8 @@ const POLLING_CONFIG = {
   UI_DELAY_MS: 500, // Delay before opening configure dialog
 } as const;
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 export default function IntegrationsView() {
   const { data: integrations = [], refetch } = useIntegrations();
   const syncMutation = useSyncIntegration();
@@ -119,9 +121,9 @@ export default function IntegrationsView() {
       // Call backend disconnect endpoint
       let endpoint = "";
       if (integration.provider === "slack") {
-        endpoint = "http://localhost:3000/api/integrations/slack/disconnect";
+        endpoint = `${API_BASE_URL}/api/integrations/slack/disconnect`;
       } else if (integration.provider === "notion") {
-        endpoint = "http://localhost:3000/api/integrations/notion/disconnect";
+        endpoint = `${API_BASE_URL}/api/integrations/notion/disconnect`;
       }
 
       if (endpoint) {
@@ -228,7 +230,7 @@ export default function IntegrationsView() {
           try {
             const token = authService.getAccessToken();
             if (token) {
-              await fetch("http://localhost:3000/api/integrations/notion/sync", {
+              await fetch(`${API_BASE_URL}/api/integrations/notion/sync`, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
