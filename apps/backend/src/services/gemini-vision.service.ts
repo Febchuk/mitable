@@ -84,6 +84,7 @@ class GeminiVisionService {
   private interpretModel: any;
   private stepGuidanceModel: any;
   private evaluateModel: any;
+  private clarificationModel: any; // Phase 1: Clarify what to look for
 
   constructor() {
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
@@ -113,6 +114,74 @@ class GeminiVisionService {
         responseSchema: toGeminiSchema(EvaluateProgressResponseSchema) as any,
       },
     });
+
+    // Clarification model (Phase 1): Returns plain text description
+    this.clarificationModel = this.genAI.getGenerativeModel({
+      model: "gemini-2.0-flash-exp",
+    });
+  }
+
+  /**
+   * PHASE 1: Clarify Target Element
+   *
+   * Takes a step description and returns a detailed visual description
+   * of what UI element to look for. This improves detection accuracy by
+   * being explicit about visual characteristics before analyzing the screenshot.
+   *
+   * @param stepDescription - Brief task description (e.g., "Click the Save button")
+   * @returns Detailed visual description (e.g., "A blue rectangular button labeled 'Save' with a white floppy disk icon...")
+   */
+  async clarifyTargetElement(stepDescription: string): Promise<string> {
+    const startTime = Date.now();
+    console.log("[GeminiVision] Phase 1: Clarifying target element");
+    console.log("[GeminiVision] Step description:", stepDescription);
+
+    const prompt = `You are helping identify the specific UI element a user needs to interact with.
+
+TASK DESCRIPTION: "${stepDescription}"
+
+Your job: Describe in detail what UI element the user should look for on their screen. Be specific about:
+- Element type (button, input field, link, dropdown, icon, checkbox, toggle, etc.)
+- Visual appearance (color, shape, size, icons, text labels, styling)
+- Location hints (top-right, left sidebar, toolbar, header, footer, navigation bar, etc.)
+- Distinctive features that make it recognizable
+- Text content or labels if applicable
+- Any surrounding context that helps identify it
+
+EXAMPLES:
+
+Task: "Click the Save button"
+Output: "A blue rectangular button labeled 'Save' with a white floppy disk icon, typically located in the top toolbar area, approximately 80-100px wide with rounded corners"
+
+Task: "Enter your email address"
+Output: "A text input field with placeholder text 'Email' or 'Enter your email', usually appearing with a light gray border (1px) and white background, commonly found in forms or login screens, approximately 250-400px wide"
+
+Task: "Open the settings menu"
+Output: "A gear/cog icon button, typically gray or dark colored, about 20-30px in size, usually located in the top-right corner of the application or in a navigation sidebar"
+
+Task: "Select a date from the calendar"
+Output: "A date picker dropdown or calendar icon, often showing a small calendar grid icon, typically appearing next to date input fields, clicking it reveals a calendar popup interface"
+
+Now describe what to look for based on: "${stepDescription}"
+
+Return ONLY the detailed description, no JSON, no extra formatting, no preamble.`;
+
+    try {
+      const result = await this.clarificationModel.generateContent(prompt);
+      const clarifiedDescription = result.response.text().trim();
+
+      const elapsedMs = Date.now() - startTime;
+
+      console.log("[GeminiVision] Clarified element description:", clarifiedDescription);
+      console.log("[GeminiVision] Clarification took:", elapsedMs, "ms");
+
+      return clarifiedDescription;
+    } catch (error) {
+      console.error("[GeminiVision] Clarification failed:", error);
+      // Fallback: return original step description
+      console.warn("[GeminiVision] Using fallback - original step description");
+      return stepDescription;
+    }
   }
 
   /**
@@ -413,12 +482,41 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
     conversationHistory: DbMessage[],
     imageDimensions?: { width: number; height: number }
   ): Promise<VisualGuidance> {
-    console.log("[GeminiVision] Analyzing step execution:", currentStep.stepNumber);
+    const phaseStartTime = Date.now();
+    console.log("[GeminiVision] ========================================");
+    console.log("[GeminiVision] PHASE 2: Analyzing step execution");
+    console.log("[GeminiVision] Step:", currentStep.stepNumber, "-", currentStep.description);
+    console.log("[GeminiVision] ========================================");
 
     try {
+      // PHASE 1: Clarify what to look for
+      const clarifiedDescription = await this.clarifyTargetElement(currentStep.description);
+      console.log("[GeminiVision] Using clarified description for detection");
+
       const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
 
-      const prompt = `You are helping a user complete this specific action:
+      const prompt = `You are helping a user find a SPECIFIC UI element on their screen.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TARGET ELEMENT TO FIND:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"${clarifiedDescription}"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONTEXT - What the user is trying to do:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step ${currentStep.stepNumber}: "${currentStep.description}"
+
+CRITICAL: You're looking for: "${clarifiedDescription}"
+NOT just anything related to: "${currentStep.description}"
+
+Your job: Look at the screenshot and locate the UI element described above with precise bounding box coordinates.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HELPING A USER COMPLETE THIS SPECIFIC ACTION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CURRENT STEP (your focus):
@@ -579,6 +677,9 @@ Note: boundingBox is null because element requires scrolling to be visible
       const text = result.response.text();
       const parsed = VisualGuidanceSchema.parse(JSON.parse(text));
 
+      // Add clarified description to response (from Phase 1)
+      parsed.clarifiedDescription = clarifiedDescription;
+
       // Convert normalized coordinates (0.0-1.0) to pixel coordinates
       if (imageDimensions && parsed.element?.boundingBox) {
         const normalized = { ...parsed.element.boundingBox };
@@ -637,12 +738,31 @@ Note: boundingBox is null because element requires scrolling to be visible
       }
 
       // Comprehensive logging for debugging
+      const totalTimeMs = Date.now() - phaseStartTime;
+      console.log("[GeminiVision] ========================================");
+      console.log("[GeminiVision] Detection complete:");
+      console.log("[GeminiVision] ========================================");
+      console.log("[GeminiVision] Original step:", currentStep.description);
+      console.log("[GeminiVision] Clarified (what we looked for):", clarifiedDescription);
+      console.log("[GeminiVision] Found element:", {
+        type: parsed.element?.type,
+        label: parsed.element?.label,
+        confidence: parsed.element?.confidence,
+        hasBoundingBox: !!parsed.element?.boundingBox,
+        boundingBox: parsed.element?.boundingBox,
+      });
+      console.log("[GeminiVision] Overall confidence:", parsed.confidence);
+      console.log("[GeminiVision] Total processing time:", totalTimeMs, "ms");
+      console.log("[GeminiVision] ========================================");
+
+      // Detailed response logging
       console.log("[GeminiVision] Visual guidance generated:", {
         elementDescription: parsed.elementDescription?.substring(0, 100) + "...",
         visualContext: parsed.visualContext?.substring(0, 100) + "...",
         conversationalMessage: parsed.conversationalMessage,
         conversationalMessageLength: parsed.conversationalMessage?.length || 0,
         confidence: parsed.confidence,
+        clarifiedDescription: parsed.clarifiedDescription?.substring(0, 100) + "...",
         hasElement: !!parsed.element,
         hasBoundingBox: !!parsed.element?.boundingBox,
         boundingBox: parsed.element?.boundingBox,

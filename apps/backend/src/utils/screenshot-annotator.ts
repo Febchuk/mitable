@@ -12,7 +12,8 @@ interface BoundingBox {
 interface AnnotationOptions {
   label: string; // Element description
   confidence: number; // 0-1
-  instruction?: string; // User's original question
+  instruction?: string; // User's original question or step description
+  clarifiedDescription?: string; // Phase 1: Detailed visual description of what to look for
   elementType?: string; // button, input, etc.
 }
 
@@ -89,6 +90,8 @@ export class ScreenshotAnnotator {
     const analysisData = {
       timestamp: new Date().toISOString(),
       instruction: options.instruction,
+      clarifiedDescription: options.clarifiedDescription, // Phase 1: What Gemini was asked to find
+      whatGeminiWasAskedToFind: options.clarifiedDescription || options.instruction,
       element: {
         label: options.label,
         type: options.elementType,
