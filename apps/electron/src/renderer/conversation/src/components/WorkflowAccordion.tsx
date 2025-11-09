@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -46,6 +46,15 @@ export function WorkflowAccordion({
   // Determine if we're in pre-flight mode (workflow not started yet)
   const isPreFlight = workflow.currentStepIndex === -1;
 
+  console.log("[WorkflowAccordion] Render:", {
+    currentStepIndex: workflow.currentStepIndex,
+    status: workflow.status,
+    isPreFlight,
+    awaitingCustomQuestion,
+    workflowLoadingMessage,
+    isStreaming,
+  });
+
   // Accordion is always expanded by default (and non-collapsible in pre-flight)
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -53,6 +62,13 @@ export function WorkflowAccordion({
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(
     new Set([workflow.currentStepIndex])
   );
+
+  // Auto-expand current step when workflow progresses
+  useEffect(() => {
+    if (workflow.currentStepIndex >= 0) {
+      setExpandedSteps((prev) => new Set(prev).add(workflow.currentStepIndex));
+    }
+  }, [workflow.currentStepIndex]);
 
   // Group messages by their related step index
   const messagesByStep = useMemo(() => {
@@ -141,6 +157,15 @@ export function WorkflowAccordion({
               // In pre-flight mode, nothing is expandable
               const isExpandable = !isPreFlight && (hasMessages || isCurrentStep);
 
+              console.log(`[WorkflowAccordion] Step ${idx}:`, {
+                isCurrentStep,
+                isCompleted,
+                isPending,
+                hasMessages,
+                isExpandable,
+                willShowContent: !isPreFlight && isCurrentStep,
+              });
+
               return (
                 <div
                   key={idx}
@@ -210,8 +235,8 @@ export function WorkflowAccordion({
                       ))}
                   </button>
 
-                  {/* Step content - never show in pre-flight, show in active when current or expanded */}
-                  {!isPreFlight && (isCurrentStep || expandedSteps.has(idx)) && (
+                  {/* Step content - always show for current step, or when manually expanded */}
+                  {!isPreFlight && isCurrentStep && (
                     <div className="step-content border-t border-[#3A3A45] px-4 pb-4 pt-3">
                       {/* Plan adjustment notice if applicable */}
                       {isCurrentStep && workflow.adjustmentHistory.length > 0 && (
@@ -279,6 +304,12 @@ export function WorkflowAccordion({
                       {/* WorkflowOptions - ONLY in current step when active and not loading */}
                       {isCurrentStep && workflow.status === "active" && !workflowLoadingMessage && (
                         <div className="mt-3">
+                          {console.log("[WorkflowAccordion] Rendering WorkflowOptions in step", idx, {
+                            isCurrentStep,
+                            status: workflow.status,
+                            awaitingCustomQuestion,
+                            currentStepIndex: workflow.currentStepIndex,
+                          })}
                           <WorkflowOptions
                             phase={"step_progression" as WorkflowPhase}
                             onOptionSelect={onOptionSelect}

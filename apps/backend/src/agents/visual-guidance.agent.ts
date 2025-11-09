@@ -9,6 +9,12 @@ import { ClarifyIntentTool } from "../tools/clarify-intent.tool";
 import { StartUIGuidanceWorkflowTool } from "../tools/start-ui-guidance-workflow.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
 import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool";
+import {
+  DEMO_MODE,
+  createDemoWorkflowSolution,
+  getDemoStepMessage,
+  getDemoCustomQuestionResponse,
+} from "../config/demo-workflow.config.js";
 
 /**
  * Visual Guidance Agent
@@ -112,7 +118,54 @@ export class VisualGuidanceAgent extends BaseAgent {
 
       // Handle metadata-driven routing (deterministic)
       if (context.metadata?.workflowAction === "progress_step") {
-        // User clicked "Move on to next step" - progress workflow
+        // DEMO MODE: Use hardcoded step progression
+        if (DEMO_MODE && context.workflowState) {
+          console.log("[VisualGuidanceAgent] DEMO MODE: Step progression");
+          const newStepIndex = context.workflowState.currentStepIndex + 1;
+
+          // Check if we've completed all steps
+          if (newStepIndex >= context.workflowState.stepList.length) {
+            yield {
+              type: "complete",
+              messageType: "text",
+              content:
+                "Congratulations! You've completed all the steps. Your development environment is now set up and ready to use!",
+            };
+            return;
+          }
+
+          // Update step statuses
+          const updatedStepList = context.workflowState.stepList.map((step, idx) => ({
+            ...step,
+            status:
+              idx < newStepIndex ? "completed" : idx === newStepIndex ? "current" : "pending",
+          }));
+
+          // Get the hardcoded message for this step
+          const stepMessage = getDemoStepMessage(newStepIndex + 1); // +1 because step numbers are 1-indexed
+
+          // Create updated workflow state
+          const updatedWorkflowState = {
+            ...context.workflowState,
+            currentStepIndex: newStepIndex,
+            stepList: updatedStepList,
+            status: "active",
+          };
+
+          yield {
+            type: "complete",
+            messageType: "workflow",
+            content: stepMessage,
+            cardData: {
+              ...updatedWorkflowState,
+              workflowActive: true,
+              currentPhase: "step_progression",
+            },
+          };
+          return;
+        }
+
+        // Normal mode: Use GuideNextStepTool
         const result = await this.guideNextStepTool.execute(
           {
             conversationId: context.conversationId,
@@ -134,6 +187,30 @@ export class VisualGuidanceAgent extends BaseAgent {
       // Workflow context makes questions like "Why this step?" clear
       // Only handle workflow questions if workflow is ACTIVE (not paused)
       if (context.workflowState && context.workflowState.status === "active") {
+        // DEMO MODE: Use hardcoded custom question responses
+        if (DEMO_MODE) {
+          console.log("[VisualGuidanceAgent] DEMO MODE: Custom question");
+          const currentStepIndex = context.workflowState.currentStepIndex;
+          const responseContent = getDemoCustomQuestionResponse(
+            currentStepIndex + 1, // +1 because step numbers are 1-indexed
+            lastUserMessage.content
+          );
+
+          yield {
+            type: "complete",
+            messageType: "workflow",
+            content: responseContent,
+            cardData: {
+              ...context.workflowState,
+              status: "active",
+              workflowActive: true,
+              currentPhase: "step_progression", // After answering, show WorkflowOptions again
+            },
+          };
+          return;
+        }
+
+        // Normal mode: Classify question and route appropriately
         const questionType = await this.classifyWorkflowQuestion(lastUserMessage.content);
 
         console.log(`[VisualGuidanceAgent] Routing workflow question: ${questionType}`, {
@@ -211,6 +288,36 @@ export class VisualGuidanceAgent extends BaseAgent {
 
       // Start new workflow: STEP 1 - Search knowledge, STEP 2 - Synthesize workflow with GPT-4
       console.log("[VisualGuidanceAgent] Starting knowledge-grounded workflow");
+
+      // DEMO MODE: Use hardcoded workflow instead of generating one
+      if (DEMO_MODE) {
+        console.log("[VisualGuidanceAgent] DEMO MODE: Creating hardcoded workflow");
+
+        // Create the demo workflow solution
+        const demoSolution = createDemoWorkflowSolution();
+
+        // Execute the start workflow tool with the hardcoded solution
+        const workflowResult = await this.startWorkflowTool.execute(
+          {
+            solution: demoSolution.solution,
+            solutionExplanation: demoSolution.solutionExplanation,
+            supportingData: demoSolution.supportingData,
+            searchQuery: demoSolution.searchQuery,
+            supportingDataExplanation: demoSolution.supportingDataExplanation,
+            stepList: demoSolution.stepList,
+          },
+          context
+        );
+
+        yield {
+          type: "complete",
+          messageType: workflowResult.messageType,
+          content: workflowResult.content,
+          cardData: workflowResult.cardData,
+          windowTrigger: workflowResult.triggerWindow,
+        };
+        return;
+      }
 
       // Emit progress event: Searching knowledge base
       yield {
