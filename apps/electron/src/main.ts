@@ -17,6 +17,9 @@ let overlayWindow: BrowserWindow | null = null;
 let guideWindow: BrowserWindow | null = null; // Not reassigned yet, but used in window management logic
 let nudgeWindow: BrowserWindow | null = null;
 
+// API Configuration
+const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
+
 // Auth token storage (shared across all windows)
 const authTokens: {
   accessToken: string | null;
@@ -26,33 +29,79 @@ const authTokens: {
   refreshToken: null,
 };
 
-// PII Redaction Helper - calls backend API
+// PII Redaction Helper - calls backend API with authentication, retry, and timeout
 async function redactPII(screenshot: string): Promise<string> {
-  try {
-    console.log("[PII] Redacting screenshot...");
-    const response = await fetch("http://localhost:3000/api/pii/redact", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ screenshot }),
-    });
+  const MAX_RETRIES = 2;
+  const TIMEOUT_MS = 30000; // 30 seconds
+  const RETRY_DELAY_MS = 1000; // 1 second
 
-    if (!response.ok) {
-      console.error("[PII] Redaction failed:", response.status, response.statusText);
-      return screenshot; // Return original on failure (graceful degradation)
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[PII] Redacting screenshot (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
+
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+      try {
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+
+        // Add authentication if available
+        if (authTokens.accessToken) {
+          headers["Authorization"] = `Bearer ${authTokens.accessToken}`;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/pii/redact`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ screenshot }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => response.statusText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log("[PII] Redaction complete:", {
+          piiCount: data.piiCount,
+          cached: data.cached,
+          detectionTime: data.detectionTime,
+          attempt: attempt + 1,
+        });
+
+        return data.redactedScreenshot || screenshot;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        throw fetchError;
+      }
+    } catch (error) {
+      const isLastAttempt = attempt === MAX_RETRIES;
+      const isTimeout = error instanceof Error && error.name === "AbortError";
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+
+      console.error(`[PII] Redaction attempt ${attempt + 1} failed:`, errorMsg);
+
+      if (isLastAttempt) {
+        console.error("[PII] All retry attempts exhausted, returning original screenshot");
+        return screenshot; // Graceful degradation
+      }
+
+      // Wait before retrying (unless it's a timeout, then retry immediately)
+      if (!isTimeout) {
+        console.log(`[PII] Retrying in ${RETRY_DELAY_MS}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      }
     }
-
-    const data = await response.json();
-    console.log("[PII] Redaction complete:", {
-      piiCount: data.piiCount,
-      cached: data.cached,
-      detectionTime: data.detectionTime,
-    });
-
-    return data.redactedScreenshot || screenshot;
-  } catch (error) {
-    console.error("[PII] Redaction error:", error);
-    return screenshot; // Return original on error (graceful degradation)
   }
+
+  // This should never be reached, but TypeScript needs it
+  return screenshot;
 }
 
 function createAgentWindow() {
@@ -569,7 +618,6 @@ function setupIPC() {
       }
 
       // Fetch from backend (without messages for performance)
-      const API_BASE_URL = "http://localhost:3000"; // TODO: Move to config
       const response = await fetch(`${API_BASE_URL}/api/conversations?includeMessages=false`, {
         headers: { Authorization: `Bearer ${authTokens.accessToken}` },
       });
