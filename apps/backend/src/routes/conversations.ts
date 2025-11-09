@@ -5,6 +5,8 @@ import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
 import { OrchestratorService } from "../services/orchestrator.service";
 import { workflowService } from "../services/workflow.service";
+import { ScreenshotAnnotator } from "../utils/screenshot-annotator";
+import { coordinateConverterService } from "../services/coordinate-converter.service";
 
 // Initialize orchestrator (replaces old agentService)
 const orchestrator = new OrchestratorService();
@@ -937,6 +939,21 @@ router.post(
           // Send enriched chunk to client
           res.write(`data: ${JSON.stringify(enrichedChunk)}\n\n`);
 
+          // Emit separate window_trigger event if windowTrigger is embedded in complete chunk
+          if (chunk.type === "complete" && (chunk as any).windowTrigger) {
+            const windowTriggerEvent = {
+              type: "window_trigger",
+              windowTrigger: (chunk as any).windowTrigger,
+            };
+
+            console.log("[Conversations] Emitting window_trigger event:", {
+              window: (chunk as any).windowTrigger.window,
+              hasData: !!(chunk as any).windowTrigger.data,
+            });
+
+            res.write(`data: ${JSON.stringify(windowTriggerEvent)}\n\n`);
+          }
+
           // Accumulate content and metadata for database save
           if (chunk.type === "chunk" && chunk.content) {
             assistantContent += chunk.content;
@@ -1005,6 +1022,71 @@ router.post(
             { cardData: finalCardData, sources: assistantSources, workflowAction: metadata?.workflowAction }
           );
           console.log(`[Stream] Workflow interaction saved for assistant response (${interactionType})`);
+        }
+
+        // Debug: Save annotated screenshot if enabled and has visual guidance
+        if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true') {
+          console.log('[DEBUG SCREENSHOT] Debug mode active, checking conditions:', {
+            envVariableSet: process.env.DEBUG_SAVE_SCREENSHOTS === 'true',
+            hasScreenshot: !!screenshot,
+            hasMetadata: !!screenshotMetadata,
+            hasVisualGuidance: !!finalCardData?.visualGuidance,
+            hasElement: !!finalCardData?.visualGuidance?.element,
+            hasBoundingBox: !!finalCardData?.visualGuidance?.element?.boundingBox,
+            boundingBoxValue: finalCardData?.visualGuidance?.element?.boundingBox,
+          });
+
+          if (screenshot && screenshotMetadata) {
+            try {
+              // Check if the response has visual guidance data with bounding box
+              const visualGuidance = finalCardData?.visualGuidance;
+              if (visualGuidance?.element?.boundingBox) {
+                console.log('[DEBUG SCREENSHOT] All conditions met, saving annotated screenshot');
+                const annotator = new ScreenshotAnnotator();
+
+                // Convert pixel coordinates back to normalized for annotation
+                // (gemini-vision.service.ts already converted normalized → pixels for overlay rendering)
+                const normalizedBoundingBox = coordinateConverterService.convertToNormalized(
+                  visualGuidance.element.boundingBox,
+                  {
+                    width: screenshotMetadata.width,
+                    height: screenshotMetadata.height,
+                  }
+                );
+
+                console.log('[DEBUG SCREENSHOT] Coordinate conversion for annotation:', {
+                  pixels: visualGuidance.element.boundingBox,
+                  normalized: normalizedBoundingBox,
+                });
+
+                const result = await annotator.annotate(
+                  screenshot,
+                  normalizedBoundingBox,
+                  {
+                    width: screenshotMetadata.width,
+                    height: screenshotMetadata.height,
+                  },
+                  {
+                    label: visualGuidance.elementDescription || visualGuidance.element.label || 'Target Element',
+                    confidence: visualGuidance.element.confidence || 0.5,
+                    instruction: content,
+                    elementType: visualGuidance.element.type,
+                  }
+                );
+                console.log('[DEBUG SCREENSHOT] Screenshot saved successfully:', result);
+              } else {
+                console.warn('[DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response');
+              }
+            } catch (debugError) {
+              console.error('[DEBUG SCREENSHOT] Failed to save annotated screenshot:', debugError);
+              // Don't fail the request, just log the error
+            }
+          } else {
+            console.warn('[DEBUG SCREENSHOT] Skipping annotation - missing screenshot or metadata', {
+              hasScreenshot: !!screenshot,
+              hasMetadata: !!screenshotMetadata,
+            });
+          }
         }
 
         // Generate conversation title if this is the first exchange

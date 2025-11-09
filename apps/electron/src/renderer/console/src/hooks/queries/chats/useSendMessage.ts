@@ -8,6 +8,7 @@ export interface SendMessageOptions {
   onChunk?: (content: string) => void;
   onComplete?: (fullContent: string) => void;
   onError?: (error: string) => void;
+  onWindowTrigger?: (window: string, data: any) => void;
   captureScreenshot?: boolean; // Whether to capture screenshot before sending
 }
 
@@ -21,11 +22,13 @@ export function useSendMessage(options?: SendMessageOptions) {
       content,
       metadata,
       screenshot: providedScreenshot,
+      screenshotMetadata,
     }: {
       chatId: string;
       content: string;
       metadata?: any;
       screenshot?: string | null;
+      screenshotMetadata?: any;
     }) => {
       const token = authService.getAccessToken();
 
@@ -34,6 +37,7 @@ export function useSendMessage(options?: SendMessageOptions) {
         contentLength: content.length,
         hasMetadata: !!metadata,
         hasProvidedScreenshot: !!providedScreenshot,
+        hasScreenshotMetadata: !!screenshotMetadata,
         captureScreenshotOption: options?.captureScreenshot,
         hasWindow: typeof window !== "undefined",
         hasConsoleAPI: typeof window !== "undefined" && !!window.consoleAPI,
@@ -81,10 +85,13 @@ export function useSendMessage(options?: SendMessageOptions) {
         onError: (error: string) => {
           options?.onError?.(error);
         },
+        onWindowTrigger: (window: string, data: any) => {
+          options?.onWindowTrigger?.(window, data);
+        },
       };
 
-      // Start streaming with optional screenshot and metadata
-      await sendStreamingMessage(chatId, content, callbacks, token, screenshot, metadata);
+      // Start streaming with optional screenshot, metadata, and screenshotMetadata
+      await sendStreamingMessage(chatId, content, callbacks, token, screenshot, metadata, screenshotMetadata);
     },
 
     // Optimistic update for user message

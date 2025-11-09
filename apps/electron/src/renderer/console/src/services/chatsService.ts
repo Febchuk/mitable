@@ -99,10 +99,14 @@ export async function sendMessage(
  * Stream chunk from SSE
  */
 export interface StreamChunk {
-  type: "chunk" | "complete" | "error" | "done";
+  type: "chunk" | "complete" | "error" | "done" | "window_trigger";
   content?: string;
   messageId?: string;
   error?: string;
+  windowTrigger?: {
+    window: string;
+    data: any;
+  };
 }
 
 /**
@@ -113,6 +117,7 @@ export interface StreamCallbacks {
   onComplete?: (fullContent: string) => void;
   onDone?: (messageId: string) => void;
   onError?: (error: string) => void;
+  onWindowTrigger?: (window: string, data: any) => void;
 }
 
 /**
@@ -128,6 +133,7 @@ export interface StreamCallbacks {
  * @param token - Auth token
  * @param screenshot - Optional base64-encoded screenshot for workflow context
  * @param metadata - Optional metadata for workflow actions (workflowAction, selectedOption)
+ * @param screenshotMetadata - Optional screenshot metadata (dimensions, scaleFactor, etc.)
  * @returns Promise that resolves when streaming completes
  */
 export async function sendStreamingMessage(
@@ -136,18 +142,22 @@ export async function sendStreamingMessage(
   callbacks: StreamCallbacks,
   token: string,
   screenshot?: string,
-  metadata?: any
+  metadata?: any,
+  screenshotMetadata?: any
 ): Promise<void> {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
   return new Promise((resolve, reject) => {
     // Build request body
-    const requestBody: { content: string; screenshot?: string; metadata?: any } = { content };
+    const requestBody: { content: string; screenshot?: string; metadata?: any; screenshotMetadata?: any } = { content };
     if (screenshot) {
       requestBody.screenshot = screenshot;
     }
     if (metadata) {
       requestBody.metadata = metadata;
+    }
+    if (screenshotMetadata) {
+      requestBody.screenshotMetadata = screenshotMetadata;
     }
 
     // Use fetch with streaming instead of EventSource for better control
@@ -201,11 +211,20 @@ export async function sendStreamingMessage(
                     callbacks.onChunk?.(chunk.content);
                   } else if (chunk.type === "complete" && chunk.content) {
                     callbacks.onComplete?.(chunk.content);
+                    // Also process embedded windowTrigger in complete chunks
+                    if ((chunk as any).windowTrigger) {
+                      callbacks.onWindowTrigger?.(
+                        (chunk as any).windowTrigger.window,
+                        (chunk as any).windowTrigger.data
+                      );
+                    }
                   } else if (chunk.type === "done" && chunk.messageId) {
                     callbacks.onDone?.(chunk.messageId);
                   } else if (chunk.type === "error" && chunk.error) {
                     callbacks.onError?.(chunk.error);
                     reject(new Error(chunk.error));
+                  } else if (chunk.type === "window_trigger" && chunk.windowTrigger) {
+                    callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
                   }
                 } catch (parseError) {
                   console.error("Error parsing SSE data:", parseError, data);

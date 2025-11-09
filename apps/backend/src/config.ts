@@ -1,9 +1,37 @@
 import dotenv from "dotenv";
+import minimist from "minimist";
+import { createServer } from "net";
 
 dotenv.config();
 
+// Parse CLI arguments
+// Supported flags: --backend-port, --port
+const argv = minimist(process.argv.slice(2));
+
+// Determine port with priority: CLI args > PORT env var > 3000
+const getPort = (): number => {
+  const cliPort = argv["backend-port"] || argv.port;
+  if (cliPort) {
+    const parsed = parseInt(String(cliPort), 10);
+    if (isNaN(parsed) || parsed < 1 || parsed > 65535) {
+      throw new Error(
+        `Invalid port number: ${cliPort}. Port must be between 1 and 65535.`
+      );
+    }
+    return parsed;
+  }
+
+  if (process.env.PORT) {
+    return parseInt(process.env.PORT, 10);
+  }
+
+  return 3000;
+};
+
+const PORT = getPort();
+
 export const config = {
-  port: process.env.PORT || 3000,
+  port: PORT,
   nodeEnv: process.env.NODE_ENV || "development",
 
   // Database Configuration
@@ -49,7 +77,7 @@ export const config = {
     clientId: (process.env.SLACK_CLIENT_ID || "").trim(),
     clientSecret: (process.env.SLACK_CLIENT_SECRET || "").trim(),
     redirectUri: (
-      process.env.SLACK_REDIRECT_URI || "http://localhost:3000/api/integrations/slack/callback"
+      process.env.SLACK_REDIRECT_URI || `http://localhost:${PORT}/api/integrations/slack/callback`
     ).trim(),
   },
 
@@ -58,7 +86,7 @@ export const config = {
     clientId: (process.env.NOTION_CLIENT_ID || "").trim(),
     clientSecret: (process.env.NOTION_CLIENT_SECRET || "").trim(),
     redirectUri: (
-      process.env.NOTION_REDIRECT_URI || "http://localhost:3000/api/integrations/notion/callback"
+      process.env.NOTION_REDIRECT_URI || `http://localhost:${PORT}/api/integrations/notion/callback`
     ).trim(),
     // Notion uses versioned API - must include in all requests
     apiVersion: "2022-06-28",
@@ -111,6 +139,32 @@ export function validateVectorDimensions(embeddingDimensions: number) {
         `Either change the embedding model or recreate the Pinecone index with matching dimensions.`
     );
   }
+}
+
+/**
+ * Check if a port is available
+ * Returns a promise that resolves to true if available, false if in use
+ */
+export function checkPortAvailability(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = createServer();
+
+    server.once("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        resolve(false);
+      } else {
+        // Other errors (permission, etc.) - treat as unavailable
+        resolve(false);
+      }
+    });
+
+    server.once("listening", () => {
+      server.close();
+      resolve(true);
+    });
+
+    server.listen(port);
+  });
 }
 
 // Validate config on module load in production

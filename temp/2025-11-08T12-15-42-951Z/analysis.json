@@ -1,0 +1,34 @@
+{
+  "timestamp": "2025-11-08T12:15:43.120Z",
+  "instruction": "Yes, let's get started!",
+  "element": {
+    "label": "To proceed after reviewing the login step, click the option that says 'Yes, let's get started!'",
+    "type": "button",
+    "confidence": 0.95,
+    "boundingBox": {
+      "normalized": {
+        "x": 0.3078125,
+        "y": 0.8379629629629629,
+        "width": 0.39479166666666665,
+        "height": 0.04259259259259259
+      },
+      "pixels": {
+        "x": 591,
+        "y": 904.9999999999999,
+        "width": 758,
+        "height": 46
+      }
+    }
+  },
+  "screenshot": {
+    "dimensions": {
+      "width": 1920,
+      "height": 1080
+    },
+    "files": {
+      "original": "original.png",
+      "annotated": "annotated.png",
+      "analysis": "analysis.json"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "timestamp": "2025-11-08T10:17:09.685Z",
+  "instruction": "Move on to next step",
+  "element": {
+    "label": "The 'Liked Songs' playlist, located in the sidebar under the 'Your Library' section.",
+    "type": "button",
+    "confidence": 0.95,
+    "boundingBox": {
+      "normalized": {
+        "x": 0.145,
+        "y": 0.472,
+        "width": 0.12,
+        "height": 0.036
+      },
+      "pixels": {
+        "x": 278.4,
+        "y": 509.76,
+        "width": 230.39999999999998,
+        "height": 38.879999999999995
+      }
+    }
+  },
+  "screenshot": {
+    "dimensions": {
+      "width": 1920,
+      "height": 1080
+    },
+    "files": {
+      "original": "original.png",
+      "annotated": "annotated.png",
+      "analysis": "analysis.json"
+    }
+  }
+}

@@ -82,7 +82,7 @@ export interface Source {
  * Window trigger data for launching UI windows
  */
 export interface WindowTrigger {
-  window: "nudge" | "guide";
+  window: "nudge" | "guide" | "overlay";
   data: Record<string, any>;
 }
 

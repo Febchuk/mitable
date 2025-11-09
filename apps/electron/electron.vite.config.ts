@@ -2,6 +2,20 @@ import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "path";
 
+// Get frontend port from environment variable or CLI arg, fallback to 5173
+// Priority: VITE_PORT env var > 5173 (default)
+const getVitePort = (): number => {
+  if (process.env.VITE_PORT) {
+    const parsed = parseInt(process.env.VITE_PORT, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 65535) {
+      return parsed;
+    }
+  }
+  return 5173;
+};
+
+const VITE_PORT = getVitePort();
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
@@ -34,6 +48,10 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, "src/renderer"),
+    server: {
+      port: VITE_PORT,
+      strictPort: true, // Fail if port is already in use (no auto-increment)
+    },
     resolve: {
       alias: {
         "@": resolve(__dirname, "src/renderer"),

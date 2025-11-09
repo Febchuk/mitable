@@ -52,7 +52,7 @@ export interface Message {
   };
   sources?: any[];
   windowTrigger?: {
-    window: "nudge" | "guide";
+    window: "nudge" | "guide" | "overlay";
     data: any;
   };
 }

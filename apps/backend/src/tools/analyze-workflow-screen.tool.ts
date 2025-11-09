@@ -137,7 +137,10 @@ BEHAVIOR:
         context.screenshot,
         currentSolution,
         currentStep,
-        context.conversationHistory
+        context.conversationHistory,
+        context.screenshotMetadata
+          ? { width: context.screenshotMetadata.width, height: context.screenshotMetadata.height }
+          : undefined
       );
 
       console.log("[AnalyzeWorkflowScreenTool] Visual analysis complete:", {
@@ -156,7 +159,24 @@ ${visualGuidance.confidence === "low" ? "\n\n*Note: I'm having some difficulty a
 
       console.log("[AnalyzeWorkflowScreenTool] Troubleshooting guidance generated");
 
-      // Step 4: Return without progressing workflow
+      // Step 4: Prepare window trigger for overlay if bounding boxes present
+      const windowTrigger = visualGuidance?.element?.boundingBox ? {
+        window: "overlay" as const,
+        data: {
+          boundingBox: visualGuidance.element.boundingBox,
+          label: visualGuidance.element.label,
+          instruction: visualGuidance.conversationalMessage,
+          elementType: visualGuidance.element.type,
+        },
+      } : undefined;
+
+      console.log("[AnalyzeWorkflowScreenTool] Window trigger:", {
+        hasWindowTrigger: !!windowTrigger,
+        hasBoundingBox: !!visualGuidance?.element?.boundingBox,
+        boundingBox: visualGuidance?.element?.boundingBox,
+      });
+
+      // Step 5: Return without progressing workflow
       // Note: We DON'T update currentStepIndex or step statuses
       // Return with workflow state preserved so WorkflowOptions remains visible
       return {
@@ -166,7 +186,9 @@ ${visualGuidance.confidence === "low" ? "\n\n*Note: I'm having some difficulty a
           ...currentSolution,
           workflowActive: true,
           workflowPhase: "custom_question", // Triggers Q&A UI mode (hides step list, shows Q&A options)
+          visualGuidance: visualGuidance, // Include full visual guidance with bounding boxes
         },
+        triggerWindow: windowTrigger, // Trigger overlay if bounding boxes present
         streamable: true,
       };
     } catch (error) {

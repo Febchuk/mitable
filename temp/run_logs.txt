@@ -1,0 +1,990 @@
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "interpretations": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "task": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "confidence": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "high",
+@mitable/backend:dev:               "medium",
+@mitable/backend:dev:               "low"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "reasoning": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "task",
+@mitable/backend:dev:           "confidence",
+@mitable/backend:dev:           "reasoning"
+@mitable/backend:dev:         ],
+@mitable/backend:dev:         "additionalProperties": false
+@mitable/backend:dev:       }
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "interpretations"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "interpretations": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "task": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "confidence": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "high",
+@mitable/backend:dev:               "medium",
+@mitable/backend:dev:               "low"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "reasoning": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "task",
+@mitable/backend:dev:           "confidence",
+@mitable/backend:dev:           "reasoning"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       }
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "interpretations"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "elementDescription": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "visualContext": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "confidence": {
+@mitable/backend:dev:       "type": "string",
+@mitable/backend:dev:       "enum": [
+@mitable/backend:dev:         "high",
+@mitable/backend:dev:         "medium",
+@mitable/backend:dev:         "low"
+@mitable/backend:dev:       ]
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "alternativeElements": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "conversationalMessage": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "element": {
+@mitable/backend:dev:       "type": "object",
+@mitable/backend:dev:       "properties": {
+@mitable/backend:dev:         "label": {
+@mitable/backend:dev:           "type": "string"
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "type": {
+@mitable/backend:dev:           "type": "string"
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "boundingBox": {
+@mitable/backend:dev:           "anyOf": [
+@mitable/backend:dev:             {
+@mitable/backend:dev:               "type": "object",
+@mitable/backend:dev:               "properties": {
+@mitable/backend:dev:                 "x": {
+@mitable/backend:dev:                   "type": "number"
+@mitable/backend:dev:                 },
+@mitable/backend:dev:                 "y": {
+@mitable/backend:dev:                   "type": "number"
+@mitable/backend:dev:                 },
+@mitable/backend:dev:                 "width": {
+@mitable/backend:dev:                   "type": "number"
+@mitable/backend:dev:                 },
+@mitable/backend:dev:                 "height": {
+@mitable/backend:dev:                   "type": "number"
+@mitable/backend:dev:                 }
+@mitable/backend:dev:               },
+@mitable/backend:dev:               "required": [
+@mitable/backend:dev:                 "x",
+@mitable/backend:dev:                 "y",
+@mitable/backend:dev:                 "width",
+@mitable/backend:dev:                 "height"
+@mitable/backend:dev:               ],
+@mitable/backend:dev:               "additionalProperties": false
+@mitable/backend:dev:             },
+@mitable/backend:dev:             {
+@mitable/backend:dev:               "type": "null"
+@mitable/backend:dev:             }
+@mitable/backend:dev:           ]
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "confidence": {
+@mitable/backend:dev:           "type": "number"
+@mitable/backend:dev:         }
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "required": [
+@mitable/backend:dev:         "label",
+@mitable/backend:dev:         "type",
+@mitable/backend:dev:         "boundingBox",
+@mitable/backend:dev:         "confidence"
+@mitable/backend:dev:       ],
+@mitable/backend:dev:       "additionalProperties": false
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "elementDescription",
+@mitable/backend:dev:     "visualContext",
+@mitable/backend:dev:     "confidence",
+@mitable/backend:dev:     "conversationalMessage",
+@mitable/backend:dev:     "element"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔄 Converting anyOf nullable: [{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"},"width":{"type":"number"},"height":{"type":"number"}},"required":["x","y","width","height"],"additionalProperties":false},{"type":"null"}]
+@mitable/backend:dev:   ✓ Converted to: {"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"},"width":{"type":"number"},"height":{"type":"number"}},"required":["x","y","width","height"],"nullable":true}
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "elementDescription": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "visualContext": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "confidence": {
+@mitable/backend:dev:       "type": "string",
+@mitable/backend:dev:       "enum": [
+@mitable/backend:dev:         "high",
+@mitable/backend:dev:         "medium",
+@mitable/backend:dev:         "low"
+@mitable/backend:dev:       ]
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "alternativeElements": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "conversationalMessage": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "element": {
+@mitable/backend:dev:       "type": "object",
+@mitable/backend:dev:       "properties": {
+@mitable/backend:dev:         "label": {
+@mitable/backend:dev:           "type": "string"
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "type": {
+@mitable/backend:dev:           "type": "string"
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "boundingBox": {
+@mitable/backend:dev:           "type": "object",
+@mitable/backend:dev:           "properties": {
+@mitable/backend:dev:             "x": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "y": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "width": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             },
+@mitable/backend:dev:             "height": {
+@mitable/backend:dev:               "type": "number"
+@mitable/backend:dev:             }
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "required": [
+@mitable/backend:dev:             "x",
+@mitable/backend:dev:             "y",
+@mitable/backend:dev:             "width",
+@mitable/backend:dev:             "height"
+@mitable/backend:dev:           ],
+@mitable/backend:dev:           "nullable": true
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "confidence": {
+@mitable/backend:dev:           "type": "number"
+@mitable/backend:dev:         }
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "required": [
+@mitable/backend:dev:         "label",
+@mitable/backend:dev:         "type",
+@mitable/backend:dev:         "boundingBox",
+@mitable/backend:dev:         "confidence"
+@mitable/backend:dev:       ]
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "elementDescription",
+@mitable/backend:dev:     "visualContext",
+@mitable/backend:dev:     "confidence",
+@mitable/backend:dev:     "conversationalMessage",
+@mitable/backend:dev:     "element"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "needsAdjustment": {
+@mitable/backend:dev:       "type": "boolean"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustedStepList": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "stepNumber": {
+@mitable/backend:dev:             "type": "integer",
+@mitable/backend:dev:             "exclusiveMinimum": 0
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "description": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "status": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "pending",
+@mitable/backend:dev:               "current",
+@mitable/backend:dev:               "completed"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "stepNumber",
+@mitable/backend:dev:           "description",
+@mitable/backend:dev:           "status"
+@mitable/backend:dev:         ],
+@mitable/backend:dev:         "additionalProperties": false
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustmentReason": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "needsAdjustment"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "needsAdjustment": {
+@mitable/backend:dev:       "type": "boolean"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustedStepList": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "stepNumber": {
+@mitable/backend:dev:             "type": "integer"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "description": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "status": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "pending",
+@mitable/backend:dev:               "current",
+@mitable/backend:dev:               "completed"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "stepNumber",
+@mitable/backend:dev:           "description",
+@mitable/backend:dev:           "status"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustmentReason": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "needsAdjustment"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideGenerationService] Initialized 3 pre-defined guides
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "array",
+@mitable/backend:dev:   "items": {
+@mitable/backend:dev:     "type": "object",
+@mitable/backend:dev:     "properties": {
+@mitable/backend:dev:       "weekNumber": {
+@mitable/backend:dev:         "type": "integer",
+@mitable/backend:dev:         "minimum": 1
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "title": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "minLength": 1,
+@mitable/backend:dev:         "maxLength": 255
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "description": {
+@mitable/backend:dev:         "type": [
+@mitable/backend:dev:           "string",
+@mitable/backend:dev:           "null"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "timeEstimate": {
+@mitable/backend:dev:         "anyOf": [
+@mitable/backend:dev:           {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "maxLength": 50
+@mitable/backend:dev:           },
+@mitable/backend:dev:           {
+@mitable/backend:dev:             "type": "null"
+@mitable/backend:dev:           }
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "orderIndex": {
+@mitable/backend:dev:         "type": "integer",
+@mitable/backend:dev:         "minimum": 0
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "required": [
+@mitable/backend:dev:       "weekNumber",
+@mitable/backend:dev:       "title",
+@mitable/backend:dev:       "description",
+@mitable/backend:dev:       "timeEstimate",
+@mitable/backend:dev:       "orderIndex"
+@mitable/backend:dev:     ],
+@mitable/backend:dev:     "additionalProperties": false
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔄 Converting type array: ["string","null"]
+@mitable/backend:dev:   ✓ Converted to: type="string", nullable=true
+@mitable/backend:dev: 🔄 Converting anyOf nullable: [{"type":"string","maxLength":50},{"type":"null"}]
+@mitable/backend:dev:   ✓ Converted to: {"type":"string","nullable":true}
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "array",
+@mitable/backend:dev:   "items": {
+@mitable/backend:dev:     "type": "object",
+@mitable/backend:dev:     "properties": {
+@mitable/backend:dev:       "weekNumber": {
+@mitable/backend:dev:         "type": "integer"
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "title": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "description": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "nullable": true
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "timeEstimate": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "nullable": true
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "orderIndex": {
+@mitable/backend:dev:         "type": "integer"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "required": [
+@mitable/backend:dev:       "weekNumber",
+@mitable/backend:dev:       "title",
+@mitable/backend:dev:       "description",
+@mitable/backend:dev:       "timeEstimate",
+@mitable/backend:dev:       "orderIndex"
+@mitable/backend:dev:     ]
+@mitable/backend:dev:   }
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Validating configuration...
+@mitable/backend:dev: 🔌 Testing database connection...
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/backend:dev: ✅ Database connected: 2025-11-08T11:48:49.040Z
+@mitable/backend:dev: 📊 Initial pool stats: { total: 1, idle: 0, waiting: 0 }
+@mitable/backend:dev: 🔧 Initializing vector service...
+@mitable/backend:dev: ✅ Vector service initialized
+@mitable/backend:dev: 🚀 Mitable Backend API running on http://localhost:3000
+@mitable/backend:dev: 📊 Environment: development
+@mitable/electron:dev: [Conversation] DOM ready
+@mitable/electron:dev: [Conversation] Renderer loaded and ready for IPC
+@mitable/electron:dev: [Console] DOM ready - window.consoleAPI should be available now
+@mitable/electron:dev: [Console] Window finished loading - preload script should be ready
+@mitable/electron:dev: [Auth] Tokens set from Console window
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/electron:dev: [Auth] Tokens set from Console window
+@mitable/backend:dev: 🔌 Database connection removed from pool
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: true, hasContext: true, options: undefined }
+@mitable/electron:dev: [Screenshot] Using conditional capture with heuristics
+@mitable/electron:dev: [CaptureService] Capture decision: {
+@mitable/electron:dev:   shouldCapture: true,
+@mitable/electron:dev:   reason: 'Screenshot needed (confidence: 0.70, triggers: help_request)',
+@mitable/electron:dev:   confidence: 0.7,
+@mitable/electron:dev:   triggeredHeuristics: [ 'help_request' ]
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Starting capture: {
+@mitable/electron:dev:   mode: 'full-screen',
+@mitable/electron:dev:   displayId: undefined,
+@mitable/electron:dev:   hasBounds: false,
+@mitable/electron:dev:   saveToFile: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 5, width: 1920, height: 1080, scaleFactor: 2 }
+@mitable/electron:dev: [CaptureService] Resizing image: {
+@mitable/electron:dev:   original: { width: 3840, height: 2160 },
+@mitable/electron:dev:   resized: { width: 1920, height: 1080 }
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1920, height: 1080, hasFile: false }
+@mitable/electron:dev: [Screenshot] Conditional capture decision: {
+@mitable/electron:dev:   shouldCapture: true,
+@mitable/electron:dev:   confidence: 0.7,
+@mitable/electron:dev:   reason: 'Screenshot needed (confidence: 0.70, triggers: help_request)'
+@mitable/electron:dev: }
+@mitable/electron:dev: [Screenshot] Screenshot captured via heuristics: { mode: 'full-screen', width: 1920, height: 1080 }
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: [Conversations] Request received: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   contentLength: 39,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   screenshotLength: 1737854,
+@mitable/backend:dev:   screenshotMetadata: {
+@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     height: 1080,
+@mitable/backend:dev:     originalWidth: 3840,
+@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     scaleFactor: 2,
+@mitable/backend:dev:     captureMode: 'full-screen',
+@mitable/backend:dev:     timestamp: 1762602587331
+@mitable/backend:dev:   },
+@mitable/backend:dev:   metadata: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [Stream] User message saved: c3d22471-bc0f-44d1-892e-c79041963895
+@mitable/backend:dev: [Conversations] User profile (from cache): {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   name: 'Emily Rodriguez',
+@mitable/backend:dev:   email: 'emily@lorikeet.ai'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] ToolContext created: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   historyLength: 1,
+@mitable/backend:dev:   hasUserProfile: true,
+@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
+@mitable/backend:dev: [Orchestrator] Processing message: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasWorkflowState: false,
+@mitable/backend:dev:   workflowAction: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [Orchestrator] Intent classified: { type: 'workflow_start', confidence: 0.95 }
+@mitable/backend:dev: [Orchestrator] Routing: intent � Agent: visual-guidance
+@mitable/backend:dev: [VisualGuidanceAgent] Vague prompt inference: "SHow me how ot opne my daylist playlist" → specific
+@mitable/backend:dev: [VisualGuidanceAgent] Starting knowledge-grounded workflow
+@mitable/backend:dev: [SearchKnowledgeTool] Searching for: "SHow me how ot opne my daylist playlist"
+@mitable/backend:dev: [SearchKnowledgeTool] Organization context: {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   topK: 10,
+@mitable/backend:dev:   fetchLimit: 50
+@mitable/backend:dev: }
+@mitable/backend:dev: [IntentService] Intent: general (confidence: 0.85, needsContext: false)
+@mitable/backend:dev: [IntentService] Reasoning: The message is asking for a how-to without specific company context.
+@mitable/backend:dev: [SearchKnowledgeTool] Detected intent: general (confidence: 0.85)
+@mitable/backend:dev: [SearchKnowledgeTool] Performing hybrid search: {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   query: 'SHow me how ot opne my daylist playlist',
+@mitable/backend:dev:   fetchLimit: 50,
+@mitable/backend:dev:   dateFilters: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [SearchService] Pinecone filter: {"organization_id":"86c996f4-d997-44cf-8bdf-b00607e619ee"}
+@mitable/backend:dev: [SearchKnowledgeTool] Hybrid search complete: {
+@mitable/backend:dev:   totalResults: 50,
+@mitable/backend:dev:   semanticResults: 100,
+@mitable/backend:dev:   keywordResults: 0,
+@mitable/backend:dev:   searchTime: '1566ms'
+@mitable/backend:dev: }
+@mitable/backend:dev: [TrustRanking] Applying trust ranking for intent: general
+@mitable/backend:dev: [TrustRanking] Multipliers - codebase: 1x, document: 1x, chat: 1x
+@mitable/backend:dev: [TrustRanking] Top 5 after trust ranking:
+@mitable/backend:dev:   1. [chat/slack] score: 0.017 × 1x = 0.017
+@mitable/backend:dev:   2. [chat/slack] score: 0.017 × 1x = 0.017
+@mitable/backend:dev:   3. [chat/slack] score: 0.016 × 1x = 0.016
+@mitable/backend:dev:   4. [chat/slack] score: 0.016 × 1x = 0.016
+@mitable/backend:dev:   5. [chat/slack] score: 0.015 × 1x = 0.015
+@mitable/backend:dev: [SearchKnowledgeTool] Returning top 10 of 50 ranked results
+@mitable/backend:dev: [SearchKnowledgeTool] Returning 10 sources (489 tokens)
+@mitable/backend:dev: [SearchKnowledgeTool] Success - returning knowledge: {
+@mitable/backend:dev:   responseLength: 1780,
+@mitable/backend:dev:   sourcesCount: 10,
+@mitable/backend:dev:   sourceNames: [
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#engineering - aurel.npounengnong',
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#meeting-notes - aurel.npounengnong',
+@mitable/backend:dev:     '#engineering - mikun.adewole',
+@mitable/backend:dev:     '#engineering - aurel.npounengnong',
+@mitable/backend:dev:     '#engineering - febchuk',
+@mitable/backend:dev:     '#product - aurel.npounengnong'
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   tokenCount: 628,
+@mitable/backend:dev:   truncated: false,
+@mitable/backend:dev:   truncatedCount: 0
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Search complete: { query: 'SHow me how ot opne my daylist playlist', sourcesFound: 10 }
+@mitable/backend:dev: [VisualGuidanceAgent] Calling GPT-4 for workflow synthesis
+@mitable/backend:dev: [VisualGuidanceAgent] GPT-4 synthesis received: {
+@mitable/backend:dev:   hasSolution: true,
+@mitable/backend:dev:   hasExplanation: true,
+@mitable/backend:dev:   hasSupportingDataExplanation: true,
+@mitable/backend:dev:   stepCount: 5
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Validation passed, preparing tool parameters: {
+@mitable/backend:dev:   solution: 'Open your daily playlist in the designated music or media application...',
+@mitable/backend:dev:   stepCount: 5,
+@mitable/backend:dev:   supportingDataFromSearch: 10
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Executing workflow tool with combined parameters
+@mitable/backend:dev: [StartUIGuidanceWorkflowTool] Execute: Open your daily playlist in the designated music or media application
+@mitable/backend:dev: [StartUIGuidanceWorkflowTool] Created workflow preview: {
+@mitable/backend:dev:   stepCount: 5,
+@mitable/backend:dev:   estimatedTime: '13 minutes',
+@mitable/backend:dev:   currentStepIndex: -1,
+@mitable/backend:dev:   allStepsPending: true
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [StartUIGuidanceWorkflowTool] Created workflow session: {
+@mitable/backend:dev:   workflowSessionId: '2040dd86-6510-4949-ab7e-d50657a66b87',
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   status: 'active'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'complete',
+@mitable/backend:dev:   hasContent: true,
+@mitable/backend:dev:   hasWindowTrigger: false,
+@mitable/backend:dev:   windowType: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [Stream] Assistant message saved: 50926900-bc0e-4bc3-845c-d499174de4c5
+@mitable/backend:dev: [Stream] Workflow interaction saved for assistant response (ai_response)
+@mitable/backend:dev: [DEBUG SCREENSHOT] Debug mode active, checking conditions: {
+@mitable/backend:dev:   envVariableSet: true,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasMetadata: true,
+@mitable/backend:dev:   hasVisualGuidance: false,
+@mitable/backend:dev:   hasElement: false,
+@mitable/backend:dev:   hasBoundingBox: false,
+@mitable/backend:dev:   boundingBoxValue: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response
+@mitable/backend:dev: [Stream] First exchange detected - generating conversation title
+@mitable/backend:dev: [TitleGenerationService] Generating title for conversation
+@mitable/backend:dev: [TitleGenerationService] Title generated: How to open my daylist playlist
+@mitable/backend:dev: [Stream] Generated title: How to open my daylist playlist
+@mitable/backend:dev: [Stream] Conversation title updated successfully
+@mitable/backend:dev: [Conversations] Streaming completed successfully: {
+@mitable/backend:dev:   messageId: '50926900-bc0e-4bc3-845c-d499174de4c5',
+@mitable/backend:dev:   contentLength: 602
+@mitable/backend:dev: }
+@mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: false, hasContext: false, options: undefined }
+@mitable/electron:dev: [Screenshot] Using unconditional capture (no heuristics)
+@mitable/electron:dev: [CaptureService] Starting capture: {
+@mitable/electron:dev:   mode: 'full-screen',
+@mitable/electron:dev:   displayId: undefined,
+@mitable/electron:dev:   hasBounds: false,
+@mitable/electron:dev:   saveToFile: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 5, width: 1920, height: 1080, scaleFactor: 2 }
+@mitable/electron:dev: [CaptureService] Resizing image: {
+@mitable/electron:dev:   original: { width: 3840, height: 2160 },
+@mitable/electron:dev:   resized: { width: 1920, height: 1080 }
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1920, height: 1080, hasFile: false }
+@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1920, height: 1080 }
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: [Conversations] Request received: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   contentLength: 23,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   screenshotLength: 1573518,
+@mitable/backend:dev:   screenshotMetadata: {
+@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     height: 1080,
+@mitable/backend:dev:     originalWidth: 3840,
+@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     scaleFactor: 2,
+@mitable/backend:dev:     captureMode: 'full-screen',
+@mitable/backend:dev:     timestamp: 1762602606820
+@mitable/backend:dev:   },
+@mitable/backend:dev:   metadata: { workflowAction: 'progress_step', selectedOption: 1 }
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 1
+@mitable/backend:dev: [Stream] User message saved: 8e36daf7-0584-4dd9-a5a2-63d561310a8e
+@mitable/backend:dev: [Conversations] User profile (from cache): {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   name: 'Emily Rodriguez',
+@mitable/backend:dev:   email: 'emily@lorikeet.ai'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] ToolContext created: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   historyLength: 3,
+@mitable/backend:dev:   hasUserProfile: true,
+@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
+@mitable/backend:dev: [Orchestrator] Processing message: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasWorkflowState: true,
+@mitable/backend:dev:   workflowAction: 'progress_step'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Orchestrator] Routing: metadata � VisualGuidanceAgent (progress_step)
+@mitable/backend:dev: [GuideNextStepTool] Progressing workflow in conversation: 1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03
+@mitable/backend:dev: [GuideNextStepTool] Current workflow state: { currentStepIndex: -1, totalSteps: 5, adjustmentHistory: 0 }
+@mitable/backend:dev: [GuideNextStepTool] Evaluating if plan needs adjustment...
+@mitable/backend:dev: [GeminiVision] Evaluating progress to step: 1
+@mitable/backend:dev: [GeminiVision] Needs adjustment: true
+@mitable/backend:dev: [GuideNextStepTool] Evaluation result: {
+@mitable/backend:dev:   needsAdjustment: true,
+@mitable/backend:dev:   reason: 'The user has already opened Spotify and it appears that the playlist is visible in the left panel. Steps 1-3 can be marked as complete',
+@mitable/backend:dev:   newStepCount: 5
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Applying plan adjustments
+@mitable/backend:dev: [GuideNextStepTool] Analyzing next step: {
+@mitable/backend:dev:   stepNumber: 1,
+@mitable/backend:dev:   description: 'Identify the music or media application where your daily playlist is stored.'
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Analyzing step execution: 1
+@mitable/backend:dev: [GeminiVision] Visual guidance generated: {
+@mitable/backend:dev:   elementDescription: 'The Spotify application is open and visible on the screen....',
+@mitable/backend:dev:   visualContext: 'The Spotify app is currently in focus, displaying the music library....',
+@mitable/backend:dev:   conversationalMessage: 'The Spotify application is already open, which is where your daily playlist is stored. Proceed to the next step to access your playlist.',
+@mitable/backend:dev:   conversationalMessageLength: 136,
+@mitable/backend:dev:   confidence: 'high',
+@mitable/backend:dev:   hasElement: true,
+@mitable/backend:dev:   hasBoundingBox: false,
+@mitable/backend:dev:   boundingBox: null,
+@mitable/backend:dev:   elementLabel: 'Spotify Application',
+@mitable/backend:dev:   elementType: 'application',
+@mitable/backend:dev:   elementConfidence: 1
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Guidance confidence: high
+@mitable/backend:dev: [GuideNextStepTool] Visual guidance generated: {
+@mitable/backend:dev:   conversationalMessage: 'The Spotify application is already open, which is where your daily playlist is stored. Proceed to the next step to access your playlist.',
+@mitable/backend:dev:   conversationalMessageLength: 136,
+@mitable/backend:dev:   confidence: 'high'
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Including adjustment notice in response
+@mitable/backend:dev: [GuideNextStepTool] Workflow progressed successfully: { newStepIndex: 0, totalSteps: 5, adjustmentMade: true }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [GuideNextStepTool] Window trigger: { hasWindowTrigger: false, hasBoundingBox: false, boundingBox: null }
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'complete',
+@mitable/backend:dev:   hasContent: true,
+@mitable/backend:dev:   hasWindowTrigger: false,
+@mitable/backend:dev:   windowType: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [Stream] Assistant message saved: a0de7ad9-272c-4164-82c5-89e205266951
+@mitable/backend:dev: [Stream] Workflow interaction saved for assistant response (step_progress)
+@mitable/backend:dev: [DEBUG SCREENSHOT] Debug mode active, checking conditions: {
+@mitable/backend:dev:   envVariableSet: true,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasMetadata: true,
+@mitable/backend:dev:   hasVisualGuidance: true,
+@mitable/backend:dev:   hasElement: true,
+@mitable/backend:dev:   hasBoundingBox: false,
+@mitable/backend:dev:   boundingBoxValue: null
+@mitable/backend:dev: }
+@mitable/backend:dev: [DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response
+@mitable/backend:dev: [Conversations] Streaming completed successfully: {
+@mitable/backend:dev:   messageId: 'a0de7ad9-272c-4164-82c5-89e205266951',
+@mitable/backend:dev:   contentLength: 291
+@mitable/backend:dev: }
+@mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: false, hasContext: false, options: undefined }
+@mitable/electron:dev: [Screenshot] Using unconditional capture (no heuristics)
+@mitable/electron:dev: [CaptureService] Starting capture: {
+@mitable/electron:dev:   mode: 'full-screen',
+@mitable/electron:dev:   displayId: undefined,
+@mitable/electron:dev:   hasBounds: false,
+@mitable/electron:dev:   saveToFile: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 5, width: 1920, height: 1080, scaleFactor: 2 }
+@mitable/electron:dev: [CaptureService] Resizing image: {
+@mitable/electron:dev:   original: { width: 3840, height: 2160 },
+@mitable/electron:dev:   resized: { width: 1920, height: 1080 }
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1920, height: 1080, hasFile: false }
+@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1920, height: 1080 }
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: [Conversations] Request received: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   contentLength: 20,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   screenshotLength: 1626422,
+@mitable/backend:dev:   screenshotMetadata: {
+@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     height: 1080,
+@mitable/backend:dev:     originalWidth: 3840,
+@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     scaleFactor: 2,
+@mitable/backend:dev:     captureMode: 'full-screen',
+@mitable/backend:dev:     timestamp: 1762602617265
+@mitable/backend:dev:   },
+@mitable/backend:dev:   metadata: { workflowAction: 'progress_step', selectedOption: 1 }
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 1
+@mitable/backend:dev: [Stream] User message saved: 9c8691f6-34e5-4776-bbb2-b066b1905b78
+@mitable/backend:dev: [Conversations] User profile (from cache): {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   name: 'Emily Rodriguez',
+@mitable/backend:dev:   email: 'emily@lorikeet.ai'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] ToolContext created: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   historyLength: 5,
+@mitable/backend:dev:   hasUserProfile: true,
+@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
+@mitable/backend:dev: [Orchestrator] Processing message: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasWorkflowState: true,
+@mitable/backend:dev:   workflowAction: 'progress_step'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Orchestrator] Routing: metadata � VisualGuidanceAgent (progress_step)
+@mitable/backend:dev: [GuideNextStepTool] Progressing workflow in conversation: 1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03
+@mitable/backend:dev: [GuideNextStepTool] Current workflow state: { currentStepIndex: 0, totalSteps: 5, adjustmentHistory: 1 }
+@mitable/backend:dev: [GuideNextStepTool] Evaluating if plan needs adjustment...
+@mitable/backend:dev: [GeminiVision] Evaluating progress to step: 2
+@mitable/backend:dev: [GeminiVision] Needs adjustment: true
+@mitable/backend:dev: [GuideNextStepTool] Evaluation result: {
+@mitable/backend:dev:   needsAdjustment: true,
+@mitable/backend:dev:   reason: 'The user has already completed steps 1-3, the next step is to locate and select the playlist.',
+@mitable/backend:dev:   newStepCount: 5
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Applying plan adjustments
+@mitable/backend:dev: [GuideNextStepTool] Analyzing next step: {
+@mitable/backend:dev:   stepNumber: 2,
+@mitable/backend:dev:   description: 'Open the designated application on your device.'
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Analyzing step execution: 2
+@mitable/backend:dev: [GeminiVision] Visual guidance generated: {
+@mitable/backend:dev:   elementDescription: 'The Spotify application is already open....',
+@mitable/backend:dev:   visualContext: 'The Spotify application is open and visible on the screen....',
+@mitable/backend:dev:   conversationalMessage: "The Spotify app is already open! You're all set for the next step.",
+@mitable/backend:dev:   conversationalMessageLength: 66,
+@mitable/backend:dev:   confidence: 'high',
+@mitable/backend:dev:   hasElement: true,
+@mitable/backend:dev:   hasBoundingBox: false,
+@mitable/backend:dev:   boundingBox: null,
+@mitable/backend:dev:   elementLabel: 'Spotify App',
+@mitable/backend:dev:   elementType: 'application',
+@mitable/backend:dev:   elementConfidence: 1
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Guidance confidence: high
+@mitable/backend:dev: [GuideNextStepTool] Visual guidance generated: {
+@mitable/backend:dev:   conversationalMessage: "The Spotify app is already open! You're all set for the next step.",
+@mitable/backend:dev:   conversationalMessageLength: 66,
+@mitable/backend:dev:   confidence: 'high'
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Including adjustment notice in response
+@mitable/backend:dev: [GuideNextStepTool] Workflow progressed successfully: { newStepIndex: 1, totalSteps: 5, adjustmentMade: true }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [GuideNextStepTool] Window trigger: { hasWindowTrigger: false, hasBoundingBox: false, boundingBox: null }
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'complete',
+@mitable/backend:dev:   hasContent: true,
+@mitable/backend:dev:   hasWindowTrigger: false,
+@mitable/backend:dev:   windowType: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [Stream] Assistant message saved: edd12d90-5705-44a1-aaf8-5239223e4c02
+@mitable/backend:dev: [Stream] Workflow interaction saved for assistant response (step_progress)
+@mitable/backend:dev: [DEBUG SCREENSHOT] Debug mode active, checking conditions: {
+@mitable/backend:dev:   envVariableSet: true,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasMetadata: true,
+@mitable/backend:dev:   hasVisualGuidance: true,
+@mitable/backend:dev:   hasElement: true,
+@mitable/backend:dev:   hasBoundingBox: false,
+@mitable/backend:dev:   boundingBoxValue: null
+@mitable/backend:dev: }
+@mitable/backend:dev: [DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response
+@mitable/backend:dev: [Conversations] Streaming completed successfully: {
+@mitable/backend:dev:   messageId: 'edd12d90-5705-44a1-aaf8-5239223e4c02',
+@mitable/backend:dev:   contentLength: 180
+@mitable/backend:dev: }
+@mitable/electron:dev: [Screenshot] IPC handler called { hasMessage: false, hasContext: false, options: undefined }
+@mitable/electron:dev: [Screenshot] Using unconditional capture (no heuristics)
+@mitable/electron:dev: [CaptureService] Starting capture: {
+@mitable/electron:dev:   mode: 'full-screen',
+@mitable/electron:dev:   displayId: undefined,
+@mitable/electron:dev:   hasBounds: false,
+@mitable/electron:dev:   saveToFile: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capturing full screen: { displayId: 5, width: 1920, height: 1080, scaleFactor: 2 }
+@mitable/electron:dev: [CaptureService] Resizing image: {
+@mitable/electron:dev:   original: { width: 3840, height: 2160 },
+@mitable/electron:dev:   resized: { width: 1920, height: 1080 }
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Capture successful: { mode: 'full-screen', width: 1920, height: 1080, hasFile: false }
+@mitable/electron:dev: [Screenshot] Capture successful: { mode: 'full-screen', width: 1920, height: 1080 }
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: [Conversations] Request received: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   contentLength: 20,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   screenshotLength: 1604474,
+@mitable/backend:dev:   screenshotMetadata: {
+@mitable/backend:dev:     width: 1920,
+@mitable/backend:dev:     height: 1080,
+@mitable/backend:dev:     originalWidth: 3840,
+@mitable/backend:dev:     originalHeight: 2160,
+@mitable/backend:dev:     scaleFactor: 2,
+@mitable/backend:dev:     captureMode: 'full-screen',
+@mitable/backend:dev:     timestamp: 1762602626520
+@mitable/backend:dev:   },
+@mitable/backend:dev:   metadata: { workflowAction: 'progress_step', selectedOption: 1 }
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 1
+@mitable/backend:dev: [Stream] User message saved: 55339714-8e4c-4ec4-8a81-5ecc23250df5
+@mitable/backend:dev: [Conversations] User profile (from cache): {
+@mitable/backend:dev:   organizationId: '86c996f4-d997-44cf-8bdf-b00607e619ee',
+@mitable/backend:dev:   name: 'Emily Rodriguez',
+@mitable/backend:dev:   email: 'emily@lorikeet.ai'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] ToolContext created: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   userId: 'fbdf69ad-94bc-4601-b54e-6e37ca527dec',
+@mitable/backend:dev:   historyLength: 7,
+@mitable/backend:dev:   hasUserProfile: true,
+@mitable/backend:dev:   userProfileOrg: '86c996f4-d997-44cf-8bdf-b00607e619ee'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
+@mitable/backend:dev: [Orchestrator] Processing message: {
+@mitable/backend:dev:   conversationId: '1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03',
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasWorkflowState: true,
+@mitable/backend:dev:   workflowAction: 'progress_step'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Orchestrator] Routing: metadata � VisualGuidanceAgent (progress_step)
+@mitable/backend:dev: [GuideNextStepTool] Progressing workflow in conversation: 1e8a2e65-49b2-45cc-b120-2b0bd0cd1f03
+@mitable/backend:dev: [GuideNextStepTool] Current workflow state: { currentStepIndex: 1, totalSteps: 5, adjustmentHistory: 2 }
+@mitable/backend:dev: [GuideNextStepTool] Evaluating if plan needs adjustment...
+@mitable/backend:dev: [GeminiVision] Evaluating progress to step: 3
+@mitable/backend:dev: [GeminiVision] Needs adjustment: true
+@mitable/backend:dev: [GuideNextStepTool] Evaluation result: {
+@mitable/backend:dev:   needsAdjustment: true,
+@mitable/backend:dev:   reason: 'The user has already completed steps 1-3. The next step is to locate and select the playlist.',
+@mitable/backend:dev:   newStepCount: 5
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Applying plan adjustments
+@mitable/backend:dev: [GuideNextStepTool] Analyzing next step: {
+@mitable/backend:dev:   stepNumber: 3,
+@mitable/backend:dev:   description: "Navigate to the 'Playlists' section within the application."
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Analyzing step execution: 3
+@mitable/backend:dev: [GeminiVision] Converted bounding box coordinates: {
+@mitable/backend:dev:   normalized: { x: 0.094, y: 0.432, width: 0.098, height: 0.023 },
+@mitable/backend:dev:   pixels: { x: 180, y: 467, width: 188, height: 25 },
+@mitable/backend:dev:   imageDimensions: { width: 1920, height: 1080 }
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Visual guidance generated: {
+@mitable/backend:dev:   elementDescription: "The 'daylist' playlist on the left panel is where you can access your daily playlist....",
+@mitable/backend:dev:   visualContext: "Spotify application is open, displaying the user's playlists in the left panel. The 'daylist' playli...",
+@mitable/backend:dev:   conversationalMessage: "Great! Now, on the left panel, click on your 'daylist' playlist to open it.",
+@mitable/backend:dev:   conversationalMessageLength: 75,
+@mitable/backend:dev:   confidence: 'high',
+@mitable/backend:dev:   hasElement: true,
+@mitable/backend:dev:   hasBoundingBox: true,
+@mitable/backend:dev:   boundingBox: { x: 180, y: 467, width: 188, height: 25 },
+@mitable/backend:dev:   elementLabel: 'daylist',
+@mitable/backend:dev:   elementType: 'text',
+@mitable/backend:dev:   elementConfidence: 0.95
+@mitable/backend:dev: }
+@mitable/backend:dev: [GeminiVision] Guidance confidence: high
+@mitable/backend:dev: [GuideNextStepTool] Visual guidance generated: {
+@mitable/backend:dev:   conversationalMessage: "Great! Now, on the left panel, click on your 'daylist' playlist to open it.",
+@mitable/backend:dev:   conversationalMessageLength: 75,
+@mitable/backend:dev:   confidence: 'high'
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideNextStepTool] Including adjustment notice in response
+@mitable/backend:dev: [GuideNextStepTool] Workflow progressed successfully: { newStepIndex: 2, totalSteps: 5, adjustmentMade: true }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [GuideNextStepTool] Window trigger: {
+@mitable/backend:dev:   hasWindowTrigger: true,
+@mitable/backend:dev:   hasBoundingBox: true,
+@mitable/backend:dev:   boundingBox: { x: 180, y: 467, width: 188, height: 25 }
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'complete',
+@mitable/backend:dev:   hasContent: true,
+@mitable/backend:dev:   hasWindowTrigger: true,
+@mitable/backend:dev:   windowType: 'overlay'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Emitting window_trigger event: { window: 'overlay', hasData: true }
+@mitable/electron:dev: [Main] OVERLAY_SHOW received with data: {
+@mitable/electron:dev:   boundingBox: { x: 180, y: 467, width: 188, height: 25 },
+@mitable/electron:dev:   label: 'daylist',
+@mitable/electron:dev:   instruction: "Great! Now, on the left panel, click on your 'daylist' playlist to open it.",
+@mitable/electron:dev:   elementType: 'text'
+@mitable/electron:dev: }
+@mitable/electron:dev: [Main] Overlay already loaded, sending data with 100ms delay
+@mitable/electron:dev: [Main] Overlay window shown
+@mitable/backend:dev: [Stream] Assistant message saved: 454cbbaf-7ca9-4ba2-8a10-de843010e40c
+@mitable/electron:dev: [Main] Overlay data sent
+@mitable/backend:dev: [Stream] Workflow interaction saved for assistant response (step_progress)
+@mitable/backend:dev: [DEBUG SCREENSHOT] Debug mode active, checking conditions: {
+@mitable/backend:dev:   envVariableSet: true,
+@mitable/backend:dev:   hasScreenshot: true,
+@mitable/backend:dev:   hasMetadata: true,
+@mitable/backend:dev:   hasVisualGuidance: true,
+@mitable/backend:dev:   hasElement: true,
+@mitable/backend:dev:   hasBoundingBox: true,
+@mitable/backend:dev:   boundingBoxValue: { x: 180, y: 467, width: 188, height: 25 }
+@mitable/backend:dev: }
+@mitable/backend:dev: [DEBUG SCREENSHOT] All conditions met, saving annotated screenshot
+@mitable/electron:dev: [59226:1108/035033.891592:ERROR:CONSOLE(1)] "Request Autofill.enable failed. {"code":-32601,"message":"'Autofill.enable' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
+@mitable/backend:dev: 
+@mitable/backend:dev: [DEBUG SCREENSHOT]
+@mitable/backend:dev:   Session:   /Users/febechukwuma/Documents/mitable/temp/2025-11-08T11-50-33-790Z
+@mitable/backend:dev:   Element:   The 'daylist' playlist on the left panel is where you can access your daily playlist. (95%)
+@mitable/backend:dev:   Files:     original.png, annotated.png, analysis.json
+@mitable/backend:dev: 
+@mitable/backend:dev: [DEBUG SCREENSHOT] Screenshot saved successfully: {
+@mitable/backend:dev:   sessionDir: '/Users/febechukwuma/Documents/mitable/temp/2025-11-08T11-50-33-790Z',
+@mitable/backend:dev:   originalPath: '/Users/febechukwuma/Documents/mitable/temp/2025-11-08T11-50-33-790Z/original.png',
+@mitable/backend:dev:   annotatedPath: '/Users/febechukwuma/Documents/mitable/temp/2025-11-08T11-50-33-790Z/annotated.png',
+@mitable/backend:dev:   jsonPath: '/Users/febechukwuma/Documents/mitable/temp/2025-11-08T11-50-33-790Z/analysis.json'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Streaming completed successfully: {
+@mitable/backend:dev:   messageId: '454cbbaf-7ca9-4ba2-8a10-de843010e40c',
+@mitable/backend:dev:   contentLength: 189
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔌 Database connection removed from pool
+@mitable/backend:dev: 🔌 Database connection removed from pool

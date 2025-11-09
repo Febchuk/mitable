@@ -16,6 +16,7 @@ const IPC_CHANNELS = {
   NUDGE_SHOW: "nudge-show",
   GUIDE_START: "guide-start",
   OPEN_CONSOLE_NUDGE_FORM: "open-console-nudge-form",
+  OVERLAY_SHOW: "overlay-show",
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
   CAPTURE_SCREENSHOT: "capture-screenshot",
@@ -115,6 +116,14 @@ contextBridge.exposeInMainWorld("conversationAPI", {
   // Trigger Nudge/Guide windows from cards
   showNudge: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.NUDGE_SHOW, data),
   startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),
+  showOverlay: (data: unknown) => {
+    console.log("[Conversation Preload] showOverlay() called from renderer", {
+      hasData: !!data,
+      dataKeys:
+        data && typeof data === "object" ? Object.keys(data as Record<string, unknown>) : [],
+    });
+    ipcRenderer.send(IPC_CHANNELS.OVERLAY_SHOW, data);
+  },
 
   // Open conversation in console
   openConversationInConsole: (conversationId: string) =>

@@ -16,7 +16,7 @@ interface Message {
   cardData?: any;
   sources?: any[];
   windowTrigger?: {
-    window: "nudge" | "guide";
+    window: "nudge" | "guide" | "overlay";
     data: any;
   };
 }

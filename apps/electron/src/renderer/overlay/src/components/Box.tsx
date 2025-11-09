@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BoundingBox } from "../types";
 
 interface BoxProps {
@@ -11,6 +12,29 @@ export function Box({ boundingBox, color = "#3B82F6", animation = "pulse" }: Box
 
   const animationClass =
     animation === "pulse" ? "animate-pulse" : animation === "fade" ? "animate-fade-in" : "";
+
+  // Debug warning for oversized bounding boxes
+  useEffect(() => {
+    const screenWidth = window.screen.width;
+    const screenHeight = window.screen.height;
+    const widthPercent = (width / screenWidth) * 100;
+    const heightPercent = (height / screenHeight) * 100;
+
+    // Warn if bounding box is suspiciously large (>40% screen coverage)
+    if (widthPercent > 40 || heightPercent > 40) {
+      console.warn("[Overlay Box] Large bounding box detected:", {
+        position: { x, y },
+        size: { width, height },
+        screenSize: { screenWidth, screenHeight },
+        coverage: {
+          widthPercent: widthPercent.toFixed(1) + "%",
+          heightPercent: heightPercent.toFixed(1) + "%",
+        },
+        message:
+          "This bounding box may be too large. Expected: buttons/links (5-25% width, 2-10% height)",
+      });
+    }
+  }, [x, y, width, height]);
 
   return (
     <div
