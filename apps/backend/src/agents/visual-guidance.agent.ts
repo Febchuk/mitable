@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
-import { KnowledgeAgent } from "./knowledge.agent";
+import { KnowledgeAgent } from "./knowledge.agent.old";
 import { TextResponseAgent } from "./text-response.agent";
 import type { StreamChunk, ToolContext } from "../tools/base.tool";
 import { ClarifyIntentTool } from "../tools/clarify-intent.tool";
