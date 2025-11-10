@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config";
 import type { StreamChunk, ToolContext } from "../tools/base.tool";
 import { TextResponseAgent } from "../agents/text-response.agent";
-import { KnowledgeAgent } from "../agents/knowledge.agent.old";
+import { KnowledgeAgent } from "../agents/knowledge.agent";
 import { VisualGuidanceAgent } from "../agents/visual-guidance.agent";
 import { ExpertMatchingAgent } from "../agents/expert-matching.agent";
 import { BaseAgent } from "../agents/base.agent";
