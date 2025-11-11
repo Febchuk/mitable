@@ -1024,6 +1024,80 @@ router.post(
           console.log(`[Stream] Workflow interaction saved for assistant response (${interactionType})`);
         }
 
+        // Debug: Save PII testing screenshots (before/after redaction)
+        if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true' && screenshot) {
+          try {
+            console.log('[DEBUG PII] Saving PII test screenshots...', {
+              screenshotType: typeof screenshot,
+              isBuffer: Buffer.isBuffer(screenshot),
+              screenshotPreview: typeof screenshot === 'string' ? screenshot.substring(0, 50) : 'Buffer',
+            });
+            const fs = await import('fs/promises');
+            const path = await import('path');
+            
+            // Create session directory
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            // Use monorepo root temp directory (go up 2 levels from apps/backend)
+            const monorepoRoot = path.resolve(process.cwd(), '..', '..');
+            const defaultDir = path.join(monorepoRoot, 'temp', 'pii-debug-screenshots');
+            const outputDir = process.env.DEBUG_SCREENSHOTS_DIR || defaultDir;
+            const sessionDir = path.join(outputDir, timestamp);
+            console.log('[DEBUG PII] Path resolution:', {
+              processCwd: process.cwd(),
+              monorepoRoot,
+              defaultDir,
+              sessionDir,
+            });
+            await fs.mkdir(sessionDir, { recursive: true });
+            
+            // Save original (after redaction)
+            let originalBuffer: Buffer;
+            if (Buffer.isBuffer(screenshot)) {
+              originalBuffer = screenshot;
+            } else if (typeof screenshot === 'string') {
+              const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, '');
+              originalBuffer = Buffer.from(base64Data, 'base64');
+            } else if (typeof screenshot === 'object' && screenshot !== null) {
+              // Handle object case - convert to Buffer
+              console.log('[DEBUG PII] Screenshot object keys:', Object.keys(screenshot));
+              const screenshotObj = screenshot as any;
+              
+              if ('dataUrl' in screenshotObj && typeof screenshotObj.dataUrl === 'string') {
+                const base64Data = screenshotObj.dataUrl.replace(/^data:image\/\w+;base64,/, '');
+                originalBuffer = Buffer.from(base64Data, 'base64');
+              } else if ('data' in screenshotObj && Buffer.isBuffer(screenshotObj.data)) {
+                originalBuffer = screenshotObj.data;
+              } else if ('data' in screenshotObj && typeof screenshotObj.data === 'string') {
+                const base64Data = screenshotObj.data.replace(/^data:image\/\w+;base64,/, '');
+                originalBuffer = Buffer.from(base64Data, 'base64');
+              } else {
+                throw new Error(`Screenshot object missing valid data. Keys: ${Object.keys(screenshotObj).join(', ')}`);
+              }
+            } else {
+              throw new Error(`Unexpected screenshot type: ${typeof screenshot}`);
+            }
+            const originalPath = path.join(sessionDir, 'redacted.png');
+            await fs.writeFile(originalPath, originalBuffer);
+            
+            // Save metadata
+            const metadataPath = path.join(sessionDir, 'metadata.json');
+            await fs.writeFile(metadataPath, JSON.stringify({
+              timestamp: new Date().toISOString(),
+              query: content,
+              piiRedacted: true,
+              hasScreenshotMetadata: !!screenshotMetadata,
+            }, null, 2));
+            
+            console.log('[DEBUG PII] Screenshots saved:', {
+              sessionDir,
+              redactedPath: originalPath,
+              metadataPath,
+            });
+          } catch (error) {
+            console.error('[DEBUG PII] Failed to save PII test screenshots:', error);
+          }
+        }
+
         // Debug: Save annotated screenshot if enabled and has visual guidance
         if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true') {
           console.log('[DEBUG SCREENSHOT] Debug mode active, checking conditions:', {
