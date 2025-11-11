@@ -116,10 +116,10 @@ export interface StreamCallbacks {
 }
 
 /**
- * Send a message and get the full AI response, then simulate streaming on frontend
+ * Send a message and stream the AI response in real-time
  *
- * Simplified approach: Backend returns complete response, frontend streams it word-by-word.
- * This is more reliable and gives us full control over the streaming UX.
+ * Uses Server-Sent Events (SSE) to receive real-time streaming responses.
+ * Chunks are passed directly to the UI as they arrive from the backend.
  *
  * @param conversationId - The conversation ID
  * @param content - The user message content
@@ -170,7 +170,7 @@ export async function sendStreamingMessage(
       throw new Error("No response body");
     }
 
-    // Read the entire SSE stream and collect the full content
+    // Real-time SSE streaming - pass chunks directly to UI
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -194,14 +194,18 @@ export async function sendStreamingMessage(
           try {
             const chunk: StreamChunk = JSON.parse(data);
 
-            // Accumulate content from backend
+            // Stream chunks directly to UI as they arrive (real-time!)
             if (chunk.type === "chunk" && chunk.content) {
               fullContent += chunk.content;
+              callbacks.onChunk?.(chunk.content);
             } else if (chunk.type === "complete" && chunk.content) {
               fullContent = chunk.content;
-            } else if (chunk.type === "done") {
-              // Stream completed
-              break;
+              callbacks.onComplete?.(fullContent);
+            } else if (chunk.type === "done" && chunk.messageId) {
+              callbacks.onDone?.(chunk.messageId);
+            } else if (chunk.type === "error" && chunk.error) {
+              callbacks.onError?.(chunk.error);
+              throw new Error(chunk.error);
             }
           } catch (e) {
             // Skip parse errors
@@ -214,21 +218,7 @@ export async function sendStreamingMessage(
       throw new Error("No content received from backend");
     }
 
-    // Now simulate frontend streaming word-by-word
-    const words = fullContent.split(" ");
-
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i];
-      const isLast = i === words.length - 1;
-
-      // Add word with space (except for last word)
-      callbacks.onChunk?.(isLast ? word : word + " ");
-
-      // Delay between words for typing effect - slowed down for Groq's speed 😎
-      await new Promise((resolve) => setTimeout(resolve, 30));
-    }
-
-    // Signal completion
+    // Final completion signal
     callbacks.onComplete?.(fullContent);
   } catch (error) {
     console.error("Message send error:", error);

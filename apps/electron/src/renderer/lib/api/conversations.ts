@@ -221,9 +221,10 @@ export async function sendMessageStream(
           try {
             const chunk: StreamChunk = JSON.parse(data);
 
-            // Accumulate content from backend
+            // Stream chunks directly to UI as they arrive (real-time!)
             if (chunk.type === "chunk" && chunk.content) {
               fullContent += chunk.content;
+              callbacks.onChunk?.(chunk.content);
             } else if (chunk.type === "complete") {
               if (chunk.content) fullContent = chunk.content;
               if (chunk.messageType) messageType = chunk.messageType;
@@ -250,26 +251,7 @@ export async function sendMessageStream(
       return;
     }
 
-    console.log("[API] ✅ Full content received, starting frontend streaming:", {
-      contentLength: fullContent.length,
-      wordCount: fullContent.split(" ").length,
-    });
-
-    // Now simulate frontend streaming word-by-word
-    const words = fullContent.split(" ");
-
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i];
-      const isLast = i === words.length - 1;
-
-      // Add word with space (except for last word)
-      callbacks.onChunk?.(isLast ? word : word + " ");
-
-      // Delay between words for typing effect
-      await new Promise((resolve) => setTimeout(resolve, 30));
-    }
-
-    console.log("[API] ✅ Streaming complete, calling onComplete");
+    console.log("[API] ✅ Real-time streaming complete, calling onComplete");
 
     // Signal completion
     callbacks.onComplete?.(fullContent, messageId, messageType, cardData, windowTriggerData);
