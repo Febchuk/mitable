@@ -98,6 +98,7 @@ export interface BaseMessage {
   streamable: boolean;
   sources?: Source[];
   triggerWindow?: WindowTrigger;
+  metadata?: Record<string, any>; // Tool-specific metadata (e.g., temporal query flags)
 }
 
 /**

@@ -483,10 +483,28 @@ router.post("/slack/configure", requireAuth, async (req: Request, res: Response)
       return;
     }
 
+    // Detect new vs existing channels for smart sync
+    const metadata = integration.metadata as any;
+    const previousChannels: string[] = metadata?.selected_channels || [];
+
+    const newChannels = selectedChannels.filter((ch: string) => !previousChannels.includes(ch));
+    const existingChannels = selectedChannels.filter((ch: string) => previousChannels.includes(ch));
+    const removedChannels = previousChannels.filter((ch: string) => !selectedChannels.includes(ch));
+
+    console.log(`📊 Channel changes for organization: ${user.organizationId}`);
+    console.log(`   New channels (${newChannels.length}): ${newChannels.join(", ") || "none"}`);
+    console.log(
+      `   Existing channels (${existingChannels.length}): ${existingChannels.join(", ") || "none"}`
+    );
+    console.log(
+      `   Removed channels (${removedChannels.length}): ${removedChannels.join(", ") || "none"}`
+    );
+
     // Merge selected channels into existing metadata
     const updatedMetadata = {
-      ...(integration.metadata as object),
+      ...metadata,
       selected_channels: selectedChannels,
+      channel_checkpoints: metadata?.channel_checkpoints || {},
     };
 
     // Update integration metadata with selected channels
@@ -503,10 +521,170 @@ router.post("/slack/configure", requireAuth, async (req: Request, res: Response)
         )
       );
 
-    console.log(`✅ Slack channels configured for organization: ${user.organizationId}`);
-    console.log(`   Selected channels: ${selectedChannels.join(", ")}`);
+    // Auto-trigger smart sync for new AND existing channels
+    let syncResult = null;
+    const channelsToSync = [...newChannels, ...existingChannels];
 
-    res.json({ success: true, message: "Channel selection saved", selectedChannels });
+    if (channelsToSync.length > 0) {
+      console.log(
+        `🔄 Smart sync: ${newChannels.length} new, ${existingChannels.length} existing channels`
+      );
+      try {
+        // Import required services
+        const { WebClient } = await import("@slack/web-api");
+        const { searchContent } = await import("../db/schema/search-content.schema.js");
+        const { desc } = await import("drizzle-orm");
+
+        const client = new WebClient(integration.accessToken!);
+
+        let totalNewMessages = 0;
+        let channelsProcessed = 0;
+        const errors: string[] = [];
+
+        // Process each channel
+        for (const channelId of channelsToSync) {
+          try {
+            const isNewChannel = newChannels.includes(channelId);
+
+            // Get channel info
+            const channelInfo = await client.conversations.info({ channel: channelId });
+            const channelName = channelInfo.channel?.name || channelId;
+
+            console.log(`  📱 ${channelName} (${isNewChannel ? "new" : "incremental"})`);
+
+            // For existing channels, get last message timestamp
+            let oldestTimestamp: string | undefined;
+            if (!isNewChannel) {
+              const [latestMessage] = await db
+                .select({ timestamp: searchContent.timestamp })
+                .from(searchContent)
+                .where(
+                  and(
+                    eq(searchContent.organizationId, user.organizationId),
+                    eq(searchContent.source, "slack"),
+                    eq(searchContent.channelId, channelId)
+                  )
+                )
+                .orderBy(desc(searchContent.timestamp))
+                .limit(1);
+
+              if (latestMessage?.timestamp) {
+                oldestTimestamp = Math.floor(latestMessage.timestamp / 1000).toString();
+                console.log(
+                  `     Last sync: ${new Date(latestMessage.timestamp).toLocaleString()}`
+                );
+              }
+            }
+
+            // Fetch messages from Slack
+            const result = await client.conversations.history({
+              channel: channelId,
+              oldest: oldestTimestamp,
+              limit: 1000,
+            });
+
+            if (!result.ok || !result.messages) {
+              errors.push(`Failed to fetch messages from ${channelName}`);
+              continue;
+            }
+
+            const messages = result.messages;
+            console.log(`     Found ${messages.length} new messages`);
+
+            if (messages.length === 0) {
+              console.log(`     ✅ Up to date`);
+              channelsProcessed++;
+              continue;
+            }
+
+            // Insert messages into DB
+            for (const msg of messages) {
+              const msgId = `slack-${channelId}-${msg.ts}-chunk-0`;
+
+              // Check if exists
+              const existing = await db
+                .select()
+                .from(searchContent)
+                .where(eq(searchContent.id, msgId))
+                .limit(1);
+
+              if (existing.length > 0) continue;
+
+              // Get username
+              let username = "Unknown";
+              if (msg.user) {
+                try {
+                  const userInfo = await client.users.info({ user: msg.user });
+                  username = userInfo.user?.name || msg.user;
+                } catch {
+                  username = msg.user;
+                }
+              }
+
+              // Insert into DB
+              await db.insert(searchContent).values({
+                id: msgId,
+                organizationId: user.organizationId,
+                source: "slack",
+                sourceType: msg.thread_ts ? "thread_reply" : "message",
+                text: msg.text || "",
+                textVector: "", // Will be populated by trigger
+                channelId,
+                channelName,
+                userId: msg.user || null,
+                username,
+                timestamp: Math.floor(parseFloat(msg.ts!) * 1000),
+                date: new Date(parseFloat(msg.ts!) * 1000).toISOString().split("T")[0],
+              });
+
+              totalNewMessages++;
+            }
+
+            console.log(`     ✅ Added ${messages.length} messages`);
+            channelsProcessed++;
+
+            // Rate limiting: 350ms between channels
+            await new Promise((resolve) => setTimeout(resolve, 350));
+          } catch (error) {
+            const errorMsg = `Error syncing ${channelId}: ${error instanceof Error ? error.message : "Unknown"}`;
+            console.error(`     ❌ ${errorMsg}`);
+            errors.push(errorMsg);
+          }
+        }
+
+        syncResult = {
+          success: errors.length === 0,
+          channelsProcessed,
+          totalMessages: totalNewMessages,
+          messagesEmbedded: totalNewMessages,
+          errors,
+        };
+
+        console.log(
+          `✅ Smart sync completed: ${totalNewMessages} messages added across ${channelsProcessed} channels`
+        );
+      } catch (error) {
+        console.error("⚠️  Smart sync failed (non-critical):", error);
+        // Don't fail the configure request if sync fails
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "Channel selection saved",
+      selectedChannels,
+      newChannels,
+      existingChannels,
+      removedChannels,
+      autoSyncTriggered: channelsToSync.length > 0,
+      syncResult: syncResult
+        ? {
+            messagesEmbedded: syncResult.messagesEmbedded,
+            channelsProcessed: syncResult.channelsProcessed,
+            errors: syncResult.errors,
+          }
+        : null,
+    });
   } catch (error) {
     console.error("Error configuring Slack channels:", error);
     res.status(500).json({

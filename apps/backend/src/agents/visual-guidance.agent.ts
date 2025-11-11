@@ -130,10 +130,29 @@ export class VisualGuidanceAgent extends BaseAgent {
         return;
       }
 
-      // Handle custom questions during active workflow FIRST (before vague prompt check)
-      // Workflow context makes questions like "Why this step?" clear
-      // Only handle workflow questions if workflow is ACTIVE (not paused)
-      if (context.workflowState && context.workflowState.status === "active") {
+      // Check if user message is vague ("How do I do this?", "Help me with this")
+      const isVaguePrompt = await this.isVaguePrompt(lastUserMessage.content);
+
+      if (isVaguePrompt) {
+        // Use clarify_intent to analyze screen and offer interpretations
+        const result = await this.clarifyIntentTool.execute(
+          {
+            vaguePrompt: lastUserMessage.content,
+          },
+          context
+        );
+
+        yield {
+          type: "complete",
+          messageType: result.messageType,
+          content: result.content,
+          cardData: result.cardData,
+        };
+        return;
+      }
+
+      // Handle custom questions during active workflow
+      if (context.workflowState) {
         const questionType = await this.classifyWorkflowQuestion(lastUserMessage.content);
 
         console.log(`[VisualGuidanceAgent] Routing workflow question: ${questionType}`, {
@@ -184,28 +203,6 @@ export class VisualGuidanceAgent extends BaseAgent {
         for await (const chunk of this.knowledgeAgent.execute(context)) {
           yield chunk;
         }
-        return;
-      }
-
-      // Check if user message is vague ("How do I do this?", "Help me with this")
-      // Only check this for NEW workflow starts, not during active workflows
-      const isVaguePrompt = await this.isVaguePrompt(lastUserMessage.content);
-
-      if (isVaguePrompt) {
-        // Use clarify_intent to analyze screen and offer interpretations
-        const result = await this.clarifyIntentTool.execute(
-          {
-            vaguePrompt: lastUserMessage.content,
-          },
-          context
-        );
-
-        yield {
-          type: "complete",
-          messageType: result.messageType,
-          content: result.content,
-          cardData: result.cardData,
-        };
         return;
       }
 

@@ -20,6 +20,7 @@
     "sync-slack": "tsx src/scripts/sync-slack.ts"
   },
   "dependencies": {
+    "@google-cloud/dlp": "^6.5.0",
     "@google/generative-ai": "^0.24.1",
     "@mitable/shared": "*",
     "@notionhq/client": "^5.2.1",

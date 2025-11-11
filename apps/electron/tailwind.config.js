@@ -100,7 +100,8 @@ export default {
         "16px": "16px",
       },
       fontFamily: {
-        sans: ["Manrope", "system-ui", "sans-serif"],
+        sans: ["Inter", "system-ui", "sans-serif"],
+        body: ["Inter", "system-ui", "sans-serif"],
       },
       fontSize: {
         base: "14px",

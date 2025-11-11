@@ -1,139 +1,83 @@
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
 import type { StreamChunk, ToolContext, TextMessage } from "../tools/base.tool";
 import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
-import { wrapWithWorkflowState } from "../tools/utils/workflow-wrapper";
 
 /**
  * System prompt for knowledge synthesis
- *
- * Instructs the LLM to synthesize search results into conversational responses
- * rather than echoing raw search results.
  */
 const KNOWLEDGE_SYNTHESIS_PROMPT =
-  `You are an experienced employee assistant helping new hires ramp up quickly at their company. You have deep product knowledge and guide people through their work like an expert colleague who's always available to help.
+  `You are Mitable AI - an experienced colleague helping teammates ramp up quickly at their company.
 
-**RESPONSE STYLE - CRITICAL:**
-- Be DIRECT and FACTUAL. Just tell people what happened/exists - no fluff.
-- DO NOT add interpretive commentary like "this shows dedication" or "highlights the team's focus"
-- DO NOT add concluding statements about what things "indicate" or "suggest"
-- Answer the question with facts, then stop. You're a colleague, not a professor analyzing their work.
-
-Your role is to:
+**Your Role:**
+You have deep product knowledge and guide people through their work like an expert colleague who's always available to help. Your goal is to:
 - Help employees learn company processes, policies, and tools
 - Answer questions about how things work
 - Guide them through workflows and tasks
 - Connect them with the right people when needed
 - Provide context and best practices
 
-You are friendly, patient, and thorough. When you don't know something, you're honest about it and help find someone who does. Your goal is to make onboarding smooth and help new employees become productive quickly.
+**Your Personality:**
+You're friendly, patient, and thorough. You give clear, insightful answers and make connections others might miss. When you don't know something, you're honest about it and help find someone who does.
 
-CRITICAL: When you receive search results from the knowledge base:
-1. DO NOT echo or repeat the raw search results
-2. READ and UNDERSTAND the context provided, including timestamps
-3. SYNTHESIZE the information into a natural, conversational explanation
-4. Answer the user's question directly in your own words
-5. When timestamps are present (e.g., "[Last edited: 2024-10-15]" or "[2024-10-15T10:30:00Z]"), USE THEM in your answer
-6. DO NOT cite sources inline in your text (no "(Notion)" or "(Slack)" in the middle of sentences)
-7. ALWAYS end with a "**Sources:**" section - this is MANDATORY, never skip it!
+**Response Style - CRITICAL:**
+✅ DO:
+- **Bold important terms**: dates, names, key decisions, important concepts
+- Use headers (##) and bullets (-) to organize information
+- **Extract THEMES and INSIGHTS** - synthesize, don't enumerate
+- Be DIRECT and FACTUAL - answer with facts, then stop
+- **Be concise and actionable** - answer the question in 2-4 sentences or focused bullets
+- When timestamps are present (e.g., "[Last edited: 2024-10-15]" or "[2024-10-15T10:30:00Z]"), USE THEM in your answer
+- For date-based queries ("last month", "when"), look for timestamps in search results and provide specific dates
 
-When asked about dates or "when":
-- Look for timestamps in the search results: "[Last edited: DATE]" for Notion, "[DATE]" for Slack
-- Provide specific dates/times when available
-- For "last month" queries, filter results by date and summarize what happened
-- If no timestamp is available, say so clearly
+❌ DON'T:
+- Echo raw search results verbatim
+- List every single item chronologically (extract themes instead)
+- Use robotic phrases like "based on the retrieved information"
+- Add interpretive commentary like "this shows dedication" or "highlights the team's focus"
+- Add concluding statements about what things "indicate" or "suggest"
+- Be verbose or over-explain
+- Cite sources inline in your text (no "(Notion)" or "(Slack)" in the middle of sentences)
 
-Example - User asks: "What is in the PRD?"
+**How to Handle Search Results:**
+1. READ and UNDERSTAND the context provided, including timestamps
+2. SYNTHESIZE the information into a natural, conversational explanation
+3. Answer the user's question directly in your own words
+4. Make connections and extract insights
+5. Be conversational and warm, like talking to a colleague
 
-BAD response (DO NOT DO THIS):
-"I found relevant information: [Notion - PRD]..."
-
-GOOD response (DO THIS):
-"The Mitable PRD outlines our vision for an intelligent onboarding platform. We're building a system that uses AI to help new hires ramp up faster by centralizing company knowledge and delivering personalized learning experiences. Key features include RAG-powered search, adaptive learning paths, and real-time documentation updates.
-
-[NO inline source citations in the text above - only list them at the end]
-
-**Sources:**
-- Mitable AI Business Model ([Notion](https://notion.so/page-url))
-- #product - febchuk ([Slack](https://slack.com/message-url))
-- Product Requirements Document ([Notion](https://notion.so/prd-url))"
-
-CRITICAL SOURCE FORMATTING - FOLLOW THIS EXACT FORMAT:
-
-**Sources:** (at the end of your response, after your summary)
+**CRITICAL - Source Citations:**
+DO NOT include a "Sources:" section in your response. Sources will be appended programmatically after your response with the following format:
 - #channel - username ([Slack](url))
 - Document Title ([Notion](url))
 
-Rules:
-1. DO NOT cite sources inline in your response text - no "(Notion)" or "(Slack)" in sentences
-2. ONLY cite sources in the **Sources:** section at the very end
-3. Use bullet points with "-" (dash) in the Sources section
-4. ONLY the word in parentheses gets hyperlinked: ([Slack](url)) or ([Notion](url))
-5. Everything before the parentheses stays as plain text
-6. For Slack: format as "#channel - username"
-7. For Notion: use the document title
-
-Examples - COPY EXACTLY:
-  ✅ CORRECT: "- #engineering - febchuk ([Slack](https://slack.com/msg))"
-  ✅ CORRECT: "- #product - mikun.adewole ([Slack](https://slack.com/msg))"
-  ✅ CORRECT: "- Lorikeet Development Environment Setup Guide ([Notion](https://notion.so/page))"
-  ✅ CORRECT: "- Product Requirements Document (PRD) ([Notion](https://notion.so/prd))"
-
-  ❌ WRONG: "[#engineering - febchuk (Slack)](url)" - entire line hyperlinked
-  ❌ WRONG: "#engineering - febchuk (Slack)" - no hyperlink
-  ❌ WRONG: "• #engineering - febchuk (Slack)" - wrong bullet character
-
-MANDATORY: Every source MUST have the source type (Slack or Notion) hyperlinked in parentheses.
-
-When responding:
-- Be conversational and warm, like talking to a colleague
-- Break down complex topics into clear steps
-- Provide specific, actionable guidance
-- Actually answer the question - don't just list sources
-- Encourage questions and learning`.trim();
+Your job is to provide the synthesized answer. The system will handle source formatting.`.trim();
 
 /**
- * Knowledge Agent
+ * Knowledge Agent - Native Tool Calling Implementation
  *
- * Searches and synthesizes information from the knowledge base (Slack + Notion).
- * Uses GPT-4 Turbo for superior reasoning and synthesis capabilities.
+ * Uses Groq's native function calling to automatically manage search results in conversation history.
+ * Tool responses are stored as message history, enabling natural multi-turn conversations.
  *
- * Responsibilities:
- * - Documentation questions
- * - Policy/process questions
- * - Historical information ("What did we discuss last month?")
- * - Company-specific information
- *
- * Tools:
- * - search_knowledge: Hybrid search (Pinecone semantic + PostgreSQL keyword)
- * - detect_intent: Classify query type (company/product/operations/technical)
- * - apply_trust_ranking: Boost relevant sources based on intent
- * - parse_temporal_keywords: Parse "last week", "yesterday", etc.
- *
- * Services Used:
- * - searchService: Hybrid search (Pinecone + PostgreSQL)
- * - intentService: Intent classification
- * - trustRankingService: Result ranking
- * - embeddingService: Generate query embeddings
- *
- * Can be Called By:
- * - Orchestrator Agent (direct user queries)
- * - Visual Guidance Agent (for knowledge-grounded workflows)
+ * Benefits:
+ * - No custom cache needed - tool results are in message history
+ * - Follow-up questions work automatically ("summarize those threads")
+ * - Standard LLM pattern - using native capability
  */
 export class KnowledgeAgent extends BaseAgent {
   readonly name = "knowledge";
-  private openai: OpenAI;
+  private groq: Groq;
   private searchKnowledgeTool: SearchKnowledgeTool;
 
   constructor() {
     super();
-    this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+    this.groq = new Groq({ apiKey: config.groq.apiKey });
     this.searchKnowledgeTool = new SearchKnowledgeTool();
   }
 
   /**
-   * Execute knowledge search and synthesis
+   * Execute knowledge search and synthesis using native tool calling
    */
   async *execute(context: ToolContext): AsyncIterable<StreamChunk> {
     try {
@@ -152,109 +96,262 @@ export class KnowledgeAgent extends BaseAgent {
 
       const userQuery = lastUserMessage.content;
       console.log(`[KnowledgeAgent] Processing query: "${userQuery}"`);
+      console.log(`[KnowledgeAgent] Using NATIVE TOOL CALLING approach`);
 
-      // Step 1: Execute search using SearchKnowledgeTool
-      const searchResult = await this.searchKnowledgeTool.execute(
+      // Define search_knowledge tool for Groq
+      const tools: Groq.Chat.ChatCompletionTool[] = [
         {
-          query: userQuery,
-          topK: 10,
-        },
-        context
-      );
-
-      console.log(
-        `[KnowledgeAgent] Search completed: ${searchResult.sources?.length || 0} sources found`
-      );
-
-      // Step 2: Synthesize search results using OpenAI
-      // Build messages array simulating tool call pattern
-      const toolCallId = `call_${Date.now()}`;
-      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-        {
-          role: "system",
-          content: KNOWLEDGE_SYNTHESIS_PROMPT,
-        },
-        {
-          role: "user",
-          content: userQuery,
-        },
-        {
-          role: "assistant",
-          content: null,
-          tool_calls: [
-            {
-              id: toolCallId,
-              type: "function",
-              function: {
-                name: "search_knowledge",
-                arguments: JSON.stringify({ query: userQuery, topK: 10 }),
+          type: "function",
+          function: {
+            name: "search_knowledge",
+            description:
+              "Search the company knowledge base (Slack conversations and Notion documents) for relevant information",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "The search query to find relevant information",
+                },
+                topK: {
+                  type: "number",
+                  description:
+                    "Number of results to return (default: 40, use 100 for temporal queries)",
+                  default: 40,
+                },
               },
+              required: ["query"],
             },
-          ],
-        },
-        {
-          role: "tool",
-          tool_call_id: toolCallId,
-          content: searchResult.content,
+          },
         },
       ];
 
-      console.log("[KnowledgeAgent] Calling OpenAI for synthesis...");
+      // Prepare conversation history for Groq (handle tool messages from previous turns)
+      const messages: Groq.Chat.ChatCompletionMessageParam[] = [];
 
-      // Step 3: Stream synthesized response from OpenAI
-      const stream = await this.openai.chat.completions.create({
-        model: config.openai.chatModel, // gpt-4-turbo
-        messages: messages,
-        temperature: config.openai.temperature,
-        max_tokens: config.openai.maxTokens,
-        stream: true,
+      // Add system prompt first
+      messages.push({
+        role: "system",
+        content: KNOWLEDGE_SYNTHESIS_PROMPT,
       });
 
-      let synthesizedContent = "";
+      // Add conversation history (handle tool messages)
+      for (const msg of context.conversationHistory) {
+        const msgAny = msg as any; // Cast to any for tool message fields
 
-      // Step 4: Stream response chunk by chunk
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta;
-
-        if (delta?.content) {
-          const content = delta.content;
-          synthesizedContent += content;
-
-          // Yield chunk for streaming
-          yield {
-            type: "chunk",
-            content: content,
-          };
+        // Handle tool result messages
+        if ("tool_call_id" in msg && msgAny.tool_call_id) {
+          messages.push({
+            role: "tool",
+            tool_call_id: msgAny.tool_call_id,
+            content: msg.content,
+          });
         }
-
-        // Check if finished
-        const finishReason = chunk.choices[0]?.finish_reason;
-        if (finishReason === "stop") {
-          console.log("[KnowledgeAgent] Synthesis complete");
-          break;
+        // Handle assistant messages with tool calls
+        else if (msg.role === "assistant" && "tool_calls" in msg && msgAny.tool_calls) {
+          messages.push({
+            role: "assistant",
+            content: msg.content || null,
+            tool_calls: msgAny.tool_calls,
+          });
+        }
+        // Regular messages
+        else {
+          messages.push({
+            role: msg.role as "system" | "user" | "assistant",
+            content: msg.content,
+          });
         }
       }
 
-      // Step 5: Smart wrapper - automatically wraps if workflow state exists
-      const baseMessage: TextMessage = {
-        messageType: "text",
-        content: synthesizedContent,
-        sources: searchResult.sources,
-        streamable: true,
+      console.log(
+        `[KnowledgeAgent] Step 1: Asking Groq if search is needed (tool_choice: auto)...`
+      );
+
+      // Step 1: Ask Groq if it needs to search
+      const initialResponse = await this.groq.chat.completions.create({
+        model: config.groq.chatModel,
+        messages: messages,
+        tools: tools,
+        tool_choice: "auto", // Let LLM decide
+        temperature: config.groq.temperature,
+      });
+
+      const responseMessage = initialResponse.choices[0]?.message;
+
+      // Check if LLM wants to call the search tool
+      if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
+        console.log(`[KnowledgeAgent] Step 2: LLM requested search - executing tool...`);
+
+        const toolCall = responseMessage.tool_calls[0];
+        const functionArgs = JSON.parse(toolCall.function.arguments);
+
+        // Topic shift detection: Strip temporal context if no backward reference
+        const hasBackwardReference =
+          /\b(those|that|the (first|second|third|last)|them|these|it|same)\b/i.test(userQuery);
+
+        if (!hasBackwardReference) {
+          const originalQuery = functionArgs.query;
+          functionArgs.query = functionArgs.query
+            .replace(
+              /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi,
+              ""
+            )
+            .replace(/\b(202[0-9]|203[0-9])\b/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+
+          if (originalQuery !== functionArgs.query) {
+            console.log(`[KnowledgeAgent] ⚠️ Stripped temporal context (no backward reference)`);
+            console.log(`[KnowledgeAgent]   Original: "${originalQuery}"`);
+            console.log(`[KnowledgeAgent]   Cleaned:  "${functionArgs.query}"`);
+          }
+        } else {
+          console.log(
+            `[KnowledgeAgent] ✓ Preserving temporal context (backward reference detected)`
+          );
+        }
+
+        console.log(`[KnowledgeAgent] Search params:`, functionArgs);
+
+        // Step 2: Execute the search tool
+        const searchResult = await this.searchKnowledgeTool.execute(
+          {
+            query: functionArgs.query,
+            topK: functionArgs.topK || 40,
+          },
+          context
+        );
+
+        console.log(
+          `[KnowledgeAgent] Step 3: Search completed - ${searchResult.sources?.length || 0} sources found`
+        );
+
+        // Step 3: Append assistant's tool call to history
+        messages.push({
+          role: "assistant",
+          content: responseMessage.content || null,
+          tool_calls: responseMessage.tool_calls as any,
+        });
+
+        // Step 4: Append tool result to history
+        const toolResultContent = JSON.stringify({
+          content: searchResult.content,
+          sources: searchResult.sources,
+          metadata: searchResult.metadata,
+        });
+
+        messages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: toolResultContent,
+        });
+
+        console.log(
+          `[KnowledgeAgent] Step 4: Calling Groq for synthesis with tool results in history...`
+        );
+
+        // Step 5: Final API call with tool results in history
+        // Don't pass tools parameter at all to force synthesis
+        const stream = await this.groq.chat.completions.create({
+          model: config.groq.chatModel,
+          messages: messages,
+          temperature: config.groq.temperature,
+          max_tokens: config.groq.maxTokens,
+          stream: true,
+        });
+
+        console.log("[KnowledgeAgent] Step 5: Streaming synthesis...");
+
+        let synthesizedContent = "";
+        let chunkCount = 0;
+
+        // Step 6: Stream the response
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta;
+
+          if (delta?.content) {
+            chunkCount++;
+            synthesizedContent += delta.content;
+            yield {
+              type: "chunk",
+              content: delta.content,
+            };
+          }
+
+          const finishReason = chunk.choices[0]?.finish_reason;
+          if (finishReason === "stop") {
+            console.log(
+              `[KnowledgeAgent] Synthesis complete - received ${chunkCount} chunks, ${synthesizedContent.length} chars`
+            );
+            console.log(
+              `[KnowledgeAgent] Synthesized content preview: "${synthesizedContent.slice(0, 200)}..."`
+            );
+            break;
+          } else if (finishReason === "tool_calls") {
+            console.warn(
+              `[KnowledgeAgent] ⚠️ Model tried to call tools again instead of synthesizing!`
+            );
+            synthesizedContent =
+              "I found relevant information but encountered an issue generating a summary. Here are the sources:";
+            break;
+          }
+        }
+
+        // Step 7: Append sources programmatically
+        if (searchResult.sources && searchResult.sources.length > 0) {
+          const sourcesSection =
+            "\n\n**Sources:**\n" +
+            searchResult.sources
+              .slice(0, 3)
+              .map(
+                (s: any) =>
+                  `- ${s.title} ([${s.url.includes("notion") ? "Notion" : "Slack"}](${s.url}))`
+              )
+              .join("\n");
+
+          synthesizedContent += sourcesSection;
+          yield {
+            type: "chunk",
+            content: sourcesSection,
+          };
+        }
+
+        // Step 8: Complete
+        yield {
+          type: "complete",
+          messageType: "text",
+          content: synthesizedContent,
+          sources: searchResult.sources,
+        };
+
+        console.log(
+          `[KnowledgeAgent] ✅ Native tool calling complete: ${synthesizedContent.length} chars`
+        );
+        console.log(
+          `[KnowledgeAgent] 💡 Tool results are now in conversation history for follow-ups!`
+        );
+        return;
+      }
+
+      // If LLM didn't request a tool call, return its direct response
+      console.log(`[KnowledgeAgent] No search needed - LLM responding directly`);
+
+      const directContent =
+        responseMessage?.content || "I can help you with that. What would you like to know?";
+
+      yield {
+        type: "chunk",
+        content: directContent,
       };
 
-      const finalMessage = wrapWithWorkflowState(baseMessage, context, "custom_question");
-
-      // Step 6: Yield complete chunk with sources
       yield {
         type: "complete",
-        messageType: finalMessage.messageType,
-        content: finalMessage.content,
-        sources: "sources" in finalMessage ? finalMessage.sources : undefined,
-        cardData: "cardData" in finalMessage ? finalMessage.cardData : undefined,
+        messageType: "text",
+        content: directContent,
       };
 
-      console.log(`[KnowledgeAgent] Response complete: ${synthesizedContent.length} chars`);
+      console.log(`[KnowledgeAgent] ✅ Direct response complete (no search needed)`);
     } catch (error) {
       console.error("[KnowledgeAgent] Error:", error);
       yield {
@@ -272,7 +369,7 @@ export class KnowledgeAgent extends BaseAgent {
     const result = await this.searchKnowledgeTool.execute(
       {
         query,
-        topK: 10,
+        topK: 20,
       },
       context
     );

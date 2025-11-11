@@ -28,6 +28,14 @@ out/
 .env.test.local
 .env.production.local
 
+# Credentials (NEVER commit these!)
+**/creds/
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!**/tsconfig*.json
+
 # Logs
 logs
 *.log
