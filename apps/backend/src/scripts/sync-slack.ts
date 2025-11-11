@@ -18,6 +18,7 @@ import { searchContent } from "../db/schema/search-content.schema.js";
 import { eq, desc } from "drizzle-orm";
 import { WebClient } from "@slack/web-api";
 import { vectorService } from "../services/vector.service.js";
+import { embeddingService } from "../services/embedding.service.js";
 import { validateConfig } from "../config.js";
 
 async function main() {
@@ -115,6 +116,13 @@ async function main() {
           continue;
         }
 
+        // Collect messages for batch Pinecone upsert
+        const vectorRecords: Array<{
+          id: string;
+          values: number[];
+          metadata: any;
+        }> = [];
+
         // Process each message
         for (const msg of messages) {
           const msgId = `slack-${channelId}-${msg.ts}-chunk-0`;
@@ -139,26 +147,57 @@ async function main() {
             }
           }
 
+          const messageText = msg.text || "";
+          const messageTimestamp = Math.floor(parseFloat(msg.ts!) * 1000);
+
           // Insert into DB
           await db.insert(searchContent).values({
             id: msgId,
             organizationId: orgId,
             source: "slack",
             sourceType: msg.thread_ts ? "thread_reply" : "message",
-            text: msg.text || "",
+            text: messageText,
             textVector: "", // Will be populated by trigger
             channelId,
             channelName,
             userId: msg.user || null,
             username,
-            timestamp: Math.floor(parseFloat(msg.ts!) * 1000),
-            date: new Date(parseFloat(msg.ts!) * 1000).toISOString().split("T")[0],
+            timestamp: messageTimestamp,
+            date: new Date(messageTimestamp).toISOString().split("T")[0],
+          });
+
+          // Generate embedding for Pinecone
+          const embedding = await embeddingService.embedText(messageText);
+
+          // Add to batch for Pinecone upsert
+          vectorRecords.push({
+            id: msgId,
+            values: embedding,
+            metadata: {
+              organization_id: orgId,
+              source: "slack",
+              source_type: msg.thread_ts ? "thread_reply" : "message",
+              text: messageText,
+              channel_id: channelId,
+              channel_name: channelName,
+              user_id: msg.user || null,
+              username,
+              timestamp: messageTimestamp,
+              date: new Date(messageTimestamp).toISOString().split("T")[0],
+            },
           });
 
           totalNewMessages++;
         }
 
-        console.log(`  ✅ Added ${messages.length} new messages\n`);
+        // Batch upsert to Pinecone
+        if (vectorRecords.length > 0) {
+          console.log(`  📤 Upserting ${vectorRecords.length} messages to Pinecone...`);
+          await vectorService.upsertVectors(vectorRecords);
+          console.log(`  ✅ Added ${messages.length} new messages (DB + Pinecone)\n`);
+        } else {
+          console.log(`  ✅ Up to date\n`);
+        }
         totalChannelsProcessed++;
       } catch (error) {
         console.error(`  ❌ Error: ${error instanceof Error ? error.message : error}\n`);

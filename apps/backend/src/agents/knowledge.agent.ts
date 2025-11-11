@@ -7,7 +7,8 @@ import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
 /**
  * System prompt for knowledge synthesis
  */
-const KNOWLEDGE_SYNTHESIS_PROMPT = `You are Mitable AI - an experienced colleague helping teammates ramp up quickly at their company.
+const KNOWLEDGE_SYNTHESIS_PROMPT =
+  `You are Mitable AI - an experienced colleague helping teammates ramp up quickly at their company.
 
 **Your Role:**
 You have deep product knowledge and guide people through their work like an expert colleague who's always available to help. Your goal is to:
@@ -114,7 +115,8 @@ export class KnowledgeAgent extends BaseAgent {
                 },
                 topK: {
                   type: "number",
-                  description: "Number of results to return (default: 40, use 100 for temporal queries)",
+                  description:
+                    "Number of results to return (default: 40, use 100 for temporal queries)",
                   default: 40,
                 },
               },
@@ -136,7 +138,7 @@ export class KnowledgeAgent extends BaseAgent {
       // Add conversation history (handle tool messages)
       for (const msg of context.conversationHistory) {
         const msgAny = msg as any; // Cast to any for tool message fields
-        
+
         // Handle tool result messages
         if ("tool_call_id" in msg && msgAny.tool_call_id) {
           messages.push({
@@ -162,7 +164,9 @@ export class KnowledgeAgent extends BaseAgent {
         }
       }
 
-      console.log(`[KnowledgeAgent] Step 1: Asking Groq if search is needed (tool_choice: auto)...`);
+      console.log(
+        `[KnowledgeAgent] Step 1: Asking Groq if search is needed (tool_choice: auto)...`
+      );
 
       // Step 1: Ask Groq if it needs to search
       const initialResponse = await this.groq.chat.completions.create({
@@ -181,6 +185,32 @@ export class KnowledgeAgent extends BaseAgent {
 
         const toolCall = responseMessage.tool_calls[0];
         const functionArgs = JSON.parse(toolCall.function.arguments);
+
+        // Topic shift detection: Strip temporal context if no backward reference
+        const hasBackwardReference =
+          /\b(those|that|the (first|second|third|last)|them|these|it|same)\b/i.test(userQuery);
+
+        if (!hasBackwardReference) {
+          const originalQuery = functionArgs.query;
+          functionArgs.query = functionArgs.query
+            .replace(
+              /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi,
+              ""
+            )
+            .replace(/\b(202[0-9]|203[0-9])\b/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+
+          if (originalQuery !== functionArgs.query) {
+            console.log(`[KnowledgeAgent] ⚠️ Stripped temporal context (no backward reference)`);
+            console.log(`[KnowledgeAgent]   Original: "${originalQuery}"`);
+            console.log(`[KnowledgeAgent]   Cleaned:  "${functionArgs.query}"`);
+          }
+        } else {
+          console.log(
+            `[KnowledgeAgent] ✓ Preserving temporal context (backward reference detected)`
+          );
+        }
 
         console.log(`[KnowledgeAgent] Search params:`, functionArgs);
 
@@ -222,10 +252,10 @@ export class KnowledgeAgent extends BaseAgent {
         );
 
         // Step 5: Final API call with tool results in history
+        // Don't pass tools parameter at all to force synthesis
         const stream = await this.groq.chat.completions.create({
           model: config.groq.chatModel,
           messages: messages,
-          tools: tools, // Keep tools available for potential follow-ups
           temperature: config.groq.temperature,
           max_tokens: config.groq.maxTokens,
           stream: true,
@@ -234,12 +264,14 @@ export class KnowledgeAgent extends BaseAgent {
         console.log("[KnowledgeAgent] Step 5: Streaming synthesis...");
 
         let synthesizedContent = "";
+        let chunkCount = 0;
 
         // Step 6: Stream the response
         for await (const chunk of stream) {
           const delta = chunk.choices[0]?.delta;
 
           if (delta?.content) {
+            chunkCount++;
             synthesizedContent += delta.content;
             yield {
               type: "chunk",
@@ -249,7 +281,19 @@ export class KnowledgeAgent extends BaseAgent {
 
           const finishReason = chunk.choices[0]?.finish_reason;
           if (finishReason === "stop") {
-            console.log("[KnowledgeAgent] Synthesis complete");
+            console.log(
+              `[KnowledgeAgent] Synthesis complete - received ${chunkCount} chunks, ${synthesizedContent.length} chars`
+            );
+            console.log(
+              `[KnowledgeAgent] Synthesized content preview: "${synthesizedContent.slice(0, 200)}..."`
+            );
+            break;
+          } else if (finishReason === "tool_calls") {
+            console.warn(
+              `[KnowledgeAgent] ⚠️ Model tried to call tools again instead of synthesizing!`
+            );
+            synthesizedContent =
+              "I found relevant information but encountered an issue generating a summary. Here are the sources:";
             break;
           }
         }
@@ -281,8 +325,12 @@ export class KnowledgeAgent extends BaseAgent {
           sources: searchResult.sources,
         };
 
-        console.log(`[KnowledgeAgent] ✅ Native tool calling complete: ${synthesizedContent.length} chars`);
-        console.log(`[KnowledgeAgent] 💡 Tool results are now in conversation history for follow-ups!`);
+        console.log(
+          `[KnowledgeAgent] ✅ Native tool calling complete: ${synthesizedContent.length} chars`
+        );
+        console.log(
+          `[KnowledgeAgent] 💡 Tool results are now in conversation history for follow-ups!`
+        );
         return;
       }
 

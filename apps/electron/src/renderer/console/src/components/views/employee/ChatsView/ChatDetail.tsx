@@ -101,20 +101,10 @@ export default function ChatDetail() {
     );
   }
 
-  if (!messages || messages.length === 0) {
-    return (
-      <div className="p-8">
-        <button
-          onClick={() => navigate("/chats")}
-          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-4"
-        >
-          <ArrowLeft size={16} />
-          <span className="text-sm">Back to Chats</span>
-        </button>
-        <p className="text-text-primary">No messages found</p>
-      </div>
-    );
-  }
+  // Don't show error for empty conversations - just render empty chat
+  // if (!messages || messages.length === 0) {
+  //   return empty state - removed to allow empty chats
+  // }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,7 +283,7 @@ export default function ChatDetail() {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto app-no-drag custom-scrollbar">
         <div className="max-w-4xl mx-auto px-8 py-4 pb-20">
-          {messages.map((message) => {
+          {(messages || []).map((message) => {
             // Render workflow messages with rich details
             if (message.messageType === "workflow" && message.cardData) {
               const isWorkflowActive = message.cardData.workflowActive;
