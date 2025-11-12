@@ -2,6 +2,7 @@ import { app } from "./app.js";
 import { config, validateConfig, checkPortAvailability } from "./config.js";
 import { testConnection } from "./db/client.js";
 import { vectorService } from "./services/vector.service.js";
+import { piiRedactionService } from "./services/pii-redaction.service.js";
 
 async function startServer() {
   // Validate environment variables
@@ -45,6 +46,11 @@ async function startServer() {
   console.log("🔧 Initializing vector service...");
   vectorService.initialize();
   console.log("✅ Vector service initialized");
+
+  // Initialize PII redaction service (warm up 5 OCR workers for parallel processing)
+  console.log("🔧 Initializing PII redaction service...");
+  await piiRedactionService.initializeOCRWorkers();
+  console.log("✅ PII redaction service hot and ready (5 workers)");
 
   // Start server
   app.listen(config.port, () => {
