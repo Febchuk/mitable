@@ -125,8 +125,6 @@ export function validateConfig() {
     { key: "SLACK_CLIENT_SECRET", value: config.slack.clientSecret },
     { key: "NOTION_CLIENT_ID", value: config.notion.clientId },
     { key: "NOTION_CLIENT_SECRET", value: config.notion.clientSecret },
-    { key: "GOOGLE_CLOUD_PROJECT_ID", value: config.googleCloud.projectId },
-    { key: "GOOGLE_CLOUD_KEY_PATH", value: config.googleCloud.keyPath },
     { key: "JWT_SECRET", value: config.jwtSecret },
   ];
 
@@ -137,6 +135,14 @@ export function validateConfig() {
     throw new Error(
       `Missing required environment variables: ${missingKeys}. ` +
         `Please check your .env file and ensure all required keys are set.`
+    );
+  }
+
+  // Optional: Warn if Google Cloud credentials are missing (PII redaction will be disabled)
+  if (!config.googleCloud.projectId || !config.googleCloud.keyPath) {
+    console.warn(
+      "[Config] Google Cloud credentials not configured - PII redaction will be disabled. " +
+        "Set GOOGLE_CLOUD_PROJECT_ID and GOOGLE_CLOUD_KEY_PATH to enable."
     );
   }
 
