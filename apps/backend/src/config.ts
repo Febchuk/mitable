@@ -102,6 +102,13 @@ export const config = {
 
   // Security
   jwtSecret: process.env.JWT_SECRET || "",
+
+  // CORS Configuration
+  cors: {
+    allowedOrigins: (process.env.ALLOWED_ORIGINS || "http://localhost:5173")
+      .split(",")
+      .map((origin) => origin.trim()),
+  },
 };
 
 // Validate required environment variables
