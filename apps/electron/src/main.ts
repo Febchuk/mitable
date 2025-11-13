@@ -7,6 +7,7 @@ import {
   CaptureResult,
   ConversationContext,
 } from "./services/captureService";
+import { initActiveWindowBridge } from "./main/activeWindowBridge";
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
@@ -1113,6 +1114,9 @@ function registerGlobalShortcuts() {
 }
 
 app.whenReady().then(() => {
+  // Initialize active window bridge for capture policy
+  initActiveWindowBridge();
+
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
   createConsoleWindow();
