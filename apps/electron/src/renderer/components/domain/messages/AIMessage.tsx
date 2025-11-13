@@ -7,7 +7,7 @@ interface AIMessageProps {
 
 export default function AIMessage({ content, isStreaming = false }: AIMessageProps) {
   return (
-    <div className="mb-8 max-w-[700px]">
+    <div className="mb-4 max-w-[700px]">
       {/* Message Content with Smart Markdown Parsing */}
       <div className="text-[16px] leading-[1.7] text-[#E5E5E5] font-normal">
         <Response parseIncompleteMarkdown={isStreaming}>{content}</Response>
