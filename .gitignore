@@ -61,6 +61,8 @@ coverage/
 # Misc
 *.tsbuildinfo
 
+# OCR/ML Models (auto-downloaded by tesseract.js)
+*.traineddata
 
 
 .mcp.json
