@@ -19,6 +19,7 @@ import {
   CaptureResult,
   ConversationContext,
 } from "./services/captureService";
+import { initActiveWindowBridge } from "./main/activeWindowBridge";
 
 // ES Module __dirname equivalent (required because package.json has "type": "module")
 // Use custom variable names to avoid conflict with electron-vite's injected __dirname
@@ -1133,6 +1134,9 @@ process.on("unhandledRejection", (reason: any, promise) => {
 });
 
 app.whenReady().then(() => {
+  // Initialize active window bridge for capture policy
+  initActiveWindowBridge();
+
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
   createConsoleWindow();

@@ -20,6 +20,7 @@ const IPC_CHANNELS = {
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
   CAPTURE_SCREENSHOT: "capture-screenshot",
+  GET_ACTIVE_WINDOW: "mitable:get-active-window",
 } as const;
 
 contextBridge.exposeInMainWorld("conversationAPI", {
@@ -171,6 +172,13 @@ contextBridge.exposeInMainWorld("conversationAPI", {
     });
     return ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT, payload);
   },
+
+  // Get active window info - for capture policy enforcement
+  getActiveWindow: (): Promise<{
+    title: string;
+    appName: string;
+    processId?: number;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.GET_ACTIVE_WINDOW),
 
   // Auth management - Conversation requests token from main process
   getAuthToken: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_TOKEN),

@@ -24,6 +24,8 @@ import { promises as fs } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import crypto from "crypto";
+import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
+import activeWin from "active-win";
 
 // ===========================
 // Types & Interfaces
@@ -76,9 +78,10 @@ export interface CaptureOptions {
 }
 
 /**
- * Screenshot capture result
+ * Screenshot capture result - Success case
  */
-export interface CaptureResult {
+export interface CaptureResultSuccess {
+  success: true;
   /** Base64-encoded image data (with data URL prefix) */
   dataUrl: string;
   /** Optional file path if saved to temp */
@@ -95,6 +98,22 @@ export interface CaptureResult {
     window?: WindowMetadata;
   };
 }
+
+/**
+ * Screenshot capture result - Error case (policy blocked or technical failure)
+ */
+export interface CaptureResultError {
+  success: false;
+  error: string;
+  reason: "policy_blocked" | "technical_error" | "no_window";
+  blockedApp?: string;
+  blockedWindow?: string;
+}
+
+/**
+ * Screenshot capture result - discriminated union
+ */
+export type CaptureResult = CaptureResultSuccess | CaptureResultError;
 
 /**
  * Temporary file information
@@ -393,7 +412,7 @@ class CaptureService {
    * @returns Capture result with image data and metadata
    */
   async capture(options: CaptureOptions = {}): Promise<CaptureResult | null> {
-    const { mode = "full-screen" } = options;
+    const { mode = "active-window" } = options; // Changed default from "full-screen" to "active-window"
 
     console.log("[CaptureService] Starting capture:", {
       mode,
@@ -410,8 +429,10 @@ class CaptureService {
           result = await this.captureActiveWindow(options.saveToFile);
           break;
         case "full-screen":
-          result = await this.captureFullScreen(options.displayId, options.saveToFile);
-          break;
+          // Full-screen capture disabled for privacy/security policy
+          console.warn("[CaptureService] ⚠️  Full-screen capture is disabled by policy");
+          console.warn("[CaptureService] Use 'active-window' mode for app-specific captures");
+          return null;
         case "region":
           if (!options.bounds) {
             throw new Error("Region capture requires bounds parameter");
@@ -423,12 +444,16 @@ class CaptureService {
       }
 
       if (result) {
-        console.log("[CaptureService] Capture successful:", {
-          mode,
-          width: result.metadata.width,
-          height: result.metadata.height,
-          hasFile: !!result.filePath,
-        });
+        if (result.success) {
+          console.log("[CaptureService] Capture successful:", {
+            mode,
+            width: result.metadata.width,
+            height: result.metadata.height,
+            hasFile: !!result.filePath,
+          });
+        } else {
+          console.log("[CaptureService] Capture blocked:", result.error);
+        }
       }
 
       return result;
@@ -446,7 +471,45 @@ class CaptureService {
    */
   async captureActiveWindow(saveToFile: boolean = false): Promise<CaptureResult | null> {
     try {
-      // Get all window sources
+      // STEP 1: Get active window info for policy check
+      const activeWindow = await activeWin();
+      if (!activeWindow) {
+        console.log("[CaptureService] No active window detected");
+        return null;
+      }
+
+      const windowTitle = activeWindow.title ?? "";
+      const appName = activeWindow.owner?.name ?? "";
+
+      console.log("[CaptureService] Active window detected:", {
+        title: windowTitle,
+        app: appName,
+      });
+
+      // STEP 2: Check capture policy (deny-first)
+      const policy = getCapturePolicy();
+      const policyDecision = isBlockedByPolicy(windowTitle, appName, undefined, policy);
+
+      if (policyDecision.blocked) {
+        console.log("[CaptureService] ❌ Capture BLOCKED by policy:", {
+          window: windowTitle,
+          app: appName,
+          reason: policyDecision.reason,
+        });
+        
+        // Return structured error for policy block
+        return {
+          success: false,
+          error: `I'm not allowed to view ${appName || windowTitle} due to your organization's capture policy. I can still help you with text-based instructions instead.`,
+          reason: "policy_blocked",
+          blockedApp: appName,
+          blockedWindow: windowTitle,
+        };
+      }
+
+      console.log("[CaptureService] ✅ Capture ALLOWED by policy");
+
+      // STEP 3: Get all window sources
       const sources = await desktopCapturer.getSources({
         types: ["window"],
         thumbnailSize: {
@@ -460,17 +523,21 @@ class CaptureService {
         return null;
       }
 
-      // Get the first non-Electron window (skip our own windows)
-      const targetSource = sources.find(
-        (source) => !source.name.includes("Mitable") && source.name.trim().length > 0
-      );
+      // STEP 4: Find the matching window source (by title)
+      const targetSource = sources.find((source) => {
+        // Try exact match first
+        if (source.name === windowTitle) return true;
+        // Fallback: contains match
+        if (windowTitle && source.name.includes(windowTitle)) return true;
+        return false;
+      });
 
       if (!targetSource) {
-        console.error("[CaptureService] No suitable window found");
+        console.error("[CaptureService] No matching window source found for:", windowTitle);
         return null;
       }
 
-      console.log("[CaptureService] Capturing active window:", targetSource.name);
+      console.log("[CaptureService] Capturing window:", targetSource.name);
 
       // Get the thumbnail image
       let image = targetSource.thumbnail;
@@ -506,6 +573,7 @@ class CaptureService {
       }
 
       return {
+        success: true,
         dataUrl,
         filePath,
         metadata: {
@@ -589,6 +657,7 @@ class CaptureService {
       }
 
       return {
+        success: true,
         dataUrl,
         filePath,
         metadata: {
@@ -622,7 +691,7 @@ class CaptureService {
       // First capture full screen, then crop to region
       const fullScreenResult = await this.captureFullScreen(undefined, false);
 
-      if (!fullScreenResult) {
+      if (!fullScreenResult || !fullScreenResult.success) {
         console.error("[CaptureService] Failed to capture full screen for region crop");
         return null;
       }
@@ -654,6 +723,7 @@ class CaptureService {
       }
 
       return {
+        success: true,
         dataUrl,
         filePath,
         metadata: {
