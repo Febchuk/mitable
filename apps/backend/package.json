@@ -21,9 +21,9 @@
     "sync-slack": "tsx src/scripts/sync-slack.ts"
   },
   "dependencies": {
-    "@google-cloud/dlp": "^6.5.0",
     "@google/generative-ai": "^0.24.1",
     "@mitable/shared": "*",
+    "tesseract.js": "^6.0.1",
     "@notionhq/client": "^5.2.1",
     "@pinecone-database/pinecone": "^6.1.2",
     "@slack/web-api": "^7.11.0",

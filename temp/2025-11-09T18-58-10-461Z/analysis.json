@@ -1,0 +1,36 @@
+{
+  "timestamp": "2025-11-09T18:58:10.572Z",
+  "instruction": "A rectangular button or list item labeled \"Liked Songs\". The visual appearance will vary depending on the music app (e.g., Spotify, Apple Music, etc.), but generally, it will be a text label, \"Liked Songs,\" possibly accompanied by an icon representing a heart or a plus symbol (typically white or the app's accent color). The location is commonly found in the left sidebar navigation menu, the main library view, or within a playlist section. The text will likely be in a readable font size (14-18pt) and the button may have a subtle background highlight on tap. The \"Liked Songs\" section is usually grouped with other library sections like \"Playlists,\" \"Albums,\" \"Artists,\" or \"Downloads\".",
+  "clarifiedDescription": "A rectangular button or list item labeled \"Liked Songs\". The visual appearance will vary depending on the music app (e.g., Spotify, Apple Music, etc.), but generally, it will be a text label, \"Liked Songs,\" possibly accompanied by an icon representing a heart or a plus symbol (typically white or the app's accent color). The location is commonly found in the left sidebar navigation menu, the main library view, or within a playlist section. The text will likely be in a readable font size (14-18pt) and the button may have a subtle background highlight on tap. The \"Liked Songs\" section is usually grouped with other library sections like \"Playlists,\" \"Albums,\" \"Artists,\" or \"Downloads\".",
+  "whatGeminiWasAskedToFind": "A rectangular button or list item labeled \"Liked Songs\". The visual appearance will vary depending on the music app (e.g., Spotify, Apple Music, etc.), but generally, it will be a text label, \"Liked Songs,\" possibly accompanied by an icon representing a heart or a plus symbol (typically white or the app's accent color). The location is commonly found in the left sidebar navigation menu, the main library view, or within a playlist section. The text will likely be in a readable font size (14-18pt) and the button may have a subtle background highlight on tap. The \"Liked Songs\" section is usually grouped with other library sections like \"Playlists,\" \"Albums,\" \"Artists,\" or \"Downloads\".",
+  "element": {
+    "label": "The 'Liked Songs' playlist button, located under 'Your Library' in the left sidebar.",
+    "type": "button",
+    "confidence": 0.95,
+    "boundingBox": {
+      "normalized": {
+        "x": 0.06302083333333333,
+        "y": 0.22592592592592592,
+        "width": 0.23802083333333332,
+        "height": 0.041666666666666664
+      },
+      "pixels": {
+        "x": 121,
+        "y": 244,
+        "width": 457,
+        "height": 45
+      }
+    }
+  },
+  "screenshot": {
+    "dimensions": {
+      "width": 1920,
+      "height": 1080
+    },
+    "files": {
+      "original": "original.png",
+      "annotated": "annotated.png",
+      "analysis": "analysis.json"
+    }
+  }
+}

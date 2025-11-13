@@ -90,13 +90,15 @@ export const SolutionObjectSchema = z.object({
   currentStepIndex: z.number().int().min(0), // 0-based index
   searchQuery: z.string(), // Original query for reference
   adjustmentHistory: z.array(AdjustmentRecordSchema), // Track plan changes
+  status: z.enum(["active", "completed", "abandoned", "paused"]).optional(), // Workflow status
+  workflowSessionId: z.string().optional(), // Reference to workflow_sessions table
 });
 
 export type SolutionObject = z.infer<typeof SolutionObjectSchema>;
 
 /**
  * Visual guidance response from Gemini Vision
- * Includes bounding boxes for UI element detection
+ * Precise conversational descriptions (no bounding boxes in MVP)
  */
 export const VisualGuidanceSchema = z.object({
   elementDescription: z.string(), // "Click the Edit button (pencil icon) in the top-right corner..."
@@ -104,17 +106,6 @@ export const VisualGuidanceSchema = z.object({
   confidence: z.enum(["high", "medium", "low"]),
   alternativeElements: z.array(z.string()).optional(), // Fallback if ambiguous
   conversationalMessage: z.string(), // AI-generated natural response for user display
-  element: z.object({
-    label: z.string(), // Element label or descriptive text
-    type: z.string(), // button|input|link|dropdown|checkbox|text
-    boundingBox: z.object({
-      x: z.number(), // Normalized 0-1 (left edge position)
-      y: z.number(), // Normalized 0-1 (top edge position)
-      width: z.number(), // Normalized 0-1 (width as fraction of image)
-      height: z.number(), // Normalized 0-1 (height as fraction of image)
-    }).nullable(), // Can be null if element not visible
-    confidence: z.number(), // 0-1 confidence score
-  }), // REQUIRED field - always return element info
 });
 
 export type VisualGuidance = z.infer<typeof VisualGuidanceSchema>;
