@@ -121,6 +121,19 @@ export class OrchestratorService {
         return;
       }
 
+      // Step 2.5: Demo mode routing (if enabled)
+      if (process.env.DEMO_MODE === "true") {
+        const lastUserMessage = context.conversationHistory
+          .filter((msg) => msg.role === "user")
+          .pop();
+
+        if (lastUserMessage?.content === "Help me analyze this P&ID for pre-FEED estimation") {
+          console.log("[Orchestrator] Routing: DEMO MODE � VisualGuidanceAgent");
+          yield* this.visualGuidanceAgent.execute(context);
+          return;
+        }
+      }
+
       // Step 3: Intent classification (LLM-based)
       const intent = await this.classifyIntent(context);
 

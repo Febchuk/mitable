@@ -129,7 +129,7 @@ export class VisualGuidanceAgent extends BaseAgent {
               type: "complete",
               messageType: "text",
               content:
-                "Congratulations! You've completed all the steps. Your development environment is now set up and ready to use!",
+                "Excellent work! You've completed the pre-FEED P&ID analysis. You now have a complete equipment sizing estimate: 3 ft × 10 ft separator vessel, sized control valves (6\", 4\", 3\"), and properly sized bypass lines. This gives you everything needed for the project scope and budget estimate.",
             };
             return;
           }
@@ -160,6 +160,7 @@ export class VisualGuidanceAgent extends BaseAgent {
               ...updatedWorkflowState,
               workflowActive: true,
               currentPhase: "step_progression",
+              workflowSessionId: (context.workflowState as any).workflowSessionId, // Preserve workflow session ID
             },
           };
           return;
@@ -205,6 +206,7 @@ export class VisualGuidanceAgent extends BaseAgent {
               status: "active",
               workflowActive: true,
               currentPhase: "step_progression", // After answering, show WorkflowOptions again
+              workflowSessionId: (context.workflowState as any).workflowSessionId, // Preserve workflow session ID
             },
           };
           return;

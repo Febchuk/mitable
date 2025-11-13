@@ -16,32 +16,17 @@ export const DEMO_MODE = process.env.DEMO_MODE === "true";
 export const DEMO_WORKFLOW_STEPS: Step[] = [
   {
     stepNumber: 1,
-    description: "Launch your IDE",
+    description: "Identify equipment requiring sizing",
     status: "pending",
   },
   {
     stepNumber: 2,
-    description: "Open your terminal in your IDE",
+    description: "Establish flow assumptions and size the vessel",
     status: "pending",
   },
   {
     stepNumber: 3,
-    description: "Launch Claude Code",
-    status: "pending",
-  },
-  {
-    stepNumber: 4,
-    description: "Turn on auto-accept in Claude Code",
-    status: "pending",
-  },
-  {
-    stepNumber: 5,
-    description: "Get Claude to install the dependencies and run the dev server",
-    status: "pending",
-  },
-  {
-    stepNumber: 6,
-    description: "Get mock username and password",
+    description: "Size control valves and piping",
     status: "pending",
   },
 ];
@@ -50,34 +35,28 @@ export const DEMO_WORKFLOW_STEPS: Step[] = [
  * Initial workflow solution object
  */
 export const DEMO_WORKFLOW_SOLUTION: Omit<SolutionObject, "currentStepIndex" | "adjustmentHistory"> = {
-  solution: "Set up your local development environment",
+  solution: "Analyze P&ID for pre-FEED estimation",
   solutionExplanation:
-    "This workflow will guide you through launching your IDE, setting up your terminal, installing dependencies, and accessing the development environment with test credentials.",
+    "This workflow will guide you through analyzing a three-phase separator P&ID for pre-FEED estimation, including identifying equipment requiring sizing, establishing flow assumptions, and sizing the vessel and control systems.",
   stepList: DEMO_WORKFLOW_STEPS,
   supportingData: [
     {
-      text: "Demo environment setup guide: Launch VSCode, open terminal with Ctrl+`, run Claude Code, enable auto-accept, start dev server, and use test credentials from Slack.",
-      source: "Demo Documentation",
-      metadata: {
-        score: 1.0,
-        sourceType: "demo",
-      },
+      title: "Pre-FEED P&ID Analysis Guide",
+      url: "https://docs.engineering.example.com/pre-feed-analysis",
+      snippet: "Pre-FEED P&ID analysis guide: Identify major equipment (separator vessel, control valves, instrumentation), establish typical flow assumptions (oil, water, gas rates), size vessel based on retention time, and size control valves and piping per API velocity limits.",
     },
   ],
-  supportingDataExplanation: "This is a guided walkthrough for environment setup based on our standard onboarding process.",
-  searchQuery: "How do I set up my local development environment?",
+  supportingDataExplanation: "This is a guided walkthrough for pre-FEED P&ID analysis based on upstream oil & gas engineering standards.",
+  searchQuery: "Help me analyze this P&ID for pre-FEED estimation",
 };
 
 /**
  * Step progression messages - what the agent says when moving to each step
  */
 export const DEMO_STEP_PROGRESSION_MESSAGES: Record<number, string> = {
-  1: "I can see that you currently have Notion open, but to move forward you need to open VSCode from your dock.",
-  2: "Great, you opened VSCode! Now use the keyboard shortcut ⌃ + ` (control + backtick) to open your terminal.",
-  3: "Now in your terminal, literally just type in \"claude\"",
-  4: "Use the keyboard shortcut shift + tab to allow Claude run terminal commands automatically.",
-  5: 'Paste this message into the Claude Code chat bar "Start the development server for me. Make sure that all of the necessary dependencies are installed before as due diligence"',
-  6: "Great, I can see that the dev app loaded successfully! Now, open [this message](https://mitableai.slack.com/archives/C09C8B5ANTY/p1761073540624099?thread_ts=1760617155.954479&cid=C09C8B5ANTY) in Slack to find the mock username and password to log in with.",
+  1: "I can see you have a three-phase separator P&ID open. For your pre-FEED estimate, here's what needs sizing:\n\n• Separator vessel (horizontal cylinder)\n• 3 control valves - vapor, oil, and water outlets\n• Instrumentation - PT, 2× LT, PC, 2× LC\n• Manual isolation valves on each line\n\nThe vessel is your starting point since everything else depends on it. Ready to move forward?",
+  2: "Now let's size the vessel. Since you don't have actual flow rates yet, we'll work with typical ranges. For upstream separators like this, here are the standard assumptions:\n\n**Flow assumptions:**\n• Oil: 2,000 BPD\n• Water cut: 40% → Water: 800 BPD\n• Total liquid: 2,800 BPD\n• Gas: 2 MMSCFD\n• Pressure: 150 psig, Temp: 80°F\n• Retention time: 4 minutes\n\nFor pre-FEED, we typically use 40-60% water cut assumptions unless there's well test data. Most engineers underestimate this and end up having to revise later.\n\nDo these assumptions look reasonable for this field?",
+  3: "Now for the piping and control valves. Based on your flow rates and sticking to API velocity limits (gas: 50-100 ft/s, liquids: 5-10 ft/s), here are the sizes:\n\n• Vapor outlet: 6\" line, 6\" control valve\n• Oil outlet: 4\" line, 4\" control valve\n• Water outlet: 3\" line, 3\" control valve\n• Inlet: 6\" (handles multiphase flow)\n\nThese follow what the team calls the \"2-second rule\" - basically, fluids should be able to exit the vessel in 2-10 seconds during upsets.",
 };
 
 /**
@@ -85,23 +64,33 @@ export const DEMO_STEP_PROGRESSION_MESSAGES: Record<number, string> = {
  * Structure: { stepIndex: { userQuestion: agentResponse } }
  */
 export const DEMO_CUSTOM_QUESTION_RESPONSES: Record<number, Record<string, string>> = {
-  4: {
-    "What is the point of this step?":
-      "Great question! Without this step you'd have to accept every single command that Claude wants to run in your terminal one by one, which slows things down. This is a great example of when to just ask AI to do something for you because the alternative would have been finding the commands and putting them in one by one.",
-    "what is the point of this step":
-      "Great question! Without this step you'd have to accept every single command that Claude wants to run in your terminal one by one, which slows things down. This is a great example of when to just ask AI to do something for you because the alternative would have been finding the commands and putting them in one by one.",
-    "why do i need this":
-      "Great question! Without this step you'd have to accept every single command that Claude wants to run in your terminal one by one, which slows things down. This is a great example of when to just ask AI to do something for you because the alternative would have been finding the commands and putting them in one by one.",
+  1: {
+    "Wait, what about the other stuff I see inside the vessel? Don't those need sizing too?":
+      "Ah, you're referring to the demister pad at the top, the weir in the middle, and the vortex breakers at the bottom outlets that I can see on your P&ID.\n\nGood eye, but I left those out intentionally - they're vendor-furnished internals. The vessel manufacturer sizes these based on your flow rates. In pre-FEED, just note: \"Vessel to include internals per API 12J\"\n\nActually, I'm seeing from our Shell project debrief last month that a junior engineer spent three days sizing internals that the vendor completely redid. Your manager flagged it as wasted time. Focus on vessel dimensions and control systems instead - that's where your engineering time actually matters.",
+    "what about the other stuff i see inside the vessel":
+      "Ah, you're referring to the demister pad at the top, the weir in the middle, and the vortex breakers at the bottom outlets that I can see on your P&ID.\n\nGood eye, but I left those out intentionally - they're vendor-furnished internals. The vessel manufacturer sizes these based on your flow rates. In pre-FEED, just note: \"Vessel to include internals per API 12J\"\n\nActually, I'm seeing from our Shell project debrief last month that a junior engineer spent three days sizing internals that the vendor completely redid. Your manager flagged it as wasted time. Focus on vessel dimensions and control systems instead - that's where your engineering time actually matters.",
+    "don't those need sizing too":
+      "Ah, you're referring to the demister pad at the top, the weir in the middle, and the vortex breakers at the bottom outlets that I can see on your P&ID.\n\nGood eye, but I left those out intentionally - they're vendor-furnished internals. The vessel manufacturer sizes these based on your flow rates. In pre-FEED, just note: \"Vessel to include internals per API 12J\"\n\nActually, I'm seeing from our Shell project debrief last month that a junior engineer spent three days sizing internals that the vendor completely redid. Your manager flagged it as wasted time. Focus on vessel dimensions and control systems instead - that's where your engineering time actually matters.",
   },
-  6: {
-    "This just took me to a message. Why can't I see any login details?":
-      "Ah I see! You need to open the TEST_ACCOUNTS.md file at the top of the thread to find what you're looking for!",
-    "this just took me to a message. why can't i see any login details":
-      "Ah I see! You need to open the TEST_ACCOUNTS.md file at the top of the thread to find what you're looking for!",
-    "where are the login details":
-      "Ah I see! You need to open the TEST_ACCOUNTS.md file at the top of the thread to find what you're looking for!",
-    "i don't see the credentials":
-      "Ah I see! You need to open the TEST_ACCOUNTS.md file at the top of the thread to find what you're looking for!",
+  2: {
+    "Yes, that works. How does this translate to vessel size?":
+      "Quick calculation:\n\nTotal liquid = 2,800 BPD = 19.5 bbl/hr\nLiquid volume needed = 19.5 bbl/hr × (4 min / 60) = 1.3 barrels\n\nFor horizontal vessels like this, liquid typically fills about 50% - gives you the vapor space and surge capacity you need. So:\n\nTotal vessel volume = 1.3 / 0.5 = 2.6 barrels ≈ 2 ft diameter × 6 ft long\n\nBut here's the thing - in pre-FEED you always round to standard sizes. So 3 ft × 10 ft is what I'd recommend.",
+    "how does this translate to vessel size":
+      "Quick calculation:\n\nTotal liquid = 2,800 BPD = 19.5 bbl/hr\nLiquid volume needed = 19.5 bbl/hr × (4 min / 60) = 1.3 barrels\n\nFor horizontal vessels like this, liquid typically fills about 50% - gives you the vapor space and surge capacity you need. So:\n\nTotal vessel volume = 1.3 / 0.5 = 2.6 barrels ≈ 2 ft diameter × 6 ft long\n\nBut here's the thing - in pre-FEED you always round to standard sizes. So 3 ft × 10 ft is what I'd recommend.",
+    "That's 170% margin though. Won't the client push back on that?":
+      "Not usually. Here's what happened on similar projects:\n\nThe BP project started with 40% water cut and hit 65% within two years - pretty typical for mature wells. The extra capacity saved a costly field modification.\n\nPlus, 3 ft × 10 ft is a standard vessel size. Custom 2.5 ft × 7 ft actually costs more because it's non-standard fabrication.\n\nPre-FEED margins typically run 50-100%. Clients expect this - they'd rather oversize now than pay for revisions in detailed design.",
+    "won't the client push back":
+      "Not usually. Here's what happened on similar projects:\n\nThe BP project started with 40% water cut and hit 65% within two years - pretty typical for mature wells. The extra capacity saved a costly field modification.\n\nPlus, 3 ft × 10 ft is a standard vessel size. Custom 2.5 ft × 7 ft actually costs more because it's non-standard fabrication.\n\nPre-FEED margins typically run 50-100%. Clients expect this - they'd rather oversize now than pay for revisions in detailed design.",
+    "that's a lot of margin":
+      "Not usually. Here's what happened on similar projects:\n\nThe BP project started with 40% water cut and hit 65% within two years - pretty typical for mature wells. The extra capacity saved a costly field modification.\n\nPlus, 3 ft × 10 ft is a standard vessel size. Custom 2.5 ft × 7 ft actually costs more because it's non-standard fabrication.\n\nPre-FEED margins typically run 50-100%. Clients expect this - they'd rather oversize now than pay for revisions in detailed design.",
+  },
+  3: {
+    "I'm noticing some smaller lines around the control valves. What are those for?":
+      "Great catch! You're looking at the bypass lines that I can see running parallel to each control valve on your P&ID. That's good design.\n\nDuring valve maintenance, you close the isolation valves and open the manual bypass to keep the separator running - can't afford downtime in the field.\n\nBypass lines are one size smaller than the control valve:\n\n• 6\" control valve → 4\" bypass\n• 4\" control valve → 3\" bypass\n• 3\" control valve → 2\" bypass\n\nThere's a good reason for this. When bypass lines are the same size as control valves, operators run on bypass indefinitely instead of fixing the valve. Making them smaller creates enough back pressure that they're forced to do proper maintenance.",
+    "what are those smaller lines":
+      "Great catch! You're looking at the bypass lines that I can see running parallel to each control valve on your P&ID. That's good design.\n\nDuring valve maintenance, you close the isolation valves and open the manual bypass to keep the separator running - can't afford downtime in the field.\n\nBypass lines are one size smaller than the control valve:\n\n• 6\" control valve → 4\" bypass\n• 4\" control valve → 3\" bypass\n• 3\" control valve → 2\" bypass\n\nThere's a good reason for this. When bypass lines are the same size as control valves, operators run on bypass indefinitely instead of fixing the valve. Making them smaller creates enough back pressure that they're forced to do proper maintenance.",
+    "what are those for":
+      "Great catch! You're looking at the bypass lines that I can see running parallel to each control valve on your P&ID. That's good design.\n\nDuring valve maintenance, you close the isolation valves and open the manual bypass to keep the separator running - can't afford downtime in the field.\n\nBypass lines are one size smaller than the control valve:\n\n• 6\" control valve → 4\" bypass\n• 4\" control valve → 3\" bypass\n• 3\" control valve → 2\" bypass\n\nThere's a good reason for this. When bypass lines are the same size as control valves, operators run on bypass indefinitely instead of fixing the valve. Making them smaller creates enough back pressure that they're forced to do proper maintenance.",
   },
 };
 
