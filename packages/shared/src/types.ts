@@ -151,3 +151,30 @@ export const UserSchema = z.object({
 });
 
 export type User = z.infer<typeof UserSchema>;
+
+// Watch Mode Types for selective screenshot capture
+export interface WatchableWindow {
+  windowId: string;
+  appName: string;
+  windowTitle: string;
+  bounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  isBlocked: boolean;
+  blockReason?: string;
+}
+
+export interface WatchState {
+  isWatching: boolean;
+  selectedApps: string[]; // App names that user has selected to watch
+}
+
+export interface WatchButtonState {
+  appName: string;
+  windowTitle: string;
+  status: 'unwatched' | 'watching' | 'blocked';
+  blockReason?: string;
+}

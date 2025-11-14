@@ -51,6 +51,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.24",
+    "get-windows": "^9.2.3",
     "harden-react-markdown": "^1.1.5",
     "katex": "^0.16.25",
     "lucide-react": "^0.545.0",
