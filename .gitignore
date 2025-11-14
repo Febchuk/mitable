@@ -62,7 +62,8 @@ coverage/
 *.tsbuildinfo
 
 
-.mcp.json
+
 .mcp.json
 apps/backend/.env.production
+
 .mcp.json
