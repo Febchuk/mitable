@@ -130,17 +130,17 @@ export default function ChatDetail() {
 
     try {
       console.log("[ChatDetail] Calling captureScreenshot()...");
-      const screenshot = await window.consoleAPI.captureScreenshot();
-      console.log("[ChatDetail] Screenshot result:", {
-        hasScreenshot: !!screenshot,
-        size: screenshot?.length || 0,
-        preview: screenshot?.substring(0, 100),
-      });
+      const result = await window.consoleAPI.captureScreenshot();
+      console.log("[ChatDetail] Multi-window screenshot result:", result);
 
-      if (screenshot) {
-        alert(`SUCCESS! Screenshot captured: ${screenshot.length} bytes`);
+      if (result && result.success) {
+        alert(
+          `SUCCESS! Captured ${result.screenshots.length} windows\nBlocked: ${result.blockedWindows.length}\nTotal detected: ${result.totalWindowsDetected}`
+        );
+      } else if (result && !result.success) {
+        alert(`Capture blocked or failed: ${result.error}`);
       } else {
-        alert("Screenshot returned null. Check console and Electron main process logs.");
+        alert("Screenshot returned unexpected result. Check console logs.");
       }
     } catch (error) {
       console.error("[ChatDetail] Screenshot capture error:", error);
@@ -181,23 +181,23 @@ export default function ChatDetail() {
     }
 
     // Capture screenshot for workflow actions if available
-    let screenshot: string | null = null;
-    let screenshotMetadata: any = null;
+    let multiWindowCapture: any = null;
     if (["progress_step", "custom_question", "confirm_start"].includes(action)) {
       if (window.consoleAPI?.captureScreenshot) {
         try {
-          console.log("[ChatDetail] Capturing screenshot for workflow action...");
-          const screenshotResult = await window.consoleAPI.captureScreenshot();
-          if (screenshotResult) {
-            screenshot = screenshotResult.dataUrl;
-            screenshotMetadata = screenshotResult.metadata;
-            console.log("[ChatDetail] Screenshot captured successfully:", {
-              hasScreenshot: !!screenshot,
-              hasMetadata: !!screenshotMetadata,
-              dimensions: screenshotMetadata
-                ? `${screenshotMetadata.width}x${screenshotMetadata.height}`
-                : "N/A",
+          console.log("[ChatDetail] Capturing multi-window screenshots for workflow action...");
+          const result = await window.consoleAPI.captureScreenshot();
+          if (result && result.success) {
+            console.log("[ChatDetail] Multi-window capture successful:", {
+              windowCount: result.screenshots.length,
+              blockedCount: result.blockedWindows.length,
+              totalDetected: result.totalWindowsDetected,
             });
+            multiWindowCapture = result;
+          } else if (result && !result.success) {
+            console.warn("[ChatDetail] Capture blocked or failed:", result.error);
+          } else {
+            console.log("[ChatDetail] No windows available to capture");
           }
         } catch (error) {
           console.error("[ChatDetail] Screenshot capture failed:", error);
@@ -211,13 +211,12 @@ export default function ChatDetail() {
     setIsStreaming(true);
     setStreamingContent("");
 
-    // Send message with metadata and screenshot
+    // Send message with metadata and multi-window capture
     sendMessageMutation.mutate({
       chatId,
       content: message,
       metadata, // Pass workflow metadata
-      screenshot, // Pass screenshot if captured
-      screenshotMetadata, // Pass screenshot metadata for debug and coordinate conversion
+      multiWindowCapture, // Pass multi-window capture result
     });
 
     setInputValue("");

@@ -1,12 +1,14 @@
 // Global type declarations for Electron preload API
 
+import type { MultiWindowCaptureResult } from "@mitable/shared";
+
 interface ConsoleAPI {
   // Help system
   requestHelp: (data: unknown) => void;
   onHelpResponse: (callback: (data: unknown) => void) => void;
 
-  // Screenshot capture
-  captureScreenshot: () => Promise<string | null>;
+  // Screenshot capture - multi-window capture with policy filtering
+  captureScreenshot: () => Promise<MultiWindowCaptureResult>;
 
   // Guide system
   startGuide: (data: unknown) => void;

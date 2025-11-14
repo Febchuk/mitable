@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
+import type { MultiWindowCaptureResult } from "@mitable/shared";
 
 console.log("[Preload] Console preload script starting...");
 
@@ -29,34 +30,22 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     );
   },
 
-  // Screenshot capture
-  captureScreenshot: async (): Promise<{
-    dataUrl: string;
-    metadata: {
-      width: number;
-      height: number;
-      originalWidth: number;
-      originalHeight: number;
-      scaleFactor: number;
-      captureMode: string;
-      timestamp: number;
-    };
-  } | null> => {
-    console.log("[Preload] captureScreenshot() called from renderer");
+  // Screenshot capture - multi-window capture with policy filtering
+  captureScreenshot: async (): Promise<MultiWindowCaptureResult> => {
+    console.log("[Console Preload] Multi-window captureScreenshot() called from renderer");
     const result = await ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
 
-    // IPC handler returns { dataUrl, metadata } - return the full object
-    if (result && typeof result === "object" && "dataUrl" in result) {
-      console.log("[Preload] Screenshot captured successfully:", {
-        dataUrlLength: result.dataUrl?.length || 0,
-        hasMetadata: !!result.metadata,
-        dimensions: result.metadata ? `${result.metadata.width}x${result.metadata.height}` : "N/A",
+    if (result && result.success) {
+      console.log("[Console Preload] Multi-window capture successful:", {
+        screenshotCount: result.screenshots.length,
+        blockedCount: result.blockedWindows.length,
+        totalDetected: result.totalWindowsDetected,
       });
-      return result;
+    } else if (result && !result.success) {
+      console.warn("[Console Preload] Capture blocked or failed:", result.error);
     }
 
-    console.error("[Preload] Screenshot capture failed - invalid result:", result);
-    return null;
+    return result;
   },
 
   // Guide system
