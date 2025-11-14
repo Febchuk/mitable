@@ -132,8 +132,6 @@ export function validateConfig() {
     { key: "SLACK_CLIENT_SECRET", value: config.slack.clientSecret },
     { key: "NOTION_CLIENT_ID", value: config.notion.clientId },
     { key: "NOTION_CLIENT_SECRET", value: config.notion.clientSecret },
-    { key: "GOOGLE_CLOUD_PROJECT_ID", value: config.googleCloud.projectId },
-    { key: "GOOGLE_CLOUD_KEY_PATH", value: config.googleCloud.keyPath },
     { key: "JWT_SECRET", value: config.jwtSecret },
   ];
 
