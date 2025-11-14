@@ -1,4 +1,5 @@
 import { apiRequest } from "./api";
+import type { MultiWindowCaptureResult } from "@mitable/shared";
 
 export interface Message {
   id: string;
@@ -126,7 +127,7 @@ export interface StreamCallbacks {
  * @param content - The user message content
  * @param callbacks - Callbacks for handling stream events
  * @param token - Auth token
- * @param screenshot - Optional base64-encoded screenshot for workflow context
+ * @param multiWindowCapture - Optional multi-window capture result
  * @param metadata - Optional metadata for workflow actions (workflowAction, selectedOption)
  * @returns Promise that resolves when streaming completes
  */
@@ -135,9 +136,8 @@ export async function sendStreamingMessage(
   content: string,
   callbacks: StreamCallbacks,
   token: string,
-  screenshot?: string,
-  metadata?: any,
-  screenshotMetadata?: any
+  multiWindowCapture?: MultiWindowCaptureResult | null,
+  metadata?: any
 ): Promise<void> {
   const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -145,18 +145,19 @@ export async function sendStreamingMessage(
     // Build request body
     const requestBody: {
       content: string;
-      screenshot?: string;
+      multiWindowCapture?: MultiWindowCaptureResult;
       metadata?: any;
-      screenshotMetadata?: any;
     } = { content };
-    if (screenshot) {
-      requestBody.screenshot = screenshot;
+
+    if (multiWindowCapture && multiWindowCapture.success) {
+      requestBody.multiWindowCapture = multiWindowCapture;
+      console.log(`[chatsService] Sending message with ${multiWindowCapture.screenshots.length} window screenshots`);
+    } else if (multiWindowCapture && !multiWindowCapture.success) {
+      console.log(`[chatsService] Screenshot capture blocked: ${multiWindowCapture.error}`);
     }
+
     if (metadata) {
       requestBody.metadata = metadata;
-    }
-    if (screenshotMetadata) {
-      requestBody.screenshotMetadata = screenshotMetadata;
     }
 
     // Fetch the SSE stream from backend
