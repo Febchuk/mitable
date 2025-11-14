@@ -23,6 +23,15 @@ export const IPC_CHANNELS = {
   OVERLAY_HIGHLIGHT_UPDATE: "overlay-highlight-update",
   GET_DISPLAY_METADATA: "get-display-metadata",
 
+  // Watch mode for selective screenshot capture
+  WATCH_WINDOWS_TOGGLE: "watch-windows-toggle",
+  WATCH_WINDOWS_GET_ALL: "watch-windows-get-all",
+  WATCH_WINDOW_SELECT: "watch-window-select",
+  WATCH_WINDOW_UNSELECT: "watch-window-unselect",
+  WATCH_WINDOWS_GET_SELECTED: "watch-windows-get-selected",
+  WATCH_BUTTON_WINDOW_CREATE: "watch-button-window-create",
+  WATCH_BUTTON_WINDOW_CLOSE: "watch-button-window-close",
+
   // Nudge system
   NUDGE_SHOW: "nudge-show",
   NUDGE_HIDE: "nudge-hide",
