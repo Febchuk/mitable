@@ -27,8 +27,9 @@ Mitable now enforces a **deny-first capture policy** to prevent screenshots of s
 Simple CSV format in `.env`:
 ```bash
 CAPTURE_DENY_APPS=outlook,gmail,1password,slack
-CAPTURE_DENY_URLS=mail.google.com,drive.google.com,bankofamerica.com
 ```
+
+**Note:** Each pattern is checked against BOTH window titles AND app names for maximum coverage with minimal configuration.
 
 ### 4. **Cross-Platform Support** 🌐
 App name matching is **OS-agnostic** - automatically strips file extensions:
@@ -94,17 +95,17 @@ Screenshot Request
 
 If `CAPTURE_DENY_APPS` is not set in ENV, these patterns are blocked by default:
 
-**Apps:**
-- `outlook`, `gmail`, `mail`, `messages`
-- `1password`, `lastpass`, `bitwarden`, `okta`
-- `bank`, `financial`, `payroll`, `paystub`, `tax`
-- `epic`, `cerner`, `ehr`, `hipaa`, `mychart`
-- `slack`
+**Patterns (checked against both window titles AND app names):**
+- `outlook`, `gmail`, `mail`, `messages` - Email clients
+- `1password`, `lastpass`, `bitwarden`, `okta` - Password managers
+- `bank`, `financial`, `payroll`, `paystub`, `tax` - Financial apps
+- `epic`, `cerner`, `ehr`, `hipaa`, `mychart` - Healthcare apps
+- `slack` - Communication apps
 
-**URLs:**
-- `mail.google.com`, `drive.google.com`
-- `bankofamerica`, `chase`, `wellsfargo`, `intuit`, `plaid`
-- `mychart`, `ehr`, `hipaa`, `medical`, `health`
+**Why single list works:** A pattern like `/gmail/i` blocks:
+- Desktop app: "Gmail.app" (app name match)
+- Browser app: "Gmail - Inbox (23)" (window title match)
+- Any browser: Works in Chrome, Firefox, Safari, Edge (title match)
 
 ---
 
@@ -142,9 +143,9 @@ If `CAPTURE_DENY_APPS` is not set in ENV, these patterns are blocked by default:
 ### **4. Test Custom ENV Config**
 Create `.env` file:
 ```bash
-CAPTURE_DENY_APPS=vscode,chrome
+CAPTURE_DENY_APPS=vscode,notion
 ```
-- VSCode and Chrome should be blocked
+- VSCode and Notion should be blocked (both app name and window title)
 - All other apps allowed
 
 ---
@@ -153,20 +154,22 @@ CAPTURE_DENY_APPS=vscode,chrome
 
 ### **Strict (Block Most Apps):**
 ```bash
-CAPTURE_DENY_APPS=*mail*,*password*,*bank*,slack,teams,zoom,chrome,firefox
+CAPTURE_DENY_APPS=mail,password,bank,slack,teams,zoom,payroll,hr
 ```
 
 ### **Minimal (Allow Almost Everything):**
 ```bash
 CAPTURE_DENY_APPS=1password
-CAPTURE_DENY_URLS=
 ```
 
 ### **Finance-Heavy Company:**
 ```bash
-CAPTURE_DENY_APPS=outlook,quickbooks,sage,xero,stripe,paypal
-CAPTURE_DENY_URLS=quickbooks.com,xero.com,stripe.com,paypal.com
+CAPTURE_DENY_APPS=outlook,quickbooks,sage,xero,stripe,paypal,bank,intuit
 ```
+
+**Note:** Patterns like "bank" match both:
+- Desktop apps: "QuickBooks Bank" (app name)
+- Browser tabs: "Bank of America - Login" (window title)
 
 ---
 
@@ -183,18 +186,18 @@ CAPTURE_DENY_URLS=quickbooks.com,xero.com,stripe.com,paypal.com
 
 ## Limitations
 
-- URL blocking requires browser tab info (future enhancement)
 - Window title changes (e.g., "Gmail - Inbox" → "Gmail - Drafts") are handled via partial matching
 - No allow-list mode yet (only deny-list)
+- Patterns must match either window title OR app name (no AND logic)
 
 ---
 
 ## Future Enhancements
 
-1. **Browser Extension** - Pass current tab URL for precise URL blocking
-2. **Allow-List Mode** - Only allow specific apps (stricter)
-3. **Per-User Policies** - Different policies per employee role
-4. **Audit Logging** - Record all blocked capture attempts
+1. **Allow-List Mode** - Only allow specific apps (stricter than deny-list)
+2. **Per-User Policies** - Different policies per employee role
+3. **Audit Logging** - Record all blocked capture attempts with timestamps
+4. **Pattern Categories** - Organize patterns by sensitivity level (high/medium/low)
 
 ---
 

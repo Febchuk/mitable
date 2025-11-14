@@ -10,6 +10,7 @@ import ExpertsCard from "./components/ExpertsCard";
 import { WorkflowAccordion } from "./components/WorkflowAccordion";
 import LoadingMessage from "./components/LoadingMessage";
 import type { Message } from "./types";
+import type { MultiWindowCaptureResult } from "@mitable/shared";
 
 declare global {
   interface Window {
@@ -56,17 +57,7 @@ declare global {
           messageCount: number;
           lastMessageHadCardData?: boolean;
         };
-      }) => Promise<{
-        dataUrl: string;
-        metadata: {
-          width: number;
-          height: number;
-          originalWidth: number;
-          originalHeight: number;
-          captureMode: string;
-          timestamp: number;
-        };
-      } | null>;
+      }) => Promise<MultiWindowCaptureResult>;
     };
   }
 }
@@ -164,12 +155,11 @@ function App() {
           setMessages((prev) => [...prev, userMsg]);
         }
 
-        // Conditionally capture screenshot based on message content and conversation context
-        let capturedScreenshot: string | null = screenshot; // Use provided screenshot if available
-        let capturedMetadata: any = null;
+        // Capture multi-window screenshots
+        let multiWindowCapture: any = null;
 
-        if (!capturedScreenshot) {
-          // Build conversation context for heuristics
+        if (!screenshot) {
+          // Build conversation context
           const lastMessage = messages[messages.length - 1];
           const hasActiveWorkflow =
             lastMessage?.messageType === "workflow" || !!lastMessage?.cardData?.workflowActive;
@@ -181,30 +171,30 @@ function App() {
             lastMessageHadCardData: !!lastMessage?.cardData,
           };
 
-          console.log("[Conversation] Evaluating screenshot capture need:", {
+          console.log("[Conversation] Requesting multi-window capture:", {
             message,
             context,
           });
 
-          // Capture screenshot conditionally using IPC API with heuristics
-          // The main process will use CaptureService.conditionalCapture() to decide
+          // Capture multi-window screenshots using IPC API
           try {
             const result = await window.conversationAPI.captureScreenshot({
               message,
               context,
             });
 
-            if (result) {
-              capturedScreenshot = result.dataUrl;
-              capturedMetadata = result.metadata;
-              console.log("[Conversation] Screenshot captured via heuristics:", {
-                size: capturedScreenshot.length,
-                metadata: result.metadata,
+            if (result && result.success) {
+              // Multi-window capture successful
+              console.log("[Conversation] Multi-window capture successful:", {
+                screenshotCount: result.screenshots.length,
+                blockedCount: result.blockedWindows.length,
+                totalDetected: result.totalWindowsDetected,
               });
+              multiWindowCapture = result;
+            } else if (result && !result.success) {
+              console.warn("[Conversation] Capture blocked or failed:", result.error);
             } else {
-              console.log(
-                "[Conversation] No screenshot captured (heuristics determined not needed)"
-              );
+              console.log("[Conversation] No windows available to capture");
             }
           } catch (error) {
             console.error("[Conversation] Screenshot capture failed:", error);
@@ -240,12 +230,12 @@ function App() {
         // Set initial loading state
         setLoadingMessage("Thinking...");
 
-        // Stream the response with conditionally captured screenshot
+        // Stream the response with multi-window captures
         try {
           await sendMessageStream(
             convId,
             message,
-            capturedScreenshot,
+            multiWindowCapture, // Multi-window capture result
             {
               onChunk: (chunk, workflowSessionId, relatedStepIndex) => {
                 // Clear loading message on first chunk
@@ -350,8 +340,7 @@ function App() {
                 setLoadingMessage(message);
               },
             },
-            metadata,
-            capturedMetadata
+            metadata // Workflow metadata only
           );
         } catch (error) {
           console.error("Failed to send message:", error);
@@ -582,26 +571,30 @@ function App() {
     setWorkflowLoadingMessage("Thinking...");
 
     // Capture screenshot for workflow actions (progress_step and custom_question)
-    let screenshot: string | null = null;
-    let screenshotMetadata: any = null;
+    let multiWindowCapture: any = null;
     if (
       option.action === "progress_step" ||
       option.action === "custom_question" ||
       option.action === "confirm_start"
     ) {
       console.log("[Conversation] Capturing screenshot for workflow action:", option.action);
-      const screenshotResult = await window.conversationAPI?.captureScreenshot?.();
-      if (screenshotResult) {
-        screenshot = screenshotResult.dataUrl;
-        screenshotMetadata = screenshotResult.metadata;
-        console.log("[Conversation] Screenshot captured successfully", {
-          hasMetadata: !!screenshotMetadata,
-          dimensions: screenshotMetadata
-            ? `${screenshotMetadata.width}x${screenshotMetadata.height}`
-            : "N/A",
-        });
-      } else {
-        console.warn("[Conversation] Screenshot capture failed");
+      try {
+        const result = await window.conversationAPI?.captureScreenshot?.();
+        if (result && result.success) {
+          console.log("[Conversation] Multi-window capture successful", {
+            windowCount: result.screenshots.length,
+            blockedCount: result.blockedWindows.length,
+            totalDetected: result.totalWindowsDetected,
+          });
+          multiWindowCapture = result;
+        } else if (result && !result.success) {
+          console.warn("[Conversation] Capture blocked or failed:", result.error);
+        } else {
+          console.log("[Conversation] No windows available to capture");
+        }
+      } catch (error) {
+        console.error("[Conversation] Screenshot capture failed:", error);
+        // Continue without screenshot - backend will handle gracefully
       }
     }
 
@@ -610,7 +603,7 @@ function App() {
       await sendMessageStream(
         conversationId,
         message,
-        screenshot,
+        multiWindowCapture,
         {
           onChunk: (chunk) => {
             // Clear workflow loading state on first chunk
@@ -690,8 +683,7 @@ function App() {
             setWorkflowLoadingMessage(message);
           },
         },
-        metadata, // Pass workflow metadata to the API
-        screenshotMetadata // Pass screenshot metadata for debug and coordinate conversion
+        metadata // Pass workflow metadata to the API
       );
     } catch (error) {
       console.error("Failed to send workflow message:", error);

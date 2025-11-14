@@ -7,19 +7,19 @@
 
 export type CapturePolicy = {
   appsDeny: (string | RegExp)[];
-  urlsDeny: (string | RegExp)[];
 };
 
 /**
  * Load capture policy from environment variables
- * 
+ *
  * ENV format:
  * CAPTURE_DENY_APPS=outlook,gmail,1password,slack
- * CAPTURE_DENY_URLS=mail.google.com,drive.google.com,bankofamerica.com
+ *
+ * Note: Each pattern is checked against BOTH window titles AND app names
+ * for maximum blocking coverage with minimal configuration.
  */
 function loadPolicyFromEnv(): CapturePolicy {
   const appsDenyStr = process.env.CAPTURE_DENY_APPS || "";
-  const urlsDenyStr = process.env.CAPTURE_DENY_URLS || "";
 
   const appsDeny = appsDenyStr
     .split(",")
@@ -27,18 +27,18 @@ function loadPolicyFromEnv(): CapturePolicy {
     .filter(Boolean)
     .map((s) => new RegExp(s, "i")); // Case-insensitive
 
-  const urlsDeny = urlsDenyStr
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((s) => new RegExp(s, "i"));
-
-  return { appsDeny, urlsDeny };
+  return { appsDeny };
 }
 
 /**
  * Default deny list for common PII-heavy applications
  * Only used if ENV variables are not set
+ *
+ * These patterns are checked against BOTH:
+ * 1. Window titles (e.g., "Gmail - Inbox", "Slack - #general")
+ * 2. App names (e.g., "Slack.app", "Outlook.exe")
+ *
+ * This dual-check provides defense-in-depth with a single configuration.
  */
 const defaultDenyList: CapturePolicy = {
   appsDeny: [
@@ -51,12 +51,6 @@ const defaultDenyList: CapturePolicy = {
     /epic|cerner|ehr|hipaa|mychart/i,
     /slack/i, // Add more as needed
   ],
-  urlsDeny: [
-    /mail\.google\.com/i,
-    /drive\.google\.com/i,
-    /bankofamerica|chase|wellsfargo|intuit|plaid/i,
-    /mychart|ehr|hipaa|medical|health/i,
-  ],
 };
 
 /**
@@ -66,7 +60,7 @@ export function getCapturePolicy(): CapturePolicy {
   const envPolicy = loadPolicyFromEnv();
 
   // If ENV is set, use only ENV (no merge with defaults)
-  if (envPolicy.appsDeny.length > 0 || envPolicy.urlsDeny.length > 0) {
+  if (envPolicy.appsDeny.length > 0) {
     return envPolicy;
   }
 
@@ -114,34 +108,38 @@ function matchesAny(str: string, patterns: (string | RegExp)[] = [], isAppName: 
 
 /**
  * Check if a window/app should be blocked by capture policy
- * 
+ *
+ * Uses defense-in-depth approach:
+ * 1. First checks window title against deny patterns
+ * 2. Then checks app name (normalized) against deny patterns
+ *
+ * This dual-check ensures maximum blocking coverage:
+ * - Window title catches browser-based apps ("Gmail - Inbox")
+ * - App name catches desktop apps ("Slack.app")
+ * - Same patterns work for both (single configuration)
+ *
  * @returns { blocked: true, reason: string } if denied, { blocked: false } if allowed
  */
 export function isBlockedByPolicy(
   windowTitle: string,
   appName?: string,
-  currentTabUrl?: string,
   policy?: CapturePolicy
 ): { blocked: boolean; reason?: string } {
   const activePolicy = policy || getCapturePolicy();
 
   const title = windowTitle || "";
   const app = appName || "";
-  const url = currentTabUrl || "";
 
-  // Check window title deny list (not normalized - check as-is)
+  // Check 1: Window title against deny patterns (not normalized - check as-is)
+  // Catches: "Gmail - Inbox", "Slack - #general", "Bank of America - Login"
   if (matchesAny(title, activePolicy.appsDeny, false)) {
-    return { blocked: true, reason: "Window/app denied by capture policy" };
+    return { blocked: true, reason: "Window title denied by capture policy" };
   }
 
-  // Check app name deny list (normalized to strip .exe/.app/etc)
+  // Check 2: App name against deny patterns (normalized to strip .exe/.app/etc)
+  // Catches: "Slack.app", "1Password.exe", "Outlook"
   if (matchesAny(app, activePolicy.appsDeny, true)) {
-    return { blocked: true, reason: "Window/app denied by capture policy" };
-  }
-
-  // Check URL deny list (if URL provided)
-  if (url && matchesAny(url, activePolicy.urlsDeny, false)) {
-    return { blocked: true, reason: "URL denied by capture policy" };
+    return { blocked: true, reason: "App name denied by capture policy" };
   }
 
   return { blocked: false };
