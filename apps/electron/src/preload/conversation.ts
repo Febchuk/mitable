@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { MultiWindowCaptureResult } from "@mitable/shared";
 
 // IPC channel constants (inlined to avoid chunking issues)
 const IPC_CHANNELS = {
@@ -145,9 +146,9 @@ contextBridge.exposeInMainWorld("conversationAPI", {
     conversationId: string;
   }) => ipcRenderer.send(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, data),
 
-  // Screenshot capture - for workflow visual guidance
+  // Screenshot capture - multi-window capture with policy filtering
   // Supports conditional capture with heuristics when message and context provided
-  // Returns {dataUrl: string, metadata: ScreenshotMetadata} or null on failure/not needed
+  // Returns MultiWindowCaptureResult (success with screenshots array or error)
   captureScreenshot: (payload?: {
     message?: string;
     context?: {
@@ -156,16 +157,7 @@ contextBridge.exposeInMainWorld("conversationAPI", {
       messageCount: number;
       lastMessageHadCardData?: boolean;
     };
-  }): Promise<{
-    dataUrl: string;
-    metadata: {
-      width: number;
-      height: number;
-      timestamp: number;
-      boundingBoxes?: unknown[];
-      window?: unknown;
-    };
-  } | null> => {
+  }): Promise<MultiWindowCaptureResult> => {
     console.log("[Conversation Preload] captureScreenshot() called from renderer", {
       hasMessage: !!payload?.message,
       hasContext: !!payload?.context,

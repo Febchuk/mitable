@@ -47,6 +47,59 @@ export const ScreenshotResultSchema = z.object({
 
 export type ScreenshotResult = z.infer<typeof ScreenshotResultSchema>;
 
+// Multi-window capture types
+export const WindowScreenshotSchema = z.object({
+  windowId: z.string(),
+  windowTitle: z.string(),
+  appName: z.string(),
+  isActiveWindow: z.boolean(),
+  priority: z.number(), // 0 = highest (active), 1-4 for others
+  dataUrl: z.string(),
+  metadata: z.object({
+    width: z.number(),
+    height: z.number(),
+    scaleFactor: z.number(),
+    bounds: BoundingBoxSchema,
+  }),
+});
+
+export type WindowScreenshot = z.infer<typeof WindowScreenshotSchema>;
+
+export const BlockedWindowMetadataSchema = z.object({
+  windowTitle: z.string(),
+  appName: z.string(),
+  reason: z.string(), // "Window title denied" or "App name denied"
+});
+
+export type BlockedWindowMetadata = z.infer<typeof BlockedWindowMetadataSchema>;
+
+export const MultiWindowCaptureSuccessSchema = z.object({
+  success: z.literal(true),
+  screenshots: z.array(WindowScreenshotSchema),
+  blockedWindows: z.array(BlockedWindowMetadataSchema),
+  totalWindowsDetected: z.number(),
+  captureTimestamp: z.number(),
+});
+
+export type MultiWindowCaptureSuccess = z.infer<typeof MultiWindowCaptureSuccessSchema>;
+
+export const MultiWindowCaptureErrorSchema = z.object({
+  success: z.literal(false),
+  error: z.string(),
+  reason: z.enum(["policy_blocked", "technical_error", "no_window"]),
+  blockedApp: z.string().optional(),
+  blockedWindow: z.string().optional(),
+});
+
+export type MultiWindowCaptureError = z.infer<typeof MultiWindowCaptureErrorSchema>;
+
+export const MultiWindowCaptureResultSchema = z.union([
+  MultiWindowCaptureSuccessSchema,
+  MultiWindowCaptureErrorSchema,
+]);
+
+export type MultiWindowCaptureResult = z.infer<typeof MultiWindowCaptureResultSchema>;
+
 // UI Element detection
 export const UIElementSchema = z.object({
   id: z.string(),

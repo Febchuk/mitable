@@ -26,6 +26,11 @@ import { tmpdir } from "os";
 import crypto from "crypto";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
 import activeWin from "active-win";
+import type {
+  MultiWindowCaptureResult,
+  WindowScreenshot,
+  BlockedWindowMetadata,
+} from "@mitable/shared";
 
 // ===========================
 // Types & Interfaces
@@ -488,7 +493,7 @@ class CaptureService {
 
       // STEP 2: Check capture policy (deny-first)
       const policy = getCapturePolicy();
-      const policyDecision = isBlockedByPolicy(windowTitle, appName, undefined, policy);
+      const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
 
       if (policyDecision.blocked) {
         console.log("[CaptureService] ❌ Capture BLOCKED by policy:", {
@@ -590,6 +595,175 @@ class CaptureService {
     } catch (error) {
       console.error("[CaptureService] Active window capture failed:", error);
       return null;
+    }
+  }
+
+  /**
+   * Capture multiple visible windows (non-minimized) with capture policy filtering
+   *
+   * This method:
+   * 1. Gets the active window for prioritization
+   * 2. Captures all visible windows using desktopCapturer
+   * 3. Filters out blocked windows based on capture policy
+   * 4. Returns up to 5 screenshots, with active window first
+   *
+   * @param saveToFile - Whether to save screenshots to temp files (default: false)
+   * @returns Multi-window capture result with screenshots and blocked window metadata
+   */
+  async captureVisibleWindows(saveToFile: boolean = false): Promise<MultiWindowCaptureResult> {
+    try {
+      // STEP 1: Get active window info for prioritization
+      const activeWindow = await activeWin();
+      const activeWindowTitle = activeWindow?.title ?? "";
+      const activeAppName = activeWindow?.owner?.name ?? "";
+
+      console.log("[CaptureService] Active window detected:", {
+        title: activeWindowTitle,
+        app: activeAppName,
+      });
+
+      // STEP 2: Capture all window sources (includes ALL windows - unavoidable)
+      // Note: Electron automatically excludes minimized windows
+      const allSources = await desktopCapturer.getSources({
+        types: ["window"],
+        thumbnailSize: {
+          width: this.MAX_WIDTH * 2, // Allow for HiDPI
+          height: this.MAX_HEIGHT * 2,
+        },
+      });
+
+      if (allSources.length === 0) {
+        console.log("[CaptureService] No window sources found");
+        return {
+          success: false,
+          error: "No windows detected on your desktop",
+          reason: "no_window",
+        };
+      }
+
+      console.log(`[CaptureService] Detected ${allSources.length} visible windows`);
+
+      // STEP 3: Filter by capture policy IMMEDIATELY (discard blocked thumbnails)
+      const policy = getCapturePolicy();
+      const allowedWindows: typeof allSources = [];
+      const blockedWindows: BlockedWindowMetadata[] = [];
+
+      for (const source of allSources) {
+        // Extract app name from source name (best effort)
+        // Source name format is usually "AppName - Window Title" or just "Window Title"
+        const appNameMatch = source.name.split(" - ")[0] || source.name;
+
+        const policyDecision = isBlockedByPolicy(source.name, appNameMatch, policy);
+
+        if (policyDecision.blocked) {
+          // Add to blocked list (metadata only, discard thumbnail)
+          blockedWindows.push({
+            windowTitle: source.name,
+            appName: appNameMatch,
+            reason: policyDecision.reason || "Blocked by capture policy",
+          });
+
+          console.log(`[CaptureService] 🚫 Blocked: ${source.name} (${policyDecision.reason})`);
+          // Thumbnail is not stored - will be garbage collected
+        } else {
+          // Keep allowed window
+          allowedWindows.push(source);
+          console.log(`[CaptureService] ✅ Allowed: ${source.name}`);
+        }
+      }
+
+      if (allowedWindows.length === 0) {
+        console.log("[CaptureService] All windows blocked by policy");
+        return {
+          success: false,
+          error: `All ${allSources.length} detected windows are blocked by your organization's capture policy`,
+          reason: "policy_blocked",
+        };
+      }
+
+      // STEP 4: Prioritize windows (active window first, then front-to-back order)
+      const prioritizedWindows = [...allowedWindows].sort((a, b) => {
+        // Active window gets highest priority
+        const aIsActive = activeWindowTitle && a.name.includes(activeWindowTitle);
+        const bIsActive = activeWindowTitle && b.name.includes(activeWindowTitle);
+
+        if (aIsActive && !bIsActive) return -1;
+        if (!aIsActive && bIsActive) return 1;
+
+        // Otherwise maintain original order (front-to-back from desktopCapturer)
+        return 0;
+      });
+
+      // STEP 5: Take top 5 windows
+      const MAX_SCREENSHOTS = 5;
+      const windowsToCapture = prioritizedWindows.slice(0, MAX_SCREENSHOTS);
+
+      console.log(`[CaptureService] Capturing ${windowsToCapture.length} of ${allowedWindows.length} allowed windows`);
+
+      // STEP 6: Process each window into WindowScreenshot format
+      const screenshots: WindowScreenshot[] = [];
+      const display = screen.getPrimaryDisplay();
+
+      for (let i = 0; i < windowsToCapture.length; i++) {
+        const source = windowsToCapture[i];
+        const isActive = activeWindowTitle && source.name.includes(activeWindowTitle);
+
+        // Get image and resize if needed
+        let image = source.thumbnail;
+        const originalSize = image.getSize();
+        image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
+        const finalSize = image.getSize();
+
+        // Convert to data URL
+        const dataUrl = image.toDataURL();
+
+        // Save to temp file if requested
+        let filePath: string | undefined;
+        if (saveToFile) {
+          const fileId = this.generateFileId();
+          filePath = await this.saveToTemp(image, fileId);
+        }
+
+        // Extract app name from window title (best effort)
+        const appNameMatch = source.name.split(" - ")[0] || source.name;
+
+        screenshots.push({
+          windowId: source.id,
+          windowTitle: source.name,
+          appName: appNameMatch,
+          isActiveWindow: isActive,
+          priority: i, // 0 = highest (active window)
+          dataUrl,
+          metadata: {
+            width: finalSize.width,
+            height: finalSize.height,
+            scaleFactor: display.scaleFactor,
+            bounds: {
+              x: 0, // Not available from desktopCapturer
+              y: 0,
+              width: finalSize.width,
+              height: finalSize.height,
+            },
+          },
+        });
+      }
+
+      // STEP 7: Return success result
+      return {
+        success: true,
+        screenshots,
+        blockedWindows,
+        totalWindowsDetected: allSources.length,
+        captureTimestamp: Date.now(),
+      };
+
+    } catch (error) {
+      console.error("[CaptureService] Multi-window capture failed:", error);
+      return {
+        success: false,
+        error: `Failed to capture windows: ${error instanceof Error ? error.message : "Unknown error"}`,
+        reason: "technical_error",
+      };
     }
   }
 

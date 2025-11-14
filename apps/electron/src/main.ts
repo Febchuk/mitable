@@ -906,79 +906,40 @@ function setupIPC() {
     });
   });
 
-  // Screenshot Capture - using enhanced CaptureService with conditional capture
+  // Screenshot Capture - Multi-window capture only
   ipcMain.handle(
     IPC_CHANNELS.CAPTURE_SCREENSHOT,
     async (
       _event,
       payload?: {
-        options?: CaptureOptions;
         message?: string;
         context?: ConversationContext;
       }
-    ): Promise<Pick<CaptureResult, "dataUrl" | "metadata"> | null> => {
-      console.log("[Screenshot] IPC handler called", {
+    ): Promise<any> => {
+      console.log("[Screenshot] Multi-window capture requested", {
         hasMessage: !!payload?.message,
         hasContext: !!payload?.context,
-        options: payload?.options,
       });
 
       try {
-        // If message and context provided, use conditional capture (heuristics)
-        if (payload?.message && payload?.context) {
-          console.log("[Screenshot] Using conditional capture with heuristics");
-          const { decision, result } = await captureService.conditionalCapture(
-            payload.message,
-            payload.context,
-            payload.options || { mode: "full-screen" }
-          );
+        // Always use multi-window capture
+        const result = await captureService.captureVisibleWindows();
 
-          console.log("[Screenshot] Conditional capture decision:", {
-            shouldCapture: decision.shouldCapture,
-            confidence: decision.confidence,
-            reason: decision.reason,
-          });
-
-          if (!result) {
-            console.log("[Screenshot] No screenshot captured (heuristics determined not needed)");
-            return null;
-          }
-
-          console.log("[Screenshot] Screenshot captured via heuristics:", {
-            mode: result.metadata.captureMode,
-            width: result.metadata.width,
-            height: result.metadata.height,
-          });
-
-          return {
-            dataUrl: result.dataUrl,
-            metadata: result.metadata,
-          };
-        }
-
-        // Fallback: unconditional capture (legacy behavior)
-        console.log("[Screenshot] Using unconditional capture (no heuristics)");
-        const result = await captureService.capture(payload?.options || { mode: "full-screen" });
-
-        if (!result) {
-          console.error("[Screenshot] Capture failed - no result returned");
-          return null;
-        }
-
-        console.log("[Screenshot] Capture successful:", {
-          mode: result.metadata.captureMode,
-          width: result.metadata.width,
-          height: result.metadata.height,
+        console.log("[Screenshot] Multi-window capture result:", {
+          success: result.success,
+          screenshotCount: result.success ? result.screenshots.length : 0,
+          blockedCount: result.success ? result.blockedWindows.length : 0,
+          totalDetected: result.success ? result.totalWindowsDetected : 0,
         });
 
-        // Return both data URL and metadata (omit filePath for security)
-        return {
-          dataUrl: result.dataUrl,
-          metadata: result.metadata,
-        };
+        return result;
       } catch (error) {
         console.error("[Screenshot] Capture failed with error:", error);
-        return null;
+        return {
+          success: false,
+          error: `Failed to capture windows: ${error instanceof Error ? error.message : "Unknown error"}`,
+          reason: "technical_error",
+        };
       }
     }
   );

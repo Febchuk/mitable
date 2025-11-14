@@ -6,6 +6,7 @@
  */
 
 import type { Message as MessageType } from "../../conversation/src/types";
+import type { MultiWindowCaptureResult } from "@mitable/shared";
 
 const API_BASE_URL = "http://localhost:3000/api";
 
@@ -135,17 +136,19 @@ export async function pauseWorkflow(conversationId: string): Promise<{
  *
  * @param conversationId - Conversation ID
  * @param content - Message content
- * @param screenshot - Optional base64-encoded screenshot for visual guidance
+ * @param multiWindowCapture - Optional multi-window capture result with screenshots
+ * @param callbacks - Streaming callbacks
+ * @param callbacks.onChunk - Callback for each streaming chunk
+ * @param callbacks.onComplete - Callback when streaming completes
+ * @param callbacks.onError - Callback for errors
+ * @param callbacks.onWindowTrigger - Callback for window triggers (Nudge/Guide)
+ * @param callbacks.onProgress - Callback for progress updates
  * @param metadata - Optional metadata for workflow actions
- * @param onChunk - Callback for each streaming chunk
- * @param onComplete - Callback when streaming completes
- * @param onError - Callback for errors
- * @param onWindowTrigger - Callback for window triggers (Nudge/Guide)
  */
 export async function sendMessageStream(
   conversationId: string,
   content: string,
-  screenshot: string | null | undefined,
+  multiWindowCapture: MultiWindowCaptureResult | null | undefined,
   callbacks: {
     onChunk?: (
       chunk: string,
@@ -165,37 +168,28 @@ export async function sendMessageStream(
     onWindowTrigger?: (window: "nudge" | "guide" | "overlay", data: any) => void;
     onProgress?: (phase: string, message: string) => void;
   },
-  metadata?: any,
-  screenshotMetadata?: {
-    width: number;
-    height: number;
-    originalWidth: number;
-    originalHeight: number;
-    captureMode: string;
-    timestamp: number;
-    scaleFactor?: number;
-  }
+  metadata?: any
 ): Promise<void> {
   const headers = await getAuthHeaders();
 
-  // Build request body with optional screenshot, metadata, and screenshotMetadata
+  // Build request body with optional multi-window capture and metadata
   const requestBody: {
     content: string;
-    screenshot?: string;
+    multiWindowCapture?: MultiWindowCaptureResult;
     metadata?: any;
-    screenshotMetadata?: any;
   } = { content };
 
-  if (screenshot) {
-    requestBody.screenshot = screenshot;
-    console.log(`[API] Sending message with screenshot (${screenshot.length} bytes)`);
-
-    if (screenshotMetadata) {
-      requestBody.screenshotMetadata = screenshotMetadata;
-      console.log(`[API] Sending screenshot metadata:`, screenshotMetadata);
+  if (multiWindowCapture) {
+    if (multiWindowCapture.success) {
+      requestBody.multiWindowCapture = multiWindowCapture;
+      console.log(`[API] Sending message with ${multiWindowCapture.screenshots.length} window screenshots`);
+      console.log(`[API] Blocked windows: ${multiWindowCapture.blockedWindows.length}`);
+    } else {
+      console.log(`[API] Screenshot capture blocked: ${multiWindowCapture.error}`);
+      // Don't send blocked capture result to backend
     }
   } else {
-    console.log("[API] Sending message without screenshot");
+    console.log("[API] Sending message without screenshots");
   }
 
   if (metadata) {
