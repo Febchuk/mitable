@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useConversations, useCreateConversation } from "@/console/src/hooks/queries/chats";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, MessageSquare, Zap, BookOpen, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -70,7 +70,7 @@ export default function ChatsView() {
     <div className="p-8 space-y-6 app-no-drag">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-4xl font-bold text-text-primary">Your chat history</h1>
+        <h1 className="text-3xl font-bold text-white">Your chat history</h1>
         <Button
           onClick={async () => {
             try {
@@ -83,7 +83,7 @@ export default function ChatsView() {
               // no-op; optionally toast later
             }
           }}
-          className="gap-2 bg-primary text-white hover:bg-primary/90"
+          className="gap-2 bg-gradient-purple text-white hover:shadow-glow-purple transition-all duration-300"
         >
           <Plus size={20} />
           <span>New Chat</span>
@@ -105,24 +105,70 @@ export default function ChatsView() {
       </div>
 
       {/* Chat List */}
-      <div className="space-y-3">
-        {filteredChats.map((chat) => (
-          <div
-            key={chat.id}
-            onClick={() => navigate(`/chats/${chat.id}`)}
-            className="bg-background-elevated rounded-lg border border-border-subtle p-6 hover:bg-background-elevated/80 transition-colors cursor-pointer"
-          >
-            <h3 className="text-text-primary text-lg mb-1">{chat.title}</h3>
-            <p className="text-text-secondary text-sm">{formatTimestamp(chat.timestamp)}</p>
-          </div>
-        ))}
+      <div className="space-y-2">
+        {filteredChats.map((chat) => {
+          // Determine chat type based on title keywords
+          const isWorkflow =
+            chat.title.toLowerCase().includes("workflow") ||
+            chat.title.toLowerCase().includes("how do");
+          const isKnowledge =
+            chat.title.toLowerCase().includes("what is") ||
+            chat.title.toLowerCase().includes("explain");
+
+          const icon = isWorkflow ? Zap : isKnowledge ? BookOpen : MessageSquare;
+          const iconColor = isWorkflow
+            ? "text-purple-400"
+            : isKnowledge
+              ? "text-blue-400"
+              : "text-gray-400";
+          const borderColor = isWorkflow
+            ? "border-purple-500/20"
+            : isKnowledge
+              ? "border-blue-500/20"
+              : "border-border-subtle";
+
+          return (
+            <div
+              key={chat.id}
+              onClick={() => navigate(`/chats/${chat.id}`)}
+              className={`group bg-background-secondary border ${borderColor} rounded-lg p-4 hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200 cursor-pointer`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-8 h-8 bg-background-elevated rounded-lg flex items-center justify-center flex-shrink-0">
+                    {(() => {
+                      const Icon = icon;
+                      return <Icon size={16} className={iconColor} />;
+                    })()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-text-primary text-base font-medium group-hover:text-white transition-colors truncate">
+                      {chat.title}
+                    </h3>
+                    <p className="text-text-tertiary text-xs">{formatTimestamp(chat.timestamp)}</p>
+                  </div>
+                </div>
+                <ChevronRight
+                  size={16}
+                  className="text-text-tertiary group-hover:text-text-secondary group-hover:translate-x-1 transition-all flex-shrink-0"
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Empty State */}
       {filteredChats.length === 0 && (
-        <div className="bg-background-elevated rounded-lg border border-border-subtle p-12">
-          <p className="text-text-secondary text-center">
+        <div className="bg-background-secondary/50 backdrop-blur rounded-xl border border-border-subtle p-12 text-center shadow-card">
+          <div className="w-16 h-16 bg-gradient-purple-blue rounded-full flex items-center justify-center mx-auto mb-4">
+            <MessageSquare size={32} className="text-white" />
+          </div>
+          <p className="text-text-secondary text-lg">
             {searchQuery ? `No chats found matching "${searchQuery}"` : "No conversations yet"}
+          </p>
+          <p className="text-text-tertiary text-sm mt-2">
+            {searchQuery ? "Try a different search term" : "Start a new chat to get help"}
           </p>
         </div>
       )}

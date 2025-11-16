@@ -1,4 +1,14 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  screen,
+  shell,
+  Tray,
+  Menu,
+  nativeImage,
+} from "electron";
 import { join } from "path";
 import { IPC_CHANNELS } from "@mitable/shared";
 import {
@@ -16,6 +26,8 @@ let overlayWindow: BrowserWindow | null = null;
 // eslint-disable-next-line prefer-const
 let guideWindow: BrowserWindow | null = null; // Not reassigned yet, but used in window management logic
 let nudgeWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let isQuitting = false; // Track if app is intentionally quitting
 
 // Auth token storage (shared across all windows)
 const authTokens: {
@@ -238,8 +250,22 @@ function createConsoleWindow() {
     consoleWindow.loadFile(join(__dirname, "../renderer/console.html"));
   }
 
+  consoleWindow.on("close", (event) => {
+    // On Windows: hide to tray instead of quitting (unless app is quitting)
+    // On macOS: follow standard behavior (quit when closed)
+    if (process.platform === "win32" && !isQuitting) {
+      event.preventDefault();
+      consoleWindow?.hide();
+      console.log("[Console] Window hidden to tray (Windows)");
+    }
+    // On macOS or when isQuitting=true, let it close normally
+  });
+
   consoleWindow.on("closed", () => {
-    app.quit(); // Quit app when main console window is closed
+    // Only quit on macOS
+    if (process.platform !== "win32") {
+      app.quit();
+    }
   });
 }
 
@@ -1077,6 +1103,108 @@ function registerGlobalShortcuts() {
   });
 }
 
+// Create system tray (Windows only)
+function createTray() {
+  console.log("[Tray] createTray() called, platform:", process.platform);
+
+  if (process.platform !== "win32") {
+    console.log("[Tray] Not Windows, skipping tray creation");
+    return; // Only show tray on Windows
+  }
+
+  console.log("[Tray] Windows detected, creating tray...");
+
+  try {
+    // Create a simple colored icon programmatically as fallback
+    // Windows tray needs a 16x16 icon
+    let trayIcon: Electron.NativeImage;
+
+    // Try to load from file first
+    let iconPath: string;
+    if (app.isPackaged) {
+      iconPath = join(process.resourcesPath, "assets", "logo-icon.png");
+    } else {
+      // In dev mode, go up to the src directory
+      iconPath = join(__dirname, "../../src/renderer/assets/logo-icon.png");
+    }
+
+    console.log("[Tray] Loading icon from:", iconPath);
+
+    const icon = nativeImage.createFromPath(iconPath);
+    if (!icon.isEmpty()) {
+      console.log("[Tray] Icon loaded, size:", icon.getSize());
+      trayIcon = icon.resize({ width: 16, height: 16 });
+    } else {
+      console.warn("[Tray] Failed to load PNG, creating simple colored icon as fallback");
+      // Create a simple 16x16 purple square as fallback
+      const canvas = Buffer.from(
+        `<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+          <rect width="16" height="16" fill="#8b5cf6" rx="3"/>
+          <text x="8" y="12" font-size="10" fill="white" text-anchor="middle" font-weight="bold">M</text>
+        </svg>`
+      );
+      trayIcon = nativeImage.createFromBuffer(canvas);
+    }
+
+    tray = new Tray(trayIcon);
+
+    console.log("[Tray] Tray instance created:", tray);
+    console.log("[Tray] Tray is destroyed?", tray.isDestroyed());
+
+    // Prevent garbage collection by keeping a strong reference
+    // This is critical on Windows - without this, the tray can disappear
+    (global as any).appTray = tray;
+
+    tray.setToolTip("Mitable");
+
+    console.log("[Tray] Tray tooltip set, checking if still exists...");
+    console.log("[Tray] Tray is destroyed after setup?", tray.isDestroyed());
+
+    // Function to show the app
+    const showApp = () => {
+      console.log("[Tray] Show app triggered");
+      if (consoleWindow && !consoleWindow.isDestroyed()) {
+        consoleWindow.show();
+        consoleWindow.restore(); // Restore if minimized
+        consoleWindow.focus();
+        console.log("[Tray] Console window shown");
+      } else {
+        console.error("[Tray] Console window is destroyed or null");
+      }
+      // Don't show agent pill - user can toggle it with Cmd+H if needed
+    };
+
+    // Create context menu
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: "Show Mitable",
+        click: showApp,
+      },
+      {
+        type: "separator",
+      },
+      {
+        label: "Quit",
+        click: () => {
+          console.log("[Tray] Quit clicked");
+          isQuitting = true; // Set flag before quitting
+          app.quit();
+        },
+      },
+    ]);
+
+    tray.setContextMenu(contextMenu);
+
+    // Click (Windows) or double-click to show console
+    tray.on("click", showApp);
+    tray.on("double-click", showApp);
+
+    console.log("[Tray] System tray initialized");
+  } catch (error) {
+    console.error("[Tray] Failed to create system tray:", error);
+  }
+}
+
 app.whenReady().then(() => {
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
@@ -1085,12 +1213,24 @@ app.whenReady().then(() => {
   // createGuideWindow(); // Create guide as child of agent
   createOverlayWindow(); // Create overlay as child of guide (must be after guide)
   createNudgeWindow(); // Create nudge as child of agent
+  createTray(); // Create system tray on Windows
 
   setupIPC();
   registerGlobalShortcuts();
 });
 
+app.on("before-quit", () => {
+  // Set flag when app is quitting to allow windows to close
+  isQuitting = true;
+});
+
 app.on("window-all-closed", () => {
+  // On Windows, keep app running in tray
+  // On macOS, follow standard behavior (quit unless dock icon clicked)
+  if (process.platform === "win32") {
+    // Don't quit - keep running in system tray
+    return;
+  }
   if (process.platform !== "darwin") {
     app.quit();
   }

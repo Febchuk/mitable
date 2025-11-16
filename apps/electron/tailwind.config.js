@@ -50,10 +50,10 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        "background-primary": "#1A1A1A",
-        "background-secondary": "#2A2A2A",
-        "background-elevated": "#3A3A3A",
-        "border-subtle": "#4A4A4A",
+        "background-primary": "#111827",
+        "background-secondary": "#1f2937",
+        "background-elevated": "#374151",
+        "border-subtle": "#4b5563",
         "integration-card": "#3E3D3D",
         "week-inactive": "#292945",
         agent: {
@@ -75,10 +75,15 @@ export default {
           tertiary: "#6B6B6B",
         },
         status: {
-          success: "#22C55E",
-          warning: "#F59E0B",
-          error: "#EF4444",
-          info: "#3B82F6",
+          success: "#10b981",
+          warning: "#f59e0b",
+          error: "#ef4444",
+          info: "#3b82f6",
+        },
+        gradient: {
+          purple: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+          blue: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+          purpleBlue: "linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
@@ -146,8 +151,35 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        glow: "glow 2s ease-in-out infinite alternate",
+      },
+      boxShadow: {
+        card: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)",
+        "glow-purple": "0 0 20px rgba(139, 92, 246, 0.3)",
+        "glow-blue": "0 0 20px rgba(59, 130, 246, 0.3)",
+      },
+      backgroundImage: {
+        "gradient-purple": "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+        "gradient-blue": "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+        "gradient-purple-blue": "linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)",
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [
+    tailwindcssAnimate,
+    function ({ addUtilities }) {
+      addUtilities({
+        ".scrollbar-hide": {
+          /* Hide scrollbar for Chrome, Safari and Opera */
+          "&::-webkit-scrollbar": {
+            display: "none",
+          },
+          /* Hide scrollbar for IE, Edge and Firefox */
+          "-ms-overflow-style": "none",
+          "scrollbar-width": "none",
+        },
+      });
+    },
+  ],
 };

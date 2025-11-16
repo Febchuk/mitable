@@ -11,13 +11,13 @@
 **Hardware:** Intel i7-14700K, 128GB RAM  
 **Test Screenshot:** 2560×1440 HDR display with complex PII
 
-| Metric | Target | Achieved | Notes |
-|--------|--------|----------|-------|
-| **Parallel OCR Time** | 3-5s | **2.6s** | 5 workers running simultaneously |
-| **Total Redaction Time** | 5-7s | **3.6s** | Including preprocessing + detection |
-| **Subsequent Runs (Cached)** | <100ms | **~50ms** | SHA-256 hash-based cache hit |
-| **PII Detection Accuracy** | 90%+ | **~95%+** | Multi-pass approach minimizes false negatives |
-| **Memory Usage** | <500MB | **~400MB** | 5 workers + image buffers |
+| Metric                       | Target | Achieved   | Notes                                         |
+| ---------------------------- | ------ | ---------- | --------------------------------------------- |
+| **Parallel OCR Time**        | 3-5s   | **2.6s**   | 5 workers running simultaneously              |
+| **Total Redaction Time**     | 5-7s   | **3.6s**   | Including preprocessing + detection           |
+| **Subsequent Runs (Cached)** | <100ms | **~50ms**  | SHA-256 hash-based cache hit                  |
+| **PII Detection Accuracy**   | 90%+   | **~95%+**  | Multi-pass approach minimizes false negatives |
+| **Memory Usage**             | <500MB | **~400MB** | 5 workers + image buffers                     |
 
 ---
 
@@ -87,11 +87,11 @@ await piiRedactionService.initializeOCRWorkers();
 
 // 5 workers created in parallel
 this.ocrWorkers = await Promise.all([
-  createWorker("eng"),  // Worker 1: Simple
-  createWorker("eng"),  // Worker 2: Aggressive
-  createWorker("eng"),  // Worker 3: Upscaled
-  createWorker("eng"),  // Worker 4: HDR tone-mapped
-  createWorker("eng"),  // Worker 5: HDR inverted
+  createWorker("eng"), // Worker 1: Simple
+  createWorker("eng"), // Worker 2: Aggressive
+  createWorker("eng"), // Worker 3: Upscaled
+  createWorker("eng"), // Worker 4: HDR tone-mapped
+  createWorker("eng"), // Worker 5: HDR inverted
 ]);
 ```
 
@@ -110,6 +110,7 @@ this.ocrWorkers = await Promise.all([
 #### Full PII Pattern List (20+ types)
 
 **Personal Identifiers:**
+
 ```typescript
 EMAIL_ADDRESS           /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
 PHONE_NUMBER           /\b(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/
@@ -120,12 +121,14 @@ DATE                   Multiple formats (MM/DD/YYYY, ISO, Month DD YYYY)
 ```
 
 **Location Data:**
+
 ```typescript
 US_STREET_ADDRESS      /\b\d{1,6}\s+(?:[A-Z][a-z]+\s+){1,4}(?:Street|Ave|Road)...\b/
 US_CITY_STATE_ZIP      /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s+[A-Z]{2}\s+\d{5}\b/
 ```
 
 **Technical Secrets:**
+
 ```typescript
 DATABASE_URL           /(?:postgres|mysql|mongodb|redis):\/\/[^\s]+/
 DATABASE_PASSWORD      /(?:\/\/|:)[a-zA-Z0-9_-]+:([^@\s]{6,})@/
@@ -141,19 +144,24 @@ GENERIC_API_KEY        /[a-zA-Z0-9]{20,}/  // Fallback pattern
 #### Special Validators
 
 **Credit Card (Luhn Algorithm):**
+
 ```typescript
 validator: (text: string) => {
   const digits = text.replace(/\D/g, "");
   if (digits.length < 13 || digits.length > 19) return false;
-  let sum = 0, isEven = false;
+  let sum = 0,
+    isEven = false;
   for (let i = digits.length - 1; i >= 0; i--) {
     let digit = parseInt(digits[i], 10);
-    if (isEven) { digit *= 2; if (digit > 9) digit -= 9; }
+    if (isEven) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
     sum += digit;
     isEven = !isEven;
   }
   return sum % 10 === 0;
-}
+};
 ```
 
 #### Pattern Priority (Critical)
@@ -170,6 +178,7 @@ validator: (text: string) => {
 ## Multi-Pass OCR Strategy
 
 **Why 5 passes?** Different preprocessing techniques catch different PII:
+
 - Pass 1 catches clean, high-contrast text
 - Pass 2 catches faded/low-contrast text
 - Pass 3 catches small text (upscaled 2x)
@@ -181,10 +190,10 @@ validator: (text: string) => {
 ```typescript
 sharp(imageBuffer)
   .greyscale()
-  .normalize()      // Stretch histogram
+  .normalize() // Stretch histogram
   .sharpen()
   .png()
-  .toBuffer()
+  .toBuffer();
 ```
 
 **Best for:** Normal screenshots, high-contrast text  
@@ -196,10 +205,10 @@ sharp(imageBuffer)
 sharp(imageBuffer)
   .greyscale()
   .normalize()
-  .linear(1.5, -50)  // Boost contrast hard
-  .threshold(140)    // Binary black/white
+  .linear(1.5, -50) // Boost contrast hard
+  .threshold(140) // Binary black/white
   .png()
-  .toBuffer()
+  .toBuffer();
 ```
 
 **Best for:** Faded text, watermarks, low-contrast PII  
@@ -209,12 +218,12 @@ sharp(imageBuffer)
 
 ```typescript
 sharp(imageBuffer)
-  .resize(width * 2, height * 2, { kernel: 'lanczos3' })
+  .resize(width * 2, height * 2, { kernel: "lanczos3" })
   .greyscale()
   .normalize()
   .sharpen()
   .png()
-  .toBuffer()
+  .toBuffer();
 ```
 
 **Best for:** Small fonts, fine print, footer text  
@@ -227,15 +236,15 @@ sharp(imageBuffer)
 
 ```typescript
 sharp(imageBuffer)
-  .gamma(1.6)         // Darken highlights, lift mids
-  .linear(1.1, -10)   // Slight contrast bump
+  .gamma(1.6) // Darken highlights, lift mids
+  .linear(1.1, -10) // Slight contrast bump
   .modulate({ saturation: 0 })
   .greyscale()
   .normalize()
-  .median(1)          // Light de-speckle
+  .median(1) // Light de-speckle
   .sharpen()
   .png()
-  .toBuffer()
+  .toBuffer();
 ```
 
 **Best for:** HDR displays, overexposed screenshots  
@@ -247,7 +256,7 @@ sharp(imageBuffer)
 
 ```typescript
 sharp(imageBuffer)
-  .negate()           // Invert colors
+  .negate() // Invert colors
   .gamma(1.6)
   .linear(1.1, -10)
   .greyscale()
@@ -255,7 +264,7 @@ sharp(imageBuffer)
   .median(1)
   .sharpen()
   .png()
-  .toBuffer()
+  .toBuffer();
 ```
 
 **Best for:** Dark mode UIs, inverted text, HDR edge cases  
@@ -270,11 +279,11 @@ sharp(imageBuffer)
 ```typescript
 // Example: 769 total words from 5 passes
 const allWords = [
-  ...pass1Words,  // 238 words (simple)
-  ...pass2Words,  // 121 words (aggressive)
-  ...pass3Words,  // 209 words (upscaled, coords scaled ÷2)
-  ...pass4Words,  // 135 words (HDR tone-mapped)
-  ...pass5Words,  // 66 words (HDR inverted)
+  ...pass1Words, // 238 words (simple)
+  ...pass2Words, // 121 words (aggressive)
+  ...pass3Words, // 209 words (upscaled, coords scaled ÷2)
+  ...pass4Words, // 135 words (HDR tone-mapped)
+  ...pass5Words, // 66 words (HDR inverted)
 ];
 ```
 
@@ -284,10 +293,10 @@ const allWords = [
 
 ```typescript
 const isOnSameLine = Math.abs(current.bbox.y0 - next.bbox.y0) < 10;
-const isClose = next.bbox.x0 - current.bbox.x1 < 30;  // Within 30px
+const isClose = next.bbox.x0 - current.bbox.x1 < 30; // Within 30px
 
 // Special case: Credit cards (groups of 4 digits can be far apart)
-const isModeratelyClose = next.bbox.x0 - current.bbox.x1 < 150;  // Within 150px
+const isModeratelyClose = next.bbox.x0 - current.bbox.x1 < 150; // Within 150px
 const mightBeCreditCard = /^\d{4}$/.test(current.text) && /^\d{4}$/.test(next.text);
 
 if (isOnSameLine && (isClose || (isModeratelyClose && mightBeCreditCard))) {
@@ -303,6 +312,7 @@ if (isOnSameLine && (isClose || (isModeratelyClose && mightBeCreditCard))) {
 ```
 
 **Example Result:**
+
 - 769 words → 135 combined words
 
 ### Step 3: Pattern Matching
@@ -310,21 +320,21 @@ if (isOnSameLine && (isClose || (isModeratelyClose && mightBeCreditCard))) {
 ```typescript
 for (const pattern of PII_PATTERNS) {
   const matches = combinedWord.text.matchAll(pattern.pattern);
-  
+
   for (const match of matches) {
     // Apply validator if present (e.g., Luhn for credit cards)
     if (pattern.validator && !pattern.validator(match[0])) {
       console.log(`❌ Validation failed: [${pattern.type}] "${match[0]}"`);
       continue;
     }
-    
+
     piiMatches.push({
       text: match[0],
       type: pattern.type,
       bbox: combinedWord.bbox,
       confidence: 1.0,
     });
-    
+
     break; // First match wins (priority order)
   }
 }
@@ -339,11 +349,11 @@ function calculateIoU(box1: BBox, box2: BBox): number {
   const xOverlap = Math.max(0, Math.min(box1.x1, box2.x1) - Math.max(box1.x0, box2.x0));
   const yOverlap = Math.max(0, Math.min(box1.y1, box2.y1) - Math.max(box1.y0, box2.y0));
   const intersection = xOverlap * yOverlap;
-  
+
   const area1 = (box1.x1 - box1.x0) * (box1.y1 - box1.y0);
   const area2 = (box2.x1 - box2.x0) * (box2.y1 - box2.y0);
   const union = area1 + area2 - intersection;
-  
+
   return intersection / union;
 }
 
@@ -359,6 +369,7 @@ if (calculateIoU(box1, box2) > 0.3) {
 ```
 
 **Example Result:**
+
 - 22 PII instances → 21 unique (after deduplication)
 
 ---
@@ -384,11 +395,13 @@ const svg = `
 
 // Composite onto original image
 const redactedBuffer = await sharp(imageBuffer)
-  .composite([{
-    input: Buffer.from(svg),
-    top: 0,
-    left: 0,
-  }])
+  .composite([
+    {
+      input: Buffer.from(svg),
+      top: 0,
+      left: 0,
+    },
+  ])
   .png()
   .toBuffer();
 
@@ -402,10 +415,7 @@ return `data:image/png;base64,${redactedBuffer.toString("base64")}`;
 const crypto = require("crypto");
 
 // Generate cache key from screenshot
-const hash = crypto
-  .createHash("sha256")
-  .update(imageDataUrl)
-  .digest("hex");
+const hash = crypto.createHash("sha256").update(imageDataUrl).digest("hex");
 
 const cacheKey = `pii-redaction:${hash}`;
 
@@ -431,15 +441,17 @@ this.cache.set(cacheKey, {
 ```
 
 **Cache Config:**
+
 ```typescript
 this.cache = new NodeCache({
-  stdTTL: 3600,        // 1 hour
-  maxKeys: 100,        // ~50-100MB memory
-  checkperiod: 600,    // Check for expired entries every 10 min
+  stdTTL: 3600, // 1 hour
+  maxKeys: 100, // ~50-100MB memory
+  checkperiod: 600, // Check for expired entries every 10 min
 });
 ```
 
 **Benefits:**
+
 - Identical screenshot → instant return (~50ms)
 - No re-OCR for repeated captures
 - Minimal memory footprint (~500KB per cached entry)
@@ -468,12 +480,12 @@ packages/shared/
 // apps/backend/src/index.ts
 async function startServer() {
   // ... validate config, test DB ...
-  
+
   // Initialize PII redaction service (hot workers)
   console.log("🔧 Initializing PII redaction service...");
   await piiRedactionService.initializeOCRWorkers();
   console.log("✅ PII redaction service hot and ready (5 workers)");
-  
+
   app.listen(config.port, () => {
     console.log(`🚀 Mitable Backend API running on http://localhost:${config.port}`);
   });
@@ -481,6 +493,7 @@ async function startServer() {
 ```
 
 **Logs on startup:**
+
 ```
 🔧 Initializing PII redaction service...
 [PIIRedactionService] Initializing 5 Tesseract.js workers for parallel OCR...
@@ -525,6 +538,7 @@ Detected PII Types:
 ```
 
 **Second run (cached):**
+
 ```
 [PIIRedactionService] Cache HIT - pii-redaction:a7f3...
 [PIIRedactionService] Redaction complete: 48ms, PII regions: 21, cached: true
@@ -539,18 +553,20 @@ Detected PII Types:
 ```typescript
 // Redacted screenshot is directly compatible with Gemini Vision API
 const geminiPayload = {
-  contents: [{
-    role: "user",
-    parts: [
-      { text: "Analyze this screenshot..." },
-      {
-        inlineData: {
-          mimeType: "image/png",
-          data: redactedScreenshot.split(",")[1], // Strip data:image/png;base64, prefix
+  contents: [
+    {
+      role: "user",
+      parts: [
+        { text: "Analyze this screenshot..." },
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: redactedScreenshot.split(",")[1], // Strip data:image/png;base64, prefix
+          },
         },
-      },
-    ],
-  }],
+      ],
+    },
+  ],
 };
 ```
 
@@ -560,15 +576,15 @@ const geminiPayload = {
 
 ## Comparison: Planned vs Actual
 
-| Metric | Planned | Actual | Notes |
-|--------|---------|--------|-------|
-| **OCR Time** | 3-4s | **2.6s** | 5 parallel workers crushed it |
-| **Total Time** | 5-7s | **3.6s** | Faster than DLP! |
-| **Accuracy** | 85-92% | **~95%** | Multi-pass > single pass |
-| **Memory** | ~500MB | **~400MB** | Optimized buffers |
-| **Workers** | 2 (planned) | **5 (actual)** | One per OCR pass |
-| **Startup** | Lazy | **Hot** | Ready before first request |
-| **HDR Support** | Not planned | **✅ Implemented** | Auto-detection + 2 passes |
+| Metric          | Planned     | Actual             | Notes                         |
+| --------------- | ----------- | ------------------ | ----------------------------- |
+| **OCR Time**    | 3-4s        | **2.6s**           | 5 parallel workers crushed it |
+| **Total Time**  | 5-7s        | **3.6s**           | Faster than DLP!              |
+| **Accuracy**    | 85-92%      | **~95%**           | Multi-pass > single pass      |
+| **Memory**      | ~500MB      | **~400MB**         | Optimized buffers             |
+| **Workers**     | 2 (planned) | **5 (actual)**     | One per OCR pass              |
+| **Startup**     | Lazy        | **Hot**            | Ready before first request    |
+| **HDR Support** | Not planned | **✅ Implemented** | Auto-detection + 2 passes     |
 
 ---
 

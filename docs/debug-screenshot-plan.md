@@ -1,6 +1,7 @@
 # Debug Screenshot Visualization with Bounding Boxes
 
 ## Goal
+
 Add debug mode that saves original screenshots + annotated versions with bounding boxes when `DEBUG_SAVE_SCREENSHOTS=true`
 
 ---
@@ -8,7 +9,9 @@ Add debug mode that saves original screenshots + annotated versions with boundin
 ## Phase 1: Environment & Configuration Setup
 
 ### 1.1 Add Environment Variable
+
 **File**: `/apps/backend/.env.example`
+
 ```env
 # Debug mode - saves screenshots with bounding box annotations
 DEBUG_SAVE_SCREENSHOTS=false
@@ -16,10 +19,13 @@ DEBUG_SCREENSHOTS_DIR=/tmp/mitable-debug-screenshots
 ```
 
 **File**: `/apps/backend/.env`
+
 - Add same variables with `DEBUG_SAVE_SCREENSHOTS=true` for your local testing
 
 ### 1.2 Update Package Scripts
+
 **File**: Root `package.json`
+
 ```json
 "scripts": {
   "dev": "turbo run dev",
@@ -28,6 +34,7 @@ DEBUG_SCREENSHOTS_DIR=/tmp/mitable-debug-screenshots
 ```
 
 **Usage**:
+
 - Normal mode: `npm run dev`
 - Debug mode: `npm run dev:debug-screenshots`
 
@@ -36,33 +43,36 @@ DEBUG_SCREENSHOTS_DIR=/tmp/mitable-debug-screenshots
 ## Phase 2: Create Screenshot Annotator Utility
 
 ### 2.1 Create New Utility File
+
 **File**: `/apps/backend/src/utils/screenshot-annotator.ts`
 
 **Functionality**:
+
 ```typescript
-import sharp from 'sharp';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
+import sharp from "sharp";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
 
 interface BoundingBox {
-  x: number;      // Normalized 0-1
-  y: number;      // Normalized 0-1
-  width: number;  // Normalized 0-1
+  x: number; // Normalized 0-1
+  y: number; // Normalized 0-1
+  width: number; // Normalized 0-1
   height: number; // Normalized 0-1
 }
 
 interface AnnotationOptions {
-  label: string;           // Element description
-  confidence: number;      // 0-1
-  instruction?: string;    // User's original question
-  elementType?: string;    // button, input, etc.
+  label: string; // Element description
+  confidence: number; // 0-1
+  instruction?: string; // User's original question
+  elementType?: string; // button, input, etc.
 }
 
 export class ScreenshotAnnotator {
   private outputDir: string;
 
   constructor(outputDir?: string) {
-    this.outputDir = outputDir || process.env.DEBUG_SCREENSHOTS_DIR || '/tmp/mitable-debug-screenshots';
+    this.outputDir =
+      outputDir || process.env.DEBUG_SCREENSHOTS_DIR || "/tmp/mitable-debug-screenshots";
   }
 
   // Main annotation function
@@ -78,17 +88,20 @@ export class ScreenshotAnnotator {
     jsonPath: string;
   }> {
     // 1. Generate timestamp for session directory
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const sessionDir = path.join(this.outputDir, timestamp);
 
     // 2. Create session directory
     await mkdir(sessionDir, { recursive: true });
 
     // 3. Decode base64 to buffer
-    const imageBuffer = Buffer.from(screenshotBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const imageBuffer = Buffer.from(
+      screenshotBase64.replace(/^data:image\/\w+;base64,/, ""),
+      "base64"
+    );
 
     // 4. Save original screenshot
-    const originalPath = path.join(sessionDir, 'original.png');
+    const originalPath = path.join(sessionDir, "original.png");
     await writeFile(originalPath, imageBuffer);
 
     // 5. Convert normalized coordinates to pixels
@@ -102,20 +115,22 @@ export class ScreenshotAnnotator {
 
     // 8. Composite SVG onto image using Sharp
     const annotatedBuffer = await sharp(imageBuffer)
-      .composite([{
-        input: Buffer.from(svgOverlay),
-        top: 0,
-        left: 0,
-      }])
+      .composite([
+        {
+          input: Buffer.from(svgOverlay),
+          top: 0,
+          left: 0,
+        },
+      ])
       .png()
       .toBuffer();
 
     // 9. Save annotated screenshot
-    const annotatedPath = path.join(sessionDir, 'annotated.png');
+    const annotatedPath = path.join(sessionDir, "annotated.png");
     await writeFile(annotatedPath, annotatedBuffer);
 
     // 10. Save analysis JSON
-    const jsonPath = path.join(sessionDir, 'analysis.json');
+    const jsonPath = path.join(sessionDir, "analysis.json");
     const analysisData = {
       timestamp: new Date().toISOString(),
       instruction: options.instruction,
@@ -131,16 +146,16 @@ export class ScreenshotAnnotator {
       screenshot: {
         dimensions: imageDimensions,
         files: {
-          original: 'original.png',
-          annotated: 'annotated.png',
-          analysis: 'analysis.json',
+          original: "original.png",
+          annotated: "annotated.png",
+          analysis: "analysis.json",
         },
       },
     };
     await writeFile(jsonPath, JSON.stringify(analysisData, null, 2));
 
     // 11. Log to console for easy access
-    console.log('\n[DEBUG SCREENSHOT]');
+    console.log("\n[DEBUG SCREENSHOT]");
     console.log(`  Session:   ${sessionDir}`);
     console.log(`  Element:   ${options.label} (${(options.confidence * 100).toFixed(0)}%)`);
     console.log(`  Files:     original.png, annotated.png, analysis.json\n`);
@@ -202,9 +217,7 @@ export class ScreenshotAnnotator {
     const labelPadding = 8;
 
     // Position label above box if there's space, otherwise below
-    const labelY = box.y > labelHeight + 10
-      ? box.y - labelHeight - 5
-      : box.y + box.height + 5;
+    const labelY = box.y > labelHeight + 10 ? box.y - labelHeight - 5 : box.y + box.height + 5;
 
     svgElements.push(`
       <rect
@@ -286,7 +299,7 @@ export class ScreenshotAnnotator {
 
     return `
       <svg width="${dimensions.width}" height="${dimensions.height}" xmlns="http://www.w3.org/2000/svg">
-        ${svgElements.join('\n')}
+        ${svgElements.join("\n")}
       </svg>
     `;
   }
@@ -294,16 +307,16 @@ export class ScreenshotAnnotator {
   // Helper: Escape XML special characters
   private escapeXml(text: string): string {
     return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
   }
 
   // Helper: Truncate text with ellipsis
   private truncateText(text: string, maxLength: number): string {
-    return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
+    return text.length > maxLength ? text.substring(0, maxLength - 3) + "..." : text;
   }
 }
 ```
@@ -313,11 +326,13 @@ export class ScreenshotAnnotator {
 ## Phase 3: Integrate into Message Stream Endpoint
 
 ### 3.1 Modify Conversations Route
+
 **File**: `/apps/backend/src/routes/conversations.ts`
 
 **Import annotator**:
+
 ```typescript
-import { ScreenshotAnnotator } from '../utils/screenshot-annotator';
+import { ScreenshotAnnotator } from "../utils/screenshot-annotator";
 ```
 
 **After Gemini Vision analysis** (around line 180-200 in POST `/api/conversations/:id/messages/stream`):
@@ -327,28 +342,29 @@ import { ScreenshotAnnotator } from '../utils/screenshot-annotator';
 const parsed = visionResult.parsed || visionResult;
 
 // NEW: Debug screenshot saving
-if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true' &&
-    parsed.recommendedAction?.element?.boundingBox) {
-
+if (
+  process.env.DEBUG_SAVE_SCREENSHOTS === "true" &&
+  parsed.recommendedAction?.element?.boundingBox
+) {
   try {
     const annotator = new ScreenshotAnnotator();
 
     await annotator.annotate(
-      screenshot,                                    // base64 screenshot
-      parsed.recommendedAction.element.boundingBox,  // normalized bounding box
+      screenshot, // base64 screenshot
+      parsed.recommendedAction.element.boundingBox, // normalized bounding box
       {
         width: screenshotMetadata.width,
         height: screenshotMetadata.height,
       },
       {
-        label: parsed.recommendedAction.element.description || 'Target Element',
+        label: parsed.recommendedAction.element.description || "Target Element",
         confidence: parsed.recommendedAction.element.confidence || 0.5,
-        instruction: content,                        // User's original message
+        instruction: content, // User's original message
         elementType: parsed.recommendedAction.element.type,
       }
     );
   } catch (error) {
-    console.error('[DEBUG SCREENSHOT] Failed to save annotated screenshot:', error);
+    console.error("[DEBUG SCREENSHOT] Failed to save annotated screenshot:", error);
     // Don't fail the request, just log the error
   }
 }
@@ -359,9 +375,11 @@ if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true' &&
 ## Phase 4: Add Sharp Dependency
 
 ### 4.1 Install Sharp
+
 **File**: `/apps/backend/package.json`
 
 Add to dependencies:
+
 ```json
 {
   "dependencies": {
@@ -371,6 +389,7 @@ Add to dependencies:
 ```
 
 **Run installation**:
+
 ```bash
 npm install --workspace=apps/backend
 ```
@@ -382,16 +401,19 @@ npm install --workspace=apps/backend
 ### 5.1 Manual Testing Flow
 
 **1. Enable debug mode**:
+
 ```bash
 npm run dev:debug-screenshots
 ```
 
 **2. Trigger workflow with visual guidance**:
+
 - Open Agent Pill
 - Type: "Show me how to click the submit button"
 - Submit message
 
 **3. Check debug output**:
+
 ```bash
 ls -lh /tmp/mitable-debug-screenshots/
 # Should see folder structure like:
@@ -402,6 +424,7 @@ ls -lh /tmp/mitable-debug-screenshots/
 ```
 
 **4. Verify annotated screenshot**:
+
 - Open `annotated.png` in image viewer
 - Check that green bounding box is drawn at correct position
 - Verify label shows element description + confidence
@@ -409,6 +432,7 @@ ls -lh /tmp/mitable-debug-screenshots/
 - Check coordinates display in bottom-right
 
 **5. Verify JSON output**:
+
 ```bash
 cat /tmp/mitable-debug-screenshots/2025-11-06T15-30-45-123Z/analysis.json
 # Should contain:
@@ -422,22 +446,27 @@ cat /tmp/mitable-debug-screenshots/2025-11-06T15-30-45-123Z/analysis.json
 ### 5.2 Test Cases
 
 **Test Case 1: Button Detection**
+
 - Instruction: "Click the save button"
 - Expected: Green box around save button, correct coordinates
 
 **Test Case 2: Input Field**
+
 - Instruction: "Type in the email field"
 - Expected: Green box around email input, correct position
 
 **Test Case 3: Multi-Monitor**
+
 - Test on secondary display
 - Verify coordinates scale correctly
 
 **Test Case 4: HiDPI Display**
+
 - Test on Retina display
 - Verify scaleFactor is handled correctly
 
 **Test Case 5: Edge Cases**
+
 - Box at edge of screen (x=0 or y=0)
 - Box near bottom-right corner
 - Very small elements (<20px)
@@ -448,9 +477,10 @@ cat /tmp/mitable-debug-screenshots/2025-11-06T15-30-45-123Z/analysis.json
 ## Phase 6: Documentation
 
 ### 6.1 Update CLAUDE.md
+
 Add section under "Screenshot Capture Service":
 
-```markdown
+````markdown
 ### Debug Mode
 
 Enable debug screenshot saving to visualize bounding box accuracy:
@@ -458,6 +488,7 @@ Enable debug screenshot saving to visualize bounding box accuracy:
 ```bash
 npm run dev:debug-screenshots
 ```
+````
 
 When enabled, every screenshot analysis saves 3 files grouped by timestamp folder in `/tmp/mitable-debug-screenshots/`:
 
@@ -470,12 +501,14 @@ When enabled, every screenshot analysis saves 3 files grouped by timestamp folde
 ```
 
 The annotated screenshot includes:
+
 - Green bounding box around target element (4px dashed border)
 - Label with element description and confidence percentage
 - User instruction overlay (top-left)
 - Pixel coordinates display (bottom-right)
 
 Use this to debug coordinate accuracy and visual guidance positioning.
+
 ```
 
 ---
@@ -502,27 +535,31 @@ Use this to debug coordinate accuracy and visual guidance positioning.
 
 ### Console Output
 ```
+
 [DEBUG SCREENSHOT]
-  Session:   /tmp/mitable-debug-screenshots/2025-11-06T15-30-45-123Z
-  Element:   Submit Button (92%)
-  Files:     original.png, annotated.png, analysis.json
+Session: /tmp/mitable-debug-screenshots/2025-11-06T15-30-45-123Z
+Element: Submit Button (92%)
+Files: original.png, annotated.png, analysis.json
+
 ```
 
 ### Folder Structure
 ```
+
 /tmp/mitable-debug-screenshots/
-  ├── 2025-11-06T15-30-45-123Z/
-  │   ├── original.png
-  │   ├── annotated.png
-  │   └── analysis.json
-  ├── 2025-11-06T15-31-12-456Z/
-  │   ├── original.png
-  │   ├── annotated.png
-  │   └── analysis.json
-  └── 2025-11-06T15-32-03-789Z/
-      ├── original.png
-      ├── annotated.png
-      └── analysis.json
+├── 2025-11-06T15-30-45-123Z/
+│ ├── original.png
+│ ├── annotated.png
+│ └── analysis.json
+├── 2025-11-06T15-31-12-456Z/
+│ ├── original.png
+│ ├── annotated.png
+│ └── analysis.json
+└── 2025-11-06T15-32-03-789Z/
+├── original.png
+├── annotated.png
+└── analysis.json
+
 ```
 
 ### Annotated Screenshot Features
@@ -551,3 +588,4 @@ Use this to debug coordinate accuracy and visual guidance positioning.
 2. **Identify patterns**: Are certain element types less accurate?
 3. **Prompt optimization**: Adjust Gemini Vision prompts if needed
 4. **Decide on architecture change**: Based on accuracy results, determine if two-call approach is needed
+```

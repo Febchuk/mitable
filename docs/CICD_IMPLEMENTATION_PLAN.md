@@ -11,9 +11,11 @@
 ## Current State (Already Implemented)
 
 ### ✅ GitHub Actions CI Workflow
+
 **File:** `.github/workflows/ci.yml`
 
 **What it does:**
+
 - ✅ Runs on every PR and push to main
 - ✅ Installs dependencies
 - ✅ Builds shared package
@@ -24,10 +26,12 @@
 - ✅ Builds all workspaces
 
 **Triggers:**
+
 - Push to `main` branch
 - Pull requests to `main` branch
 
 ### ✅ npm Scripts (Root package.json)
+
 - `npm run test` - Run all tests
 - `npm run typecheck` - TypeScript checks
 - `npm run lint` - ESLint
@@ -36,6 +40,7 @@
 - `npm run ci` - Full CI check locally
 
 ### ✅ Railway Production Deployment
+
 - Connected to `main` branch
 - Auto-deploys on merge to main
 - URL: https://mitablebackend-production.up.railway.app
@@ -51,9 +56,11 @@
 **Goal:** Automatically create preview deployments for every PR
 
 #### Step 1.1: Enable PR Previews in Railway Dashboard
+
 **Location:** Railway Dashboard → Project Settings → Environments
 
 **Actions:**
+
 1. Go to https://railway.app/dashboard
 2. Select your Mitable project
 3. Navigate to Settings → Environments
@@ -65,9 +72,11 @@
    - ✅ Inherit environment variables from base
 
 #### Step 1.2: Configure Dev Environment Variables in Railway
+
 **Location:** Railway Dashboard → Environment Variables
 
 **Required Variables for Preview Deployments:**
+
 ```bash
 # Database (Supabase Dev Project)
 DATABASE_URL=<SUPABASE_DEV_POOLER_URL>
@@ -108,9 +117,11 @@ NODE_ENV=development
 **Goal:** Automatically comment Railway preview URL on PRs
 
 #### Step 2.1: Get Railway API Token
+
 **Location:** Railway Dashboard → Account Settings → Tokens
 
 **Actions:**
+
 1. Go to https://railway.app/account/tokens
 2. Click "Create New Token"
 3. Name: `GitHub Actions CI/CD`
@@ -118,9 +129,11 @@ NODE_ENV=development
 5. Save for next step
 
 #### Step 2.2: Add GitHub Secret
+
 **Location:** GitHub Repository → Settings → Secrets and Variables → Actions
 
 **Actions:**
+
 1. Go to https://github.com/Febchuk/mitable/settings/secrets/actions
 2. Click "New repository secret"
 3. Name: `RAILWAY_TOKEN`
@@ -128,14 +141,17 @@ NODE_ENV=development
 5. Click "Add secret"
 
 #### Step 2.3: Create PR Comment Workflow
+
 **File:** `.github/workflows/pr-preview.yml`
 
 **Purpose:**
+
 - Posts Railway preview URL in PR comments
 - Updates comment on each push
 - Shows deployment status
 
 **Implementation:**
+
 ```yaml
 name: PR Preview
 
@@ -209,14 +225,17 @@ jobs:
 **Goal:** Automate production deployment with safety checks
 
 #### Step 3.1: Create Production Deploy Workflow
+
 **File:** `.github/workflows/production-deploy.yml`
 
 **Purpose:**
+
 - Runs only when code merges to `main`
 - Verifies deployment health
 - Optional: Slack notification
 
 **Implementation:**
+
 ```yaml
 name: Production Deploy
 
@@ -265,15 +284,18 @@ jobs:
 **Goal:** Prevent direct pushes to main, require CI checks
 
 #### Step 4.1: Configure Branch Protection Rules
+
 **Location:** GitHub Repository → Settings → Branches
 
 **Actions:**
+
 1. Go to https://github.com/Febchuk/mitable/settings/branches
 2. Click "Add rule"
 3. Branch name pattern: `main`
 4. Configure:
 
 **Required Settings:**
+
 ```
 ✅ Require a pull request before merging
    └─ Require approvals: 1 (recommended)
@@ -291,6 +313,7 @@ jobs:
 ```
 
 **Optional Settings:**
+
 ```
 ☐ Require signed commits
 ☐ Require linear history
@@ -308,9 +331,11 @@ jobs:
 **Goal:** Set up separate dev database for testing
 
 #### Step 5.1: Create Supabase Dev Project (if not exists)
+
 **Location:** Supabase Dashboard → https://supabase.com/dashboard/projects
 
 **Actions:**
+
 1. Click "New Project"
 2. Organization: Same as production
 3. Name: `mitable-dev`
@@ -321,9 +346,11 @@ jobs:
 8. Wait 2-3 minutes for provisioning
 
 #### Step 5.2: Copy Connection Strings
+
 **Location:** Supabase Dev Project → Settings → Database
 
 **Get these values:**
+
 - Connection Pooling URL (port 6543) → `DATABASE_URL`
 - Direct Connection URL (port 5432) → `DIRECT_URL`
 - Project URL → `SUPABASE_URL`
@@ -331,7 +358,9 @@ jobs:
 - Service Role Key (Settings → API) → `SUPABASE_SERVICE_ROLE_KEY`
 
 #### Step 5.3: Run Migrations on Dev Database
+
 **From terminal:**
+
 ```bash
 cd /Users/febechukwuma/Documents/mitable/apps/backend
 
@@ -346,13 +375,16 @@ npm run db:studio
 ```
 
 #### Step 5.4: Seed Dev Database with Test Data
+
 **From terminal:**
+
 ```bash
 # Create seed script or use existing
 DATABASE_URL="<SUPABASE_DEV_DIRECT_URL>" npm run db:seed
 ```
 
 **Expected Data:**
+
 - 1-2 test organizations
 - 5-10 test users
 - Sample roadmap templates
@@ -366,9 +398,11 @@ DATABASE_URL="<SUPABASE_DEV_DIRECT_URL>" npm run db:seed
 **Goal:** Separate vector database for dev testing
 
 #### Step 6.1: Create Dev Pinecone Index
+
 **Location:** Pinecone Dashboard → https://app.pinecone.io/
 
 **Actions:**
+
 1. Click "Create Index"
 2. Index Name: `mitable-dev`
 3. Dimensions: `1536` (must match prod)
@@ -378,7 +412,9 @@ DATABASE_URL="<SUPABASE_DEV_DIRECT_URL>" npm run db:seed
 7. Click "Create Index"
 
 #### Step 6.2: Verify Index Configuration
+
 **From terminal:**
+
 ```bash
 cd /Users/febechukwuma/Documents/mitable/apps/backend
 
@@ -393,7 +429,9 @@ PINECONE_INDEX_NAME=mitable-dev npm run test-search
 **Goal:** Verify entire CI/CD workflow end-to-end
 
 #### Step 7.1: Create Test PR
+
 **From terminal:**
+
 ```bash
 git checkout main
 git pull origin main
@@ -408,6 +446,7 @@ git push origin test/cicd-pipeline
 ```
 
 **On GitHub:**
+
 1. Create PR from `test/cicd-pipeline` → `main`
 2. Watch for:
    - ✅ CI workflow runs
@@ -415,19 +454,24 @@ git push origin test/cicd-pipeline
    - ✅ Bot comments with preview URL
 
 #### Step 7.2: Verify Preview Deployment
+
 **In browser:**
+
 1. Click preview URL in PR comment
 2. Test endpoints:
    - https://mitable-pr-X.up.railway.app/health
    - https://mitable-pr-X.up.railway.app/api-docs
 
 **Expected:**
+
 - ✅ Health endpoint returns 200
 - ✅ API docs load correctly
 - ✅ Railway logs show dev database connection
 
 #### Step 7.3: Test Production Deploy
+
 **On GitHub:**
+
 1. Merge the test PR
 2. Watch for:
    - ✅ Production deploy workflow runs
@@ -435,10 +479,13 @@ git push origin test/cicd-pipeline
    - ✅ Health check passes
 
 **Verify:**
+
 - https://mitablebackend-production.up.railway.app/health
 
 #### Step 7.4: Verify Cleanup
+
 **After merge:**
+
 - ✅ Preview deployment auto-deletes
 - ✅ PR shows as merged
 - ✅ Production is stable
@@ -452,11 +499,13 @@ git push origin test/cicd-pipeline
 **Goal:** Get notified in Slack when deployments happen
 
 #### Setup Steps:
+
 1. Create Slack incoming webhook
 2. Add `SLACK_WEBHOOK_URL` to GitHub secrets
 3. Update production-deploy.yml with notification step
 
 **Notification Example:**
+
 ```
 🚀 Production Deploy: SUCCESS
 Commit: feat: add user management
@@ -471,6 +520,7 @@ URL: https://mitablebackend-production.up.railway.app
 **Goal:** Run migrations automatically before deployment
 
 **Implementation:**
+
 - Add migration step to production-deploy.yml
 - Use DIRECT_URL for migrations
 - Rollback on failure
@@ -484,12 +534,14 @@ URL: https://mitablebackend-production.up.railway.app
 **Triggers:** Git tags (v1.0.0, v1.0.1, etc.)
 
 **Outputs:**
+
 - macOS DMG (signed)
 - Windows installer (signed)
 - Linux AppImage
 - GitHub Release with changelog
 
 **Implementation:**
+
 - Code signing certificates required
 - electron-builder configuration
 - Auto-update server manifest
@@ -499,6 +551,7 @@ URL: https://mitablebackend-production.up.railway.app
 ## Implementation Checklist
 
 ### Week 1: Core Setup (3-4 hours)
+
 - [ ] **Phase 1:** Enable Railway PR previews (30 min)
 - [ ] **Phase 1:** Configure dev env vars in Railway (30 min)
 - [ ] **Phase 2:** Get Railway API token (5 min)
@@ -511,6 +564,7 @@ URL: https://mitablebackend-production.up.railway.app
 - [ ] **Phase 6:** Create Pinecone dev index (15 min)
 
 ### Week 2: Testing & Polish (2-3 hours)
+
 - [ ] **Phase 7:** Create test PR (15 min)
 - [ ] **Phase 7:** Verify preview deployment (30 min)
 - [ ] **Phase 7:** Test production deploy (30 min)
@@ -520,6 +574,7 @@ URL: https://mitablebackend-production.up.railway.app
 - [ ] Document rollback procedures (30 min)
 
 ### Optional (Later)
+
 - [ ] Set up Slack notifications
 - [ ] Automate database migrations
 - [ ] Electron release workflow
@@ -545,12 +600,15 @@ After implementation, you should be able to:
 ## Rollback Procedures
 
 ### If Preview Deployment Breaks
+
 - PR preview issues don't affect production
 - Close PR or push fixes
 - Preview auto-deletes when PR closes
 
 ### If Production Deployment Breaks
+
 **Option 1: Revert Commit**
+
 ```bash
 git revert <commit-hash>
 git push origin main
@@ -558,12 +616,14 @@ git push origin main
 ```
 
 **Option 2: Railway Rollback**
+
 ```bash
 railway rollback
 # Returns to previous deployment instantly
 ```
 
 **Option 3: Hotfix**
+
 ```bash
 git checkout -b hotfix/critical-fix
 # Fix the issue
@@ -624,20 +684,24 @@ git checkout -b hotfix/critical-fix
 ## Resources & Links
 
 **Railway:**
+
 - Dashboard: https://railway.app/dashboard
 - Project: https://railway.app/project/your-project-id
 - Docs: https://docs.railway.app/
 
 **GitHub:**
+
 - Repository: https://github.com/Febchuk/mitable
 - Actions: https://github.com/Febchuk/mitable/actions
 - Branch Protection: https://github.com/Febchuk/mitable/settings/branches
 
 **Supabase:**
+
 - Production: https://lbudgeprqnhellzakkvy.supabase.co
 - Dev: <to be created>
 
 **Pinecone:**
+
 - Production Index: mitable-production
 - Dev Index: mitable-dev
 

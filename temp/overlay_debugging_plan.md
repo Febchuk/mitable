@@ -1,4 +1,5 @@
 # Overlay Window Debugging Plan
+
 **Date**: 2025-11-08  
 **Issue**: Overlay window not showing despite complete data flow
 
@@ -7,20 +8,24 @@
 ## Executive Summary
 
 ### Current State Analysis
+
 Based on log analysis from `/Users/febechukwuma/Documents/mitable/temp/run_logs.txt`:
 
 **✅ WORKING - Backend generates and emits data correctly:**
+
 - Line 787-790: `[GuideNextStepTool]` creates window trigger with bounding box
 - Line 798: `[Conversations] Emitting window_trigger event: { window: 'overlay', hasData: true }`
 
 **❌ MISSING - No frontend/IPC logs after backend emission:**
+
 - ❌ No `[API] Received window_trigger event` log
-- ❌ No `[ChatDetail] Window trigger received` log  
+- ❌ No `[ChatDetail] Window trigger received` log
 - ❌ No `[Preload] showOverlay() called` log
 - ❌ No `[Main] OVERLAY_SHOW received` log
 - ❌ No `[Overlay Preload]` or `[Overlay]` logs
 
 ### Breaking Point
+
 **The flow stops at backend SSE emission.** The frontend SSE parser is NOT receiving or NOT parsing the `window_trigger` event.
 
 ---
@@ -74,6 +79,7 @@ Based on log analysis from `/Users/febechukwuma/Documents/mitable/temp/run_logs.
 ## Logs We SEE (from run_logs.txt)
 
 ### Backend - Tool Generation
+
 ```
 Line 787-790: [GuideNextStepTool] Window trigger: {
   hasWindowTrigger: true,
@@ -83,6 +89,7 @@ Line 787-790: [GuideNextStepTool] Window trigger: {
 ```
 
 ### Backend - SSE Emission
+
 ```
 Line 792-796: [Conversations] Streaming chunk sent: {
   type: 'complete',
@@ -91,9 +98,9 @@ Line 792-796: [Conversations] Streaming chunk sent: {
   windowType: 'overlay'
 }
 
-Line 798: [Conversations] Emitting window_trigger event: { 
-  window: 'overlay', 
-  hasData: true 
+Line 798: [Conversations] Emitting window_trigger event: {
+  window: 'overlay',
+  hasData: true
 }
 ```
 
@@ -102,45 +109,56 @@ Line 798: [Conversations] Emitting window_trigger event: {
 ## Logs We DON'T SEE (Missing)
 
 ### Frontend - SSE Parsing (Step 4)
+
 **File**: `/Users/febechukwuma/Documents/mitable/apps/electron/src/renderer/lib/api/conversations.ts:282-289`
 
 **Expected logs (MISSING)**:
+
 ```
 [API] Received window_trigger event: { ... }
 [API] Stored windowTriggerData: { ... }
 ```
 
 ### Frontend - Callback Invocation (Step 6)
+
 **File**: `/Users/febechukwuma/Documents/mitable/apps/electron/src/renderer/console/src/components/views/employee/ChatsView/ChatDetail.tsx:37-42`
 
 **Expected log (MISSING)**:
+
 ```
 [ChatDetail] Window trigger received: { windowType: 'overlay', data: {...} }
 ```
 
 ### Preload - IPC Send (Step 7)
+
 **File**: `/Users/febechukwuma/Documents/mitable/apps/electron/src/preload/console.ts:80-83`
 
 **Expected log (MISSING)**:
+
 ```
 [Preload] showOverlay() called with data: { ... }
 ```
 
 ### Main Process - IPC Receive (Step 8)
+
 **File**: `/Users/febechukwuma/Documents/mitable/apps/electron/src/main.ts:593-607`
 
 **Expected log (MISSING)**:
+
 ```
 [Main] OVERLAY_SHOW received with data: { ... }
 [Main] Overlay window shown with bounding box data
 ```
 
 ### Overlay - Data Receive (Steps 9-10)
-**Files**: 
+
+**Files**:
+
 - `/Users/febechukwuma/Documents/mitable/apps/electron/src/preload/overlay.ts:18-23`
 - `/Users/febechukwuma/Documents/mitable/apps/electron/src/renderer/overlay/src/App.tsx:96-108`
 
 **Expected logs (MISSING)**:
+
 ```
 [Overlay Preload] Received overlay-data: { ... }
 [Overlay] Received bounding box data: { ... }
@@ -164,6 +182,7 @@ The `window_trigger` event is being emitted by backend but NOT parsed by fronten
 ### Evidence Supporting Hypothesis
 
 **Backend code (conversations.ts:942-953)**:
+
 ```typescript
 // Emit separate window_trigger event if windowTrigger is embedded in complete chunk
 if (chunk.type === "complete" && (chunk as any).windowTrigger) {
@@ -182,6 +201,7 @@ if (chunk.type === "complete" && (chunk as any).windowTrigger) {
 ```
 
 **Frontend code (conversations.ts:254-289)**:
+
 ```typescript
 switch (chunk.type) {
   case "chunk":
@@ -217,9 +237,11 @@ switch (chunk.type) {
 **File**: `/Users/febechukwuma/Documents/mitable/apps/electron/src/renderer/lib/api/conversations.ts`
 
 #### 1.1 Log ALL SSE Lines (Before Parsing)
+
 **Location**: Line ~241 (inside `for (const line of lines)` loop)
 
 **Add**:
+
 ```typescript
 for (const line of lines) {
   console.log("[API] SSE line received:", line.substring(0, 100)); // First 100 chars
@@ -235,16 +257,20 @@ for (const line of lines) {
 ```
 
 #### 1.2 Log Chunk Type BEFORE Switch
+
 **Location**: Line ~252 (right after JSON.parse)
 
 **Add**:
+
 ```typescript
 try {
   const chunk: StreamChunk = JSON.parse(data);
   console.log("[API] Parsed chunk type:", chunk.type, "keys:", Object.keys(chunk));
 
-  switch (chunk.type) {
+  switch (
+    chunk.type
     // ... existing cases
+  ) {
   }
 } catch (error) {
   console.error("[API] JSON parse failed:", error, "data:", data);
@@ -252,9 +278,11 @@ try {
 ```
 
 #### 1.3 Log Switch Default Case
+
 **Location**: Line ~300 (add default case to switch)
 
 **Add**:
+
 ```typescript
 switch (chunk.type) {
   case "chunk":
@@ -288,13 +316,15 @@ switch (chunk.type) {
 **File**: `/Users/febechukwuma/Documents/mitable/apps/electron/src/renderer/console/src/components/views/employee/ChatsView/ChatDetail.tsx`
 
 #### 2.1 Log Callback Registration
+
 **Location**: Line ~37 (inside onWindowTrigger callback)
 
 **Add**:
+
 ```typescript
 onWindowTrigger: (windowType: string, data: any) => {
-  console.log("[ChatDetail] Window trigger callback FIRED:", { 
-    windowType, 
+  console.log("[ChatDetail] Window trigger callback FIRED:", {
+    windowType,
     hasData: !!data,
     dataKeys: data ? Object.keys(data) : [],
     hasConsoleAPI: !!window.consoleAPI,
@@ -309,9 +339,11 @@ onWindowTrigger: (windowType: string, data: any) => {
 ```
 
 #### 2.2 Log Mutation Setup
+
 **Location**: Line ~23 (right after useSendMessage hook)
 
 **Add**:
+
 ```typescript
 const sendMessageMutation = useSendMessage({
   onChunk: (chunk: string) => {
@@ -343,9 +375,11 @@ console.log("[ChatDetail] useSendMessage configured with callbacks:", {
 **File**: `/Users/febechukwuma/Documents/mitable/apps/electron/src/preload/console.ts`
 
 #### 3.1 Enhanced Logging in showOverlay
+
 **Location**: Line ~80-83
 
 **Replace**:
+
 ```typescript
 // Overlay management
 showOverlay: (data: unknown) => {
@@ -355,7 +389,7 @@ showOverlay: (data: unknown) => {
     dataKeys: data && typeof data === 'object' ? Object.keys(data) : [],
     rawData: data
   });
-  
+
   console.log("[Preload] Sending IPC to main process:", IPC_CHANNELS.OVERLAY_SHOW);
   ipcRenderer.send(IPC_CHANNELS.OVERLAY_SHOW, data);
   console.log("[Preload] IPC sent successfully");
@@ -367,22 +401,24 @@ showOverlay: (data: unknown) => {
 **File**: `/Users/febechukwuma/Documents/mitable/apps/electron/src/main.ts`
 
 #### 4.1 Enhanced Logging in OVERLAY_SHOW Handler
+
 **Location**: Line ~593-607
 
 **Replace**:
+
 ```typescript
 ipcMain.on(IPC_CHANNELS.OVERLAY_SHOW, (_event, data) => {
   console.log("[Main] OVERLAY_SHOW received:", {
     hasData: !!data,
     dataType: typeof data,
-    dataKeys: data && typeof data === 'object' ? Object.keys(data) : [],
-    rawData: data
+    dataKeys: data && typeof data === "object" ? Object.keys(data) : [],
+    rawData: data,
   });
 
   if (!overlayWindow || overlayWindow.isDestroyed()) {
     console.error("[Main] Overlay window not available:", {
       exists: !!overlayWindow,
-      isDestroyed: overlayWindow?.isDestroyed()
+      isDestroyed: overlayWindow?.isDestroyed(),
     });
     return;
   }
@@ -407,13 +443,15 @@ ipcMain.on(IPC_CHANNELS.OVERLAY_SHOW, (_event, data) => {
 **File**: `/Users/febechukwuma/Documents/mitable/apps/electron/src/preload/overlay.ts`
 
 #### 5.1 Enhanced Logging in onOverlayData
+
 **Location**: Line ~18-23
 
 **Replace**:
+
 ```typescript
 onOverlayData: (callback: (data: unknown) => void) => {
   console.log("[Overlay Preload] Setting up onOverlayData listener");
-  
+
   ipcRenderer.on("overlay-data", (_event: IpcRendererEvent, data: unknown) => {
     console.log("[Overlay Preload] Received overlay-data IPC:", {
       hasData: !!data,
@@ -421,12 +459,12 @@ onOverlayData: (callback: (data: unknown) => void) => {
       dataKeys: data && typeof data === 'object' ? Object.keys(data) : [],
       rawData: data
     });
-    
+
     console.log("[Overlay Preload] Calling callback with data");
     callback(data);
     console.log("[Overlay Preload] Callback invoked successfully");
   });
-  
+
   console.log("[Overlay Preload] onOverlayData listener registered");
 },
 ```
@@ -434,14 +472,16 @@ onOverlayData: (callback: (data: unknown) => void) => {
 **File**: `/Users/febechukwuma/Documents/mitable/apps/electron/src/renderer/overlay/src/App.tsx`
 
 #### 5.2 Enhanced Logging in App.tsx
+
 **Location**: Line ~94-108
 
 **Replace**:
+
 ```typescript
 // Listen for overlay data (bounding boxes from workflow)
 useEffect(() => {
   console.log("[Overlay] Setting up onOverlayData listener in App.tsx");
-  
+
   const handleOverlayData = (data: BoundingBoxData) => {
     console.log("[Overlay] handleOverlayData FIRED:", {
       hasData: !!data,
@@ -451,7 +491,7 @@ useEffect(() => {
       instruction: data?.instruction,
       elementType: data?.elementType,
     });
-    
+
     console.log("[Overlay] Setting bounding box data in state");
     setBoundingBoxData(data);
     setGuideData(null); // Clear guide data when bounding box is received
@@ -479,6 +519,7 @@ console.log("[Overlay] App.tsx render:", {
 ## Expected Data Structures at Each Step
 
 ### Step 1: Backend Tool Return
+
 ```typescript
 {
   messageType: "workflow",
@@ -498,6 +539,7 @@ console.log("[Overlay] App.tsx render:", {
 ```
 
 ### Step 2: Agent Service Yield
+
 ```typescript
 {
   type: "window_trigger",
@@ -514,12 +556,14 @@ console.log("[Overlay] App.tsx render:", {
 ```
 
 ### Step 3: Backend SSE Emission
+
 ```
 data: {"type":"window_trigger","windowTrigger":{"window":"overlay","data":{...}}}
 
 ```
 
 ### Step 4: Frontend SSE Parse
+
 ```typescript
 chunk = {
   type: "window_trigger",
@@ -531,16 +575,18 @@ chunk = {
 ```
 
 ### Step 5: Frontend Callback
+
 ```typescript
 callbacks.onWindowTrigger("overlay", {
   boundingBox: { x: 0.307, y: 0.593, width: 0.398, height: 0.045 },
   label: "Move on to next step",
   instruction: "Great, you're already logged in! Now, click...",
-  elementType: "button"
-})
+  elementType: "button",
+});
 ```
 
 ### Step 6: ChatDetail Handler
+
 ```typescript
 onWindowTrigger: (windowType: "overlay", data: {
   boundingBox: { x: 0.307, y: 0.593, width: 0.398, height: 0.045 },
@@ -551,16 +597,18 @@ onWindowTrigger: (windowType: "overlay", data: {
 ```
 
 ### Step 7: Preload IPC Send
+
 ```typescript
 ipcRenderer.send("overlay-show", {
   boundingBox: { x: 0.307, y: 0.593, width: 0.398, height: 0.045 },
   label: "Move on to next step",
   instruction: "Great, you're already logged in! Now, click...",
-  elementType: "button"
-})
+  elementType: "button",
+});
 ```
 
 ### Step 8: Main Process IPC Receive
+
 ```typescript
 _event: IpcMainEvent
 data: {
@@ -572,6 +620,7 @@ data: {
 ```
 
 ### Step 9: Overlay Preload Receive
+
 ```typescript
 _event: IpcRendererEvent
 data: {
@@ -583,13 +632,14 @@ data: {
 ```
 
 ### Step 10: Overlay App Render
+
 ```typescript
 boundingBoxData: BoundingBoxData = {
   boundingBox: { x: 0.307, y: 0.593, width: 0.398, height: 0.045 },
   label: "Move on to next step",
   instruction: "Great, you're already logged in! Now, click...",
-  elementType: "button"
-}
+  elementType: "button",
+};
 ```
 
 ---
@@ -597,23 +647,28 @@ boundingBoxData: BoundingBoxData = {
 ## Testing Protocol
 
 ### 1. Apply All Logs (Phases 1-5)
+
 Add all strategic logs listed above to the codebase.
 
 ### 2. Restart Dev Environment
+
 ```bash
 npm run dev
 ```
 
 ### 3. Reproduce Issue
+
 - Open Spotify application
 - Ask: "How do I open my liked songs playlist in spotify"
 - Click "Move on to next step" (workflow progression button)
 - Click "Move on to next step" again (this triggers bounding box)
 
 ### 4. Analyze Logs
+
 Check which logs appear and at what point the flow stops.
 
 ### 5. Identify Breaking Point
+
 The FIRST missing log indicates where the flow breaks.
 
 ---
@@ -621,60 +676,72 @@ The FIRST missing log indicates where the flow breaks.
 ## Possible Outcomes & Next Steps
 
 ### Outcome 1: SSE Line NOT Received
+
 **Symptom**: `[API] SSE line received` does NOT show `window_trigger` event
 
 **Root Cause**: Backend not sending event correctly OR network issue
 
 **Next Steps**:
+
 - Check backend network response (browser DevTools → Network → SSE stream)
 - Verify SSE format (should be `data: {...}\n\n`)
 - Check if event sent AFTER stream ends
 
 ### Outcome 2: SSE Line Received, Parse Fails
+
 **Symptom**: `[API] SSE line received` shows event, but `[API] Parsed chunk type` does NOT
 
 **Root Cause**: JSON parse error
 
 **Next Steps**:
+
 - Check JSON format in SSE line
 - Check for escaped characters or invalid JSON
 
 ### Outcome 3: Parse Works, Switch Case Fails
+
 **Symptom**: `[API] Parsed chunk type` shows `window_trigger`, but callback NOT fired
 
 **Root Cause**: Switch case not matching OR callback not registered
 
 **Next Steps**:
+
 - Verify `chunk.type === "window_trigger"` (exact string match)
 - Verify `chunk.windowTrigger` exists
 - Check if `callbacks.onWindowTrigger` is defined
 
 ### Outcome 4: Callback Fires, IPC Not Sent
+
 **Symptom**: `[ChatDetail] Window trigger callback FIRED` shows, but `[Preload] showOverlay()` does NOT
 
 **Root Cause**: `window.consoleAPI?.showOverlay` not available
 
 **Next Steps**:
+
 - Check preload script loaded correctly
 - Verify `contextBridge.exposeInMainWorld` ran
 - Check browser console for errors
 
 ### Outcome 5: IPC Sent, Main Not Receiving
+
 **Symptom**: `[Preload] IPC sent successfully` shows, but `[Main] OVERLAY_SHOW received` does NOT
 
 **Root Cause**: IPC channel mismatch OR main handler not registered
 
 **Next Steps**:
+
 - Verify IPC channel name matches exactly (`overlay-show`)
 - Check if `ipcMain.on(OVERLAY_SHOW)` handler registered before window creation
 - Check for typos in IPC_CHANNELS constant
 
 ### Outcome 6: Main Receives, Overlay Not Showing
+
 **Symptom**: `[Main] Overlay window shown` shows, but overlay window not visible
 
 **Root Cause**: Overlay window positioning OR visibility issue
 
 **Next Steps**:
+
 - Check overlay window bounds (off-screen?)
 - Check overlay window opacity (transparent?)
 - Check overlay window z-order (behind other windows?)
@@ -685,7 +752,9 @@ The FIRST missing log indicates where the flow breaks.
 ## Quick Diagnostic Commands
 
 ### Check Overlay Window State (Main Process)
+
 Add to main.ts OVERLAY_SHOW handler:
+
 ```typescript
 console.log("[Main] Overlay window state:", {
   exists: !!overlayWindow,
@@ -698,13 +767,16 @@ console.log("[Main] Overlay window state:", {
 ```
 
 ### Check SSE Response (Browser DevTools)
+
 1. Open DevTools → Network tab
 2. Find SSE request (filter: `/messages/stream`)
 3. Click on request → Response tab
 4. Look for `data: {"type":"window_trigger",...}`
 
 ### Check IPC Registration (Main Process Startup)
+
 Add to main.ts after all IPC handlers:
+
 ```typescript
 console.log("[Main] Registered IPC handlers:", {
   overlayShow: ipcMain.listenerCount(IPC_CHANNELS.OVERLAY_SHOW),

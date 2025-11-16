@@ -1,6 +1,6 @@
-import sharp from 'sharp';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
+import sharp from "sharp";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
 
 interface BoundingBox {
   x: number; // Normalized 0-1
@@ -22,9 +22,7 @@ export class ScreenshotAnnotator {
 
   constructor(outputDir?: string) {
     this.outputDir =
-      outputDir ||
-      process.env.DEBUG_SCREENSHOTS_DIR ||
-      '/tmp/mitable-debug-screenshots';
+      outputDir || process.env.DEBUG_SCREENSHOTS_DIR || "/tmp/mitable-debug-screenshots";
   }
 
   // Main annotation function
@@ -40,7 +38,7 @@ export class ScreenshotAnnotator {
     jsonPath: string;
   }> {
     // 1. Generate timestamp for session directory
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const sessionDir = path.join(this.outputDir, timestamp);
 
     // 2. Create session directory
@@ -48,12 +46,12 @@ export class ScreenshotAnnotator {
 
     // 3. Decode base64 to buffer
     const imageBuffer = Buffer.from(
-      screenshotBase64.replace(/^data:image\/\w+;base64,/, ''),
-      'base64'
+      screenshotBase64.replace(/^data:image\/\w+;base64,/, ""),
+      "base64"
     );
 
     // 4. Save original screenshot
-    const originalPath = path.join(sessionDir, 'original.png');
+    const originalPath = path.join(sessionDir, "original.png");
     await writeFile(originalPath, imageBuffer);
 
     // 5. Convert normalized coordinates to pixels
@@ -63,11 +61,7 @@ export class ScreenshotAnnotator {
     const validBox = this.clampToImageBounds(pixelBox, imageDimensions);
 
     // 7. Build SVG overlay with bounding box
-    const svgOverlay = this.buildSVGOverlay(
-      validBox,
-      imageDimensions,
-      options
-    );
+    const svgOverlay = this.buildSVGOverlay(validBox, imageDimensions, options);
 
     // 8. Composite SVG onto image using Sharp
     const annotatedBuffer = await sharp(imageBuffer)
@@ -82,11 +76,11 @@ export class ScreenshotAnnotator {
       .toBuffer();
 
     // 9. Save annotated screenshot
-    const annotatedPath = path.join(sessionDir, 'annotated.png');
+    const annotatedPath = path.join(sessionDir, "annotated.png");
     await writeFile(annotatedPath, annotatedBuffer);
 
     // 10. Save analysis JSON
-    const jsonPath = path.join(sessionDir, 'analysis.json');
+    const jsonPath = path.join(sessionDir, "analysis.json");
     const analysisData = {
       timestamp: new Date().toISOString(),
       instruction: options.instruction,
@@ -104,20 +98,18 @@ export class ScreenshotAnnotator {
       screenshot: {
         dimensions: imageDimensions,
         files: {
-          original: 'original.png',
-          annotated: 'annotated.png',
-          analysis: 'analysis.json',
+          original: "original.png",
+          annotated: "annotated.png",
+          analysis: "analysis.json",
         },
       },
     };
     await writeFile(jsonPath, JSON.stringify(analysisData, null, 2));
 
     // 11. Log to console for easy access
-    console.log('\n[DEBUG SCREENSHOT]');
+    console.log("\n[DEBUG SCREENSHOT]");
     console.log(`  Session:   ${sessionDir}`);
-    console.log(
-      `  Element:   ${options.label} (${(options.confidence * 100).toFixed(0)}%)`
-    );
+    console.log(`  Element:   ${options.label} (${(options.confidence * 100).toFixed(0)}%)`);
     console.log(`  Files:     original.png, annotated.png, analysis.json\n`);
 
     return { sessionDir, originalPath, annotatedPath, jsonPath };
@@ -177,8 +169,7 @@ export class ScreenshotAnnotator {
     const labelPadding = 8;
 
     // Position label above box if there's space, otherwise below
-    const labelY =
-      box.y > labelHeight + 10 ? box.y - labelHeight - 5 : box.y + box.height + 5;
+    const labelY = box.y > labelHeight + 10 ? box.y - labelHeight - 5 : box.y + box.height + 5;
 
     svgElements.push(`
       <rect
@@ -260,7 +251,7 @@ export class ScreenshotAnnotator {
 
     return `
       <svg width="${dimensions.width}" height="${dimensions.height}" xmlns="http://www.w3.org/2000/svg">
-        ${svgElements.join('\n')}
+        ${svgElements.join("\n")}
       </svg>
     `;
   }
@@ -268,17 +259,15 @@ export class ScreenshotAnnotator {
   // Helper: Escape XML special characters
   private escapeXml(text: string): string {
     return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
   }
 
   // Helper: Truncate text with ellipsis
   private truncateText(text: string, maxLength: number): string {
-    return text.length > maxLength
-      ? text.substring(0, maxLength - 3) + '...'
-      : text;
+    return text.length > maxLength ? text.substring(0, maxLength - 3) + "..." : text;
   }
 }

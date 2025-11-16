@@ -405,7 +405,7 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
         ...solutionObject,
         workflowSessionId: workflowSession.id, // Add session ID to cardData
         workflowActive: true,
-        workflowPhase: "initial_proposal"
+        workflowPhase: "initial_proposal",
       },
       streamable: true,
     };

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import AgentPill from "./components/AgentPill";
 import { createConversation } from "../../lib/api/conversations";
-import type { ScreenshotResult } from "@mitable/shared";
 
 declare global {
   interface Window {
@@ -23,7 +22,7 @@ declare global {
       sendMessageToConversation: (messageData: any, screenshot: string | null) => void;
       showNudge: (data: unknown) => void;
       startGuide: (data: unknown) => void;
-      captureScreenshot: () => Promise<ScreenshotResult | null>;
+      captureScreenshot: () => Promise<{ dataUrl: string; metadata?: any } | null>;
       getAuthToken: () => Promise<string | null>;
       onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
       onGuideNextStep: (callback: () => void) => void;

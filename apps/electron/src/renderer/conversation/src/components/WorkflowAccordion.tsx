@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { ChevronDown, ChevronRight, PlayCircle, CheckCircle } from "lucide-react";
-import WorkflowOptions, { WorkflowPhase } from "../../../components/domain/workflow/WorkflowOptions";
+import WorkflowOptions, {
+  WorkflowPhase,
+} from "../../../components/domain/workflow/WorkflowOptions";
 import StepList from "../../../components/domain/workflow/StepList";
 import AIMessage from "../../../components/domain/messages/AIMessage";
 import { cn } from "../../../lib/utils";
@@ -73,11 +75,7 @@ export function WorkflowAccordion({
         <AIMessage content={workflow.solutionExplanation} />
 
         <div className="mt-4">
-          <StepList
-            steps={workflow.stepList}
-            currentStepIndex={-1}
-            showCheckboxes={false}
-          />
+          <StepList steps={workflow.stepList} currentStepIndex={-1} showCheckboxes={false} />
         </div>
 
         <div className="mt-4">
@@ -107,9 +105,7 @@ export function WorkflowAccordion({
             <ChevronRight className="w-5 h-5 text-text-secondary" />
           )}
 
-          <span className="workflow-title font-medium text-text-primary">
-            {workflow.solution}
-          </span>
+          <span className="workflow-title font-medium text-text-primary">{workflow.solution}</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -179,13 +175,12 @@ export function WorkflowAccordion({
                         )}
                       </div>
 
-                      {hasMessages && (
-                        expandedSteps.has(idx) ? (
+                      {hasMessages &&
+                        (expandedSteps.has(idx) ? (
                           <ChevronDown className="w-4 h-4 text-text-secondary" />
                         ) : (
                           <ChevronRight className="w-4 h-4 text-text-secondary" />
-                        )
-                      )}
+                        ))}
                     </button>
                   )}
 
@@ -196,7 +191,11 @@ export function WorkflowAccordion({
                       {isCurrentStep && workflow.adjustmentHistory.length > 0 && (
                         <div className="plan-adjustment-notice bg-status-warning/20 border border-status-warning/40 rounded p-3 mb-3">
                           <p className="text-sm text-status-warning">
-                            📝 <strong>Plan updated:</strong> {workflow.adjustmentHistory[workflow.adjustmentHistory.length - 1].reason}
+                            📝 <strong>Plan updated:</strong>{" "}
+                            {
+                              workflow.adjustmentHistory[workflow.adjustmentHistory.length - 1]
+                                .reason
+                            }
                           </p>
                         </div>
                       )}
@@ -214,9 +213,7 @@ export function WorkflowAccordion({
                           key={msgIdx}
                           className={cn(
                             "step-message mb-2 p-2 rounded",
-                            msg.role === "user"
-                              ? "bg-primary/20 ml-4"
-                              : "bg-background-elevated"
+                            msg.role === "user" ? "bg-primary/20 ml-4" : "bg-background-elevated"
                           )}
                         >
                           <p className="text-sm text-text-primary">{msg.content}</p>
@@ -227,9 +224,18 @@ export function WorkflowAccordion({
                       {isCurrentStep && isStreaming && (
                         <div className="streaming-indicator flex items-center gap-2 text-sm text-text-secondary mt-2">
                           <div className="loading-dots flex gap-1">
-                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                            <span
+                              className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                              style={{ animationDelay: "0ms" }}
+                            ></span>
+                            <span
+                              className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                              style={{ animationDelay: "150ms" }}
+                            ></span>
+                            <span
+                              className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                              style={{ animationDelay: "300ms" }}
+                            ></span>
                           </div>
                           AI is thinking...
                         </div>

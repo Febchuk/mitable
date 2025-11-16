@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUp, Circle, Square, Type, Mic } from "lucide-react";
+import { ArrowUp, Circle, Square, Type, Mic, Maximize2 } from "lucide-react";
 import logoIconSvg from "../../../assets/logo-icon.svg";
 
 interface AgentPillProps {
@@ -47,7 +47,7 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
     }
 
     // Resize the Electron window to match pill content
-    // Text mode: 740px wide, Audio mode: 280px wide
+    // Text mode: 800px wide, Audio mode: 280px wide
     window.agentAPI.resizeWindow(mode === "text" ? "text-mode" : "audio-mode");
   };
 
@@ -62,7 +62,7 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
   return (
     <div
       className={`${
-        inputMode === "text" ? "w-[740px] px-6" : "w-[280px] px-4"
+        inputMode === "text" ? "w-[800px] px-6" : "w-[280px] px-4"
       } h-full flex items-center py-2 bg-agent-pill rounded-full app-drag transition-all duration-300`}
     >
       {/* Logo Icon - Click to open conversation switcher */}
@@ -120,16 +120,35 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
         </button>
       </div>
 
-      {/* Action Button */}
+      {/* Action Buttons */}
       {inputMode === "text" ? (
-        <button
-          onClick={handleSubmit}
-          disabled={!inputValue.trim()}
-          className="w-10 h-10 rounded-full bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0 app-no-drag"
-          aria-label="Send message"
-        >
-          <ArrowUp size={20} className="text-white" />
-        </button>
+        <div className="flex items-center gap-2 app-no-drag">
+          <button
+            onClick={handleSubmit}
+            disabled={!inputValue.trim()}
+            className="w-10 h-10 rounded-full bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
+            aria-label="Send message"
+          >
+            <ArrowUp size={20} className="text-white" />
+          </button>
+          <button
+            onClick={() => {
+              console.log("[AgentPill] Maximize clicked - opening Console window and hiding pill");
+              // Open the main Console window
+              window.agentAPI.showConsole();
+              // Hide the agent pill
+              window.agentAPI.toggle();
+            }}
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-primary hover:shadow-glow-purple flex items-center justify-center transition-all duration-200 flex-shrink-0 group"
+            aria-label="Open Console"
+            title="Open Console"
+          >
+            <Maximize2
+              size={18}
+              className="text-white/60 group-hover:text-white group-hover:scale-110 transition-all"
+            />
+          </button>
+        </div>
       ) : isRecording ? (
         <button
           onClick={handleRecord}

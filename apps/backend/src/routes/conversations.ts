@@ -800,7 +800,8 @@ router.post(
       // Check if there's an active workflow for this conversation
       const activeWorkflow = await workflowService.getActiveWorkflow(conversationId);
       const workflowSessionId = activeWorkflow?.id || metadata?.workflowSessionId || null;
-      const currentStepIndex = activeWorkflow?.currentStepIndex || metadata?.currentStepIndex || null;
+      const currentStepIndex =
+        activeWorkflow?.currentStepIndex || metadata?.currentStepIndex || null;
 
       // Save user message to database with workflow fields
       const [userMessage] = await db
@@ -989,7 +990,8 @@ router.post(
           : assistantCardData;
 
         // Extract workflow fields from cardData
-        const assistantWorkflowSessionId = finalCardData?.workflowSessionId || workflowSessionId || null;
+        const assistantWorkflowSessionId =
+          finalCardData?.workflowSessionId || workflowSessionId || null;
         const assistantStepIndex = finalCardData?.currentStepIndex ?? currentStepIndex ?? null;
 
         const [assistantMessage] = await db
@@ -1012,9 +1014,8 @@ router.post(
 
         // Dual-write to workflow_interactions if this is a workflow response
         if (assistantWorkflowSessionId) {
-          const interactionType = metadata?.workflowAction === "progress_step"
-            ? "step_progress"
-            : "ai_response";
+          const interactionType =
+            metadata?.workflowAction === "progress_step" ? "step_progress" : "ai_response";
 
           await workflowService.addWorkflowInteraction(
             assistantWorkflowSessionId,
@@ -1022,89 +1023,105 @@ router.post(
             "assistant",
             assistantContent,
             assistantStepIndex,
-            { cardData: finalCardData, sources: assistantSources, workflowAction: metadata?.workflowAction }
+            {
+              cardData: finalCardData,
+              sources: assistantSources,
+              workflowAction: metadata?.workflowAction,
+            }
           );
-          console.log(`[Stream] Workflow interaction saved for assistant response (${interactionType})`);
+          console.log(
+            `[Stream] Workflow interaction saved for assistant response (${interactionType})`
+          );
         }
 
         // Debug: Save PII testing screenshots (before/after redaction)
-        if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true' && screenshot) {
+        if (process.env.DEBUG_SAVE_SCREENSHOTS === "true" && screenshot) {
           try {
-            console.log('[DEBUG PII] Saving PII test screenshots...', {
+            console.log("[DEBUG PII] Saving PII test screenshots...", {
               screenshotType: typeof screenshot,
               isBuffer: Buffer.isBuffer(screenshot),
-              screenshotPreview: typeof screenshot === 'string' ? screenshot.substring(0, 50) : 'Buffer',
+              screenshotPreview:
+                typeof screenshot === "string" ? screenshot.substring(0, 50) : "Buffer",
             });
-            const fs = await import('fs/promises');
-            const path = await import('path');
-            
+            const fs = await import("fs/promises");
+            const path = await import("path");
+
             // Create session directory
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
             // Use monorepo root temp directory (go up 2 levels from apps/backend)
-            const monorepoRoot = path.resolve(process.cwd(), '..', '..');
-            const defaultDir = path.join(monorepoRoot, 'temp', 'pii-debug-screenshots');
+            const monorepoRoot = path.resolve(process.cwd(), "..", "..");
+            const defaultDir = path.join(monorepoRoot, "temp", "pii-debug-screenshots");
             const outputDir = process.env.DEBUG_SCREENSHOTS_DIR || defaultDir;
             const sessionDir = path.join(outputDir, timestamp);
-            console.log('[DEBUG PII] Path resolution:', {
+            console.log("[DEBUG PII] Path resolution:", {
               processCwd: process.cwd(),
               monorepoRoot,
               defaultDir,
               sessionDir,
             });
             await fs.mkdir(sessionDir, { recursive: true });
-            
+
             // Save original (after redaction)
             let originalBuffer: Buffer;
             if (Buffer.isBuffer(screenshot)) {
               originalBuffer = screenshot;
-            } else if (typeof screenshot === 'string') {
-              const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, '');
-              originalBuffer = Buffer.from(base64Data, 'base64');
-            } else if (typeof screenshot === 'object' && screenshot !== null) {
+            } else if (typeof screenshot === "string") {
+              const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
+              originalBuffer = Buffer.from(base64Data, "base64");
+            } else if (typeof screenshot === "object" && screenshot !== null) {
               // Handle object case - convert to Buffer
-              console.log('[DEBUG PII] Screenshot object keys:', Object.keys(screenshot));
+              console.log("[DEBUG PII] Screenshot object keys:", Object.keys(screenshot));
               const screenshotObj = screenshot as any;
-              
-              if ('dataUrl' in screenshotObj && typeof screenshotObj.dataUrl === 'string') {
-                const base64Data = screenshotObj.dataUrl.replace(/^data:image\/\w+;base64,/, '');
-                originalBuffer = Buffer.from(base64Data, 'base64');
-              } else if ('data' in screenshotObj && Buffer.isBuffer(screenshotObj.data)) {
+
+              if ("dataUrl" in screenshotObj && typeof screenshotObj.dataUrl === "string") {
+                const base64Data = screenshotObj.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+                originalBuffer = Buffer.from(base64Data, "base64");
+              } else if ("data" in screenshotObj && Buffer.isBuffer(screenshotObj.data)) {
                 originalBuffer = screenshotObj.data;
-              } else if ('data' in screenshotObj && typeof screenshotObj.data === 'string') {
-                const base64Data = screenshotObj.data.replace(/^data:image\/\w+;base64,/, '');
-                originalBuffer = Buffer.from(base64Data, 'base64');
+              } else if ("data" in screenshotObj && typeof screenshotObj.data === "string") {
+                const base64Data = screenshotObj.data.replace(/^data:image\/\w+;base64,/, "");
+                originalBuffer = Buffer.from(base64Data, "base64");
               } else {
-                throw new Error(`Screenshot object missing valid data. Keys: ${Object.keys(screenshotObj).join(', ')}`);
+                throw new Error(
+                  `Screenshot object missing valid data. Keys: ${Object.keys(screenshotObj).join(", ")}`
+                );
               }
             } else {
               throw new Error(`Unexpected screenshot type: ${typeof screenshot}`);
             }
-            const originalPath = path.join(sessionDir, 'redacted.png');
+            const originalPath = path.join(sessionDir, "redacted.png");
             await fs.writeFile(originalPath, originalBuffer);
-            
+
             // Save metadata
-            const metadataPath = path.join(sessionDir, 'metadata.json');
-            await fs.writeFile(metadataPath, JSON.stringify({
-              timestamp: new Date().toISOString(),
-              query: content,
-              piiRedacted: true,
-              hasScreenshotMetadata: !!screenshotMetadata,
-            }, null, 2));
-            
-            console.log('[DEBUG PII] Screenshots saved:', {
+            const metadataPath = path.join(sessionDir, "metadata.json");
+            await fs.writeFile(
+              metadataPath,
+              JSON.stringify(
+                {
+                  timestamp: new Date().toISOString(),
+                  query: content,
+                  piiRedacted: true,
+                  hasScreenshotMetadata: !!screenshotMetadata,
+                },
+                null,
+                2
+              )
+            );
+
+            console.log("[DEBUG PII] Screenshots saved:", {
               sessionDir,
               redactedPath: originalPath,
               metadataPath,
             });
           } catch (error) {
-            console.error('[DEBUG PII] Failed to save PII test screenshots:', error);
+            console.error("[DEBUG PII] Failed to save PII test screenshots:", error);
           }
         }
 
         // Debug: Save annotated screenshot if enabled and has visual guidance
-        if (process.env.DEBUG_SAVE_SCREENSHOTS === 'true') {
-          console.log('[DEBUG SCREENSHOT] Debug mode active, checking conditions:', {
-            envVariableSet: process.env.DEBUG_SAVE_SCREENSHOTS === 'true',
+        if (process.env.DEBUG_SAVE_SCREENSHOTS === "true") {
+          console.log("[DEBUG SCREENSHOT] Debug mode active, checking conditions:", {
+            envVariableSet: process.env.DEBUG_SAVE_SCREENSHOTS === "true",
             hasScreenshot: !!screenshot,
             hasMetadata: !!screenshotMetadata,
             hasVisualGuidance: !!finalCardData?.visualGuidance,
@@ -1118,7 +1135,7 @@ router.post(
               // Check if the response has visual guidance data with bounding box
               const visualGuidance = finalCardData?.visualGuidance;
               if (visualGuidance?.element?.boundingBox) {
-                console.log('[DEBUG SCREENSHOT] All conditions met, saving annotated screenshot');
+                console.log("[DEBUG SCREENSHOT] All conditions met, saving annotated screenshot");
                 const annotator = new ScreenshotAnnotator();
 
                 // Convert pixel coordinates back to normalized for annotation
@@ -1131,13 +1148,14 @@ router.post(
                   }
                 );
 
-                console.log('[DEBUG SCREENSHOT] Coordinate conversion for annotation:', {
+                console.log("[DEBUG SCREENSHOT] Coordinate conversion for annotation:", {
                   pixels: visualGuidance.element.boundingBox,
                   normalized: normalizedBoundingBox,
                 });
 
-                console.log('[DEBUG SCREENSHOT] Annotation metadata:', {
-                  instruction: visualGuidance.clarifiedDescription || visualGuidance.elementDescription,
+                console.log("[DEBUG SCREENSHOT] Annotation metadata:", {
+                  instruction:
+                    visualGuidance.clarifiedDescription || visualGuidance.elementDescription,
                   clarifiedDescription: visualGuidance.clarifiedDescription,
                   elementDescription: visualGuidance.elementDescription,
                   userOriginalMessage: content,
@@ -1151,26 +1169,35 @@ router.post(
                     height: screenshotMetadata.height,
                   },
                   {
-                    label: visualGuidance.elementDescription || visualGuidance.element.label || 'Target Element',
+                    label:
+                      visualGuidance.elementDescription ||
+                      visualGuidance.element.label ||
+                      "Target Element",
                     confidence: visualGuidance.element.confidence || 0.5,
-                    instruction: visualGuidance.clarifiedDescription || visualGuidance.elementDescription, // Use clarified description (Phase 1 output)
+                    instruction:
+                      visualGuidance.clarifiedDescription || visualGuidance.elementDescription, // Use clarified description (Phase 1 output)
                     clarifiedDescription: visualGuidance.clarifiedDescription, // Store clarified description
                     elementType: visualGuidance.element.type,
                   }
                 );
-                console.log('[DEBUG SCREENSHOT] Screenshot saved successfully:', result);
+                console.log("[DEBUG SCREENSHOT] Screenshot saved successfully:", result);
               } else {
-                console.warn('[DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response');
+                console.warn(
+                  "[DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response"
+                );
               }
             } catch (debugError) {
-              console.error('[DEBUG SCREENSHOT] Failed to save annotated screenshot:', debugError);
+              console.error("[DEBUG SCREENSHOT] Failed to save annotated screenshot:", debugError);
               // Don't fail the request, just log the error
             }
           } else {
-            console.warn('[DEBUG SCREENSHOT] Skipping annotation - missing screenshot or metadata', {
-              hasScreenshot: !!screenshot,
-              hasMetadata: !!screenshotMetadata,
-            });
+            console.warn(
+              "[DEBUG SCREENSHOT] Skipping annotation - missing screenshot or metadata",
+              {
+                hasScreenshot: !!screenshot,
+                hasMetadata: !!screenshotMetadata,
+              }
+            );
           }
         }
 
