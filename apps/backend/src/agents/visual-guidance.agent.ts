@@ -533,7 +533,10 @@ Generate the complete JSON object now with ALL required fields.`;
         userQuestion: lastUserMessage.content,
         visibleApp: visibleApp,
         searchResultCount: searchResult.sources?.length || 0,
-        firstStepUsesVisibleApp: aiGeneratedParams.stepList?.[0]?.description.toLowerCase().includes(visibleApp.toLowerCase()) || false,
+        firstStepUsesVisibleApp:
+          aiGeneratedParams.stepList?.[0]?.description
+            .toLowerCase()
+            .includes(visibleApp.toLowerCase()) || false,
       });
 
       // STEP 3: Validate required fields (only those GPT-4 should generate)

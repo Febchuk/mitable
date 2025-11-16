@@ -11,6 +11,7 @@
 Mitable's RAG system evolved from a simple search-then-answer pipeline into a sophisticated multi-stage routing and synthesis engine. The key innovation is **preflight-first architecture**: the system checks the knowledge base BEFORE routing decisions, not after.
 
 **Why This Matters:**
+
 - Ambiguous queries like "How do I setup RAG locally?" now route correctly
 - KB content informs routing decisions (not just keyword matching)
 - Cached preflight results eliminate redundant searches
@@ -85,7 +86,7 @@ Auto-append from original searchResult.sources
 Filter: Remove Notion docs (query asked about "setup" = wants Slack)
 Show: Top 3 most relevant sources
     ↓
-Result: "I don't have concrete setup steps in the KB. 
+Result: "I don't have concrete setup steps in the KB.
          Would you like me to connect you with someone who can help?
          Sources: [3 #engineering threads]"
 ```
@@ -95,9 +96,11 @@ Result: "I don't have concrete setup steps in the KB.
 ## The Three-Stage Architecture
 
 ### Stage 1: Intent Classification (Orchestrator)
+
 **File:** `apps/backend/src/services/orchestrator.service.ts`
 
 **What happens:**
+
 1. Quick heuristic checks (greetings, obvious patterns)
 2. **KB preflight for ambiguous queries** (NEW!)
 3. LLM classification if needed (Gemini Flash)
@@ -106,9 +109,11 @@ Result: "I don't have concrete setup steps in the KB.
 **Key Innovation:** Preflight happens BEFORE routing
 
 ### Stage 2: Knowledge Search (KnowledgeAgent)
+
 **File:** `apps/backend/src/agents/knowledge.agent.ts`
 
 **What happens:**
+
 1. Check for cached preflight results (reuse if available)
 2. Execute search (or use cache)
 3. **Unit normalization** - group messages into threads/pages
@@ -118,9 +123,11 @@ Result: "I don't have concrete setup steps in the KB.
 **Key Innovation:** Unit normalization + more context for AI
 
 ### Stage 3: Synthesis (Groq Streaming)
+
 **File:** `apps/backend/src/agents/knowledge.agent.ts` (lines 900-1100)
 
 **What happens:**
+
 1. Stream synthesis from Groq
 2. **Source filtering** (remove irrelevant)
 3. **Programmatic source appending** (never forget!)
@@ -145,9 +152,9 @@ const isAmbiguous = GENERIC_QA.test(query);
 if (isAmbiguous && !ORG_HINT.test(query)) {
   // PREFLIGHT FIRST! (NEW)
   console.log("[Orchestrator] Ambiguous query → checking KB first");
-  
+
   const kbContext = await this.kbPreflight(query, context);
-  
+
   if (kbContext.top < 0.28 || kbContext.strongCount < 1) {
     // NO content → open_domain_qa (Wikipedia answer)
     return { type: "open_domain_qa", confidence: 0.95 };
@@ -170,15 +177,15 @@ async kbPreflight(query: string, ctx: ToolContext) {
   const cacheKey = `kb-preflight:${ctx.organizationId}:${query}`;
   const cached = cacheService.get(cacheKey);
   if (cached) return cached; // ⚡ CACHE HIT
-  
+
   // 2. Quick search (topK=6 only)
   const res = await this.searchTool.execute({ query, topK: 6 }, ctx);
-  
+
   // 3. Compute scores
   const scores = res.sources.map(s => s.score || 0);
   const top = scores[0] || 0;
   const strongCount = scores.filter(x => x >= 0.35).length;
-  
+
   // 4. Build result object (includes FULL results)
   const result = {
     top,                    // Best score
@@ -186,15 +193,16 @@ async kbPreflight(query: string, ctx: ToolContext) {
     results: res,           // 🆕 FULL SEARCH RESULTS
     preview: res.sources[0]?.snippet?.slice(0, 150) || ""
   };
-  
+
   // 5. Cache for 5min
   cacheService.set(cacheKey, result, 300);
-  
+
   return result;
 }
 ```
 
 **Why This Is Brilliant:**
+
 - Caches full search results, not just scores
 - KnowledgeAgent can reuse without redundant search
 - 5min TTL keeps routing decisions fresh
@@ -215,7 +223,7 @@ async kbPreflight(query: string, ctx: ToolContext) {
 
 // Step 1: Get raw results
 const structured = searchResult.metadata?.results; // Raw search results
-const items = structured || searchResult.sources;  // Fall back if needed
+const items = structured || searchResult.sources; // Fall back if needed
 
 // Step 2: Group Slack by thread
 const slackThreads = new Map<string, items[]>();
@@ -224,7 +232,7 @@ for (const item of items) {
   if (isSlack) {
     // Thread key = channel + parent timestamp
     const threadKey = `${item.channelId}_${item.threadTs || item.messageTs}`;
-    
+
     if (!slackThreads.has(threadKey)) {
       slackThreads.set(threadKey, []);
     }
@@ -240,8 +248,8 @@ for (const [threadKey, threadItems] of slackThreads) {
     id: threadKey,
     source: "Slack",
     title: `#${threadItems[0].channelName} thread`,
-    score: Math.max(...threadItems.map(i => i.score)), // Best score in thread
-    items: threadItems,  // ALL messages in thread
+    score: Math.max(...threadItems.map((i) => i.score)), // Best score in thread
+    items: threadItems, // ALL messages in thread
   });
 }
 
@@ -261,7 +269,7 @@ for (const [threadKey, threadItems] of slackThreads) {
 const buildSummaryUnits = (unitList: Unit[], max = 12) => {
   return unitList
     .sort((a, b) => b.score - a.score)
-    .filter(u => !seen.has(u.permalink)) // Dedupe
+    .filter((u) => !seen.has(u.permalink)) // Dedupe
     .slice(0, max);
 };
 
@@ -269,6 +277,7 @@ summaryUnits = buildSummaryUnits(units, 12); // 🆕 Changed from 5 to 12
 ```
 
 **Why 12?**
+
 - Semantic scores are noisy (0.01 difference = meaningless)
 - LLM has semantic understanding (scores don't)
 - Better to give more context and let AI filter
@@ -280,14 +289,15 @@ summaryUnits = buildSummaryUnits(units, 12); // 🆕 Changed from 5 to 12
 **Result:** Couldn't group into threads → all 25 messages became 1 unit!
 
 **Fix:**
+
 ```typescript
 // File: knowledge.agent.ts, lines 279-286
 
 // OLD: Only use structured for temporal
-const items = (isTemporal && structured?.length ? structured : sources);
+const items = isTemporal && structured?.length ? structured : sources;
 
 // NEW: Always use structured when available
-const items = (structured && structured.length > 0 ? structured : sources);
+const items = structured && structured.length > 0 ? structured : sources;
 ```
 
 Now all queries get full metadata → proper thread grouping!
@@ -350,18 +360,18 @@ const qualityFiltered = searchResult.sources.filter((source: any) => {
   const snippet = source.snippet || "";
   const title = source.title || "";
   const url = source.url || "";
-  
+
   // Filter 1: Skip generic link shares
-  const isLikelyLinkShare = 
-    snippet.includes("http") && snippet.length < 100 ||
+  const isLikelyLinkShare =
+    (snippet.includes("http") && snippet.length < 100) ||
     snippet.match(/^(check out|found this)/i) ||
     title.includes("cool-resources");
-  
+
   // Filter 2: Deprioritize Notion when query asks about discussions 🆕
   const queryWantsDiscussions = /\b(mentioned|discussed|said|blockers?)\b/i.test(query);
   const isNotionDoc = url.includes("notion.so");
   const shouldDeprioritizeNotion = queryWantsDiscussions && isNotionDoc;
-  
+
   return !isLikelyLinkShare && !shouldDeprioritizeNotion;
 });
 ```
@@ -376,14 +386,14 @@ const qualityFiltered = searchResult.sources.filter((source: any) => {
 // After streaming completes...
 if (!synthesizedContent.includes("**Sources:**")) {
   console.log("[KnowledgeAgent] LLM forgot Sources - appending programmatically");
-  
+
   let sourcesText = "\n\n**Sources:**\n";
-  
+
   for (const source of finalSources.slice(0, 3)) { // Top 3 only
     const platform = source.url.includes("slack.com") ? "Slack" : "Notion";
     sourcesText += `- ${source.title} ([${platform}](${source.url}))\n`;
   }
-  
+
   // Stream the sources
   yield { type: "chunk", content: sourcesText };
 }
@@ -398,12 +408,14 @@ if (!synthesizedContent.includes("**Sources:**")) {
 ### Why Does It Feel Like Magic?
 
 **You see:**
+
 ```
 Input: "What blockers in October?"
 Output: Perfect synthesis with 3 sources
 ```
 
 **What actually happens:**
+
 1. **Preflight check** (200ms, cached)
 2. **Search** → 100 results (500ms)
 3. **Unit normalization** → 13 threads (50ms)
@@ -432,6 +444,7 @@ Query: "What is RAG?"
 ```
 
 **Cache Hit Rate:**
+
 - Preflight: ~60% (many similar queries)
 - Search: ~40% (exact query matches)
 - Synthesis: 0% (always fresh)
@@ -450,13 +463,13 @@ Orchestrator
 │  ├─ Search (topK=6):      180ms
 │  └─ Cache write:          5ms
 └─ Intent classification:   10ms
-    
+
 KnowledgeAgent
 ├─ Check preflight cache:   5ms (hit!)
 ├─ Unit normalization:      50ms
 ├─ Select top 12 units:     10ms
 └─ Build context:           20ms
-    
+
 Synthesis
 ├─ System prompt:           10ms
 ├─ Groq streaming:          500ms
@@ -497,44 +510,48 @@ Total per query: ~$0.003
 
 ```typescript
 // Orchestrator (orchestrator.service.ts)
-KB_PREFLIGHT_CACHE_TTL = 300;          // 5 minutes
-KB_PREFLIGHT_TOP_K = 6;                // Quick sample
-KB_PREFLIGHT_WEAK_THRESHOLD = 0.28;    // Minimum top score
-KB_PREFLIGHT_MIN_STRONG_COUNT = 1;     // Minimum strong results
+KB_PREFLIGHT_CACHE_TTL = 300; // 5 minutes
+KB_PREFLIGHT_TOP_K = 6; // Quick sample
+KB_PREFLIGHT_WEAK_THRESHOLD = 0.28; // Minimum top score
+KB_PREFLIGHT_MIN_STRONG_COUNT = 1; // Minimum strong results
 
 // Knowledge Agent (knowledge.agent.ts)
-UNIT_SELECTION_MAX = 12;               // 🆕 Up from 5
-UNIT_SCORE_FLOOR = 0.28;               // Minimum unit score
-MIN_UNITS_FOR_SYNTHESIS = 2;           // Trigger "no info" if < 2
+UNIT_SELECTION_MAX = 12; // 🆕 Up from 5
+UNIT_SCORE_FLOOR = 0.28; // Minimum unit score
+MIN_UNITS_FOR_SYNTHESIS = 2; // Trigger "no info" if < 2
 
-SOURCE_FILTER_MAX = 3;                 // Show top 3 sources
+SOURCE_FILTER_MAX = 3; // Show top 3 sources
 SOURCE_QUALITY_FILTERS = [
-  "cool-resources",  // Skip link dumps
-  "random",          // Skip random chatter
+  "cool-resources", // Skip link dumps
+  "random", // Skip random chatter
   // Notion deprioritized for "discussed/mentioned" queries
 ];
 
 // Search Tool (search-knowledge.tool.ts)
-STANDARD_TOP_K = 40;                   // Standard queries
-TEMPORAL_TOP_K = 100;                  // Temporal queries
-FETCH_LIMIT_MULTIPLIER = 15;           // For trust ranking pool
+STANDARD_TOP_K = 40; // Standard queries
+TEMPORAL_TOP_K = 100; // Temporal queries
+FETCH_LIMIT_MULTIPLIER = 15; // For trust ranking pool
 ```
 
 ### Tuning Guide
 
 **If answers are too narrow:**
+
 - Increase `UNIT_SELECTION_MAX` from 12 to 15
 - Lower `KB_PREFLIGHT_WEAK_THRESHOLD` from 0.28 to 0.25
 
 **If answers are too broad/noisy:**
+
 - Decrease `UNIT_SELECTION_MAX` from 12 to 10
 - Raise `KB_PREFLIGHT_WEAK_THRESHOLD` from 0.28 to 0.30
 
 **If getting "no info" too often:**
+
 - Lower `KB_PREFLIGHT_MIN_STRONG_COUNT` from 1 to 0
 - Lower `UNIT_SCORE_FLOOR` from 0.28 to 0.25
 
 **If sources are irrelevant:**
+
 - Add more patterns to `SOURCE_QUALITY_FILTERS`
 - Adjust source filtering regex patterns
 

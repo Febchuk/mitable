@@ -54,7 +54,7 @@ export default function LoginPage() {
       {/* Animated gradient orbs */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      
+
       <div className="w-full max-w-md bg-background-secondary/80 backdrop-blur-xl rounded-2xl border border-border-subtle shadow-card-hover p-8 space-y-8 relative z-10">
         {/* Logo */}
         <div className="flex justify-center">

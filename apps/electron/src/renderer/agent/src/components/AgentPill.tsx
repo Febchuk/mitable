@@ -139,11 +139,14 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
               // Hide the agent pill
               window.agentAPI.toggle();
             }}
-            className="w-10 h-10 rounded-full bg-background-elevated hover:bg-background-elevated/80 flex items-center justify-center transition-colors flex-shrink-0 group"
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-primary hover:shadow-glow-purple flex items-center justify-center transition-all duration-200 flex-shrink-0 group"
             aria-label="Open Console"
             title="Open Console"
           >
-            <Maximize2 size={18} className="text-text-secondary group-hover:text-primary-light transition-colors" />
+            <Maximize2
+              size={18}
+              className="text-white/60 group-hover:text-white group-hover:scale-110 transition-all"
+            />
           </button>
         </div>
       ) : isRecording ? (

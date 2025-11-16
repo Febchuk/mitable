@@ -155,14 +155,16 @@ export default function ChatDetail() {
       if (window.consoleAPI?.captureScreenshot) {
         try {
           console.log("[ChatDetail] Capturing screenshot for workflow action...");
-          const screenshotResult = await window.consoleAPI.captureScreenshot() as any;
+          const screenshotResult = (await window.consoleAPI.captureScreenshot()) as any;
           if (screenshotResult) {
             screenshot = screenshotResult.dataUrl || screenshotResult;
             screenshotMetadata = screenshotResult.metadata;
             console.log("[ChatDetail] Screenshot captured successfully:", {
               hasScreenshot: !!screenshot,
               hasMetadata: !!screenshotMetadata,
-              dimensions: screenshotMetadata ? `${screenshotMetadata.width}x${screenshotMetadata.height}` : 'N/A',
+              dimensions: screenshotMetadata
+                ? `${screenshotMetadata.width}x${screenshotMetadata.height}`
+                : "N/A",
             });
           }
         } catch (error) {
@@ -302,11 +304,14 @@ export default function ChatDetail() {
                     window.consoleAPI.minimizeWindow();
                   }
                 }}
-                className="w-10 h-10 bg-background-elevated hover:bg-background-elevated/80 rounded-full flex items-center justify-center transition-colors group"
+                className="w-10 h-10 bg-white/10 hover:bg-primary hover:shadow-glow-purple rounded-full flex items-center justify-center transition-all duration-200 group"
                 aria-label="Minimize to reduced view"
                 title="Minimize to reduced view"
               >
-                <Minimize2 size={18} className="text-text-secondary group-hover:text-primary-light transition-colors" />
+                <Minimize2
+                  size={18}
+                  className="text-white/60 group-hover:text-white group-hover:scale-110 transition-all"
+                />
               </button>
             </div>
           </form>

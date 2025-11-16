@@ -709,31 +709,34 @@ Note: boundingBox is null because element requires scrolling to be visible
           const widthPercent = (bbox.width / imageDimensions.width) * 100;
           const heightPercent = (bbox.height / imageDimensions.height) * 100;
 
-        // Warn if bounding box is suspiciously large (>50% width or >50% height)
-        if (widthPercent > 50 || heightPercent > 50) {
-          console.warn("[GeminiVision] WARNING: Bounding box is very large!", {
-            widthPercent: widthPercent.toFixed(1) + "%",
-            heightPercent: heightPercent.toFixed(1) + "%",
-            elementType: parsed.element.type,
-            elementLabel: parsed.element.label,
-            normalizedWidth: normalized.width.toFixed(3),
-            normalizedHeight: normalized.height.toFixed(3),
-          });
+          // Warn if bounding box is suspiciously large (>50% width or >50% height)
+          if (widthPercent > 50 || heightPercent > 50) {
+            console.warn("[GeminiVision] WARNING: Bounding box is very large!", {
+              widthPercent: widthPercent.toFixed(1) + "%",
+              heightPercent: heightPercent.toFixed(1) + "%",
+              elementType: parsed.element.type,
+              elementLabel: parsed.element.label,
+              normalizedWidth: normalized.width.toFixed(3),
+              normalizedHeight: normalized.height.toFixed(3),
+            });
 
-          // If it's marked as "application" type and covers >30% of screen, set to null
-          if (parsed.element.type === "application" && (widthPercent > 30 || heightPercent > 30)) {
-            console.warn(
-              "[GeminiVision] Nullifying application-level bounding box (too large to be useful)"
-            );
-            parsed.element.boundingBox = null;
+            // If it's marked as "application" type and covers >30% of screen, set to null
+            if (
+              parsed.element.type === "application" &&
+              (widthPercent > 30 || heightPercent > 30)
+            ) {
+              console.warn(
+                "[GeminiVision] Nullifying application-level bounding box (too large to be useful)"
+              );
+              parsed.element.boundingBox = null;
+            }
+            // For other element types, warn but don't auto-nullify (let it through for debugging)
+            else {
+              console.warn(
+                "[GeminiVision] Large bounding box detected but not auto-nullified. Review Gemini prompt effectiveness."
+              );
+            }
           }
-          // For other element types, warn but don't auto-nullify (let it through for debugging)
-          else {
-            console.warn(
-              "[GeminiVision] Large bounding box detected but not auto-nullified. Review Gemini prompt effectiveness."
-            );
-          }
-        }
         } // End of bounding box validation
       }
 

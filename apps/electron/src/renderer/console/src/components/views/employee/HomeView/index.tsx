@@ -18,8 +18,11 @@ export default function HomeView() {
     <div className="h-screen w-full flex items-center justify-center bg-gradient-to-br from-background-primary via-[#1e1b4b] to-background-primary relative overflow-hidden">
       {/* Animated gradient orbs */}
       <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-      
+      <div
+        className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-3xl animate-pulse"
+        style={{ animationDelay: "1s" }}
+      ></div>
+
       <div className="max-w-4xl w-full px-12 app-no-drag space-y-16 relative z-10">
         {/* Welcome Heading - Extra Large & Bold */}
         <div className="text-center space-y-6">
@@ -30,9 +33,7 @@ export default function HomeView() {
               {user?.firstName}
             </span>
           </h1>
-          <p className="text-text-secondary text-xl font-light">
-            How can I assist you today?
-          </p>
+          <p className="text-text-secondary text-xl font-light">How can I assist you today?</p>
         </div>
 
         {/* Input Form - Large & Prominent */}

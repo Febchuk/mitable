@@ -14,9 +14,7 @@ const getPort = (): number => {
   if (cliPort) {
     const parsed = parseInt(String(cliPort), 10);
     if (isNaN(parsed) || parsed < 1 || parsed > 65535) {
-      throw new Error(
-        `Invalid port number: ${cliPort}. Port must be between 1 and 65535.`
-      );
+      throw new Error(`Invalid port number: ${cliPort}. Port must be between 1 and 65535.`);
     }
     return parsed;
   }

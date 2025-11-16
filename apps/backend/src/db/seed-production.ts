@@ -893,7 +893,8 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .values({
       organizationId,
       title: "AI/ML Engineer Onboarding",
-      description: "Comprehensive onboarding for AI/ML engineers working on LLM integrations and RAG systems",
+      description:
+        "Comprehensive onboarding for AI/ML engineers working on LLM integrations and RAG systems",
       icon: "Brain",
       color: "#8b5cf6",
       roleTags: ["AI/ML Engineer", "Machine Learning", "Data Science"],
@@ -1248,12 +1249,54 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: mobileTemplate.id, weekNumber: 1, title: "Setup mobile dev environment", description: "Xcode, Android Studio, and simulators", timeEstimate: "4 hours", orderIndex: 0 },
-    { templateId: mobileTemplate.id, weekNumber: 2, title: "Build your first mobile screen", description: "Create a screen with navigation", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: mobileTemplate.id, weekNumber: 3, title: "Integrate with native APIs", description: "Camera, location, notifications", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: mobileTemplate.id, weekNumber: 4, title: "Add offline support", description: "Local storage and sync", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: mobileTemplate.id, weekNumber: 5, title: "Test on real devices", description: "iOS and Android testing", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: mobileTemplate.id, weekNumber: 6, title: "Submit app update", description: "App Store and Play Store submission", timeEstimate: "1 day", orderIndex: 0 },
+    {
+      templateId: mobileTemplate.id,
+      weekNumber: 1,
+      title: "Setup mobile dev environment",
+      description: "Xcode, Android Studio, and simulators",
+      timeEstimate: "4 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: mobileTemplate.id,
+      weekNumber: 2,
+      title: "Build your first mobile screen",
+      description: "Create a screen with navigation",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: mobileTemplate.id,
+      weekNumber: 3,
+      title: "Integrate with native APIs",
+      description: "Camera, location, notifications",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: mobileTemplate.id,
+      weekNumber: 4,
+      title: "Add offline support",
+      description: "Local storage and sync",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: mobileTemplate.id,
+      weekNumber: 5,
+      title: "Test on real devices",
+      description: "iOS and Android testing",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: mobileTemplate.id,
+      weekNumber: 6,
+      title: "Submit app update",
+      description: "App Store and Play Store submission",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
   ]);
 
   // DevOps Engineer
@@ -1271,14 +1314,70 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: devopsTemplate.id, weekNumber: 1, title: "Review infrastructure overview", description: "Cloud architecture and services", timeEstimate: "3 hours", orderIndex: 0 },
-    { templateId: devopsTemplate.id, weekNumber: 2, title: "Setup monitoring dashboards", description: "DataDog and log aggregation", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: devopsTemplate.id, weekNumber: 3, title: "Learn CI/CD pipeline", description: "GitHub Actions workflows", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: devopsTemplate.id, weekNumber: 4, title: "Implement auto-scaling", description: "Configure load balancers", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: devopsTemplate.id, weekNumber: 5, title: "Setup disaster recovery", description: "Backup and restore procedures", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: devopsTemplate.id, weekNumber: 6, title: "Optimize infrastructure costs", description: "Right-size resources", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: devopsTemplate.id, weekNumber: 7, title: "Implement security hardening", description: "Network policies and secrets", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: devopsTemplate.id, weekNumber: 8, title: "Run production incident drill", description: "Practice incident response", timeEstimate: "4 hours", orderIndex: 0 },
+    {
+      templateId: devopsTemplate.id,
+      weekNumber: 1,
+      title: "Review infrastructure overview",
+      description: "Cloud architecture and services",
+      timeEstimate: "3 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: devopsTemplate.id,
+      weekNumber: 2,
+      title: "Setup monitoring dashboards",
+      description: "DataDog and log aggregation",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: devopsTemplate.id,
+      weekNumber: 3,
+      title: "Learn CI/CD pipeline",
+      description: "GitHub Actions workflows",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: devopsTemplate.id,
+      weekNumber: 4,
+      title: "Implement auto-scaling",
+      description: "Configure load balancers",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: devopsTemplate.id,
+      weekNumber: 5,
+      title: "Setup disaster recovery",
+      description: "Backup and restore procedures",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: devopsTemplate.id,
+      weekNumber: 6,
+      title: "Optimize infrastructure costs",
+      description: "Right-size resources",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: devopsTemplate.id,
+      weekNumber: 7,
+      title: "Implement security hardening",
+      description: "Network policies and secrets",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: devopsTemplate.id,
+      weekNumber: 8,
+      title: "Run production incident drill",
+      description: "Practice incident response",
+      timeEstimate: "4 hours",
+      orderIndex: 0,
+    },
   ]);
 
   // QA Engineer
@@ -1296,10 +1395,38 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: qaTemplate.id, weekNumber: 1, title: "Learn testing strategy", description: "Unit, integration, and E2E testing", timeEstimate: "3 hours", orderIndex: 0 },
-    { templateId: qaTemplate.id, weekNumber: 2, title: "Write your first test suite", description: "Create Playwright E2E tests", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: qaTemplate.id, weekNumber: 3, title: "Perform exploratory testing", description: "Find and report bugs", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: qaTemplate.id, weekNumber: 4, title: "Build test automation pipeline", description: "Integrate tests into CI", timeEstimate: "2 days", orderIndex: 0 },
+    {
+      templateId: qaTemplate.id,
+      weekNumber: 1,
+      title: "Learn testing strategy",
+      description: "Unit, integration, and E2E testing",
+      timeEstimate: "3 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: qaTemplate.id,
+      weekNumber: 2,
+      title: "Write your first test suite",
+      description: "Create Playwright E2E tests",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: qaTemplate.id,
+      weekNumber: 3,
+      title: "Perform exploratory testing",
+      description: "Find and report bugs",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: qaTemplate.id,
+      weekNumber: 4,
+      title: "Build test automation pipeline",
+      description: "Integrate tests into CI",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
   ]);
 
   // Product Manager
@@ -1317,13 +1444,62 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: pmTemplate.id, weekNumber: 1, title: "Study product roadmap", description: "Understand strategic priorities", timeEstimate: "2 hours", orderIndex: 0 },
-    { templateId: pmTemplate.id, weekNumber: 1, title: "Review user research playbook", description: "Learn research methods", timeEstimate: "2 hours", orderIndex: 1 },
-    { templateId: pmTemplate.id, weekNumber: 2, title: "Conduct user interviews", description: "Interview 5 customers", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: pmTemplate.id, weekNumber: 3, title: "Write your first PRD", description: "Create product requirements doc", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: pmTemplate.id, weekNumber: 4, title: "Setup product analytics", description: "Track key metrics", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: pmTemplate.id, weekNumber: 5, title: "Run A/B test", description: "Design and analyze experiment", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: pmTemplate.id, weekNumber: 6, title: "Launch a feature", description: "Complete feature launch checklist", timeEstimate: "1 day", orderIndex: 0 },
+    {
+      templateId: pmTemplate.id,
+      weekNumber: 1,
+      title: "Study product roadmap",
+      description: "Understand strategic priorities",
+      timeEstimate: "2 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: pmTemplate.id,
+      weekNumber: 1,
+      title: "Review user research playbook",
+      description: "Learn research methods",
+      timeEstimate: "2 hours",
+      orderIndex: 1,
+    },
+    {
+      templateId: pmTemplate.id,
+      weekNumber: 2,
+      title: "Conduct user interviews",
+      description: "Interview 5 customers",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: pmTemplate.id,
+      weekNumber: 3,
+      title: "Write your first PRD",
+      description: "Create product requirements doc",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: pmTemplate.id,
+      weekNumber: 4,
+      title: "Setup product analytics",
+      description: "Track key metrics",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: pmTemplate.id,
+      weekNumber: 5,
+      title: "Run A/B test",
+      description: "Design and analyze experiment",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: pmTemplate.id,
+      weekNumber: 6,
+      title: "Launch a feature",
+      description: "Complete feature launch checklist",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
   ]);
 
   // Product Designer
@@ -1341,13 +1517,62 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: designerTemplate.id, weekNumber: 1, title: "Review design system", description: "Understand design tokens and components", timeEstimate: "2 hours", orderIndex: 0 },
-    { templateId: designerTemplate.id, weekNumber: 1, title: "Setup Figma workspace", description: "Import component library", timeEstimate: "1 hour", orderIndex: 1 },
-    { templateId: designerTemplate.id, weekNumber: 2, title: "Learn accessibility guidelines", description: "WCAG compliance and best practices", timeEstimate: "3 hours", orderIndex: 0 },
-    { templateId: designerTemplate.id, weekNumber: 3, title: "Design your first feature", description: "Create high-fidelity mockups", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: designerTemplate.id, weekNumber: 4, title: "Run usability test", description: "Test designs with users", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: designerTemplate.id, weekNumber: 5, title: "Participate in design critique", description: "Present work and get feedback", timeEstimate: "1 hour", orderIndex: 0 },
-    { templateId: designerTemplate.id, weekNumber: 6, title: "Ship your design", description: "Handoff to engineering and launch", timeEstimate: "1 day", orderIndex: 0 },
+    {
+      templateId: designerTemplate.id,
+      weekNumber: 1,
+      title: "Review design system",
+      description: "Understand design tokens and components",
+      timeEstimate: "2 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: designerTemplate.id,
+      weekNumber: 1,
+      title: "Setup Figma workspace",
+      description: "Import component library",
+      timeEstimate: "1 hour",
+      orderIndex: 1,
+    },
+    {
+      templateId: designerTemplate.id,
+      weekNumber: 2,
+      title: "Learn accessibility guidelines",
+      description: "WCAG compliance and best practices",
+      timeEstimate: "3 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: designerTemplate.id,
+      weekNumber: 3,
+      title: "Design your first feature",
+      description: "Create high-fidelity mockups",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: designerTemplate.id,
+      weekNumber: 4,
+      title: "Run usability test",
+      description: "Test designs with users",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: designerTemplate.id,
+      weekNumber: 5,
+      title: "Participate in design critique",
+      description: "Present work and get feedback",
+      timeEstimate: "1 hour",
+      orderIndex: 0,
+    },
+    {
+      templateId: designerTemplate.id,
+      weekNumber: 6,
+      title: "Ship your design",
+      description: "Handoff to engineering and launch",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
   ]);
 
   // Customer Success
@@ -1365,11 +1590,46 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: csTemplate.id, weekNumber: 1, title: "Complete platform training", description: "Learn all product features", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: csTemplate.id, weekNumber: 1, title: "Review customer communication templates", description: "Email and messaging best practices", timeEstimate: "1 hour", orderIndex: 1 },
-    { templateId: csTemplate.id, weekNumber: 2, title: "Shadow senior CS team member", description: "Observe customer calls", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: csTemplate.id, weekNumber: 3, title: "Run your first customer onboarding", description: "Onboard a new customer end-to-end", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: csTemplate.id, weekNumber: 4, title: "Handle escalated ticket", description: "Resolve complex customer issue", timeEstimate: "1 day", orderIndex: 0 },
+    {
+      templateId: csTemplate.id,
+      weekNumber: 1,
+      title: "Complete platform training",
+      description: "Learn all product features",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: csTemplate.id,
+      weekNumber: 1,
+      title: "Review customer communication templates",
+      description: "Email and messaging best practices",
+      timeEstimate: "1 hour",
+      orderIndex: 1,
+    },
+    {
+      templateId: csTemplate.id,
+      weekNumber: 2,
+      title: "Shadow senior CS team member",
+      description: "Observe customer calls",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: csTemplate.id,
+      weekNumber: 3,
+      title: "Run your first customer onboarding",
+      description: "Onboard a new customer end-to-end",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: csTemplate.id,
+      weekNumber: 4,
+      title: "Handle escalated ticket",
+      description: "Resolve complex customer issue",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
   ]);
 
   // Sales
@@ -1387,11 +1647,46 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: salesTemplate.id, weekNumber: 1, title: "Study sales playbook", description: "Learn sales methodology", timeEstimate: "3 hours", orderIndex: 0 },
-    { templateId: salesTemplate.id, weekNumber: 1, title: "Review pricing and packaging", description: "Understand product tiers", timeEstimate: "2 hours", orderIndex: 1 },
-    { templateId: salesTemplate.id, weekNumber: 2, title: "Setup demo environment", description: "Prepare personalized demos", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: salesTemplate.id, weekNumber: 3, title: "Shadow sales calls", description: "Observe senior reps", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: salesTemplate.id, weekNumber: 4, title: "Run your first demo", description: "Present product to prospect", timeEstimate: "1 hour", orderIndex: 0 },
+    {
+      templateId: salesTemplate.id,
+      weekNumber: 1,
+      title: "Study sales playbook",
+      description: "Learn sales methodology",
+      timeEstimate: "3 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: salesTemplate.id,
+      weekNumber: 1,
+      title: "Review pricing and packaging",
+      description: "Understand product tiers",
+      timeEstimate: "2 hours",
+      orderIndex: 1,
+    },
+    {
+      templateId: salesTemplate.id,
+      weekNumber: 2,
+      title: "Setup demo environment",
+      description: "Prepare personalized demos",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: salesTemplate.id,
+      weekNumber: 3,
+      title: "Shadow sales calls",
+      description: "Observe senior reps",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: salesTemplate.id,
+      weekNumber: 4,
+      title: "Run your first demo",
+      description: "Present product to prospect",
+      timeEstimate: "1 hour",
+      orderIndex: 0,
+    },
   ]);
 
   // Marketing
@@ -1409,11 +1704,46 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: marketingTemplate.id, weekNumber: 1, title: "Review brand guidelines", description: "Logo, colors, and brand voice", timeEstimate: "2 hours", orderIndex: 0 },
-    { templateId: marketingTemplate.id, weekNumber: 1, title: "Study content marketing strategy", description: "Blog, social, and SEO", timeEstimate: "2 hours", orderIndex: 1 },
-    { templateId: marketingTemplate.id, weekNumber: 2, title: "Write your first blog post", description: "Create and publish content", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: marketingTemplate.id, weekNumber: 3, title: "Run lead generation campaign", description: "Create landing page and ads", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: marketingTemplate.id, weekNumber: 4, title: "Analyze campaign performance", description: "Review metrics and optimize", timeEstimate: "1 day", orderIndex: 0 },
+    {
+      templateId: marketingTemplate.id,
+      weekNumber: 1,
+      title: "Review brand guidelines",
+      description: "Logo, colors, and brand voice",
+      timeEstimate: "2 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: marketingTemplate.id,
+      weekNumber: 1,
+      title: "Study content marketing strategy",
+      description: "Blog, social, and SEO",
+      timeEstimate: "2 hours",
+      orderIndex: 1,
+    },
+    {
+      templateId: marketingTemplate.id,
+      weekNumber: 2,
+      title: "Write your first blog post",
+      description: "Create and publish content",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: marketingTemplate.id,
+      weekNumber: 3,
+      title: "Run lead generation campaign",
+      description: "Create landing page and ads",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: marketingTemplate.id,
+      weekNumber: 4,
+      title: "Analyze campaign performance",
+      description: "Review metrics and optimize",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
   ]);
 
   // Data Analyst
@@ -1431,13 +1761,62 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: dataTemplate.id, weekNumber: 1, title: "Setup data analysis tools", description: "SQL clients, Python, Jupyter", timeEstimate: "2 hours", orderIndex: 0 },
-    { templateId: dataTemplate.id, weekNumber: 1, title: "Review database schema", description: "Understand data model", timeEstimate: "2 hours", orderIndex: 1 },
-    { templateId: dataTemplate.id, weekNumber: 2, title: "Write your first SQL queries", description: "Analyze user behavior data", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: dataTemplate.id, weekNumber: 3, title: "Build dashboard", description: "Create executive dashboard", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: dataTemplate.id, weekNumber: 4, title: "Perform cohort analysis", description: "Analyze user retention", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: dataTemplate.id, weekNumber: 5, title: "Run statistical analysis", description: "A/B test analysis", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: dataTemplate.id, weekNumber: 6, title: "Present insights to team", description: "Share findings in all-hands", timeEstimate: "1 hour", orderIndex: 0 },
+    {
+      templateId: dataTemplate.id,
+      weekNumber: 1,
+      title: "Setup data analysis tools",
+      description: "SQL clients, Python, Jupyter",
+      timeEstimate: "2 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: dataTemplate.id,
+      weekNumber: 1,
+      title: "Review database schema",
+      description: "Understand data model",
+      timeEstimate: "2 hours",
+      orderIndex: 1,
+    },
+    {
+      templateId: dataTemplate.id,
+      weekNumber: 2,
+      title: "Write your first SQL queries",
+      description: "Analyze user behavior data",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: dataTemplate.id,
+      weekNumber: 3,
+      title: "Build dashboard",
+      description: "Create executive dashboard",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: dataTemplate.id,
+      weekNumber: 4,
+      title: "Perform cohort analysis",
+      description: "Analyze user retention",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: dataTemplate.id,
+      weekNumber: 5,
+      title: "Run statistical analysis",
+      description: "A/B test analysis",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: dataTemplate.id,
+      weekNumber: 6,
+      title: "Present insights to team",
+      description: "Share findings in all-hands",
+      timeEstimate: "1 hour",
+      orderIndex: 0,
+    },
   ]);
 
   // Full Stack Engineer
@@ -1455,14 +1834,70 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: fullstackTemplate.id, weekNumber: 1, title: "Setup full development environment", description: "Frontend and backend tooling", timeEstimate: "4 hours", orderIndex: 0 },
-    { templateId: fullstackTemplate.id, weekNumber: 2, title: "Learn frontend architecture", description: "React, TypeScript, Tailwind", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: fullstackTemplate.id, weekNumber: 3, title: "Learn backend architecture", description: "Node.js, Express, PostgreSQL", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: fullstackTemplate.id, weekNumber: 4, title: "Build end-to-end feature", description: "Create API endpoint and UI", timeEstimate: "3 days", orderIndex: 0 },
-    { templateId: fullstackTemplate.id, weekNumber: 5, title: "Add authentication", description: "Implement JWT auth flow", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: fullstackTemplate.id, weekNumber: 6, title: "Write E2E tests", description: "Test full user flow", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: fullstackTemplate.id, weekNumber: 7, title: "Optimize performance", description: "Improve page load and API speed", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: fullstackTemplate.id, weekNumber: 8, title: "Deploy to production", description: "Ship your feature", timeEstimate: "1 day", orderIndex: 0 },
+    {
+      templateId: fullstackTemplate.id,
+      weekNumber: 1,
+      title: "Setup full development environment",
+      description: "Frontend and backend tooling",
+      timeEstimate: "4 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: fullstackTemplate.id,
+      weekNumber: 2,
+      title: "Learn frontend architecture",
+      description: "React, TypeScript, Tailwind",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: fullstackTemplate.id,
+      weekNumber: 3,
+      title: "Learn backend architecture",
+      description: "Node.js, Express, PostgreSQL",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: fullstackTemplate.id,
+      weekNumber: 4,
+      title: "Build end-to-end feature",
+      description: "Create API endpoint and UI",
+      timeEstimate: "3 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: fullstackTemplate.id,
+      weekNumber: 5,
+      title: "Add authentication",
+      description: "Implement JWT auth flow",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: fullstackTemplate.id,
+      weekNumber: 6,
+      title: "Write E2E tests",
+      description: "Test full user flow",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: fullstackTemplate.id,
+      weekNumber: 7,
+      title: "Optimize performance",
+      description: "Improve page load and API speed",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: fullstackTemplate.id,
+      weekNumber: 8,
+      title: "Deploy to production",
+      description: "Ship your feature",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
   ]);
 
   // Security Engineer
@@ -1480,14 +1915,70 @@ async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
     .returning();
 
   await db.insert(schema.roadmapTemplateTasks).values([
-    { templateId: securityTemplate.id, weekNumber: 1, title: "Review security best practices", description: "Company security policies", timeEstimate: "3 hours", orderIndex: 0 },
-    { templateId: securityTemplate.id, weekNumber: 2, title: "Audit API security", description: "Review authentication and authorization", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: securityTemplate.id, weekNumber: 3, title: "Implement rate limiting", description: "Protect APIs from abuse", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: securityTemplate.id, weekNumber: 4, title: "Setup vulnerability scanning", description: "Automated security checks", timeEstimate: "1 day", orderIndex: 0 },
-    { templateId: securityTemplate.id, weekNumber: 5, title: "Conduct penetration testing", description: "Find and fix vulnerabilities", timeEstimate: "3 days", orderIndex: 0 },
-    { templateId: securityTemplate.id, weekNumber: 6, title: "Implement secrets management", description: "Secure credential storage", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: securityTemplate.id, weekNumber: 7, title: "Setup security monitoring", description: "Alerts for suspicious activity", timeEstimate: "2 days", orderIndex: 0 },
-    { templateId: securityTemplate.id, weekNumber: 8, title: "Run security incident drill", description: "Practice incident response", timeEstimate: "4 hours", orderIndex: 0 },
+    {
+      templateId: securityTemplate.id,
+      weekNumber: 1,
+      title: "Review security best practices",
+      description: "Company security policies",
+      timeEstimate: "3 hours",
+      orderIndex: 0,
+    },
+    {
+      templateId: securityTemplate.id,
+      weekNumber: 2,
+      title: "Audit API security",
+      description: "Review authentication and authorization",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: securityTemplate.id,
+      weekNumber: 3,
+      title: "Implement rate limiting",
+      description: "Protect APIs from abuse",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: securityTemplate.id,
+      weekNumber: 4,
+      title: "Setup vulnerability scanning",
+      description: "Automated security checks",
+      timeEstimate: "1 day",
+      orderIndex: 0,
+    },
+    {
+      templateId: securityTemplate.id,
+      weekNumber: 5,
+      title: "Conduct penetration testing",
+      description: "Find and fix vulnerabilities",
+      timeEstimate: "3 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: securityTemplate.id,
+      weekNumber: 6,
+      title: "Implement secrets management",
+      description: "Secure credential storage",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: securityTemplate.id,
+      weekNumber: 7,
+      title: "Setup security monitoring",
+      description: "Alerts for suspicious activity",
+      timeEstimate: "2 days",
+      orderIndex: 0,
+    },
+    {
+      templateId: securityTemplate.id,
+      weekNumber: 8,
+      title: "Run security incident drill",
+      description: "Practice incident response",
+      timeEstimate: "4 hours",
+      orderIndex: 0,
+    },
   ]);
 
   console.log("✅ Created 15 roadmap templates with 200+ tasks");

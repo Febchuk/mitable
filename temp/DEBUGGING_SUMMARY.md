@@ -6,7 +6,8 @@
 
 **Breaking Point**: Frontend SSE parsing (Step 5 in data flow)
 
-**Evidence**: 
+**Evidence**:
+
 - ✅ Backend logs show `window_trigger` event being emitted
 - ❌ Frontend logs show NO parsing or handling of the event
 
@@ -19,15 +20,18 @@
 ## Quick Start: Priority Actions
 
 ### 1. Add Phase 1 Logs (Highest Priority)
+
 **File**: `apps/electron/src/renderer/lib/api/conversations.ts`
 
 Add logs at these locations:
+
 - Line ~241: Log every SSE line received
 - Line ~252: Log chunk type after JSON.parse
 - Line ~283: Log when window_trigger case fires
 - Line ~300: Add default case to log unknown types
 
 ### 2. Test Reproduction
+
 ```bash
 # Restart dev environment
 npm run dev
@@ -39,7 +43,9 @@ npm run dev
 ```
 
 ### 3. Analyze Logs
+
 Look for the FIRST missing log in this sequence:
+
 ```
 [Conversations] Emitting window_trigger event ← Should see this
 [API] SSE line received                      ← Looking for this
@@ -57,6 +63,7 @@ Look for the FIRST missing log in this sequence:
 ## Expected Data at Each Step
 
 ### Backend Emission (Working ✅)
+
 ```typescript
 {
   type: "window_trigger",
@@ -73,7 +80,9 @@ Look for the FIRST missing log in this sequence:
 ```
 
 ### Frontend Parsing (Broken ❌)
+
 Should parse to:
+
 ```typescript
 chunk = {
   type: "window_trigger",  // This should match switch case
@@ -82,6 +91,7 @@ chunk = {
 ```
 
 Then call:
+
 ```typescript
 callbacks.onWindowTrigger("overlay", {
   boundingBox: { ... },
@@ -124,6 +134,7 @@ When fixed, you should see this complete log sequence:
 ## Key Insights from Log Analysis
 
 ### What Works (✅)
+
 - Backend tool creates window trigger correctly (Line 787-790)
 - Backend agent service yields window_trigger event (not logged but inferred)
 - Backend route emits SSE event correctly (Line 798)
@@ -131,6 +142,7 @@ When fixed, you should see this complete log sequence:
 - Workflow state management working correctly
 
 ### What's Missing (❌)
+
 - No frontend SSE parsing logs
 - No frontend callback invocation logs
 - No IPC send logs
@@ -138,6 +150,7 @@ When fixed, you should see this complete log sequence:
 - No overlay window logs
 
 ### Critical Finding
+
 The complete absence of frontend logs suggests the issue is in the FIRST step of frontend processing (SSE parsing), not in later steps like IPC or window management.
 
 ## Files Modified (After Applying All Logs)

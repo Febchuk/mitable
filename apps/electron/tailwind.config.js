@@ -151,18 +151,18 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "glow": "glow 2s ease-in-out infinite alternate",
+        glow: "glow 2s ease-in-out infinite alternate",
       },
       boxShadow: {
-        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)',
-        'glow-purple': '0 0 20px rgba(139, 92, 246, 0.3)',
-        'glow-blue': '0 0 20px rgba(59, 130, 246, 0.3)',
+        card: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)",
+        "glow-purple": "0 0 20px rgba(139, 92, 246, 0.3)",
+        "glow-blue": "0 0 20px rgba(59, 130, 246, 0.3)",
       },
       backgroundImage: {
-        'gradient-purple': 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-        'gradient-blue': 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-        'gradient-purple-blue': 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
+        "gradient-purple": "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+        "gradient-blue": "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+        "gradient-purple-blue": "linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)",
       },
     },
   },
@@ -170,16 +170,16 @@ export default {
     tailwindcssAnimate,
     function ({ addUtilities }) {
       addUtilities({
-        '.scrollbar-hide': {
+        ".scrollbar-hide": {
           /* Hide scrollbar for Chrome, Safari and Opera */
-          '&::-webkit-scrollbar': {
-            display: 'none',
+          "&::-webkit-scrollbar": {
+            display: "none",
           },
           /* Hide scrollbar for IE, Edge and Firefox */
-          '-ms-overflow-style': 'none',
-          'scrollbar-width': 'none',
+          "-ms-overflow-style": "none",
+          "scrollbar-width": "none",
         },
-      })
+      });
     },
   ],
 };

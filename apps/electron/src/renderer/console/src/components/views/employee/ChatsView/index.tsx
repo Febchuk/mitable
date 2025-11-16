@@ -108,13 +108,25 @@ export default function ChatsView() {
       <div className="space-y-2">
         {filteredChats.map((chat) => {
           // Determine chat type based on title keywords
-          const isWorkflow = chat.title.toLowerCase().includes('workflow') || chat.title.toLowerCase().includes('how do');
-          const isKnowledge = chat.title.toLowerCase().includes('what is') || chat.title.toLowerCase().includes('explain');
-          
+          const isWorkflow =
+            chat.title.toLowerCase().includes("workflow") ||
+            chat.title.toLowerCase().includes("how do");
+          const isKnowledge =
+            chat.title.toLowerCase().includes("what is") ||
+            chat.title.toLowerCase().includes("explain");
+
           const icon = isWorkflow ? Zap : isKnowledge ? BookOpen : MessageSquare;
-          const iconColor = isWorkflow ? 'text-purple-400' : isKnowledge ? 'text-blue-400' : 'text-gray-400';
-          const borderColor = isWorkflow ? 'border-purple-500/20' : isKnowledge ? 'border-blue-500/20' : 'border-border-subtle';
-          
+          const iconColor = isWorkflow
+            ? "text-purple-400"
+            : isKnowledge
+              ? "text-blue-400"
+              : "text-gray-400";
+          const borderColor = isWorkflow
+            ? "border-purple-500/20"
+            : isKnowledge
+              ? "border-blue-500/20"
+              : "border-border-subtle";
+
           return (
             <div
               key={chat.id}
@@ -130,11 +142,16 @@ export default function ChatsView() {
                     })()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-text-primary text-base font-medium group-hover:text-white transition-colors truncate">{chat.title}</h3>
+                    <h3 className="text-text-primary text-base font-medium group-hover:text-white transition-colors truncate">
+                      {chat.title}
+                    </h3>
                     <p className="text-text-tertiary text-xs">{formatTimestamp(chat.timestamp)}</p>
                   </div>
                 </div>
-                <ChevronRight size={16} className="text-text-tertiary group-hover:text-text-secondary group-hover:translate-x-1 transition-all flex-shrink-0" />
+                <ChevronRight
+                  size={16}
+                  className="text-text-tertiary group-hover:text-text-secondary group-hover:translate-x-1 transition-all flex-shrink-0"
+                />
               </div>
             </div>
           );
