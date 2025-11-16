@@ -5,6 +5,7 @@ import swaggerUi from "swagger-ui-express";
 import { router } from "./routes.js";
 import { swaggerSpec } from "./swagger.js";
 import { config } from "./config.js";
+import { generalLimiter } from "./middleware/rateLimiter.js";
 
 export const app = express();
 
@@ -63,5 +64,5 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// API routes
-app.use("/api", router);
+// API routes with rate limiting
+app.use("/api", generalLimiter, router);

@@ -7,6 +7,7 @@ import { OrchestratorService } from "../services/orchestrator.service";
 import { workflowService } from "../services/workflow.service";
 import { ScreenshotAnnotator } from "../utils/screenshot-annotator";
 import { coordinateConverterService } from "../services/coordinate-converter.service";
+import { screenshotLimiter } from "../middleware/rateLimiter.js";
 
 // Initialize orchestrator (replaces old agentService)
 const orchestrator = new OrchestratorService();
@@ -722,6 +723,7 @@ router.post(
 router.post(
   "/:conversationId/messages/stream",
   requireAuth,
+  screenshotLimiter, // Rate limit screenshot analysis to prevent AI compute abuse
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id || req.userId;
 
