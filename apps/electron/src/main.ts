@@ -27,6 +27,7 @@ let overlayWindow: BrowserWindow | null = null;
 let guideWindow: BrowserWindow | null = null; // Not reassigned yet, but used in window management logic
 let nudgeWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let isQuitting = false; // Track if app is intentionally quitting
 
 // Auth token storage (shared across all windows)
 const authTokens: {
@@ -250,14 +251,14 @@ function createConsoleWindow() {
   }
 
   consoleWindow.on("close", (event) => {
-    // On Windows: hide to tray instead of quitting
+    // On Windows: hide to tray instead of quitting (unless app is quitting)
     // On macOS: follow standard behavior (quit when closed)
-    if (process.platform === "win32") {
+    if (process.platform === "win32" && !isQuitting) {
       event.preventDefault();
       consoleWindow?.hide();
       console.log("[Console] Window hidden to tray (Windows)");
     }
-    // On macOS, let it close normally and quit the app
+    // On macOS or when isQuitting=true, let it close normally
   });
 
   consoleWindow.on("closed", () => {
@@ -1186,6 +1187,7 @@ function createTray() {
         label: "Quit",
         click: () => {
           console.log("[Tray] Quit clicked");
+          isQuitting = true; // Set flag before quitting
           app.quit();
         },
       },
@@ -1215,6 +1217,11 @@ app.whenReady().then(() => {
 
   setupIPC();
   registerGlobalShortcuts();
+});
+
+app.on("before-quit", () => {
+  // Set flag when app is quitting to allow windows to close
+  isQuitting = true;
 });
 
 app.on("window-all-closed", () => {
