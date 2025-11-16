@@ -1,0 +1,46 @@
+appId: com.mitable.app
+productName: Mitable
+copyright: Copyright © 2025 Mitable
+directories:
+  buildResources: build
+  output: dist
+
+# macOS Configuration
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  category: public.app-category.productivity
+  icon: build/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+
+# DMG Configuration
+dmg:
+  title: "${productName} ${version}"
+  icon: build/icon.icns
+  iconSize: 100
+  contents:
+    - x: 410
+      y: 150
+      type: link
+      path: /Applications
+    - x: 130
+      y: 150
+      type: file
+
+# File associations and metadata
+files:
+  - "!**/.vscode/*"
+  - "!src/*"
+  - "!electron.vite.config.{js,ts,mjs,cjs}"
+  - "!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}"
+  - "!{.env,.env.*,.editorconfig,.gitattributes,.gitignore,.yarnrc.yml,.travis.yml,appveyor.yml,circle.yml}"
+  - "!{npm-debug.log,yarn.lock,.npmrc,yarn-error.log}"
+
+# Build artifact configuration
+artifactName: "${productName}-${version}-${arch}.${ext}"
