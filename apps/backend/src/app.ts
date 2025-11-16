@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
 import { router } from "./routes.js";
 import { swaggerSpec } from "./swagger.js";
@@ -30,6 +31,15 @@ app.use(
     credentials: true,
   })
 );
+
+// Security headers
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Disable CSP for API (not needed)
+    crossOriginEmbedderPolicy: false, // Allow embedding for Swagger docs
+  })
+);
+
 app.use(express.json({ limit: "10mb" })); // Increased limit for screenshot uploads (~2MB base64)
 
 // Swagger API Documentation
