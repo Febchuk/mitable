@@ -65,6 +65,4 @@ coverage/
 *.traineddata
 
 .mcp.json
-.mcp.json
 apps/backend/.env.production
-.mcp.json
