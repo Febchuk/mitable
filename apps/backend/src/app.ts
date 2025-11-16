@@ -13,16 +13,13 @@ export const app = express();
 app.use(
   cors({
     origin: (origin, callback) => {
-      // In development, allow requests with no origin (like curl, Postman, etc.)
-      // In production, require origin header for security
+      // Allow requests with no origin header (Electron, mobile apps, curl, etc.)
+      // This is safe because we still require authentication (JWT tokens)
       if (!origin) {
-        if (config.nodeEnv === "development") {
-          return callback(null, true);
-        } else {
-          return callback(new Error("Origin header required"));
-        }
+        return callback(null, true);
       }
 
+      // Validate origin header if present (web browsers)
       if (config.cors.allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
