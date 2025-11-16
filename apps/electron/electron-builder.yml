@@ -13,7 +13,7 @@ mac:
         - x64
         - arm64
   category: public.app-category.productivity
-  icon: build/icon.icns
+  # icon: build/icon.icns  # TODO: Add custom icon
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
@@ -22,7 +22,7 @@ mac:
 # DMG Configuration
 dmg:
   title: "${productName} ${version}"
-  icon: build/icon.icns
+  # icon: build/icon.icns  # TODO: Add custom icon
   iconSize: 100
   contents:
     - x: 410
