@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Code, ExternalLink, LucideIcon, Users, Workflow, X } from "lucide-react";
+import { Code, LucideIcon, Users, Workflow, X } from "lucide-react";
 import UserMessage from "../../components/domain/messages/UserMessage";
 import AIMessage from "../../components/domain/messages/AIMessage";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
@@ -554,31 +554,17 @@ function App() {
           className="w-full h-full flex items-center justify-center p-4"
         >
           <div className="relative w-full h-[600px] flex flex-col bg-background-secondary rounded-2xl overflow-hidden app-drag">
-            {/* Open in Console Button */}
-            <button
-              onClick={() => {
-                if (conversationId) {
-                  console.log("[Conversation] Opening in console:", conversationId);
-                  window.conversationAPI.openConversationInConsole(conversationId);
-                }
-              }}
-              className="absolute top-4 left-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag"
-              aria-label="Open in Console"
-            >
-              <ExternalLink size={16} className="text-white" />
-            </button>
-
-            {/* Close Button */}
+            {/* Close Button - Subtle gray background with hover effect */}
             <button
               onClick={handleClose}
-              className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag"
+              className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag shadow-lg"
               aria-label="Close"
             >
-              <X size={16} className="text-white" />
+              <X size={18} className="text-white" />
             </button>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 pt-16 pb-8 app-no-drag">
+            <div className="flex-1 overflow-y-auto px-6 py-4 pt-16 pb-8 app-no-drag scrollbar-hide">
               {messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center text-gray-400">

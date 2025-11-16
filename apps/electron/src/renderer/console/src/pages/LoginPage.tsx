@@ -50,8 +50,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#1A1A1A] p-4">
-      <div className="w-full max-w-md bg-background-secondary rounded-lg border border-border-subtle p-8 space-y-8">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background-primary via-[#1e1b4b] to-background-primary p-4 relative overflow-hidden">
+      {/* Animated gradient orbs */}
+      <div className="absolute top-0 left-0 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse"></div>
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      
+      <div className="w-full max-w-md bg-background-secondary/80 backdrop-blur-xl rounded-2xl border border-border-subtle shadow-card-hover p-8 space-y-8 relative z-10">
         {/* Logo */}
         <div className="flex justify-center">
           <img src={logoSvg} alt="Mitable" className="h-14 w-auto" />
@@ -86,7 +90,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={isLoading}
-                  className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent focus:shadow-glow-purple disabled:cursor-not-allowed disabled:opacity-50 transition-all"
                 />
               </div>
               <div className="space-y-2">

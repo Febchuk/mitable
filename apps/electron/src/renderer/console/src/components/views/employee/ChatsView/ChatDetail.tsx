@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowUp, ExternalLink, Camera } from "lucide-react";
+import { ArrowLeft, ArrowUp, Minimize2 } from "lucide-react";
 import { useConversationMessages, useSendMessage } from "@/console/src/hooks/queries/chats";
 import UserMessage from "../../../../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../../../../components/domain/messages/AIMessage";
@@ -9,7 +9,6 @@ import WorkflowOptions, {
   type WorkflowPhase,
 } from "../../../../../../components/domain/workflow/WorkflowOptions";
 import StepList from "../../../../../../components/domain/workflow/StepList";
-import { Button } from "@/components/ui/button";
 
 export default function ChatDetail() {
   const { chatId } = useParams<{ chatId: string }>();
@@ -38,14 +37,8 @@ export default function ChatDetail() {
     onWindowTrigger: (windowType: string, data: any) => {
       console.log("[ChatDetail] Window trigger callback FIRED");
       console.log("[ChatDetail] Window trigger received:", { windowType, data });
-      if (windowType === "overlay") {
-        console.log("[ChatDetail] Calling showOverlay...");
-        // Trigger overlay window with bounding box data
-        window.consoleAPI?.showOverlay?.(data);
-        console.log("[ChatDetail] showOverlay called");
-      } else {
-        console.warn("[ChatDetail] Unknown window type:", windowType);
-      }
+      // Note: showOverlay removed - bounding box UI detection no longer used
+      console.log("[ChatDetail] Window trigger type:", windowType);
     },
     // Enable screenshot capture for workflow mode
     captureScreenshot: true,
@@ -123,45 +116,6 @@ export default function ChatDetail() {
     setInputValue("");
   };
 
-  const handleTestScreenshot = async () => {
-    console.log("[ChatDetail] Test Screenshot button clicked");
-    console.log("[ChatDetail] Checking window.consoleAPI...", {
-      hasConsoleAPI: !!window.consoleAPI,
-      hasCaptureMethod: !!window.consoleAPI?.captureScreenshot,
-    });
-
-    if (!window.consoleAPI) {
-      console.error("[ChatDetail] window.consoleAPI is NOT available!");
-      alert("ERROR: window.consoleAPI is not available. Check console logs.");
-      return;
-    }
-
-    if (!window.consoleAPI.captureScreenshot) {
-      console.error("[ChatDetail] window.consoleAPI.captureScreenshot is NOT available!");
-      alert("ERROR: captureScreenshot method is not available. Check console logs.");
-      return;
-    }
-
-    try {
-      console.log("[ChatDetail] Calling captureScreenshot()...");
-      const screenshot = await window.consoleAPI.captureScreenshot();
-      console.log("[ChatDetail] Screenshot result:", {
-        hasScreenshot: !!screenshot,
-        size: screenshot?.length || 0,
-        preview: screenshot?.substring(0, 100),
-      });
-
-      if (screenshot) {
-        alert(`SUCCESS! Screenshot captured: ${screenshot.length} bytes`);
-      } else {
-        alert("Screenshot returned null. Check console and Electron main process logs.");
-      }
-    } catch (error) {
-      console.error("[ChatDetail] Screenshot capture error:", error);
-      alert(`ERROR: ${error}. Check console logs.`);
-    }
-  };
-
   const handleWorkflowOptionSelect = async (option: any) => {
     if (!chatId) return;
 
@@ -201,9 +155,9 @@ export default function ChatDetail() {
       if (window.consoleAPI?.captureScreenshot) {
         try {
           console.log("[ChatDetail] Capturing screenshot for workflow action...");
-          const screenshotResult = await window.consoleAPI.captureScreenshot();
+          const screenshotResult = await window.consoleAPI.captureScreenshot() as any;
           if (screenshotResult) {
-            screenshot = screenshotResult.dataUrl;
+            screenshot = screenshotResult.dataUrl || screenshotResult;
             screenshotMetadata = screenshotResult.metadata;
             console.log("[ChatDetail] Screenshot captured successfully:", {
               hasScreenshot: !!screenshot,
@@ -238,46 +192,14 @@ export default function ChatDetail() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="p-8 pb-4 space-y-4 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => navigate("/chats")}
-            className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
-          >
-            <ArrowLeft size={16} />
-            <span className="text-sm">Back to Chats</span>
-          </button>
-
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              className="gap-2 text-text-secondary hover:text-white hover:bg-primary rounded-full px-4 py-2 h-auto"
-              onClick={handleTestScreenshot}
-            >
-              <Camera size={14} />
-              <span className="text-xs">Test Screenshot</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              className="gap-2 text-text-secondary hover:text-white hover:bg-primary rounded-full px-4 py-2 h-auto"
-              onClick={() => {
-                if (chatId) {
-                  console.log("Launch in Pill clicked, sending conversation:", chatId);
-                  window.consoleAPI.sendToAgent(chatId);
-                  window.consoleAPI.minimizeWindow();
-                }
-              }}
-            >
-              <ExternalLink size={14} />
-              <span className="text-xs">Launch in Pill</span>
-            </Button>
-          </div>
-        </div>
-
-        <div>
-          <h1 className="text-4xl font-bold text-text-primary">Conversation</h1>
-        </div>
+      <div className="p-8 pb-4 flex-shrink-0">
+        <button
+          onClick={() => navigate("/chats")}
+          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
+        >
+          <ArrowLeft size={16} />
+          <span className="text-sm">Back to Chats</span>
+        </button>
       </div>
 
       {/* Messages Area */}
@@ -360,16 +282,33 @@ export default function ChatDetail() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Type your message..."
-              className="w-full bg-[#1A1A1A] text-text-primary placeholder-text-tertiary px-lg py-md pr-16 rounded-full border-none outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              className="w-full bg-[#1A1A1A] text-text-primary placeholder-text-tertiary px-lg py-md pr-28 rounded-full border-none outline-none focus:ring-2 focus:ring-primary/50 transition-all"
             />
-            <button
-              type="submit"
-              disabled={!inputValue.trim()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-primary hover:bg-primary-hover disabled:bg-primary/50 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-colors"
-              aria-label="Send message"
-            >
-              <ArrowUp size={20} className="text-white" />
-            </button>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              <button
+                type="submit"
+                disabled={!inputValue.trim()}
+                className="w-10 h-10 bg-primary hover:bg-primary-hover disabled:bg-primary/50 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-colors"
+                aria-label="Send message"
+              >
+                <ArrowUp size={20} className="text-white" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (chatId) {
+                    console.log("Minimize to reduced view clicked, sending conversation:", chatId);
+                    window.consoleAPI.sendToAgent(chatId);
+                    window.consoleAPI.minimizeWindow();
+                  }
+                }}
+                className="w-10 h-10 bg-background-elevated hover:bg-background-elevated/80 rounded-full flex items-center justify-center transition-colors group"
+                aria-label="Minimize to reduced view"
+                title="Minimize to reduced view"
+              >
+                <Minimize2 size={18} className="text-text-secondary group-hover:text-primary-light transition-colors" />
+              </button>
+            </div>
           </form>
         </div>
       </div>
