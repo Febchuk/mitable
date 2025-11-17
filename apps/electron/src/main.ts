@@ -1,71 +1,19 @@
-import {
-  app,
-  BrowserWindow,
-  globalShortcut,
-  ipcMain,
-  screen,
-  shell,
-  Tray,
-  Menu,
-  nativeImage,
-} from "electron";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { createWriteStream, existsSync } from "fs";
+import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from "electron";
+import { join } from "path";
 import { IPC_CHANNELS } from "@mitable/shared";
-import {
-  captureService,
-  CaptureOptions,
-  CaptureResult,
-  ConversationContext,
-} from "./services/captureService";
+import { captureService, ConversationContext } from "./services/captureService";
+import type { MultiWindowCaptureResult } from "@mitable/shared";
+import { windowDetectionService } from "./services/windowDetectionService";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
-
-// ES Module __dirname equivalent (required because package.json has "type": "module")
-// Use custom variable names to avoid conflict with electron-vite's injected __dirname
-const _filename = fileURLToPath(import.meta.url);
-const _dirname = dirname(_filename);
-
-// Use electron-vite's injected __dirname if available, otherwise use our calculated path
-const MAIN_DIR = typeof __dirname !== "undefined" ? __dirname : _dirname;
-
-// Production logging setup - write to file for debugging
-if (app.isPackaged) {
-  const logPath = join(app.getPath("userData"), "app.log");
-  const logStream = createWriteStream(logPath, { flags: "a" });
-
-  const originalLog = console.log;
-  const originalError = console.error;
-
-  console.log = (...args: any[]) => {
-    const message = args
-      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
-      .join(" ");
-    logStream.write(`[LOG] ${new Date().toISOString()} - ${message}\n`);
-    originalLog(...args);
-  };
-
-  console.error = (...args: any[]) => {
-    const message = args
-      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
-      .join(" ");
-    logStream.write(`[ERROR] ${new Date().toISOString()} - ${message}\n`);
-    originalError(...args);
-  };
-
-  console.log("[PRODUCTION] App starting...");
-  console.log("[PRODUCTION] Log file:", logPath);
-  console.log("[PRODUCTION] MAIN_DIR:", MAIN_DIR);
-  console.log("[PRODUCTION] userData:", app.getPath("userData"));
-  console.log("[PRODUCTION] appPath:", app.getAppPath());
-}
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
-let tray: Tray | null = null;
-let isQuitting = false; // Track if app is intentionally quitting
+let overlayWindow: BrowserWindow | null = null;
+// eslint-disable-next-line prefer-const
+let guideWindow: BrowserWindow | null = null; // Not reassigned yet, but used in window management logic
+let nudgeWindow: BrowserWindow | null = null;
 
 // Auth token storage (shared across all windows)
 const authTokens: {
@@ -96,7 +44,7 @@ function createAgentWindow() {
     skipTaskbar: true,
     show: false,
     webPreferences: {
-      preload: join(MAIN_DIR, "../preload/agent.cjs"),
+      preload: join(__dirname, "../preload/agent.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -122,11 +70,7 @@ function createAgentWindow() {
   if (!app.isPackaged) {
     agentWindow.loadURL("http://localhost:5173/agent/index.html");
   } else {
-    const agentPath = join(MAIN_DIR, "../renderer/agent/index.html");
-    console.log("[Agent] Loading from:", agentPath);
-    console.log("[Agent] File exists:", existsSync(agentPath));
-    agentWindow.loadFile(agentPath);
-    // Don't auto-show - user must trigger with Ctrl+H or minimize from chat
+    agentWindow.loadFile(join(__dirname, "../renderer/agent.html"));
   }
 
   // Listen for pill movement - reposition conversation in real-time
@@ -190,7 +134,7 @@ function createConversationWindow() {
     show: false,
     modal: false, // Non-modal so pill remains interactive
     webPreferences: {
-      preload: join(MAIN_DIR, "../preload/conversation.cjs"),
+      preload: join(__dirname, "../preload/conversation.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -219,10 +163,7 @@ function createConversationWindow() {
   if (!app.isPackaged) {
     conversationWindow.loadURL("http://localhost:5173/conversation/index.html");
   } else {
-    const conversationPath = join(MAIN_DIR, "../renderer/conversation/index.html");
-    console.log("[Conversation] Loading from:", conversationPath);
-    console.log("[Conversation] File exists:", existsSync(conversationPath));
-    conversationWindow.loadFile(conversationPath);
+    conversationWindow.loadFile(join(__dirname, "../renderer/conversation.html"));
   }
 
   // Wait for renderer to be ready before allowing IPC
@@ -241,19 +182,19 @@ function createConversationWindow() {
 
 function createConsoleWindow() {
   console.log("[Console] Creating console window...");
-  console.log("[Console] Preload script path:", join(MAIN_DIR, "../preload/console.cjs"));
+  console.log("[Console] Preload script path:", join(__dirname, "../preload/console.cjs"));
 
   consoleWindow = new BrowserWindow({
     width: 1264,
     height: 888,
-    transparent: process.platform === "darwin", // Only transparent on macOS
+    transparent: true,
     // Hidden title bar on macOS for native traffic lights with custom positioning
     titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
     trafficLightPosition: process.platform === "darwin" ? { x: 6, y: 10 } : undefined,
     frame: process.platform !== "darwin",
-    maximizable: true, // Allow maximizing on Windows
+    maximizable: false,
     webPreferences: {
-      preload: join(MAIN_DIR, "../preload/console.cjs"),
+      preload: join(__dirname, "../preload/console.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -262,11 +203,6 @@ function createConsoleWindow() {
   // Log when preload script finishes loading
   consoleWindow.webContents.on("did-finish-load", () => {
     console.log("[Console] Window finished loading - preload script should be ready");
-    // Show console window on startup (main window)
-    if (consoleWindow && !consoleWindow.isDestroyed()) {
-      consoleWindow.show();
-      console.log("[Console] Window shown");
-    }
   });
 
   // Log when DOM is ready
@@ -297,80 +233,52 @@ function createConsoleWindow() {
     consoleWindow.loadURL("http://localhost:5173/console/index.html");
     consoleWindow.webContents.openDevTools();
   } else {
-    const consolePath = join(MAIN_DIR, "../renderer/console/index.html");
-    console.log("[Console] Loading from:", consolePath);
-    console.log("[Console] File exists:", existsSync(consolePath));
-    consoleWindow.loadFile(consolePath);
+    consoleWindow.loadFile(join(__dirname, "../renderer/console.html"));
   }
 
-  consoleWindow.on("close", (event) => {
-    // On Windows: hide to tray instead of quitting (unless app is quitting)
-    // On macOS: follow standard behavior (quit when closed)
-    if (process.platform === "win32" && !isQuitting) {
-      event.preventDefault();
-      consoleWindow?.hide();
-      console.log("[Console] Window hidden to tray (Windows)");
-    }
-    // On macOS or when isQuitting=true, let it close normally
-  });
-
   consoleWindow.on("closed", () => {
-    // Only quit on macOS
-    if (process.platform !== "win32") {
-      app.quit();
-    }
+    app.quit(); // Quit app when main console window is closed
   });
 }
 
-/**
- * DEPRECATED: Overlay Window
- *
- * The overlay window has been deprecated - visual guidance is now handled differently.
- * Previously showed transparent overlays with bounding boxes and highlights.
- *
- * Kept for reference only - can be deleted after confirming new system works.
- */
-// function createOverlayWindow() {
-//   if (!guideWindow || guideWindow.isDestroyed()) {
-//     console.error("[Overlay] Cannot create overlay window - guide window not available");
-//     return;
-//   }
-//
-//   const primaryDisplay = screen.getPrimaryDisplay();
-//   const { width, height } = primaryDisplay.bounds;
-//
-//   overlayWindow = new BrowserWindow({
-//     width,
-//     height,
-//     x: 0,
-//     y: 0,
-//     transparent: true,
-//     frame: false,
-//     skipTaskbar: true,
-//     resizable: false,
-//     movable: false,
-//     focusable: false,
-//     show: false,
-//     modal: false, // Non-modal so other windows remain interactive
-//     webPreferences: {
-//       preload: join(MAIN_DIR, "../preload/overlay.cjs"),
-//       contextIsolation: true,
-//       nodeIntegration: false,
-//     },
-//   });
-//
-//   overlayWindow.setIgnoreMouseEvents(true, { forward: true });
-//
-//   if (!app.isPackaged) {
-//     overlayWindow.loadURL("http://localhost:5173/overlay/index.html");
-//   } else {
-//     overlayWindow.loadFile(join(MAIN_DIR, "../renderer/overlay/index.html"));
-//   }
-//
-//   overlayWindow.on("closed", () => {
-//     overlayWindow = null;
-//   });
-// }
+function createOverlayWindow() {
+  console.log("[Overlay] Creating overlay window...");
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.bounds;
+
+  overlayWindow = new BrowserWindow({
+    width,
+    height,
+    x: 0,
+    y: 0,
+    transparent: true,
+    frame: false,
+    skipTaskbar: true,
+    resizable: false,
+    movable: false,
+    focusable: false,
+    show: false,
+    modal: false, // Non-modal so other windows remain interactive
+    webPreferences: {
+      preload: join(__dirname, "../preload/overlay.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+
+  if (!app.isPackaged) {
+    overlayWindow.loadURL("http://localhost:5173/overlay/index.html");
+  } else {
+    overlayWindow.loadFile(join(__dirname, "../renderer/overlay.html"));
+  }
+
+  overlayWindow.on("closed", () => {
+    overlayWindow = null;
+  });
+}
 
 /**
  * DEPRECATED: Guide Window
@@ -396,7 +304,7 @@ function createConsoleWindow() {
 //     show: false,
 //     modal: false, // Non-modal so other windows remain interactive
 //     webPreferences: {
-//       preload: join(MAIN_DIR, "../preload/guide.cjs"),
+//       preload: join(__dirname, "../preload/guide.cjs"),
 //       contextIsolation: true,
 //       nodeIntegration: false,
 //     },
@@ -413,13 +321,45 @@ function createConsoleWindow() {
 //   if (!app.isPackaged) {
 //     guideWindow.loadURL("http://localhost:5173/guide/index.html");
 //   } else {
-//     guideWindow.loadFile(join(MAIN_DIR, "../renderer/guide.html"));
+//     guideWindow.loadFile(join(__dirname, "../renderer/guide.html"));
 //   }
 
 //   guideWindow.on("closed", () => {
 //     guideWindow = null;
 //   });
 // }
+
+function createNudgeWindow() {
+  if (!agentWindow || agentWindow.isDestroyed()) {
+    console.error("[Nudge] Cannot create nudge window - agent window not available");
+    return;
+  }
+
+  nudgeWindow = new BrowserWindow({
+    width: 400,
+    height: 600,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    show: false,
+    modal: false, // Non-modal so other windows remain interactive
+    webPreferences: {
+      preload: join(__dirname, "../preload/nudge.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  if (!app.isPackaged) {
+    nudgeWindow.loadURL("http://localhost:5173/nudge/index.html");
+  } else {
+    nudgeWindow.loadFile(join(__dirname, "../renderer/nudge.html"));
+  }
+
+  nudgeWindow.on("closed", () => {
+    nudgeWindow = null;
+  });
+}
 
 // IPC Handlers
 function setupIPC() {
@@ -433,6 +373,15 @@ function setupIPC() {
         // Also hide all dependent windows when agent is hidden
         if (conversationWindow && !conversationWindow.isDestroyed()) {
           conversationWindow.hide();
+        }
+        if (guideWindow && !guideWindow.isDestroyed()) {
+          guideWindow.hide();
+        }
+        if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+          nudgeWindow.hide();
+        }
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.hide();
         }
       } else {
         agentWindow.show();
@@ -562,6 +511,15 @@ function setupIPC() {
     if (conversationWindow && !conversationWindow.isDestroyed()) {
       conversationWindow.hide();
     }
+    if (guideWindow && !guideWindow.isDestroyed()) {
+      guideWindow.hide();
+    }
+    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      nudgeWindow.hide();
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.hide();
+    }
   });
 
   // NEW: Handle conversation list request (fetch from backend)
@@ -577,8 +535,7 @@ function setupIPC() {
       }
 
       // Fetch from backend (without messages for performance)
-      const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-      console.log(`[Conversation] Fetching from: ${API_BASE_URL}/api/conversations`);
+      const API_BASE_URL = "http://localhost:3000"; // TODO: Move to config
       const response = await fetch(`${API_BASE_URL}/api/conversations?includeMessages=false`, {
         headers: { Authorization: `Bearer ${authTokens.accessToken}` },
       });
@@ -626,6 +583,44 @@ function setupIPC() {
     if (consoleWindow && !consoleWindow.isDestroyed()) {
       consoleWindow.minimize();
     }
+  });
+
+  // Show overlay with bounding box data
+  ipcMain.on(IPC_CHANNELS.OVERLAY_SHOW, (_event, data) => {
+    console.log("[Main] OVERLAY_SHOW received with data:", data);
+
+    if (!overlayWindow || overlayWindow.isDestroyed()) {
+      console.error("[Main] Overlay window not available");
+      return;
+    }
+
+    // Show overlay window first
+    overlayWindow.show();
+    overlayWindow.focus();
+
+    // Open DevTools when overlay is shown (dev mode only, first time)
+    if (!app.isPackaged && !overlayWindow.webContents.isDevToolsOpened()) {
+      overlayWindow.webContents.openDevTools({ mode: "detach" });
+    }
+
+    // Wait for renderer to be ready, then send data
+    // If already loaded, this fires immediately
+    if (overlayWindow.webContents.isLoading()) {
+      console.log("[Main] Overlay still loading, waiting for did-finish-load...");
+      overlayWindow.webContents.once("did-finish-load", () => {
+        console.log("[Main] Overlay loaded, sending data now");
+        overlayWindow.webContents.send("overlay-data", data);
+      });
+    } else {
+      // Already loaded, add small delay for React to mount and set up listeners
+      console.log("[Main] Overlay already loaded, sending data with 100ms delay");
+      setTimeout(() => {
+        overlayWindow.webContents.send("overlay-data", data);
+        console.log("[Main] Overlay data sent");
+      }, 100);
+    }
+
+    console.log("[Main] Overlay window shown");
   });
 
   /**
@@ -765,7 +760,53 @@ function setupIPC() {
   //   }
   // );
 
-  // Nudge system - handled via Console
+  // Nudge system
+  ipcMain.on(IPC_CHANNELS.NUDGE_SHOW, (_event, data) => {
+    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      // Position nudge window to the right of agent window
+      if (agentWindow && !agentWindow.isDestroyed()) {
+        const agentBounds = agentWindow.getBounds();
+        const nudgeBounds = nudgeWindow.getBounds();
+
+        // Position to the right with 16px gap
+        const x = agentBounds.x + agentBounds.width + 16;
+        const y = agentBounds.y;
+
+        nudgeWindow.setBounds({
+          x,
+          y,
+          width: nudgeBounds.width,
+          height: nudgeBounds.height,
+        });
+      }
+
+      nudgeWindow.webContents.send(IPC_CHANNELS.NUDGE_SHOW, data);
+      nudgeWindow.show();
+    }
+    if (guideWindow && !guideWindow.isDestroyed() && guideWindow.isVisible()) {
+      guideWindow.hide();
+    }
+  });
+
+  // Nudge creation request - from nudge window to console
+  ipcMain.on(IPC_CHANNELS.NUDGE_CREATE_REQUEST, (_event, data) => {
+    console.log("[Nudge] Create request received:", data);
+
+    // Show and focus console window
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+
+      // Forward nudge creation data to console
+      // Console will navigate to /nudges/new and populate the form
+      consoleWindow.webContents.send(IPC_CHANNELS.NUDGE_OPEN_CREATOR, data);
+    }
+
+    // Hide nudge window after triggering creation
+    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      nudgeWindow.hide();
+    }
+  });
 
   // NEW: Direct nudge creation from conversation window (inline expert cards)
   ipcMain.on(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, (_event, data) => {
@@ -784,10 +825,16 @@ function setupIPC() {
     }
   });
 
-  // Dynamic mouse events
+  // Dynamic mouse events for overlay
   ipcMain.on(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, (_event, ignore: boolean) => {
     if (agentWindow && !agentWindow.isDestroyed()) {
       agentWindow.setIgnoreMouseEvents(ignore, { forward: true });
+    }
+    if (guideWindow && !guideWindow.isDestroyed()) {
+      guideWindow.setIgnoreMouseEvents(ignore, { forward: true });
+    }
+    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+      nudgeWindow.setIgnoreMouseEvents(ignore, { forward: true });
     }
   });
 
@@ -869,6 +916,56 @@ function setupIPC() {
     }
   );
 
+  // Nudge window resize with left-to-right expansion
+  ipcMain.on(
+    IPC_CHANNELS.NUDGE_RESIZE,
+    (_event, options: { width?: number; height?: number } | "collapsed" | "expanded") => {
+      if (nudgeWindow && !nudgeWindow.isDestroyed()) {
+        const currentBounds = nudgeWindow.getBounds();
+
+        // Support both mode strings and flexible options
+        let newWidth: number;
+        let newHeight: number;
+
+        if (typeof options === "string") {
+          // Mode-based resizing
+          switch (options) {
+            case "collapsed":
+              newWidth = 85;
+              newHeight = 400;
+              break;
+            case "expanded":
+              newWidth = 380;
+              newHeight = 400;
+              break;
+            default:
+              newWidth = currentBounds.width;
+              newHeight = currentBounds.height;
+          }
+        } else {
+          // Flexible options format
+          newWidth = options.width ?? currentBounds.width;
+          newHeight = options.height ?? currentBounds.height;
+        }
+
+        // Left-to-right expansion: keep X position fixed (left edge anchored)
+        // Only adjust Y if height changes (keep vertical center)
+        const heightDiff = newHeight - currentBounds.height;
+        const newY = currentBounds.y - heightDiff / 2;
+
+        nudgeWindow.setBounds(
+          {
+            x: currentBounds.x, // Left edge stays fixed
+            y: Math.round(newY),
+            width: newWidth,
+            height: newHeight,
+          },
+          true // animate
+        );
+      }
+    }
+  );
+
   // Auth Management - Cross-window token sharing
   // Console sets tokens after login
   ipcMain.on(IPC_CHANNELS.AUTH_SET_TOKENS, (_event, accessToken: string, refreshToken: string) => {
@@ -877,7 +974,7 @@ function setupIPC() {
     authTokens.refreshToken = refreshToken;
 
     // Broadcast token update to all windows
-    const allWindows = [agentWindow, conversationWindow, consoleWindow];
+    const allWindows = [agentWindow, conversationWindow, guideWindow, nudgeWindow, overlayWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, accessToken);
@@ -898,7 +995,7 @@ function setupIPC() {
     authTokens.refreshToken = null;
 
     // Broadcast token clear to all windows
-    const allWindows = [agentWindow, conversationWindow, consoleWindow];
+    const allWindows = [agentWindow, conversationWindow, guideWindow, nudgeWindow, overlayWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, null);
@@ -915,15 +1012,27 @@ function setupIPC() {
         message?: string;
         context?: ConversationContext;
       }
-    ): Promise<any> => {
+    ): Promise<MultiWindowCaptureResult> => {
       console.log("[Screenshot] Multi-window capture requested", {
         hasMessage: !!payload?.message,
         hasContext: !!payload?.context,
       });
 
       try {
-        // Always use multi-window capture
-        const result = await captureService.captureVisibleWindows();
+        // Get currently selected apps for filtering
+        const selectedApps = windowDetectionService.getSelectedApps();
+        const hasSelectedApps = selectedApps.length > 0;
+
+        console.log("[Screenshot] Capture with filters:", {
+          hasSelectedApps,
+          selectedApps: selectedApps.join(", ") || "none",
+        });
+
+        // Capture with optional filtering
+        const result = await captureService.captureVisibleWindows(
+          false, // saveToFile
+          hasSelectedApps ? selectedApps : undefined // Only filter if apps are selected
+        );
 
         console.log("[Screenshot] Multi-window capture result:", {
           success: result.success,
@@ -944,7 +1053,107 @@ function setupIPC() {
     }
   );
 
-  console.log("[IPC] Screenshot capture handler registered successfully");
+  // Display Metadata - for multi-monitor support
+  ipcMain.handle(IPC_CHANNELS.GET_DISPLAY_METADATA, () => {
+    const displays = screen.getAllDisplays();
+    return displays.map((display) => ({
+      bounds: display.bounds,
+      scaleFactor: display.scaleFactor,
+    }));
+  });
+
+  console.log("[IPC] Screenshot capture and display metadata handlers registered successfully");
+
+  // Watch Mode IPC Handlers
+  setupWatchModeHandlers();
+}
+
+// Watch mode handlers for selective screenshot capture
+function setupWatchModeHandlers() {
+  // Store references to watch button windows
+  const watchButtonWindows: Map<string, BrowserWindow> = new Map();
+
+  // Toggle watch mode on/off
+  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_TOGGLE, async (_event, enabled: boolean) => {
+    console.log(`[Watch Mode] Toggling watch mode: ${enabled}`);
+
+    windowDetectionService.setWatchingMode(enabled);
+
+    if (enabled) {
+      // Get all visible windows
+      const windows = await windowDetectionService.getAllVisibleWindows();
+      console.log(`[Watch Mode] Found ${windows.length} watchable windows`);
+
+      // Create overlay buttons for each window
+      for (const window of windows) {
+        if (!window.isBlocked) {
+          createWatchButtonWindow(window, watchButtonWindows);
+        }
+      }
+    } else {
+      // Close all watch button windows
+      console.log("[Watch Mode] Closing all watch button windows");
+      for (const [windowId, buttonWindow] of watchButtonWindows.entries()) {
+        if (!buttonWindow.isDestroyed()) {
+          buttonWindow.close();
+        }
+        watchButtonWindows.delete(windowId);
+      }
+      windowDetectionService.clearAll();
+    }
+  });
+
+  // Select a window to watch
+  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_SELECT, async (_event, appName: string) => {
+    console.log(`[Watch Mode] Selecting app: ${appName}`);
+    const added = windowDetectionService.addApp(appName);
+
+    if (added) {
+      broadcastWatchAppsUpdate();
+    }
+  });
+
+  // Unselect a window
+  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, async (_event, appName: string) => {
+    console.log(`[Watch Mode] Unselecting app: ${appName}`);
+    const removed = windowDetectionService.removeApp(appName);
+
+    if (removed) {
+      broadcastWatchAppsUpdate();
+    }
+  });
+
+  // Get currently selected apps
+  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED, async () => {
+    const apps = windowDetectionService.getSelectedApps();
+    console.log(`[Watch Mode] Returning ${apps.length} selected apps`);
+    return apps;
+  });
+
+  // Broadcast updated app list to all windows
+  function broadcastWatchAppsUpdate() {
+    const apps = windowDetectionService.getSelectedApps();
+    const windows = [agentWindow, conversationWindow];
+
+    for (const window of windows) {
+      if (window && !window.isDestroyed()) {
+        window.webContents.send(IPC_CHANNELS.WATCH_APPS_UPDATED, apps);
+      }
+    }
+
+    console.log(`[Watch Mode] Broadcasted update to windows. Selected apps: ${apps.join(", ") || "none"}`);
+  }
+
+  console.log("[IPC] Watch mode handlers registered successfully");
+}
+
+// Helper function to create a watch button window (placeholder for now)
+function createWatchButtonWindow(
+  window: any,
+  watchButtonWindows: Map<string, BrowserWindow>
+) {
+  // TODO: Implement watch button window creation
+  console.log(`[Watch Mode] Would create button for: ${window.appName} at (${window.bounds.x}, ${window.bounds.y})`);
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)
@@ -963,136 +1172,7 @@ function registerGlobalShortcuts() {
       }
     }
   });
-
-  // DevTools shortcuts (F12 and Ctrl+Shift+I)
-  globalShortcut.register("F12", () => {
-    const focusedWindow = BrowserWindow.getFocusedWindow();
-    if (focusedWindow) {
-      focusedWindow.webContents.toggleDevTools();
-    }
-  });
-
-  globalShortcut.register("CommandOrControl+Shift+I", () => {
-    const focusedWindow = BrowserWindow.getFocusedWindow();
-    if (focusedWindow) {
-      focusedWindow.webContents.toggleDevTools();
-    }
-  });
 }
-
-// Create system tray (Windows only)
-function createTray() {
-  console.log("[Tray] createTray() called, platform:", process.platform);
-
-  if (process.platform !== "win32") {
-    console.log("[Tray] Not Windows, skipping tray creation");
-    return; // Only show tray on Windows
-  }
-
-  console.log("[Tray] Windows detected, creating tray...");
-
-  try {
-    // Create a simple colored icon programmatically as fallback
-    // Windows tray needs a 16x16 icon
-    let trayIcon: Electron.NativeImage;
-
-    // Try to load from file first (use ICO for Windows tray)
-    let iconPath: string;
-    if (app.isPackaged) {
-      iconPath = join(process.resourcesPath, "assets", "icon.ico");
-    } else {
-      // In dev mode, go up to the src directory
-      iconPath = join(MAIN_DIR, "../../src/renderer/assets/icon.ico");
-    }
-
-    console.log("[Tray] Loading icon from:", iconPath);
-
-    const icon = nativeImage.createFromPath(iconPath);
-    if (!icon.isEmpty()) {
-      console.log("[Tray] Icon loaded, size:", icon.getSize());
-      trayIcon = icon.resize({ width: 16, height: 16 });
-    } else {
-      console.warn("[Tray] Failed to load ICO, creating simple colored icon as fallback");
-      // Create a simple 16x16 purple square as fallback
-      const canvas = Buffer.from(
-        `<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
-          <rect width="16" height="16" fill="#8b5cf6" rx="3"/>
-          <text x="8" y="12" font-size="10" fill="white" text-anchor="middle" font-weight="bold">M</text>
-        </svg>`
-      );
-      trayIcon = nativeImage.createFromBuffer(canvas);
-    }
-
-    tray = new Tray(trayIcon);
-
-    console.log("[Tray] Tray instance created:", tray);
-    console.log("[Tray] Tray is destroyed?", tray.isDestroyed());
-
-    // Prevent garbage collection by keeping a strong reference
-    // This is critical on Windows - without this, the tray can disappear
-    (global as any).appTray = tray;
-
-    tray.setToolTip("Mitable");
-
-    console.log("[Tray] Tray tooltip set, checking if still exists...");
-    console.log("[Tray] Tray is destroyed after setup?", tray.isDestroyed());
-
-    // Function to show the app
-    const showApp = () => {
-      console.log("[Tray] Show app triggered");
-      if (consoleWindow && !consoleWindow.isDestroyed()) {
-        consoleWindow.show();
-        consoleWindow.restore(); // Restore if minimized
-        consoleWindow.focus();
-        console.log("[Tray] Console window shown");
-      } else {
-        console.error("[Tray] Console window is destroyed or null");
-      }
-      // Don't show agent pill - user can toggle it with Cmd+H if needed
-    };
-
-    // Create context menu
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: "Show Mitable",
-        click: showApp,
-      },
-      {
-        type: "separator",
-      },
-      {
-        label: "Quit",
-        click: () => {
-          console.log("[Tray] Quit clicked");
-          isQuitting = true; // Set flag before quitting
-          app.quit();
-        },
-      },
-    ]);
-
-    tray.setContextMenu(contextMenu);
-
-    // Click (Windows) or double-click to show console
-    tray.on("click", showApp);
-    tray.on("double-click", showApp);
-
-    console.log("[Tray] System tray initialized");
-  } catch (error) {
-    console.error("[Tray] Failed to create system tray:", error);
-  }
-}
-
-// Uncaught exception handlers - prevent silent crashes
-process.on("uncaughtException", (error) => {
-  console.error("[UNCAUGHT EXCEPTION]", error.message);
-  console.error("[STACK]", error.stack);
-  // Don't exit immediately - try to keep app running
-});
-
-process.on("unhandledRejection", (reason: any, promise) => {
-  console.error("[UNHANDLED REJECTION] at:", promise);
-  console.error("[REASON]", reason);
-});
 
 app.whenReady().then(() => {
   // Initialize active window bridge for capture policy
@@ -1101,24 +1181,16 @@ app.whenReady().then(() => {
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
   createConsoleWindow();
-  createTray(); // Create system tray on Windows
+  // DEPRECATED: Guide window no longer needed - workflow UI moved to conversation window
+  // createGuideWindow(); // Create guide as child of agent
+  createOverlayWindow(); // Create overlay for bounding box visual guidance
+  createNudgeWindow(); // Create nudge as child of agent
 
   setupIPC();
   registerGlobalShortcuts();
 });
 
-app.on("before-quit", () => {
-  // Set flag when app is quitting to allow windows to close
-  isQuitting = true;
-});
-
 app.on("window-all-closed", () => {
-  // On Windows, keep app running in tray
-  // On macOS, follow standard behavior (quit unless dock icon clicked)
-  if (process.platform === "win32") {
-    // Don't quit - keep running in system tray
-    return;
-  }
   if (process.platform !== "darwin") {
     app.quit();
   }
