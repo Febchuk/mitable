@@ -109,7 +109,8 @@ class SlackService {
     organizationId: string,
     channelId: string,
     cursor?: string,
-    limit: number = 100
+    limit: number = 100,
+    oldest?: string
   ): Promise<{
     messages: SlackMessage[];
     nextCursor?: string;
@@ -122,6 +123,7 @@ class SlackService {
         channel: channelId,
         cursor,
         limit,
+        ...(oldest && { oldest }),
       });
 
       if (!result.ok || !result.messages) {

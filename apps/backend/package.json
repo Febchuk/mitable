@@ -21,6 +21,7 @@
     "test-search": "tsx src/scripts/test-search.ts",
     "sync-slack": "tsx src/scripts/sync-slack.ts",
     "sync-notion": "tsx src/scripts/sync-notion.ts",
+    "sync-integrations": "tsx src/scripts/sync-integrations.ts",
     "backfill-tokens": "tsx src/scripts/backfill-encrypted-tokens.ts"
   },
   "dependencies": {
