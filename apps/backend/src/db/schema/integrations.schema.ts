@@ -21,11 +21,20 @@ export const integrations = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     provider: varchar("provider", { length: 50 }).notNull(), // 'slack' | 'notion' | 'github' | 'google-drive'
     status: varchar("status", { length: 50 }).notNull(), // 'connected' | 'disconnected' | 'pending' | 'error'
-    // TODO: SECURITY - Implement encryption for sensitive tokens before production deployment
-    // Consider using @aws-sdk/client-kms, Supabase Vault, or database-level encryption
-    // These tokens grant full workspace access and MUST be encrypted at rest
-    accessToken: text("access_token"), // Currently plaintext - MUST encrypt before production
-    refreshToken: text("refresh_token"), // Currently plaintext - MUST encrypt before production
+
+    // Token encryption (SECURITY CRITICAL)
+    // ENCRYPTED tokens (AES-256-GCM) - USE THESE
+    accessTokenEncrypted: text("access_token_encrypted"), // Encrypted with encryption.service.ts
+    refreshTokenEncrypted: text("refresh_token_encrypted"), // Encrypted with encryption.service.ts
+
+    // DEPRECATED: Plaintext tokens (for migration only, will be dropped)
+    // TODO: Remove these columns after backfill complete and verified
+    accessToken: text("access_token"), // DEPRECATED - use accessTokenEncrypted
+    refreshToken: text("refresh_token"), // DEPRECATED - use refreshTokenEncrypted
+
+    // Encryption metadata
+    encryptionVersion: integer("encryption_version").default(1), // Track encryption algorithm version
+
     tokenExpiresAt: timestamp("token_expires_at"),
     metadata: jsonb("metadata").default("{}"), // Provider-specific config
     lastSyncedAt: timestamp("last_synced_at"),

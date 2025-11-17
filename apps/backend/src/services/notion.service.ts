@@ -3,6 +3,7 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 import { config } from "../config.js";
+import { encryptionService } from "./encryption.service.js";
 
 export interface NotionPage {
   id: string;
@@ -58,6 +59,7 @@ class NotionService {
   /**
    * Get Notion Client instance for an organization
    * Checks token expiry and refreshes if needed
+   * Decrypts tokens from database before use
    */
   private async getClient(organizationId: string): Promise<Client> {
     const [integration] = await db
@@ -71,25 +73,53 @@ class NotionService {
       )
       .limit(1);
 
-    if (!integration || !integration.accessToken) {
+    if (!integration) {
       throw new Error("Notion integration not found or not connected");
+    }
+
+    // Decrypt tokens before use (SECURITY CRITICAL)
+    // Prefer encrypted token, fallback to plaintext during migration
+    let accessToken: string;
+    let refreshToken: string | null = null;
+
+    if (integration.accessTokenEncrypted) {
+      accessToken = encryptionService.decrypt(integration.accessTokenEncrypted);
+      if (integration.refreshTokenEncrypted) {
+        refreshToken = encryptionService.decrypt(integration.refreshTokenEncrypted);
+      }
+    } else if (integration.accessToken) {
+      // DEPRECATED: Fallback to plaintext token during migration
+      accessToken = integration.accessToken;
+      refreshToken = integration.refreshToken;
+      console.warn(
+        `[NotionService] Using plaintext tokens for org ${organizationId} - run backfill script`
+      );
+    } else {
+      throw new Error("No access token found (neither encrypted nor plaintext)");
     }
 
     // Check if token is expired and refresh if needed
     if (integration.tokenExpiresAt && new Date() > integration.tokenExpiresAt) {
-      if (!integration.refreshToken) {
+      if (!refreshToken) {
         throw new Error("Notion token expired and no refresh token available");
       }
 
-      // Refresh the token
-      const tokenResponse = await this.refreshAccessToken(integration.refreshToken);
+      // Refresh the token (refreshAccessToken expects decrypted token)
+      const tokenResponse = await this.refreshAccessToken(refreshToken);
 
-      // Update integration with new tokens
+      // Encrypt new tokens before storing
+      const encryptedAccessToken = encryptionService.encrypt(tokenResponse.access_token);
+      const encryptedRefreshToken = encryptionService.encrypt(tokenResponse.refresh_token);
+
+      // Update integration with new encrypted tokens (DUAL-WRITE during migration)
       await db
         .update(schema.integrations)
         .set({
-          accessToken: tokenResponse.access_token,
-          refreshToken: tokenResponse.refresh_token,
+          accessToken: tokenResponse.access_token, // DEPRECATED
+          refreshToken: tokenResponse.refresh_token, // DEPRECATED
+          accessTokenEncrypted: encryptedAccessToken, // USE THIS
+          refreshTokenEncrypted: encryptedRefreshToken, // USE THIS
+          encryptionVersion: 1,
           // Notion doesn't provide expiry time, use estimated lifetime
           tokenExpiresAt: new Date(
             Date.now() + NOTION_CONFIG.TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
@@ -105,7 +135,7 @@ class NotionService {
     }
 
     return new Client({
-      auth: integration.accessToken,
+      auth: accessToken,
       notionVersion: config.notion.apiVersion,
     });
   }

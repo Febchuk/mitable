@@ -2,6 +2,7 @@ import { WebClient } from "@slack/web-api";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
+import { encryptionService } from "./encryption.service.js";
 
 export interface SlackChannel {
   id: string;
@@ -23,6 +24,7 @@ export interface SlackMessage {
 class SlackService {
   /**
    * Get Slack WebClient instance for an organization
+   * Decrypts the access token from database before use
    */
   private async getClient(organizationId: string): Promise<WebClient> {
     const [integration] = await db
@@ -36,11 +38,27 @@ class SlackService {
       )
       .limit(1);
 
-    if (!integration || !integration.accessToken) {
+    if (!integration) {
       throw new Error("Slack integration not found or not connected");
     }
 
-    return new WebClient(integration.accessToken);
+    // Decrypt token before use (SECURITY CRITICAL)
+    // Prefer encrypted token, fallback to plaintext during migration
+    let accessToken: string;
+
+    if (integration.accessTokenEncrypted) {
+      accessToken = encryptionService.decrypt(integration.accessTokenEncrypted);
+    } else if (integration.accessToken) {
+      // DEPRECATED: Fallback to plaintext token during migration
+      accessToken = integration.accessToken;
+      console.warn(
+        `[SlackService] Using plaintext token for org ${organizationId} - run backfill script`
+      );
+    } else {
+      throw new Error("No access token found (neither encrypted nor plaintext)");
+    }
+
+    return new WebClient(accessToken);
   }
 
   /**
