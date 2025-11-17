@@ -19,7 +19,8 @@
     "db:migrate-fts": "tsx src/scripts/run-fts-migration.ts",
     "test-search": "tsx src/scripts/test-search.ts",
     "sync-slack": "tsx src/scripts/sync-slack.ts",
-    "sync-notion": "tsx src/scripts/sync-notion.ts"
+    "sync-notion": "tsx src/scripts/sync-notion.ts",
+    "sync-integrations": "tsx src/scripts/sync-integrations.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
