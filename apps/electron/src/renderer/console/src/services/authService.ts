@@ -61,20 +61,37 @@ class AuthService {
    * Login with email and password
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(credentials),
-    });
+    console.log(`[AUTH] Attempting login to: ${API_BASE_URL}/api/auth/login`);
+    console.log(`[AUTH] API_BASE_URL resolved to: ${API_BASE_URL}`);
 
-    if (!response.ok) {
-      const error: AuthError = await response.json();
-      throw new Error(error.message || "Login failed");
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      console.log(`[AUTH] Login response status: ${response.status}`);
+
+      if (!response.ok) {
+        const error: AuthError = await response.json();
+        console.error(`[AUTH] Login failed:`, error);
+        throw new Error(error.message || "Login failed");
+      }
+
+      const data = await response.json();
+      console.log(`[AUTH] Login successful for user:`, data.user.email);
+      return data;
+    } catch (error) {
+      console.error(`[AUTH] Login request failed:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        url: `${API_BASE_URL}/api/auth/login`,
+      });
+      throw error;
     }
-
-    return response.json();
   }
 
   /**

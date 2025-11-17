@@ -5,7 +5,7 @@
  * Works with both Agent and Conversation windows
  */
 
-const API_BASE_URL = "http://localhost:3000/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export interface Message {
   id: string;
@@ -75,7 +75,7 @@ export async function createConversation(
   const headers = await getAuthHeaders();
   console.log("[API] Auth headers obtained");
 
-  const response = await fetch(`${API_BASE_URL}/conversations`, {
+  const response = await fetch(`${API_BASE_URL}/api/conversations`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -111,7 +111,7 @@ export async function createConversation(
 export async function getConversationMessages(conversationId: string): Promise<Message[]> {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
+  const response = await fetch(`${API_BASE_URL}/api/conversations/${conversationId}/messages`, {
     headers,
   });
 
@@ -175,7 +175,7 @@ export async function sendMessageStream(
     console.log(`[API] Sending message with metadata:`, metadata);
   }
 
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
+  const response = await fetch(`${API_BASE_URL}/api/conversations/${conversationId}/messages/stream`, {
     method: "POST",
     headers,
     body: JSON.stringify(requestBody),

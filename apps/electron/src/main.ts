@@ -9,7 +9,9 @@ import {
   Menu,
   nativeImage,
 } from "electron";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+import { createWriteStream, existsSync } from "fs";
 import { IPC_CHANNELS } from "@mitable/shared";
 import {
   captureService,
@@ -17,6 +19,42 @@ import {
   CaptureResult,
   ConversationContext,
 } from "./services/captureService";
+
+// ES Module __dirname equivalent (required because package.json has "type": "module")
+// Use custom variable names to avoid conflict with electron-vite's injected __dirname
+const _filename = fileURLToPath(import.meta.url);
+const _dirname = dirname(_filename);
+
+// Use electron-vite's injected __dirname if available, otherwise use our calculated path
+// @ts-ignore - __dirname may or may not exist depending on build environment
+const MAIN_DIR = typeof __dirname !== "undefined" ? __dirname : _dirname;
+
+// Production logging setup - write to file for debugging
+if (app.isPackaged) {
+  const logPath = join(app.getPath("userData"), "app.log");
+  const logStream = createWriteStream(logPath, { flags: "a" });
+
+  const originalLog = console.log;
+  const originalError = console.error;
+
+  console.log = (...args: any[]) => {
+    const message = args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg))).join(" ");
+    logStream.write(`[LOG] ${new Date().toISOString()} - ${message}\n`);
+    originalLog(...args);
+  };
+
+  console.error = (...args: any[]) => {
+    const message = args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg))).join(" ");
+    logStream.write(`[ERROR] ${new Date().toISOString()} - ${message}\n`);
+    originalError(...args);
+  };
+
+  console.log("[PRODUCTION] App starting...");
+  console.log("[PRODUCTION] Log file:", logPath);
+  console.log("[PRODUCTION] MAIN_DIR:", MAIN_DIR);
+  console.log("[PRODUCTION] userData:", app.getPath("userData"));
+  console.log("[PRODUCTION] appPath:", app.getAppPath());
+}
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
@@ -58,7 +96,7 @@ function createAgentWindow() {
     skipTaskbar: true,
     show: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/agent.cjs"),
+      preload: join(MAIN_DIR, "../preload/agent.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -84,7 +122,17 @@ function createAgentWindow() {
   if (!app.isPackaged) {
     agentWindow.loadURL("http://localhost:5173/agent/index.html");
   } else {
-    agentWindow.loadFile(join(__dirname, "../renderer/agent.html"));
+    const agentPath = join(MAIN_DIR, "../renderer/agent/index.html");
+    console.log("[Agent] Loading from:", agentPath);
+    console.log("[Agent] File exists:", existsSync(agentPath));
+    agentWindow.loadFile(agentPath);
+    // Show agent window after loading in production
+    agentWindow.webContents.on("did-finish-load", () => {
+      console.log("[Agent] Window loaded, showing...");
+      if (agentWindow && !agentWindow.isDestroyed()) {
+        agentWindow.show();
+      }
+    });
   }
 
   // Listen for pill movement - reposition conversation in real-time
@@ -148,7 +196,7 @@ function createConversationWindow() {
     show: false,
     modal: false, // Non-modal so pill remains interactive
     webPreferences: {
-      preload: join(__dirname, "../preload/conversation.cjs"),
+      preload: join(MAIN_DIR, "../preload/conversation.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -177,7 +225,10 @@ function createConversationWindow() {
   if (!app.isPackaged) {
     conversationWindow.loadURL("http://localhost:5173/conversation/index.html");
   } else {
-    conversationWindow.loadFile(join(__dirname, "../renderer/conversation.html"));
+    const conversationPath = join(MAIN_DIR, "../renderer/conversation/index.html");
+    console.log("[Conversation] Loading from:", conversationPath);
+    console.log("[Conversation] File exists:", existsSync(conversationPath));
+    conversationWindow.loadFile(conversationPath);
   }
 
   // Wait for renderer to be ready before allowing IPC
@@ -196,7 +247,7 @@ function createConversationWindow() {
 
 function createConsoleWindow() {
   console.log("[Console] Creating console window...");
-  console.log("[Console] Preload script path:", join(__dirname, "../preload/console.cjs"));
+  console.log("[Console] Preload script path:", join(MAIN_DIR, "../preload/console.cjs"));
 
   consoleWindow = new BrowserWindow({
     width: 1264,
@@ -208,7 +259,7 @@ function createConsoleWindow() {
     frame: process.platform !== "darwin",
     maximizable: true, // Allow maximizing on Windows
     webPreferences: {
-      preload: join(__dirname, "../preload/console.cjs"),
+      preload: join(MAIN_DIR, "../preload/console.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -217,6 +268,11 @@ function createConsoleWindow() {
   // Log when preload script finishes loading
   consoleWindow.webContents.on("did-finish-load", () => {
     console.log("[Console] Window finished loading - preload script should be ready");
+    // Show console window on startup (main window)
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      console.log("[Console] Window shown");
+    }
   });
 
   // Log when DOM is ready
@@ -247,7 +303,10 @@ function createConsoleWindow() {
     consoleWindow.loadURL("http://localhost:5173/console/index.html");
     consoleWindow.webContents.openDevTools();
   } else {
-    consoleWindow.loadFile(join(__dirname, "../renderer/console.html"));
+    const consolePath = join(MAIN_DIR, "../renderer/console/index.html");
+    console.log("[Console] Loading from:", consolePath);
+    console.log("[Console] File exists:", existsSync(consolePath));
+    consoleWindow.loadFile(consolePath);
   }
 
   consoleWindow.on("close", (event) => {
@@ -292,7 +351,7 @@ function createOverlayWindow() {
     show: false,
     modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
-      preload: join(__dirname, "../preload/overlay.cjs"),
+      preload: join(MAIN_DIR, "../preload/overlay.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -303,7 +362,7 @@ function createOverlayWindow() {
   if (!app.isPackaged) {
     overlayWindow.loadURL("http://localhost:5173/overlay/index.html");
   } else {
-    overlayWindow.loadFile(join(__dirname, "../renderer/overlay.html"));
+    overlayWindow.loadFile(join(MAIN_DIR, "../renderer/overlay/index.html"));
   }
 
   overlayWindow.on("closed", () => {
@@ -335,7 +394,7 @@ function createOverlayWindow() {
 //     show: false,
 //     modal: false, // Non-modal so other windows remain interactive
 //     webPreferences: {
-//       preload: join(__dirname, "../preload/guide.cjs"),
+//       preload: join(MAIN_DIR, "../preload/guide.cjs"),
 //       contextIsolation: true,
 //       nodeIntegration: false,
 //     },
@@ -352,7 +411,7 @@ function createOverlayWindow() {
 //   if (!app.isPackaged) {
 //     guideWindow.loadURL("http://localhost:5173/guide/index.html");
 //   } else {
-//     guideWindow.loadFile(join(__dirname, "../renderer/guide.html"));
+//     guideWindow.loadFile(join(MAIN_DIR, "../renderer/guide.html"));
 //   }
 
 //   guideWindow.on("closed", () => {
@@ -375,7 +434,7 @@ function createNudgeWindow() {
     show: false,
     modal: false, // Non-modal so other windows remain interactive
     webPreferences: {
-      preload: join(__dirname, "../preload/nudge.cjs"),
+      preload: join(MAIN_DIR, "../preload/nudge.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -384,7 +443,10 @@ function createNudgeWindow() {
   if (!app.isPackaged) {
     nudgeWindow.loadURL("http://localhost:5173/nudge/index.html");
   } else {
-    nudgeWindow.loadFile(join(__dirname, "../renderer/nudge.html"));
+    const nudgePath = join(MAIN_DIR, "../renderer/nudge/index.html");
+    console.log("[Nudge] Loading from:", nudgePath);
+    console.log("[Nudge] File exists:", existsSync(nudgePath));
+    nudgeWindow.loadFile(nudgePath);
   }
 
   nudgeWindow.on("closed", () => {
@@ -566,7 +628,8 @@ function setupIPC() {
       }
 
       // Fetch from backend (without messages for performance)
-      const API_BASE_URL = "http://localhost:3000"; // TODO: Move to config
+      const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      console.log(`[Conversation] Fetching from: ${API_BASE_URL}/api/conversations`);
       const response = await fetch(`${API_BASE_URL}/api/conversations?includeMessages=false`, {
         headers: { Authorization: `Bearer ${authTokens.accessToken}` },
       });
@@ -1125,7 +1188,7 @@ function createTray() {
       iconPath = join(process.resourcesPath, "assets", "logo-icon.png");
     } else {
       // In dev mode, go up to the src directory
-      iconPath = join(__dirname, "../../src/renderer/assets/logo-icon.png");
+      iconPath = join(MAIN_DIR, "../../src/renderer/assets/logo-icon.png");
     }
 
     console.log("[Tray] Loading icon from:", iconPath);
@@ -1205,13 +1268,25 @@ function createTray() {
   }
 }
 
+// Uncaught exception handlers - prevent silent crashes
+process.on("uncaughtException", (error) => {
+  console.error("[UNCAUGHT EXCEPTION]", error.message);
+  console.error("[STACK]", error.stack);
+  // Don't exit immediately - try to keep app running
+});
+
+process.on("unhandledRejection", (reason: any, promise) => {
+  console.error("[UNHANDLED REJECTION] at:", promise);
+  console.error("[REASON]", reason);
+});
+
 app.whenReady().then(() => {
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
   createConsoleWindow();
   // DEPRECATED: Guide window no longer needed - workflow UI moved to conversation window
   // createGuideWindow(); // Create guide as child of agent
-  createOverlayWindow(); // Create overlay as child of guide (must be after guide)
+  // createOverlayWindow(); // DISABLED - requires guide window which is deprecated
   createNudgeWindow(); // Create nudge as child of agent
   createTray(); // Create system tray on Windows
 

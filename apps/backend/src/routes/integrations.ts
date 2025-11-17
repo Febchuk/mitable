@@ -75,10 +75,13 @@ interface NotionOAuthResponse {
 // Slack OAuth configuration from environment
 const SLACK_CLIENT_ID = config.slack?.clientId || process.env.SLACK_CLIENT_ID;
 const SLACK_CLIENT_SECRET = config.slack?.clientSecret || process.env.SLACK_CLIENT_SECRET;
+
+// Build redirect URI from environment or use localhost for development
+const API_BASE_URL = process.env.API_BASE_URL || process.env.VITE_API_URL || "http://localhost:3000";
 const SLACK_REDIRECT_URI =
   config.slack?.redirectUri ||
   process.env.SLACK_REDIRECT_URI ||
-  "http://localhost:3000/api/integrations/slack/callback";
+  `${API_BASE_URL}/api/integrations/slack/callback`;
 
 /**
  * POST /api/integrations/slack/oauth/start
