@@ -39,7 +39,7 @@ win:
     - target: nsis
       arch:
         - x64
-  # icon: build/icon.ico  # TODO: Add custom icon
+  icon: build/icon.png  # Electron-builder will convert PNG to ICO
   # Disable code signing for dev builds (enable for production)
   sign: null
   certificateSubjectName: null
