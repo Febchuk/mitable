@@ -9,6 +9,10 @@ import { generalLimiter } from "./middleware/rateLimiter.js";
 
 export const app = express();
 
+// Trust proxy - Required for Railway/Heroku and other reverse proxies
+// This allows express-rate-limit to correctly identify client IPs via X-Forwarded-For
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(
   cors({
