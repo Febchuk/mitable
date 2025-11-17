@@ -33,6 +33,17 @@ dmg:
       y: 150
       type: file
 
+# Windows Configuration
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # icon: build/icon.ico  # TODO: Add custom icon
+  # Disable code signing for dev builds (enable for production)
+  sign: null
+  certificateSubjectName: null
+
 # File associations and metadata
 files:
   - "!**/.vscode/*"
