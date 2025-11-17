@@ -126,13 +126,7 @@ function createAgentWindow() {
     console.log("[Agent] Loading from:", agentPath);
     console.log("[Agent] File exists:", existsSync(agentPath));
     agentWindow.loadFile(agentPath);
-    // Show agent window after loading in production
-    agentWindow.webContents.on("did-finish-load", () => {
-      console.log("[Agent] Window loaded, showing...");
-      if (agentWindow && !agentWindow.isDestroyed()) {
-        agentWindow.show();
-      }
-    });
+    // Don't auto-show - user must trigger with Ctrl+H or minimize from chat
   }
 
   // Listen for pill movement - reposition conversation in real-time
@@ -1164,6 +1158,21 @@ function registerGlobalShortcuts() {
       }
     }
   });
+
+  // DevTools shortcuts (F12 and Ctrl+Shift+I)
+  globalShortcut.register("F12", () => {
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    if (focusedWindow) {
+      focusedWindow.webContents.toggleDevTools();
+    }
+  });
+
+  globalShortcut.register("CommandOrControl+Shift+I", () => {
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    if (focusedWindow) {
+      focusedWindow.webContents.toggleDevTools();
+    }
+  });
 }
 
 // Create system tray (Windows only)
@@ -1182,13 +1191,13 @@ function createTray() {
     // Windows tray needs a 16x16 icon
     let trayIcon: Electron.NativeImage;
 
-    // Try to load from file first
+    // Try to load from file first (use ICO for Windows tray)
     let iconPath: string;
     if (app.isPackaged) {
-      iconPath = join(process.resourcesPath, "assets", "logo-icon.png");
+      iconPath = join(process.resourcesPath, "assets", "icon.ico");
     } else {
       // In dev mode, go up to the src directory
-      iconPath = join(MAIN_DIR, "../../src/renderer/assets/logo-icon.png");
+      iconPath = join(MAIN_DIR, "../../src/renderer/assets/icon.ico");
     }
 
     console.log("[Tray] Loading icon from:", iconPath);
@@ -1198,7 +1207,7 @@ function createTray() {
       console.log("[Tray] Icon loaded, size:", icon.getSize());
       trayIcon = icon.resize({ width: 16, height: 16 });
     } else {
-      console.warn("[Tray] Failed to load PNG, creating simple colored icon as fallback");
+      console.warn("[Tray] Failed to load ICO, creating simple colored icon as fallback");
       // Create a simple 16x16 purple square as fallback
       const canvas = Buffer.from(
         `<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">

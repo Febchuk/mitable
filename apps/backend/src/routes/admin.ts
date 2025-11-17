@@ -7,6 +7,7 @@ import { supabaseAdmin } from "../lib/supabase";
 import { extractNotionPageId } from "../utils/notion-url-parser.js";
 import { notionService } from "../services/notion.service.js";
 import { llmService } from "../services/llm.service.js";
+import { encryptionService } from "../services/encryption.service.js";
 
 const router = Router();
 
@@ -933,7 +934,6 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
         id: schema.integrations.id,
         provider: schema.integrations.provider,
         status: schema.integrations.status,
-        accessToken: schema.integrations.accessToken,
         lastSyncedAt: schema.integrations.lastSyncedAt,
         syncFrequency: schema.integrations.syncFrequency,
         createdAt: schema.integrations.createdAt,
@@ -1747,16 +1747,35 @@ router.post(
         return;
       }
 
+      // Validate that accessToken is provided (required for connection)
+      if (!accessToken) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "Access token is required to connect integration",
+        });
+        return;
+      }
+
+      // Encrypt tokens before storing
+      const accessTokenEncrypted = encryptionService.encrypt(accessToken);
+      const refreshTokenEncrypted = refreshToken ? encryptionService.encrypt(refreshToken) : undefined;
+
       // Update integration status to connected
+      const updateData: any = {
+        status: "connected",
+        accessTokenEncrypted: accessTokenEncrypted,
+        metadata: metadata || integration.metadata,
+        updatedAt: new Date(),
+      };
+
+      // Only update refreshToken if provided (Slack doesn't have refresh tokens)
+      if (refreshTokenEncrypted) {
+        updateData.refreshTokenEncrypted = refreshTokenEncrypted;
+      }
+
       const [updatedIntegration] = await db
         .update(schema.integrations)
-        .set({
-          status: "connected",
-          accessToken: accessToken || null,
-          refreshToken: refreshToken || null,
-          metadata: metadata || integration.metadata,
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(eq(schema.integrations.id, integrationId))
         .returning();
 
@@ -1844,13 +1863,12 @@ router.post(
         return;
       }
 
-      // Update integration status to disconnected and clear tokens
+      // Update integration status to disconnected
+      // Note: Encrypted tokens are kept for audit trail (can't be null per schema)
       const [updatedIntegration] = await db
         .update(schema.integrations)
         .set({
           status: "disconnected",
-          accessToken: null,
-          refreshToken: null,
           tokenExpiresAt: null,
           updatedAt: new Date(),
         })

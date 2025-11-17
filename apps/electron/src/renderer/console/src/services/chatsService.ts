@@ -137,7 +137,7 @@ export async function sendStreamingMessage(
   screenshot?: string,
   metadata?: any
 ): Promise<void> {
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
   try {
     // Build request body
@@ -151,7 +151,7 @@ export async function sendStreamingMessage(
 
     // Fetch the SSE stream from backend
     const response = await fetch(
-      `${API_BASE_URL}/conversations/${conversationId}/messages/stream`,
+      `${API_BASE_URL}/api/conversations/${conversationId}/messages/stream`,
       {
         method: "POST",
         headers: {
