@@ -605,12 +605,17 @@ class CaptureService {
    * 1. Gets the active window for prioritization
    * 2. Captures all visible windows using desktopCapturer
    * 3. Filters out blocked windows based on capture policy
-   * 4. Returns up to 5 screenshots, with active window first
+   * 4. Optionally filters to only allowed apps (if provided)
+   * 5. Returns screenshots for all selected windows (no limit)
    *
    * @param saveToFile - Whether to save screenshots to temp files (default: false)
+   * @param allowedApps - Optional list of app names to capture (if provided, only these apps are captured)
    * @returns Multi-window capture result with screenshots and blocked window metadata
    */
-  async captureVisibleWindows(saveToFile: boolean = false): Promise<MultiWindowCaptureResult> {
+  async captureVisibleWindows(
+    saveToFile: boolean = false,
+    allowedApps?: string[]
+  ): Promise<MultiWindowCaptureResult> {
     try {
       // STEP 1: Get active window info for prioritization
       const activeWindow = await activeWin();
@@ -681,36 +686,29 @@ class CaptureService {
         };
       }
 
-      // STEP 4: Prioritize windows (active window first, then front-to-back order)
-      const prioritizedWindows = [...allowedWindows].sort((a, b) => {
-        // Active window gets highest priority
-        const aIsActive = activeWindowTitle && a.name.includes(activeWindowTitle);
-        const bIsActive = activeWindowTitle && b.name.includes(activeWindowTitle);
+      // STEP 4: Filter by allowedApps if provided
+      let windowsToCapture = allowedWindows;
+      if (allowedApps && allowedApps.length > 0) {
+        windowsToCapture = allowedWindows.filter((source) => {
+          const appNameMatch = source.name.split(" - ")[0] || source.name;
+          return allowedApps.includes(appNameMatch);
+        });
 
-        if (aIsActive && !bIsActive) return -1;
-        if (!aIsActive && bIsActive) return 1;
+        console.log(`[CaptureService] Filtered to ${windowsToCapture.length} windows matching allowed apps: ${allowedApps.join(", ")}`);
+      }
 
-        // Otherwise maintain original order (front-to-back from desktopCapturer)
-        return 0;
-      });
+      console.log(`[CaptureService] Capturing ${windowsToCapture.length} windows`);
 
-      // STEP 5: Take top 5 windows
-      const MAX_SCREENSHOTS = 5;
-      const windowsToCapture = prioritizedWindows.slice(0, MAX_SCREENSHOTS);
-
-      console.log(`[CaptureService] Capturing ${windowsToCapture.length} of ${allowedWindows.length} allowed windows`);
-
-      // STEP 6: Process each window into WindowScreenshot format
+      // STEP 5: Process each window into WindowScreenshot format
       const screenshots: WindowScreenshot[] = [];
       const display = screen.getPrimaryDisplay();
 
       for (let i = 0; i < windowsToCapture.length; i++) {
         const source = windowsToCapture[i];
-        const isActive = activeWindowTitle && source.name.includes(activeWindowTitle);
+        const isActive = !!(activeWindowTitle && source.name.includes(activeWindowTitle));
 
         // Get image and resize if needed
         let image = source.thumbnail;
-        const originalSize = image.getSize();
         image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
         const finalSize = image.getSize();
 
@@ -718,10 +716,9 @@ class CaptureService {
         const dataUrl = image.toDataURL();
 
         // Save to temp file if requested
-        let filePath: string | undefined;
         if (saveToFile) {
           const fileId = this.generateFileId();
-          filePath = await this.saveToTemp(image, fileId);
+          await this.saveToTemp(image, fileId);
         }
 
         // Extract app name from window title (best effort)
@@ -748,7 +745,7 @@ class CaptureService {
         });
       }
 
-      // STEP 7: Return success result
+      // STEP 6: Return success result
       return {
         success: true,
         screenshots,

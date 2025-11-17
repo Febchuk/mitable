@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ArrowUp, Circle, Square, Type, Mic } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowUp, Circle, Square, Type, Mic, Eye, EyeOff, ChevronDown, X } from "lucide-react";
 import logoIconSvg from "../../../assets/logo-icon.svg";
 
 interface AgentPillProps {
@@ -10,6 +10,9 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
   const [inputMode, setInputMode] = useState<"text" | "audio">("text");
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [watchingScreen, setWatchingScreen] = useState(false);
+  const [selectedApps, setSelectedApps] = useState<string[]>([]);
+  const [dropdownExpanded, setDropdownExpanded] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +53,41 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
     window.agentAPI.toggleConversation();
   };
 
+  const handleWatchToggle = async () => {
+    const newState = !watchingScreen;
+    setWatchingScreen(newState);
+
+    // Toggle watch mode in main process
+    await window.agentAPI.toggleWatchMode(newState);
+
+    // If turning off, clear selected apps
+    if (!newState) {
+      setSelectedApps([]);
+      setDropdownExpanded(false);
+    }
+  };
+
+  const handleRemoveApp = async (appName: string) => {
+    await window.agentAPI.unselectApp(appName);
+    // State will be updated by the WATCH_APPS_UPDATED event
+  };
+
+  // Listen for watch apps updates from main process
+  useEffect(() => {
+    const handleWatchAppsUpdated = (apps: string[]) => {
+      console.log("[AgentPill] Watch apps updated:", apps);
+      setSelectedApps(apps);
+    };
+
+    // Register listener
+    window.agentAPI.onWatchAppsUpdated(handleWatchAppsUpdated);
+
+    // Cleanup listener on unmount
+    return () => {
+      window.agentAPI.offWatchAppsUpdated(handleWatchAppsUpdated);
+    };
+  }, []);
+
   return (
     <div
       className={`${
@@ -63,6 +101,67 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
       >
         <img src={logoIconSvg} alt="Mitable" className="w-8 h-8 mr-3 flex-shrink-0" />
       </button>
+
+      {/* Watch Mode Controls - Only show in text mode */}
+      {inputMode === "text" && (
+        <div className="relative flex items-center mr-3">
+          {/* Eye Button */}
+          <button
+            onClick={handleWatchToggle}
+            className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all app-no-drag ${
+              watchingScreen
+                ? "bg-primary text-white hover:bg-primary-hover"
+                : "bg-[#3e3e3e] text-muted-foreground hover:bg-[#4a4a4a]"
+            }`}
+            aria-label={watchingScreen ? "Stop watching screen" : "Start watching screen"}
+          >
+            {watchingScreen ? <Eye size={18} /> : <EyeOff size={18} />}
+          </button>
+
+          {/* Chevron + Count Badge - Only show when apps selected */}
+          {selectedApps.length > 0 && (
+            <button
+              onClick={() => setDropdownExpanded(!dropdownExpanded)}
+              className="flex items-center ml-1 px-2 h-9 rounded-lg bg-[#3e3e3e] hover:bg-[#4a4a4a] transition-colors app-no-drag"
+              aria-label="Toggle app list"
+            >
+              <span className="text-xs text-muted-foreground mr-1">
+                {selectedApps.length}
+              </span>
+              <ChevronDown
+                size={14}
+                className={`text-muted-foreground transition-transform ${
+                  dropdownExpanded ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+          )}
+
+          {/* Dropdown List */}
+          {dropdownExpanded && selectedApps.length > 0 && (
+            <div className="absolute top-full mt-2 left-0 w-64 bg-[#2a2a2a] rounded-lg shadow-lg border border-[#3e3e3e] py-2 z-50">
+              <div className="text-xs text-muted-foreground px-3 py-1 mb-1">
+                Watching {selectedApps.length} app{selectedApps.length !== 1 ? "s" : ""}
+              </div>
+              {selectedApps.map((app) => (
+                <div
+                  key={app}
+                  className="flex items-center justify-between px-3 py-2 hover:bg-[#3e3e3e] transition-colors"
+                >
+                  <span className="text-sm text-text-primary truncate">{app}</span>
+                  <button
+                    onClick={() => handleRemoveApp(app)}
+                    className="ml-2 p-1 rounded hover:bg-[#4a4a4a] transition-colors"
+                    aria-label={`Stop watching ${app}`}
+                  >
+                    <X size={14} className="text-muted-foreground" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Input Area (Text mode only) */}
       {inputMode === "text" && (

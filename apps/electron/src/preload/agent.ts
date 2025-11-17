@@ -17,6 +17,11 @@ const IPC_CHANNELS = {
   CAPTURE_SCREENSHOT: "capture-screenshot",
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
+  // Watch mode channels
+  WATCH_WINDOWS_TOGGLE: "watch-windows-toggle",
+  WATCH_WINDOW_UNSELECT: "watch-window-unselect",
+  WATCH_WINDOWS_GET_SELECTED: "watch-windows-get-selected",
+  WATCH_APPS_UPDATED: "watch-apps-updated",
 } as const;
 
 contextBridge.exposeInMainWorld("agentAPI", {
@@ -74,5 +79,24 @@ contextBridge.exposeInMainWorld("agentAPI", {
   // Guide next step - triggered when Guide "Done" button clicked
   onGuideNextStep: (callback: () => void) => {
     ipcRenderer.on(IPC_CHANNELS.AGENT_GUIDE_NEXT_STEP, () => callback());
+  },
+
+  // Watch mode for selective screenshot capture
+  toggleWatchMode: (enabled: boolean): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_TOGGLE, enabled),
+  unselectApp: (appName: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, appName),
+  getSelectedApps: (): Promise<string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED),
+
+  // Event listeners for watch apps updates
+  onWatchAppsUpdated: (callback: (apps: string[]) => void) => {
+    const listener = (_event: any, apps: string[]) => callback(apps);
+    ipcRenderer.on(IPC_CHANNELS.WATCH_APPS_UPDATED, listener);
+  },
+  offWatchAppsUpdated: (_callback: (apps: string[]) => void) => {
+    // Remove all listeners for this channel
+    // We use removeAllListeners since we only have one listener at a time
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.WATCH_APPS_UPDATED);
   },
 });

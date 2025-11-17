@@ -31,6 +31,7 @@ export const IPC_CHANNELS = {
   WATCH_WINDOWS_GET_SELECTED: "watch-windows-get-selected",
   WATCH_BUTTON_WINDOW_CREATE: "watch-button-window-create",
   WATCH_BUTTON_WINDOW_CLOSE: "watch-button-window-close",
+  WATCH_APPS_UPDATED: "watch-apps-updated", // Broadcast event when selected apps change
 
   // Nudge system
   NUDGE_SHOW: "nudge-show",
