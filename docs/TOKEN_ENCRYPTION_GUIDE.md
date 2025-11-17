@@ -411,6 +411,252 @@ This enables gradual migration to new algorithms without breaking existing data.
 
 ---
 
+## 🔄 Key Rotation Strategy
+
+### When to Rotate Encryption Keys
+
+**Recommended Schedule:**
+- **Annual rotation:** Rotate keys every 12 months as a best practice
+- **Security incident:** Rotate immediately if key compromise is suspected
+- **Personnel changes:** Rotate if someone with key access leaves the team
+- **Regulatory requirements:** Follow industry-specific compliance needs
+
+### Key Rotation Process
+
+#### Step 1: Generate New Encryption Key
+```bash
+# Generate new 32-byte key
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# Output: <new-64-character-hex-string>
+```
+
+#### Step 2: Create Re-Encryption Script
+```typescript
+// apps/backend/src/scripts/rotate-encryption-key.ts
+import { db } from '../db/client';
+import { integrations } from '../db/schema/integrations.schema';
+import { encryptionService } from '../services/encryption.service';
+
+const OLD_KEY = process.env.OLD_ENCRYPTION_KEY!;
+const NEW_KEY = process.env.ENCRYPTION_KEY!;
+
+async function rotateKeys() {
+  console.log('🔄 Starting key rotation...');
+  
+  const allIntegrations = await db.select().from(integrations);
+  
+  for (const integration of allIntegrations) {
+    // Decrypt with old key
+    const oldService = new EncryptionService(OLD_KEY);
+    const decryptedToken = oldService.decrypt(integration.accessTokenEncrypted);
+    
+    // Re-encrypt with new key
+    const newService = new EncryptionService(NEW_KEY);
+    const reencryptedToken = newService.encrypt(decryptedToken);
+    
+    // Update database
+    await db.update(integrations)
+      .set({
+        accessTokenEncrypted: reencryptedToken,
+        encryptionVersion: 2 // Increment version
+      })
+      .where(eq(integrations.id, integration.id));
+  }
+  
+  console.log('✅ Key rotation complete!');
+}
+```
+
+#### Step 3: Execute Rotation
+```bash
+# Set both old and new keys
+export OLD_ENCRYPTION_KEY=<old-key>
+export ENCRYPTION_KEY=<new-key>
+
+# Run rotation script
+npm run rotate-keys --workspace=@mitable/backend
+
+# Verify all tokens re-encrypted
+# Check encryptionVersion updated to 2
+```
+
+#### Step 4: Update Environment Variables
+```bash
+# Railway/Production
+railway variables set ENCRYPTION_KEY=<new-key>
+
+# Remove old key from environment
+unset OLD_ENCRYPTION_KEY
+```
+
+#### Step 5: Verify Production
+```bash
+# Test Slack sync
+npm run sync-slack --workspace=@mitable/backend
+
+# Test Notion sync  
+npm run sync-notion --workspace=@mitable/backend
+
+# Check logs for decryption errors
+```
+
+### Rollback Strategy
+
+If rotation fails:
+1. **Keep old key accessible:** Store `OLD_ENCRYPTION_KEY` in secure vault
+2. **Revert environment variable:** `ENCRYPTION_KEY=<old-key>`
+3. **Re-deploy application:** Use old key until issues resolved
+4. **Investigate failures:** Check logs for specific decryption errors
+
+### Multi-Version Key Support
+
+The `encryptionVersion` field supports multiple key versions simultaneously:
+
+```typescript
+class EncryptionService {
+  private keys: Map<number, Buffer> = new Map();
+  
+  constructor() {
+    // Support multiple key versions
+    this.keys.set(1, Buffer.from(process.env.ENCRYPTION_KEY_V1!, 'hex'));
+    this.keys.set(2, Buffer.from(process.env.ENCRYPTION_KEY_V2!, 'hex'));
+  }
+  
+  decrypt(encrypted: string, version: number = 1): string {
+    const key = this.keys.get(version);
+    // ... decrypt using version-specific key
+  }
+}
+```
+
+This enables:
+- ✅ Gradual key rotation (some tokens use v1, others v2)
+- ✅ Zero-downtime migration
+- ✅ Rollback capability
+
+---
+
+## 🚨 Incident Response Plan
+
+### Key Compromise Scenario
+
+**If encryption key is compromised (exposed in logs, committed to git, etc.):**
+
+#### Immediate Actions (Within 1 Hour)
+1. **Revoke all OAuth tokens:**
+   ```bash
+   # For each integration, call provider's revoke API
+   # Slack: https://api.slack.com/methods/auth.revoke
+   # Notion: Revoke via OAuth settings
+   ```
+
+2. **Generate new encryption key:**
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+
+3. **Disable API access:**
+   - Put application in maintenance mode
+   - Block incoming requests to `/api/integrations/*`
+
+#### Recovery Actions (1-4 Hours)
+1. **Notify affected users:**
+   - Email all organizations with active integrations
+   - Explain need to re-connect integrations
+   - Provide step-by-step instructions
+
+2. **Rotate encryption key:**
+   - Deploy new `ENCRYPTION_KEY` to production
+   - Cannot re-encrypt old tokens (they're compromised)
+   - Delete all encrypted tokens from database
+
+3. **Force re-authentication:**
+   ```sql
+   -- Clear all encrypted tokens
+   UPDATE integrations 
+   SET access_token_encrypted = NULL,
+       refresh_token_encrypted = NULL,
+       status = 'disconnected';
+   ```
+
+4. **Re-enable application:**
+   - Remove maintenance mode
+   - Users must re-connect via OAuth
+
+#### Post-Incident (Within 24 Hours)
+1. **Root cause analysis:**
+   - How was key exposed?
+   - What systems were affected?
+   - Who had access?
+
+2. **Implement preventions:**
+   - Audit logging for key access
+   - Automated secret scanning (git hooks)
+   - Key stored in secure vault (AWS Secrets Manager)
+   - Restricted access to environment variables
+
+3. **Document incident:**
+   - Timeline of events
+   - Actions taken
+   - Lessons learned
+   - Prevention measures
+
+### Database Compromise Scenario
+
+**If database is breached but encryption key is safe:**
+
+✅ **Tokens remain secure** - encrypted data is useless without the key
+
+**Recommended actions:**
+1. **Verify key security:** Confirm `ENCRYPTION_KEY` not exposed
+2. **Monitor for anomalies:** Watch for unusual API activity
+3. **Rotate keys (optional):** Defensive measure, not required
+4. **Secure database:** Fix vulnerability, update credentials
+
+### Security Monitoring
+
+**Implement these ongoing checks:**
+
+```typescript
+// Log encryption/decryption events (WITHOUT sensitive data)
+logger.info('Token decrypted', {
+  organizationId: org.id,
+  provider: integration.provider,
+  encryptionVersion: integration.encryptionVersion,
+  // NEVER log: decrypted token, encryption key
+});
+
+// Alert on failures
+if (decryptionFailed) {
+  logger.error('Decryption failed', {
+    organizationId: org.id,
+    error: error.message,
+    // Could indicate key mismatch or tampering
+  });
+  
+  // Trigger re-authentication flow
+  await forceReconnect(integration);
+}
+```
+
+### Key Storage Best Practices
+
+**Current (Acceptable for MVP):**
+- ✅ Environment variable in Railway/Vercel
+- ✅ Encrypted at rest by platform
+- ✅ Access controlled via team permissions
+
+**Recommended for Production Scale:**
+- 🔐 **AWS Secrets Manager** or **HashiCorp Vault**
+- 🔐 **Automated rotation** (monthly/quarterly)
+- 🔐 **Audit logging** for all key access
+- 🔐 **Multi-region replication** for disaster recovery
+- 🔐 **HSM-backed storage** for regulated industries
+
+**Cost:** ~$50-200/month for enterprise key management
+
+---
+
 ## 📚 References
 
 - [NIST GCM Recommendation](https://csrc.nist.gov/publications/detail/sp/800-38d/final)
