@@ -1158,6 +1158,21 @@ function registerGlobalShortcuts() {
       }
     }
   });
+
+  // DevTools shortcuts (F12 and Ctrl+Shift+I)
+  globalShortcut.register("F12", () => {
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    if (focusedWindow) {
+      focusedWindow.webContents.toggleDevTools();
+    }
+  });
+
+  globalShortcut.register("CommandOrControl+Shift+I", () => {
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    if (focusedWindow) {
+      focusedWindow.webContents.toggleDevTools();
+    }
+  });
 }
 
 // Create system tray (Windows only)

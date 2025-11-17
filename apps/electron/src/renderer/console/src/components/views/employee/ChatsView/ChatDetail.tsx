@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowUp, Minimize2 } from "lucide-react";
 import { useConversationMessages, useSendMessage } from "@/console/src/hooks/queries/chats";
@@ -19,28 +19,30 @@ export default function ChatDetail() {
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Memoize callbacks to prevent infinite re-renders
+  const onChunk = useCallback((chunk: string) => {
+    setStreamingContent((prev) => prev + chunk);
+  }, []);
+
+  const onComplete = useCallback((_fullContent: string) => {
+    setIsStreaming(false);
+  }, []);
+
+  const onError = useCallback((error: string) => {
+    console.error("[ChatDetail] Streaming error:", error);
+    setStreamingContent("");
+    setIsStreaming(false);
+  }, []);
+
+  const onWindowTrigger = useCallback((windowType: string, data: any) => {
+    console.log("[ChatDetail] Window trigger:", { windowType, data });
+  }, []);
+
   const sendMessageMutation = useSendMessage({
-    onChunk: (chunk: string) => {
-      setStreamingContent((prev) => prev + chunk);
-    },
-    onComplete: (_fullContent: string) => {
-      // Don't clear streaming content immediately - let it stay visible
-      // until the query refetches and the new message appears
-      setIsStreaming(false);
-    },
-    onError: (error: string) => {
-      console.error("[ChatDetail] Streaming error:", error);
-      setStreamingContent("");
-      setIsStreaming(false);
-      // TODO: Show error toast notification
-    },
-    onWindowTrigger: (windowType: string, data: any) => {
-      console.log("[ChatDetail] Window trigger callback FIRED");
-      console.log("[ChatDetail] Window trigger received:", { windowType, data });
-      // Note: showOverlay removed - bounding box UI detection no longer used
-      console.log("[ChatDetail] Window trigger type:", windowType);
-    },
-    // Enable screenshot capture for workflow mode
+    onChunk,
+    onComplete,
+    onError,
+    onWindowTrigger,
     captureScreenshot: true,
   });
 
@@ -54,13 +56,6 @@ export default function ChatDetail() {
       return () => clearTimeout(timer);
     }
   }, [isStreaming, streamingContent, messages]);
-
-  console.log("[ChatDetail] Component loaded", {
-    hasSendMutation: !!sendMessageMutation,
-    captureScreenshotEnabled: true,
-    hasConsoleAPI: typeof window !== "undefined" && !!window.consoleAPI,
-    hasCaptureMethod: typeof window !== "undefined" && !!window.consoleAPI?.captureScreenshot,
-  });
 
   // Auto-scroll to bottom when messages change or streaming content updates
   useEffect(() => {
