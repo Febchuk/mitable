@@ -5,7 +5,7 @@ import { vectorService } from "./vector.service.js";
 import { chunkingService } from "./chunking.service.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import type { VectorRecord } from "./vector.service.js";
 import type { NewSearchContent } from "../db/schema/search-content.schema.js";
 
@@ -171,6 +171,32 @@ class IngestionService {
       const workspaceId = metadata?.team_id || "unknown";
       const workspaceName = metadata?.team_name || "Slack Workspace";
 
+      // Determine sync mode (incremental vs full)
+      const [latestMessage] = await db
+        .select({ timestamp: schema.searchContent.timestamp })
+        .from(schema.searchContent)
+        .where(
+          and(
+            eq(schema.searchContent.organizationId, organizationId),
+            eq(schema.searchContent.source, "slack")
+          )
+        )
+        .orderBy(desc(schema.searchContent.timestamp))
+        .limit(1);
+
+      let oldestTimestamp: string | undefined;
+      let syncMode = "full";
+
+      if (latestMessage?.timestamp) {
+        // Convert to Unix timestamp string (seconds)
+        oldestTimestamp = Math.floor(latestMessage.timestamp / 1000).toString();
+        syncMode = "incremental";
+        console.log(`🔄 Sync Mode: ${syncMode}`);
+        console.log(`📅 Last sync: ${new Date(latestMessage.timestamp).toLocaleString()}`);
+      } else {
+        console.log(`🔄 Sync Mode: ${syncMode} (first sync)`);
+      }
+
       // Process each channel
       for (let i = 0; i < selectedChannels.length; i++) {
         const channelId = selectedChannels[i];
@@ -199,7 +225,8 @@ class IngestionService {
               organizationId,
               channelId,
               cursor,
-              SYNC_CONFIG.MESSAGES_PER_PAGE
+              SYNC_CONFIG.MESSAGES_PER_PAGE,
+              oldestTimestamp
             );
 
             if (messages.length === 0) break;
