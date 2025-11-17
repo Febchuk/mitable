@@ -5,7 +5,7 @@ import { vectorService } from "./vector.service.js";
 import { chunkingService } from "./chunking.service.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import type { VectorRecord } from "./vector.service.js";
 import type { NewSearchContent } from "../db/schema/search-content.schema.js";
 
@@ -378,12 +378,24 @@ class IngestionService {
       // DUAL-WRITE: Store in both Pinecone (semantic) and PostgreSQL (keyword)
       await vectorService.upsertVectors(vectors, namespace);
 
-      // Transform vectors to PostgreSQL format and insert
+      // Transform vectors to PostgreSQL format and upsert (handles duplicates)
       const searchContentRecords = vectors.map((v) =>
         this.transformVectorToSearchContent(v, organizationId)
       );
 
-      await db.insert(schema.searchContent).values(searchContentRecords);
+      // Use onConflictDoUpdate to handle re-syncing of updated messages
+      await db
+        .insert(schema.searchContent)
+        .values(searchContentRecords)
+        .onConflictDoUpdate({
+          target: schema.searchContent.id,
+          set: {
+            text: sql`EXCLUDED.text`,
+            timestamp: sql`EXCLUDED.timestamp`,
+            date: sql`EXCLUDED.date`,
+            updatedAt: new Date(),
+          },
+        });
     } catch (error) {
       throw new Error("Failed to process message batch", { cause: error });
     }
@@ -445,13 +457,44 @@ class IngestionService {
 
       syncLogId = syncLog.id;
 
-      // Search all shared pages
-      const pages = await notionService.searchPages(organizationId);
+      // Get last sync timestamp for incremental sync
+      const lastSyncedAt = integration.lastSyncedAt ? new Date(integration.lastSyncedAt) : null;
 
-      if (pages.length === 0) {
+      const syncMode = lastSyncedAt ? "incremental" : "full";
+      console.log(`[NOTION SYNC] Starting ${syncMode} sync for org ${organizationId}`);
+      if (lastSyncedAt) {
+        console.log(`[NOTION SYNC] Fetching pages modified since ${lastSyncedAt.toISOString()}`);
+      }
+
+      // Search pages (with incremental filtering if lastSyncedAt exists)
+      const pages = await notionService.searchPages(organizationId, {
+        modifiedSince: lastSyncedAt || undefined,
+      });
+
+      console.log(`[NOTION SYNC] Found ${pages.length} updated pages`);
+
+      if (pages.length === 0 && !lastSyncedAt) {
         throw new Error(
           "No pages shared with integration. Please share pages in Notion or reconnect."
         );
+      }
+
+      // If no updated pages in incremental sync, that's OK
+      if (pages.length === 0 && lastSyncedAt) {
+        console.log("[NOTION SYNC] No pages modified since last sync - skipping");
+        result.success = true;
+        result.duration = Date.now() - startTime;
+
+        await db
+          .update(schema.syncLogs)
+          .set({
+            status: "success",
+            itemsSynced: 0,
+            completedAt: new Date(),
+          })
+          .where(eq(schema.syncLogs.id, syncLogId));
+
+        return result;
       }
 
       // Process each page
@@ -522,7 +565,7 @@ class IngestionService {
         })
         .where(eq(schema.syncLogs.id, syncLogId));
 
-      // Update integration lastSyncedAt
+      // Update integration lastSyncedAt (only on successful sync)
       await db
         .update(schema.integrations)
         .set({
@@ -533,6 +576,16 @@ class IngestionService {
 
       result.success = true;
       result.duration = Date.now() - startTime;
+
+      // Log completion summary
+      console.log(`[NOTION SYNC] ✅ Sync complete for org ${organizationId}`);
+      console.log(`[NOTION SYNC]    Mode: ${syncMode}`);
+      console.log(`[NOTION SYNC]    Pages synced: ${result.channelsProcessed}`);
+      console.log(`[NOTION SYNC]    Blocks embedded: ${result.messagesEmbedded}`);
+      console.log(`[NOTION SYNC]    Duration: ${Math.round(result.duration / 1000)}s`);
+      if (result.errors.length > 0) {
+        console.log(`[NOTION SYNC]    Errors: ${result.errors.length}`);
+      }
 
       return result;
     } catch (error) {
@@ -638,12 +691,25 @@ class IngestionService {
       // DUAL-WRITE: Store in both Pinecone (semantic) and PostgreSQL (keyword)
       await vectorService.upsertVectors(vectors, namespace);
 
-      // Transform vectors to PostgreSQL format and insert
+      // Transform vectors to PostgreSQL format and upsert (handles duplicates)
       const searchContentRecords = vectors.map((v) =>
         this.transformVectorToSearchContent(v, organizationId)
       );
 
-      await db.insert(schema.searchContent).values(searchContentRecords);
+      // Use onConflictDoUpdate to handle re-syncing of updated pages/blocks
+      await db
+        .insert(schema.searchContent)
+        .values(searchContentRecords)
+        .onConflictDoUpdate({
+          target: schema.searchContent.id,
+          set: {
+            text: sql`EXCLUDED.text`,
+            pageTitle: sql`EXCLUDED.page_title`,
+            timestamp: sql`EXCLUDED.timestamp`,
+            date: sql`EXCLUDED.date`,
+            updatedAt: new Date(),
+          },
+        });
     } catch (error) {
       throw new Error("Failed to process Notion block batch", { cause: error });
     }
