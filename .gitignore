@@ -21,12 +21,14 @@ out/
 .vite/
 .cache/
 
-# Environment variables
+# Environment variables (NEVER commit production secrets!)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+**/.env.production
 
 # Credentials (NEVER commit these!)
 **/creds/
@@ -65,4 +67,3 @@ coverage/
 *.traineddata
 
 .mcp.json
-apps/backend/.env.production

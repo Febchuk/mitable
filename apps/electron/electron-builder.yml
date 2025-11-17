@@ -36,13 +36,30 @@ dmg:
 # Windows Configuration
 win:
   target:
-    - target: nsis
+    - target: squirrel
       arch:
         - x64
-  icon: build/icon.png  # Electron-builder will convert PNG to ICO
+  icon: build/icon.ico  # Windows ICO file with multiple sizes
   # Disable code signing for dev builds (enable for production)
   sign: null
   certificateSubjectName: null
+
+# Squirrel.Windows Configuration (Modern silent installer like Slack/Discord)
+squirrelWindows:
+  # Icon URL - must be HTTPS/HTTP (Squirrel requirement)
+  # TODO: Replace with your actual hosted icon URL when deploying
+  iconUrl: "https://raw.githubusercontent.com/electron/electron/main/shell/browser/resources/win/electron.ico"
+  
+  # Optional: Custom loading animation during install
+  # loadingGif: "build/install-spinner.gif"
+  
+  # Use appId instead of name to identify package
+  useAppIdAsId: true
+
+# Extra resources (copied to app resources folder for runtime access)
+extraResources:
+  - from: "src/renderer/assets/icon.ico"
+    to: "assets/icon.ico"
 
 # File associations and metadata
 files:
