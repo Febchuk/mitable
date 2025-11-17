@@ -17,8 +17,11 @@
     "db:seed": "tsx src/db/seed.ts",
     "seed:production": "tsx src/db/seed-production.ts",
     "db:migrate-fts": "tsx src/scripts/run-fts-migration.ts",
+    "migrate:0008": "tsx src/scripts/run-migration-0008.ts",
     "test-search": "tsx src/scripts/test-search.ts",
-    "sync-slack": "tsx src/scripts/sync-slack.ts"
+    "sync-slack": "tsx src/scripts/sync-slack.ts",
+    "sync-notion": "tsx src/scripts/sync-notion.ts",
+    "backfill-tokens": "tsx src/scripts/backfill-encrypted-tokens.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

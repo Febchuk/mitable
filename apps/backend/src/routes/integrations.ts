@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { config } from "../config.js";
 import { NOTION_CONFIG } from "../services/notion.service.js";
+import { encryptionService } from "../services/encryption.service.js";
 
 const router = Router();
 
@@ -214,15 +215,21 @@ router.get("/slack/callback", async (req: Request, res: Response): Promise<void>
       throw new Error(data.error || "Failed to exchange code for token");
     }
 
+    // Encrypt tokens before storing (SECURITY CRITICAL)
+    const encryptedAccessToken = encryptionService.encrypt(data.access_token);
+
     // Store integration in database
     // Use INSERT ... ON CONFLICT to handle both new connections and reconnections
+    // DUAL-WRITE: Write to both encrypted and plaintext columns during migration
     await db
       .insert(schema.integrations)
       .values({
         organizationId: organizationId,
         provider: "slack",
         status: "connected",
-        accessToken: data.access_token, // Bot token (xoxb-...)
+        accessToken: data.access_token, // DEPRECATED - for migration only
+        accessTokenEncrypted: encryptedAccessToken, // USE THIS
+        encryptionVersion: 1,
         metadata: {
           team_id: data.team.id,
           team_name: data.team.name,
@@ -239,7 +246,9 @@ router.get("/slack/callback", async (req: Request, res: Response): Promise<void>
         target: [schema.integrations.organizationId, schema.integrations.provider],
         set: {
           status: "connected",
-          accessToken: data.access_token,
+          accessToken: data.access_token, // DEPRECATED - for migration only
+          accessTokenEncrypted: encryptedAccessToken, // USE THIS
+          encryptionVersion: 1,
           metadata: {
             team_id: data.team.id,
             team_name: data.team.name,
@@ -916,15 +925,23 @@ router.get("/notion/callback", async (req: Request, res: Response): Promise<void
       Date.now() + NOTION_CONFIG.TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
     );
 
+    // Encrypt tokens before storing (SECURITY CRITICAL)
+    const encryptedAccessToken = encryptionService.encrypt(data.access_token);
+    const encryptedRefreshToken = encryptionService.encrypt(data.refresh_token);
+
     // Store integration in database
+    // DUAL-WRITE: Write to both encrypted and plaintext columns during migration
     await db
       .insert(schema.integrations)
       .values({
         organizationId: organizationId,
         provider: "notion",
         status: "connected",
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
+        accessToken: data.access_token, // DEPRECATED - for migration only
+        refreshToken: data.refresh_token, // DEPRECATED - for migration only
+        accessTokenEncrypted: encryptedAccessToken, // USE THIS
+        refreshTokenEncrypted: encryptedRefreshToken, // USE THIS
+        encryptionVersion: 1,
         tokenExpiresAt: tokenExpiresAt,
         metadata: {
           bot_id: data.bot_id, // Use as primary key
@@ -942,8 +959,11 @@ router.get("/notion/callback", async (req: Request, res: Response): Promise<void
         target: [schema.integrations.organizationId, schema.integrations.provider],
         set: {
           status: "connected",
-          accessToken: data.access_token,
-          refreshToken: data.refresh_token,
+          accessToken: data.access_token, // DEPRECATED - for migration only
+          refreshToken: data.refresh_token, // DEPRECATED - for migration only
+          accessTokenEncrypted: encryptedAccessToken, // USE THIS
+          refreshTokenEncrypted: encryptedRefreshToken, // USE THIS
+          encryptionVersion: 1,
           tokenExpiresAt: tokenExpiresAt,
           metadata: {
             bot_id: data.bot_id,
