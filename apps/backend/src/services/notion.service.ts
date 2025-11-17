@@ -163,10 +163,18 @@ class NotionService {
 
   /**
    * Search for all pages shared with the integration
+   * @param organizationId - Organization ID
+   * @param options - Search options
+   * @param options.query - Text query to filter pages
+   * @param options.modifiedSince - Only return pages edited after this date (incremental sync)
    */
-  async searchPages(organizationId: string, query?: string): Promise<NotionPage[]> {
+  async searchPages(
+    organizationId: string,
+    options?: { query?: string; modifiedSince?: Date }
+  ): Promise<NotionPage[]> {
     const client = await this.getClient(organizationId);
     const pages: NotionPage[] = [];
+    const { query, modifiedSince } = options || {};
 
     try {
       await this.rateLimit();
@@ -181,11 +189,25 @@ class NotionService {
             property: "object",
             value: "page",
           },
+          sort: {
+            direction: "descending",
+            timestamp: "last_edited_time",
+          },
           page_size: NOTION_CONFIG.PAGE_SIZE,
           start_cursor: startCursor,
         });
 
         for (const page of response.results) {
+          // Early exit optimization: Since pages are sorted by last_edited_time descending,
+          // once we hit a page older than modifiedSince, all remaining pages are also older
+          if (modifiedSince && new Date(page.last_edited_time) <= modifiedSince) {
+            console.log(
+              `[NotionService] Early exit: Hit page from ${page.last_edited_time} (before ${modifiedSince.toISOString()})`
+            );
+            hasMore = false; // Stop pagination - all remaining pages are older
+            break;
+          }
+
           // Extract title from properties
           let title = "Untitled";
           if (page.properties?.title?.title?.[0]?.plain_text) {
@@ -206,6 +228,11 @@ class NotionService {
             parent_database_id:
               page.parent?.type === "database_id" ? page.parent.database_id : undefined,
           });
+        }
+
+        // Only continue pagination if hasMore is still true (not stopped by early exit)
+        if (!hasMore) {
+          break; // Exit pagination loop
         }
 
         hasMore = response.has_more;
