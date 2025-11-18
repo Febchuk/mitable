@@ -21,6 +21,7 @@ import { WebClient } from "@slack/web-api";
 import { ingestionService } from "../services/ingestion.service.js";
 import { vectorService } from "../services/vector.service.js";
 import { validateConfig } from "../config.js";
+import { encryptionService } from "../services/encryption.service.js";
 
 interface SyncStats {
   slack: {
@@ -65,16 +66,18 @@ async function syncSlack(stats: SyncStats): Promise<void> {
     for (const integration of slackIntegrations) {
       const orgId = integration.organizationId;
       const metadata = integration.metadata as any;
-      const token = integration.accessToken;
       const selectedChannels: string[] = metadata?.selected_channels || [];
 
       console.log(`\n${"─".repeat(60)}`);
       console.log(`📦 Organization: ${orgId}`);
 
       try {
-        if (!token) {
+        // Decrypt the access token
+        if (!integration.accessTokenEncrypted) {
           throw new Error("No Slack access token found");
         }
+        
+        const token = encryptionService.decrypt(integration.accessTokenEncrypted);
 
         if (selectedChannels.length === 0) {
           console.log("⏭️  No channels selected - skipping");

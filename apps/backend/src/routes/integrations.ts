@@ -230,8 +230,7 @@ router.get("/slack/callback", async (req: Request, res: Response): Promise<void>
         organizationId: organizationId,
         provider: "slack",
         status: "connected",
-        accessToken: data.access_token, // DEPRECATED - for migration only
-        accessTokenEncrypted: encryptedAccessToken, // USE THIS
+        accessTokenEncrypted: encryptedAccessToken,
         encryptionVersion: 1,
         metadata: {
           team_id: data.team.id,
@@ -249,8 +248,7 @@ router.get("/slack/callback", async (req: Request, res: Response): Promise<void>
         target: [schema.integrations.organizationId, schema.integrations.provider],
         set: {
           status: "connected",
-          accessToken: data.access_token, // DEPRECATED - for migration only
-          accessTokenEncrypted: encryptedAccessToken, // USE THIS
+          accessTokenEncrypted: encryptedAccessToken,
           encryptionVersion: 1,
           metadata: {
             team_id: data.team.id,
@@ -370,7 +368,6 @@ router.delete(
         .update(schema.integrations)
         .set({
           status: "disconnected",
-          accessToken: null,
           updatedAt: new Date(),
         })
         .where(
@@ -547,7 +544,12 @@ router.post("/slack/configure", requireAuth, async (req: Request, res: Response)
         const { searchContent } = await import("../db/schema/search-content.schema.js");
         const { desc } = await import("drizzle-orm");
 
-        const client = new WebClient(integration.accessToken!);
+        // Decrypt the access token
+        if (!integration.accessTokenEncrypted) {
+          throw new Error("No Slack access token found");
+        }
+        const accessToken = encryptionService.decrypt(integration.accessTokenEncrypted);
+        const client = new WebClient(accessToken);
 
         let totalNewMessages = 0;
         let channelsProcessed = 0;
@@ -940,10 +942,8 @@ router.get("/notion/callback", async (req: Request, res: Response): Promise<void
         organizationId: organizationId,
         provider: "notion",
         status: "connected",
-        accessToken: data.access_token, // DEPRECATED - for migration only
-        refreshToken: data.refresh_token, // DEPRECATED - for migration only
-        accessTokenEncrypted: encryptedAccessToken, // USE THIS
-        refreshTokenEncrypted: encryptedRefreshToken, // USE THIS
+        accessTokenEncrypted: encryptedAccessToken,
+        refreshTokenEncrypted: encryptedRefreshToken,
         encryptionVersion: 1,
         tokenExpiresAt: tokenExpiresAt,
         metadata: {
@@ -962,10 +962,8 @@ router.get("/notion/callback", async (req: Request, res: Response): Promise<void
         target: [schema.integrations.organizationId, schema.integrations.provider],
         set: {
           status: "connected",
-          accessToken: data.access_token, // DEPRECATED - for migration only
-          refreshToken: data.refresh_token, // DEPRECATED - for migration only
-          accessTokenEncrypted: encryptedAccessToken, // USE THIS
-          refreshTokenEncrypted: encryptedRefreshToken, // USE THIS
+          accessTokenEncrypted: encryptedAccessToken,
+          refreshTokenEncrypted: encryptedRefreshToken,
           encryptionVersion: 1,
           tokenExpiresAt: tokenExpiresAt,
           metadata: {
@@ -1089,8 +1087,6 @@ router.delete(
         .update(schema.integrations)
         .set({
           status: "disconnected",
-          accessToken: null,
-          refreshToken: null,
           tokenExpiresAt: null,
           updatedAt: new Date(),
         })

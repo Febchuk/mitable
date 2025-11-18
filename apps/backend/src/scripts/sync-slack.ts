@@ -20,6 +20,7 @@ import { WebClient } from "@slack/web-api";
 import { vectorService } from "../services/vector.service.js";
 import { embeddingService } from "../services/embedding.service.js";
 import { validateConfig } from "../config.js";
+import { encryptionService } from "../services/encryption.service.js";
 
 async function main() {
   // Validate configuration
@@ -69,13 +70,15 @@ async function main() {
 
     const orgId = integration.organizationId;
     const metadata = integration.metadata as any;
-    const token = integration.accessToken;
     const selectedChannels: string[] = metadata?.selected_channels || [];
 
-    if (!token) {
+    if (!integration.accessTokenEncrypted) {
       console.error("❌ No Slack access token found");
       process.exit(1);
     }
+
+    // Decrypt the access token
+    const token = encryptionService.decrypt(integration.accessTokenEncrypted);
 
     if (selectedChannels.length === 0) {
       console.error("❌ No channels selected for syncing");

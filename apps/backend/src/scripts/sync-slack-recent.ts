@@ -15,6 +15,7 @@ import { sql } from "drizzle-orm";
 import { eq, and } from "drizzle-orm";
 import { vectorService } from "../services/vector.service.js";
 import { validateConfig } from "../config.js";
+import { encryptionService } from "../services/encryption.service.js";
 
 async function main() {
   validateConfig();
@@ -37,12 +38,14 @@ async function main() {
   }
 
   const metadata = integration.metadata as any;
-  const token = integration.accessToken;
 
-  if (!token) {
+  if (!integration.accessTokenEncrypted) {
     console.error("❌ No access token found for Slack integration");
     process.exit(1);
   }
+
+  // Decrypt the access token
+  const token = encryptionService.decrypt(integration.accessTokenEncrypted);
 
   const selectedChannels = metadata?.selected_channels || [];
 
