@@ -5,13 +5,30 @@ import request from "supertest";
 import { app } from "./app.js";
 
 describe("Backend API Routes", () => {
+  describe("GET /", () => {
+    it("should return API information", async () => {
+      const response = await request(app).get("/");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty("service", "Mitable API");
+      expect(response.body).toHaveProperty("version");
+      expect(response.body).toHaveProperty("status", "running");
+      expect(response.body).toHaveProperty("environment");
+      expect(response.body).toHaveProperty("endpoints");
+      expect(response.body).toHaveProperty("links");
+    });
+  });
+
   describe("GET /health", () => {
-    it("should return 200 with status ok", async () => {
+    it("should return 200 with enhanced health info", async () => {
       const response = await request(app).get("/health");
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty("status", "ok");
       expect(response.body).toHaveProperty("timestamp");
+      expect(response.body).toHaveProperty("service", "Mitable Backend API");
+      expect(response.body).toHaveProperty("environment");
+      expect(response.body).toHaveProperty("version");
     });
   });
 
