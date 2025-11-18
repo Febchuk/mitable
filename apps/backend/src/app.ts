@@ -60,9 +60,37 @@ app.get("/api-docs.json", (_req, res) => {
   res.send(swaggerSpec);
 });
 
-// Health check
+// Root endpoint - API information
+app.get("/", (req, res) => {
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  res.json({
+    service: "Mitable API",
+    version: "0.1.0",
+    status: "running",
+    environment: config.nodeEnv,
+    endpoints: {
+      health: "/health",
+      apiDocs: "/api-docs",
+      apiDocsJson: "/api-docs.json",
+      api: "/api/*"
+    },
+    links: {
+      health: `${baseUrl}/health`,
+      docs: `${baseUrl}/api-docs`,
+      repository: "https://github.com/Febchuk/mitable"
+    }
+  });
+});
+
+// Health check - Enhanced with environment info
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    service: "Mitable Backend API",
+    environment: config.nodeEnv,
+    version: "0.1.0"
+  });
 });
 
 // API routes with rate limiting
