@@ -1,0 +1,88 @@
+name: Production Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify-deployment:
+    name: Verify Production Deployment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for Railway deployment
+        run: |
+          echo "🚂 Railway is auto-deploying from main branch..."
+          echo "⏳ Waiting 2 minutes for deployment to complete..."
+          sleep 120
+
+      - name: Verify health endpoint
+        run: |
+          echo "🏥 Checking production health endpoint..."
+
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          SUCCESS=false
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES..."
+
+            response=$(curl -s -o /dev/null -w "%{http_code}" https://mitablebackend-production.up.railway.app/health || echo "000")
+
+            if [ "$response" = "200" ]; then
+              echo "✅ Production health check passed! (HTTP $response)"
+              SUCCESS=true
+              break
+            else
+              echo "⚠️  Health check returned HTTP $response, retrying in 10 seconds..."
+              sleep 10
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+            fi
+          done
+
+          if [ "$SUCCESS" = "false" ]; then
+            echo "❌ Production health check failed after $MAX_RETRIES attempts!"
+            echo ""
+            echo "🚨 PRODUCTION MAY BE BROKEN!"
+            echo ""
+            echo "Rollback instructions:"
+            echo "  1. Via Railway CLI: railway rollback"
+            echo "  2. Via Git: git revert HEAD && git push origin main"
+            echo ""
+            echo "Check Railway logs: https://railway.app/project/your-project-id/deployments"
+            exit 1
+          fi
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "🎉 Production deployment successful!"
+          echo ""
+          echo "📊 Deployment Details:"
+          echo "  • URL: https://mitablebackend-production.up.railway.app"
+          echo "  • Commit: ${{ github.sha }}"
+          echo "  • Author: ${{ github.actor }}"
+          echo "  • Branch: ${{ github.ref_name }}"
+          echo ""
+          echo "🔗 Quick Links:"
+          echo "  • Health: https://mitablebackend-production.up.railway.app/health"
+          echo "  • Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          echo "💥 Production deployment verification failed!"
+          echo ""
+          echo "⚠️  IMPORTANT: Production may be in a broken state."
+          echo ""
+          echo "Next steps:"
+          echo "  1. Check Railway deployment logs immediately"
+          echo "  2. Verify database connectivity"
+          echo "  3. Check for runtime errors"
+          echo "  4. Consider rollback if issues persist"
+          echo ""
+          echo "See docs/runbooks/rollback-procedure.md for details"
