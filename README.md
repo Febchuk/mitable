@@ -1,6 +1,16 @@
 # Mitable AI Onboarding Buddy
 
+[![CI](https://github.com/Febchuk/mitable/workflows/CI/badge.svg)](https://github.com/Febchuk/mitable/actions/workflows/ci.yml)
+[![Production Deploy](https://github.com/Febchuk/mitable/workflows/Production%20Deploy/badge.svg)](https://github.com/Febchuk/mitable/actions/workflows/production-deploy.yml)
+[![Production Status](https://img.shields.io/badge/production-deployed-success)](https://mitablebackend-production.up.railway.app/health)
+
 Your AI Onboarding Companion: Just-in-time contextual help meets intelligent workflow guidance.
+
+## 🚀 Quick Links
+
+- **Production**: [https://mitablebackend-production.up.railway.app](https://mitablebackend-production.up.railway.app)
+- **CI/CD Pipeline**: [GitHub Actions](https://github.com/Febchuk/mitable/actions)
+- **Contributing**: [CONTRIBUTING.md](docs/CONTRIBUTING.md)
 
 ## Project Structure
 
