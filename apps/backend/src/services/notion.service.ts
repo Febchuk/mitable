@@ -82,20 +82,13 @@ class NotionService {
     let accessToken: string;
     let refreshToken: string | null = null;
 
-    if (integration.accessTokenEncrypted) {
-      accessToken = encryptionService.decrypt(integration.accessTokenEncrypted);
-      if (integration.refreshTokenEncrypted) {
-        refreshToken = encryptionService.decrypt(integration.refreshTokenEncrypted);
-      }
-    } else if (integration.accessToken) {
-      // DEPRECATED: Fallback to plaintext token during migration
-      accessToken = integration.accessToken;
-      refreshToken = integration.refreshToken;
-      console.warn(
-        `[NotionService] Using plaintext tokens for org ${organizationId} - run backfill script`
-      );
-    } else {
-      throw new Error("No access token found (neither encrypted nor plaintext)");
+    if (!integration.accessTokenEncrypted) {
+      throw new Error("No encrypted access token found");
+    }
+
+    accessToken = encryptionService.decrypt(integration.accessTokenEncrypted);
+    if (integration.refreshTokenEncrypted) {
+      refreshToken = encryptionService.decrypt(integration.refreshTokenEncrypted);
     }
 
     // Check if token is expired and refresh if needed
@@ -111,14 +104,12 @@ class NotionService {
       const encryptedAccessToken = encryptionService.encrypt(tokenResponse.access_token);
       const encryptedRefreshToken = encryptionService.encrypt(tokenResponse.refresh_token);
 
-      // Update integration with new encrypted tokens (DUAL-WRITE during migration)
+      // Update integration with new encrypted tokens
       await db
         .update(schema.integrations)
         .set({
-          accessToken: tokenResponse.access_token, // DEPRECATED
-          refreshToken: tokenResponse.refresh_token, // DEPRECATED
-          accessTokenEncrypted: encryptedAccessToken, // USE THIS
-          refreshTokenEncrypted: encryptedRefreshToken, // USE THIS
+          accessTokenEncrypted: encryptedAccessToken,
+          refreshTokenEncrypted: encryptedRefreshToken,
           encryptionVersion: 1,
           // Notion doesn't provide expiry time, use estimated lifetime
           tokenExpiresAt: new Date(

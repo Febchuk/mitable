@@ -43,20 +43,11 @@ class SlackService {
     }
 
     // Decrypt token before use (SECURITY CRITICAL)
-    // Prefer encrypted token, fallback to plaintext during migration
-    let accessToken: string;
-
-    if (integration.accessTokenEncrypted) {
-      accessToken = encryptionService.decrypt(integration.accessTokenEncrypted);
-    } else if (integration.accessToken) {
-      // DEPRECATED: Fallback to plaintext token during migration
-      accessToken = integration.accessToken;
-      console.warn(
-        `[SlackService] Using plaintext token for org ${organizationId} - run backfill script`
-      );
-    } else {
-      throw new Error("No access token found (neither encrypted nor plaintext)");
+    if (!integration.accessTokenEncrypted) {
+      throw new Error("No encrypted access token found");
     }
+
+    const accessToken = encryptionService.decrypt(integration.accessTokenEncrypted);
 
     return new WebClient(accessToken);
   }

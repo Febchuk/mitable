@@ -1,0 +1,32 @@
+{
+  "name": "@mitable/integration-sync",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Standalone cron service for syncing Slack and Notion integrations",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mitable/shared": "*",
+    "@google/generative-ai": "^0.24.1",
+    "@notionhq/client": "^5.2.1",
+    "@pinecone-database/pinecone": "^6.1.2",
+    "@slack/web-api": "^7.11.0",
+    "@supabase/supabase-js": "^2.75.0",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.44.6",
+    "groq-sdk": "^0.7.0",
+    "node-cache": "^5.1.2",
+    "openai": "^6.3.0",
+    "pg": "^8.13.1",
+    "tiktoken": "^1.0.22",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}
