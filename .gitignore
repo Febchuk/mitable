@@ -67,3 +67,6 @@ coverage/
 *.traineddata
 
 .mcp.json
+
+# User specific files
+*cursor-rules.mdc
