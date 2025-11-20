@@ -605,16 +605,16 @@ class CaptureService {
    * 1. Gets the active window for prioritization
    * 2. Captures all visible windows using desktopCapturer
    * 3. Filters out blocked windows based on capture policy
-   * 4. Optionally filters to only allowed apps (if provided)
+   * 4. Optionally filters to only allowed windows (if provided)
    * 5. Returns screenshots for all selected windows (no limit)
    *
    * @param saveToFile - Whether to save screenshots to temp files (default: false)
-   * @param allowedApps - Optional list of app names to capture (if provided, only these apps are captured)
+   * @param allowedWindowIds - Optional list of OS window IDs to capture (if provided, only these windows are captured)
    * @returns Multi-window capture result with screenshots and blocked window metadata
    */
   async captureVisibleWindows(
     saveToFile: boolean = false,
-    allowedApps?: string[]
+    allowedWindowIds?: string[]
   ): Promise<MultiWindowCaptureResult> {
     try {
       // STEP 1: Get active window info for prioritization
@@ -686,16 +686,28 @@ class CaptureService {
         };
       }
 
-      // STEP 4: Filter by allowedApps if provided
-      let windowsToCapture = allowedWindows;
-      if (allowedApps && allowedApps.length > 0) {
-        windowsToCapture = allowedWindows.filter((source) => {
-          const appNameMatch = source.name.split(" - ")[0] || source.name;
-          return allowedApps.includes(appNameMatch);
-        });
+        // STEP 4: Filter by allowed window IDs if provided
+        let windowsToCapture = allowedWindows;
+        if (allowedWindowIds && allowedWindowIds.length > 0) {
+          const normalizedAllowedIds = new Set<string>();
+          for (const id of allowedWindowIds) {
+            normalizedAllowedIds.add(id);
+            normalizedAllowedIds.add(this.normalizeWindowSourceId(id));
+          }
 
-        console.log(`[CaptureService] Filtered to ${windowsToCapture.length} windows matching allowed apps: ${allowedApps.join(", ")}`);
-      }
+          windowsToCapture = allowedWindows.filter((source) => {
+            const normalizedSourceId = this.normalizeWindowSourceId(source.id);
+            return (
+              normalizedAllowedIds.has(source.id) || normalizedAllowedIds.has(normalizedSourceId)
+            );
+          });
+
+          console.log(
+            `[CaptureService] Filtered to ${windowsToCapture.length} windows matching allowed IDs: ${allowedWindowIds.join(
+              ", "
+            )}`
+          );
+        }
 
       console.log(`[CaptureService] Capturing ${windowsToCapture.length} windows`);
 
@@ -754,15 +766,36 @@ class CaptureService {
         captureTimestamp: Date.now(),
       };
 
-    } catch (error) {
-      console.error("[CaptureService] Multi-window capture failed:", error);
-      return {
-        success: false,
-        error: `Failed to capture windows: ${error instanceof Error ? error.message : "Unknown error"}`,
-        reason: "technical_error",
-      };
+      } catch (error) {
+        console.error("[CaptureService] Multi-window capture failed:", error);
+        return {
+          success: false,
+          error: `Failed to capture windows: ${error instanceof Error ? error.message : "Unknown error"}`,
+          reason: "technical_error",
+        };
+      }
     }
-  }
+
+    /**
+     * Normalize desktopCapturer window IDs to match OS-level window IDs
+     *
+     * @param id - Raw window source ID from desktopCapturer
+     * @returns Normalized ID string
+     */
+    private normalizeWindowSourceId(id: string): string {
+      if (!id) {
+        return id;
+      }
+
+      if (id.startsWith("window:")) {
+        const parts = id.split(":");
+        if (parts.length >= 2 && parts[1]) {
+          return parts[1];
+        }
+      }
+
+      return id;
+    }
 
   /**
    * Capture the full screen of a specific display

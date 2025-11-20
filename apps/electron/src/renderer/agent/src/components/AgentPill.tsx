@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
-import { ArrowUp, Circle, Square, Type, Mic, Eye, EyeOff, ChevronDown, X } from "lucide-react";
+import type { SelectedWindowInfo } from "@mitable/shared";
+import {
+  ArrowUp,
+  Circle,
+  Square,
+  Type,
+  Mic,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  X,
+  Maximize2,
+} from "lucide-react";
 import logoIconSvg from "../../../assets/logo-icon.svg";
 
 interface AgentPillProps {
@@ -11,14 +23,23 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [watchingScreen, setWatchingScreen] = useState(false);
-  const [selectedApps, setSelectedApps] = useState<string[]>([]);
+  const [selectedWindows, setSelectedWindows] = useState<SelectedWindowInfo[]>([]);
   const [dropdownExpanded, setDropdownExpanded] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputMode === "text" && inputValue.trim()) {
+      console.log("🔵 [AgentPill] Submitting message:", inputValue);
       onSubmit(inputValue);
       setInputValue("");
+      console.log("🔵 [AgentPill] Input cleared, message sent");
+    } else {
+      console.log(
+        "🔴 [AgentPill] Submit blocked - inputMode:",
+        inputMode,
+        "hasValue:",
+        !!inputValue.trim()
+      );
     }
   };
 
@@ -41,7 +62,7 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
     }
 
     // Resize the Electron window to match pill content
-    // Text mode: 740px wide, Audio mode: 280px wide
+    // Text mode: 800px wide, Audio mode: 280px wide
     window.agentAPI.resizeWindow(mode === "text" ? "text-mode" : "audio-mode");
   };
 
@@ -62,36 +83,36 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
 
     // If turning off, clear selected apps
     if (!newState) {
-      setSelectedApps([]);
+      setSelectedWindows([]);
       setDropdownExpanded(false);
     }
   };
 
-  const handleRemoveApp = async (appName: string) => {
-    await window.agentAPI.unselectApp(appName);
-    // State will be updated by the WATCH_APPS_UPDATED event
+  const handleRemoveWindow = async (windowId: string) => {
+    await window.agentAPI.unselectWindow(windowId);
+    // State will be updated by the WATCH_WINDOWS_UPDATED event
   };
 
-  // Listen for watch apps updates from main process
+  // Listen for watch window updates from main process
   useEffect(() => {
-    const handleWatchAppsUpdated = (apps: string[]) => {
-      console.log("[AgentPill] Watch apps updated:", apps);
-      setSelectedApps(apps);
+    const handleWatchWindowsUpdated = (windows: SelectedWindowInfo[]) => {
+      console.log("[AgentPill] Watch windows updated:", windows);
+      setSelectedWindows(windows);
     };
 
     // Register listener
-    window.agentAPI.onWatchAppsUpdated(handleWatchAppsUpdated);
+    window.agentAPI.onWatchWindowsUpdated(handleWatchWindowsUpdated);
 
     // Cleanup listener on unmount
     return () => {
-      window.agentAPI.offWatchAppsUpdated(handleWatchAppsUpdated);
+      window.agentAPI.offWatchWindowsUpdated(handleWatchWindowsUpdated);
     };
   }, []);
 
   return (
     <div
-      className={`${
-        inputMode === "text" ? "w-[740px] px-6" : "w-[280px] px-4"
+      className={`$${
+        inputMode === "text" ? "w-[800px] px-6" : "w-[280px] px-4"
       } h-full flex items-center py-2 bg-agent-pill rounded-full app-drag transition-all duration-300`}
     >
       {/* Logo Icon - Click to open conversation switcher */}
@@ -119,14 +140,14 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
           </button>
 
           {/* Chevron + Count Badge - Only show when apps selected */}
-          {selectedApps.length > 0 && (
+            {selectedWindows.length > 0 && (
             <button
               onClick={() => setDropdownExpanded(!dropdownExpanded)}
               className="flex items-center ml-1 px-2 h-9 rounded-lg bg-[#3e3e3e] hover:bg-[#4a4a4a] transition-colors app-no-drag"
               aria-label="Toggle app list"
             >
               <span className="text-xs text-muted-foreground mr-1">
-                {selectedApps.length}
+                  {selectedWindows.length}
               </span>
               <ChevronDown
                 size={14}
@@ -138,21 +159,23 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
           )}
 
           {/* Dropdown List */}
-          {dropdownExpanded && selectedApps.length > 0 && (
+            {dropdownExpanded && selectedWindows.length > 0 && (
             <div className="absolute top-full mt-2 left-0 w-64 bg-[#2a2a2a] rounded-lg shadow-lg border border-[#3e3e3e] py-2 z-50">
               <div className="text-xs text-muted-foreground px-3 py-1 mb-1">
-                Watching {selectedApps.length} app{selectedApps.length !== 1 ? "s" : ""}
+                  Watching {selectedWindows.length} window{selectedWindows.length !== 1 ? "s" : ""}
               </div>
-              {selectedApps.map((app) => (
+                {selectedWindows.map((windowInfo) => (
                 <div
-                  key={app}
+                    key={windowInfo.windowId}
                   className="flex items-center justify-between px-3 py-2 hover:bg-[#3e3e3e] transition-colors"
                 >
-                  <span className="text-sm text-text-primary truncate">{app}</span>
+                    <span className="text-sm text-text-primary truncate">
+                      {windowInfo.appName} - {windowInfo.windowTitle}
+                    </span>
                   <button
-                    onClick={() => handleRemoveApp(app)}
+                      onClick={() => handleRemoveWindow(windowInfo.windowId)}
                     className="ml-2 p-1 rounded hover:bg-[#4a4a4a] transition-colors"
-                    aria-label={`Stop watching ${app}`}
+                      aria-label={`Stop watching ${windowInfo.appName}`}
                   >
                     <X size={14} className="text-muted-foreground" />
                   </button>
@@ -171,7 +194,7 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Ask me anything"
-            className="flex-1 bg-transparent text-text-primary placeholder-text-tertiary outline-none text-sm"
+            className="flex-1 bg-transparent text-text-primary placeholder-text-tertiary outline-none text-[15px]"
           />
         </form>
       )}
@@ -205,21 +228,44 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
         >
           <Mic
             size={16}
-            className={inputMode === "audio" ? "text-primary-foreground" : "text-muted-foreground"}
+            className={
+              inputMode === "audio" ? "text-primary-foreground" : "text-muted-foreground"
+            }
           />
         </button>
       </div>
 
-      {/* Action Button */}
+      {/* Action Buttons */}
       {inputMode === "text" ? (
-        <button
-          onClick={handleSubmit}
-          disabled={!inputValue.trim()}
-          className="w-10 h-10 rounded-full bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0 app-no-drag"
-          aria-label="Send message"
-        >
-          <ArrowUp size={20} className="text-white" />
-        </button>
+        <div className="flex items-center gap-2 app-no-drag">
+          <button
+            onClick={handleSubmit}
+            disabled={!inputValue.trim()}
+            className="w-10 h-10 rounded-full bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
+            aria-label="Send message"
+          >
+            <ArrowUp size={20} className="text-white" />
+          </button>
+          <button
+            onClick={() => {
+              console.log(
+                "[AgentPill] Maximize clicked - opening Console window and hiding pill"
+              );
+              // Open the main Console window
+              window.agentAPI.showConsole();
+              // Hide the agent pill
+              window.agentAPI.toggle();
+            }}
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-primary hover:shadow-glow-purple flex items-center justify-center transition-all duration-200 flex-shrink-0 group"
+            aria-label="Open Console"
+            title="Open Console"
+          >
+            <Maximize2
+              size={18}
+              className="text-white/60 group-hover:text-white group-hover:scale-110 transition-all"
+            />
+          </button>
+        </div>
       ) : isRecording ? (
         <button
           onClick={handleRecord}

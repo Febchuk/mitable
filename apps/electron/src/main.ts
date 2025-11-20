@@ -2,7 +2,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from "elec
 import { join } from "path";
 import { IPC_CHANNELS } from "@mitable/shared";
 import { captureService, ConversationContext } from "./services/captureService";
-import type { MultiWindowCaptureResult } from "@mitable/shared";
+import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
 import { windowDetectionService } from "./services/windowDetectionService";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
 
@@ -14,6 +14,9 @@ let overlayWindow: BrowserWindow | null = null;
 // eslint-disable-next-line prefer-const
 let guideWindow: BrowserWindow | null = null; // Not reassigned yet, but used in window management logic
 let nudgeWindow: BrowserWindow | null = null;
+
+// Watch button windows tracking (module scope for cleanup from multiple handlers)
+const watchButtonWindows: Map<string, BrowserWindow> = new Map();
 
 // Auth token storage (shared across all windows)
 const authTokens: {
@@ -419,6 +422,10 @@ function setupIPC() {
         screenshot
       );
     }
+
+    // Close all watch button windows when message is sent
+    // This prevents visual clutter after user submits help request
+    closeAllWatchButtonWindows(watchButtonWindows);
   });
 
   // NEW: Toggle conversation (collapsed combobox)
@@ -1019,19 +1026,22 @@ function setupIPC() {
       });
 
       try {
-        // Get currently selected apps for filtering
-        const selectedApps = windowDetectionService.getSelectedApps();
-        const hasSelectedApps = selectedApps.length > 0;
+        // Get currently selected windows for filtering
+        const selectedWindows = windowDetectionService.getSelectedWindows();
+        const selectedWindowIds = selectedWindows.map((window) => window.windowId);
+        const hasSelectedWindows = selectedWindowIds.length > 0;
 
         console.log("[Screenshot] Capture with filters:", {
-          hasSelectedApps,
-          selectedApps: selectedApps.join(", ") || "none",
+          hasSelectedWindows,
+          selectedWindows:
+            selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
+            "none",
         });
 
         // Capture with optional filtering
         const result = await captureService.captureVisibleWindows(
           false, // saveToFile
-          hasSelectedApps ? selectedApps : undefined // Only filter if apps are selected
+          hasSelectedWindows ? selectedWindowIds : undefined // Only filter if windows are selected
         );
 
         console.log("[Screenshot] Multi-window capture result:", {
@@ -1070,9 +1080,6 @@ function setupIPC() {
 
 // Watch mode handlers for selective screenshot capture
 function setupWatchModeHandlers() {
-  // Store references to watch button windows
-  const watchButtonWindows: Map<string, BrowserWindow> = new Map();
-
   // Toggle watch mode on/off
   ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_TOGGLE, async (_event, enabled: boolean) => {
     console.log(`[Watch Mode] Toggling watch mode: ${enabled}`);
@@ -1084,11 +1091,9 @@ function setupWatchModeHandlers() {
       const windows = await windowDetectionService.getAllVisibleWindows();
       console.log(`[Watch Mode] Found ${windows.length} watchable windows`);
 
-      // Create overlay buttons for each window
+      // Create overlay buttons for ALL windows (including blocked ones to show policy)
       for (const window of windows) {
-        if (!window.isBlocked) {
-          createWatchButtonWindow(window, watchButtonWindows);
-        }
+        createWatchButtonWindow(window, watchButtonWindows);
       }
     } else {
       // Close all watch button windows
@@ -1103,57 +1108,136 @@ function setupWatchModeHandlers() {
     }
   });
 
-  // Select a window to watch
-  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_SELECT, async (_event, appName: string) => {
-    console.log(`[Watch Mode] Selecting app: ${appName}`);
-    const added = windowDetectionService.addApp(appName);
+    // Select a window to watch
+    ipcMain.handle(
+      IPC_CHANNELS.WATCH_WINDOW_SELECT,
+      async (_event, windowInfo: SelectedWindowInfo) => {
+        console.log(
+          `[Watch Mode] Selecting window: ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowInfo.windowId}]`
+        );
+        const added = windowDetectionService.addWindow(windowInfo);
 
-    if (added) {
-      broadcastWatchAppsUpdate();
-    }
-  });
+        if (added) {
+          const buttonWindow = watchButtonWindows.get(windowInfo.windowId);
 
-  // Unselect a window
-  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, async (_event, appName: string) => {
-    console.log(`[Watch Mode] Unselecting app: ${appName}`);
-    const removed = windowDetectionService.removeApp(appName);
+          if (buttonWindow && !buttonWindow.isDestroyed()) {
+            console.log(
+              `[Watch Mode] Closing button for selected window: ${windowInfo.appName} (windowId: ${windowInfo.windowId})`
+            );
+            buttonWindow.close();
+          }
 
-    if (removed) {
-      broadcastWatchAppsUpdate();
-    }
-  });
-
-  // Get currently selected apps
-  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED, async () => {
-    const apps = windowDetectionService.getSelectedApps();
-    console.log(`[Watch Mode] Returning ${apps.length} selected apps`);
-    return apps;
-  });
-
-  // Broadcast updated app list to all windows
-  function broadcastWatchAppsUpdate() {
-    const apps = windowDetectionService.getSelectedApps();
-    const windows = [agentWindow, conversationWindow];
-
-    for (const window of windows) {
-      if (window && !window.isDestroyed()) {
-        window.webContents.send(IPC_CHANNELS.WATCH_APPS_UPDATED, apps);
+          watchButtonWindows.delete(windowInfo.windowId);
+          broadcastWatchWindowsUpdate();
+        }
       }
-    }
+    );
 
-    console.log(`[Watch Mode] Broadcasted update to windows. Selected apps: ${apps.join(", ") || "none"}`);
-  }
+    // Unselect a window
+    ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, async (_event, windowId: string) => {
+      console.log(`[Watch Mode] Unselecting window: ${windowId}`);
+      const removed = windowDetectionService.removeWindow(windowId);
+
+      if (removed) {
+        broadcastWatchWindowsUpdate();
+      }
+    });
+
+    // Get currently selected windows
+    ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED, async () => {
+      const selectedWindows = windowDetectionService.getSelectedWindows();
+      console.log(`[Watch Mode] Returning ${selectedWindows.length} selected windows`);
+      return selectedWindows;
+    });
+
+    // Broadcast updated window list to all windows
+    function broadcastWatchWindowsUpdate() {
+      const selectedWindows = windowDetectionService.getSelectedWindows();
+      const windows = [agentWindow, conversationWindow];
+
+      for (const window of windows) {
+        if (window && !window.isDestroyed()) {
+          window.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
+        }
+      }
+
+      console.log(
+        `[Watch Mode] Broadcasted update to windows. Selected windows: ${
+          selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") || "none"
+        }`
+      );
+    }
 
   console.log("[IPC] Watch mode handlers registered successfully");
 }
 
-// Helper function to create a watch button window (placeholder for now)
+// Helper function to create a watch button window
 function createWatchButtonWindow(
   window: any,
   watchButtonWindows: Map<string, BrowserWindow>
 ) {
-  // TODO: Implement watch button window creation
-  console.log(`[Watch Mode] Would create button for: ${window.appName} at (${window.bounds.x}, ${window.bounds.y})`);
+  const buttonWindow = new BrowserWindow({
+    width: 250,
+    height: 50,
+    x: window.bounds.x + 10,
+    y: window.bounds.y + 10,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    focusable: true,
+    hasShadow: false,
+    webPreferences: {
+      preload: join(MAIN_DIR, "../preload/watchButton.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Pass data via query parameters
+  const queryParams = new URLSearchParams({
+    windowId: window.windowId,
+    appName: window.appName,
+    windowTitle: window.windowTitle,
+    isBlocked: window.isBlocked.toString(),
+    ...(window.blockReason && { blockReason: window.blockReason }),
+  });
+
+  if (!app.isPackaged) {
+    buttonWindow.loadURL(`http://localhost:5173/watchButton/index.html?${queryParams.toString()}`);
+  } else {
+    buttonWindow.loadFile(join(MAIN_DIR, "../renderer/watchButton.html"), {
+      query: Object.fromEntries(queryParams.entries()),
+    });
+  }
+
+  // Cleanup on close
+  buttonWindow.on("closed", () => {
+    console.log(`[Watch Mode] Button window closed for: ${window.appName}`);
+    watchButtonWindows.delete(window.windowId);
+  });
+
+  watchButtonWindows.set(window.windowId, buttonWindow);
+
+  console.log(
+    `[Watch Mode] Created button for ${window.appName} at (${window.bounds.x + 10}, ${window.bounds.y + 10})`
+  );
+}
+
+// Helper function to close all watch button windows
+function closeAllWatchButtonWindows(watchButtonWindows: Map<string, BrowserWindow>) {
+  const count = watchButtonWindows.size;
+  console.log(`[Watch Mode] Closing ${count} watch button windows`);
+  
+  for (const [windowId, buttonWindow] of watchButtonWindows.entries()) {
+    if (!buttonWindow.isDestroyed()) {
+      buttonWindow.close();
+    }
+    watchButtonWindows.delete(windowId);
+  }
+  
+  console.log(`[Watch Mode] ✅ Closed ${count} watch button windows`);
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)

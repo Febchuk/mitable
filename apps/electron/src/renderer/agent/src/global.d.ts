@@ -1,5 +1,7 @@
 // Global type declarations for Agent window preload API
 
+import type { SelectedWindowInfo } from "@mitable/shared";
+
 interface AgentAPI {
   // Window control
   toggle: () => void;
@@ -45,11 +47,11 @@ interface AgentAPI {
   onGuideNextStep: (callback: () => void) => void;
 
   // Watch mode for selective screenshot capture
-  toggleWatchMode: (enabled: boolean) => Promise<void>;
-  unselectApp: (appName: string) => Promise<void>;
-  getSelectedApps: () => Promise<string[]>;
-  onWatchAppsUpdated: (callback: (apps: string[]) => void) => void;
-  offWatchAppsUpdated: (callback: (apps: string[]) => void) => void;
+    toggleWatchMode: (enabled: boolean) => Promise<void>;
+    unselectWindow: (windowId: string) => Promise<void>;
+    getSelectedWindows: () => Promise<SelectedWindowInfo[]>;
+    onWatchWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => void;
+    offWatchWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => void;
 }
 
 declare global {

@@ -167,9 +167,15 @@ export interface WatchableWindow {
   blockReason?: string;
 }
 
+export interface SelectedWindowInfo {
+  windowId: string;
+  appName: string;
+  windowTitle: string;
+}
+
 export interface WatchState {
   isWatching: boolean;
-  selectedApps: string[]; // App names that user has selected to watch
+  selectedWindows: SelectedWindowInfo[]; // Windows that user has selected to watch
 }
 
 export interface WatchButtonState {

@@ -14,7 +14,7 @@
  * @module windowDetectionService
  */
 
-import type { WatchableWindow, WatchState } from "@mitable/shared";
+import type { SelectedWindowInfo, WatchableWindow, WatchState } from "@mitable/shared";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
 import { openWindows } from "get-windows";
 
@@ -38,8 +38,8 @@ interface GetWindowsResult {
 }
 
 class WindowDetectionService {
-  // Track which apps user has selected to watch
-  private selectedApps: Set<string> = new Set();
+  // Track which windows user has selected to watch
+  private selectedWindows: Map<string, SelectedWindowInfo> = new Map();
   private isWatching: boolean = false;
 
   // Mitable window titles to exclude from detection
@@ -51,6 +51,7 @@ class WindowDetectionService {
     /^Overlay/i,
     /^Guide/i,
     /^Nudge/i,
+    /Watch/i, // Watch button windows
     /Electron/i, // Electron dev tools
   ];
 
@@ -127,63 +128,74 @@ class WindowDetectionService {
   }
 
   /**
-   * Add an app to the watch list
+   * Add a window to the watch list
    *
-   * @param appName - Name of the app to watch
+   * @param window - Window metadata to track
    * @returns true if added, false if already watching
    */
-  addApp(appName: string): boolean {
-    if (this.selectedApps.has(appName)) {
+  addWindow(window: SelectedWindowInfo): boolean {
+    if (this.selectedWindows.has(window.windowId)) {
       return false;
     }
-    this.selectedApps.add(appName);
-    console.log(`[WindowDetectionService] Added app to watch list: ${appName}`);
-    console.log(`[WindowDetectionService] Now watching ${this.selectedApps.size} apps`);
+    this.selectedWindows.set(window.windowId, window);
+    console.log(
+      `[WindowDetectionService] Added window to watch list: ${window.appName} (${window.windowTitle}) [${window.windowId}]`
+    );
+    console.log(`[WindowDetectionService] Now watching ${this.selectedWindows.size} windows`);
     return true;
   }
 
   /**
-   * Remove an app from the watch list
+   * Remove a window from the watch list
    *
-   * @param appName - Name of the app to stop watching
-   * @returns true if removed, false if wasn't watching
+   * @param windowId - ID of the window to stop watching
+   * @returns true if removed, false if it wasn't being watched
    */
-  removeApp(appName: string): boolean {
-    const removed = this.selectedApps.delete(appName);
+  removeWindow(windowId: string): boolean {
+    const removed = this.selectedWindows.delete(windowId);
     if (removed) {
-      console.log(`[WindowDetectionService] Removed app from watch list: ${appName}`);
-      console.log(`[WindowDetectionService] Now watching ${this.selectedApps.size} apps`);
+      console.log(`[WindowDetectionService] Removed window from watch list: ${windowId}`);
+      console.log(`[WindowDetectionService] Now watching ${this.selectedWindows.size} windows`);
     }
     return removed;
   }
 
   /**
-   * Get list of currently selected apps
+   * Get list of currently selected windows
    *
-   * @returns Array of app names being watched
+   * @returns Array of window info currently being watched
    */
-  getSelectedApps(): string[] {
-    return Array.from(this.selectedApps);
+  getSelectedWindows(): SelectedWindowInfo[] {
+    return Array.from(this.selectedWindows.values());
+  }
+
+  /**
+   * Get list of selected window IDs only
+   *
+   * @returns Array of window IDs being watched
+   */
+  getSelectedWindowIds(): string[] {
+    return Array.from(this.selectedWindows.keys());
   }
 
   /**
    * Clear all selected apps
    */
   clearAll(): void {
-    const count = this.selectedApps.size;
-    this.selectedApps.clear();
-    console.log(`[WindowDetectionService] Cleared all ${count} apps from watch list`);
+    const count = this.selectedWindows.size;
+    this.selectedWindows.clear();
+    console.log(`[WindowDetectionService] Cleared all ${count} windows from watch list`);
   }
 
   /**
    * Get current watch state
    *
-   * @returns Current watch state including selected apps
+   * @returns Current watch state including selected windows
    */
   getWatchState(): WatchState {
     return {
       isWatching: this.isWatching,
-      selectedApps: this.getSelectedApps(),
+      selectedWindows: this.getSelectedWindows(),
     };
   }
 
@@ -203,27 +215,17 @@ class WindowDetectionService {
   }
 
   /**
-   * Check if an app is currently selected for watching
-   *
-   * @param appName - Name of the app to check
-   * @returns true if app is selected
-   */
-  isAppSelected(appName: string): boolean {
-    return this.selectedApps.has(appName);
-  }
-
-  /**
    * Get statistics about current detection state
    */
   getStats(): {
     isWatching: boolean;
     selectedCount: number;
-    selectedApps: string[]
+    selectedWindows: SelectedWindowInfo[]
   } {
     return {
       isWatching: this.isWatching,
-      selectedCount: this.selectedApps.size,
-      selectedApps: this.getSelectedApps(),
+      selectedCount: this.selectedWindows.size,
+      selectedWindows: this.getSelectedWindows(),
     };
   }
 }
