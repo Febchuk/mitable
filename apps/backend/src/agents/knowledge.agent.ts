@@ -2,7 +2,7 @@ import Groq from "groq-sdk";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
 import type { StreamChunk, ToolContext, TextMessage } from "../tools/base.tool";
-import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
+import { MetaSearchTool } from "../tools/meta-search.tool";
 
 /**
  * System prompt for knowledge synthesis
@@ -46,13 +46,14 @@ You're friendly, patient, and thorough. You give clear, insightful answers and m
 3. Answer the user's question directly in your own words
 4. Make connections and extract insights
 5. Be conversational and warm, like talking to a colleague
+6. **For commit/PR/issue queries**: When asked for a "description", provide BOTH the title AND explain what it does/changes in 1-2 sentences. Don't just echo the title.
+   - ✅ GOOD: "chore(seo): add Google Search Console verification file. This commit adds the google59d308909c025cce.html verification file to the repository, enabling Google Search Console verification for the site."
+   - ❌ BAD: "chore(seo): add Google Search Console verification file." (just the title)
 
-**CRITICAL - Source Citations:**
-DO NOT include a "Sources:" section in your response. Sources will be appended programmatically after your response with the following format:
-- #channel - username ([Slack](url))
-- Document Title ([Notion](url))
-
-Your job is to provide the synthesized answer. The system will handle source formatting.`.trim();
+**Source Citations - CRITICAL:**
+NEVER write "Sources:" in your response. NEVER list sources. NEVER mention where information came from.
+Sources are automatically appended AFTER your response by the system.
+Just answer the question - the system will add sources for you.`.trim();
 
 /**
  * Knowledge Agent - Native Tool Calling Implementation
@@ -68,12 +69,12 @@ Your job is to provide the synthesized answer. The system will handle source for
 export class KnowledgeAgent extends BaseAgent {
   readonly name = "knowledge";
   private groq: Groq;
-  private searchKnowledgeTool: SearchKnowledgeTool;
+  private metaSearchTool: MetaSearchTool;
 
   constructor() {
     super();
     this.groq = new Groq({ apiKey: config.groq.apiKey });
-    this.searchKnowledgeTool = new SearchKnowledgeTool();
+    this.metaSearchTool = new MetaSearchTool();
   }
 
   /**
@@ -98,26 +99,29 @@ export class KnowledgeAgent extends BaseAgent {
       console.log(`[KnowledgeAgent] Processing query: "${userQuery}"`);
       console.log(`[KnowledgeAgent] Using NATIVE TOOL CALLING approach`);
 
-      // Define search_knowledge tool for Groq
+      // Define meta_search tool - the intelligent multi-domain coordinator
+      // This single tool replaces search_knowledge + search_codebase
+      // It automatically determines which domains to search and how to search them
       const tools: Groq.Chat.ChatCompletionTool[] = [
         {
           type: "function",
           function: {
-            name: "search_knowledge",
+            name: "meta_search",
             description:
-              "Search the company knowledge base (Slack conversations and Notion documents) for relevant information",
+              "Intelligent multi-domain search that automatically searches code, Slack conversations, Notion docs, and more. " +
+              "Use this for ANY question - the system will determine whether to search code, knowledge base, or both. " +
+              "It rewrites queries per domain and combines results intelligently.",
             parameters: {
               type: "object",
               properties: {
                 query: {
                   type: "string",
-                  description: "The search query to find relevant information",
+                  description: "The search query - can be about code, discussions, decisions, or anything",
                 },
                 topK: {
                   type: "number",
-                  description:
-                    "Number of results to return (default: 40, use 100 for temporal queries)",
-                  default: 40,
+                  description: "Number of results to return per domain (default: 10)",
+                  default: 10,
                 },
               },
               required: ["query"],
@@ -212,20 +216,49 @@ export class KnowledgeAgent extends BaseAgent {
           );
         }
 
-        console.log(`[KnowledgeAgent] Search params:`, functionArgs);
+        console.log(`[KnowledgeAgent] Tool: ${toolCall.function.name}`);
+        console.log(`[KnowledgeAgent] Params:`, functionArgs);
 
-        // Step 2: Execute the search tool
-        const searchResult = await this.searchKnowledgeTool.execute(
+        // Step 2: Execute meta-search (handles all domains automatically)
+        const searchResult = await this.metaSearchTool.execute(
           {
             query: functionArgs.query,
-            topK: functionArgs.topK || 40,
+            topK: functionArgs.topK || 10,
           },
           context
         );
+        
+        console.log(`[KnowledgeAgent] Meta-search metadata:`, searchResult.metadata);
 
         console.log(
           `[KnowledgeAgent] Step 3: Search completed - ${searchResult.sources?.length || 0} sources found`
         );
+
+        // Check if search returned 0 results - return helpful message immediately
+        if (!searchResult.sources || searchResult.sources.length === 0) {
+          console.log("[KnowledgeAgent] No results found - returning helpful message");
+          
+          const noResultsMessage = 
+            "I couldn't find any relevant information in the connected resources. " +
+            "This could mean:\n\n" +
+            "• The information hasn't been synced yet\n" +
+            "• It might be in a channel/page that isn't connected\n" +
+            "• The content might use different terminology\n\n" +
+            "Try rephrasing your question or check if the relevant sources are connected.";
+          
+          yield {
+            type: "chunk",
+            content: noResultsMessage,
+          };
+          
+          yield {
+            type: "complete",
+            content: noResultsMessage,
+          };
+          
+          console.log(`[KnowledgeAgent] ✅ No-results message sent: ${noResultsMessage.length} chars`);
+          return;
+        }
 
         // Step 3: Append assistant's tool call to history
         messages.push({
@@ -298,16 +331,66 @@ export class KnowledgeAgent extends BaseAgent {
           }
         }
 
-        // Step 7: Append sources programmatically
+        // Step 7: Append sources programmatically (domain-aware)
         if (searchResult.sources && searchResult.sources.length > 0) {
+          console.log(`[KnowledgeAgent] Formatting ${searchResult.sources.length} sources...`);
+          console.log(`[KnowledgeAgent] Sample source metadata:`, JSON.stringify(searchResult.sources[0], null, 2));
+          
           const sourcesSection =
             "\n\n**Sources:**\n" +
             searchResult.sources
-              .slice(0, 3)
-              .map(
-                (s: any) =>
-                  `- ${s.title} ([${s.url.includes("notion") ? "Notion" : "Slack"}](${s.url}))`
-              )
+              .slice(0, 5) // Show up to 5 sources
+              .map((s: any) => {
+                // Format based on domain
+                if (s.domain === 'work') {
+                  // Work items: use short IDs (commit SHA, PR#, issue#)
+                  const type = s.metadata?.type || 'commit';
+                  let identifier = '';
+                  
+                  console.log(`[KnowledgeAgent] Work item: type=${type}, commitSha=${s.metadata?.commitSha}, author=${s.metadata?.author}, title=${s.title}`);
+                  
+                  if (type === 'commit' && s.metadata?.commitSha) {
+                    identifier = `commit ${s.metadata.commitSha.substring(0, 7)}`;
+                  } else if (type === 'pr' && s.metadata?.prNumber) {
+                    identifier = `PR#${s.metadata.prNumber}`;
+                  } else if (type === 'issue' && s.metadata?.issueNumber) {
+                    identifier = `issue#${s.metadata.issueNumber}`;
+                  } else {
+                    // Fallback: extract SHA from title if it starts with "commit:"
+                    if (s.title && type === 'commit') {
+                      identifier = `commit (${s.title.substring(0, 30)}...)`;
+                    } else {
+                      identifier = type;
+                    }
+                  }
+                  
+                  // Add author and date if available
+                  const author = s.metadata?.author;
+                  const createdAt = s.metadata?.createdAt;
+                  
+                  if (author || createdAt) {
+                    const parts: string[] = [];
+                    if (author) parts.push(`by ${author}`);
+                    if (createdAt) {
+                      // Format date as MM/DD/YYYY (American format)
+                      const date = new Date(createdAt);
+                      const formatted = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+                      parts.push(`on ${formatted}`);
+                    }
+                    identifier += ` (${parts.join(' ')})`;
+                  }
+                  
+                  return `- ${identifier}`;
+                } else if (s.domain === 'code') {
+                  return `- ${s.title} ([GitHub](${s.url}))`;
+                } else if (s.domain === 'slack') {
+                  return `- ${s.title} ([Slack](${s.url}))`;
+                } else if (s.domain === 'notion') {
+                  return `- ${s.title} ([Notion](${s.url}))`;
+                } else {
+                  return `- ${s.title}`;
+                }
+              })
               .join("\n");
 
           synthesizedContent += sourcesSection;
@@ -366,10 +449,10 @@ export class KnowledgeAgent extends BaseAgent {
    * (Used by Visual Guidance Agent)
    */
   async search(query: string, context: ToolContext): Promise<TextMessage> {
-    const result = await this.searchKnowledgeTool.execute(
+    const result = await this.metaSearchTool.execute(
       {
         query,
-        topK: 20,
+        topK: 10,
       },
       context
     );

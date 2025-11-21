@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { supabase, supabaseAdmin } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
+import { authLimiter } from "../middleware/rateLimiter.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
@@ -145,7 +146,7 @@ export const authRouter = Router();
  *                       example: Unable to cleanup incomplete previous signup. Please contact support.
  *     security: []
  */
-authRouter.post("/signup-organization", async (req: Request, res: Response) => {
+authRouter.post("/signup-organization", authLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password, firstName, lastName, organizationName, organizationDomain } = req.body;
 
@@ -422,7 +423,7 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
  *         $ref: '#/components/responses/InternalError'
  *     security: []
  */
-authRouter.post("/signup", async (req: Request, res: Response) => {
+authRouter.post("/signup", authLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password, firstName, lastName, organizationId } = req.body;
 
@@ -554,7 +555,7 @@ authRouter.post("/signup", async (req: Request, res: Response) => {
  *         $ref: '#/components/responses/InternalError'
  *     security: []
  */
-authRouter.post("/login", async (req: Request, res: Response) => {
+authRouter.post("/login", authLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 

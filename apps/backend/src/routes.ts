@@ -7,14 +7,13 @@ import conversationsRouter from "./routes/conversations.js";
 import adminRouter from "./routes/admin.js";
 import integrationsRouter from "./routes/integrations.js";
 import piiRouter from "./routes/pii.js";
-import { authLimiter, screenshotLimiter } from "./middleware/rateLimiter.js";
 // DEPRECATED: Guide routes replaced by WorkflowOptions metadata system
 // import guidesRouter from "./routes/guides.routes.js";
 
 export const router = Router();
 
-// Auth routes (public) with stricter rate limiting
-router.use("/auth", authLimiter, authRouter);
+// Auth routes (public) - rate limiting applied selectively within authRouter
+router.use("/auth", authRouter);
 
 // Public route example
 router.get("/health", (_req, res) => {

@@ -5,14 +5,14 @@ import { config } from "../config";
 import type { Message } from "../db/schema/conversations.schema";
 import { BaseTool, ToolContext, StreamChunk, ToolDefinition } from "../tools/base.tool";
 import { RespondTextTool } from "../tools/respond-text.tool";
-import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
+import { MetaSearchTool } from "../tools/meta-search.tool";
 import { FindExpertTool } from "../tools/find-expert.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
 import { ClarifyIntentTool } from "../tools/clarify-intent.tool.js";
 import { StartUIGuidanceWorkflowTool } from "../tools/start-ui-guidance-workflow.tool.js";
 import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool.js";
 // REMOVED: RespondTextInWorkflowTool - replaced by smart wrapper utility
-// REMOVED: SearchKnowledgeInWorkflowTool - replaced by smart wrapper utility
+// REMOVED: SearchKnowledgeInWorkflowTool - replaced by MetaSearchTool + smart wrapper utility
 // DEPRECATED: Continuation detector only used in commented-out code (see lines 310-402)
 // import { continuationDetectorService } from "./continuation-detector.service";
 
@@ -198,8 +198,8 @@ export class AgentService {
     // Register Phase 1 tools
     this.registerTool(new RespondTextTool());
 
-    // Register Phase 2 tools - RAG Knowledge Search
-    this.registerTool(new SearchKnowledgeTool());
+    // Register Phase 2 tools - RAG Meta Search (code + knowledge + more)
+    this.registerTool(new MetaSearchTool());
 
     // Register Phase 3 tools - Expert Matching
     this.registerTool(new FindExpertTool());

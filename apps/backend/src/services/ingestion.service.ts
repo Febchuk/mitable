@@ -331,6 +331,35 @@ class IngestionService {
     if (validMessages.length === 0) return;
 
     try {
+      // Check which messages already exist (Slack messages are immutable - once embedded, done forever)
+      const existingMessages = await db
+        .select({ id: schema.searchContent.id })
+        .from(schema.searchContent)
+        .where(
+          and(
+            eq(schema.searchContent.organizationId, organizationId),
+            eq(schema.searchContent.source, "slack")
+          )
+        );
+      
+      const existingIds = new Set(existingMessages.map(m => {
+        // Extract message TS from ID (format: slack-{channel}-{ts}-chunk-{index})
+        const match = m.id.match(/slack-[^-]+-([^-]+)-chunk/);
+        return match ? match[1] : null;
+      }).filter(Boolean));
+
+      // Filter out already-embedded messages
+      const newMessages = validMessages.filter(msg => !existingIds.has(msg.ts));
+      
+      if (newMessages.length === 0) {
+        console.log(`   ⏭️  All ${validMessages.length} messages already embedded - skipping`);
+        return;
+      }
+      
+      if (newMessages.length < validMessages.length) {
+        console.log(`   📊 ${newMessages.length} new, ${validMessages.length - newMessages.length} already embedded`);
+      }
+
       const allChunks: Array<{
         chunkText: string;
         chunkIndex: number;
@@ -338,7 +367,7 @@ class IngestionService {
         parentMessage: any;
       }> = [];
 
-      for (const msg of validMessages) {
+      for (const msg of newMessages) {
         const chunks = chunkingService.chunkText(msg.text);
         for (const chunk of chunks) {
           allChunks.push({
@@ -646,6 +675,36 @@ class IngestionService {
     botId: string
   ): Promise<void> {
     try {
+      // Check which blocks already exist (by checking first chunk of each block)
+      const existingBlocks = await db
+        .select({ id: schema.searchContent.id })
+        .from(schema.searchContent)
+        .where(
+          and(
+            eq(schema.searchContent.organizationId, organizationId),
+            eq(schema.searchContent.source, "notion"),
+            eq(schema.searchContent.pageId, page.id)
+          )
+        );
+      
+      const existingIds = new Set(existingBlocks.map(b => b.id));
+      
+      // Filter out blocks that already exist
+      // Notion blocks with same ID = same content (Notion API ensures this)
+      const newOrModifiedBlocks = blocks.filter(block => {
+        const firstChunkId = `notion-${page.id}-${block.id}-chunk-0`;
+        return !existingIds.has(firstChunkId);
+      });
+      
+      if (newOrModifiedBlocks.length === 0) {
+        console.log(`   ⏭️  All ${blocks.length} blocks already up-to-date - skipping`);
+        return;
+      }
+      
+      if (newOrModifiedBlocks.length < blocks.length) {
+        console.log(`   📊 ${newOrModifiedBlocks.length} new/modified, ${blocks.length - newOrModifiedBlocks.length} unchanged`);
+      }
+
       const allChunks: Array<{
         chunkText: string;
         chunkIndex: number;
@@ -653,7 +712,7 @@ class IngestionService {
         parentBlock: any;
       }> = [];
 
-      for (const block of blocks) {
+      for (const block of newOrModifiedBlocks) {
         const chunks = chunkingService.chunkText(block.text);
         for (const chunk of chunks) {
           allChunks.push({

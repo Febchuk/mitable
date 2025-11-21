@@ -1,14 +1,14 @@
 #!/usr/bin/env tsx
 // Combined Integration Sync Script for Railway Cron
 //
-// Syncs ALL active integrations (Slack + Notion) in one run.
+// Syncs ALL active integrations (Slack + Notion + GitHub) in one run.
 // Designed to be executed by Railway cron jobs every 6 hours.
 //
 // Usage: npm run sync-integrations
 // Railway Cron Schedule: 0 */6 * * * (every 6 hours)
 //
 // Features:
-// - Incremental syncs for both Slack and Notion
+// - Incremental syncs for Slack, Notion, and GitHub
 // - Graceful error handling (logs failures, continues execution)
 // - Structured logging with timestamps
 // - Clean exit after completion
@@ -22,6 +22,7 @@ import { ingestionService } from "../services/ingestion.service.js";
 import { vectorService } from "../services/vector.service.js";
 import { validateConfig } from "../config.js";
 import { encryptionService } from "../services/encryption.service.js";
+import { githubSyncService } from "../services/github-sync.service.js";
 
 interface SyncStats {
   slack: {
@@ -35,6 +36,15 @@ interface SyncStats {
     success: number;
     failed: number;
     pagesProcessed: number;
+  };
+  github: {
+    integrations: number;
+    success: number;
+    failed: number;
+    reposProcessed: number;
+    commitsProcessed: number;
+    prsProcessed: number;
+    issuesProcessed: number;
   };
   startTime: number;
   endTime?: number;
@@ -260,6 +270,88 @@ async function syncNotion(stats: SyncStats): Promise<void> {
 }
 
 /**
+ * Sync all GitHub integrations
+ */
+async function syncGithub(stats: SyncStats): Promise<void> {
+  console.log("\n" + "=".repeat(70));
+  console.log("🐙 GITHUB SYNC");
+  console.log("=".repeat(70) + "\n");
+
+  try {
+    const githubIntegrations = await db
+      .select()
+      .from(integrations)
+      .where(eq(integrations.provider, "github"));
+
+    stats.github.integrations = githubIntegrations.length;
+
+    if (githubIntegrations.length === 0) {
+      console.log("📭 No GitHub integrations found\n");
+      return;
+    }
+
+    console.log(`📋 Found ${githubIntegrations.length} GitHub integration(s)\n`);
+
+    for (const integration of githubIntegrations) {
+      const orgId = integration.organizationId;
+      const lastSyncedAt = integration.lastSyncedAt ? new Date(integration.lastSyncedAt) : null;
+      const syncMode = lastSyncedAt ? "incremental" : "full";
+
+      console.log(`\n${"─".repeat(60)}`);
+      console.log(`📦 Organization: ${orgId}`);
+      console.log(`🔄 Sync Mode: ${syncMode}`);
+
+      if (lastSyncedAt) {
+        console.log(`📅 Last synced: ${lastSyncedAt.toLocaleString()}`);
+      } else {
+        console.log(`📅 First sync - fetching all data`);
+      }
+
+      console.log(`${"─".repeat(60)}`);
+
+      try {
+        const result = await githubSyncService.syncIntegration(integration);
+
+        stats.github.reposProcessed += result.reposProcessed;
+        stats.github.commitsProcessed += result.commitsProcessed;
+        stats.github.prsProcessed += result.prsProcessed;
+        stats.github.issuesProcessed += result.issuesProcessed;
+        stats.github.success++;
+
+        console.log(`\n✅ GitHub sync complete for ${orgId}`);
+        console.log(`   Repos: ${result.reposProcessed}`);
+        console.log(`   Commits: ${result.commitsProcessed}`);
+        console.log(`   PRs: ${result.prsProcessed}`);
+        console.log(`   Issues: ${result.issuesProcessed}`);
+
+        if (result.reposSkipped > 0) {
+          console.log(`   ⏭️  Repos skipped: ${result.reposSkipped}`);
+        }
+      } catch (error) {
+        stats.github.failed++;
+        console.error(
+          `\n❌ Failed to sync GitHub for ${orgId}:`,
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+
+    console.log(`\n${"=".repeat(60)}`);
+    console.log(`📊 GitHub Summary:`);
+    console.log(`   Integrations: ${stats.github.integrations}`);
+    console.log(`   ✅ Success: ${stats.github.success}`);
+    console.log(`   ❌ Failed: ${stats.github.failed}`);
+    console.log(`   Repos: ${stats.github.reposProcessed}`);
+    console.log(`   Commits: ${stats.github.commitsProcessed}`);
+    console.log(`   PRs: ${stats.github.prsProcessed}`);
+    console.log(`   Issues: ${stats.github.issuesProcessed}`);
+    console.log(`${"=".repeat(60)}\n`);
+  } catch (error) {
+    console.error("\n❌ Fatal error in GitHub sync:", error);
+  }
+}
+
+/**
  * Main entry point
  */
 async function main() {
@@ -275,6 +367,15 @@ async function main() {
       success: 0,
       failed: 0,
       pagesProcessed: 0,
+    },
+    github: {
+      integrations: 0,
+      success: 0,
+      failed: 0,
+      reposProcessed: 0,
+      commitsProcessed: 0,
+      prsProcessed: 0,
+      issuesProcessed: 0,
     },
     startTime: Date.now(),
   };
@@ -302,6 +403,9 @@ async function main() {
   // Sync Notion integrations (don't exit on failure)
   await syncNotion(stats);
 
+  // Sync GitHub integrations (don't exit on failure)
+  await syncGithub(stats);
+
   // Final summary
   stats.endTime = Date.now();
   const durationSeconds = Math.round((stats.endTime - stats.startTime) / 1000);
@@ -323,10 +427,19 @@ async function main() {
   console.log(`   ✅ Success: ${stats.notion.success}`);
   console.log(`   ❌ Failed: ${stats.notion.failed}`);
   console.log(`   Pages: ${stats.notion.pagesProcessed}`);
+  console.log("");
+  console.log(`🐙 GitHub:`);
+  console.log(`   Integrations: ${stats.github.integrations}`);
+  console.log(`   ✅ Success: ${stats.github.success}`);
+  console.log(`   ❌ Failed: ${stats.github.failed}`);
+  console.log(`   Repos: ${stats.github.reposProcessed}`);
+  console.log(`   Commits: ${stats.github.commitsProcessed}`);
+  console.log(`   PRs: ${stats.github.prsProcessed}`);
+  console.log(`   Issues: ${stats.github.issuesProcessed}`);
   console.log("=".repeat(70) + "\n");
 
   // Exit with appropriate code
-  const totalFailed = stats.slack.failed + stats.notion.failed;
+  const totalFailed = stats.slack.failed + stats.notion.failed + stats.github.failed;
   process.exit(totalFailed > 0 ? 1 : 0);
 }
 

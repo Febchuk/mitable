@@ -7,7 +7,7 @@ import { VisualGuidanceAgent } from "../agents/visual-guidance.agent";
 import { ExpertMatchingAgent } from "../agents/expert-matching.agent";
 import { BaseAgent } from "../agents/base.agent";
 import { guideGenerationService } from "./guideGeneration.service";
-import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
+import { MetaSearchTool } from "../tools/meta-search.tool";
 import { cacheService } from "./cache.service";
 
 /**
@@ -69,7 +69,7 @@ export class OrchestratorService {
   private knowledgeAgent: KnowledgeAgent;
   private visualGuidanceAgent: VisualGuidanceAgent;
   private expertMatchingAgent: ExpertMatchingAgent;
-  private searchTool: SearchKnowledgeTool;
+  private searchTool: MetaSearchTool;
 
   constructor() {
     this.gemini = new GoogleGenerativeAI(config.gemini.apiKey);
@@ -81,7 +81,7 @@ export class OrchestratorService {
 
     // Visual Guidance Agent depends on Knowledge Agent and Text Response Agent
     this.visualGuidanceAgent = new VisualGuidanceAgent(this.knowledgeAgent, this.textAgent);
-    this.searchTool = new SearchKnowledgeTool();
+    this.searchTool = new MetaSearchTool();
   }
 
   // Generate a concise 1–2 sentence definition using TextResponseAgent and truncate

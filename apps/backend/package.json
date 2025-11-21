@@ -22,12 +22,17 @@
     "sync-slack": "tsx src/scripts/sync-slack.ts",
     "sync-notion": "tsx src/scripts/sync-notion.ts",
     "sync-integrations": "tsx src/scripts/sync-integrations.ts",
-    "backfill-tokens": "tsx src/scripts/backfill-encrypted-tokens.ts"
+    "run:github-schema": "tsx src/scripts/run-github-schema.ts",
+    "run:github-ingestion": "tsx src/scripts/run-github-ingestion.ts",
+    "backfill-tokens": "tsx src/scripts/backfill-encrypted-tokens.ts",
+    "backfill-github-content": "tsx src/scripts/backfill-github-file-content.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@mitable/shared": "*",
     "@notionhq/client": "^5.2.1",
+    "@octokit/app": "^15.1.6",
+    "@octokit/request": "^9.2.4",
     "@pinecone-database/pinecone": "^6.1.2",
     "@slack/web-api": "^7.11.0",
     "@supabase/supabase-js": "^2.75.0",

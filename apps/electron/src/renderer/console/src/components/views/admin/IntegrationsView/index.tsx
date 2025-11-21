@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { useIntegrations, useSyncIntegration } from "@/console/src/hooks/queries/admin";
+import { useIntegrations } from "@/console/src/hooks/queries/admin";
 import IntegrationCard from "./components/IntegrationCard";
 import SlackConnectDialog from "./components/SlackConnectDialog";
 import SlackConfigureDialog from "./components/SlackConfigureDialog";
 import NotionConnectDialog from "./components/NotionConnectDialog";
 import NotionConfigureDialog from "./components/NotionConfigureDialog";
+import GitHubConnectDialog from "./components/GitHubConnectDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -22,13 +23,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export default function IntegrationsView() {
   const { data: integrations = [], refetch } = useIntegrations();
-  const syncMutation = useSyncIntegration();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [slackDialogOpen, setSlackDialogOpen] = useState(false);
   const [slackConfigureDialogOpen, setSlackConfigureDialogOpen] = useState(false);
   const [notionDialogOpen, setNotionDialogOpen] = useState(false);
   const [notionConfigureDialogOpen, setNotionConfigureDialogOpen] = useState(false);
+  const [githubDialogOpen, setGithubDialogOpen] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSlackConnect = () => {
@@ -63,6 +64,10 @@ export default function IntegrationsView() {
     setNotionDialogOpen(true);
   };
 
+  const handleGithubConnect = () => {
+    setGithubDialogOpen(true);
+  };
+
   // Stub handlers for IntegrationCard (not used for Slack, but required by component)
   const handleConnectIntegration = async (id: string) => {
     // Generic connect - not used for Slack (uses custom OAuth flow)
@@ -75,13 +80,57 @@ export default function IntegrationsView() {
   };
 
   const handleSyncIntegration = async (id: string) => {
+    const integration = integrations.find((i) => i.id === id);
+    if (!integration) return;
+
     try {
-      await syncMutation.mutateAsync(id);
-      toast({
-        title: "Sync Started",
-        description: "Integration sync has been triggered successfully.",
-      });
+      const token = authService.getAccessToken();
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Not authenticated. Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Call provider-specific sync endpoint
+      let endpoint = "";
+      if (integration.provider === "slack") {
+        endpoint = `${API_BASE_URL}/api/integrations/slack/sync`;
+      } else if (integration.provider === "notion") {
+        endpoint = `${API_BASE_URL}/api/integrations/notion/sync`;
+      } else if (integration.provider === "github") {
+        endpoint = `${API_BASE_URL}/api/integrations/github/sync`;
+      }
+
+      if (endpoint) {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Sync failed");
+        }
+
+        const result = await response.json();
+        
+        toast({
+          title: "Sync Complete",
+          description: integration.provider === "github" 
+            ? `Processed ${result.commitsProcessed || 0} commits from ${result.reposProcessed || 0} repositories`
+            : "Integration sync completed successfully.",
+        });
+
+        // Refresh integrations to update lastSyncedAt
+        await refetch();
+      }
     } catch (error) {
+      console.error("Sync error:", error);
       toast({
         title: "Sync Failed",
         description: error instanceof Error ? error.message : "Failed to sync integration",
@@ -124,6 +173,8 @@ export default function IntegrationsView() {
         endpoint = `${API_BASE_URL}/api/integrations/slack/disconnect`;
       } else if (integration.provider === "notion") {
         endpoint = `${API_BASE_URL}/api/integrations/notion/disconnect`;
+      } else if (integration.provider === "github") {
+        endpoint = `${API_BASE_URL}/api/integrations/github/disconnect`;
       }
 
       if (endpoint) {
@@ -252,6 +303,36 @@ export default function IntegrationsView() {
     }, 1000);
   };
 
+  const handleGithubOAuthStarted = () => {
+    let pollCount = 0;
+    const maxPolls = POLLING_CONFIG.MAX_POLLS;
+
+    pollingIntervalRef.current = setInterval(async () => {
+      pollCount++;
+
+      await refetch();
+
+      const githubIntegration = integrations.find((i) => i.provider === "github");
+
+      if (githubIntegration?.status === "connected") {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+
+        toast({
+          title: "GitHub Connected",
+          description: "Your GitHub installation is complete.",
+        });
+      } else if (pollCount >= maxPolls) {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      }
+    }, POLLING_CONFIG.INTERVAL_MS);
+  };
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
@@ -365,7 +446,9 @@ export default function IntegrationsView() {
                       ? handleSlackConnect
                       : integration.provider === "notion"
                         ? handleNotionConnect
-                        : undefined
+                        : integration.provider === "github"
+                          ? handleGithubConnect
+                          : undefined
                   }
                   position={getCardPosition(index, sortedIntegrations.length)}
                 />
@@ -406,7 +489,9 @@ export default function IntegrationsView() {
                         ? handleSlackConnect
                         : integration.provider === "notion"
                           ? handleNotionConnect
-                          : undefined
+                          : integration.provider === "github"
+                            ? handleGithubConnect
+                            : undefined
                     }
                     position={getCardPosition(index, connectedIntegrations.length)}
                   />
@@ -442,7 +527,9 @@ export default function IntegrationsView() {
                         ? handleSlackConnect
                         : integration.provider === "notion"
                           ? handleNotionConnect
-                          : undefined
+                          : integration.provider === "github"
+                            ? handleGithubConnect
+                            : undefined
                     }
                     position={getCardPosition(index, availableIntegrations.length)}
                   />
@@ -476,6 +563,13 @@ export default function IntegrationsView() {
         open={notionDialogOpen}
         onOpenChange={setNotionDialogOpen}
         onConnect={handleNotionOAuthStarted}
+      />
+
+      {/* GitHub Connect Dialog */}
+      <GitHubConnectDialog
+        open={githubDialogOpen}
+        onOpenChange={setGithubDialogOpen}
+        onConnect={handleGithubOAuthStarted}
       />
 
       {/* Notion Configure Dialog */}

@@ -2,7 +2,7 @@
 /**
  * Railway Cron Service - Integration Sync
  * 
- * Standalone service that syncs ALL active integrations (Slack + Notion).
+ * Standalone service that syncs ALL active integrations (Slack + Notion + GitHub).
  * Designed to run as a separate Railway service every 6 hours.
  * 
  * Schedule: 0 *\/6 * * * (every 6 hours)
@@ -16,13 +16,11 @@
 
 import { db } from "../../backend/src/db/client.js";
 import { integrations } from "../../backend/src/db/schema/integrations.schema.js";
-import { searchContent } from "../../backend/src/db/schema/search-content.schema.js";
-import { eq, desc } from "drizzle-orm";
-import { WebClient } from "@slack/web-api";
+import { eq } from "drizzle-orm";
 import { ingestionService } from "../../backend/src/services/ingestion.service.js";
 import { vectorService } from "../../backend/src/services/vector.service.js";
 import { validateConfig } from "../../backend/src/config.js";
-import { encryptionService } from "../../backend/src/services/encryption.service.js";
+import { githubSyncService } from "../../backend/src/services/github-sync.service.js";
 
 interface SyncStats {
   slack: {
@@ -37,8 +35,73 @@ interface SyncStats {
     failed: number;
     pagesProcessed: number;
   };
+  github: {
+    integrations: number;
+    success: number;
+    failed: number;
+    reposProcessed: number;
+    commitsProcessed: number;
+  };
   startTime: number;
   endTime?: number;
+}
+
+/**
+ * Sync all GitHub integrations
+ */
+async function syncGithub(stats: SyncStats): Promise<void> {
+  console.log("\n" + "=".repeat(70));
+  console.log("🐙 GITHUB SYNC");
+  console.log("=".repeat(70) + "\n");
+
+  try {
+    const githubIntegrations = await db
+      .select()
+      .from(integrations)
+      .where(eq(integrations.provider, "github"));
+
+    stats.github.integrations = githubIntegrations.length;
+
+    if (githubIntegrations.length === 0) {
+      console.log("📭 No GitHub integrations found\n");
+      return;
+    }
+
+    console.log(`📋 Found ${githubIntegrations.length} GitHub integration(s)\n`);
+
+    for (const integration of githubIntegrations) {
+      const orgId = integration.organizationId;
+      console.log(`\n${"─".repeat(60)}`);
+      console.log(`📦 Organization: ${orgId}`);
+
+      try {
+        const result = await githubSyncService.syncIntegration(integration);
+        stats.github.reposProcessed += result.reposProcessed;
+        stats.github.commitsProcessed += result.commitsProcessed;
+        stats.github.success++;
+        console.log(
+          `✅ GitHub sync complete for ${orgId} | Repos: ${result.reposProcessed} | Commits: ${result.commitsProcessed}`
+        );
+      } catch (error) {
+        stats.github.failed++;
+        console.error(
+          `❌ Failed to sync GitHub for ${orgId}:`,
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+
+    console.log(`\n${"=".repeat(60)}`);
+    console.log(`📊 GitHub Summary:`);
+    console.log(`   Integrations: ${stats.github.integrations}`);
+    console.log(`   ✅ Success: ${stats.github.success}`);
+    console.log(`   ❌ Failed: ${stats.github.failed}`);
+    console.log(`   Repos: ${stats.github.reposProcessed}`);
+    console.log(`   Commits: ${stats.github.commitsProcessed}`);
+    console.log(`${"=".repeat(60)}\n`);
+  } catch (error) {
+    console.error("\n❌ Fatal error in GitHub sync:", error);
+  }
 }
 
 /**
@@ -66,98 +129,30 @@ async function syncSlack(stats: SyncStats): Promise<void> {
 
     for (const integration of slackIntegrations) {
       const orgId = integration.organizationId;
-      const metadata = integration.metadata as any;
-      const selectedChannels: string[] = metadata?.selected_channels || [];
 
       console.log(`\n${"─".repeat(60)}`);
       console.log(`📦 Organization: ${orgId}`);
 
       try {
-        // Decrypt the access token
-        if (!integration.accessTokenEncrypted) {
-          throw new Error("No Slack access token found");
-        }
-        
-        const token = encryptionService.decrypt(integration.accessTokenEncrypted);
-
-        if (selectedChannels.length === 0) {
-          console.log("⏭️  No channels selected - skipping");
-          continue;
-        }
-
-        // Find latest message timestamp for incremental sync
-        const [latestMessage] = await db
-          .select({ timestamp: searchContent.timestamp })
-          .from(searchContent)
-          .where(eq(searchContent.source, "slack"))
-          .orderBy(desc(searchContent.timestamp))
-          .limit(1);
-
-        let oldestTimestamp: number | undefined;
-        let syncMode = "full";
-
-        if (latestMessage && latestMessage.timestamp) {
-          oldestTimestamp = Math.floor(latestMessage.timestamp / 1000);
-          syncMode = "incremental";
-          const lastSyncDate = new Date(latestMessage.timestamp);
-          console.log(`🔄 Sync Mode: ${syncMode}`);
-          console.log(`📅 Last sync: ${lastSyncDate.toLocaleString()}`);
-        } else {
-          console.log(`🔄 Sync Mode: ${syncMode} (first sync)`);
-        }
-
-        console.log(`📊 Channels: ${selectedChannels.length}`);
-        console.log(`${"─".repeat(60)}`);
-
-        const client = new WebClient(token);
-        let totalMessages = 0;
-
-        for (const channelId of selectedChannels) {
-          try {
-            console.log(`\n📥 Fetching messages from ${channelId}...`);
-
-            let hasMore = true;
-            let cursor: string | undefined;
-            let channelMessages = 0;
-
-            while (hasMore) {
-              const result = await client.conversations.history({
-                channel: channelId,
-                cursor,
-                limit: 100,
-                oldest: oldestTimestamp?.toString(),
-              });
-
-              const messages = result.messages || [];
-              channelMessages += messages.length;
-
-              if (!result.has_more) {
-                hasMore = false;
-              } else {
-                cursor = result.response_metadata?.next_cursor;
-              }
-
-              // Break if no new messages
-              if (messages.length === 0) {
-                hasMore = false;
-              }
-            }
-
-            totalMessages += channelMessages;
-            console.log(`   ✅ ${channelMessages} messages fetched`);
-          } catch (error) {
-            console.error(
-              `   ❌ Failed to fetch ${channelId}:`,
-              error instanceof Error ? error.message : error
+        // Use the built-in sync method (handles fetch + ingestion properly)
+        const result = await ingestionService.syncSlackMessages(orgId, (progress) => {
+          if (progress.currentChannel) {
+            console.log(
+              `� [${progress.channelsProcessed + 1}/${progress.totalChannels}] ${progress.currentChannel} (${progress.messagesProcessed} messages)`
             );
           }
-        }
+        });
 
-        stats.slack.messagesProcessed += totalMessages;
+        stats.slack.messagesProcessed += result.messagesEmbedded;
         stats.slack.success++;
 
         console.log(`\n✅ Slack sync complete for ${orgId}`);
-        console.log(`   Total messages: ${totalMessages}`);
+        console.log(`   Total messages: ${result.messagesEmbedded}`);
+        console.log(`   Duration: ${Math.round(result.duration / 1000)}s`);
+        
+        if (result.errors.length > 0) {
+          console.log(`   ⚠️  Errors: ${result.errors.length}`);
+        }
       } catch (error) {
         stats.slack.failed++;
         console.error(
@@ -277,6 +272,13 @@ async function main() {
       failed: 0,
       pagesProcessed: 0,
     },
+    github: {
+      integrations: 0,
+      success: 0,
+      failed: 0,
+      reposProcessed: 0,
+      commitsProcessed: 0,
+    },
     startTime: Date.now(),
   };
 
@@ -303,6 +305,9 @@ async function main() {
   // Sync Notion integrations (don't exit on failure)
   await syncNotion(stats);
 
+  // Sync GitHub integrations (don't exit on failure)
+  await syncGithub(stats);
+
   // Final summary
   stats.endTime = Date.now();
   const durationSeconds = Math.round((stats.endTime - stats.startTime) / 1000);
@@ -324,10 +329,17 @@ async function main() {
   console.log(`   ✅ Success: ${stats.notion.success}`);
   console.log(`   ❌ Failed: ${stats.notion.failed}`);
   console.log(`   Pages: ${stats.notion.pagesProcessed}`);
+  console.log("");
+  console.log(`🐙 GitHub:`);
+  console.log(`   Integrations: ${stats.github.integrations}`);
+  console.log(`   ✅ Success: ${stats.github.success}`);
+  console.log(`   ❌ Failed: ${stats.github.failed}`);
+  console.log(`   Repos: ${stats.github.reposProcessed}`);
+  console.log(`   Commits: ${stats.github.commitsProcessed}`);
   console.log("=".repeat(70) + "\n");
 
   // Exit with appropriate code (required for Railway cron)
-  const totalFailed = stats.slack.failed + stats.notion.failed;
+  const totalFailed = stats.slack.failed + stats.notion.failed + stats.github.failed;
   process.exit(totalFailed > 0 ? 1 : 0);
 }
 
