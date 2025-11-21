@@ -675,7 +675,7 @@ Note: boundingBox is null because element requires scrolling to be visible
       ]);
 
       const text = result.response.text();
-      const parsed = VisualGuidanceSchema.parse(JSON.parse(text));
+      const parsed = VisualGuidanceSchema.parse(JSON.parse(text)) as any;
 
       // Add clarified description to response (from Phase 1)
       parsed.clarifiedDescription = clarifiedDescription;

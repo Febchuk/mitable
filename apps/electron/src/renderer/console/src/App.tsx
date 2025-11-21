@@ -74,9 +74,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   // Log startup configuration
   useEffect(() => {
-    console.log('[CONFIG] Console App Environment:', {
-      apiUrl: import.meta.env.VITE_API_URL || 'undefined (will use localhost:3000)',
-      supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'undefined',
+    console.log("[CONFIG] Console App Environment:", {
+      apiUrl: import.meta.env.VITE_API_URL || "undefined (will use localhost:3000)",
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL || "undefined",
       mode: import.meta.env.MODE,
       dev: import.meta.env.DEV,
       prod: import.meta.env.PROD,

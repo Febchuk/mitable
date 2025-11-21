@@ -148,15 +148,29 @@ class EncryptionService {
 
       return decrypted;
     } catch (error) {
-      // Authentication tag verification failure means data was tampered with
-      if (error instanceof Error && error.message.includes("auth")) {
-        throw new Error("Authentication failed: encrypted data may have been tampered with");
+      // Re-throw validation errors as-is (they already have good messages)
+      if (error instanceof Error && error.message.startsWith("Invalid")) {
+        throw error;
       }
 
-      // Re-throw with context
-      throw new Error(
-        `Decryption failed: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
+      // Authentication tag verification failure or crypto errors
+      // Node crypto throws various error codes/messages for auth failures
+      if (error instanceof Error) {
+        const errorStr = error.message.toLowerCase();
+        if (
+          errorStr.includes("auth") ||
+          errorStr.includes("unsupported state") ||
+          errorStr.includes("bad decrypt")
+        ) {
+          throw new Error("Authentication failed: encrypted data may have been tampered with");
+        }
+        // Re-throw with context
+        throw new Error(`Decryption failed: ${error.message}`);
+      }
+
+      // Handle non-Error objects (should be rare, but crypto can throw various types)
+      // Default to authentication failure for crypto-related errors
+      throw new Error("Authentication failed: encrypted data may have been tampered with");
     }
   }
 

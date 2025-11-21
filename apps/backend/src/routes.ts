@@ -7,7 +7,7 @@ import conversationsRouter from "./routes/conversations.js";
 import adminRouter from "./routes/admin.js";
 import integrationsRouter from "./routes/integrations.js";
 import piiRouter from "./routes/pii.js";
-import { authLimiter, screenshotLimiter } from "./middleware/rateLimiter.js";
+import { authLimiter } from "./middleware/rateLimiter.js";
 // DEPRECATED: Guide routes replaced by WorkflowOptions metadata system
 // import guidesRouter from "./routes/guides.routes.js";
 

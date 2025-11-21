@@ -878,14 +878,14 @@ async function seedSourceMaterials(organizationId: string) {
   return materials;
 }
 
-async function seedRoadmapTemplates(organizationId: string, materials: any[]) {
+async function seedRoadmapTemplates(organizationId: string, _materials: any[]) {
   console.log("🗺️  Seeding roadmap templates (15 templates with 200+ tasks)...");
 
-  // Helper to get random materials for linking
-  const getRandomMaterials = (count: number) => {
-    const shuffled = [...materials].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
-  };
+  // Helper to get random materials for linking (currently unused but kept for future use)
+  // const getRandomMaterials = (count: number) => {
+  //   const shuffled = [..._materials].sort(() => 0.5 - Math.random());
+  //   return shuffled.slice(0, count);
+  // };
 
   // === TEMPLATE 1: AI/ML Engineer ===
   const [aiMlTemplate] = await db
@@ -2011,24 +2011,28 @@ async function seedIntegrations(organizationId: string) {
         organizationId,
         provider: "slack",
         status: "disconnected",
+        accessTokenEncrypted: "", // Empty for disconnected integrations
         metadata: {},
       },
       {
         organizationId,
         provider: "notion",
         status: "disconnected",
+        accessTokenEncrypted: "", // Empty for disconnected integrations
         metadata: {},
       },
       {
         organizationId,
         provider: "github",
         status: "disconnected",
+        accessTokenEncrypted: "", // Empty for disconnected integrations
         metadata: {},
       },
       {
         organizationId,
         provider: "google-drive",
         status: "disconnected",
+        accessTokenEncrypted: "", // Empty for disconnected integrations
         metadata: {},
       },
     ])
@@ -2057,7 +2061,7 @@ async function main() {
     const organization = await seedOrganization();
     const users = await seedUsers(organization.id);
     const materials = await seedSourceMaterials(organization.id);
-    const templates = await seedRoadmapTemplates(organization.id, materials);
+    await seedRoadmapTemplates(organization.id, materials);
     const integrations = await seedIntegrations(organization.id);
 
     console.log("");

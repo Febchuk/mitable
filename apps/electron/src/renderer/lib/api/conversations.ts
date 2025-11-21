@@ -175,11 +175,14 @@ export async function sendMessageStream(
     console.log(`[API] Sending message with metadata:`, metadata);
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/conversations/${conversationId}/messages/stream`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(requestBody),
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/api/conversations/${conversationId}/messages/stream`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestBody),
+    }
+  );
 
   if (!response.ok) {
     const errorText = await response.text();

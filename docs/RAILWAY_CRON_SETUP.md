@@ -9,6 +9,7 @@ This guide explains how to set up automated syncing of Slack and Notion integrat
 ## 🎯 What Gets Synced
 
 The cron job runs `sync-integrations.ts` which syncs:
+
 - **All Slack integrations** - Incremental message sync
 - **All Notion integrations** - Incremental page sync
 
@@ -25,15 +26,16 @@ The cron job runs `sync-integrations.ts` which syncs:
 
 ## 💰 Cost Estimate
 
-| Item | Details |
-|------|---------|
-| **Syncs per day** | 4 |
-| **Syncs per month** | 120 (4 × 30) |
-| **Execution time** | ~10 min per sync |
+| Item                 | Details                  |
+| -------------------- | ------------------------ |
+| **Syncs per day**    | 4                        |
+| **Syncs per month**  | 120 (4 × 30)             |
+| **Execution time**   | ~10 min per sync         |
 | **Total time/month** | ~20 hours (120 × 10 min) |
-| **Railway cost** | ~$6-7/month |
+| **Railway cost**     | ~$6-7/month              |
 
 **Breakdown:**
+
 - Railway Hobby Plan: $5/month (base)
 - Execution time: $1-2/month
 - **Total:** $6-7/month
@@ -58,11 +60,13 @@ The cron job runs `sync-integrations.ts` which syncs:
 ### Step 3: Configure Build Settings
 
 1. **Build Command:**
+
    ```
    npm install
    ```
 
 2. **Start Command:**
+
    ```
    npm run sync-integrations
    ```
@@ -78,6 +82,7 @@ The cron job runs `sync-integrations.ts` which syncs:
 Copy all environment variables from your main backend service:
 
 **Required Variables:**
+
 ```bash
 # Database
 DATABASE_URL=postgresql://...
@@ -111,6 +116,7 @@ NODE_ENV=production
 ```
 
 **Optional Variables:**
+
 ```bash
 # Groq (if used)
 GROQ_API_KEY=...
@@ -243,6 +249,7 @@ npm run sync-integrations
 ```
 
 Expected behavior:
+
 - Syncs all Slack integrations
 - Syncs all Notion integrations
 - Shows structured logs
@@ -255,11 +262,13 @@ Expected behavior:
 ### Issue: Cron job not running
 
 **Possible causes:**
+
 1. Cron schedule not enabled
 2. Invalid cron expression
 3. Service not deployed
 
 **Solutions:**
+
 1. Check service settings → Enable cron schedule
 2. Verify cron expression: `0 */6 * * *`
 3. Deploy the service
@@ -267,11 +276,13 @@ Expected behavior:
 ### Issue: Environment variables missing
 
 **Symptom:**
+
 ```
 ❌ Configuration error: PINECONE_API_KEY not found
 ```
 
 **Solution:**
+
 1. Go to service settings → Variables
 2. Copy all variables from main backend service
 3. Redeploy
@@ -279,11 +290,13 @@ Expected behavior:
 ### Issue: Database connection failed
 
 **Symptom:**
+
 ```
 ❌ Fatal error in Slack sync: Connection terminated
 ```
 
 **Solution:**
+
 1. Verify `DATABASE_URL` is correct
 2. Check if database is accessible from Railway
 3. Ensure connection pooler is configured (if using Supabase)
@@ -291,12 +304,14 @@ Expected behavior:
 ### Issue: No integrations found
 
 **Symptom:**
+
 ```
 📭 No Slack integrations found
 📭 No Notion integrations found
 ```
 
 **Solution:**
+
 - This is normal if no integrations are connected
 - Connect Slack/Notion through the app first
 - Run sync again
@@ -304,10 +319,12 @@ Expected behavior:
 ### Issue: Sync takes too long
 
 **Symptom:**
+
 - Execution time > 15 minutes
 - Railway timeout errors
 
 **Solutions:**
+
 1. Reduce `syncFrequency` in database (sync less often)
 2. Limit number of Slack channels selected
 3. Split into separate Slack/Notion cron jobs
@@ -316,13 +333,13 @@ Expected behavior:
 
 ## 📝 Cron Expression Reference
 
-| Expression | Description | Times (UTC) |
-|-----------|-------------|-------------|
-| `0 */6 * * *` | Every 6 hours | 12 AM, 6 AM, 12 PM, 6 PM |
-| `0 */4 * * *` | Every 4 hours | 12 AM, 4 AM, 8 AM, 12 PM, 4 PM, 8 PM |
-| `0 */12 * * *` | Every 12 hours | 12 AM, 12 PM |
-| `0 0 * * *` | Daily at midnight | 12 AM |
-| `0 */2 * * *` | Every 2 hours | Every even hour |
+| Expression     | Description       | Times (UTC)                          |
+| -------------- | ----------------- | ------------------------------------ |
+| `0 */6 * * *`  | Every 6 hours     | 12 AM, 6 AM, 12 PM, 6 PM             |
+| `0 */4 * * *`  | Every 4 hours     | 12 AM, 4 AM, 8 AM, 12 PM, 4 PM, 8 PM |
+| `0 */12 * * *` | Every 12 hours    | 12 AM, 12 PM                         |
+| `0 0 * * *`    | Daily at midnight | 12 AM                                |
+| `0 */2 * * *`  | Every 2 hours     | Every even hour                      |
 
 **Minimum interval:** 5 minutes (`*/5 * * * *`)
 
@@ -347,6 +364,7 @@ Expected behavior:
 ## 🎯 Best Practices
 
 ### ✅ DO
+
 - ✅ Monitor logs regularly for errors
 - ✅ Start with 6-hour intervals
 - ✅ Test locally before deploying
@@ -354,6 +372,7 @@ Expected behavior:
 - ✅ Use incremental sync for efficiency
 
 ### ❌ DON'T
+
 - ❌ Set interval < 1 hour (unnecessary API calls)
 - ❌ Ignore failed syncs (check logs)
 - ❌ Forget to copy environment variables
@@ -374,6 +393,7 @@ Expected behavior:
 If you prefer manual control over automated syncs:
 
 **Option 1: API Endpoints**
+
 ```bash
 # Slack
 curl -X POST https://your-api.com/api/integrations/slack/sync
@@ -383,6 +403,7 @@ curl -X POST https://your-api.com/api/integrations/notion/sync
 ```
 
 **Option 2: CLI Scripts**
+
 ```bash
 # Slack only
 npm run sync-slack
@@ -396,11 +417,12 @@ npm run sync-integrations
 
 **Option 3: GitHub Actions**
 Create `.github/workflows/sync-integrations.yml`:
+
 ```yaml
 name: Sync Integrations
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 jobs:

@@ -9,6 +9,7 @@ This guide covers the token encryption feature that securely stores Slack and No
 ## 🎯 What Was Implemented
 
 ### Security Features
+
 - ✅ **AES-256-GCM** authenticated encryption (NIST-recommended)
 - ✅ **Random 12-byte IV** per encryption (prevents pattern analysis)
 - ✅ **16-byte authentication tag** (prevents tampering)
@@ -18,6 +19,7 @@ This guide covers the token encryption feature that securely stores Slack and No
 - ✅ **Comprehensive test suite** (>90% coverage)
 
 ### Files Created
+
 ```
 apps/backend/src/
 ├── services/
@@ -33,6 +35,7 @@ apps/backend/src/
 ```
 
 ### Files Modified
+
 ```
 apps/backend/src/
 ├── db/schema/integrations.schema.ts   # Added encrypted columns
@@ -51,7 +54,9 @@ apps/backend/src/
 ### 1. Connect a New Slack Workspace
 
 **Steps:**
+
 1. Start the backend server:
+
    ```bash
    cd apps/backend
    npm run dev
@@ -66,6 +71,7 @@ apps/backend/src/
    ```
 
 **What Happens:**
+
 - OAuth callback receives the access token
 - Token is **encrypted** using AES-256-GCM
 - Token is stored in **both** columns:
@@ -75,6 +81,7 @@ apps/backend/src/
 ### 2. Connect a New Notion Workspace
 
 **Steps:**
+
 1. In your frontend app, navigate to integrations
 2. Click **"Connect Notion"**
 3. Authorize the workspace
@@ -84,6 +91,7 @@ apps/backend/src/
    ```
 
 **What Happens:**
+
 - OAuth callback receives access + refresh tokens
 - Both tokens are **encrypted** using AES-256-GCM
 - Tokens are stored in **both** columns:
@@ -93,7 +101,9 @@ apps/backend/src/
 ### 3. Test Slack Message Fetch
 
 **Steps:**
+
 1. After connecting Slack, try fetching messages:
+
    ```bash
    npm run sync-slack
    ```
@@ -106,6 +116,7 @@ apps/backend/src/
    ```
 
 **What Happens:**
+
 - `slack.service.ts` reads from database
 - If `access_token_encrypted` exists, it **decrypts** it
 - Uses decrypted token to call Slack API
@@ -114,7 +125,9 @@ apps/backend/src/
 ### 4. Test Notion Page Sync
 
 **Steps:**
+
 1. After connecting Notion, try syncing pages:
+
    ```bash
    npm run sync-notion
    ```
@@ -127,6 +140,7 @@ apps/backend/src/
    ```
 
 **What Happens:**
+
 - `notion.service.ts` reads from database
 - If `access_token_encrypted` exists, it **decrypts** it
 - Uses decrypted token to call Notion API
@@ -139,20 +153,24 @@ apps/backend/src/
 ### Check Database Columns
 
 **Option 1: Using Drizzle Studio**
+
 ```bash
 npm run db:studio
 ```
+
 Navigate to the `integrations` table and look for:
+
 - `access_token_encrypted` - Should contain encrypted string like `abc123:def456:ghi789`
 - `refresh_token_encrypted` - Should contain encrypted string (Notion only)
 - `encryption_version` - Should be `1`
 
 **Option 2: Using SQL Query**
+
 ```sql
-SELECT 
+SELECT
   provider,
   status,
-  CASE 
+  CASE
     WHEN access_token_encrypted IS NOT NULL THEN '✅ Encrypted'
     ELSE '❌ Plaintext only'
   END as token_status,
@@ -164,12 +182,14 @@ FROM integrations;
 ### Check Application Logs
 
 **During OAuth Connection:**
+
 ```
 ✅ Slack connected for organization: <org-id> (<workspace>)
 ✅ Notion connected for organization: <org-id> (<workspace>)
 ```
 
 **During API Calls (if using plaintext fallback):**
+
 ```
 ⚠️ [SlackService] Using plaintext token for org <org-id> - run backfill script
 ⚠️ [NotionService] Using plaintext tokens for org <org-id> - run backfill script
@@ -184,11 +204,13 @@ FROM integrations;
 If you already have Slack/Notion integrations connected **before** this feature was deployed, run the backfill script:
 
 ### Step 1: Preview (Dry Run)
+
 ```bash
 npm run backfill-tokens -- --dry-run
 ```
 
 **Expected Output:**
+
 ```
 📊 Found 2 records to process
 
@@ -202,11 +224,13 @@ npm run backfill-tokens -- --dry-run
 ```
 
 ### Step 2: Actual Migration
+
 ```bash
 npm run backfill-tokens
 ```
 
 **Expected Output:**
+
 ```
 📦 Processing batch 1 (2 records)...
   ✅ [slack] Encrypted successfully
@@ -216,7 +240,9 @@ npm run backfill-tokens
 ```
 
 ### Step 3: Verify
+
 Check database or run sync scripts to confirm tokens work:
+
 ```bash
 npm run sync-slack
 npm run sync-notion
@@ -227,12 +253,14 @@ npm run sync-notion
 ## 🧪 Running Tests
 
 ### Unit Tests
+
 ```bash
 cd apps/backend
 npm run test -- encryption.service.test.ts
 ```
 
 **Expected Output:**
+
 ```
  PASS  src/services/encryption.service.test.ts
   EncryptionService
@@ -255,6 +283,7 @@ Tests:       10+ passed, 10+ total
 **Cause:** Missing encryption key in `.env`
 
 **Fix:**
+
 ```bash
 # Generate a new key
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -268,6 +297,7 @@ echo 'ENCRYPTION_KEY=<your-key-here>' >> apps/backend/.env
 **Cause:** Encrypted data is corrupted or wrong key
 
 **Possible Solutions:**
+
 1. Check that `ENCRYPTION_KEY` matches the one used to encrypt
 2. Re-run OAuth flow to get fresh encrypted token
 3. Check database - encrypted format should be `iv:authTag:ciphertext`
@@ -277,6 +307,7 @@ echo 'ENCRYPTION_KEY=<your-key-here>' >> apps/backend/.env
 **Cause:** Token decryption might be failing silently
 
 **Debug Steps:**
+
 1. Check application logs for decryption errors
 2. Verify `access_token_encrypted` exists in database
 3. Try re-connecting the integration
@@ -293,6 +324,7 @@ echo 'ENCRYPTION_KEY=<your-key-here>' >> apps/backend/.env
 ## 📊 Architecture
 
 ### Encryption Flow (OAuth Callback)
+
 ```
 OAuth Provider
     ↓ (returns access_token)
@@ -304,6 +336,7 @@ Database (dual-write)
 ```
 
 ### Decryption Flow (API Calls)
+
 ```
 Database
     ↓ (read integration record)
@@ -315,6 +348,7 @@ Response
 ```
 
 ### Token Refresh Flow (Notion Only)
+
 ```
 Notion API (token expired)
     ↓
@@ -330,6 +364,7 @@ Database (dual-write with new encrypted tokens)
 ## 🔒 Security Best Practices
 
 ### ✅ DO
+
 - ✅ Keep `ENCRYPTION_KEY` in environment variables only
 - ✅ Use different keys for dev/staging/production
 - ✅ Rotate keys annually or if compromised
@@ -338,6 +373,7 @@ Database (dual-write with new encrypted tokens)
 - ✅ Keep `.env` in `.gitignore`
 
 ### ❌ DON'T
+
 - ❌ Commit `ENCRYPTION_KEY` to git
 - ❌ Share keys via Slack/email
 - ❌ Reuse keys across projects
@@ -350,28 +386,33 @@ Database (dual-write with new encrypted tokens)
 ## 📅 Deployment Checklist
 
 ### Phase 1: Prepare ✅
+
 - [x] Generate `ENCRYPTION_KEY`
 - [x] Add to local `.env`
 - [x] Run unit tests
 - [x] Run migration 0008
 
 ### Phase 2: Deploy 🔄
+
 - [ ] Add `ENCRYPTION_KEY` to Railway/Production environment variables
 - [ ] Deploy code to production
 - [ ] Monitor logs for errors
 
 ### Phase 3: Backfill ⏳
+
 - [ ] Run backfill script (if you have existing integrations)
 - [ ] Verify all tokens encrypted
 - [ ] Test OAuth flows (connect new workspace)
 - [ ] Test API calls (sync messages/pages)
 
 ### Phase 4: Verify ⏳
+
 - [ ] Wait 24-48 hours
 - [ ] Monitor for any issues
 - [ ] Confirm no plaintext token warnings in logs
 
 ### Phase 5: Cleanup (Future) 🔜
+
 - [ ] Run migration 0009 to drop plaintext columns
 - [ ] Update schema to remove deprecated fields
 - [ ] Remove dual-write logic from routes
@@ -381,6 +422,7 @@ Database (dual-write with new encrypted tokens)
 ## 🎓 How It Works (Technical Details)
 
 ### AES-256-GCM Overview
+
 - **Algorithm:** Advanced Encryption Standard with 256-bit key
 - **Mode:** Galois/Counter Mode (GCM) - authenticated encryption
 - **IV:** 12 bytes (96 bits) - randomly generated per encryption
@@ -388,22 +430,28 @@ Database (dual-write with new encrypted tokens)
 - **Key:** 32 bytes (256 bits) - from `ENCRYPTION_KEY` environment variable
 
 ### Encrypted Format
+
 ```
 iv:authTag:ciphertext
 ```
+
 Example:
+
 ```
 a1b2c3d4e5f6g7h8i9j0:k1l2m3n4o5p6q7r8:s9t0u1v2w3x4y5z6...
 ```
 
 ### Why GCM?
+
 - **Authenticated:** Detects tampering (integrity check)
 - **Fast:** Hardware acceleration available
 - **Secure:** NIST-recommended for sensitive data
 - **Modern:** Used by TLS 1.3, VPN protocols
 
 ### Encryption Versioning
+
 The `encryption_version` column allows for future algorithm upgrades:
+
 - **Version 1:** AES-256-GCM (current)
 - **Version 2+:** Future algorithms (e.g., ChaCha20-Poly1305)
 
@@ -416,6 +464,7 @@ This enables gradual migration to new algorithms without breaking existing data.
 ### When to Rotate Encryption Keys
 
 **Recommended Schedule:**
+
 - **Annual rotation:** Rotate keys every 12 months as a best practice
 - **Security incident:** Rotate immediately if key compromise is suspected
 - **Personnel changes:** Rotate if someone with key access leaves the team
@@ -424,6 +473,7 @@ This enables gradual migration to new algorithms without breaking existing data.
 ### Key Rotation Process
 
 #### Step 1: Generate New Encryption Key
+
 ```bash
 # Generate new 32-byte key
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -431,43 +481,46 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 #### Step 2: Create Re-Encryption Script
+
 ```typescript
 // apps/backend/src/scripts/rotate-encryption-key.ts
-import { db } from '../db/client';
-import { integrations } from '../db/schema/integrations.schema';
-import { encryptionService } from '../services/encryption.service';
+import { db } from "../db/client";
+import { integrations } from "../db/schema/integrations.schema";
+import { encryptionService } from "../services/encryption.service";
 
 const OLD_KEY = process.env.OLD_ENCRYPTION_KEY!;
 const NEW_KEY = process.env.ENCRYPTION_KEY!;
 
 async function rotateKeys() {
-  console.log('🔄 Starting key rotation...');
-  
+  console.log("🔄 Starting key rotation...");
+
   const allIntegrations = await db.select().from(integrations);
-  
+
   for (const integration of allIntegrations) {
     // Decrypt with old key
     const oldService = new EncryptionService(OLD_KEY);
     const decryptedToken = oldService.decrypt(integration.accessTokenEncrypted);
-    
+
     // Re-encrypt with new key
     const newService = new EncryptionService(NEW_KEY);
     const reencryptedToken = newService.encrypt(decryptedToken);
-    
+
     // Update database
-    await db.update(integrations)
+    await db
+      .update(integrations)
       .set({
         accessTokenEncrypted: reencryptedToken,
-        encryptionVersion: 2 // Increment version
+        encryptionVersion: 2, // Increment version
       })
       .where(eq(integrations.id, integration.id));
   }
-  
-  console.log('✅ Key rotation complete!');
+
+  console.log("✅ Key rotation complete!");
 }
 ```
 
 #### Step 3: Execute Rotation
+
 ```bash
 # Set both old and new keys
 export OLD_ENCRYPTION_KEY=<old-key>
@@ -481,6 +534,7 @@ npm run rotate-keys --workspace=@mitable/backend
 ```
 
 #### Step 4: Update Environment Variables
+
 ```bash
 # Railway/Production
 railway variables set ENCRYPTION_KEY=<new-key>
@@ -490,11 +544,12 @@ unset OLD_ENCRYPTION_KEY
 ```
 
 #### Step 5: Verify Production
+
 ```bash
 # Test Slack sync
 npm run sync-slack --workspace=@mitable/backend
 
-# Test Notion sync  
+# Test Notion sync
 npm run sync-notion --workspace=@mitable/backend
 
 # Check logs for decryption errors
@@ -503,6 +558,7 @@ npm run sync-notion --workspace=@mitable/backend
 ### Rollback Strategy
 
 If rotation fails:
+
 1. **Keep old key accessible:** Store `OLD_ENCRYPTION_KEY` in secure vault
 2. **Revert environment variable:** `ENCRYPTION_KEY=<old-key>`
 3. **Re-deploy application:** Use old key until issues resolved
@@ -515,13 +571,13 @@ The `encryptionVersion` field supports multiple key versions simultaneously:
 ```typescript
 class EncryptionService {
   private keys: Map<number, Buffer> = new Map();
-  
+
   constructor() {
     // Support multiple key versions
-    this.keys.set(1, Buffer.from(process.env.ENCRYPTION_KEY_V1!, 'hex'));
-    this.keys.set(2, Buffer.from(process.env.ENCRYPTION_KEY_V2!, 'hex'));
+    this.keys.set(1, Buffer.from(process.env.ENCRYPTION_KEY_V1!, "hex"));
+    this.keys.set(2, Buffer.from(process.env.ENCRYPTION_KEY_V2!, "hex"));
   }
-  
+
   decrypt(encrypted: string, version: number = 1): string {
     const key = this.keys.get(version);
     // ... decrypt using version-specific key
@@ -530,6 +586,7 @@ class EncryptionService {
 ```
 
 This enables:
+
 - ✅ Gradual key rotation (some tokens use v1, others v2)
 - ✅ Zero-downtime migration
 - ✅ Rollback capability
@@ -543,7 +600,9 @@ This enables:
 **If encryption key is compromised (exposed in logs, committed to git, etc.):**
 
 #### Immediate Actions (Within 1 Hour)
+
 1. **Revoke all OAuth tokens:**
+
    ```bash
    # For each integration, call provider's revoke API
    # Slack: https://api.slack.com/methods/auth.revoke
@@ -551,6 +610,7 @@ This enables:
    ```
 
 2. **Generate new encryption key:**
+
    ```bash
    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
@@ -560,6 +620,7 @@ This enables:
    - Block incoming requests to `/api/integrations/*`
 
 #### Recovery Actions (1-4 Hours)
+
 1. **Notify affected users:**
    - Email all organizations with active integrations
    - Explain need to re-connect integrations
@@ -571,9 +632,10 @@ This enables:
    - Delete all encrypted tokens from database
 
 3. **Force re-authentication:**
+
    ```sql
    -- Clear all encrypted tokens
-   UPDATE integrations 
+   UPDATE integrations
    SET access_token_encrypted = NULL,
        refresh_token_encrypted = NULL,
        status = 'disconnected';
@@ -584,6 +646,7 @@ This enables:
    - Users must re-connect via OAuth
 
 #### Post-Incident (Within 24 Hours)
+
 1. **Root cause analysis:**
    - How was key exposed?
    - What systems were affected?
@@ -608,6 +671,7 @@ This enables:
 ✅ **Tokens remain secure** - encrypted data is useless without the key
 
 **Recommended actions:**
+
 1. **Verify key security:** Confirm `ENCRYPTION_KEY` not exposed
 2. **Monitor for anomalies:** Watch for unusual API activity
 3. **Rotate keys (optional):** Defensive measure, not required
@@ -619,7 +683,7 @@ This enables:
 
 ```typescript
 // Log encryption/decryption events (WITHOUT sensitive data)
-logger.info('Token decrypted', {
+logger.info("Token decrypted", {
   organizationId: org.id,
   provider: integration.provider,
   encryptionVersion: integration.encryptionVersion,
@@ -628,12 +692,12 @@ logger.info('Token decrypted', {
 
 // Alert on failures
 if (decryptionFailed) {
-  logger.error('Decryption failed', {
+  logger.error("Decryption failed", {
     organizationId: org.id,
     error: error.message,
     // Could indicate key mismatch or tampering
   });
-  
+
   // Trigger re-authentication flow
   await forceReconnect(integration);
 }
@@ -642,11 +706,13 @@ if (decryptionFailed) {
 ### Key Storage Best Practices
 
 **Current (Acceptable for MVP):**
+
 - ✅ Environment variable in Railway/Vercel
 - ✅ Encrypted at rest by platform
 - ✅ Access controlled via team permissions
 
 **Recommended for Production Scale:**
+
 - 🔐 **AWS Secrets Manager** or **HashiCorp Vault**
 - 🔐 **Automated rotation** (monthly/quarterly)
 - 🔐 **Audit logging** for all key access
@@ -668,17 +734,20 @@ if (decryptionFailed) {
 ## 💡 Tips
 
 ### For Development
+
 - Use a test encryption key locally (don't use production key)
 - Test OAuth flows regularly to ensure encryption works
 - Check logs for any decryption warnings
 
 ### For Production
+
 - Generate a strong key: `openssl rand -hex 32`
 - Store in Railway/Vercel environment variables
 - Never log decrypted tokens
 - Rotate keys annually
 
 ### For Testing
+
 - Use the dry-run flag first: `--dry-run`
 - Monitor application logs during backfill
 - Test both Slack and Notion integrations after migration

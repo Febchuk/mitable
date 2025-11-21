@@ -124,6 +124,7 @@ function App() {
                 label: label,
                 boundingBox: boundingBox,
               },
+              completed: false,
             }}
           />
         </AnimatePresence>

@@ -14,6 +14,7 @@ interface WorkflowOptionsProps {
   phase: WorkflowPhase;
   onOptionSelect: (option: WorkflowOption) => void;
   disabled?: boolean;
+  hidden?: boolean;
 }
 
 /**

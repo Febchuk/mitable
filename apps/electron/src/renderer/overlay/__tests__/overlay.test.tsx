@@ -12,6 +12,7 @@ const mockGetDisplayMetadata = jest.fn();
 beforeEach(() => {
   global.window.overlayAPI = {
     onHighlightUpdate: mockOnHighlightUpdate,
+    onOverlayData: jest.fn(),
     show: jest.fn(),
     hide: jest.fn(),
     getDisplayMetadata: mockGetDisplayMetadata,

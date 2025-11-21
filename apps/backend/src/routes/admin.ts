@@ -1758,7 +1758,9 @@ router.post(
 
       // Encrypt tokens before storing
       const accessTokenEncrypted = encryptionService.encrypt(accessToken);
-      const refreshTokenEncrypted = refreshToken ? encryptionService.encrypt(refreshToken) : undefined;
+      const refreshTokenEncrypted = refreshToken
+        ? encryptionService.encrypt(refreshToken)
+        : undefined;
 
       // Update integration status to connected
       const updateData: any = {

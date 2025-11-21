@@ -2328,6 +2328,7 @@ async function seedIntegrations(organizationId: string) {
         organizationId,
         provider: "slack",
         status: "disconnected", // Changed: No real token, so disconnected
+        accessTokenEncrypted: "", // Empty for disconnected integrations
         syncFrequency: "6 hours",
         metadata: {},
       },
@@ -2335,6 +2336,7 @@ async function seedIntegrations(organizationId: string) {
         organizationId,
         provider: "notion",
         status: "disconnected", // Changed: No real token, so disconnected
+        accessTokenEncrypted: "", // Empty for disconnected integrations
         syncFrequency: "6 hours",
         metadata: {},
       },
@@ -2342,6 +2344,7 @@ async function seedIntegrations(organizationId: string) {
         organizationId,
         provider: "github",
         status: "disconnected",
+        accessTokenEncrypted: "", // Empty for disconnected integrations
         syncFrequency: "24 hours",
         metadata: {
           organization: "lorikeet-ai",
@@ -2351,6 +2354,7 @@ async function seedIntegrations(organizationId: string) {
         organizationId,
         provider: "google-drive",
         status: "disconnected",
+        accessTokenEncrypted: "", // Empty for disconnected integrations
         syncFrequency: "24 hours",
         metadata: {},
       },
