@@ -63,10 +63,6 @@ if (app.isPackaged) {
 let agentWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
-const overlayWindow: BrowserWindow | null = null;
-// eslint-disable-next-line prefer-const
-let guideWindow: BrowserWindow | null = null; // Not reassigned yet, but used in window management logic
-let nudgeWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false; // Track if app is intentionally quitting
 
@@ -424,41 +420,6 @@ function createConsoleWindow() {
 //   });
 // }
 
-function createNudgeWindow() {
-  if (!agentWindow || agentWindow.isDestroyed()) {
-    console.error("[Nudge] Cannot create nudge window - agent window not available");
-    return;
-  }
-
-  nudgeWindow = new BrowserWindow({
-    width: 400,
-    height: 600,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    show: false,
-    modal: false, // Non-modal so other windows remain interactive
-    webPreferences: {
-      preload: join(MAIN_DIR, "../preload/nudge.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  if (!app.isPackaged) {
-    nudgeWindow.loadURL("http://localhost:5173/nudge/index.html");
-  } else {
-    const nudgePath = join(MAIN_DIR, "../renderer/nudge/index.html");
-    console.log("[Nudge] Loading from:", nudgePath);
-    console.log("[Nudge] File exists:", existsSync(nudgePath));
-    nudgeWindow.loadFile(nudgePath);
-  }
-
-  nudgeWindow.on("closed", () => {
-    nudgeWindow = null;
-  });
-}
-
 // IPC Handlers
 function setupIPC() {
   console.log("[IPC] Setting up IPC handlers...");
@@ -471,15 +432,6 @@ function setupIPC() {
         // Also hide all dependent windows when agent is hidden
         if (conversationWindow && !conversationWindow.isDestroyed()) {
           conversationWindow.hide();
-        }
-        if (guideWindow && !guideWindow.isDestroyed()) {
-          guideWindow.hide();
-        }
-        if (nudgeWindow && !nudgeWindow.isDestroyed()) {
-          nudgeWindow.hide();
-        }
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          overlayWindow.hide();
         }
       } else {
         agentWindow.show();
@@ -608,15 +560,6 @@ function setupIPC() {
     }
     if (conversationWindow && !conversationWindow.isDestroyed()) {
       conversationWindow.hide();
-    }
-    if (guideWindow && !guideWindow.isDestroyed()) {
-      guideWindow.hide();
-    }
-    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
-      nudgeWindow.hide();
-    }
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.hide();
     }
   });
 
@@ -821,53 +764,7 @@ function setupIPC() {
   //   }
   // );
 
-  // Nudge system
-  ipcMain.on(IPC_CHANNELS.NUDGE_SHOW, (_event, data) => {
-    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
-      // Position nudge window to the right of agent window
-      if (agentWindow && !agentWindow.isDestroyed()) {
-        const agentBounds = agentWindow.getBounds();
-        const nudgeBounds = nudgeWindow.getBounds();
-
-        // Position to the right with 16px gap
-        const x = agentBounds.x + agentBounds.width + 16;
-        const y = agentBounds.y;
-
-        nudgeWindow.setBounds({
-          x,
-          y,
-          width: nudgeBounds.width,
-          height: nudgeBounds.height,
-        });
-      }
-
-      nudgeWindow.webContents.send(IPC_CHANNELS.NUDGE_SHOW, data);
-      nudgeWindow.show();
-    }
-    if (guideWindow && !guideWindow.isDestroyed() && guideWindow.isVisible()) {
-      guideWindow.hide();
-    }
-  });
-
-  // Nudge creation request - from nudge window to console
-  ipcMain.on(IPC_CHANNELS.NUDGE_CREATE_REQUEST, (_event, data) => {
-    console.log("[Nudge] Create request received:", data);
-
-    // Show and focus console window
-    if (consoleWindow && !consoleWindow.isDestroyed()) {
-      consoleWindow.show();
-      consoleWindow.focus();
-
-      // Forward nudge creation data to console
-      // Console will navigate to /nudges/new and populate the form
-      consoleWindow.webContents.send(IPC_CHANNELS.NUDGE_OPEN_CREATOR, data);
-    }
-
-    // Hide nudge window after triggering creation
-    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
-      nudgeWindow.hide();
-    }
-  });
+  // Nudge system - handled via Console
 
   // NEW: Direct nudge creation from conversation window (inline expert cards)
   ipcMain.on(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, (_event, data) => {
@@ -886,16 +783,10 @@ function setupIPC() {
     }
   });
 
-  // Dynamic mouse events for overlay
+  // Dynamic mouse events
   ipcMain.on(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, (_event, ignore: boolean) => {
     if (agentWindow && !agentWindow.isDestroyed()) {
       agentWindow.setIgnoreMouseEvents(ignore, { forward: true });
-    }
-    if (guideWindow && !guideWindow.isDestroyed()) {
-      guideWindow.setIgnoreMouseEvents(ignore, { forward: true });
-    }
-    if (nudgeWindow && !nudgeWindow.isDestroyed()) {
-      nudgeWindow.setIgnoreMouseEvents(ignore, { forward: true });
     }
   });
 
@@ -977,56 +868,6 @@ function setupIPC() {
     }
   );
 
-  // Nudge window resize with left-to-right expansion
-  ipcMain.on(
-    IPC_CHANNELS.NUDGE_RESIZE,
-    (_event, options: { width?: number; height?: number } | "collapsed" | "expanded") => {
-      if (nudgeWindow && !nudgeWindow.isDestroyed()) {
-        const currentBounds = nudgeWindow.getBounds();
-
-        // Support both mode strings and flexible options
-        let newWidth: number;
-        let newHeight: number;
-
-        if (typeof options === "string") {
-          // Mode-based resizing
-          switch (options) {
-            case "collapsed":
-              newWidth = 85;
-              newHeight = 400;
-              break;
-            case "expanded":
-              newWidth = 380;
-              newHeight = 400;
-              break;
-            default:
-              newWidth = currentBounds.width;
-              newHeight = currentBounds.height;
-          }
-        } else {
-          // Flexible options format
-          newWidth = options.width ?? currentBounds.width;
-          newHeight = options.height ?? currentBounds.height;
-        }
-
-        // Left-to-right expansion: keep X position fixed (left edge anchored)
-        // Only adjust Y if height changes (keep vertical center)
-        const heightDiff = newHeight - currentBounds.height;
-        const newY = currentBounds.y - heightDiff / 2;
-
-        nudgeWindow.setBounds(
-          {
-            x: currentBounds.x, // Left edge stays fixed
-            y: Math.round(newY),
-            width: newWidth,
-            height: newHeight,
-          },
-          true // animate
-        );
-      }
-    }
-  );
-
   // Auth Management - Cross-window token sharing
   // Console sets tokens after login
   ipcMain.on(IPC_CHANNELS.AUTH_SET_TOKENS, (_event, accessToken: string, refreshToken: string) => {
@@ -1035,7 +876,7 @@ function setupIPC() {
     authTokens.refreshToken = refreshToken;
 
     // Broadcast token update to all windows
-    const allWindows = [agentWindow, conversationWindow, guideWindow, nudgeWindow, overlayWindow];
+    const allWindows = [agentWindow, conversationWindow, consoleWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, accessToken);
@@ -1056,7 +897,7 @@ function setupIPC() {
     authTokens.refreshToken = null;
 
     // Broadcast token clear to all windows
-    const allWindows = [agentWindow, conversationWindow, guideWindow, nudgeWindow, overlayWindow];
+    const allWindows = [agentWindow, conversationWindow, consoleWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, null);
@@ -1141,16 +982,7 @@ function setupIPC() {
     }
   );
 
-  // Display Metadata - for multi-monitor support
-  ipcMain.handle(IPC_CHANNELS.GET_DISPLAY_METADATA, () => {
-    const displays = screen.getAllDisplays();
-    return displays.map((display) => ({
-      bounds: display.bounds,
-      scaleFactor: display.scaleFactor,
-    }));
-  });
-
-  console.log("[IPC] Screenshot capture and display metadata handlers registered successfully");
+  console.log("[IPC] Screenshot capture handler registered successfully");
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)
@@ -1304,10 +1136,6 @@ app.whenReady().then(() => {
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
   createConsoleWindow();
-  // DEPRECATED: Guide window no longer needed - workflow UI moved to conversation window
-  // createGuideWindow(); // Create guide as child of agent
-  // createOverlayWindow(); // DISABLED - requires guide window which is deprecated
-  createNudgeWindow(); // Create nudge as child of agent
   createTray(); // Create system tray on Windows
 
   setupIPC();

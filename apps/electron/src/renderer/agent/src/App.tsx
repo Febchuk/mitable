@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import AgentPill from "./components/AgentPill";
 import { createConversation } from "../../lib/api/conversations";
 
@@ -20,60 +20,15 @@ declare global {
       hideConversation: () => void;
       toggleConversation: () => void; // NEW: Toggle collapsed combobox
       sendMessageToConversation: (messageData: any, screenshot: string | null) => void;
-      showNudge: (data: unknown) => void;
-      startGuide: (data: unknown) => void;
       captureScreenshot: () => Promise<{ dataUrl: string; metadata?: any } | null>;
       getAuthToken: () => Promise<string | null>;
       onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
-      onGuideNextStep: (callback: () => void) => void;
     };
   }
 }
 
 function App() {
   const [conversationId, setConversationId] = useState<string | null>(null);
-
-  // Listen for Guide "Next" button clicks
-  useEffect(() => {
-    window.agentAPI.onGuideNextStep(() => {
-      console.log("[Agent] Guide next step requested - capturing screenshot for continuation");
-      // Handle silent continuation (don't show in chat)
-      handleSilentContinuation();
-    });
-    // Note: Using conversationId in deps to ensure we have it when continuation happens
-  }, [conversationId]);
-
-  /**
-   * Handle silent continuation for Guide "Next" button
-   * Forwards "Next" message to conversation window
-   * Screenshot capture will be handled by conversation window based on heuristics
-   */
-  async function handleSilentContinuation() {
-    if (!conversationId) {
-      console.error("[Agent] No conversation ID for continuation");
-      return;
-    }
-
-    console.log("[Agent] Starting silent continuation...");
-
-    // Forward "Next" message to conversation window
-    // The conversation window will handle conditional screenshot capture
-    try {
-      window.agentAPI.sendMessageToConversation(
-        {
-          message: "Next",
-          conversationId,
-          userMessage: "Next",
-          silent: true, // Flag to indicate silent continuation (no user message display)
-        },
-        null // No screenshot - let conversation window handle conditional capture
-      );
-
-      console.log("[Agent] Silent continuation message forwarded to conversation window");
-    } catch (error) {
-      console.error("[Agent] Failed to forward continuation:", error);
-    }
-  }
 
   // Create conversation on first message if needed
   const ensureConversation = async (): Promise<string> => {

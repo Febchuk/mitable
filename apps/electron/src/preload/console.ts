@@ -7,14 +7,11 @@ const IPC_CHANNELS = {
   HELP_REQUEST: "help-request",
   HELP_RESPONSE: "help-response",
   CAPTURE_SCREENSHOT: "capture-screenshot",
-  GUIDE_START: "guide-start",
-  GUIDE_DATA: "guide-data",
   CONVERSATION_NEW: "conversation-new",
   CONVERSATION_LOAD: "conversation-load",
   AGENT_OPEN_CONVERSATION: "agent-open-conversation", // NEW: Send conversation to Agent
   CONSOLE_MINIMIZE: "console-minimize", // NEW: Minimize console window
   NUDGE_OPEN_CREATOR: "nudge-open-creator",
-  OVERLAY_SHOW: "overlay-show", // NEW: Show overlay with bounding box
   AUTH_SET_TOKENS: "auth-set-tokens",
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
@@ -59,14 +56,6 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     return null;
   },
 
-  // Guide system
-  startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),
-  onGuideData: (callback: (data: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.GUIDE_DATA, (_event: IpcRendererEvent, data: unknown) =>
-      callback(data)
-    );
-  },
-
   // Conversation management
   newConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_NEW),
   loadConversation: (id: string) => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_LOAD, id),
@@ -75,14 +64,6 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   // Window management
   minimizeWindow: () => ipcRenderer.send(IPC_CHANNELS.CONSOLE_MINIMIZE),
-
-  // Overlay management
-  showOverlay: (data: unknown) => {
-    console.log("[Preload] showOverlay() CALLED with data:", data);
-    console.log("[Preload] Sending IPC event:", IPC_CHANNELS.OVERLAY_SHOW);
-    ipcRenderer.send(IPC_CHANNELS.OVERLAY_SHOW, data);
-    console.log("[Preload] IPC SENT to main process");
-  },
 
   // Navigation - Listen for navigation requests from main process
   onNavigateToChat: (callback: (conversationId: string) => void) => {
