@@ -52,8 +52,6 @@ export const WindowScreenshotSchema = z.object({
   windowId: z.string(),
   windowTitle: z.string(),
   appName: z.string(),
-  isActiveWindow: z.boolean(),
-  priority: z.number(), // 0 = highest (active), 1-4 for others
   dataUrl: z.string(),
   metadata: z.object({
     width: z.number(),

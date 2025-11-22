@@ -1,5 +1,5 @@
 import { apiRequest } from "./api";
-import type { MultiWindowCaptureResult } from "@mitable/shared";
+import type { MultiWindowCaptureResult, WindowScreenshot } from "@mitable/shared";
 
 export interface Message {
   id: string;
@@ -97,7 +97,7 @@ export async function sendMessage(
 }
 
 /**
- * Stream chunk from SSE
+ * Stream chunk from SSE (console client uses a minimal subset)
  */
 export interface StreamChunk {
   type: "chunk" | "complete" | "error" | "done";
@@ -114,7 +114,6 @@ export interface StreamCallbacks {
   onComplete?: (fullContent: string) => void;
   onDone?: (messageId: string) => void;
   onError?: (error: string) => void;
-  onWindowTrigger?: (window: string, data: any) => void;
 }
 
 /**
@@ -123,13 +122,12 @@ export interface StreamCallbacks {
  * Uses Server-Sent Events (SSE) to receive real-time streaming responses.
  * Chunks are passed directly to the UI as they arrive from the backend.
  *
- * @param conversationId - The conversation ID
- * @param content - The user message content
- * @param callbacks - Callbacks for handling stream events
- * @param token - Auth token
- * @param multiWindowCapture - Optional multi-window capture result
- * @param metadata - Optional metadata for workflow actions (workflowAction, selectedOption)
- * @returns Promise that resolves when streaming completes
+ * NOTE: Backend contract (main):
+ * - Request body: { content: string; screenshot?: string; metadata?: any }
+ * - SSE events: { type: "chunk" | "complete" | "error" | "done", ... }
+ *
+ * We keep the feature branch's multi-window capture input but map it down
+ * to a single screenshot string before calling the backend.
  */
 export async function sendStreamingMessage(
   conversationId: string,
@@ -142,18 +140,33 @@ export async function sendStreamingMessage(
   const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
   try {
-    // Build request body
+    // Forward all captured screenshots (if any) from multi-window capture
+    let screenshotsPayload: WindowScreenshot[] | undefined;
+
+    if (multiWindowCapture && multiWindowCapture.success) {
+      if (multiWindowCapture.screenshots.length > 0) {
+        screenshotsPayload = multiWindowCapture.screenshots;
+
+        console.log("[chatsService] Sending multi-window capture payload:", {
+          screenshotCount: screenshotsPayload.length,
+          apps: screenshotsPayload.map((s) => s.appName).join(", "),
+        });
+      } else {
+        console.log("[chatsService] Multi-window capture had no screenshots");
+      }
+    } else if (multiWindowCapture && !multiWindowCapture.success) {
+      console.log("[chatsService] Screenshot capture blocked or failed:", multiWindowCapture.error);
+    }
+
+    // Build request body aligned with backend (main) contract
     const requestBody: {
       content: string;
-      multiWindowCapture?: MultiWindowCaptureResult;
+      screenshots?: WindowScreenshot[];
       metadata?: any;
     } = { content };
 
-    if (multiWindowCapture && multiWindowCapture.success) {
-      requestBody.multiWindowCapture = multiWindowCapture;
-      console.log(`[chatsService] Sending message with ${multiWindowCapture.screenshots.length} window screenshots`);
-    } else if (multiWindowCapture && !multiWindowCapture.success) {
-      console.log(`[chatsService] Screenshot capture blocked: ${multiWindowCapture.error}`);
+    if (screenshotsPayload) {
+      requestBody.screenshots = screenshotsPayload;
     }
 
     if (metadata) {
@@ -229,47 +242,11 @@ export async function sendStreamingMessage(
       throw new Error("No content received from backend");
     }
 
-            // Process complete SSE messages
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const data = line.slice(6); // Remove "data: " prefix
-
-                if (data === "") continue; // Empty data line
-                if (data.startsWith(":")) continue; // Comment (ping)
-
-                try {
-                  const chunk: StreamChunk = JSON.parse(data);
-
-                  if (chunk.type === "chunk" && chunk.content) {
-                    callbacks.onChunk?.(chunk.content);
-                  } else if (chunk.type === "complete" && chunk.content) {
-                    callbacks.onComplete?.(chunk.content);
-                  } else if (chunk.type === "done" && chunk.messageId) {
-                    callbacks.onDone?.(chunk.messageId);
-                  } else if (chunk.type === "error" && chunk.error) {
-                    callbacks.onError?.(chunk.error);
-                    reject(new Error(chunk.error));
-                  }
-                } catch (parseError) {
-                  console.error("Error parsing SSE data:", parseError, data);
-                }
-              }
-            }
-
-            // Continue reading
-            return read();
-          });
-        };
-
-        return read();
-      })
-      .catch((error) => {
-        console.error("Streaming error:", error);
-        callbacks.onError?.(error instanceof Error ? error.message : "Streaming failed");
-        reject(error);
-      });
-  });
+    // Final completion signal (in case backend didn't send an explicit "complete")
+    callbacks.onComplete?.(fullContent);
+  } catch (error) {
+    console.error("Message send error:", error);
+    callbacks.onError?.(error instanceof Error ? error.message : "Failed to send message");
+    throw error;
+  }
 }

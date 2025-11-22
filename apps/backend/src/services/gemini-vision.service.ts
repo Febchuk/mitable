@@ -3,9 +3,14 @@ import { config } from "../config";
 import { z } from "zod";
 import { toGeminiSchema } from "../utils/gemini-schema.js";
 import { InterpretationOptionSchema, VisualGuidanceSchema, StepSchema } from "@mitable/shared";
-import type { SolutionObject, Step, VisualGuidance, InterpretationOption } from "@mitable/shared";
+import type {
+  SolutionObject,
+  Step,
+  VisualGuidance,
+  InterpretationOption,
+  WindowScreenshot,
+} from "@mitable/shared";
 import type { Message as DbMessage } from "../db/schema/conversations.schema.js";
-import { coordinateConverterService } from "./coordinate-converter.service.js";
 
 const InterpretResponseSchema = z.object({
   interpretations: z.array(InterpretationOptionSchema),
@@ -16,6 +21,17 @@ const EvaluateProgressResponseSchema = z.object({
   adjustedStepList: z.array(StepSchema).optional(),
   adjustmentReason: z.string().optional(),
 });
+
+const ScreenshotFilterResultSchema = z.object({
+  relevantScreenshots: z.array(
+    z.object({
+      imageName: z.string(),
+      inclusionReason: z.string(),
+    })
+  ),
+});
+
+type ScreenshotFilterResult = z.infer<typeof ScreenshotFilterResultSchema>;
 
 /**
  * UI Element detected by Gemini Vision
@@ -85,6 +101,7 @@ class GeminiVisionService {
   private stepGuidanceModel: any;
   private evaluateModel: any;
   private clarificationModel: any; // Phase 1: Clarify what to look for
+  private screenshotFilterModel: any; // Phase 1a: Filter relevant screenshots
 
   constructor() {
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
@@ -118,6 +135,14 @@ class GeminiVisionService {
     // Clarification model (Phase 1): Returns plain text description
     this.clarificationModel = this.genAI.getGenerativeModel({
       model: "gemini-2.0-flash-exp",
+    });
+
+    this.screenshotFilterModel = this.genAI.getGenerativeModel({
+      model: "gemini-2.0-flash-exp",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: toGeminiSchema(ScreenshotFilterResultSchema) as any,
+      },
     });
   }
 
@@ -181,6 +206,84 @@ Return ONLY the detailed description, no JSON, no extra formatting, no preamble.
       // Fallback: return original step description
       console.warn("[GeminiVision] Using fallback - original step description");
       return stepDescription;
+    }
+  }
+
+  async filterRelevantScreenshots(
+    screenshots: WindowScreenshot[],
+    currentStep: Step,
+    solutionObject: SolutionObject
+  ): Promise<ScreenshotFilterResult> {
+    console.log("[GeminiVision] ========================================");
+    console.log("[GeminiVision] Filtering relevant screenshots");
+    console.log("[GeminiVision] ========================================");
+
+    if (!screenshots.length) {
+      console.log("[GeminiVision] No screenshots supplied to filter");
+      return { relevantScreenshots: [] };
+    }
+
+    try {
+      const prompt = `You are helping a coworker complete a workflow step.
+
+CURRENT STEP:
+Step ${currentStep.stepNumber}: "${currentStep.description}"
+
+OVERALL TASK:
+${solutionObject.solution}
+
+FULL STEP LIST:
+${solutionObject.stepList.map((s) => `${s.stepNumber}. ${s.description} [${s.status}]`).join("\n")}
+
+You will be given ${screenshots.length} screenshots from their desktop. Some may show the app they need, others may not.
+
+For EACH screenshot, decide if it will actually help them complete THIS step. Return JSON:
+{
+  "relevantScreenshots": [
+    { "imageName": "screenshot_0", "inclusionReason": "Why this screenshot helps" }
+  ]
+}
+
+Rules:
+1. Include a screenshot only if its content is required to complete the current step.
+2. If multiple windows together are needed (e.g., copy from email, paste into settings), include both with reasons.
+3. If none of the screenshots help, return an empty array.
+4. Reason should be specific: e.g., "Shows Slack with #product-team channel where user must post update".
+`;
+
+      const contentParts: any[] = [prompt];
+
+      screenshots.forEach((screenshot, index) => {
+        const base64Data = screenshot.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+        contentParts.push({
+          inlineData: {
+            mimeType: "image/png",
+            data: base64Data,
+          },
+        });
+        contentParts.push(
+          `screenshot_${index}: ${screenshot.appName} - ${screenshot.windowTitle}`
+        );
+      });
+
+      const result = await this.screenshotFilterModel.generateContent(contentParts);
+      const parsed = ScreenshotFilterResultSchema.parse(JSON.parse(result.response.text()));
+
+      console.log("[GeminiVision] Relevant screenshots identified:", parsed.relevantScreenshots.length);
+      parsed.relevantScreenshots.forEach((entry) => {
+        console.log(`[GeminiVision]   - ${entry.imageName}: ${entry.inclusionReason}`);
+      });
+
+      return parsed;
+    } catch (error) {
+      console.error("[GeminiVision] Screenshot filtering failed:", error);
+      // Fallback to including all screenshots so user still gets guidance
+      return {
+        relevantScreenshots: screenshots.map((_, index) => ({
+          imageName: `screenshot_${index}`,
+          inclusionReason: "Filtering failed - include by default",
+        })),
+      };
     }
   }
 
@@ -432,13 +535,25 @@ Return ONLY raw JSON (no markdown code blocks):
   }
 
   async interpretVaguePrompt(
-    screenshot: string,
+    screenshots: WindowScreenshot[],
     vaguePrompt: string
   ): Promise<{ interpretations: InterpretationOption[] }> {
     console.log("[GeminiVision] Interpreting vague prompt:", vaguePrompt);
 
     try {
-      const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
+      if (!screenshots.length) {
+        return {
+          interpretations: [
+            {
+              task: "No screenshot available to analyze",
+              confidence: "low",
+              reasoning: "User did not share their screen",
+            },
+          ],
+        };
+      }
+
+      const base64Data = screenshots[0].dataUrl.replace(/^data:image\/\w+;base64,/, "");
 
       const prompt = `The user said: "${vaguePrompt}"
 
@@ -476,333 +591,148 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
   }
 
   async analyzeStepExecution(
-    screenshot: string,
+    screenshots: WindowScreenshot[],
     solutionObject: SolutionObject,
     currentStep: Step,
-    conversationHistory: DbMessage[],
-    imageDimensions?: { width: number; height: number }
+    conversationHistory: DbMessage[]
   ): Promise<VisualGuidance> {
     const phaseStartTime = Date.now();
     console.log("[GeminiVision] ========================================");
-    console.log("[GeminiVision] PHASE 2: Analyzing step execution");
+    console.log("[GeminiVision] PHASE 2: Conversational guidance");
     console.log("[GeminiVision] Step:", currentStep.stepNumber, "-", currentStep.description);
+    console.log("[GeminiVision] Total screenshots:", screenshots.length);
     console.log("[GeminiVision] ========================================");
 
+    if (!screenshots.length) {
+      return {
+        elementDescription: "No screenshots provided",
+        visualContext: "Unable to view the user's workspace.",
+        confidence: "low",
+        conversationalMessage:
+          "I don’t have any screenshots to reference yet. Capture the windows you’re using and I’ll guide you through this step.",
+      };
+    }
+
     try {
-      // PHASE 1: Clarify what to look for
       const clarifiedDescription = await this.clarifyTargetElement(currentStep.description);
-      console.log("[GeminiVision] Using clarified description for detection");
+      const filterResult = await this.filterRelevantScreenshots(
+        screenshots,
+        currentStep,
+        solutionObject
+      );
 
-      const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
+      if (!filterResult.relevantScreenshots.length) {
+        return {
+          elementDescription: "Required application not visible",
+          visualContext: "None of the captured windows match the app needed for this step.",
+          confidence: "low",
+          conversationalMessage: `I can’t see the application needed for step ${currentStep.stepNumber}. Open the app where you "${currentStep.description}" and capture it again so I can walk you through it.`,
+        };
+      }
 
-      const prompt = `You are helping a user find a SPECIFIC UI element on their screen.
+      const relevantEntries = filterResult.relevantScreenshots
+        .map((entry) => {
+          const index = Number.parseInt(entry.imageName.replace("screenshot_", ""), 10);
+          const screenshot = screenshots[index];
+          if (!screenshot) {
+            return undefined;
+          }
+          return {
+            screenshot,
+            inclusionReason: entry.inclusionReason,
+            originalIndex: index,
+          };
+        })
+        .filter(
+          (entry): entry is { screenshot: WindowScreenshot; inclusionReason: string; originalIndex: number } =>
+            !!entry
+        );
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TARGET ELEMENT TO FIND:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      if (!relevantEntries.length) {
+        relevantEntries.push(
+          ...screenshots.map((screenshot, index) => ({
+            screenshot,
+            inclusionReason: "Fallback include (filter returned invalid indexes)",
+            originalIndex: index,
+          }))
+        );
+      }
 
-"${clarifiedDescription}"
+      const prompt = `You are a patient senior engineer on a Zoom call, guiding a teammate through step ${
+        currentStep.stepNumber
+      }: "${currentStep.description}".
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CONTEXT - What the user is trying to do:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You will see only the screenshots that matter, each followed by the reason it's included. Explain what to click or manipulate in a conversational tone.
 
-Step ${currentStep.stepNumber}: "${currentStep.description}"
-
-CRITICAL: You're looking for: "${clarifiedDescription}"
-NOT just anything related to: "${currentStep.description}"
-
-Your job: Look at the screenshot and locate the UI element described above with precise bounding box coordinates.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-HELPING A USER COMPLETE THIS SPECIFIC ACTION:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CURRENT STEP (your focus):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Step ${currentStep.stepNumber}: "${currentStep.description}"
-
-Your job: Look at the screenshot and tell the user EXACTLY which UI element to click/interact with to complete this action.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-COMPLETE WORKFLOW CONTEXT:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Overall Task: ${solutionObject.solution}
-
-Explanation: ${solutionObject.solutionExplanation}
-
-Search Query Used: ${solutionObject.searchQuery}
-
-Supporting Data Explanation: ${solutionObject.supportingDataExplanation}
-
-Complete Step List:
-${solutionObject.stepList.map((s) => `${s.stepNumber}. ${s.description} [${s.status}]`).join("\n")}
-
-Company Documentation (from knowledge base search):
-${solutionObject.supportingData.map((d) => `[${d.title}]\n${d.snippet}\nSource: ${d.url}`).join("\n\n")}
-
-Recent Conversation History:
-${conversationHistory
-  .slice(-5)
-  .map((m) => `${m.role}: ${m.content.substring(0, 200)}`)
-  .join("\n")}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL RULES:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. Your recommendation must help complete the current step: "${currentStep.description}"
-2. Use the supporting data and step list context to understand the workflow
-3. Identify the specific button, link, or UI element that accomplishes this step
-4. If the required app/page is not visible, tell the user to open/navigate to it first
-5. NEVER suggest clicking unrelated elements just because they're visible
-6. Ignore any chat/agent windows in the screenshot (those are AI assistant interfaces)
-7. DO NOT reference future steps - focus only on the current step
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-OUTPUT FORMAT:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. elementDescription: The exact UI element that helps complete "${currentStep.description}"
-   - If visible: Describe its precise location (e.g., "Blue 'Save' button in top-right corner")
-   - If NOT visible: Explain what needs to be opened first (e.g., "Notion app needs to be opened")
-
-2. visualContext: Current state of the screen and relevance to the step
-
-3. confidence:
-   - "high" = Correct app/page is visible AND target element is clearly identified
-   - "medium" = Correct context but element location uncertain
-   - "low" = Wrong app/page is currently visible
-
-4. conversationalMessage: Natural guidance in 1-2 sentences telling user what to click
-   - Be specific about the UI element's location
-   - Use conversational tone like a helpful teammate
-   - If wrong app is open, guide them to the correct one
-
-5. element (ALWAYS REQUIRED): Information about the target UI element
-   - label: Short descriptive label for the element (e.g., "Save Button")
-   - type: Element type (button, input, link, dropdown, checkbox, text)
-   - boundingBox: Normalized coordinates (0.0-1.0 range) OR null if not visible
-
-     CRITICAL BOUNDING BOX RULES:
-     * NEVER highlight entire application windows - only specific interactive elements
-     * Application-level bounding boxes (covering >50% of screen) are NOT helpful
-     * If the step asks to "open an app" but the app is already open:
-       - Set boundingBox to null
-       - Set confidence to "high"
-       - conversationalMessage should say "The app is already open! You're ready for the next step."
-
-     * If element IS visible: Provide normalized coordinates for the SPECIFIC UI element
-       - x: horizontal position as fraction (0.0 = left edge, 1.0 = right edge)
-       - y: vertical position as fraction (0.0 = top edge, 1.0 = bottom edge)
-       - width: width as fraction of image width (typically 0.05-0.25 for buttons)
-       - height: height as fraction of image height (typically 0.02-0.10 for buttons)
-
-     * Sanity check - Most interactive elements are SMALL:
-       - Buttons/Links: width 5-25%, height 2-10%
-       - Input fields: width 10-40%, height 2-5%
-       - Icons: width 2-8%, height 2-8%
-       - Dropdowns: width 10-30%, height 2-5%
-       - If your bounding box is >50% width OR >30% height, it's probably wrong!
-
-     * If element NOT visible: Set boundingBox to null
-   - confidence: Detection confidence (0.0-1.0)
-
-   CRITICAL: ALWAYS include the "element" field. Set boundingBox to null ONLY if:
-   - Wrong app is open
-   - Element requires scrolling to be visible
-   - Element is off-screen or obscured
-   - The step asks to "open/launch" an app that is already open
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-EXAMPLES:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Example 1:
-Step: "Navigate to the Mitable PRD document in Notion"
-Screenshot shows: Slack is open
-✅ GOOD conversationalMessage: "I can see Slack is open. Let's switch to Notion - you can open it from your dock or use Cmd+Space to search for the Notion app."
-❌ BAD: "Click on the DM with Aurel in the left sidebar" (Wrong - this doesn't help open Notion!)
-
-Example 2:
-Step: "Click the Save button"
-Screenshot shows: Document editor with visible Save button in top-right
-✅ GOOD response:
+Return JSON exactly matching:
 {
-  "elementDescription": "Blue 'Save' button in top-right corner of the document editor, next to the Share button",
-  "visualContext": "Document editor is open with the Save button clearly visible",
-  "confidence": "high",
-  "conversationalMessage": "Perfect! Click the blue 'Save' button in the top-right corner, next to the Share button.",
-  "element": {
-    "label": "Save Button",
-    "type": "button",
-    "boundingBox": { "x": 0.85, "y": 0.05, "width": 0.08, "height": 0.04 },
-    "confidence": 0.95
-  }
+  "elementDescription": "What needs to be interacted with",
+  "visualContext": "What you observed in the screenshots",
+  "confidence": "high|medium|low",
+  "alternativeElements": ["Optional fallbacks"],
+  "conversationalMessage": "Friendly instructions describing the sequence of actions"
 }
-❌ BAD: No bounding box provided even though element is visible!
 
-Example 3:
-Step: "Scroll to the Product Vision section"
-Screenshot shows: Notion document with Product Vision section off-screen, need to scroll
-✅ GOOD response:
-{
-  "elementDescription": "Product Vision section heading that needs scrolling to reach",
-  "visualContext": "Notion document is open showing the top sections, Product Vision is below the fold",
-  "confidence": "medium",
-  "conversationalMessage": "I can see you're in the right document. Scroll down about halfway to find the 'Product Vision & Strategy' section.",
-  "element": {
-    "label": "Product Vision Section",
-    "type": "text",
-    "boundingBox": null,
-    "confidence": 0.7
-  }
-}
-Note: boundingBox is null because element requires scrolling to be visible
-❌ BAD: Omitting the "element" field entirely (element field is ALWAYS required!)`;
+Guidelines:
+- Reference screenshots naturally (e.g., "In the Slack window...", "Back in Chrome...").
+- If multiple windows matter, describe the order of actions across them.
+- If something is missing, explicitly say what the user should open or capture next.
+- Sound like you're narrating in real time to a teammate.`;
 
-      const result = await this.stepGuidanceModel.generateContent([
+      const contentParts: any[] = [
         prompt,
-        {
+        `Clarified UI element to look for: ${clarifiedDescription}`,
+        `Solution summary: ${solutionObject.solution}`,
+        `Step list:\n${solutionObject.stepList
+          .map((s) => `${s.stepNumber}. ${s.description} [${s.status}]`)
+          .join("\n")}`,
+        `Recent conversation snippets:\n${conversationHistory
+          .slice(-5)
+          .map((m) => `${m.role}: ${m.content.substring(0, 200)}`)
+          .join("\n")}`,
+      ];
+
+      relevantEntries.forEach((entry, idx) => {
+        const base64Data = entry.screenshot.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+        contentParts.push({
           inlineData: {
             mimeType: "image/png",
             data: base64Data,
           },
-        },
-      ]);
-
-      const text = result.response.text();
-      const parsed = VisualGuidanceSchema.parse(JSON.parse(text)) as any;
-
-      // Add clarified description to response (from Phase 1)
-      parsed.clarifiedDescription = clarifiedDescription;
-
-      // Convert normalized coordinates (0.0-1.0) to pixel coordinates
-      if (imageDimensions && parsed.element?.boundingBox) {
-        const normalized = { ...parsed.element.boundingBox };
-        parsed.element.boundingBox = coordinateConverterService.convertToPixels(
-          parsed.element.boundingBox,
-          imageDimensions
-        );
-
-        console.log("[GeminiVision] Converted bounding box coordinates:", {
-          normalized,
-          pixels: parsed.element.boundingBox,
-          imageDimensions,
         });
+        contentParts.push(
+          `Screenshot ${idx} (captured window ${entry.originalIndex}): ${entry.screenshot.appName} - ${entry.screenshot.windowTitle}. Why it matters: ${entry.inclusionReason}`
+        );
+      });
 
-        // Filter out application-type elements (they represent entire windows, not specific UI elements)
-        if (parsed.element.type === "application") {
-          console.log(
-            "[GeminiVision] Element type is 'application' - setting boundingBox to null (application windows should not have bounding boxes)"
-          );
-          parsed.element.boundingBox = null;
-        }
+      const result = await this.stepGuidanceModel.generateContent(contentParts);
+      const parsed = VisualGuidanceSchema.parse(JSON.parse(result.response.text()));
 
-        // Validate bounding box size (catch oversized boxes from Gemini)
-        // Only validate if boundingBox is still present (not nullified above)
-        if (parsed.element.boundingBox) {
-          const bbox = parsed.element.boundingBox;
-          const widthPercent = (bbox.width / imageDimensions.width) * 100;
-          const heightPercent = (bbox.height / imageDimensions.height) * 100;
-
-          // Warn if bounding box is suspiciously large (>50% width or >50% height)
-          if (widthPercent > 50 || heightPercent > 50) {
-            console.warn("[GeminiVision] WARNING: Bounding box is very large!", {
-              widthPercent: widthPercent.toFixed(1) + "%",
-              heightPercent: heightPercent.toFixed(1) + "%",
-              elementType: parsed.element.type,
-              elementLabel: parsed.element.label,
-              normalizedWidth: normalized.width.toFixed(3),
-              normalizedHeight: normalized.height.toFixed(3),
-            });
-
-            // If it's marked as "application" type and covers >30% of screen, set to null
-            if (
-              parsed.element.type === "application" &&
-              (widthPercent > 30 || heightPercent > 30)
-            ) {
-              console.warn(
-                "[GeminiVision] Nullifying application-level bounding box (too large to be useful)"
-              );
-              parsed.element.boundingBox = null;
-            }
-            // For other element types, warn but don't auto-nullify (let it through for debugging)
-            else {
-              console.warn(
-                "[GeminiVision] Large bounding box detected but not auto-nullified. Review Gemini prompt effectiveness."
-              );
-            }
-          }
-        } // End of bounding box validation
-      }
-
-      // Comprehensive logging for debugging
       const totalTimeMs = Date.now() - phaseStartTime;
       console.log("[GeminiVision] ========================================");
-      console.log("[GeminiVision] Detection complete:");
-      console.log("[GeminiVision] ========================================");
-      console.log("[GeminiVision] Original step:", currentStep.description);
-      console.log("[GeminiVision] Clarified (what we looked for):", clarifiedDescription);
-      console.log("[GeminiVision] Found element:", {
-        type: parsed.element?.type,
-        label: parsed.element?.label,
-        confidence: parsed.element?.confidence,
-        hasBoundingBox: !!parsed.element?.boundingBox,
-        boundingBox: parsed.element?.boundingBox,
-      });
-      console.log("[GeminiVision] Overall confidence:", parsed.confidence);
+      console.log("[GeminiVision] Conversational guidance complete");
+      console.log("[GeminiVision] Confidence:", parsed.confidence);
       console.log("[GeminiVision] Total processing time:", totalTimeMs, "ms");
       console.log("[GeminiVision] ========================================");
 
-      // Detailed response logging
-      console.log("[GeminiVision] Visual guidance generated:", {
-        elementDescription: parsed.elementDescription?.substring(0, 100) + "...",
-        visualContext: parsed.visualContext?.substring(0, 100) + "...",
-        conversationalMessage: parsed.conversationalMessage,
-        conversationalMessageLength: parsed.conversationalMessage?.length || 0,
-        confidence: parsed.confidence,
-        clarifiedDescription: parsed.clarifiedDescription?.substring(0, 100) + "...",
-        hasElement: !!parsed.element,
-        hasBoundingBox: !!parsed.element?.boundingBox,
-        boundingBox: parsed.element?.boundingBox,
-        elementLabel: parsed.element?.label,
-        elementType: parsed.element?.type,
-        elementConfidence: parsed.element?.confidence,
-      });
-
-      // Validate conversationalMessage quality
       if (!parsed.conversationalMessage || parsed.conversationalMessage.trim().length < 10) {
-        console.warn("[GeminiVision] WARNING: conversationalMessage is too short or missing!", {
-          conversationalMessage: parsed.conversationalMessage,
-          length: parsed.conversationalMessage?.length || 0,
-          stepDescription: currentStep.description,
-        });
-
-        // Generate fallback message using step description
-        const fallbackMessage = `Let's work on step ${currentStep.stepNumber}: ${currentStep.description}. ${parsed.elementDescription || "I'll guide you through this step."}`;
-        console.log("[GeminiVision] Using fallback message:", fallbackMessage);
-        parsed.conversationalMessage = fallbackMessage;
+        parsed.conversationalMessage = `Let's focus on step ${currentStep.stepNumber}: ${currentStep.description}. Follow the instructions I outlined for the captured windows.`;
       }
 
-      console.log("[GeminiVision] Guidance confidence:", parsed.confidence);
       return parsed;
     } catch (error) {
       console.error("[GeminiVision] Step analysis failed:", error);
       return {
         elementDescription: `Look for elements related to: ${currentStep.description}`,
-        visualContext: "Unable to analyze screenshot",
+        visualContext: "Unable to analyze screenshots",
         confidence: "low",
-        conversationalMessage: `I'm having trouble analyzing your screenshot right now. For this step (${currentStep.description}), look for any UI elements that would help you accomplish this. Let me know if you need help!`,
+        conversationalMessage: `I'm having trouble analyzing the screenshots right now. For this step (${currentStep.description}), look for UI elements that match the workflow instructions and let me know if you'd like me to try again.`,
       };
     }
   }
 
   async evaluateProgress(
-    screenshot: string,
+    screenshots: WindowScreenshot[],
     solutionObject: SolutionObject,
     conversationHistory: DbMessage[],
     nextStepIndex: number
@@ -814,7 +744,12 @@ Note: boundingBox is null because element requires scrolling to be visible
     console.log("[GeminiVision] Evaluating progress to step:", nextStepIndex + 1);
 
     try {
-      const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
+      if (!screenshots.length) {
+        console.warn("[GeminiVision] evaluateProgress called without screenshots");
+        return { needsAdjustment: false };
+      }
+
+      const base64Data = screenshots[0].dataUrl.replace(/^data:image\/\w+;base64,/, "");
 
       const currentPlan = solutionObject.stepList
         .map((s) => `${s.stepNumber}. ${s.description} [${s.status}]`)

@@ -1,31 +1,19 @@
 /**
  * Screenshot Capture Service
  *
- * Provides comprehensive screenshot capture functionality for the Mitable Agent window.
- * Supports multiple capture modes, multi-monitor setups, automatic image processing,
- * and temporary file management with auto-cleanup.
- *
- * Features:
- * - Active window capture
- * - Full screen capture (with display selection)
- * - Region capture
- * - Multi-monitor support
- * - Automatic image resizing (max 1920x1080)
- * - Retina/HiDPI display handling
- * - Temporary file management with auto-cleanup
- * - Window metadata extraction (title, bounds)
- * - Memory usage monitoring
+ * Provides multi-window screenshot capture for watch mode.
+ * Focuses on policy-compliant capture of the windows the user explicitly selected,
+ * with automatic resizing, temporary file handling, and metadata extraction.
  *
  * @module captureService
  */
 
-import { desktopCapturer, screen, nativeImage, NativeImage, Display } from "electron";
+import { desktopCapturer, screen, NativeImage, Display } from "electron";
 import { promises as fs } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import crypto from "crypto";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
-import activeWin from "active-win";
 import type {
   MultiWindowCaptureResult,
   WindowScreenshot,
@@ -69,58 +57,6 @@ export interface WindowMetadata {
 }
 
 /**
- * Screenshot capture options
- */
-export interface CaptureOptions {
-  /** Capture mode */
-  mode?: "active-window" | "full-screen" | "region";
-  /** Display ID for multi-monitor setups (full-screen mode only) */
-  displayId?: number;
-  /** Bounds for region capture (region mode only) */
-  bounds?: Rectangle;
-  /** Whether to save to temp file (default: false, returns base64) */
-  saveToFile?: boolean;
-}
-
-/**
- * Screenshot capture result - Success case
- */
-export interface CaptureResultSuccess {
-  success: true;
-  /** Base64-encoded image data (with data URL prefix) */
-  dataUrl: string;
-  /** Optional file path if saved to temp */
-  filePath?: string;
-  /** Screenshot metadata */
-  metadata: {
-    width: number;
-    height: number;
-    originalWidth: number;
-    originalHeight: number;
-    scaleFactor: number; // Display scale factor (1 = standard, 2 = Retina, 1.5 = Windows 150%)
-    captureMode: string;
-    timestamp: number;
-    window?: WindowMetadata;
-  };
-}
-
-/**
- * Screenshot capture result - Error case (policy blocked or technical failure)
- */
-export interface CaptureResultError {
-  success: false;
-  error: string;
-  reason: "policy_blocked" | "technical_error" | "no_window";
-  blockedApp?: string;
-  blockedWindow?: string;
-}
-
-/**
- * Screenshot capture result - discriminated union
- */
-export type CaptureResult = CaptureResultSuccess | CaptureResultError;
-
-/**
  * Temporary file information
  */
 interface TempFileInfo {
@@ -137,34 +73,6 @@ export interface MemoryStats {
   tempFileCount: number;
   totalTempFileSize: number;
   memoryUsageMB: number;
-}
-
-/**
- * Conversation context for screenshot capture heuristics
- */
-export interface ConversationContext {
-  /** Whether there is an active workflow in progress */
-  hasActiveWorkflow: boolean;
-  /** Type of the last assistant message */
-  lastMessageType?: string;
-  /** Number of messages in conversation */
-  messageCount: number;
-  /** Whether the last message contained workflow card data */
-  lastMessageHadCardData?: boolean;
-}
-
-/**
- * Screenshot capture decision result
- */
-export interface CaptureDecision {
-  /** Whether screenshot should be captured */
-  shouldCapture: boolean;
-  /** Reason for the decision (for logging/debugging) */
-  reason: string;
-  /** Confidence score (0-1) of the decision */
-  confidence: number;
-  /** Which heuristics triggered (for analytics) */
-  triggeredHeuristics: string[];
 }
 
 // ===========================
@@ -186,427 +94,13 @@ class CaptureService {
   }
 
   /**
-   * Evaluate whether a screenshot should be captured based on message content and context
-   *
-   * @param message - User message content
-   * @param context - Conversation context (workflow state, message history, etc.)
-   * @returns Decision object with shouldCapture flag, reason, and confidence
-   */
-  evaluateCaptureNeed(message: string, context: ConversationContext): CaptureDecision {
-    const triggeredHeuristics: string[] = [];
-    let confidence = 0;
-
-    // Normalize message for analysis
-    const normalizedMessage = message.toLowerCase().trim();
-
-    // ============================================
-    // HEURISTIC 1: Active Workflow (HIGHEST PRIORITY)
-    // ============================================
-    // If there's an active workflow, ALWAYS capture to track progress
-    if (context.hasActiveWorkflow) {
-      triggeredHeuristics.push("active_workflow");
-      return {
-        shouldCapture: true,
-        reason: "Active workflow in progress - screenshot required for step tracking",
-        confidence: 1.0,
-        triggeredHeuristics,
-      };
-    }
-
-    // ============================================
-    // HEURISTIC 2: Workflow-Related Last Message
-    // ============================================
-    // If last message was workflow-related, likely continuation
-    if (context.lastMessageType === "workflow" || context.lastMessageHadCardData) {
-      triggeredHeuristics.push("workflow_continuation");
-      confidence += 0.8; // High confidence - workflows need screenshots
-    }
-
-    // ============================================
-    // HEURISTIC 3: Help/Guidance Request Patterns
-    // ============================================
-    // User is asking for help with a task
-    const helpPatterns = [
-      // Direct help requests
-      /\b(how do i|how can i|how to|help me|show me|guide me|walk me through|teach me)\b/i,
-      // Task-oriented questions
-      /\b(where do i|what do i|when do i|which|should i)\b/i,
-      // Instructions/guidance
-      /\b(step by step|instructions|tutorial|walkthrough)\b/i,
-    ];
-
-    for (const pattern of helpPatterns) {
-      if (pattern.test(normalizedMessage)) {
-        triggeredHeuristics.push("help_request");
-        confidence += 0.7; // Strong indicator - help requests usually need visual context
-        break;
-      }
-    }
-
-    // ============================================
-    // HEURISTIC 4: Visual Language Indicators
-    // ============================================
-    // User is talking about visual elements on screen
-    const visualPatterns = [
-      // Visibility issues
-      /\b(don't see|can't see|can't find|don't find|not seeing|not showing|missing|where is|where's)\b/i,
-      // UI element references
-      /\b(button|icon|menu|tab|link|field|box|dialog|window|screen|page|form|dropdown|checkbox)\b/i,
-      // Actions on UI
-      /\b(click|press|tap|select|choose|open|close|expand|collapse|scroll|drag|drop)\b/i,
-      // Visual descriptors
-      /\b(top|bottom|left|right|corner|side|toolbar|sidebar|header|footer|banner)\b/i,
-      // Looking/finding
-      /\b(looking for|trying to find|search for|locate)\b/i,
-    ];
-
-    for (const pattern of visualPatterns) {
-      if (pattern.test(normalizedMessage)) {
-        triggeredHeuristics.push("visual_language");
-        confidence += 0.6; // Clear visual reference - likely needs screenshot
-        break;
-      }
-    }
-
-    // ============================================
-    // HEURISTIC 5: Problem/Error Indicators
-    // ============================================
-    // User is reporting an issue that needs visual inspection
-    const problemPatterns = [
-      /\b(error|issue|problem|wrong|broken|not working|doesn't work|isn't working|stuck|confused)\b/i,
-      /\b(why is|why isn't|why won't|what's wrong|what happened)\b/i,
-    ];
-
-    for (const pattern of problemPatterns) {
-      if (pattern.test(normalizedMessage)) {
-        triggeredHeuristics.push("problem_report");
-        confidence += 0.5; // Problems often need visual diagnosis
-        break;
-      }
-    }
-
-    // ============================================
-    // HEURISTIC 6: Demonstrative Language
-    // ============================================
-    // User is referencing "this" or "here" (likely pointing at screen)
-    const demonstrativePatterns = [/\b(this|these|here|that|those)\b/i];
-
-    for (const pattern of demonstrativePatterns) {
-      if (pattern.test(normalizedMessage)) {
-        triggeredHeuristics.push("demonstrative_reference");
-        confidence += 0.7; // The user is most likely talking about their screen, so we should categorise this as a vague prompt
-        break;
-      }
-    }
-
-    // ============================================
-    // HEURISTIC 7: Action Verb + Object Patterns
-    // ============================================
-    // User is describing an action they want to perform
-    const actionObjectPatterns = [
-      // Create/Add actions
-      /\b(create|make|add|insert|upload|post|publish|submit|send)\s+(a|an|the)?\s*\w+/i,
-      // Modify actions
-      /\b(edit|change|update|modify|delete|remove|rename)\s+(a|an|the|my)?\s*\w+/i,
-      // View actions
-      /\b(view|see|check|look at|review|inspect|examine)\s+(a|an|the|my)?\s*\w+/i,
-    ];
-
-    for (const pattern of actionObjectPatterns) {
-      if (pattern.test(normalizedMessage)) {
-        triggeredHeuristics.push("action_object_pattern");
-        confidence += 0.3; // Moderate signal - combination preferred
-        break;
-      }
-    }
-
-    // ============================================
-    // NEGATIVE HEURISTICS (reduce confidence)
-    // ============================================
-    // These patterns suggest screenshot is NOT needed
-
-    // Pure knowledge/information queries
-    const knowledgePatterns = [
-      /\b(what is|what are|who is|who are|define|definition|meaning|explain|tell me about)\b/i,
-      /\b(why do we|why does|why should|when should|when do we)\b/i,
-    ];
-
-    for (const pattern of knowledgePatterns) {
-      if (pattern.test(normalizedMessage)) {
-        triggeredHeuristics.push("knowledge_query");
-        confidence -= 0.3;
-        break;
-      }
-    }
-
-    // Simple greetings
-    const greetingPatterns = [
-      /^(hi|hello|hey|good morning|good afternoon|good evening|thanks|thank you|ok|okay|yes|no|sure)$/i,
-    ];
-
-    for (const pattern of greetingPatterns) {
-      if (pattern.test(normalizedMessage)) {
-        triggeredHeuristics.push("greeting");
-        confidence -= 0.5;
-        break;
-      }
-    }
-
-    // ============================================
-    // DECISION LOGIC
-    // ============================================
-    // Confidence threshold: 0.5
-    // If confidence >= 0.5, capture screenshot
-    // Cap confidence between 0 and 1
-    confidence = Math.max(0, Math.min(1, confidence));
-
-    const shouldCapture = confidence >= 0.5;
-
-    return {
-      shouldCapture,
-      reason: shouldCapture
-        ? `Screenshot needed (confidence: ${confidence.toFixed(2)}, triggers: ${triggeredHeuristics.join(", ")})`
-        : `Screenshot not needed (confidence: ${confidence.toFixed(2)}, triggers: ${triggeredHeuristics.join(", ")})`,
-      confidence,
-      triggeredHeuristics,
-    };
-  }
-
-  /**
-   * Conditionally capture screenshot based on message content and context
-   *
-   * @param message - User message content
-   * @param context - Conversation context
-   * @param options - Capture options (mode, display, etc.)
-   * @returns Capture result if screenshot was needed, null otherwise
-   */
-  async conditionalCapture(
-    message: string,
-    context: ConversationContext,
-    options: CaptureOptions = {}
-  ): Promise<{ decision: CaptureDecision; result: CaptureResult | null }> {
-    // Evaluate whether screenshot is needed
-    const decision = this.evaluateCaptureNeed(message, context);
-
-    console.log("[CaptureService] Capture decision:", {
-      shouldCapture: decision.shouldCapture,
-      reason: decision.reason,
-      confidence: decision.confidence,
-      triggeredHeuristics: decision.triggeredHeuristics,
-    });
-
-    // If not needed, return early
-    if (!decision.shouldCapture) {
-      return { decision, result: null };
-    }
-
-    // Capture screenshot
-    const result = await this.capture(options);
-
-    if (!result) {
-      console.error("[CaptureService] Screenshot capture failed despite being needed");
-    }
-
-    return { decision, result };
-  }
-
-  /**
-   * Main capture method - dispatches to specific capture mode
-   *
-   * @param options - Capture options
-   * @returns Capture result with image data and metadata
-   */
-  async capture(options: CaptureOptions = {}): Promise<CaptureResult | null> {
-    const { mode = "active-window" } = options; // Changed default from "full-screen" to "active-window"
-
-    console.log("[CaptureService] Starting capture:", {
-      mode,
-      displayId: options.displayId,
-      hasBounds: !!options.bounds,
-      saveToFile: options.saveToFile,
-    });
-
-    try {
-      let result: CaptureResult | null;
-
-      switch (mode) {
-        case "active-window":
-          result = await this.captureActiveWindow(options.saveToFile);
-          break;
-        case "full-screen":
-          // Full-screen capture disabled for privacy/security policy
-          console.warn("[CaptureService] ⚠️  Full-screen capture is disabled by policy");
-          console.warn("[CaptureService] Use 'active-window' mode for app-specific captures");
-          return null;
-        case "region":
-          if (!options.bounds) {
-            throw new Error("Region capture requires bounds parameter");
-          }
-          result = await this.captureRegion(options.bounds, options.saveToFile);
-          break;
-        default:
-          throw new Error(`Unknown capture mode: ${mode}`);
-      }
-
-      if (result) {
-        if (result.success) {
-          console.log("[CaptureService] Capture successful:", {
-            mode,
-            width: result.metadata.width,
-            height: result.metadata.height,
-            hasFile: !!result.filePath,
-          });
-        } else {
-          console.log("[CaptureService] Capture blocked:", result.error);
-        }
-      }
-
-      return result;
-    } catch (error) {
-      console.error("[CaptureService] Capture failed:", error);
-      return null;
-    }
-  }
-
-  /**
-   * Capture the currently active/focused window
-   *
-   * @param saveToFile - Whether to save to temp file
-   * @returns Capture result or null on failure
-   */
-  async captureActiveWindow(saveToFile: boolean = false): Promise<CaptureResult | null> {
-    try {
-      // STEP 1: Get active window info for policy check
-      const activeWindow = await activeWin();
-      if (!activeWindow) {
-        console.log("[CaptureService] No active window detected");
-        return null;
-      }
-
-      const windowTitle = activeWindow.title ?? "";
-      const appName = activeWindow.owner?.name ?? "";
-
-      console.log("[CaptureService] Active window detected:", {
-        title: windowTitle,
-        app: appName,
-      });
-
-      // STEP 2: Check capture policy (deny-first)
-      const policy = getCapturePolicy();
-      const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
-
-      if (policyDecision.blocked) {
-        console.log("[CaptureService] ❌ Capture BLOCKED by policy:", {
-          window: windowTitle,
-          app: appName,
-          reason: policyDecision.reason,
-        });
-        
-        // Return structured error for policy block
-        return {
-          success: false,
-          error: `I'm not allowed to view ${appName || windowTitle} due to your organization's capture policy. I can still help you with text-based instructions instead.`,
-          reason: "policy_blocked",
-          blockedApp: appName,
-          blockedWindow: windowTitle,
-        };
-      }
-
-      console.log("[CaptureService] ✅ Capture ALLOWED by policy");
-
-      // STEP 3: Get all window sources
-      const sources = await desktopCapturer.getSources({
-        types: ["window"],
-        thumbnailSize: {
-          width: this.MAX_WIDTH * 2, // Allow for HiDPI
-          height: this.MAX_HEIGHT * 2,
-        },
-      });
-
-      if (sources.length === 0) {
-        console.error("[CaptureService] No window sources found");
-        return null;
-      }
-
-      // STEP 4: Find the matching window source (by title)
-      const targetSource = sources.find((source) => {
-        // Try exact match first
-        if (source.name === windowTitle) return true;
-        // Fallback: contains match
-        if (windowTitle && source.name.includes(windowTitle)) return true;
-        return false;
-      });
-
-      if (!targetSource) {
-        console.error("[CaptureService] No matching window source found for:", windowTitle);
-        return null;
-      }
-
-      console.log("[CaptureService] Capturing window:", targetSource.name);
-
-      // Get the thumbnail image
-      let image = targetSource.thumbnail;
-      const originalSize = image.getSize();
-
-      // Resize if needed
-      image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
-      const finalSize = image.getSize();
-
-      // Convert to data URL
-      const dataUrl = image.toDataURL();
-
-      // Extract window metadata
-      const display = screen.getPrimaryDisplay();
-      const scaleFactor = display.scaleFactor;
-      const windowMetadata: WindowMetadata = {
-        title: targetSource.name,
-        bounds: {
-          x: 0, // Not available from desktopCapturer
-          y: 0,
-          width: finalSize.width,
-          height: finalSize.height,
-        },
-        sourceId: targetSource.id,
-        display: this.displayToInfo(display),
-      };
-
-      // Save to temp file if requested
-      let filePath: string | undefined;
-      if (saveToFile) {
-        const fileId = this.generateFileId();
-        filePath = await this.saveToTemp(image, fileId);
-      }
-
-      return {
-        success: true,
-        dataUrl,
-        filePath,
-        metadata: {
-          width: finalSize.width,
-          height: finalSize.height,
-          originalWidth: originalSize.width,
-          originalHeight: originalSize.height,
-          scaleFactor: scaleFactor,
-          captureMode: "active-window",
-          timestamp: Date.now(),
-          window: windowMetadata,
-        },
-      };
-    } catch (error) {
-      console.error("[CaptureService] Active window capture failed:", error);
-      return null;
-    }
-  }
-
-  /**
    * Capture multiple visible windows (non-minimized) with capture policy filtering
    *
    * This method:
-   * 1. Gets the active window for prioritization
-   * 2. Captures all visible windows using desktopCapturer
-   * 3. Filters out blocked windows based on capture policy
-   * 4. Optionally filters to only allowed windows (if provided)
-   * 5. Returns screenshots for all selected windows (no limit)
+   * 1. Captures all visible windows using desktopCapturer
+   * 2. Filters out blocked windows based on capture policy
+   * 3. Optionally filters to only allowed windows (if provided)
+   * 4. Returns screenshots for all selected windows (no limit)
    *
    * @param saveToFile - Whether to save screenshots to temp files (default: false)
    * @param allowedWindowIds - Optional list of OS window IDs to capture (if provided, only these windows are captured)
@@ -617,17 +111,7 @@ class CaptureService {
     allowedWindowIds?: string[]
   ): Promise<MultiWindowCaptureResult> {
     try {
-      // STEP 1: Get active window info for prioritization
-      const activeWindow = await activeWin();
-      const activeWindowTitle = activeWindow?.title ?? "";
-      const activeAppName = activeWindow?.owner?.name ?? "";
-
-      console.log("[CaptureService] Active window detected:", {
-        title: activeWindowTitle,
-        app: activeAppName,
-      });
-
-      // STEP 2: Capture all window sources (includes ALL windows - unavoidable)
+      // STEP 1: Capture all window sources (includes ALL windows - unavoidable)
       // Note: Electron automatically excludes minimized windows
       const allSources = await desktopCapturer.getSources({
         types: ["window"],
@@ -648,7 +132,7 @@ class CaptureService {
 
       console.log(`[CaptureService] Detected ${allSources.length} visible windows`);
 
-      // STEP 3: Filter by capture policy IMMEDIATELY (discard blocked thumbnails)
+      // STEP 2: Filter by capture policy IMMEDIATELY (discard blocked thumbnails)
       const policy = getCapturePolicy();
       const allowedWindows: typeof allSources = [];
       const blockedWindows: BlockedWindowMetadata[] = [];
@@ -686,7 +170,7 @@ class CaptureService {
         };
       }
 
-        // STEP 4: Filter by allowed window IDs if provided
+        // STEP 3: Filter by allowed window IDs if provided
         let windowsToCapture = allowedWindows;
         if (allowedWindowIds && allowedWindowIds.length > 0) {
           const normalizedAllowedIds = new Set<string>();
@@ -711,14 +195,11 @@ class CaptureService {
 
       console.log(`[CaptureService] Capturing ${windowsToCapture.length} windows`);
 
-      // STEP 5: Process each window into WindowScreenshot format
+      // STEP 4: Process each window into WindowScreenshot format
       const screenshots: WindowScreenshot[] = [];
       const display = screen.getPrimaryDisplay();
 
-      for (let i = 0; i < windowsToCapture.length; i++) {
-        const source = windowsToCapture[i];
-        const isActive = !!(activeWindowTitle && source.name.includes(activeWindowTitle));
-
+      for (const source of windowsToCapture) {
         // Get image and resize if needed
         let image = source.thumbnail;
         image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
@@ -740,8 +221,6 @@ class CaptureService {
           windowId: source.id,
           windowTitle: source.name,
           appName: appNameMatch,
-          isActiveWindow: isActive,
-          priority: i, // 0 = highest (active window)
           dataUrl,
           metadata: {
             width: finalSize.width,
@@ -757,7 +236,7 @@ class CaptureService {
         });
       }
 
-      // STEP 6: Return success result
+      // STEP 5: Return success result
       return {
         success: true,
         screenshots,
@@ -796,155 +275,6 @@ class CaptureService {
 
       return id;
     }
-
-  /**
-   * Capture the full screen of a specific display
-   *
-   * @param displayId - Display ID (defaults to primary display)
-   * @param saveToFile - Whether to save to temp file
-   * @returns Capture result or null on failure
-   */
-  async captureFullScreen(
-    displayId?: number,
-    saveToFile: boolean = false
-  ): Promise<CaptureResult | null> {
-    try {
-      // Get target display
-      const displays = screen.getAllDisplays();
-      const targetDisplay =
-        displayId !== undefined
-          ? displays.find((d) => d.id === displayId) || screen.getPrimaryDisplay()
-          : screen.getPrimaryDisplay();
-
-      const { width, height } = targetDisplay.size;
-      const scaleFactor = targetDisplay.scaleFactor;
-
-      console.log("[CaptureService] Capturing full screen:", {
-        displayId: targetDisplay.id,
-        width,
-        height,
-        scaleFactor,
-      });
-
-      // Capture screenshot using desktopCapturer
-      const sources = await desktopCapturer.getSources({
-        types: ["screen"],
-        thumbnailSize: {
-          width: width * scaleFactor,
-          height: height * scaleFactor,
-        },
-      });
-
-      if (sources.length === 0) {
-        console.error("[CaptureService] No screen sources found");
-        return null;
-      }
-
-      // Use the first screen source (or match by display if possible)
-      // Note: desktopCapturer doesn't directly map to display IDs
-      const screenSource = sources[0];
-      let image = screenSource.thumbnail;
-      const originalSize = image.getSize();
-
-      // Resize if needed
-      image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
-      const finalSize = image.getSize();
-
-      // Convert to data URL
-      const dataUrl = image.toDataURL();
-
-      // Save to temp file if requested
-      let filePath: string | undefined;
-      if (saveToFile) {
-        const fileId = this.generateFileId();
-        filePath = await this.saveToTemp(image, fileId);
-      }
-
-      return {
-        success: true,
-        dataUrl,
-        filePath,
-        metadata: {
-          width: finalSize.width,
-          height: finalSize.height,
-          originalWidth: originalSize.width,
-          originalHeight: originalSize.height,
-          scaleFactor: scaleFactor,
-          captureMode: "full-screen",
-          timestamp: Date.now(),
-        },
-      };
-    } catch (error) {
-      console.error("[CaptureService] Full screen capture failed:", error);
-      return null;
-    }
-  }
-
-  /**
-   * Capture a specific region of the screen
-   *
-   * @param bounds - Region bounds (x, y, width, height)
-   * @param saveToFile - Whether to save to temp file
-   * @returns Capture result or null on failure
-   */
-  async captureRegion(
-    bounds: Rectangle,
-    saveToFile: boolean = false
-  ): Promise<CaptureResult | null> {
-    try {
-      // First capture full screen, then crop to region
-      const fullScreenResult = await this.captureFullScreen(undefined, false);
-
-      if (!fullScreenResult || !fullScreenResult.success) {
-        console.error("[CaptureService] Failed to capture full screen for region crop");
-        return null;
-      }
-
-      // Extract scaleFactor from full screen capture
-      const scaleFactor = fullScreenResult.metadata.scaleFactor;
-
-      // Convert data URL back to NativeImage
-      const base64Data = fullScreenResult.dataUrl.replace(/^data:image\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
-      let image = nativeImage.createFromBuffer(buffer);
-
-      // Crop to specified region
-      image = image.crop(bounds);
-      const originalSize = image.getSize();
-
-      // Resize if needed
-      image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
-      const finalSize = image.getSize();
-
-      // Convert to data URL
-      const dataUrl = image.toDataURL();
-
-      // Save to temp file if requested
-      let filePath: string | undefined;
-      if (saveToFile) {
-        const fileId = this.generateFileId();
-        filePath = await this.saveToTemp(image, fileId);
-      }
-
-      return {
-        success: true,
-        dataUrl,
-        filePath,
-        metadata: {
-          width: finalSize.width,
-          height: finalSize.height,
-          originalWidth: originalSize.width,
-          originalHeight: originalSize.height,
-          scaleFactor: scaleFactor,
-          captureMode: "region",
-          timestamp: Date.now(),
-        },
-      };
-    } catch (error) {
-      console.error("[CaptureService] Region capture failed:", error);
-      return null;
-    }
-  }
 
   /**
    * Resize image if it exceeds maximum dimensions

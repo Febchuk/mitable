@@ -55,11 +55,9 @@ However, screenshot capture in Mitable has **multiple use cases and entry points
 
 ```
 📁 apps/electron/src/services/captureService.ts
-├── capture() - Main entry point
-├── captureActiveWindow() - Specific window
-├── captureFullScreen() - Entire display
-├── captureRegion() - Bounded area
-└── evaluateCaptureNeed() - Heuristics (workflow, message content)
+├── captureVisibleWindows() - Multi-window capture for watch mode (policy aware)
+├── normalizeWindowSourceId() - Maps desktopCapturer IDs to OS IDs
+└── Temp file utilities (saveToTemp, cleanup, etc.)
 ```
 
 **Key Issue:** No centralized "is this app allowed?" check anywhere.

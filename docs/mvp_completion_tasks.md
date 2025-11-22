@@ -25,30 +25,30 @@ This document provides detailed tasks and acceptance criteria to complete the re
 
 ### Task 1.1: Implement Screenshot Capture System
 
-**Description:** Build native screenshot capture functionality using Electron's `desktopCapturer` API to capture the active application window or full screen when user invokes help (Cmd+H).
+**Description:** Build native screenshot capture functionality using Electron's `desktopCapturer` API to capture the watch-mode windows the user explicitly selects (instead of auto-capturing the active window or full screen). Capture runs only after the user enters watch mode and requests guidance, ensuring we stay within the capture policy.
 
 **Location:** `/apps/electron/src/main.ts` and new service `/apps/electron/src/services/captureService.ts`
 
 **Technical Requirements:**
 
-- Use `desktopCapturer.getSources()` to capture screens and windows
+- Use `desktopCapturer.getSources()` to enumerate windows
+- Filter windows through capture policy before capture
+- Only capture the windows the user selects via watch buttons
 - Capture at high DPI (Retina support for macOS)
 - Convert to PNG buffer for transmission
 - Limit capture size to 1920x1080 max (resize if larger)
 - Include window title and bounds in metadata
 - Handle multi-monitor scenarios
-- Support both full screen and active window capture
 
 **Implementation Steps:**
 
-1. Create `captureService.ts` with methods:
-   - `captureActiveWindow()`: Captures the currently focused window
-   - `captureFullScreen()`: Captures primary display
-   - `captureRegion(bounds)`: Captures specific coordinates
-2. Add IPC handler `SCREENSHOT_CAPTURE` in main process
-3. Integrate with Agent window's help button
-4. Store screenshot in temp directory with unique ID
-5. Send screenshot path + metadata to backend via IPC
+1. Create `captureService.ts` with methods focused on watch mode:
+   - `captureVisibleWindows()` for multi-window capture
+   - `normalizeWindowSourceId()` to map desktopCapturer IDs to OS IDs
+2. Add IPC handler `CAPTURE_SCREENSHOT` in main process
+3. Surface watch buttons for every allowable window and pass selected IDs to the capture service
+4. Store screenshots in temp directory with unique ID
+5. Send screenshot metadata + data URLs to backend via IPC
 
 **Acceptance Criteria:**
 

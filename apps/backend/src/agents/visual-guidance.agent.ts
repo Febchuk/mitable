@@ -87,7 +87,7 @@ export class VisualGuidanceAgent extends BaseAgent {
   async *execute(context: ToolContext): AsyncIterable<StreamChunk> {
     try {
       // Check if screenshot is available
-      if (!context.screenshot) {
+      if (!context.screenshots || context.screenshots.length === 0) {
         yield {
           type: "complete",
           messageType: "text",
@@ -235,7 +235,7 @@ export class VisualGuidanceAgent extends BaseAgent {
           model: "gemini-2.0-flash-exp",
         });
 
-        const base64Data = context.screenshot.replace(/^data:image\/\w+;base64,/, "");
+        const base64Data = context.screenshots[0].dataUrl.replace(/^data:image\/\w+;base64,/, "");
 
         const screenAnalysisPrompt = `Look at this screenshot and identify:
 1. What application/program is currently visible and focused?

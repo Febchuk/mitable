@@ -78,7 +78,7 @@ DO NOT USE:
     console.log("[GuideNextStepTool] Progressing workflow in conversation:", conversationId);
 
     // Validate screenshot is present
-    if (!context.screenshot) {
+    if (!context.screenshots || context.screenshots.length === 0) {
       console.error("[GuideNextStepTool] No screenshot provided");
       return {
         messageType: "text",
@@ -124,12 +124,12 @@ DO NOT USE:
 
       // Step 3: ALWAYS evaluate if plan needs adjustment
       console.log("[GuideNextStepTool] Evaluating if plan needs adjustment...");
-      const evaluation = await geminiVisionService.evaluateProgress(
-        context.screenshot,
-        currentSolution,
-        context.conversationHistory,
-        nextStepIndex
-      );
+        const evaluation = await geminiVisionService.evaluateProgress(
+          context.screenshots,
+          currentSolution,
+          context.conversationHistory,
+          nextStepIndex
+        );
 
       console.log("[GuideNextStepTool] Evaluation result:", {
         needsAdjustment: evaluation.needsAdjustment,
@@ -173,12 +173,12 @@ DO NOT USE:
         description: nextStep.description,
       });
 
-      const visualGuidance = await geminiVisionService.analyzeStepExecution(
-        context.screenshot,
-        updatedSolution,
-        nextStep,
-        context.conversationHistory
-      );
+        const visualGuidance = await geminiVisionService.analyzeStepExecution(
+          context.screenshots,
+          updatedSolution,
+          nextStep,
+          context.conversationHistory
+        );
 
       console.log("[GuideNextStepTool] Visual guidance generated:", {
         conversationalMessage: visualGuidance.conversationalMessage,

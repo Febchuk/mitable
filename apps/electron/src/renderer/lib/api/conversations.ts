@@ -6,9 +6,10 @@
  */
 
 import type { Message as MessageType } from "../../conversation/src/types";
-import type { MultiWindowCaptureResult } from "@mitable/shared";
+import type { MultiWindowCaptureResult, WindowScreenshot } from "@mitable/shared";
 
-const API_BASE_URL = "http://localhost:3000/api";
+// Base URL for backend API (configurable via Vite env)
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Re-export Message type for convenience
 export type Message = MessageType;
@@ -29,12 +30,15 @@ export interface StreamChunk {
   messageType?: "text" | "workflow" | "experts";
   cardData?: any;
   sources?: any[];
+  // Workflow routing metadata (added by backend)
   workflowSessionId?: string | null;
   relatedStepIndex?: number | null;
+  // Window trigger for UI coordination (nudge/guide; overlay deprecated but kept for backward-compat)
   windowTrigger?: {
     window: "nudge" | "guide" | "overlay";
     data: any;
   };
+  // Progress updates for long-running operations
   progress?: {
     phase: string;
     message: string;
@@ -68,9 +72,12 @@ export async function createConversation(
   title: string = "New Conversation",
   initialMessage?: string
 ): Promise<Conversation> {
-  const headers = await getAuthHeaders();
+  console.log("[API] Creating conversation:", { title, initialMessage });
 
-  const response = await fetch(`${API_BASE_URL}/conversations`, {
+  const headers = await getAuthHeaders();
+  console.log("[API] Auth headers obtained");
+
+  const response = await fetch(`${API_BASE_URL}/api/conversations`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -80,11 +87,23 @@ export async function createConversation(
     }),
   });
 
+  console.log("[API] Conversation creation response:", {
+    status: response.status,
+    ok: response.ok,
+  });
+
   if (!response.ok) {
-    throw new Error(`Failed to create conversation: ${response.statusText}`);
+    const errorText = await response.text();
+    console.error("[API] ❌ Failed to create conversation:", {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorText,
+    });
+    throw new Error(`Failed to create conversation: ${response.statusText} - ${errorText}`);
   }
 
   const data = await response.json();
+  console.log("[API] ✅ Conversation created:", data.conversation);
   return data.conversation;
 }
 
@@ -94,7 +113,7 @@ export async function createConversation(
 export async function getConversationMessages(conversationId: string): Promise<Message[]> {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
+  const response = await fetch(`${API_BASE_URL}/api/conversations/${conversationId}/messages`, {
     headers,
   });
 
@@ -119,10 +138,13 @@ export async function pauseWorkflow(conversationId: string): Promise<{
 }> {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/workflow/pause`, {
-    method: "POST",
-    headers,
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/api/conversations/${conversationId}/workflow/pause`,
+    {
+      method: "POST",
+      headers,
+    }
+  );
 
   if (!response.ok) {
     throw new Error(`Failed to pause workflow: ${response.statusText}`);
@@ -138,8 +160,8 @@ export async function pauseWorkflow(conversationId: string): Promise<{
  * @param content - Message content
  * @param multiWindowCapture - Optional multi-window capture result with screenshots
  * @param callbacks - Streaming callbacks
- * @param callbacks.onChunk - Callback for each streaming chunk
- * @param callbacks.onComplete - Callback when streaming completes
+ * @param callbacks.onChunk - Callback for each streaming chunk (with workflow metadata)
+ * @param callbacks.onComplete - Callback when streaming completes (with workflow metadata)
  * @param callbacks.onError - Callback for errors
  * @param callbacks.onWindowTrigger - Callback for window triggers (Nudge/Guide)
  * @param callbacks.onProgress - Callback for progress updates
@@ -170,38 +192,54 @@ export async function sendMessageStream(
   },
   metadata?: any
 ): Promise<void> {
-  const headers = await getAuthHeaders();
+  // Forward all captured screenshots (if any) from multi-window capture
+  let screenshotsPayload: WindowScreenshot[] | undefined;
+  if (multiWindowCapture && multiWindowCapture.success && multiWindowCapture.screenshots.length) {
+    screenshotsPayload = multiWindowCapture.screenshots;
 
-  // Build request body with optional multi-window capture and metadata
-  const requestBody: {
-    content: string;
-    multiWindowCapture?: MultiWindowCaptureResult;
-    metadata?: any;
-  } = { content };
-
-  if (multiWindowCapture) {
-    if (multiWindowCapture.success) {
-      requestBody.multiWindowCapture = multiWindowCapture;
-      console.log(`[API] Sending message with ${multiWindowCapture.screenshots.length} window screenshots`);
-      console.log(`[API] Blocked windows: ${multiWindowCapture.blockedWindows.length}`);
-    } else {
-      console.log(`[API] Screenshot capture blocked: ${multiWindowCapture.error}`);
-      // Don't send blocked capture result to backend
-    }
+    console.log("[API] Sending multi-window capture payload:", {
+      screenshotCount: screenshotsPayload.length,
+      apps: screenshotsPayload.map((s) => s.appName).join(", "),
+    });
+  } else if (multiWindowCapture && !multiWindowCapture.success) {
+    console.log("[API] Screenshot capture blocked or failed:", multiWindowCapture.error);
   } else {
     console.log("[API] Sending message without screenshots");
   }
 
-  if (metadata) {
-    requestBody.metadata = metadata;
-    console.log(`[API] Sending message with metadata:`, metadata);
+  console.log("[API] 📨 Starting message stream:", {
+    conversationId,
+    contentLength: content.length,
+    screenshotCount: screenshotsPayload?.length || 0,
+  });
+
+  const headers = await getAuthHeaders();
+  console.log("[API] Auth headers obtained for streaming");
+
+  // Build request body with optional screenshots and metadata
+  const requestBody: {
+    content: string;
+    screenshots?: WindowScreenshot[];
+    metadata?: any;
+  } = { content };
+
+  if (screenshotsPayload) {
+    requestBody.screenshots = screenshotsPayload;
   }
 
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/stream`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(requestBody),
-  });
+  if (metadata) {
+    requestBody.metadata = metadata;
+    console.log("[API] Sending message with metadata:", metadata);
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/conversations/${conversationId}/messages/stream`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestBody),
+    }
+  );
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -250,29 +288,25 @@ export async function sendMessageStream(
         // Parse SSE data
         if (line.startsWith("data: ")) {
           const data = line.slice(6); // Remove "data: " prefix
-          console.log("[API] SSE data received:", data.substring(0, 150));
-
           try {
             const chunk: StreamChunk = JSON.parse(data);
-            console.log("[API] Parsed chunk:", { type: chunk.type, keys: Object.keys(chunk) });
 
             switch (chunk.type) {
-              case "chunk":
+              case "chunk": {
                 // Extract workflow metadata from first chunk
-                // Backend enriches ALL chunks with these fields (either null or actual values)
                 if (workflowSessionId === undefined) {
-                  workflowSessionId = chunk.workflowSessionId;
-                  relatedStepIndex = chunk.relatedStepIndex;
+                  workflowSessionId = chunk.workflowSessionId ?? null;
+                  relatedStepIndex = chunk.relatedStepIndex ?? null;
                 }
 
                 if (chunk.content) {
                   fullContent += chunk.content;
-                  // Pass workflow metadata to onChunk so frontend can route chunks during streaming
                   callbacks.onChunk?.(chunk.content, workflowSessionId, relatedStepIndex);
                 }
                 break;
+              }
 
-              case "complete":
+              case "complete": {
                 if (chunk.content) {
                   fullContent = chunk.content;
                 }
@@ -283,20 +317,20 @@ export async function sendMessageStream(
                   cardData = chunk.cardData;
                 }
                 break;
+              }
 
-              case "window_trigger":
-                console.log("[API] Window trigger case MATCHED");
-                console.log("[API] Received window_trigger event:", chunk.windowTrigger);
+              case "window_trigger": {
                 if (chunk.windowTrigger) {
                   windowTriggerData = chunk.windowTrigger;
-                  console.log("[API] Stored windowTriggerData:", windowTriggerData);
-                  console.log("[API] Calling onWindowTrigger callback...");
-                  callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
-                  console.log("[API] onWindowTrigger callback called");
+                  callbacks.onWindowTrigger?.(
+                    chunk.windowTrigger.window,
+                    chunk.windowTrigger.data
+                  );
                 }
                 break;
+              }
 
-              case "done":
+              case "done": {
                 if (chunk.messageId) {
                   messageId = chunk.messageId;
                 }
@@ -306,11 +340,7 @@ export async function sendMessageStream(
                 if (chunk.relatedStepIndex !== undefined) {
                   relatedStepIndex = chunk.relatedStepIndex;
                 }
-                console.log("[API] Calling onComplete with workflow fields:", {
-                  windowTriggerData,
-                  workflowSessionId,
-                  relatedStepIndex,
-                });
+
                 callbacks.onComplete?.(
                   fullContent,
                   messageId,
@@ -321,31 +351,48 @@ export async function sendMessageStream(
                   relatedStepIndex
                 );
                 break;
+              }
 
-              case "error":
-                callbacks.onError?.(chunk.error || "Unknown error");
-                break;
-
-              case "progress":
+              case "progress": {
                 if (chunk.progress) {
                   callbacks.onProgress?.(chunk.progress.phase, chunk.progress.message);
                 }
                 break;
+              }
 
-              default:
-                console.warn(
-                  "[API] Unknown chunk type received:",
-                  chunk.type,
-                  "Full chunk:",
-                  chunk
-                );
+              case "error": {
+                callbacks.onError?.(chunk.error || "Unknown error");
                 break;
+              }
+
+              default: {
+                console.warn("[API] Unknown chunk type received:", chunk.type, chunk);
+              }
             }
           } catch (parseError) {
-            console.error("Failed to parse SSE data:", parseError, data);
+            console.error("[API] Failed to parse SSE data:", parseError, data);
           }
         }
       }
+    }
+
+    if (!fullContent) {
+      console.error("[API] ❌ No content received from backend");
+      callbacks.onError?.("No content received from backend");
+      return;
+    }
+
+    // If we somehow exit the loop without a "done" event, still call onComplete once
+    if (!messageId) {
+      callbacks.onComplete?.(
+        fullContent,
+        messageId,
+        messageType,
+        cardData,
+        windowTriggerData,
+        workflowSessionId,
+        relatedStepIndex
+      );
     }
   } catch (error) {
     console.error("Stream reading error:", error);

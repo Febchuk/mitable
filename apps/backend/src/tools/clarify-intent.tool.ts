@@ -26,7 +26,7 @@ export class ClarifyIntentTool extends BaseTool {
 
     console.log("[ClarifyIntentTool] Execute:", args.vaguePrompt);
 
-    if (!context.screenshot) {
+    if (!context.screenshots || context.screenshots.length === 0) {
       return {
         messageType: "text",
         content: "I need to see your screen to understand what you're asking about.",
@@ -35,7 +35,7 @@ export class ClarifyIntentTool extends BaseTool {
     }
 
     const result = await geminiVisionService.interpretVaguePrompt(
-      context.screenshot,
+      context.screenshots,
       args.vaguePrompt
     );
 

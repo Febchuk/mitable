@@ -137,16 +137,7 @@ export interface ToolContext {
   userId: string;
   organizationId: string;
   conversationHistory: Message[];
-  screenshot?: string;
-  screenshotMetadata?: {
-    width: number;
-    height: number;
-    originalWidth: number;
-    originalHeight: number;
-    scaleFactor: number;
-    captureMode: string;
-    timestamp: number;
-  };
+  screenshots?: WindowScreenshot[];
   userProfile?: {
     name: string;
     email: string;
