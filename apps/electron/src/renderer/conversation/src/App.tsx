@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Code, LucideIcon, Users, Workflow, X } from "lucide-react";
+import { X } from "lucide-react";
 import UserMessage from "../../components/domain/messages/UserMessage";
 import AIMessage from "../../components/domain/messages/AIMessage";
-import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { sendMessageStream } from "../../lib/api/conversations";
 import CollapsedView from "./components/CollapsedView";
 import WorkflowOptions, { WorkflowPhase } from "../../components/domain/workflow/WorkflowOptions";
@@ -19,8 +18,6 @@ declare global {
       ) => () => void;
       updateMessages: (messages: any[]) => void;
       onPositionUpdate: (callback: (x: number, y: number) => void) => () => void;
-      showNudge: (data: unknown) => void;
-      startGuide: (data: unknown) => void;
       getAuthToken: () => Promise<string | null>;
       onAuthTokenUpdated: (callback: (token: string | null) => void) => () => void;
       // NEW: State management
@@ -77,10 +74,6 @@ interface Message {
   messageType?: string;
   cardData?: any;
   sources?: any[];
-  windowTrigger?: {
-    window: "nudge" | "guide";
-    data: any;
-  };
 }
 
 type ViewState = "hidden" | "collapsed" | "expanded";
@@ -231,12 +224,11 @@ function App() {
                 )
               );
             },
-            onComplete: (fullContent, messageId, messageType, cardData, windowTrigger) => {
+            onComplete: (fullContent, messageId, messageType, cardData) => {
               console.log("[Conversation] onComplete received:", {
                 messageId,
                 messageType,
                 hasCardData: !!cardData,
-                windowTrigger,
               });
               setMessages((prev) =>
                 prev.map((msg) =>
@@ -248,7 +240,6 @@ function App() {
                         type: cardData ? "card" : "text",
                         messageType,
                         cardData,
-                        windowTrigger,
                       }
                     : msg
                 )
@@ -268,10 +259,6 @@ function App() {
                 )
               );
               streamingMessageIdRef.current = null;
-            },
-            onWindowTrigger: (windowType, data) => {
-              console.log(`Window trigger: ${windowType}`, data);
-              // Window trigger data is stored in message for user to click card
             },
           });
         } catch (error) {
@@ -334,7 +321,6 @@ function App() {
         messageType: msg.messageType,
         cardData: msg.cardData,
         sources: msg.sources,
-        windowTrigger: msg.windowTrigger,
       }));
 
       setMessages(uiMessages);
@@ -352,38 +338,6 @@ function App() {
     console.log("[Conversation] Closing to collapsed state");
     // Don't clear messages or conversation - just collapse back to combobox
     window.conversationAPI.setViewState("collapsed");
-  };
-
-  const handleCardClick = (message: Message) => {
-    console.log("[Conversation] Card clicked - message object:", {
-      id: message.id,
-      messageType: message.messageType,
-      hasCardData: !!message.cardData,
-      windowTrigger: message.windowTrigger,
-      fullMessage: message,
-    });
-
-    if (!message.windowTrigger) {
-      console.warn("Card clicked but no window trigger data");
-      return;
-    }
-
-    const { window: windowType, data } = message.windowTrigger;
-    console.log(`Card clicked - launching ${windowType} window`, data);
-
-    if (windowType === "nudge") {
-      // Pass expert data + conversationId for context generation
-      window.conversationAPI.showNudge({
-        ...data,
-        conversationId,
-      });
-    } else if (windowType === "guide") {
-      // Pass guide data + conversationId for step progression
-      window.conversationAPI.startGuide({
-        ...data,
-        conversationId,
-      });
-    }
   };
 
   const handleWorkflowOptionSelect = async (option: any) => {
@@ -491,7 +445,7 @@ function App() {
               )
             );
           },
-          onComplete: (fullContent, messageId, messageType, cardData, windowTrigger) => {
+          onComplete: (fullContent, messageId, messageType, cardData) => {
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === streamingMessageId
@@ -502,7 +456,6 @@ function App() {
                       type: cardData ? "card" : "text",
                       messageType,
                       cardData,
-                      windowTrigger,
                     }
                   : msg
               )
@@ -517,13 +470,6 @@ function App() {
               )
             );
             streamingMessageIdRef.current = null;
-          },
-          onWindowTrigger: (windowType, data) => {
-            if (windowType === "nudge") {
-              window.conversationAPI?.showNudge(data);
-            } else if (windowType === "guide") {
-              window.conversationAPI?.startGuide(data);
-            }
           },
         },
         metadata // Pass metadata to the API
@@ -590,31 +536,6 @@ function App() {
                   isWorkflowMessage && workflowPhase && workflowPhase !== "custom_question";
                 const shouldShowCheckboxes = workflowPhase === "step_progression";
 
-                // Determine card title/subtitle/icon for non-workflow cards
-                let title = "";
-                let subtitle = "";
-                let Icon: LucideIcon = Code;
-
-                if (message.messageType === "experts" && message.cardData) {
-                  const expertCount = message.cardData.experts?.length || 0;
-                  title = `${expertCount} Expert${expertCount > 1 ? "s" : ""} Available`;
-                  subtitle = "View Experts";
-                  Icon = Users;
-                } else if (
-                  message.messageType === "workflow" &&
-                  message.cardData &&
-                  !isWorkflowMessage
-                ) {
-                  // Old workflow card format (before our changes)
-                  title = message.cardData.guide?.title || "Interactive Workflow";
-                  subtitle = "Start Guide";
-                  Icon = Workflow;
-                } else if (message.cardData && !isWorkflowMessage) {
-                  // Fallback for unknown card types
-                  title = message.cardData.title || "Card";
-                  subtitle = message.cardData.subtitle || "Click to view";
-                }
-
                 return (
                   <div key={message.id} className="space-y-3">
                     {/* Show workflow components for active workflows */}
@@ -659,25 +580,6 @@ function App() {
                         conversationId={conversationId || ""}
                       />
                     )}
-
-                    {/* Show card below the text if cardData exists (non-workflow, non-experts cards) */}
-                    {message.type === "card" &&
-                      message.cardData &&
-                      !isWorkflowMessage &&
-                      message.messageType !== "experts" && (
-                        <Card
-                          className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-accent transition-colors"
-                          onClick={() => handleCardClick(message)}
-                        >
-                          <div className="text-left">
-                            <CardTitle className="text-base mb-1">{title}</CardTitle>
-                            <CardDescription>{subtitle}</CardDescription>
-                          </div>
-                          <div className="w-12 h-12 bg-[#30303e] rounded-lg flex items-center justify-center flex-shrink-0 ml-4">
-                            <Icon size={24} className="text-primary-foreground" />
-                          </div>
-                        </Card>
-                      )}
                   </div>
                 );
               })}

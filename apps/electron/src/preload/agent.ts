@@ -6,14 +6,11 @@ const IPC_CHANNELS = {
   AGENT_SHOW_CONSOLE: "agent-show-console",
   SET_IGNORE_MOUSE_EVENTS: "set-ignore-mouse-events",
   AGENT_RESIZE: "agent-resize",
-  AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step",
   CONVERSATION_SHOW: "conversation-show",
   CONVERSATION_HIDE: "conversation-hide",
   CONVERSATION_TOGGLE: "conversation-toggle", // NEW: Toggle collapsed/hidden state
   CONVERSATION_SEND_MESSAGE: "conversation-send-message",
   CONSOLE_OPEN_CHAT: "console-open-chat",
-  NUDGE_SHOW: "nudge-show",
-  GUIDE_START: "guide-start",
   CAPTURE_SCREENSHOT: "capture-screenshot",
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
@@ -42,9 +39,6 @@ contextBridge.exposeInMainWorld("agentAPI", {
   openConversationInConsole: (conversationId: string) =>
     ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHAT, conversationId),
 
-  showNudge: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.NUDGE_SHOW, data),
-  startGuide: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.GUIDE_START, data),
-
   // Screenshot capture - for workflow visual guidance
   // Returns {dataUrl: string, metadata: ScreenshotMetadata} or null on failure
   captureScreenshot: (): Promise<{
@@ -69,10 +63,5 @@ contextBridge.exposeInMainWorld("agentAPI", {
     ipcRenderer.on(IPC_CHANNELS.AUTH_TOKEN_UPDATED, (_event, token: string | null) =>
       callback(token)
     );
-  },
-
-  // Guide next step - triggered when Guide "Done" button clicked
-  onGuideNextStep: (callback: () => void) => {
-    ipcRenderer.on(IPC_CHANNELS.AGENT_GUIDE_NEXT_STEP, () => callback());
   },
 });

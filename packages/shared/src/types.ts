@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Window types
-export type WindowType = "agent" | "console" | "overlay" | "guide" | "nudge";
+export type WindowType = "agent" | "console" | "conversation";
 
 // Coordinate types for visual guidance
 export const BoundingBoxSchema = z.object({
