@@ -72,13 +72,13 @@ app.get("/", (req, res) => {
       health: "/health",
       apiDocs: "/api-docs",
       apiDocsJson: "/api-docs.json",
-      api: "/api/*"
+      api: "/api/*",
     },
     links: {
       health: `${baseUrl}/health`,
       docs: `${baseUrl}/api-docs`,
-      repository: "https://github.com/Febchuk/mitable"
-    }
+      repository: "https://github.com/Febchuk/mitable",
+    },
   });
 });
 
@@ -89,7 +89,7 @@ app.get("/health", (_req, res) => {
     timestamp: new Date().toISOString(),
     service: "Mitable Backend API",
     environment: config.nodeEnv,
-    version: "0.1.0"
+    version: "0.1.0",
   });
 });
 

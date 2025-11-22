@@ -5,6 +5,7 @@
 The following has been automatically configured:
 
 ### 1. GitHub Branch Protection ✅
+
 - Direct pushes to `main` are **BLOCKED**
 - All changes must go through Pull Requests
 - CI checks are **required** before merge
@@ -13,6 +14,7 @@ The following has been automatically configured:
 - Rules apply to administrators too
 
 **Verification:**
+
 ```bash
 gh api repos/Febchuk/mitable/branches/main/protection
 ```
@@ -20,16 +22,19 @@ gh api repos/Febchuk/mitable/branches/main/protection
 ### 2. GitHub Workflows Created ✅
 
 **Files created:**
+
 - `.github/workflows/production-deploy.yml` - Production health verification
 - `.github/workflows/pr-preview.yml` - PR preview URL automation
 
 **What they do:**
+
 - Production Deploy: Verifies `/health` endpoint after every merge to `main`
 - PR Preview: Posts Railway preview URLs in PR comments automatically
 
 ### 3. Documentation Updated ✅
 
 **Files updated:**
+
 - `CONTRIBUTING.md` - Complete safety workflow documentation
 - `README.md` - Added CI/CD status badges and quick links
 - `docs/runbooks/rollback-procedure.md` - Comprehensive rollback guide
@@ -57,6 +62,7 @@ You need to complete these steps in external dashboards:
    - ✅ **Inherit environment variables from base**: ON
 
 **What this does:**
+
 - Creates an isolated deployment for every PR
 - Uses pattern: `https://mitable-pr-{number}.up.railway.app`
 - Automatically copies environment variables from production
@@ -124,6 +130,7 @@ Your local `.env` file in `/apps/backend/.env` should already have the dev crede
 5. Click **Save**
 
 **Verification:**
+
 - Preview deployments will use these variables automatically
 - Production deployments will continue using production variables
 
@@ -282,6 +289,7 @@ railway logs --service backend --environment pr-{number}
    - ✅ Preview environment auto-deletes
 
 3. Verify production:
+
    ```bash
    curl https://mitablebackend-production.up.railway.app/health
    # Expected: {"status":"ok"}
@@ -298,26 +306,31 @@ railway logs --service backend --environment pr-{number}
 After completing all steps, you should have:
 
 ✅ **Branch Protection Working**
+
 - Cannot push directly to `main`
 - CI must pass before merge
 - At least 1 approval required
 
 ✅ **Preview Deployments Working**
+
 - Every PR gets unique preview URL
 - Preview uses dev database/Pinecone
 - Preview auto-deletes on PR close
 
 ✅ **Production Verification Working**
+
 - Health checks run after merge to main
 - Alerts if health check fails
 - Deployment status visible in GitHub Actions
 
 ✅ **Clear Documentation**
+
 - CONTRIBUTING.md explains the workflow
 - README.md has status badges
 - Rollback procedures documented
 
 ✅ **Safety Guarantees**
+
 - No one can break production without review
 - All changes tested in preview first
 - Quick rollback if something goes wrong
@@ -329,12 +342,14 @@ After completing all steps, you should have:
 ### Preview URL not working
 
 **Check:**
+
 1. Railway preview deployment exists in dashboard
 2. Deployment logs for errors
 3. Environment variables are set correctly
 4. Health endpoint returns 200
 
 **Fix:**
+
 - Verify dev database credentials
 - Check Railway logs for startup errors
 - Ensure `NODE_ENV=development`
@@ -342,11 +357,13 @@ After completing all steps, you should have:
 ### Bot not commenting on PRs
 
 **Check:**
+
 1. `RAILWAY_TOKEN` secret exists in GitHub
 2. PR Preview workflow ran successfully
 3. GitHub Actions has permission to comment
 
 **Fix:**
+
 ```bash
 # Verify secret exists
 gh secret list | grep RAILWAY_TOKEN
@@ -358,6 +375,7 @@ gh workflow run pr-preview.yml
 ### Branch protection not working
 
 **Check:**
+
 ```bash
 gh api repos/Febchuk/mitable/branches/main/protection
 ```
@@ -368,11 +386,13 @@ Re-run the branch protection command from this repo's implementation.
 ### Health check failing
 
 **Check:**
+
 ```bash
 curl https://mitablebackend-production.up.railway.app/health
 ```
 
 **Fix:**
+
 - Check Railway production logs
 - Verify database connectivity
 - Check for runtime errors
@@ -382,22 +402,27 @@ curl https://mitablebackend-production.up.railway.app/health
 ## 🔗 Quick Reference Links
 
 **GitHub:**
+
 - Repository: https://github.com/Febchuk/mitable
 - Actions: https://github.com/Febchuk/mitable/actions
 - Branch Protection: https://github.com/Febchuk/mitable/settings/branches
 - Secrets: https://github.com/Febchuk/mitable/settings/secrets/actions
 
 **Railway:**
+
 - Dashboard: https://railway.app/dashboard
 - Account Tokens: https://railway.app/account/tokens
 
 **Supabase:**
+
 - Dashboard: https://supabase.com/dashboard/projects
 
 **Pinecone:**
+
 - Dashboard: https://app.pinecone.io/
 
 **Documentation:**
+
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Development workflow
 - [Rollback Procedure](./runbooks/rollback-procedure.md) - Emergency rollback guide
 - [CI/CD Implementation Plan](./CICD_IMPLEMENTATION_PLAN.md) - Full implementation details
