@@ -14,4 +14,6 @@ process.env.OPENAI_API_KEY = "test-openai-key";
 process.env.PINECONE_API_KEY = "test-pinecone-key";
 process.env.PINECONE_INDEX_NAME = "test-index";
 process.env.GEMINI_API_KEY = "test-gemini-key";
+process.env.GROQ_API_KEY = "test-groq-key";
 process.env.JWT_SECRET = "test-jwt-secret";
+process.env.ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // 64 hex chars (32 bytes) for AES-256

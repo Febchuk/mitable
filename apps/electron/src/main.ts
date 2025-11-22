@@ -26,7 +26,6 @@ const _filename = fileURLToPath(import.meta.url);
 const _dirname = dirname(_filename);
 
 // Use electron-vite's injected __dirname if available, otherwise use our calculated path
-// @ts-ignore - __dirname may or may not exist depending on build environment
 const MAIN_DIR = typeof __dirname !== "undefined" ? __dirname : _dirname;
 
 // Production logging setup - write to file for debugging
@@ -38,13 +37,17 @@ if (app.isPackaged) {
   const originalError = console.error;
 
   console.log = (...args: any[]) => {
-    const message = args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg))).join(" ");
+    const message = args
+      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
+      .join(" ");
     logStream.write(`[LOG] ${new Date().toISOString()} - ${message}\n`);
     originalLog(...args);
   };
 
   console.error = (...args: any[]) => {
-    const message = args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg))).join(" ");
+    const message = args
+      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
+      .join(" ");
     logStream.write(`[ERROR] ${new Date().toISOString()} - ${message}\n`);
     originalError(...args);
   };
@@ -60,7 +63,7 @@ if (app.isPackaged) {
 let agentWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
-let overlayWindow: BrowserWindow | null = null;
+const overlayWindow: BrowserWindow | null = null;
 // eslint-disable-next-line prefer-const
 let guideWindow: BrowserWindow | null = null; // Not reassigned yet, but used in window management logic
 let nudgeWindow: BrowserWindow | null = null;
@@ -322,47 +325,55 @@ function createConsoleWindow() {
   });
 }
 
-function createOverlayWindow() {
-  if (!guideWindow || guideWindow.isDestroyed()) {
-    console.error("[Overlay] Cannot create overlay window - guide window not available");
-    return;
-  }
-
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.bounds;
-
-  overlayWindow = new BrowserWindow({
-    width,
-    height,
-    x: 0,
-    y: 0,
-    transparent: true,
-    frame: false,
-    skipTaskbar: true,
-    resizable: false,
-    movable: false,
-    focusable: false,
-    show: false,
-    modal: false, // Non-modal so other windows remain interactive
-    webPreferences: {
-      preload: join(MAIN_DIR, "../preload/overlay.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
-
-  if (!app.isPackaged) {
-    overlayWindow.loadURL("http://localhost:5173/overlay/index.html");
-  } else {
-    overlayWindow.loadFile(join(MAIN_DIR, "../renderer/overlay/index.html"));
-  }
-
-  overlayWindow.on("closed", () => {
-    overlayWindow = null;
-  });
-}
+/**
+ * DEPRECATED: Overlay Window
+ *
+ * The overlay window has been deprecated - visual guidance is now handled differently.
+ * Previously showed transparent overlays with bounding boxes and highlights.
+ *
+ * Kept for reference only - can be deleted after confirming new system works.
+ */
+// function createOverlayWindow() {
+//   if (!guideWindow || guideWindow.isDestroyed()) {
+//     console.error("[Overlay] Cannot create overlay window - guide window not available");
+//     return;
+//   }
+//
+//   const primaryDisplay = screen.getPrimaryDisplay();
+//   const { width, height } = primaryDisplay.bounds;
+//
+//   overlayWindow = new BrowserWindow({
+//     width,
+//     height,
+//     x: 0,
+//     y: 0,
+//     transparent: true,
+//     frame: false,
+//     skipTaskbar: true,
+//     resizable: false,
+//     movable: false,
+//     focusable: false,
+//     show: false,
+//     modal: false, // Non-modal so other windows remain interactive
+//     webPreferences: {
+//       preload: join(MAIN_DIR, "../preload/overlay.cjs"),
+//       contextIsolation: true,
+//       nodeIntegration: false,
+//     },
+//   });
+//
+//   overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+//
+//   if (!app.isPackaged) {
+//     overlayWindow.loadURL("http://localhost:5173/overlay/index.html");
+//   } else {
+//     overlayWindow.loadFile(join(MAIN_DIR, "../renderer/overlay/index.html"));
+//   }
+//
+//   overlayWindow.on("closed", () => {
+//     overlayWindow = null;
+//   });
+// }
 
 /**
  * DEPRECATED: Guide Window

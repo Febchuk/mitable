@@ -112,7 +112,9 @@ async function main() {
           }
 
           if (DRY_RUN) {
-            console.log(`  🔍 [${record.provider}] Would encrypt token (length: ${record.accessToken.length})`);
+            console.log(
+              `  🔍 [${record.provider}] Would encrypt token (length: ${record.accessToken.length})`
+            );
             stats.encrypted++;
             continue;
           }

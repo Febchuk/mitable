@@ -126,7 +126,7 @@ const PII_PATTERNS: PIIPattern[] = [
     type: "DATE",
     // Matches dates in various formats: MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, Month DD YYYY, etc.
     pattern:
-      /\b(?:\d{1,2}[-\/\.]\d{1,2}[-\/\.]\d{2,4}|\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4}|\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4})\b/gi,
+      /\b(?:\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4}|\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4})\b/gi,
   },
   {
     type: "EMPLOYEE_ID",
@@ -192,7 +192,7 @@ const PII_PATTERNS: PIIPattern[] = [
   {
     type: "BEARER_TOKEN",
     // Bearer tokens in Authorization headers
-    pattern: /\b[Bb]earer\s+[A-Za-z0-9_\-\.=]+/g,
+    pattern: /\b[Bb]earer\s+[A-Za-z0-9_\-.=]+/g,
   },
   {
     type: "API_KEY_GENERIC",
@@ -208,7 +208,7 @@ const PII_PATTERNS: PIIPattern[] = [
     type: "ENV_SECRET",
     // Environment variable secrets: KEY=value format
     pattern:
-      /(?:SECRET|KEY|TOKEN|PASSWORD|PASS|PWD|AUTH|CREDENTIAL|API_KEY|ACCESS_KEY|SERVICE_ROLE_KEY|ANON_KEY|CLIENT_SECRET|JWT_SECRET)[\s]*[=:][\s]*['""]?([A-Za-z0-9_\-\.\/\+]{8,})['""]?/gi,
+      /(?:SECRET|KEY|TOKEN|PASSWORD|PASS|PWD|AUTH|CREDENTIAL|API_KEY|ACCESS_KEY|SERVICE_ROLE_KEY|ANON_KEY|CLIENT_SECRET|JWT_SECRET)[\s]*[=:][\s]*['""]?([A-Za-z0-9_\-./+]{8,})['""]?/gi,
   },
   {
     type: "PASSWORD_IN_URL",
@@ -465,7 +465,7 @@ class PIIRedactionService {
       if (used.has(i)) continue;
 
       const current = piiMatches[i];
-      let merged = { ...current };
+      const merged = { ...current };
 
       // Check for overlaps with remaining matches
       for (let j = i + 1; j < piiMatches.length; j++) {

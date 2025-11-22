@@ -1,0 +1,97 @@
+name: PR Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  comment-preview-url:
+    name: Comment Preview URL
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Generate preview URL
+        id: preview
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          PREVIEW_URL="https://mitable-pr-${PR_NUMBER}.up.railway.app"
+          echo "url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
+          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+
+      - name: Comment preview deployment info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.preview.outputs.pr_number }};
+            const previewUrl = '${{ steps.preview.outputs.url }}';
+
+            const comment = `## 🚀 Preview Deployment
+
+            Your preview deployment will be ready shortly!
+
+            **Preview URL:** ${previewUrl}
+
+            **Environment Details:**
+            - 🗄️ Database: Supabase Dev
+            - 🔍 Vector Store: Pinecone Dev (\`mitable-dev\`)
+            - 🌍 Environment: Development
+            - 🔒 Isolated from production
+
+            **Test Endpoints:**
+            - Health Check: [\`${previewUrl}/health\`](${previewUrl}/health)
+            - API Documentation: [\`${previewUrl}/api-docs\`](${previewUrl}/api-docs)
+
+            **Railway Dashboard:**
+            - [View Deployment Logs](https://railway.app) (requires login)
+
+            **Important Notes:**
+            - ✅ This preview uses **development** data (safe to test)
+            - ✅ Changes to this PR will trigger redeployment
+            - ✅ Preview will **auto-delete** when PR is closed/merged
+            - ⚠️  Initial deployment may take 2-3 minutes
+
+            ---
+
+            <sub>💡 **Tip:** Check the Railway logs if the preview isn't responding after 3 minutes</sub>
+
+            <sub>📚 See [CONTRIBUTING.md](https://github.com/${{ github.repository }}/blob/main/CONTRIBUTING.md) for testing guidelines</sub>`;
+
+            // Find existing comment from this bot
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('Preview Deployment')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+              console.log('✅ Updated existing preview comment');
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: comment
+              });
+              console.log('✅ Created new preview comment');
+            }
+
+      - name: Summary
+        run: |
+          echo "📝 Preview comment posted to PR #${{ steps.preview.outputs.pr_number }}"
+          echo "🔗 Preview URL: ${{ steps.preview.outputs.url }}"

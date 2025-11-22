@@ -113,6 +113,7 @@ export interface StreamCallbacks {
   onComplete?: (fullContent: string) => void;
   onDone?: (messageId: string) => void;
   onError?: (error: string) => void;
+  onWindowTrigger?: (window: string, data: any) => void;
 }
 
 /**
@@ -135,18 +136,27 @@ export async function sendStreamingMessage(
   callbacks: StreamCallbacks,
   token: string,
   screenshot?: string,
-  metadata?: any
+  metadata?: any,
+  screenshotMetadata?: any
 ): Promise<void> {
   const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
   try {
     // Build request body
-    const requestBody: { content: string; screenshot?: string; metadata?: any } = { content };
+    const requestBody: {
+      content: string;
+      screenshot?: string;
+      metadata?: any;
+      screenshotMetadata?: any;
+    } = { content };
     if (screenshot) {
       requestBody.screenshot = screenshot;
     }
     if (metadata) {
       requestBody.metadata = metadata;
+    }
+    if (screenshotMetadata) {
+      requestBody.screenshotMetadata = screenshotMetadata;
     }
 
     // Fetch the SSE stream from backend

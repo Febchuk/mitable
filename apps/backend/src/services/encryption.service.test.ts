@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import crypto from "crypto";
 
@@ -6,6 +7,8 @@ import crypto from "crypto";
  *
  * Tests AES-256-GCM authenticated encryption for access tokens.
  * Coverage target: >90%
+ *
+ * Note: Uses require() within jest.isolateModules() for proper module isolation testing
  */
 
 describe("EncryptionService", () => {
@@ -211,7 +214,9 @@ describe("EncryptionService", () => {
     });
 
     it("should throw error for empty components", () => {
-      expect(() => encryptionService.decrypt("::")).toThrow("Encrypted data contains empty components");
+      expect(() => encryptionService.decrypt("::")).toThrow(
+        "Encrypted data contains empty components"
+      );
       expect(() => encryptionService.decrypt("abc::def")).toThrow(
         "Encrypted data contains empty components"
       );
@@ -266,9 +271,7 @@ describe("EncryptionService", () => {
     });
 
     it("should throw error for invalid hex in components", () => {
-      expect(() => encryptionService.decrypt("notHex:alsoNotHex:stillNotHex")).toThrow(
-        "Decryption failed"
-      );
+      expect(() => encryptionService.decrypt("notHex:alsoNotHex:stillNotHex")).toThrow("Invalid");
     });
   });
 

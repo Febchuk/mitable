@@ -78,7 +78,8 @@ const SLACK_CLIENT_ID = config.slack?.clientId || process.env.SLACK_CLIENT_ID;
 const SLACK_CLIENT_SECRET = config.slack?.clientSecret || process.env.SLACK_CLIENT_SECRET;
 
 // Build redirect URI from environment or use localhost for development
-const API_BASE_URL = process.env.API_BASE_URL || process.env.VITE_API_URL || "http://localhost:3000";
+const API_BASE_URL =
+  process.env.API_BASE_URL || process.env.VITE_API_URL || "http://localhost:3000";
 const SLACK_REDIRECT_URI =
   config.slack?.redirectUri ||
   process.env.SLACK_REDIRECT_URI ||
@@ -223,15 +224,13 @@ router.get("/slack/callback", async (req: Request, res: Response): Promise<void>
 
     // Store integration in database
     // Use INSERT ... ON CONFLICT to handle both new connections and reconnections
-    // DUAL-WRITE: Write to both encrypted and plaintext columns during migration
     await db
       .insert(schema.integrations)
       .values({
         organizationId: organizationId,
         provider: "slack",
         status: "connected",
-        accessToken: data.access_token, // DEPRECATED - for migration only
-        accessTokenEncrypted: encryptedAccessToken, // USE THIS
+        accessTokenEncrypted: encryptedAccessToken,
         encryptionVersion: 1,
         metadata: {
           team_id: data.team.id,
@@ -249,8 +248,7 @@ router.get("/slack/callback", async (req: Request, res: Response): Promise<void>
         target: [schema.integrations.organizationId, schema.integrations.provider],
         set: {
           status: "connected",
-          accessToken: data.access_token, // DEPRECATED - for migration only
-          accessTokenEncrypted: encryptedAccessToken, // USE THIS
+          accessTokenEncrypted: encryptedAccessToken,
           encryptionVersion: 1,
           metadata: {
             team_id: data.team.id,
@@ -370,7 +368,7 @@ router.delete(
         .update(schema.integrations)
         .set({
           status: "disconnected",
-          accessToken: null,
+          accessTokenEncrypted: "",
           updatedAt: new Date(),
         })
         .where(
@@ -547,7 +545,9 @@ router.post("/slack/configure", requireAuth, async (req: Request, res: Response)
         const { searchContent } = await import("../db/schema/search-content.schema.js");
         const { desc } = await import("drizzle-orm");
 
-        const client = new WebClient(integration.accessToken!);
+        // Decrypt access token before use
+        const accessToken = encryptionService.decrypt(integration.accessTokenEncrypted);
+        const client = new WebClient(accessToken);
 
         let totalNewMessages = 0;
         let channelsProcessed = 0;
@@ -933,17 +933,14 @@ router.get("/notion/callback", async (req: Request, res: Response): Promise<void
     const encryptedRefreshToken = encryptionService.encrypt(data.refresh_token);
 
     // Store integration in database
-    // DUAL-WRITE: Write to both encrypted and plaintext columns during migration
     await db
       .insert(schema.integrations)
       .values({
         organizationId: organizationId,
         provider: "notion",
         status: "connected",
-        accessToken: data.access_token, // DEPRECATED - for migration only
-        refreshToken: data.refresh_token, // DEPRECATED - for migration only
-        accessTokenEncrypted: encryptedAccessToken, // USE THIS
-        refreshTokenEncrypted: encryptedRefreshToken, // USE THIS
+        accessTokenEncrypted: encryptedAccessToken,
+        refreshTokenEncrypted: encryptedRefreshToken,
         encryptionVersion: 1,
         tokenExpiresAt: tokenExpiresAt,
         metadata: {
@@ -962,10 +959,8 @@ router.get("/notion/callback", async (req: Request, res: Response): Promise<void
         target: [schema.integrations.organizationId, schema.integrations.provider],
         set: {
           status: "connected",
-          accessToken: data.access_token, // DEPRECATED - for migration only
-          refreshToken: data.refresh_token, // DEPRECATED - for migration only
-          accessTokenEncrypted: encryptedAccessToken, // USE THIS
-          refreshTokenEncrypted: encryptedRefreshToken, // USE THIS
+          accessTokenEncrypted: encryptedAccessToken,
+          refreshTokenEncrypted: encryptedRefreshToken,
           encryptionVersion: 1,
           tokenExpiresAt: tokenExpiresAt,
           metadata: {
@@ -1089,8 +1084,8 @@ router.delete(
         .update(schema.integrations)
         .set({
           status: "disconnected",
-          accessToken: null,
-          refreshToken: null,
+          accessTokenEncrypted: "",
+          refreshTokenEncrypted: null,
           tokenExpiresAt: null,
           updatedAt: new Date(),
         })

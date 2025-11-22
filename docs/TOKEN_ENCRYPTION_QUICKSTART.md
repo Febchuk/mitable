@@ -3,23 +3,28 @@
 ## ⚡ Quick Test (5 minutes)
 
 ### 1. Start Server
+
 ```bash
 cd apps/backend
 npm run dev
 ```
 
 ### 2. Connect Integration
+
 - Go to your app → Integrations
 - Click "Connect Slack" or "Connect Notion"
 - Authorize the workspace
 
 ### 3. Verify Encryption
+
 **Check logs:**
+
 ```
 ✅ Slack connected for organization: <id> (<name>)
 ```
 
 **Check database:**
+
 ```bash
 npm run db:studio
 # Look at integrations table
@@ -27,6 +32,7 @@ npm run db:studio
 ```
 
 ### 4. Test API Calls
+
 ```bash
 # Test Slack
 npm run sync-slack
@@ -53,12 +59,12 @@ npm run backfill-tokens
 
 ## 🐛 Quick Troubleshooting
 
-| Issue | Fix |
-|-------|-----|
-| "ENCRYPTION_KEY not set" | Add to `.env`: `ENCRYPTION_KEY=<64-char-hex>` |
-| Found 0 records | No existing integrations - connect a new one |
-| Decryption failed | Check ENCRYPTION_KEY matches, or reconnect integration |
-| API calls fail | Check logs for decryption errors, try reconnecting |
+| Issue                    | Fix                                                    |
+| ------------------------ | ------------------------------------------------------ |
+| "ENCRYPTION_KEY not set" | Add to `.env`: `ENCRYPTION_KEY=<64-char-hex>`          |
+| Found 0 records          | No existing integrations - connect a new one           |
+| Decryption failed        | Check ENCRYPTION_KEY matches, or reconnect integration |
+| API calls fail           | Check logs for decryption errors, try reconnecting     |
 
 ---
 

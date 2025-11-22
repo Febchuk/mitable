@@ -133,7 +133,7 @@ BEHAVIOR:
 
       // Step 2: Analyze screenshot with issue context
       // We'll use the same analyzeStepExecution method but focus on the troubleshooting aspect
-      const visualGuidance = await geminiVisionService.analyzeStepExecution(
+      const visualGuidance: any = await geminiVisionService.analyzeStepExecution(
         context.screenshot,
         currentSolution,
         currentStep,
@@ -189,7 +189,7 @@ ${visualGuidance.confidence === "low" ? "\n\n*Note: I'm having some difficulty a
           workflowActive: true,
           workflowPhase: "custom_question", // Triggers Q&A UI mode (hides step list, shows Q&A options)
           visualGuidance: visualGuidance, // Include full visual guidance with bounding boxes
-        },
+        } as any,
         triggerWindow: windowTrigger, // Trigger overlay if bounding boxes present
         streamable: true,
       };

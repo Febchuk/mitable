@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 /**
  * Run Migration 0008: Add Encrypted Token Columns
- * 
+ *
  * This script runs the SQL migration to add encrypted token columns
  * to the integrations table.
- * 
+ *
  * Usage:
  *   npm run migrate:0008
  *   OR
