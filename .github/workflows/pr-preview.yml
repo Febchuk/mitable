@@ -8,6 +8,9 @@ jobs:
   comment-preview-url:
     name: Comment Preview URL
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
 
     steps:
       - name: Generate preview URL
