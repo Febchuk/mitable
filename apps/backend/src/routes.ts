@@ -16,15 +16,6 @@ export const router = Router();
 // Auth routes (public) with stricter rate limiting
 router.use("/auth", authLimiter, authRouter);
 
-// Public route example
-router.get("/health", (_req, res) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    message: "Mitable Backend API is running",
-  });
-});
-
 // Mount route modules (these already have auth middleware built-in)
 router.use("/roadmaps", roadmapsRouter);
 router.use("/nudges", nudgesRouter);
