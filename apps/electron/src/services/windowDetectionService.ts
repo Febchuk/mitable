@@ -42,18 +42,16 @@ class WindowDetectionService {
   private selectedWindows: Map<string, SelectedWindowInfo> = new Map();
   private isWatching: boolean = false;
 
-  // Mitable window titles to exclude from detection
-  private readonly MITABLE_WINDOW_PATTERNS = [
-    /^Mitable/i,
-    /^Agent/i,
-    /^Console/i,
-    /^Conversation/i,
-    /^Overlay/i,
-    /^Guide/i,
-    /^Nudge/i,
-    /Watch/i, // Watch button windows
-    /Electron/i, // Electron dev tools
-  ];
+  // Exact window titles of our own Electron renderers to exclude
+  private readonly MITABLE_WINDOW_TITLES: Set<string> = new Set([
+    "Mitable Agent",
+    "Mitable Conversation",
+    "Mitable Console",
+    "Mitable Overlay",
+    "Mitable Guide",
+    "Mitable Nudge",
+    "Watch Button", // watch-mode button windows
+  ]);
 
   constructor() {
     console.log("[WindowDetectionService] Initialized");
@@ -124,7 +122,8 @@ class WindowDetectionService {
    * Check if a window title belongs to Mitable
    */
   private isMitableWindow(title: string): boolean {
-    return this.MITABLE_WINDOW_PATTERNS.some((pattern) => pattern.test(title));
+    // Only exclude exact-known titles from our app to avoid false positives
+    return this.MITABLE_WINDOW_TITLES.has(title);
   }
 
   /**
