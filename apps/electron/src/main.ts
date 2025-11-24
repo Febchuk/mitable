@@ -4,6 +4,8 @@ import { IPC_CHANNELS } from "@mitable/shared";
 import { captureService, ConversationContext } from "./services/captureService";
 import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
 import { windowDetectionService } from "./services/windowDetectionService";
+import { isBlockedByPolicy } from "./services/capturePolicy";
+import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
 
 // Window references
@@ -1109,29 +1111,93 @@ function setupWatchModeHandlers() {
   });
 
     // Select a window to watch
-    ipcMain.handle(
-      IPC_CHANNELS.WATCH_WINDOW_SELECT,
-      async (_event, windowInfo: SelectedWindowInfo) => {
-        console.log(
-          `[Watch Mode] Selecting window: ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowInfo.windowId}]`
-        );
-        const added = windowDetectionService.addWindow(windowInfo);
+  ipcMain.handle(
+    IPC_CHANNELS.WATCH_WINDOW_SELECT,
+    async (_event, windowInfo: SelectedWindowInfo) => {
+      console.log(
+        `[Watch Mode] Selecting window: ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowInfo.windowId}]`
+      );
 
-        if (added) {
-          const buttonWindow = watchButtonWindows.get(windowInfo.windowId);
+      const windowDetails = windowDetectionService.getWindowDetails(windowInfo.windowId);
 
-          if (buttonWindow && !buttonWindow.isDestroyed()) {
-            console.log(
-              `[Watch Mode] Closing button for selected window: ${windowInfo.appName} (windowId: ${windowInfo.windowId})`
-            );
-            buttonWindow.close();
+      if (!windowDetails) {
+        console.warn(
+          "[Watch Mode] Window details not found for selection, likely closed or stale",
+          {
+            windowId: windowInfo.windowId,
+            appName: windowInfo.appName,
+            windowTitle: windowInfo.windowTitle,
           }
-
-          watchButtonWindows.delete(windowInfo.windowId);
-          broadcastWatchWindowsUpdate();
-        }
+        );
+        return {
+          allowed: false,
+          reason: "This window is no longer available. Please try again.",
+        };
       }
-    );
+
+      // On non-macOS platforms, block all browser windows from watch mode
+      if (process.platform !== "darwin") {
+        const isBrowser = isBrowserProcess(windowDetails.appName, windowDetails.path);
+        if (isBrowser) {
+          console.log(
+            "[Watch Mode] Blocking browser window selection on non-macOS platform",
+            {
+              appName: windowDetails.appName,
+              path: windowDetails.path,
+            }
+          );
+          return {
+            allowed: false,
+            reason:
+              "Browser windows cannot be watched on this platform to protect sensitive data.",
+          };
+        }
+
+        return selectWindowForWatch(windowInfo);
+      }
+
+      // macOS: only run focus + URL resolution for browser apps
+      let resolvedTitle = windowDetails.title;
+      let resolvedAppName = windowDetails.appName;
+      let resolvedUrl: string | undefined = undefined;
+
+      const isBrowserApp = isBrowserProcess(windowDetails.appName, windowDetails.path);
+
+      if (isBrowserApp) {
+        const resolved = await resolveWindowUrlForWatchSelection({
+          processId: windowDetails.processId,
+          appName: windowDetails.appName,
+          windowTitle: windowDetails.title,
+        });
+
+        resolvedTitle = resolved.title;
+        resolvedAppName = resolved.appName;
+        resolvedUrl = resolved.url;
+      }
+
+      const policyDecision = isBlockedByPolicy(
+        resolvedTitle,
+        resolvedAppName,
+        undefined,
+        resolvedUrl
+      );
+
+      if (policyDecision.blocked) {
+        console.log("[Watch Mode] Selection blocked by capture policy", {
+          title: resolvedTitle,
+          appName: resolvedAppName,
+          reason: policyDecision.reason,
+          hasUrl: !!resolvedUrl,
+        });
+        return {
+          allowed: false,
+          reason: policyDecision.reason || "Blocked by capture policy.",
+        };
+      }
+
+      return selectWindowForWatch(windowInfo);
+    }
+  );
 
     // Unselect a window
     ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, async (_event, windowId: string) => {
@@ -1168,7 +1234,49 @@ function setupWatchModeHandlers() {
       );
     }
 
+    function selectWindowForWatch(
+      windowInfo: SelectedWindowInfo
+    ): { allowed: boolean } {
+      const added = windowDetectionService.addWindow(windowInfo);
+
+      if (added) {
+        const buttonWindow = watchButtonWindows.get(windowInfo.windowId);
+
+        if (buttonWindow && !buttonWindow.isDestroyed()) {
+          console.log(
+            `[Watch Mode] Closing button for selected window: ${windowInfo.appName} (windowId: ${windowInfo.windowId})`
+          );
+          buttonWindow.close();
+        }
+
+        watchButtonWindows.delete(windowInfo.windowId);
+        broadcastWatchWindowsUpdate();
+      }
+
+      return { allowed: true };
+    }
+
   console.log("[IPC] Watch mode handlers registered successfully");
+}
+
+function isBrowserProcess(appName: string, appPath?: string): boolean {
+  const haystack = `${appName || ""} ${appPath || ""}`.toLowerCase();
+
+  // Simple heuristic for common browsers across platforms
+  const browserPatterns = [
+    "chrome",
+    "google chrome",
+    "msedge",
+    "edge",
+    "firefox",
+    "safari",
+    "brave",
+    "opera",
+    "vivaldi",
+    "arc",
+  ];
+
+  return browserPatterns.some((pattern) => haystack.includes(pattern));
 }
 
 // Helper function to create a watch button window
@@ -1200,8 +1308,6 @@ function createWatchButtonWindow(
     windowId: window.windowId,
     appName: window.appName,
     windowTitle: window.windowTitle,
-    isBlocked: window.isBlocked.toString(),
-    ...(window.blockReason && { blockReason: window.blockReason }),
   });
 
   if (!app.isPackaged) {

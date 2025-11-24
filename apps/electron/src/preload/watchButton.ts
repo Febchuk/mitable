@@ -8,6 +8,6 @@ const IPC_CHANNELS = {
 contextBridge.exposeInMainWorld("watchButtonAPI", {
   selectWindow: (windowInfo: { windowId: string; appName: string; windowTitle: string }) => {
     console.log("[WatchButton Preload] Selecting window:", windowInfo);
-    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOW_SELECT, windowInfo);
+    return ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOW_SELECT, windowInfo);
   },
 });

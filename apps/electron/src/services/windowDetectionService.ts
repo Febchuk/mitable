@@ -42,6 +42,9 @@ class WindowDetectionService {
   private selectedWindows: Map<string, SelectedWindowInfo> = new Map();
   private isWatching: boolean = false;
 
+  // Last detected OS windows keyed by windowId (stringified)
+  private lastDetectedWindows: Map<string, GetWindowsResult> = new Map();
+
   // Exact window titles of our own Electron renderers to exclude
   private readonly MITABLE_WINDOW_TITLES: Set<string> = new Set([
     "Mitable Agent",
@@ -74,6 +77,10 @@ class WindowDetectionService {
       const watchableWindows: WatchableWindow[] = [];
 
       for (const window of allWindows) {
+        const windowId = window.id.toString();
+
+        // Track last seen metadata for later lookups (e.g., watch selection)
+        this.lastDetectedWindows.set(windowId, window);
         // Skip Mitable's own windows
         if (this.isMitableWindow(window.title)) {
           console.log(`[WindowDetectionService] Skipping Mitable window: ${window.title}`);
@@ -92,7 +99,7 @@ class WindowDetectionService {
         const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
 
         const watchableWindow: WatchableWindow = {
-          windowId: window.id.toString(),
+          windowId,
           appName,
           windowTitle,
           bounds: window.bounds,
@@ -169,6 +176,32 @@ class WindowDetectionService {
   }
 
   /**
+   * Get internal details for a detected window by ID
+   *
+   * Used by watch mode selection to resolve processId/app/path.
+   */
+  getWindowDetails(windowId: string): {
+    title: string;
+    appName: string;
+    processId?: number;
+    bundleId?: string;
+    path?: string;
+  } | undefined {
+    const window = this.lastDetectedWindows.get(windowId);
+    if (!window) {
+      return undefined;
+    }
+
+    return {
+      title: window.title,
+      appName: window.owner.name,
+      processId: window.owner.processId,
+      bundleId: window.owner.bundleId,
+      path: window.owner.path,
+    };
+  }
+
+  /**
    * Get list of selected window IDs only
    *
    * @returns Array of window IDs being watched
@@ -184,6 +217,13 @@ class WindowDetectionService {
     const count = this.selectedWindows.size;
     this.selectedWindows.clear();
     console.log(`[WindowDetectionService] Cleared all ${count} windows from watch list`);
+
+    // Also clear last detected OS windows when we stop watching
+    const lastDetectedCount = this.lastDetectedWindows.size;
+    this.lastDetectedWindows.clear();
+    console.log(
+      `[WindowDetectionService] Cleared ${lastDetectedCount} entries from lastDetectedWindows`
+    );
   }
 
   /**

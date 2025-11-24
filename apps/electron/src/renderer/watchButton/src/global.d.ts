@@ -5,7 +5,9 @@ interface WatchButtonSelectPayload {
 }
 
 interface WatchButtonAPI {
-  selectWindow: (windowInfo: WatchButtonSelectPayload) => void;
+  selectWindow: (
+    windowInfo: WatchButtonSelectPayload
+  ) => Promise<{ allowed: boolean; reason?: string }>;
 }
 
 declare global {

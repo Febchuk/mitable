@@ -91,7 +91,11 @@ function normalizeAppName(appName: string): string {
  * Check if a string matches any pattern in the list
  * For app names, normalizes to remove OS-specific extensions first
  */
-function matchesAny(str: string, patterns: (string | RegExp)[] = [], isAppName: boolean = false): boolean {
+function matchesAny(
+  str: string,
+  patterns: (string | RegExp)[] = [],
+  isAppName: boolean = false
+): boolean {
   let haystack = str || "";
   
   // Normalize app names to be OS-agnostic
@@ -123,12 +127,19 @@ function matchesAny(str: string, patterns: (string | RegExp)[] = [], isAppName: 
 export function isBlockedByPolicy(
   windowTitle: string,
   appName?: string,
-  policy?: CapturePolicy
+  policy?: CapturePolicy,
+  url?: string
 ): { blocked: boolean; reason?: string } {
   const activePolicy = policy || getCapturePolicy();
 
   const title = windowTitle || "";
   const app = appName || "";
+
+  // Check 0: URL against deny patterns (if provided)
+  // Catches: "https://mail.google.com/...", "https://slack.com/app/..."
+  if (url && matchesAny(url, activePolicy.appsDeny, false)) {
+    return { blocked: true, reason: "URL denied by capture policy" };
+  }
 
   // Check 1: Window title against deny patterns (not normalized - check as-is)
   // Catches: "Gmail - Inbox", "Slack - #general", "Bank of America - Login"
