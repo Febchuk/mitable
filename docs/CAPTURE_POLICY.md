@@ -14,17 +14,21 @@ Mitable now enforces a **deny-first capture policy** to prevent screenshots of s
 ## Key Features
 
 ### 1. **Deny-First Policy** 🚫
+
 - Checks window/app against deny-list **before** capture
 - No pixels are ever accessed for denied apps
 - Configurable via environment variables
 
 ### 2. **App-Specific Captures Only** 📱
+
 - ❌ Full-screen capture **disabled**
 - ✅ Only captures specific application windows
 - Uses `active-win` to detect focused window
 
 ### 3. **ENV-Based Configuration** ⚙️
+
 Simple CSV format in `.env`:
+
 ```bash
 CAPTURE_DENY_APPS=outlook,gmail,1password,slack
 ```
@@ -32,7 +36,9 @@ CAPTURE_DENY_APPS=outlook,gmail,1password,slack
 **Note:** Each pattern is checked against BOTH window titles AND app names for maximum coverage with minimal configuration.
 
 ### 4. **Cross-Platform Support** 🌐
+
 App name matching is **OS-agnostic** - automatically strips file extensions:
+
 - **Windows:** `Slack.exe` → matches `"slack"`
 - **macOS:** `Slack.app` → matches `"slack"`
 - **Linux:** `slack` or `slack.AppImage` → matches `"slack"`
@@ -78,12 +84,14 @@ Screenshot Request
 ## Files Created/Modified
 
 ### **New Files:**
+
 - `apps/electron/src/services/capturePolicy.ts` - Policy logic
 - `apps/electron/src/main/activeWindowBridge.ts` - IPC handler
 - `.env.example` - Configuration template
 - `docs/CAPTURE_POLICY.md` - This file
 
 ### **Modified Files:**
+
 - `apps/electron/src/services/captureService.ts` - Integrated policy check
 - `apps/electron/src/preload/conversation.ts` - Added getActiveWindow IPC
 - `apps/electron/src/main.ts` - Initialize bridge on startup
@@ -96,6 +104,7 @@ Screenshot Request
 If `CAPTURE_DENY_APPS` is not set in ENV, these patterns are blocked by default:
 
 **Patterns (checked against both window titles AND app names):**
+
 - `outlook`, `gmail`, `mail`, `messages` - Email clients
 - `1password`, `lastpass`, `bitwarden`, `okta` - Password managers
 - `bank`, `financial`, `payroll`, `paystub`, `tax` - Financial apps
@@ -103,6 +112,7 @@ If `CAPTURE_DENY_APPS` is not set in ENV, these patterns are blocked by default:
 - `slack` - Communication apps
 
 **Why single list works:** A pattern like `/gmail/i` blocks:
+
 - Desktop app: "Gmail.app" (app name match)
 - Browser app: "Gmail - Inbox (23)" (window title match)
 - Any browser: Works in Chrome, Firefox, Safari, Edge (title match)
@@ -114,6 +124,7 @@ If `CAPTURE_DENY_APPS` is not set in ENV, these patterns are blocked by default:
 ### **Test Steps:**
 
 1. **Start the dev server:**
+
    ```bash
    npm run dev
    ```
@@ -123,7 +134,7 @@ If `CAPTURE_DENY_APPS` is not set in ENV, these patterns are blocked by default:
    - Ask AI for help with Slack
    - **Expected:** AI responds with graceful denial message:
      ```
-     I'm not allowed to view Slack due to your organization's capture policy. 
+     I'm not allowed to view Slack due to your organization's capture policy.
      I can still help you with text-based instructions instead.
      ```
 
@@ -141,10 +152,13 @@ If `CAPTURE_DENY_APPS` is not set in ENV, these patterns are blocked by default:
    ```
 
 ### **4. Test Custom ENV Config**
+
 Create `.env` file:
+
 ```bash
 CAPTURE_DENY_APPS=vscode,notion
 ```
+
 - VSCode and Notion should be blocked (both app name and window title)
 - All other apps allowed
 
@@ -153,21 +167,25 @@ CAPTURE_DENY_APPS=vscode,notion
 ## Configuration Examples
 
 ### **Strict (Block Most Apps):**
+
 ```bash
 CAPTURE_DENY_APPS=mail,password,bank,slack,teams,zoom,payroll,hr
 ```
 
 ### **Minimal (Allow Almost Everything):**
+
 ```bash
 CAPTURE_DENY_APPS=1password
 ```
 
 ### **Finance-Heavy Company:**
+
 ```bash
 CAPTURE_DENY_APPS=outlook,quickbooks,sage,xero,stripe,paypal,bank,intuit
 ```
 
 **Note:** Patterns like "bank" match both:
+
 - Desktop apps: "QuickBooks Bank" (app name)
 - Browser tabs: "Bank of America - Login" (window title)
 
@@ -180,7 +198,7 @@ CAPTURE_DENY_APPS=outlook,quickbooks,sage,xero,stripe,paypal,bank,intuit
 ✅ **Performance:** Policy check happens before capture (~1ms)  
 ✅ **Transparency:** Clear logs showing allowed/denied decisions  
 ✅ **Flexible:** Regex patterns support complex matching  
-✅ **Cross-Platform:** Works on Windows, macOS, and Linux with same config  
+✅ **Cross-Platform:** Works on Windows, macOS, and Linux with same config
 
 ---
 

@@ -47,11 +47,11 @@ interface AgentAPI {
   onGuideNextStep: (callback: () => void) => void;
 
   // Watch mode for selective screenshot capture
-    toggleWatchMode: (enabled: boolean) => Promise<void>;
-    unselectWindow: (windowId: string) => Promise<void>;
-    getSelectedWindows: () => Promise<SelectedWindowInfo[]>;
-    onWatchWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => void;
-    offWatchWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => void;
+  toggleWatchMode: (enabled: boolean) => Promise<void>;
+  unselectWindow: (windowId: string) => Promise<void>;
+  getSelectedWindows: () => Promise<SelectedWindowInfo[]>;
+  onWatchWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => void;
+  offWatchWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => void;
 }
 
 declare global {

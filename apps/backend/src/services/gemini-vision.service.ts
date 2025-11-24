@@ -261,15 +261,16 @@ Rules:
             data: base64Data,
           },
         });
-        contentParts.push(
-          `screenshot_${index}: ${screenshot.appName} - ${screenshot.windowTitle}`
-        );
+        contentParts.push(`screenshot_${index}: ${screenshot.appName} - ${screenshot.windowTitle}`);
       });
 
       const result = await this.screenshotFilterModel.generateContent(contentParts);
       const parsed = ScreenshotFilterResultSchema.parse(JSON.parse(result.response.text()));
 
-      console.log("[GeminiVision] Relevant screenshots identified:", parsed.relevantScreenshots.length);
+      console.log(
+        "[GeminiVision] Relevant screenshots identified:",
+        parsed.relevantScreenshots.length
+      );
       parsed.relevantScreenshots.forEach((entry) => {
         console.log(`[GeminiVision]   - ${entry.imageName}: ${entry.inclusionReason}`);
       });
@@ -644,8 +645,13 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
           };
         })
         .filter(
-          (entry): entry is { screenshot: WindowScreenshot; inclusionReason: string; originalIndex: number } =>
-            !!entry
+          (
+            entry
+          ): entry is {
+            screenshot: WindowScreenshot;
+            inclusionReason: string;
+            originalIndex: number;
+          } => !!entry
         );
 
       if (!relevantEntries.length) {

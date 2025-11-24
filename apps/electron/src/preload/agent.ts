@@ -20,9 +20,9 @@ const IPC_CHANNELS = {
   AUTH_TOKEN_UPDATED: "auth-token-updated",
   // Watch mode channels
   WATCH_WINDOWS_TOGGLE: "watch-windows-toggle",
-    WATCH_WINDOW_UNSELECT: "watch-window-unselect",
-    WATCH_WINDOWS_GET_SELECTED: "watch-windows-get-selected",
-    WATCH_WINDOWS_UPDATED: "watch-windows-updated",
+  WATCH_WINDOW_UNSELECT: "watch-window-unselect",
+  WATCH_WINDOWS_GET_SELECTED: "watch-windows-get-selected",
+  WATCH_WINDOWS_UPDATED: "watch-windows-updated",
 } as const;
 
 contextBridge.exposeInMainWorld("agentAPI", {
@@ -82,22 +82,22 @@ contextBridge.exposeInMainWorld("agentAPI", {
     ipcRenderer.on(IPC_CHANNELS.AGENT_GUIDE_NEXT_STEP, () => callback());
   },
 
-    // Watch mode for selective screenshot capture
-    toggleWatchMode: (enabled: boolean): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_TOGGLE, enabled),
-    unselectWindow: (windowId: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, windowId),
-    getSelectedWindows: (): Promise<SelectedWindowInfo[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED),
+  // Watch mode for selective screenshot capture
+  toggleWatchMode: (enabled: boolean): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_TOGGLE, enabled),
+  unselectWindow: (windowId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, windowId),
+  getSelectedWindows: (): Promise<SelectedWindowInfo[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED),
 
-    // Event listeners for watch apps updates
-    onWatchWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => {
-      const listener = (_event: unknown, windows: SelectedWindowInfo[]) => callback(windows);
-      ipcRenderer.on(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, listener);
-    },
-    offWatchWindowsUpdated: (_callback: (windows: SelectedWindowInfo[]) => void) => {
-      // Remove all listeners for this channel
-      // We use removeAllListeners since we only have one listener at a time
-      ipcRenderer.removeAllListeners(IPC_CHANNELS.WATCH_WINDOWS_UPDATED);
-    },
+  // Event listeners for watch apps updates
+  onWatchWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => {
+    const listener = (_event: unknown, windows: SelectedWindowInfo[]) => callback(windows);
+    ipcRenderer.on(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, listener);
+  },
+  offWatchWindowsUpdated: (_callback: (windows: SelectedWindowInfo[]) => void) => {
+    // Remove all listeners for this channel
+    // We use removeAllListeners since we only have one listener at a time
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.WATCH_WINDOWS_UPDATED);
+  },
 });

@@ -373,7 +373,7 @@ export class OrchestratorService {
       // (2) Model with strict JSON and RAG-biased prompt
       const model = this.gemini.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
-    const prompt = `Classify into ONE intent:
+      const prompt = `Classify into ONE intent:
 - "general_chat": Simple conversation, greetings, thanks, acknowledgments, clarifications
 - "knowledge_search": Questions about company docs, policies, discussions, meetings, decisions
 - "workflow_start": User wants step-by-step guidance to complete a task in an app

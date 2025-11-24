@@ -349,14 +349,14 @@ if (
   try {
     const annotator = new ScreenshotAnnotator();
 
-const [primaryScreenshot] = screenshots || [];
+    const [primaryScreenshot] = screenshots || [];
 
-await annotator.annotate(
-  primaryScreenshot?.dataUrl ?? "", // base64 screenshot
+    await annotator.annotate(
+      primaryScreenshot?.dataUrl ?? "", // base64 screenshot
       parsed.recommendedAction.element.boundingBox, // normalized bounding box
       {
-    width: primaryScreenshot?.metadata.width ?? 1920,
-    height: primaryScreenshot?.metadata.height ?? 1080,
+        width: primaryScreenshot?.metadata.width ?? 1920,
+        height: primaryScreenshot?.metadata.height ?? 1080,
       },
       {
         label: parsed.recommendedAction.element.description || "Target Element",

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from "electron";
 import { join } from "path";
 import { IPC_CHANNELS } from "@mitable/shared";
-import { captureService, ConversationContext } from "./services/captureService";
+import { captureService } from "./services/captureService";
 import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
 import { windowDetectionService } from "./services/windowDetectionService";
 import { isBlockedByPolicy } from "./services/capturePolicy";
@@ -594,44 +594,6 @@ function setupIPC() {
     }
   });
 
-  // Show overlay with bounding box data
-  ipcMain.on(IPC_CHANNELS.OVERLAY_SHOW, (_event, data) => {
-    console.log("[Main] OVERLAY_SHOW received with data:", data);
-
-    if (!overlayWindow || overlayWindow.isDestroyed()) {
-      console.error("[Main] Overlay window not available");
-      return;
-    }
-
-    // Show overlay window first
-    overlayWindow.show();
-    overlayWindow.focus();
-
-    // Open DevTools when overlay is shown (dev mode only, first time)
-    if (!app.isPackaged && !overlayWindow.webContents.isDevToolsOpened()) {
-      overlayWindow.webContents.openDevTools({ mode: "detach" });
-    }
-
-    // Wait for renderer to be ready, then send data
-    // If already loaded, this fires immediately
-    if (overlayWindow.webContents.isLoading()) {
-      console.log("[Main] Overlay still loading, waiting for did-finish-load...");
-      overlayWindow.webContents.once("did-finish-load", () => {
-        console.log("[Main] Overlay loaded, sending data now");
-        overlayWindow.webContents.send("overlay-data", data);
-      });
-    } else {
-      // Already loaded, add small delay for React to mount and set up listeners
-      console.log("[Main] Overlay already loaded, sending data with 100ms delay");
-      setTimeout(() => {
-        overlayWindow.webContents.send("overlay-data", data);
-        console.log("[Main] Overlay data sent");
-      }, 100);
-    }
-
-    console.log("[Main] Overlay window shown");
-  });
-
   /**
    * DEPRECATED: Guide System IPC Handlers
    *
@@ -1019,12 +981,10 @@ function setupIPC() {
       _event,
       payload?: {
         message?: string;
-        context?: ConversationContext;
       }
     ): Promise<MultiWindowCaptureResult> => {
       console.log("[Screenshot] Multi-window capture requested", {
         hasMessage: !!payload?.message,
-        hasContext: !!payload?.context,
       });
 
       try {
@@ -1036,8 +996,9 @@ function setupIPC() {
         console.log("[Screenshot] Capture with filters:", {
           hasSelectedWindows,
           selectedWindows:
-            selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
-            "none",
+            selectedWindows
+              .map((window) => `${window.appName} - ${window.windowTitle}`)
+              .join(", ") || "none",
         });
 
         // Capture with optional filtering
@@ -1110,7 +1071,7 @@ function setupWatchModeHandlers() {
     }
   });
 
-    // Select a window to watch
+  // Select a window to watch
   ipcMain.handle(
     IPC_CHANNELS.WATCH_WINDOW_SELECT,
     async (_event, windowInfo: SelectedWindowInfo) => {
@@ -1139,17 +1100,13 @@ function setupWatchModeHandlers() {
       if (process.platform !== "darwin") {
         const isBrowser = isBrowserProcess(windowDetails.appName, windowDetails.path);
         if (isBrowser) {
-          console.log(
-            "[Watch Mode] Blocking browser window selection on non-macOS platform",
-            {
-              appName: windowDetails.appName,
-              path: windowDetails.path,
-            }
-          );
+          console.log("[Watch Mode] Blocking browser window selection on non-macOS platform", {
+            appName: windowDetails.appName,
+            path: windowDetails.path,
+          });
           return {
             allowed: false,
-            reason:
-              "Browser windows cannot be watched on this platform to protect sensitive data.",
+            reason: "Browser windows cannot be watched on this platform to protect sensitive data.",
           };
         }
 
@@ -1199,62 +1156,61 @@ function setupWatchModeHandlers() {
     }
   );
 
-    // Unselect a window
-    ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, async (_event, windowId: string) => {
-      console.log(`[Watch Mode] Unselecting window: ${windowId}`);
-      const removed = windowDetectionService.removeWindow(windowId);
+  // Unselect a window
+  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, async (_event, windowId: string) => {
+    console.log(`[Watch Mode] Unselecting window: ${windowId}`);
+    const removed = windowDetectionService.removeWindow(windowId);
 
-      if (removed) {
-        broadcastWatchWindowsUpdate();
+    if (removed) {
+      broadcastWatchWindowsUpdate();
+    }
+  });
+
+  // Get currently selected windows
+  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED, async () => {
+    const selectedWindows = windowDetectionService.getSelectedWindows();
+    console.log(`[Watch Mode] Returning ${selectedWindows.length} selected windows`);
+    return selectedWindows;
+  });
+
+  // Broadcast updated window list to all windows
+  function broadcastWatchWindowsUpdate() {
+    const selectedWindows = windowDetectionService.getSelectedWindows();
+    const windows = [agentWindow, conversationWindow];
+
+    for (const window of windows) {
+      if (window && !window.isDestroyed()) {
+        window.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
       }
-    });
-
-    // Get currently selected windows
-    ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED, async () => {
-      const selectedWindows = windowDetectionService.getSelectedWindows();
-      console.log(`[Watch Mode] Returning ${selectedWindows.length} selected windows`);
-      return selectedWindows;
-    });
-
-    // Broadcast updated window list to all windows
-    function broadcastWatchWindowsUpdate() {
-      const selectedWindows = windowDetectionService.getSelectedWindows();
-      const windows = [agentWindow, conversationWindow];
-
-      for (const window of windows) {
-        if (window && !window.isDestroyed()) {
-          window.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
-        }
-      }
-
-      console.log(
-        `[Watch Mode] Broadcasted update to windows. Selected windows: ${
-          selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") || "none"
-        }`
-      );
     }
 
-    function selectWindowForWatch(
-      windowInfo: SelectedWindowInfo
-    ): { allowed: boolean } {
-      const added = windowDetectionService.addWindow(windowInfo);
+    console.log(
+      `[Watch Mode] Broadcasted update to windows. Selected windows: ${
+        selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
+        "none"
+      }`
+    );
+  }
 
-      if (added) {
-        const buttonWindow = watchButtonWindows.get(windowInfo.windowId);
+  function selectWindowForWatch(windowInfo: SelectedWindowInfo): { allowed: boolean } {
+    const added = windowDetectionService.addWindow(windowInfo);
 
-        if (buttonWindow && !buttonWindow.isDestroyed()) {
-          console.log(
-            `[Watch Mode] Closing button for selected window: ${windowInfo.appName} (windowId: ${windowInfo.windowId})`
-          );
-          buttonWindow.close();
-        }
+    if (added) {
+      const buttonWindow = watchButtonWindows.get(windowInfo.windowId);
 
-        watchButtonWindows.delete(windowInfo.windowId);
-        broadcastWatchWindowsUpdate();
+      if (buttonWindow && !buttonWindow.isDestroyed()) {
+        console.log(
+          `[Watch Mode] Closing button for selected window: ${windowInfo.appName} (windowId: ${windowInfo.windowId})`
+        );
+        buttonWindow.close();
       }
 
-      return { allowed: true };
+      watchButtonWindows.delete(windowInfo.windowId);
+      broadcastWatchWindowsUpdate();
     }
+
+    return { allowed: true };
+  }
 
   console.log("[IPC] Watch mode handlers registered successfully");
 }
@@ -1280,10 +1236,7 @@ function isBrowserProcess(appName: string, appPath?: string): boolean {
 }
 
 // Helper function to create a watch button window
-function createWatchButtonWindow(
-  window: any,
-  watchButtonWindows: Map<string, BrowserWindow>
-) {
+function createWatchButtonWindow(window: any, watchButtonWindows: Map<string, BrowserWindow>) {
   const buttonWindow = new BrowserWindow({
     width: 250,
     height: 50,
@@ -1297,7 +1250,7 @@ function createWatchButtonWindow(
     focusable: true,
     hasShadow: false,
     webPreferences: {
-      preload: join(MAIN_DIR, "../preload/watchButton.cjs"),
+      preload: join(__dirname, "../preload/watchButton.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -1313,7 +1266,7 @@ function createWatchButtonWindow(
   if (!app.isPackaged) {
     buttonWindow.loadURL(`http://localhost:5173/watchButton/index.html?${queryParams.toString()}`);
   } else {
-    buttonWindow.loadFile(join(MAIN_DIR, "../renderer/watchButton.html"), {
+    buttonWindow.loadFile(join(__dirname, "../renderer/watchButton.html"), {
       query: Object.fromEntries(queryParams.entries()),
     });
   }
@@ -1335,14 +1288,14 @@ function createWatchButtonWindow(
 function closeAllWatchButtonWindows(watchButtonWindows: Map<string, BrowserWindow>) {
   const count = watchButtonWindows.size;
   console.log(`[Watch Mode] Closing ${count} watch button windows`);
-  
+
   for (const [windowId, buttonWindow] of watchButtonWindows.entries()) {
     if (!buttonWindow.isDestroyed()) {
       buttonWindow.close();
     }
     watchButtonWindows.delete(windowId);
   }
-  
+
   console.log(`[Watch Mode] ✅ Closed ${count} watch button windows`);
 }
 

@@ -170,28 +170,28 @@ class CaptureService {
         };
       }
 
-        // STEP 3: Filter by allowed window IDs if provided
-        let windowsToCapture = allowedWindows;
-        if (allowedWindowIds && allowedWindowIds.length > 0) {
-          const normalizedAllowedIds = new Set<string>();
-          for (const id of allowedWindowIds) {
-            normalizedAllowedIds.add(id);
-            normalizedAllowedIds.add(this.normalizeWindowSourceId(id));
-          }
-
-          windowsToCapture = allowedWindows.filter((source) => {
-            const normalizedSourceId = this.normalizeWindowSourceId(source.id);
-            return (
-              normalizedAllowedIds.has(source.id) || normalizedAllowedIds.has(normalizedSourceId)
-            );
-          });
-
-          console.log(
-            `[CaptureService] Filtered to ${windowsToCapture.length} windows matching allowed IDs: ${allowedWindowIds.join(
-              ", "
-            )}`
-          );
+      // STEP 3: Filter by allowed window IDs if provided
+      let windowsToCapture = allowedWindows;
+      if (allowedWindowIds && allowedWindowIds.length > 0) {
+        const normalizedAllowedIds = new Set<string>();
+        for (const id of allowedWindowIds) {
+          normalizedAllowedIds.add(id);
+          normalizedAllowedIds.add(this.normalizeWindowSourceId(id));
         }
+
+        windowsToCapture = allowedWindows.filter((source) => {
+          const normalizedSourceId = this.normalizeWindowSourceId(source.id);
+          return (
+            normalizedAllowedIds.has(source.id) || normalizedAllowedIds.has(normalizedSourceId)
+          );
+        });
+
+        console.log(
+          `[CaptureService] Filtered to ${windowsToCapture.length} windows matching allowed IDs: ${allowedWindowIds.join(
+            ", "
+          )}`
+        );
+      }
 
       console.log(`[CaptureService] Capturing ${windowsToCapture.length} windows`);
 
@@ -244,37 +244,36 @@ class CaptureService {
         totalWindowsDetected: allSources.length,
         captureTimestamp: Date.now(),
       };
-
-      } catch (error) {
-        console.error("[CaptureService] Multi-window capture failed:", error);
-        return {
-          success: false,
-          error: `Failed to capture windows: ${error instanceof Error ? error.message : "Unknown error"}`,
-          reason: "technical_error",
-        };
-      }
+    } catch (error) {
+      console.error("[CaptureService] Multi-window capture failed:", error);
+      return {
+        success: false,
+        error: `Failed to capture windows: ${error instanceof Error ? error.message : "Unknown error"}`,
+        reason: "technical_error",
+      };
     }
+  }
 
-    /**
-     * Normalize desktopCapturer window IDs to match OS-level window IDs
-     *
-     * @param id - Raw window source ID from desktopCapturer
-     * @returns Normalized ID string
-     */
-    private normalizeWindowSourceId(id: string): string {
-      if (!id) {
-        return id;
-      }
-
-      if (id.startsWith("window:")) {
-        const parts = id.split(":");
-        if (parts.length >= 2 && parts[1]) {
-          return parts[1];
-        }
-      }
-
+  /**
+   * Normalize desktopCapturer window IDs to match OS-level window IDs
+   *
+   * @param id - Raw window source ID from desktopCapturer
+   * @returns Normalized ID string
+   */
+  private normalizeWindowSourceId(id: string): string {
+    if (!id) {
       return id;
     }
+
+    if (id.startsWith("window:")) {
+      const parts = id.split(":");
+      if (parts.length >= 2 && parts[1]) {
+        return parts[1];
+      }
+    }
+
+    return id;
+  }
 
   /**
    * Resize image if it exceeds maximum dimensions

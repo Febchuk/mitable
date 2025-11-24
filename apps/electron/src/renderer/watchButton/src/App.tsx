@@ -63,8 +63,7 @@ export default function App() {
       } else {
         setStatus("blocked");
         setBlockMessage(
-          result?.reason ||
-            "This window is blocked by your organization's capture policy."
+          result?.reason || "This window is blocked by your organization's capture policy."
         );
       }
     } catch (error) {
@@ -102,10 +101,7 @@ export default function App() {
             : "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer hover:shadow-xl"
         }
       `}
-      title={
-        blockMessage ||
-        `Click to watch ${data.appName} - ${data.windowTitle}`
-      }
+      title={blockMessage || `Click to watch ${data.appName} - ${data.windowTitle}`}
     >
       {label}
     </button>

@@ -67,17 +67,18 @@ However, screenshot capture in Mitable has **multiple use cases and entry points
 ## What We've Built (Stashed for Now)
 
 ### Completed Work:
+
 ```bash
 git stash list
 # "Capture policy work - defer for later"
 ```
 
 **Contents:**
+
 - ✅ `capturePolicy.ts` - Deny-first policy engine
   - Load deny-list from ENV (`CAPTURE_DENY_APPS=slack,outlook,1password`)
   - OS-agnostic matching (strips .exe, .app, .AppImage)
   - Checks app name AND window title
-  
 - ✅ `activeWindowBridge.ts` - IPC bridge using `active-win`
   - Gets focused window info from OS
   - Returns app name, window title, bounds
@@ -97,6 +98,7 @@ git stash list
 - ✅ Documentation (`CAPTURE_POLICY.md`, `.env.example`)
 
 ### What's NOT Done:
+
 - ❌ Frontend error handling (show message to user)
 - ❌ Disable full-screen → switch to window-specific only
 - ❌ Fix `captureScreenshot: true` in ChatDetail (always capturing)
@@ -112,6 +114,7 @@ git stash list
 **Goal:** Block screenshots of sensitive apps ONLY during workflow UI guidance.
 
 **Scope:**
+
 - ✅ Visual Guidance Agent workflows
 - ✅ "Help me do X in Slack" → blocked gracefully
 - ❌ NOT general chat (Console window)
@@ -119,6 +122,7 @@ git stash list
 - ❌ NOT conversation window pill
 
 **Implementation:**
+
 1. Use stashed capture policy work as-is
 2. Add policy check to workflow capture path only
 3. Agent receives error → responds with text-based instructions:
@@ -128,6 +132,7 @@ git stash list
    ```
 
 **Changes Required:**
+
 ```typescript
 // apps/backend/src/agents/visual-guidance.agent.ts
 // When workflow needs screenshot:
@@ -176,11 +181,13 @@ if (captureResult && !captureResult.success) {
 ## Recommendation
 
 **Start small, iterate:**
+
 1. ✅ **Phase 1:** Workflow UI guidance only (use stashed work)
 2. ⏳ **Phase 2:** Audit all capture paths, decide architecture
 3. ⏳ **Phase 3:** Implement policy across all features (if needed)
 
 **Rationale:**
+
 - Gets client requirement met for primary use case (workflow)
 - Doesn't require refactoring entire capture system
 - Lets Febe/Mikun (capture owners) design broader solution

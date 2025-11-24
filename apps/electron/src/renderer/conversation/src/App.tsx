@@ -260,7 +260,6 @@ function App() {
                 messageId,
                 messageType,
                 cardData,
-                windowTrigger,
                 workflowSessionId,
                 relatedStepIndex
               ) => {
@@ -268,7 +267,6 @@ function App() {
                   messageId,
                   messageType,
                   hasCardData: !!cardData,
-                  windowTrigger,
                   workflowSessionId,
                   relatedStepIndex,
                 });
@@ -287,7 +285,6 @@ function App() {
                             type: cardData ? "card" : "text",
                             messageType: messageType as "workflow" | "experts" | "text",
                             cardData,
-                            windowTrigger,
                             workflowSessionId,
                             relatedStepIndex,
                           }
@@ -318,22 +315,6 @@ function App() {
                   )
                 );
                 streamingMessageIdRef.current = null;
-              },
-              onWindowTrigger: (windowType, data) => {
-                console.log(`[Conversation] Window trigger received: ${windowType}`, {
-                  hasData: !!data,
-                  dataKeys: data ? Object.keys(data) : [],
-                });
-                if (windowType === "nudge") {
-                  window.conversationAPI?.showNudge(data);
-                } else if (windowType === "guide") {
-                  window.conversationAPI?.startGuide(data);
-                } else if (windowType === "overlay") {
-                  console.log("[Conversation] Triggering overlay via conversationAPI.showOverlay");
-                  window.conversationAPI?.showOverlay?.(data);
-                } else {
-                  console.warn("[Conversation] Unknown window trigger type:", windowType);
-                }
               },
               onProgress: (phase, message) => {
                 console.log(`[Conversation] Progress update: ${phase} - ${message}`);
@@ -621,7 +602,6 @@ function App() {
             messageId,
             messageType,
             cardData,
-            windowTrigger,
             workflowSessionId,
             relatedStepIndex
           ) => {
@@ -639,7 +619,6 @@ function App() {
                         type: cardData ? "card" : "text",
                         messageType: messageType as "workflow" | "experts" | "text",
                         cardData,
-                        windowTrigger,
                         workflowSessionId,
                         relatedStepIndex,
                       }
@@ -661,22 +640,6 @@ function App() {
               )
             );
             streamingMessageIdRef.current = null;
-          },
-          onWindowTrigger: (windowType, data) => {
-            console.log(`[Conversation] Workflow window trigger received: ${windowType}`, {
-              hasData: !!data,
-              dataKeys: data ? Object.keys(data) : [],
-            });
-            if (windowType === "nudge") {
-              window.conversationAPI?.showNudge(data);
-            } else if (windowType === "guide") {
-              window.conversationAPI?.startGuide(data);
-            } else if (windowType === "overlay") {
-              console.log("[Conversation] Triggering overlay via conversationAPI.showOverlay");
-              window.conversationAPI?.showOverlay?.(data);
-            } else {
-              console.warn("[Conversation] Unknown workflow window trigger:", windowType);
-            }
           },
           onProgress: (phase, message) => {
             console.log(`[Conversation] Workflow progress update: ${phase} - ${message}`);

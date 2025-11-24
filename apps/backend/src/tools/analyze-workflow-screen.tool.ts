@@ -133,12 +133,12 @@ BEHAVIOR:
 
       // Step 2: Analyze screenshot with issue context
       // We'll use the same analyzeStepExecution method but focus on the troubleshooting aspect
-        const visualGuidance = await geminiVisionService.analyzeStepExecution(
-          context.screenshots,
-          currentSolution,
-          currentStep,
-          context.conversationHistory
-        );
+      const visualGuidance = await geminiVisionService.analyzeStepExecution(
+        context.screenshots,
+        currentSolution,
+        currentStep,
+        context.conversationHistory
+      );
 
       console.log("[AnalyzeWorkflowScreenTool] Visual analysis complete:", {
         conversationalMessage: visualGuidance.conversationalMessage?.substring(0, 100),
@@ -156,7 +156,7 @@ ${visualGuidance.confidence === "low" ? "\n\n*Note: I'm having some difficulty a
 
       console.log("[AnalyzeWorkflowScreenTool] Troubleshooting guidance generated");
 
-        // Step 4: Return without progressing workflow
+      // Step 4: Return without progressing workflow
       // Note: We DON'T update currentStepIndex or step statuses
       // Return with workflow state preserved so WorkflowOptions remains visible
       return {
@@ -166,7 +166,6 @@ ${visualGuidance.confidence === "low" ? "\n\n*Note: I'm having some difficulty a
           ...currentSolution,
           workflowActive: true,
           workflowPhase: "custom_question", // Triggers Q&A UI mode (hides step list, shows Q&A options)
-            visualGuidance: visualGuidance, // Include full visual guidance context
         },
         streamable: true,
       };

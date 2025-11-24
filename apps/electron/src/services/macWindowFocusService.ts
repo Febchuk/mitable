@@ -31,11 +31,7 @@ end tell
     await execFileAsync("/usr/bin/osascript", ["-e", script]);
     console.log("[MacWindowFocusService] Focused app by processId:", processId);
   } catch (error) {
-    console.error(
-      "[MacWindowFocusService] Failed to focus app by processId:",
-      processId,
-      error
-    );
+    console.error("[MacWindowFocusService] Failed to focus app by processId:", processId, error);
   }
 }
 
@@ -74,9 +70,7 @@ export async function resolveWindowUrlForWatchSelection(
     const activeWindow = await activeWin();
 
     if (!activeWindow) {
-      console.warn(
-        "[MacWindowFocusService] active-win returned null after focusing app"
-      );
+      console.warn("[MacWindowFocusService] active-win returned null after focusing app");
       return fallback;
     }
 
@@ -86,19 +80,15 @@ export async function resolveWindowUrlForWatchSelection(
     const url = (activeWindow as any).url as string | undefined;
 
     const sameProcess =
-      typeof activeProcessId === "number" &&
-      activeProcessId === windowInfo.processId;
+      typeof activeProcessId === "number" && activeProcessId === windowInfo.processId;
 
     if (!sameProcess) {
-      console.warn(
-        "[MacWindowFocusService] Active window processId mismatch after focus attempt",
-        {
-          expectedProcessId: windowInfo.processId,
-          activeProcessId,
-          title,
-          appName,
-        }
-      );
+      console.warn("[MacWindowFocusService] Active window processId mismatch after focus attempt", {
+        expectedProcessId: windowInfo.processId,
+        activeProcessId,
+        title,
+        appName,
+      });
       return {
         title,
         appName,
@@ -125,4 +115,3 @@ export async function resolveWindowUrlForWatchSelection(
     return fallback;
   }
 }
-

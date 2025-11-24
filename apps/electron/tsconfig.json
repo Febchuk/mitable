@@ -11,6 +11,14 @@
       "@/*": ["./src/renderer/*"]
     }
   },
-  "include": ["src/main.ts", "src/preload/**/*", "src/renderer/**/*", "src/global.d.ts"],
+  "include": [
+    "src/main.ts",
+    "src/preload/**/*",
+    "src/renderer/**/*",
+    "src/global.d.ts",
+    "src/renderer/agent/src/global.d.ts",
+    "src/renderer/console/src/global.d.ts",
+    "src/renderer/watchButton/src/global.d.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

@@ -117,7 +117,9 @@ class WindowDetectionService {
         });
       }
 
-      console.log(`[WindowDetectionService] Returning ${watchableWindows.length} watchable windows`);
+      console.log(
+        `[WindowDetectionService] Returning ${watchableWindows.length} watchable windows`
+      );
       return watchableWindows;
     } catch (error) {
       console.error("[WindowDetectionService] Failed to get windows:", error);
@@ -180,13 +182,15 @@ class WindowDetectionService {
    *
    * Used by watch mode selection to resolve processId/app/path.
    */
-  getWindowDetails(windowId: string): {
-    title: string;
-    appName: string;
-    processId?: number;
-    bundleId?: string;
-    path?: string;
-  } | undefined {
+  getWindowDetails(windowId: string):
+    | {
+        title: string;
+        appName: string;
+        processId?: number;
+        bundleId?: string;
+        path?: string;
+      }
+    | undefined {
     const window = this.lastDetectedWindows.get(windowId);
     if (!window) {
       return undefined;
@@ -259,7 +263,7 @@ class WindowDetectionService {
   getStats(): {
     isWatching: boolean;
     selectedCount: number;
-    selectedWindows: SelectedWindowInfo[]
+    selectedWindows: SelectedWindowInfo[];
   } {
     return {
       isWatching: this.isWatching,

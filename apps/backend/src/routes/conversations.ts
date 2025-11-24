@@ -740,25 +740,25 @@ router.post(
   "/:conversationId/messages/stream",
   requireAuth,
   screenshotLimiter, // Rate limit screenshot analysis to prevent AI compute abuse
-    async (req: Request, res: Response): Promise<void> => {
+  async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id || req.userId;
 
     const { conversationId } = req.params;
-      const {
-        content,
-        screenshots,
-        metadata,
-      }: {
-        content?: string;
-        screenshots?: WindowScreenshot[];
-        metadata?: any;
-      } = req.body;
+    const {
+      content,
+      screenshots,
+      metadata,
+    }: {
+      content?: string;
+      screenshots?: WindowScreenshot[];
+      metadata?: any;
+    } = req.body;
 
     console.log("[Conversations] Request received:", {
       conversationId,
       userId,
       contentLength: content?.length || 0,
-        screenshotCount: screenshots?.length || 0,
+      screenshotCount: screenshots?.length || 0,
       metadata,
     });
 
@@ -1055,21 +1055,21 @@ router.post(
           );
         }
 
-          // Note: We only persist the first screenshot for PII debugging to minimize disk usage.
-          // Multi-window captures can include several high-resolution images; saving just one keeps
-          // the debug helper lightweight while still letting us inspect redaction fidelity.
-          const primaryScreenshot = screenshots?.[0];
+        // Note: We only persist the first screenshot for PII debugging to minimize disk usage.
+        // Multi-window captures can include several high-resolution images; saving just one keeps
+        // the debug helper lightweight while still letting us inspect redaction fidelity.
+        const primaryScreenshot = screenshots?.[0];
 
-          // Debug: Save PII testing screenshots (before/after redaction)
-          if (
-            process.env.DEBUG_SAVE_SCREENSHOTS === "true" &&
-            primaryScreenshot &&
-            typeof primaryScreenshot.dataUrl === "string"
-          ) {
+        // Debug: Save PII testing screenshots (before/after redaction)
+        if (
+          process.env.DEBUG_SAVE_SCREENSHOTS === "true" &&
+          primaryScreenshot &&
+          typeof primaryScreenshot.dataUrl === "string"
+        ) {
           try {
             console.log("[DEBUG PII] Saving PII test screenshots...", {
-                screenshotPreview: primaryScreenshot.dataUrl.substring(0, 50),
-                hasMetadata: !!primaryScreenshot.metadata,
+              screenshotPreview: primaryScreenshot.dataUrl.substring(0, 50),
+              hasMetadata: !!primaryScreenshot.metadata,
             });
             const fs = await import("fs/promises");
             const path = await import("path");
@@ -1089,9 +1089,9 @@ router.post(
             });
             await fs.mkdir(sessionDir, { recursive: true });
 
-              // Save original (after redaction)
-              const base64Data = primaryScreenshot.dataUrl.replace(/^data:image\/\w+;base64,/, "");
-              const originalBuffer = Buffer.from(base64Data, "base64");
+            // Save original (after redaction)
+            const base64Data = primaryScreenshot.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+            const originalBuffer = Buffer.from(base64Data, "base64");
             const originalPath = path.join(sessionDir, "redacted.png");
             await fs.writeFile(originalPath, originalBuffer);
 
@@ -1100,16 +1100,16 @@ router.post(
             await fs.writeFile(
               metadataPath,
               JSON.stringify(
-                  {
-                    timestamp: new Date().toISOString(),
-                    query: content,
-                    piiRedacted: true,
-                    windowTitle: primaryScreenshot.windowTitle,
-                    appName: primaryScreenshot.appName,
-                    width: primaryScreenshot.metadata.width,
-                    height: primaryScreenshot.metadata.height,
-                    scaleFactor: primaryScreenshot.metadata.scaleFactor,
-                  },
+                {
+                  timestamp: new Date().toISOString(),
+                  query: content,
+                  piiRedacted: true,
+                  windowTitle: primaryScreenshot.windowTitle,
+                  appName: primaryScreenshot.appName,
+                  width: primaryScreenshot.metadata.width,
+                  height: primaryScreenshot.metadata.height,
+                  scaleFactor: primaryScreenshot.metadata.scaleFactor,
+                },
                 null,
                 2
               )
@@ -1125,12 +1125,12 @@ router.post(
           }
         }
 
-          // Debug: previously saved annotated screenshots, but bounding boxes are no longer produced.
-          if (process.env.DEBUG_SAVE_SCREENSHOTS === "true") {
-            console.warn(
-              "[DEBUG SCREENSHOT] Annotated screenshot saving is disabled for conversational-only guidance output (no bounding boxes available)."
-            );
-          }
+        // Debug: previously saved annotated screenshots, but bounding boxes are no longer produced.
+        if (process.env.DEBUG_SAVE_SCREENSHOTS === "true") {
+          console.warn(
+            "[DEBUG SCREENSHOT] Annotated screenshot saving is disabled for conversational-only guidance output (no bounding boxes available)."
+          );
+        }
 
         // Generate conversation title if this is the first exchange
         // conversationHistory includes the just-saved user message, so length <= 2 means first exchange

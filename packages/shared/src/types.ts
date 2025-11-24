@@ -179,6 +179,6 @@ export interface WatchState {
 export interface WatchButtonState {
   appName: string;
   windowTitle: string;
-  status: 'unwatched' | 'watching' | 'blocked';
+  status: "unwatched" | "watching" | "blocked";
   blockReason?: string;
 }

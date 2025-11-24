@@ -140,15 +140,13 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
           </button>
 
           {/* Chevron + Count Badge - Only show when apps selected */}
-            {selectedWindows.length > 0 && (
+          {selectedWindows.length > 0 && (
             <button
               onClick={() => setDropdownExpanded(!dropdownExpanded)}
               className="flex items-center ml-1 px-2 h-9 rounded-lg bg-[#3e3e3e] hover:bg-[#4a4a4a] transition-colors app-no-drag"
               aria-label="Toggle app list"
             >
-              <span className="text-xs text-muted-foreground mr-1">
-                  {selectedWindows.length}
-              </span>
+              <span className="text-xs text-muted-foreground mr-1">{selectedWindows.length}</span>
               <ChevronDown
                 size={14}
                 className={`text-muted-foreground transition-transform ${
@@ -159,23 +157,23 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
           )}
 
           {/* Dropdown List */}
-            {dropdownExpanded && selectedWindows.length > 0 && (
+          {dropdownExpanded && selectedWindows.length > 0 && (
             <div className="absolute top-full mt-2 left-0 w-64 bg-[#2a2a2a] rounded-lg shadow-lg border border-[#3e3e3e] py-2 z-50">
               <div className="text-xs text-muted-foreground px-3 py-1 mb-1">
-                  Watching {selectedWindows.length} window{selectedWindows.length !== 1 ? "s" : ""}
+                Watching {selectedWindows.length} window{selectedWindows.length !== 1 ? "s" : ""}
               </div>
-                {selectedWindows.map((windowInfo) => (
+              {selectedWindows.map((windowInfo) => (
                 <div
-                    key={windowInfo.windowId}
+                  key={windowInfo.windowId}
                   className="flex items-center justify-between px-3 py-2 hover:bg-[#3e3e3e] transition-colors"
                 >
-                    <span className="text-sm text-text-primary truncate">
-                      {windowInfo.appName} - {windowInfo.windowTitle}
-                    </span>
+                  <span className="text-sm text-text-primary truncate">
+                    {windowInfo.appName} - {windowInfo.windowTitle}
+                  </span>
                   <button
-                      onClick={() => handleRemoveWindow(windowInfo.windowId)}
+                    onClick={() => handleRemoveWindow(windowInfo.windowId)}
                     className="ml-2 p-1 rounded hover:bg-[#4a4a4a] transition-colors"
-                      aria-label={`Stop watching ${windowInfo.appName}`}
+                    aria-label={`Stop watching ${windowInfo.appName}`}
                   >
                     <X size={14} className="text-muted-foreground" />
                   </button>
@@ -228,9 +226,7 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
         >
           <Mic
             size={16}
-            className={
-              inputMode === "audio" ? "text-primary-foreground" : "text-muted-foreground"
-            }
+            className={inputMode === "audio" ? "text-primary-foreground" : "text-muted-foreground"}
           />
         </button>
       </div>
@@ -248,9 +244,7 @@ export default function AgentPill({ onSubmit }: AgentPillProps) {
           </button>
           <button
             onClick={() => {
-              console.log(
-                "[AgentPill] Maximize clicked - opening Console window and hiding pill"
-              );
+              console.log("[AgentPill] Maximize clicked - opening Console window and hiding pill");
               // Open the main Console window
               window.agentAPI.showConsole();
               // Hide the agent pill

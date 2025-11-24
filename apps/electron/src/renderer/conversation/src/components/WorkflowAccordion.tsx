@@ -1,12 +1,5 @@
 import { useState, useMemo } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  PlayCircle,
-  CheckCircle,
-  Check,
-  Circle,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, PlayCircle, CheckCircle, Check, Circle } from "lucide-react";
 import WorkflowOptions, {
   WorkflowPhase,
 } from "../../../components/domain/workflow/WorkflowOptions";

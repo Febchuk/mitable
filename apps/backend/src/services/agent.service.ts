@@ -286,11 +286,11 @@ export class AgentService {
       // Workflow detection removed - agent service is deprecated
       const shouldEnterWorkflow = false;
 
-        console.log("[AgentService] Workflow detection:", {
-          shouldEnterWorkflow,
-          userMessage: userMessage.substring(0, 50),
-          screenshotCount: context.screenshots?.length || 0,
-        });
+      console.log("[AgentService] Workflow detection:", {
+        shouldEnterWorkflow,
+        userMessage: userMessage.substring(0, 50),
+        screenshotCount: context.screenshots?.length || 0,
+      });
 
       /**
        * DEPRECATED: Continuation detection via natural language parsing
@@ -424,16 +424,16 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
         { role: "user", content: userMessage },
       ];
 
-        // Inject context about screenshot availability and workflow intent
-        // This critical information helps OpenAI make informed tool selection decisions
-        if (context.screenshots && context.screenshots.length > 0) {
-          messages.push({
-            role: "system",
-            content:
-              "[CONTEXT] User has provided a screenshot of their current screen. Screenshot is available for visual analysis and UI guidance.",
-          });
-          console.log("[AgentService] Added screenshot context to messages");
-        }
+      // Inject context about screenshot availability and workflow intent
+      // This critical information helps OpenAI make informed tool selection decisions
+      if (context.screenshots && context.screenshots.length > 0) {
+        messages.push({
+          role: "system",
+          content:
+            "[CONTEXT] User has provided a screenshot of their current screen. Screenshot is available for visual analysis and UI guidance.",
+        });
+        console.log("[AgentService] Added screenshot context to messages");
+      }
 
       // Inject metadata hints for WorkflowOptions UI interactions
       if (context.metadata?.workflowAction) {
@@ -692,14 +692,14 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
             toolResult.content.toLowerCase().includes("connect you with") ||
             toolResult.content.toLowerCase().includes("couldn't find");
 
-            // Special case: If search_knowledge succeeded in a workflow context with screenshot,
-            // continue the loop to allow show_step_by_step_guide to be called next
-            const shouldContinueForGuidance =
-              functionName === "search_knowledge" &&
-              shouldEnterWorkflow &&
-              context.screenshots &&
-              context.screenshots.length > 0 &&
-              !isIncompleteResult; // search succeeded
+          // Special case: If search_knowledge succeeded in a workflow context with screenshot,
+          // continue the loop to allow show_step_by_step_guide to be called next
+          const shouldContinueForGuidance =
+            functionName === "search_knowledge" &&
+            shouldEnterWorkflow &&
+            context.screenshots &&
+            context.screenshots.length > 0 &&
+            !isIncompleteResult; // search succeeded
 
           console.log("[AgentService] Completion decision:", {
             isIncompleteResult,

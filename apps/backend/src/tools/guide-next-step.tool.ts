@@ -124,12 +124,12 @@ DO NOT USE:
 
       // Step 3: ALWAYS evaluate if plan needs adjustment
       console.log("[GuideNextStepTool] Evaluating if plan needs adjustment...");
-        const evaluation = await geminiVisionService.evaluateProgress(
-          context.screenshots,
-          currentSolution,
-          context.conversationHistory,
-          nextStepIndex
-        );
+      const evaluation = await geminiVisionService.evaluateProgress(
+        context.screenshots,
+        currentSolution,
+        context.conversationHistory,
+        nextStepIndex
+      );
 
       console.log("[GuideNextStepTool] Evaluation result:", {
         needsAdjustment: evaluation.needsAdjustment,
@@ -173,12 +173,12 @@ DO NOT USE:
         description: nextStep.description,
       });
 
-        const visualGuidance = await geminiVisionService.analyzeStepExecution(
-          context.screenshots,
-          updatedSolution,
-          nextStep,
-          context.conversationHistory
-        );
+      const visualGuidance = await geminiVisionService.analyzeStepExecution(
+        context.screenshots,
+        updatedSolution,
+        nextStep,
+        context.conversationHistory
+      );
 
       console.log("[GuideNextStepTool] Visual guidance generated:", {
         conversationalMessage: visualGuidance.conversationalMessage,
@@ -189,7 +189,7 @@ DO NOT USE:
       // Step 7: Build conversational message
       // Note: Don't include adjustment notice here - it's shown in the warning banner
       // on the frontend (WorkflowAccordion reads from adjustmentHistory)
-      let message = visualGuidance.conversationalMessage;
+      const message = visualGuidance.conversationalMessage;
 
       console.log("[GuideNextStepTool] Workflow progressed successfully:", {
         newStepIndex: nextStepIndex,

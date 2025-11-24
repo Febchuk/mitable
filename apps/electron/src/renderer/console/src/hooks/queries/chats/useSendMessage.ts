@@ -9,7 +9,6 @@ export interface SendMessageOptions {
   onChunk?: (content: string) => void;
   onComplete?: (fullContent: string) => void;
   onError?: (error: string) => void;
-  onWindowTrigger?: (window: string, data: any) => void;
   captureScreenshot?: boolean; // Whether to capture screenshot before sending
 }
 
@@ -67,7 +66,10 @@ export function useSendMessage(options?: SendMessageOptions) {
                 blockedCount: multiWindowCapture.blockedWindows.length,
               });
             } else {
-              console.log("[useSendMessage] Capture blocked or failed:", multiWindowCapture?.success === false ? multiWindowCapture.error : "Unknown");
+              console.log(
+                "[useSendMessage] Capture blocked or failed:",
+                multiWindowCapture?.success === false ? multiWindowCapture.error : "Unknown"
+              );
             }
           } catch (error) {
             console.error("[useSendMessage] Screenshot capture failed:", error);
@@ -87,20 +89,10 @@ export function useSendMessage(options?: SendMessageOptions) {
         onError: (error: string) => {
           options?.onError?.(error);
         },
-        onWindowTrigger: (window: string, data: any) => {
-          options?.onWindowTrigger?.(window, data);
-        },
       };
 
       // Start streaming with optional multi-window capture and metadata
-      await sendStreamingMessage(
-        chatId,
-        content,
-        callbacks,
-        token,
-        multiWindowCapture,
-        metadata
-      );
+      await sendStreamingMessage(chatId, content, callbacks, token, multiWindowCapture, metadata);
     },
 
     // Optimistic update for user message

@@ -1,6 +1,6 @@
 /**
  * Capture Policy - ENV-based deny-first window capture control
- * 
+ *
  * Prevents Mitable from capturing screenshots of sensitive applications
  * as specified in environment variables.
  */
@@ -71,7 +71,7 @@ export function getCapturePolicy(): CapturePolicy {
 /**
  * Normalize app name by removing OS-specific extensions
  * This ensures cross-platform matching works correctly
- * 
+ *
  * Examples:
  * - Windows: "Slack.exe" → "Slack"
  * - macOS: "Slack.app" → "Slack"
@@ -79,11 +79,11 @@ export function getCapturePolicy(): CapturePolicy {
  */
 function normalizeAppName(appName: string): string {
   if (!appName) return "";
-  
+
   // Remove common OS-specific extensions
   return appName
-    .replace(/\.exe$/i, "")    // Windows
-    .replace(/\.app$/i, "")    // macOS
+    .replace(/\.exe$/i, "") // Windows
+    .replace(/\.app$/i, "") // macOS
     .replace(/\.AppImage$/i, ""); // Linux AppImage
 }
 
@@ -97,12 +97,12 @@ function matchesAny(
   isAppName: boolean = false
 ): boolean {
   let haystack = str || "";
-  
+
   // Normalize app names to be OS-agnostic
   if (isAppName) {
     haystack = normalizeAppName(haystack);
   }
-  
+
   return patterns.some((pattern) =>
     pattern instanceof RegExp
       ? pattern.test(haystack)

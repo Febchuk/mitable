@@ -1,6 +1,6 @@
 /**
  * Active Window Bridge - IPC handler for getting focused window info
- * 
+ *
  * Uses active-win to detect which window is currently active.
  * This runs in the main process and exposes data to renderer via IPC.
  */

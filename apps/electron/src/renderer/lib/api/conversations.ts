@@ -33,11 +33,6 @@ export interface StreamChunk {
   // Workflow routing metadata (added by backend)
   workflowSessionId?: string | null;
   relatedStepIndex?: number | null;
-  // Window trigger for UI coordination (nudge/guide; overlay deprecated but kept for backward-compat)
-  windowTrigger?: {
-    window: "nudge" | "guide" | "overlay";
-    data: any;
-  };
   // Progress updates for long-running operations
   progress?: {
     phase: string;
@@ -182,12 +177,10 @@ export async function sendMessageStream(
       messageId: string,
       messageType?: string,
       cardData?: any,
-      windowTrigger?: { window: "nudge" | "guide" | "overlay"; data: any },
       workflowSessionId?: string | null,
       relatedStepIndex?: number | null
     ) => void;
     onError?: (error: string) => void;
-    onWindowTrigger?: (window: "nudge" | "guide" | "overlay", data: any) => void;
     onProgress?: (phase: string, message: string) => void;
   },
   metadata?: any
@@ -259,7 +252,6 @@ export async function sendMessageStream(
   let messageId = "";
   let messageType: string | undefined;
   let cardData: any = undefined;
-  let windowTriggerData: { window: "nudge" | "guide" | "overlay"; data: any } | undefined;
   let workflowSessionId: string | null | undefined;
   let relatedStepIndex: number | null | undefined;
 
@@ -319,17 +311,6 @@ export async function sendMessageStream(
                 break;
               }
 
-              case "window_trigger": {
-                if (chunk.windowTrigger) {
-                  windowTriggerData = chunk.windowTrigger;
-                  callbacks.onWindowTrigger?.(
-                    chunk.windowTrigger.window,
-                    chunk.windowTrigger.data
-                  );
-                }
-                break;
-              }
-
               case "done": {
                 if (chunk.messageId) {
                   messageId = chunk.messageId;
@@ -346,7 +327,6 @@ export async function sendMessageStream(
                   messageId,
                   messageType,
                   cardData,
-                  windowTriggerData,
                   workflowSessionId,
                   relatedStepIndex
                 );
@@ -389,7 +369,6 @@ export async function sendMessageStream(
         messageId,
         messageType,
         cardData,
-        windowTriggerData,
         workflowSessionId,
         relatedStepIndex
       );

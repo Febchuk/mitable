@@ -34,18 +34,6 @@ export default function ChatDetail() {
       setIsStreaming(false);
       // TODO: Show error toast notification
     },
-    onWindowTrigger: (windowType: string, data: any) => {
-      console.log("[ChatDetail] Window trigger callback FIRED");
-      console.log("[ChatDetail] Window trigger received:", { windowType, data });
-      if (windowType === "overlay") {
-        console.log("[ChatDetail] Calling showOverlay...");
-        // Trigger overlay window with bounding box data
-        window.consoleAPI?.showOverlay?.(data);
-        console.log("[ChatDetail] showOverlay called");
-      } else {
-        console.warn("[ChatDetail] Unknown window type:", windowType);
-      }
-    },
     // Enable screenshot capture for workflow mode
     captureScreenshot: true,
   });
