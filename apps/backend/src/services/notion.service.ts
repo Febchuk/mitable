@@ -275,11 +275,15 @@ class NotionService {
    * Get all blocks from a page (recursively)
    */
   async getPageBlocks(organizationId: string, pageId: string): Promise<NotionBlock[]> {
+    console.log(`[NotionService] Getting blocks for page ${pageId}`);
     const client = await this.getClient(organizationId);
 
     try {
-      return await this.getBlockChildrenRecursive(client, pageId);
+      const blocks = await this.getBlockChildrenRecursive(client, pageId);
+      console.log(`[NotionService] Successfully fetched ${blocks.length} total blocks`);
+      return blocks;
     } catch (error) {
+      console.error(`[NotionService] Error fetching blocks:`, error);
       throw new Error("Failed to fetch Notion page blocks", { cause: error });
     }
   }
@@ -292,6 +296,7 @@ class NotionService {
 
     try {
       await this.rateLimit();
+      console.log(`[NotionService] Fetching children for block ${blockId}`);
 
       let hasMore = true;
       let startCursor: string | undefined;
@@ -303,12 +308,21 @@ class NotionService {
           start_cursor: startCursor,
         });
 
+        console.log(`[NotionService]   Got ${response.results.length} blocks in this batch`);
+
         for (const block of response.results) {
+          // Skip child_page blocks - they're processed separately as top-level pages
+          if (block.type === 'child_page') {
+            console.log(`[NotionService]   Skipping child_page "${block.child_page?.title}" (processed separately)`);
+            continue;
+          }
+
           const extractedBlock = this.extractBlockText(block);
           blocks.push(extractedBlock);
 
-          // Recursively fetch children if block has them
+          // Recursively fetch children if block has them (but not for child_page)
           if (block.has_children) {
+            console.log(`[NotionService]   Block ${block.type} has children, fetching recursively...`);
             const children = await this.getBlockChildrenRecursive(client, block.id);
             blocks.push(...children);
           }
@@ -318,12 +332,15 @@ class NotionService {
         startCursor = response.next_cursor || undefined;
 
         if (hasMore) {
+          console.log(`[NotionService]   More blocks available, continuing pagination...`);
           await this.rateLimit();
         }
       }
 
+      console.log(`[NotionService]   Finished fetching block ${blockId}: ${blocks.length} blocks total`);
       return blocks;
     } catch (error) {
+      console.error(`[NotionService] ERROR in getBlockChildrenRecursive for ${blockId}:`, error);
       throw new Error("Failed to fetch block children", { cause: error });
     }
   }

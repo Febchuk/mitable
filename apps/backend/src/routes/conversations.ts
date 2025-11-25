@@ -3,6 +3,7 @@ import { eq, sql, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
+import { keepAliveMiddleware } from "../middleware/keepAlive";
 import { OrchestratorService } from "../services/orchestrator.service";
 import { workflowService } from "../services/workflow.service";
 import { ScreenshotAnnotator } from "../utils/screenshot-annotator";
@@ -13,6 +14,9 @@ import { screenshotLimiter } from "../middleware/rateLimiter.js";
 const orchestrator = new OrchestratorService();
 
 const router = Router();
+
+// Apply keep-alive middleware to all conversation routes
+router.use(keepAliveMiddleware);
 
 /**
  * @openapi

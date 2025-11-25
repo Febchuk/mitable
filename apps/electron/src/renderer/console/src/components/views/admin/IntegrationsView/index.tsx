@@ -9,8 +9,9 @@ import GitHubConnectDialog from "./components/GitHubConnectDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Filter, Plus } from "lucide-react";
+import { Search, Filter } from "lucide-react";
 import { authService } from "@/console/src/services/authService";
+import logoIconSvg from "../../../../../../assets/logo-icon.svg";
 
 // Polling configuration for OAuth callback
 const POLLING_CONFIG = {
@@ -381,9 +382,11 @@ export default function IntegrationsView() {
   };
 
   return (
-    <div className="p-8 space-y-6 app-no-drag">
+    <div className="h-screen overflow-y-auto bg-[#0a0810] custom-scrollbar">
+      <div className="max-w-7xl mx-auto p-8 space-y-6 app-no-drag">
       {/* Header */}
-      <div>
+      <div className="flex items-center gap-3 mb-2">
+        <img src={logoIconSvg} alt="Mitable" className="w-10 h-10" />
         <h1 className="text-4xl font-bold text-white">Integrations</h1>
       </div>
 
@@ -400,26 +403,17 @@ export default function IntegrationsView() {
             placeholder="Search integrations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
+            className="pl-12 bg-[#1a1625] border-primary/20 text-white placeholder:text-text-tertiary"
           />
         </div>
 
         {/* Filter Button */}
         <Button
           variant="outline"
-          className="gap-2 bg-background-elevated border-transparent text-text-secondary hover:text-text-primary hover:bg-background-elevated/80"
+          className="gap-2 bg-[#1a1625] border-primary/20 text-text-secondary hover:text-white hover:bg-[#231d2e]"
         >
           <Filter size={20} />
           <span className="font-medium">Filter</span>
-        </Button>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Add Custom Integration Button */}
-        <Button className="gap-2 bg-primary hover:bg-primary/90">
-          <Plus className="w-4 h-4" />
-          Add Custom Integration
         </Button>
       </div>
 
@@ -427,7 +421,7 @@ export default function IntegrationsView() {
       {isSearching ? (
         <div className="space-y-4 max-w-5xl">
           {sortedIntegrations.length > 0 ? (
-            <div className="bg-background-elevated rounded-lg border border-border-subtle overflow-hidden divide-y divide-border-subtle">
+            <div className="bg-[#1a1625] rounded-xl border border-primary/20 overflow-hidden divide-y divide-primary/10">
               {sortedIntegrations.map((integration, index) => (
                 <IntegrationCard
                   key={integration.id}
@@ -456,7 +450,7 @@ export default function IntegrationsView() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">
+              <p className="text-text-secondary">
                 No integrations found matching "{searchQuery}"
               </p>
             </div>
@@ -468,7 +462,7 @@ export default function IntegrationsView() {
           <div className="space-y-4 max-w-5xl">
             <h2 className="text-2xl font-semibold text-white">Connected Integrations</h2>
             {connectedIntegrations.length > 0 ? (
-              <div className="bg-background-elevated rounded-lg border border-border-subtle overflow-hidden divide-y divide-border-subtle">
+              <div className="bg-[#1a1625] rounded-xl border border-primary/20 overflow-hidden divide-y divide-primary/10">
                 {connectedIntegrations.map((integration, index) => (
                   <IntegrationCard
                     key={integration.id}
@@ -498,7 +492,7 @@ export default function IntegrationsView() {
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-8">No connected integrations</p>
+              <p className="text-text-secondary text-center py-8">No connected integrations</p>
             )}
           </div>
 
@@ -506,7 +500,7 @@ export default function IntegrationsView() {
           <div className="space-y-4 max-w-5xl">
             <h2 className="text-2xl font-semibold text-white">Available Integrations</h2>
             {availableIntegrations.length > 0 ? (
-              <div className="bg-background-elevated rounded-lg border border-border-subtle overflow-hidden divide-y divide-border-subtle">
+              <div className="bg-[#1a1625] rounded-xl border border-primary/20 overflow-hidden divide-y divide-primary/10">
                 {availableIntegrations.map((integration, index) => (
                   <IntegrationCard
                     key={integration.id}
@@ -536,7 +530,7 @@ export default function IntegrationsView() {
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-8">
+              <p className="text-text-secondary text-center py-8">
                 No more available integrations
               </p>
             )}
@@ -579,6 +573,7 @@ export default function IntegrationsView() {
         onSave={handleNotionConfigureSave}
         onReconnect={handleNotionReconnect}
       />
+      </div>
     </div>
   );
 }

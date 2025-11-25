@@ -14,10 +14,10 @@ export async function getAuthToken(): Promise<string | null> {
 }
 
 /**
- * Make an authenticated API request
+ * Make an authenticated API request with automatic token refresh
  */
 export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = await getAuthToken();
+  let token = await getAuthToken();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -28,10 +28,47 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
+  let response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
     ...options,
     headers,
   });
+
+  // If we get 401, try to refresh the token once
+  if (response.status === 401 && token) {
+    console.log("[API] Token expired, attempting refresh...");
+    
+    const refreshToken = authService.getRefreshToken();
+    if (refreshToken) {
+      try {
+        // Attempt to refresh the token
+        const refreshResponse = await authService.refreshToken(refreshToken);
+        authService.saveTokens(
+          refreshResponse.session.access_token,
+          refreshResponse.session.refresh_token
+        );
+
+        // Retry the original request with new token
+        headers["Authorization"] = `Bearer ${refreshResponse.session.access_token}`;
+        response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
+          ...options,
+          headers,
+        });
+
+        console.log("[API] Token refreshed successfully, request retried");
+      } catch (refreshError) {
+        console.error("[API] Token refresh failed:", refreshError);
+        // Clear tokens and redirect to login (use hash for HashRouter)
+        authService.clearTokens();
+        window.location.hash = "#/login";
+        throw new Error("Session expired. Please log in again.");
+      }
+    } else {
+      // No refresh token, redirect to login (use hash for HashRouter)
+      authService.clearTokens();
+      window.location.hash = "#/login";
+      throw new Error("Session expired. Please log in again.");
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({

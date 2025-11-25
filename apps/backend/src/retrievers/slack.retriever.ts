@@ -289,6 +289,11 @@ export class SlackRetriever {
     
     console.log(`[SlackRetriever] Expanding ${threadTsSet.size} threads...`);
     
+    // Build LIKE patterns for thread messages
+    // Slack message IDs are in format: slack-{channelId}-{messageTs}-{index}
+    // We want to match all messages where the ID starts with "slack-%" and contains the thread_ts
+    const threadPatterns = Array.from(threadTsSet).map(ts => `slack-%-${ts}-%`);
+    
     // Fetch all messages in these threads from PostgreSQL
     const threadMessages = await db
       .select()
@@ -296,24 +301,14 @@ export class SlackRetriever {
       .where(
         and(
           eq(searchContent.source, "slack"),
-          sql`(
-            ${searchContent.id} IN (
-              SELECT id FROM ${searchContent}
-              WHERE source = 'slack'
-              AND (
-                -- Parent messages
-                ${searchContent.id} LIKE ANY(ARRAY[${sql.join(
-                  Array.from(threadTsSet).map(ts => sql`${"slack-%"}${ts}${"-%"}`),
-                  sql`, `
-                )}])
-                OR
-                -- Thread replies (stored in metadata or message_ts)
-                true -- TODO: Need proper thread_ts column or metadata query
-              )
-            )
-          )`
+          sql`${searchContent.id} LIKE ANY(ARRAY[${sql.join(
+            threadPatterns.map(pattern => sql.raw(`'${pattern}'`)),
+            sql`, `
+          )}])`
         )
       );
+    
+    console.log(`[SlackRetriever] Found ${threadMessages.length} thread messages`);
     
     // Combine with original results
     const allMessages = [...messages];

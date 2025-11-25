@@ -22,6 +22,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const loadUser = async () => {
       const token = authService.getAccessToken();
+      
+      console.log("[UserContext] Loading user, token present:", !!token);
+      console.log("[UserContext] Token value:", token ? `${token.substring(0, 20)}...` : 'null');
 
       if (!token) {
         setIsLoading(false);
@@ -29,6 +32,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
 
       try {
+        console.log("[UserContext] Calling getMe with token");
         const response = await authService.getMe(token);
 
         setUser({

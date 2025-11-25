@@ -21,15 +21,15 @@ interface ConsoleAPI {
   minimizeWindow: () => void;
 
   // Navigation
-  onNavigateToChat: (callback: (conversationId: string) => void) => void;
+  onNavigateToChat: (callback: (conversationId: string) => void) => () => void;
 
   // Nudge creator
-  onNudgeOpenCreator: (callback: (data: unknown) => void) => void;
+  onNudgeOpenCreator: (callback: (data: unknown) => void) => () => void;
 
   // Auth management
   setAuthTokens: (accessToken: string, refreshToken: string) => void;
   clearAuthTokens: () => void;
-  onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
+  onAuthTokenUpdated: (callback: (token: string | null) => void) => () => void;
 }
 
 declare global {

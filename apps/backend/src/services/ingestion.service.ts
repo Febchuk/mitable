@@ -3,6 +3,7 @@ import { notionService } from "./notion.service.js";
 import { embeddingService } from "./embedding.service.js";
 import { vectorService } from "./vector.service.js";
 import { chunkingService } from "./chunking.service.js";
+import { notionChunkingService } from "./notion-chunking.service.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, sql, desc } from "drizzle-orm";
@@ -90,11 +91,26 @@ class IngestionService {
       userId: metadata.user_id,
       username: metadata.username,
 
-      // Notion-specific fields
+      // Notion-specific fields (basic)
       pageId: metadata.page_id,
       pageTitle: metadata.page_title,
       blockId: metadata.block_id,
       blockType: metadata.block_type,
+      
+      // Notion-specific fields (structure-aware)
+      sectionPath: metadata.section_path,
+      sectionTitle: metadata.section_title,
+      sectionId: metadata.section_id,
+      headingLevel: metadata.heading_level,
+      
+      // Chunk classification
+      chunkType: metadata.chunk_type,
+      hasCode: metadata.has_code || false,
+      hasTable: metadata.has_table || false,
+      hasList: metadata.has_list || false,
+      
+      // Code-specific metadata
+      codeLanguage: metadata.code_language,
 
       // Chunk metadata
       chunkIndex: metadata.chunk_index || 0,
@@ -558,6 +574,8 @@ class IngestionService {
         const page = pages[i];
 
         try {
+          console.log(`[NOTION SYNC] Processing page ${i + 1}/${pages.length}: "${page.title}"`);
+          
           // Update progress
           onProgress?.({
             channelsProcessed: i,
@@ -569,15 +587,24 @@ class IngestionService {
           });
 
           // Fetch all blocks from page (recursive)
+          console.log(`[NOTION SYNC]   Fetching blocks from page...`);
           const blocks = await notionService.getPageBlocks(organizationId, page.id);
+          console.log(`[NOTION SYNC]   ✅ Found ${blocks.length} blocks`);
 
           // Filter out empty blocks
           const validBlocks = blocks.filter((block) => block.text && block.text.trim().length > 0);
+          console.log(`[NOTION SYNC]   Valid blocks (non-empty): ${validBlocks.length}`);
 
           if (validBlocks.length > 0) {
             // Process blocks in batches
+            const totalBatches = Math.ceil(validBlocks.length / SYNC_CONFIG.BATCH_SIZE);
+            console.log(`[NOTION SYNC]   Embedding ${validBlocks.length} blocks in ${totalBatches} batches...`);
+            
             for (let j = 0; j < validBlocks.length; j += SYNC_CONFIG.BATCH_SIZE) {
               const batch = validBlocks.slice(j, j + SYNC_CONFIG.BATCH_SIZE);
+              const batchNum = Math.floor(j / SYNC_CONFIG.BATCH_SIZE) + 1;
+              
+              console.log(`[NOTION SYNC]     Batch ${batchNum}/${totalBatches}: Embedding ${batch.length} blocks...`);
               await this.processNotionBatch(
                 batch,
                 page,
@@ -589,6 +616,7 @@ class IngestionService {
 
               result.messagesEmbedded += batch.length;
               result.totalMessages += batch.length;
+              console.log(`[NOTION SYNC]     ✅ Batch ${batchNum}/${totalBatches} complete (Total embedded: ${result.messagesEmbedded})`);
 
               // Update progress
               onProgress?.({
@@ -600,6 +628,9 @@ class IngestionService {
                 currentChannel: page.title,
               });
             }
+            console.log(`[NOTION SYNC]   ✅ Page "${page.title}" complete - ${validBlocks.length} blocks embedded`);
+          } else {
+            console.log(`[NOTION SYNC]   ⚠️  No valid content to embed for "${page.title}"`);
           }
 
           result.channelsProcessed++;
@@ -607,6 +638,7 @@ class IngestionService {
           const errorMsg = `Failed to process page ${page.title}: ${
             error instanceof Error ? error.message : "Unknown error"
           }`;
+          console.error(`[NOTION SYNC]   ❌ ${errorMsg}`);
           result.errors.push(errorMsg);
         }
       }
@@ -705,37 +737,32 @@ class IngestionService {
         console.log(`   📊 ${newOrModifiedBlocks.length} new/modified, ${blocks.length - newOrModifiedBlocks.length} unchanged`);
       }
 
-      const allChunks: Array<{
-        chunkText: string;
-        chunkIndex: number;
-        totalChunks: number;
-        parentBlock: any;
-      }> = [];
+      // Use structure-aware chunking for Notion
+      // This preserves headings, code blocks, and creates rich metadata
+      const smartChunks = notionChunkingService.chunkNotionBlocks(
+        newOrModifiedBlocks,
+        page.title
+      );
 
-      for (const block of newOrModifiedBlocks) {
-        const chunks = chunkingService.chunkText(block.text);
-        for (const chunk of chunks) {
-          allChunks.push({
-            chunkText: chunk.text,
-            chunkIndex: chunk.chunkIndex,
-            totalChunks: chunk.totalChunks,
-            parentBlock: block,
-          });
-        }
-      }
-
-      const texts = allChunks.map((c) => c.chunkText);
+      const texts = smartChunks.map((chunk) => chunk.text);
       const embeddings = await embeddingService.embedTexts(texts);
 
-      const vectors = allChunks.map((chunkData, idx) => {
-        const block = chunkData.parentBlock;
-        const editedDate = new Date(block.last_edited_time);
+      const vectors = smartChunks.map((chunk, idx) => {
+        // Get the first block referenced by this chunk for timestamps
+        const firstBlockId = chunk.block_ids[0];
+        const firstBlock = newOrModifiedBlocks.find(b => b.id === firstBlockId);
+        const editedDate = firstBlock ? new Date(firstBlock.last_edited_time) : new Date();
+        
+        // Safety check
+        if (!chunk.block_ids || chunk.block_ids.length === 0) {
+          console.warn(`[NOTION SYNC] ⚠️  Chunk ${idx} has no block_ids!`, chunk);
+        }
 
         return {
-          id: `notion-${page.id}-${block.id}-chunk-${chunkData.chunkIndex}`,
+          id: `notion-${page.id}-${chunk.section_id}-chunk-${chunk.chunkIndex}`,
           values: embeddings[idx],
           metadata: {
-            text: chunkData.chunkText,
+            text: chunk.text,
             source: "notion",
             source_type: "block",
 
@@ -743,18 +770,32 @@ class IngestionService {
             page_title: page.title,
             page_url: page.url,
 
-            block_id: block.id,
-            block_type: block.type,
+            // Original block metadata (for backward compat)
+            block_id: chunk.block_ids[0], // Primary block
+            block_type: firstBlock?.type || "unknown",
 
-            chunk_index: chunkData.chunkIndex,
-            total_chunks: chunkData.totalChunks,
-            is_chunked: chunkData.totalChunks > 1,
+            // NEW: Structure-aware metadata
+            section_path: JSON.stringify(chunk.section_path), // Store as JSON string
+            section_title: chunk.section_title,
+            section_id: chunk.section_id,
+            ...(chunk.heading_level !== null && { heading_level: chunk.heading_level }),
+
+            chunk_type: chunk.chunk_type,
+            has_code: chunk.has_code,
+            has_table: chunk.has_table,
+            has_list: chunk.has_list,
+            
+            ...(chunk.code_language && { code_language: chunk.code_language }),
+
+            chunk_index: chunk.chunkIndex,
+            total_chunks: chunk.totalChunks,
+            is_chunked: chunk.totalChunks > 1,
 
             created_by_id: page.created_by_id,
             last_edited_by_id: page.last_edited_by_id,
 
-            created_time: block.created_time,
-            last_edited_time: block.last_edited_time,
+            created_time: firstBlock?.created_time || new Date().toISOString(),
+            last_edited_time: firstBlock?.last_edited_time || new Date().toISOString(),
             timestamp: Math.floor(editedDate.getTime() / 1000),
 
             date: editedDate.toISOString().split("T")[0],
@@ -791,12 +832,25 @@ class IngestionService {
           set: {
             text: sql`EXCLUDED.text`,
             pageTitle: sql`EXCLUDED.page_title`,
+            // Update structure-aware metadata on re-sync
+            sectionPath: sql`EXCLUDED.section_path`,
+            sectionTitle: sql`EXCLUDED.section_title`,
+            chunkType: sql`EXCLUDED.chunk_type`,
+            hasCode: sql`EXCLUDED.has_code`,
+            hasTable: sql`EXCLUDED.has_table`,
+            hasList: sql`EXCLUDED.has_list`,
+            codeLanguage: sql`EXCLUDED.code_language`,
             timestamp: sql`EXCLUDED.timestamp`,
             date: sql`EXCLUDED.date`,
             updatedAt: new Date(),
           },
         });
     } catch (error) {
+      console.error("[NOTION SYNC] ❌ Batch processing error:", error);
+      console.error("[NOTION SYNC] Error details:", error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && error.stack) {
+        console.error("[NOTION SYNC] Stack trace:", error.stack);
+      }
       throw new Error("Failed to process Notion block batch", { cause: error });
     }
   }

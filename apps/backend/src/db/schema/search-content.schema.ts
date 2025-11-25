@@ -63,11 +63,26 @@ export const searchContent = pgTable(
     userId: text("user_id"),
     username: text("username"),
 
-    // Notion-specific metadata
+    // Notion-specific metadata (basic)
     pageId: text("page_id"),
     pageTitle: text("page_title"),
     blockId: text("block_id"),
     blockType: text("block_type"),
+    
+    // Notion-specific metadata (structure-aware chunking)
+    sectionPath: text("section_path"), // JSON array: ["Parent", "Child", "Section"]
+    sectionTitle: text("section_title"),
+    sectionId: text("section_id"),
+    headingLevel: integer("heading_level"), // 1, 2, 3, or null
+    
+    // Chunk classification
+    chunkType: text("chunk_type"), // "code" | "table" | "list" | "text" | "callout" | "quote"
+    hasCode: boolean("has_code").default(false),
+    hasTable: boolean("has_table").default(false),
+    hasList: boolean("has_list").default(false),
+    
+    // Code-specific metadata
+    codeLanguage: text("code_language"), // "sql" | "typescript" | "python" | etc.
 
     // Chunk metadata (from chunking service)
     chunkIndex: integer("chunk_index").default(0),
@@ -101,6 +116,13 @@ export const searchContent = pgTable(
 
     // Notion-specific indexes
     index("search_content_page_idx").on(table.pageId),
+    index("search_content_section_idx").on(table.sectionId),
+    index("search_content_chunk_type_idx").on(table.chunkType),
+    index("search_content_has_code_idx").on(table.hasCode),
+    
+    // Composite indexes for smart filtering
+    index("search_content_org_chunk_type_idx").on(table.organizationId, table.chunkType),
+    index("search_content_page_chunk_type_idx").on(table.pageId, table.chunkType),
   ]
 );
 

@@ -86,16 +86,18 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   // Navigation - Listen for navigation requests from main process
   onNavigateToChat: (callback: (conversationId: string) => void) => {
-    ipcRenderer.on("navigate-to-chat", (_event: IpcRendererEvent, conversationId: string) =>
-      callback(conversationId)
-    );
+    const handler = (_event: IpcRendererEvent, conversationId: string) => callback(conversationId);
+    ipcRenderer.on("navigate-to-chat", handler);
+    // Return cleanup function
+    return () => ipcRenderer.removeListener("navigate-to-chat", handler);
   },
 
   // Nudge creator
   onNudgeOpenCreator: (callback: (data: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.NUDGE_OPEN_CREATOR, (_event: IpcRendererEvent, data: unknown) =>
-      callback(data)
-    );
+    const handler = (_event: IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.NUDGE_OPEN_CREATOR, handler);
+    // Return cleanup function
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.NUDGE_OPEN_CREATOR, handler);
   },
 
   // Auth management - Console sends tokens to main process after login
@@ -103,10 +105,10 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.send(IPC_CHANNELS.AUTH_SET_TOKENS, accessToken, refreshToken),
   clearAuthTokens: () => ipcRenderer.send(IPC_CHANNELS.AUTH_CLEAR),
   onAuthTokenUpdated: (callback: (token: string | null) => void) => {
-    ipcRenderer.on(
-      IPC_CHANNELS.AUTH_TOKEN_UPDATED,
-      (_event: IpcRendererEvent, token: string | null) => callback(token)
-    );
+    const handler = (_event: IpcRendererEvent, token: string | null) => callback(token);
+    ipcRenderer.on(IPC_CHANNELS.AUTH_TOKEN_UPDATED, handler);
+    // Return cleanup function
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AUTH_TOKEN_UPDATED, handler);
   },
 });
 

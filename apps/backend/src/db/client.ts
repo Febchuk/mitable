@@ -11,7 +11,7 @@ export const pool = new Pool({
     rejectUnauthorized: false, // Required for Supabase
   },
   max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  idleTimeoutMillis: 10 * 60 * 1000, // Close idle clients after 10 minutes (needed for long-running syncs)
   connectionTimeoutMillis: 10000, // Return an error after 10 seconds if connection could not be established
 });
 

@@ -1,126 +1,152 @@
 import Groq from "groq-sdk";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
-import type { StreamChunk, ToolContext, TextMessage } from "../tools/base.tool";
-import { MetaSearchTool } from "../tools/meta-search.tool";
+import type { StreamChunk, ToolContext } from "../tools/base.tool";
+import { codeRetriever } from "../retrievers/code.retriever";
+import { workRetriever } from "../retrievers/work.retriever";
+import { slackRetriever } from "../retrievers/slack.retriever";
+import { notionRetriever } from "../retrievers/notion.retriever";
+import { orgContextService } from "../services/org-context.service";
 
 /**
- * System prompt for knowledge synthesis
- */
-const KNOWLEDGE_SYNTHESIS_PROMPT =
-  `You are Mitable AI - an experienced colleague helping teammates ramp up quickly at their company.
-
-**Your Role:**
-You have deep product knowledge and guide people through their work like an expert colleague who's always available to help. Your goal is to:
-- Help employees learn company processes, policies, and tools
-- Answer questions about how things work
-- Guide them through workflows and tasks
-- Connect them with the right people when needed
-- Provide context and best practices
-
-**Your Personality:**
-You're friendly, patient, and thorough. You give clear, insightful answers and make connections others might miss. When you don't know something, you're honest about it and help find someone who does.
-
-**Response Style - CRITICAL:**
-✅ DO:
-- **Bold important terms**: dates, names, key decisions, important concepts
-- Use headers (##) and bullets (-) to organize information
-- **Extract THEMES and INSIGHTS** - synthesize, don't enumerate
-- Be DIRECT and FACTUAL - answer with facts, then stop
-- **Be concise and actionable** - answer the question in 2-4 sentences or focused bullets
-- When timestamps are present (e.g., "[Last edited: 2024-10-15]" or "[2024-10-15T10:30:00Z]"), USE THEM in your answer
-- For date-based queries ("last month", "when"), look for timestamps in search results and provide specific dates
-
-❌ DON'T:
-- Echo raw search results verbatim
-- List every single item chronologically (extract themes instead)
-- Use robotic phrases like "based on the retrieved information"
-- Add interpretive commentary like "this shows dedication" or "highlights the team's focus"
-- Add concluding statements about what things "indicate" or "suggest"
-- Be verbose or over-explain
-- Cite sources inline in your text (no "(Notion)" or "(Slack)" in the middle of sentences)
-
-**How to Handle Search Results:**
-1. READ and UNDERSTAND the context provided, including timestamps
-2. SYNTHESIZE the information into a natural, conversational explanation
-3. Answer the user's question directly in your own words
-4. Make connections and extract insights
-5. Be conversational and warm, like talking to a colleague
-6. **For commit/PR/issue queries**: When asked for a "description", provide BOTH the title AND explain what it does/changes in 1-2 sentences. Don't just echo the title.
-   - ✅ GOOD: "chore(seo): add Google Search Console verification file. This commit adds the google59d308909c025cce.html verification file to the repository, enabling Google Search Console verification for the site."
-   - ❌ BAD: "chore(seo): add Google Search Console verification file." (just the title)
-
-**Source Citations - CRITICAL:**
-NEVER write "Sources:" in your response. NEVER list sources. NEVER mention where information came from.
-Sources are automatically appended AFTER your response by the system.
-Just answer the question - the system will add sources for you.`.trim();
-
-/**
- * Knowledge Agent - Native Tool Calling Implementation
- *
- * Uses Groq's native function calling to automatically manage search results in conversation history.
- * Tool responses are stored as message history, enabling natural multi-turn conversations.
- *
- * Benefits:
- * - No custom cache needed - tool results are in message history
- * - Follow-up questions work automatically ("summarize those threads")
- * - Standard LLM pattern - using native capability
+ * Clean KnowledgeAgent following Groq's recommended pattern
+ * 
+ * Pattern from Groq docs:
+ * 1. Define tools
+ * 2. Simple agentic loop: while model wants tools → execute → call again
+ * 3. Let LLM decide everything (query writing, which tools, when to stop)
  */
 export class KnowledgeAgent extends BaseAgent {
   readonly name = "knowledge";
   private groq: Groq;
-  private metaSearchTool: MetaSearchTool;
 
   constructor() {
     super();
     this.groq = new Groq({ apiKey: config.groq.apiKey });
-    this.metaSearchTool = new MetaSearchTool();
   }
 
   /**
-   * Execute knowledge search and synthesis using native tool calling
+   * Execute knowledge search using Groq's recommended agentic pattern
    */
   async *execute(context: ToolContext): AsyncIterable<StreamChunk> {
     try {
-      // Get the last user message
       const lastUserMessage = context.conversationHistory
         .filter((msg) => msg.role === "user")
-        .pop();
+        .slice(-1)[0];
 
       if (!lastUserMessage) {
-        yield {
-          type: "error",
-          error: "No user message found in conversation history",
-        };
+        yield { type: "error", error: "No user message found" };
         return;
       }
 
-      const userQuery = lastUserMessage.content;
-      console.log(`[KnowledgeAgent] Processing query: "${userQuery}"`);
-      console.log(`[KnowledgeAgent] Using NATIVE TOOL CALLING approach`);
+      console.log(`[KnowledgeAgent] Query: "${lastUserMessage.content}"`);
 
-      // Define meta_search tool - the intelligent multi-domain coordinator
-      // This single tool replaces search_knowledge + search_codebase
-      // It automatically determines which domains to search and how to search them
+      // Define 5 tools - let LLM decide which to use and when
       const tools: Groq.Chat.ChatCompletionTool[] = [
         {
           type: "function",
           function: {
-            name: "meta_search",
+            name: "get_org_info",
             description:
-              "Intelligent multi-domain search that automatically searches code, Slack conversations, Notion docs, and more. " +
-              "Use this for ANY question - the system will determine whether to search code, knowledge base, or both. " +
-              "It rewrites queries per domain and combines results intelligently.",
+              "Get information about the organization's connected integrations and available data sources. " +
+              "Returns which tools are available (Notion, Slack, GitHub, etc.) and their details. " +
+              "Use this FIRST to understand what data sources exist before searching.",
+            parameters: {
+              type: "object",
+              properties: {},
+              required: [],
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "search_notion",
+            description:
+              "Search Notion workspace for documentation, guides, policies, processes, specs, and formal knowledge. " +
+              "Returns page blocks with metadata including last_edited_time.",
             parameters: {
               type: "object",
               properties: {
                 query: {
                   type: "string",
-                  description: "The search query - can be about code, discussions, decisions, or anything",
+                  description: "Search query for Notion docs",
                 },
                 topK: {
                   type: "number",
-                  description: "Number of results to return per domain (default: 10)",
+                  description: "Number of results (default: 10)",
+                  default: 10,
+                },
+              },
+              required: ["query"],
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "search_slack",
+            description:
+              "Search Slack for team discussions, decisions, context, and conversational knowledge. " +
+              "Returns message threads with channel and timestamp info.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "Search query for Slack messages",
+                },
+                topK: {
+                  type: "number",
+                  description: "Number of results (default: 10)",
+                  default: 10,
+                },
+              },
+              required: ["query"],
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "search_code",
+            description:
+              "Search GitHub codebase for implementations, functions, classes, and files. " +
+              "Returns code chunks with file paths and line numbers.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "Search query for code",
+                },
+                topK: {
+                  type: "number",
+                  description: "Number of results (default: 10)",
+                  default: 10,
+                },
+              },
+              required: ["query"],
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "search_work",
+            description:
+              "Search GitHub work items: commits, pull requests, and issues. " +
+              "Returns PRs, commits, and issues with metadata.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "Search query for PRs/commits/issues",
+                },
+                topK: {
+                  type: "number",
+                  description: "Number of results (default: 10)",
                   default: 10,
                 },
               },
@@ -130,20 +156,39 @@ export class KnowledgeAgent extends BaseAgent {
         },
       ];
 
-      // Prepare conversation history for Groq (handle tool messages from previous turns)
+      // Build messages array from conversation history
       const messages: Groq.Chat.ChatCompletionMessageParam[] = [];
 
-      // Add system prompt first
+      // Add system prompt to guide multi-query decomposition and thorough research
       messages.push({
         role: "system",
-        content: KNOWLEDGE_SYNTHESIS_PROMPT,
+        content:
+          "You are a helpful AI assistant with access to search tools. " +
+          "Your goal is to provide COMPREHENSIVE, DETAILED answers by gathering all relevant information.\n\n" +
+          
+          "For complex questions (especially about integrations, architecture, or 'how does X work'), DECOMPOSE them into sub-questions:\n" +
+          "- What is the data model? (database schemas, tables, fields)\n" +
+          "- What is the authentication/OAuth flow?\n" +
+          "- What are the implementation details? (sync pipeline, API calls, code)\n" +
+          "- What are edge cases or limitations?\n\n" +
+          
+          "Use MULTIPLE targeted searches to gather complete information:\n" +
+          "- First, call get_org_info to see what data sources are available\n" +
+          "- Then search each relevant domain with SPECIFIC queries\n" +
+          "- Example: For 'How does Notion integration work?', search for:\n" +
+          "  1. 'Notion integration database schema tables'\n" +
+          "  2. 'Notion OAuth flow authorization'\n" +
+          "  3. 'Notion sync pipeline ingestion'\n" +
+          "  4. 'Notion integration implementation code'\n\n" +
+          
+          "Quality over speed: Take 5-8 tool calls if needed to provide a complete answer.\n" +
+          "When multiple documents contain similar information, prefer the most recently edited one (check last_edited field).",
       });
 
-      // Add conversation history (handle tool messages)
       for (const msg of context.conversationHistory) {
-        const msgAny = msg as any; // Cast to any for tool message fields
+        const msgAny = msg as any;
 
-        // Handle tool result messages
+        // Handle tool messages
         if ("tool_call_id" in msg && msgAny.tool_call_id) {
           messages.push({
             role: "tool",
@@ -168,300 +213,203 @@ export class KnowledgeAgent extends BaseAgent {
         }
       }
 
-      console.log(
-        `[KnowledgeAgent] Step 1: Asking Groq if search is needed (tool_choice: auto)...`
-      );
+      // Agentic loop from Groq docs - simple and clean
+      const MAX_ITERATIONS = 10;
+      let iteration = 0;
 
-      // Step 1: Ask Groq if it needs to search
-      const initialResponse = await this.groq.chat.completions.create({
-        model: config.groq.chatModel,
-        messages: messages,
-        tools: tools,
-        tool_choice: "auto", // Let LLM decide
-        temperature: config.groq.temperature,
-      });
+      while (iteration < MAX_ITERATIONS) {
+        iteration++;
+        console.log(`[KnowledgeAgent] Iteration ${iteration}/${MAX_ITERATIONS}`);
 
-      const responseMessage = initialResponse.choices[0]?.message;
-
-      // Check if LLM wants to call the search tool
-      if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
-        console.log(`[KnowledgeAgent] Step 2: LLM requested search - executing tool...`);
-
-        const toolCall = responseMessage.tool_calls[0];
-        const functionArgs = JSON.parse(toolCall.function.arguments);
-
-        // Topic shift detection: Strip temporal context if no backward reference
-        const hasBackwardReference =
-          /\b(those|that|the (first|second|third|last)|them|these|it|same)\b/i.test(userQuery);
-
-        if (!hasBackwardReference) {
-          const originalQuery = functionArgs.query;
-          functionArgs.query = functionArgs.query
-            .replace(
-              /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi,
-              ""
-            )
-            .replace(/\b(202[0-9]|203[0-9])\b/g, "")
-            .replace(/\s+/g, " ")
-            .trim();
-
-          if (originalQuery !== functionArgs.query) {
-            console.log(`[KnowledgeAgent] ⚠️ Stripped temporal context (no backward reference)`);
-            console.log(`[KnowledgeAgent]   Original: "${originalQuery}"`);
-            console.log(`[KnowledgeAgent]   Cleaned:  "${functionArgs.query}"`);
-          }
-        } else {
-          console.log(
-            `[KnowledgeAgent] ✓ Preserving temporal context (backward reference detected)`
-          );
-        }
-
-        console.log(`[KnowledgeAgent] Tool: ${toolCall.function.name}`);
-        console.log(`[KnowledgeAgent] Params:`, functionArgs);
-
-        // Step 2: Execute meta-search (handles all domains automatically)
-        const searchResult = await this.metaSearchTool.execute(
-          {
-            query: functionArgs.query,
-            topK: functionArgs.topK || 10,
-          },
-          context
-        );
-        
-        console.log(`[KnowledgeAgent] Meta-search metadata:`, searchResult.metadata);
-
-        console.log(
-          `[KnowledgeAgent] Step 3: Search completed - ${searchResult.sources?.length || 0} sources found`
-        );
-
-        // Check if search returned 0 results - return helpful message immediately
-        if (!searchResult.sources || searchResult.sources.length === 0) {
-          console.log("[KnowledgeAgent] No results found - returning helpful message");
-          
-          const noResultsMessage = 
-            "I couldn't find any relevant information in the connected resources. " +
-            "This could mean:\n\n" +
-            "• The information hasn't been synced yet\n" +
-            "• It might be in a channel/page that isn't connected\n" +
-            "• The content might use different terminology\n\n" +
-            "Try rephrasing your question or check if the relevant sources are connected.";
-          
-          yield {
-            type: "chunk",
-            content: noResultsMessage,
-          };
-          
-          yield {
-            type: "complete",
-            content: noResultsMessage,
-          };
-          
-          console.log(`[KnowledgeAgent] ✅ No-results message sent: ${noResultsMessage.length} chars`);
-          return;
-        }
-
-        // Step 3: Append assistant's tool call to history
-        messages.push({
-          role: "assistant",
-          content: responseMessage.content || null,
-          tool_calls: responseMessage.tool_calls as any,
-        });
-
-        // Step 4: Append tool result to history
-        const toolResultContent = JSON.stringify({
-          content: searchResult.content,
-          sources: searchResult.sources,
-          metadata: searchResult.metadata,
-        });
-
-        messages.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: toolResultContent,
-        });
-
-        console.log(
-          `[KnowledgeAgent] Step 4: Calling Groq for synthesis with tool results in history...`
-        );
-
-        // Step 5: Final API call with tool results in history
-        // Don't pass tools parameter at all to force synthesis
-        const stream = await this.groq.chat.completions.create({
-          model: config.groq.chatModel,
+        const response = await this.groq.chat.completions.create({
+          model: "openai/gpt-oss-120b",
           messages: messages,
+          tools: tools,
+          tool_choice: "auto",
           temperature: config.groq.temperature,
-          max_tokens: config.groq.maxTokens,
-          stream: true,
         });
 
-        console.log("[KnowledgeAgent] Step 5: Streaming synthesis...");
+        const responseMessage = response.choices[0]?.message;
 
-        let synthesizedContent = "";
-        let chunkCount = 0;
+        // Check if LLM wants to call tools
+        if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
+          console.log(
+            `[KnowledgeAgent] LLM called ${responseMessage.tool_calls.length} tool(s)`
+          );
 
-        // Step 6: Stream the response
-        for await (const chunk of stream) {
-          const delta = chunk.choices[0]?.delta;
+          // Add assistant message to history
+          messages.push({
+            role: "assistant",
+            content: responseMessage.content || null,
+            tool_calls: responseMessage.tool_calls as any,
+          });
 
-          if (delta?.content) {
-            chunkCount++;
-            synthesizedContent += delta.content;
-            yield {
-              type: "chunk",
-              content: delta.content,
-            };
-          }
+          // Execute all tool calls IN PARALLEL for speed
+          const toolCallPromises = responseMessage.tool_calls.map(async (toolCall) => {
+            const toolName = toolCall.function.name;
+            const args = JSON.parse(toolCall.function.arguments);
 
-          const finishReason = chunk.choices[0]?.finish_reason;
-          if (finishReason === "stop") {
-            console.log(
-              `[KnowledgeAgent] Synthesis complete - received ${chunkCount} chunks, ${synthesizedContent.length} chars`
-            );
-            console.log(
-              `[KnowledgeAgent] Synthesized content preview: "${synthesizedContent.slice(0, 200)}..."`
-            );
-            break;
-          } else if (finishReason === "tool_calls") {
-            console.warn(
-              `[KnowledgeAgent] ⚠️ Model tried to call tools again instead of synthesizing!`
-            );
-            synthesizedContent =
-              "I found relevant information but encountered an issue generating a summary. Here are the sources:";
-            break;
-          }
-        }
+            console.log(`[KnowledgeAgent] Executing: ${toolName}(${JSON.stringify(args)})`);
 
-        // Step 7: Append sources programmatically (domain-aware)
-        if (searchResult.sources && searchResult.sources.length > 0) {
-          console.log(`[KnowledgeAgent] Formatting ${searchResult.sources.length} sources...`);
-          console.log(`[KnowledgeAgent] Sample source metadata:`, JSON.stringify(searchResult.sources[0], null, 2));
+            try {
+              const result = await this.executeTool(toolName, args, context);
+
+              console.log(
+                `[KnowledgeAgent] Tool result: ${result.substring(0, 200)}...`
+              );
+
+              return {
+                role: "tool" as const,
+                tool_call_id: toolCall.id,
+                content: result,
+              };
+            } catch (error) {
+              console.error(`[KnowledgeAgent] Tool ${toolName} failed:`, error);
+              return {
+                role: "tool" as const,
+                tool_call_id: toolCall.id,
+                content: `Error: ${error instanceof Error ? error.message : "Tool execution failed"}`,
+              };
+            }
+          });
+
+          // Wait for all tool calls to complete in parallel
+          const toolResults = await Promise.all(toolCallPromises);
           
-          const sourcesSection =
-            "\n\n**Sources:**\n" +
-            searchResult.sources
-              .slice(0, 5) // Show up to 5 sources
-              .map((s: any) => {
-                // Format based on domain
-                if (s.domain === 'work') {
-                  // Work items: use short IDs (commit SHA, PR#, issue#)
-                  const type = s.metadata?.type || 'commit';
-                  let identifier = '';
-                  
-                  console.log(`[KnowledgeAgent] Work item: type=${type}, commitSha=${s.metadata?.commitSha}, author=${s.metadata?.author}, title=${s.title}`);
-                  
-                  if (type === 'commit' && s.metadata?.commitSha) {
-                    identifier = `commit ${s.metadata.commitSha.substring(0, 7)}`;
-                  } else if (type === 'pr' && s.metadata?.prNumber) {
-                    identifier = `PR#${s.metadata.prNumber}`;
-                  } else if (type === 'issue' && s.metadata?.issueNumber) {
-                    identifier = `issue#${s.metadata.issueNumber}`;
-                  } else {
-                    // Fallback: extract SHA from title if it starts with "commit:"
-                    if (s.title && type === 'commit') {
-                      identifier = `commit (${s.title.substring(0, 30)}...)`;
-                    } else {
-                      identifier = type;
-                    }
-                  }
-                  
-                  // Add author and date if available
-                  const author = s.metadata?.author;
-                  const createdAt = s.metadata?.createdAt;
-                  
-                  if (author || createdAt) {
-                    const parts: string[] = [];
-                    if (author) parts.push(`by ${author}`);
-                    if (createdAt) {
-                      // Format date as MM/DD/YYYY (American format)
-                      const date = new Date(createdAt);
-                      const formatted = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
-                      parts.push(`on ${formatted}`);
-                    }
-                    identifier += ` (${parts.join(' ')})`;
-                  }
-                  
-                  return `- ${identifier}`;
-                } else if (s.domain === 'code') {
-                  return `- ${s.title} ([GitHub](${s.url}))`;
-                } else if (s.domain === 'slack') {
-                  return `- ${s.title} ([Slack](${s.url}))`;
-                } else if (s.domain === 'notion') {
-                  return `- ${s.title} ([Notion](${s.url}))`;
-                } else {
-                  return `- ${s.title}`;
-                }
-              })
-              .join("\n");
+          // Add all results to message history
+          toolResults.forEach(result => messages.push(result));
 
-          synthesizedContent += sourcesSection;
-          yield {
-            type: "chunk",
-            content: sourcesSection,
-          };
+          // Loop continues - call LLM again with tool results
+          continue;
         }
 
-        // Step 8: Complete
+        // No tool calls - LLM has final answer
+        const finalAnswer = responseMessage?.content || "I couldn't generate an answer.";
+
+        console.log(`[KnowledgeAgent] Final answer (${finalAnswer.length} chars)`);
+
+        // Stream the answer to user
+        yield {
+          type: "chunk",
+          content: finalAnswer,
+        };
+
         yield {
           type: "complete",
           messageType: "text",
-          content: synthesizedContent,
-          sources: searchResult.sources,
+          content: finalAnswer,
         };
 
-        console.log(
-          `[KnowledgeAgent] ✅ Native tool calling complete: ${synthesizedContent.length} chars`
-        );
-        console.log(
-          `[KnowledgeAgent] 💡 Tool results are now in conversation history for follow-ups!`
-        );
         return;
       }
 
-      // If LLM didn't request a tool call, return its direct response
-      console.log(`[KnowledgeAgent] No search needed - LLM responding directly`);
-
-      const directContent =
-        responseMessage?.content || "I can help you with that. What would you like to know?";
-
+      // Max iterations reached
       yield {
-        type: "chunk",
-        content: directContent,
+        type: "error",
+        error: "Max iterations reached without completing",
       };
-
-      yield {
-        type: "complete",
-        messageType: "text",
-        content: directContent,
-      };
-
-      console.log(`[KnowledgeAgent] ✅ Direct response complete (no search needed)`);
     } catch (error) {
       console.error("[KnowledgeAgent] Error:", error);
       yield {
         type: "error",
-        error: error instanceof Error ? error.message : "Unknown error in knowledge search",
+        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   }
 
   /**
-   * Direct search method for agent-to-agent communication
-   * (Used by Visual Guidance Agent)
+   * Execute a tool and return formatted result
    */
-  async search(query: string, context: ToolContext): Promise<TextMessage> {
-    const result = await this.metaSearchTool.execute(
-      {
-        query,
-        topK: 10,
-      },
-      context
-    );
+  private async executeTool(
+    toolName: string,
+    args: any,
+    context: ToolContext
+  ): Promise<string> {
+    const topK = args.topK || 20; // More context per targeted search for comprehensive answers
 
-    return {
-      messageType: "text",
-      content: result.content,
-      sources: result.sources,
-      streamable: true,
-    };
+    switch (toolName) {
+      case "get_org_info": {
+        const orgContext = await orgContextService.getOrgContext(context.organizationId);
+        return JSON.stringify(orgContext);
+      }
+
+      case "search_notion": {
+        const results = await notionRetriever.retrieve(
+          args.query,
+          { organizationId: context.organizationId },
+          { topK }
+        );
+
+        const formatted = results.pages.flatMap((page: any) =>
+          page.blocks.map((block: any) => ({
+            title: page.pageTitle,
+            url: page.pageUrl,
+            content: block.text, // Full content, not snippet
+            last_edited: page.lastEditedTime,
+          }))
+        );
+
+        return JSON.stringify(formatted);
+      }
+
+      case "search_slack": {
+        const results = await slackRetriever.retrieve(
+          args.query,
+          { organizationId: context.organizationId },
+          { topK }
+        );
+
+        const formatted = results.threads.flatMap((thread: any) =>
+          thread.messages.map((msg: any) => ({
+            channel: thread.channelName,
+            user: msg.username,
+            text: msg.text, // Full message
+            timestamp: msg.timestamp,
+          }))
+        );
+
+        return JSON.stringify(formatted);
+      }
+
+      case "search_code": {
+        const results = await codeRetriever.retrieve(
+          args.query,
+          { organizationId: context.organizationId },
+          { topK, includeTypes: ["code"] }
+        );
+
+        const formatted = results.files.flatMap((file: any) =>
+          file.chunks.map((chunk: any) => ({
+            file: file.path,
+            lines: `${chunk.startLine}-${chunk.endLine}`,
+            code: chunk.text, // Full code chunk
+            repo: file.repoFullName,
+          }))
+        );
+
+        return JSON.stringify(formatted);
+      }
+
+      case "search_work": {
+        const results = await workRetriever.retrieve(
+          args.query,
+          { organizationId: context.organizationId },
+          { topK }
+        );
+
+        const formatted = results.items.map((item: any) => ({
+          type: item.type,
+          title: item.title,
+          description: item.description, // Full description
+          author: item.author,
+          created: item.createdAt,
+        }));
+
+        return JSON.stringify(formatted);
+      }
+
+      default:
+        throw new Error(`Unknown tool: ${toolName}`);
+    }
   }
 }

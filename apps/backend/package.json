@@ -18,14 +18,13 @@
     "seed:production": "tsx src/db/seed-production.ts",
     "db:migrate-fts": "tsx src/scripts/run-fts-migration.ts",
     "migrate:0008": "tsx src/scripts/run-migration-0008.ts",
+    "migrate:0010": "tsx src/scripts/run-migration-0010.ts",
     "test-search": "tsx src/scripts/test-search.ts",
     "sync-slack": "tsx src/scripts/sync-slack.ts",
     "sync-notion": "tsx src/scripts/sync-notion.ts",
     "sync-integrations": "tsx src/scripts/sync-integrations.ts",
     "run:github-schema": "tsx src/scripts/run-github-schema.ts",
-    "run:github-ingestion": "tsx src/scripts/run-github-ingestion.ts",
-    "backfill-tokens": "tsx src/scripts/backfill-encrypted-tokens.ts",
-    "backfill-github-content": "tsx src/scripts/backfill-github-file-content.ts"
+    "run:github-ingestion": "tsx src/scripts/run-github-ingestion.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

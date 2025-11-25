@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useUsers } from "@/console/src/hooks/queries/admin";
+import logoIconSvg from "../../../../../../assets/logo-icon.svg";
 
 export default function PeopleView() {
   const navigate = useNavigate();
@@ -31,10 +32,14 @@ export default function PeopleView() {
   });
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="h-screen overflow-y-auto bg-[#0a0810] custom-scrollbar">
+      <div className="max-w-7xl mx-auto p-8 space-y-6 app-no-drag">
       {/* Header */}
       <div className="space-y-6">
-        <h1 className="text-4xl font-bold text-text-primary">People</h1>
+        <div className="flex items-center gap-3">
+          <img src={logoIconSvg} alt="Mitable" className="w-10 h-10" />
+          <h1 className="text-4xl font-bold text-white">People</h1>
+        </div>
 
         {/* Search and Actions Bar */}
         <div className="flex items-center gap-4">
@@ -48,14 +53,14 @@ export default function PeopleView() {
               placeholder="Search people..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
+              className="pl-12 bg-[#1a1625] border-primary/20 text-white placeholder:text-text-tertiary"
             />
           </div>
 
           {/* Filter Button */}
           <Button
             variant="outline"
-            className="gap-2 bg-background-elevated border-transparent text-text-secondary hover:text-text-primary hover:bg-background-elevated/80"
+            className="gap-2 bg-[#1a1625] border-primary/20 text-text-secondary hover:text-white hover:bg-[#231d2e]"
           >
             <Filter size={20} />
             <span className="font-medium">Filter</span>
@@ -63,7 +68,7 @@ export default function PeopleView() {
 
           {/* Add New User Button */}
           <Button
-            className="gap-2 bg-primary text-white hover:bg-primary/90"
+            className="gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-glow-purple text-white"
             onClick={() => navigate("/people/new")}
           >
             <Plus size={20} />
@@ -73,23 +78,23 @@ export default function PeopleView() {
       </div>
 
       {/* Table */}
-      <div className="bg-background-elevated rounded-lg border border-border-subtle overflow-hidden">
+      <div className="bg-[#1a1625] rounded-xl border border-primary/20 overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-background-primary/50 bg-background-secondary border-border-subtle">
-              <TableHead className="text-text-secondary uppercase tracking-wider font-semibold text-xs">
+            <TableRow className="bg-[#0f0d15] border-primary/10 hover:bg-[#0f0d15]">
+              <TableHead className="text-text-tertiary uppercase tracking-wider font-semibold text-xs">
                 Name
               </TableHead>
-              <TableHead className="text-text-secondary uppercase tracking-wider font-semibold text-xs">
+              <TableHead className="text-text-tertiary uppercase tracking-wider font-semibold text-xs">
                 Role
               </TableHead>
-              <TableHead className="text-text-secondary uppercase tracking-wider font-semibold text-xs">
+              <TableHead className="text-text-tertiary uppercase tracking-wider font-semibold text-xs">
                 Start Date
               </TableHead>
-              <TableHead className="text-text-secondary uppercase tracking-wider font-semibold text-xs">
+              <TableHead className="text-text-tertiary uppercase tracking-wider font-semibold text-xs">
                 Status
               </TableHead>
-              <TableHead className="text-text-secondary uppercase tracking-wider font-semibold text-xs">
+              <TableHead className="text-text-tertiary uppercase tracking-wider font-semibold text-xs">
                 Progress
               </TableHead>
             </TableRow>
@@ -97,8 +102,9 @@ export default function PeopleView() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-text-secondary py-8">
-                  Loading users...
+                <TableCell colSpan={5} className="text-center py-8">
+                  <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-3"></div>
+                  <p className="text-text-secondary">Loading users...</p>
                 </TableCell>
               </TableRow>
             ) : error ? (
@@ -117,10 +123,10 @@ export default function PeopleView() {
               filteredUsers.map((employee) => (
                 <TableRow
                   key={employee.id}
-                  className="border-border-subtle hover:bg-background-primary/50 cursor-pointer"
+                  className="border-primary/10 hover:bg-[#231d2e] cursor-pointer transition-colors"
                   onClick={() => navigate(`/people/${employee.id}`)}
                 >
-                  <TableCell className="font-medium text-text-primary">{employee.name}</TableCell>
+                  <TableCell className="font-medium text-white">{employee.name}</TableCell>
                   <TableCell className="text-text-secondary">{employee.role}</TableCell>
                   <TableCell className="text-text-secondary">{employee.startDate}</TableCell>
                   <TableCell>
@@ -136,7 +142,7 @@ export default function PeopleView() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <Progress value={employee.progress} className="flex-1 h-2 bg-border-subtle" />
+                      <Progress value={employee.progress} className="flex-1 h-2 bg-black/40" />
                       <span className="text-text-secondary text-sm font-medium w-12 text-right">
                         {employee.progress}%
                       </span>
@@ -147,6 +153,7 @@ export default function PeopleView() {
             )}
           </TableBody>
         </Table>
+      </div>
       </div>
     </div>
   );

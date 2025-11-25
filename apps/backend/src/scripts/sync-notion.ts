@@ -57,19 +57,17 @@ async function main() {
     // Sync each integration
     for (const integration of notionIntegrations) {
       const orgId = integration.organizationId;
-      const lastSyncedAt = integration.lastSyncedAt ? new Date(integration.lastSyncedAt) : null;
-
-      const syncMode = lastSyncedAt ? "incremental" : "full";
-
+      const lastSync = integration.lastSyncedAt ? new Date(integration.lastSyncedAt) : null;
+      
       console.log(`\n${"=".repeat(60)}`);
       console.log(`📦 Organization: ${orgId}`);
-      console.log(`🔄 Sync Mode: ${syncMode}`);
-      if (lastSyncedAt) {
-        console.log(`📅 Last synced: ${lastSyncedAt.toLocaleString()}`);
-        console.log(`📥 Fetching pages modified since then...`);
+      
+      if (lastSync) {
+        console.log(`🔄 Incremental sync - changes since ${lastSync.toISOString()}`);
       } else {
-        console.log(`📥 First sync - fetching all pages...`);
+        console.log(`📥 Full sync - fetching all pages...`);
       }
+      
       console.log(`${"=".repeat(60)}\n`);
 
       try {

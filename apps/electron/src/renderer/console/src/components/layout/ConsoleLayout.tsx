@@ -20,9 +20,17 @@ export default function ConsoleLayout() {
     };
 
     // Register IPC listener
+    let unsubscribe: (() => void) | undefined;
     if (window.consoleAPI?.onNudgeOpenCreator) {
-      window.consoleAPI.onNudgeOpenCreator(handleNudgeOpenCreator);
+      unsubscribe = window.consoleAPI.onNudgeOpenCreator(handleNudgeOpenCreator);
     }
+
+    // Cleanup listener on unmount
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [navigate]);
 
   return (
@@ -30,7 +38,7 @@ export default function ConsoleLayout() {
       <div className="relative flex h-screen overflow-hidden">
         {/* Invisible draggable overlay at top - allows window dragging */}
         <div
-          className="absolute top-0 left-0 right-0 h-10 z-50 pointer-events-auto"
+          className="absolute top-0 left-0 right-0 h-10 pointer-events-none"
           style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
         />
 

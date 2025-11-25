@@ -47,7 +47,7 @@ export default function IntegrationCard({
 
   return (
     <Card
-      className={`flex items-center gap-4 p-6 bg-integration-card border-0 ${radiusClasses[position]}`}
+      className={`flex items-center gap-4 p-6 bg-[#0f0d15] hover:bg-[#1a1625] border-0 transition-colors ${radiusClasses[position]}`}
     >
       {/* Integration Icon */}
       <div className="flex-shrink-0">
@@ -59,7 +59,7 @@ export default function IntegrationCard({
         <div className="flex items-center gap-2 mb-1">
           <h3 className="text-lg font-semibold text-white">{integration.name}</h3>
         </div>
-        <p className="text-sm text-muted-foreground">{integration.description}</p>
+        <p className="text-sm text-text-secondary">{integration.description}</p>
       </div>
 
       {/* Action Button */}

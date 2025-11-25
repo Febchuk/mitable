@@ -76,6 +76,57 @@ function detectLanguage(filePath: string): string {
 }
 
 /**
+ * Check if file should be skipped from indexing
+ * Filters out lock files, generated files, and build artifacts
+ */
+function shouldSkipFile(filePath: string): boolean {
+  const fileName = filePath.split("/").pop()?.toLowerCase() || "";
+  const pathLower = filePath.toLowerCase();
+
+  // Lock files and dependency manifests
+  if (
+    fileName === "package-lock.json" ||
+    fileName === "pnpm-lock.yaml" ||
+    fileName === "yarn.lock" ||
+    fileName === "composer.lock" ||
+    fileName === "gemfile.lock" ||
+    fileName === "poetry.lock" ||
+    fileName === "cargo.lock"
+  ) {
+    return true;
+  }
+
+  // Build artifacts and dist folders
+  if (
+    pathLower.includes("/node_modules/") ||
+    pathLower.includes("/dist/") ||
+    pathLower.includes("/build/") ||
+    pathLower.includes("/.next/") ||
+    pathLower.includes("/out/") ||
+    pathLower.includes("/target/") ||
+    pathLower.includes("/vendor/") ||
+    pathLower.includes("/__pycache__/") ||
+    pathLower.includes("/.venv/")
+  ) {
+    return true;
+  }
+
+  // Auto-generated config files
+  if (
+    fileName === ".env" ||
+    fileName === ".env.local" ||
+    fileName === ".env.production" ||
+    fileName.endsWith(".min.js") ||
+    fileName.endsWith(".min.css") ||
+    fileName.endsWith(".map")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Chunk code by logical blocks (functions, classes, etc.)
  * For V1, we use line-based chunking with overlap
  * Target: 40-120 lines per chunk with 10-line overlap
@@ -257,6 +308,12 @@ class GithubIngestionService {
 
       // Skip files without content
       if (!file.content || file.content.trim().length === 0) continue;
+
+      // Skip garbage files (lockfiles, node_modules, build artifacts)
+      if (shouldSkipFile(file.path)) {
+        skippedFiles++;
+        continue;
+      }
 
       const language = detectLanguage(file.path);
       const area = classifyArea(file.path);

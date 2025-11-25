@@ -1,7 +1,7 @@
 # Notion Integration Documentation
 
-**Date:** October 17, 2025  
-**Status:** ✅ Complete  
+**Date:** November 25, 2025  
+**Status:** ✅ Complete & Enhanced  
 **Author:** Mitable Team
 
 ---
@@ -13,9 +13,12 @@ The Notion integration allows organizations to sync their Notion workspace pages
 ### Key Features
 
 - ✅ **OAuth 2.0 Authentication** - Secure authorization with token refresh
+- ✅ **Token Encryption** - AES-256 encryption for access/refresh tokens at rest
 - ✅ **Page Selection During OAuth** - Users select pages directly in Notion's UI
 - ✅ **Automatic Sync** - Initial sync triggered automatically after connection
-- ✅ **Block-Level Embedding** - Each block embedded separately for precise search
+- ✅ **Structure-Aware Chunking** - Intelligent chunking that preserves code blocks, tables, and document hierarchy
+- ✅ **Rich Metadata** - Section paths, chunk types, code languages for precise filtering
+- ✅ **Smart Boosting** - SQL code blocks boosted 8x, tables 3x for better retrieval
 - ✅ **Recursive Content Fetching** - Handles nested blocks and hierarchical content
 - ✅ **Rate Limiting** - Respects Notion's 3 req/sec limit
 - ✅ **Token Refresh** - Automatic token renewal when expired
@@ -80,7 +83,30 @@ class NotionService {
 | `POST`   | `/api/integrations/notion/sync`        | Trigger sync           |
 | `DELETE` | `/api/integrations/notion/disconnect`  | Disconnect integration |
 
-#### 4. Ingestion Service (`ingestion.service.ts`)
+#### 4. Notion Chunking Service (`notion-chunking.service.ts`) 🆕
+
+**Purpose:** Structure-aware chunking that preserves document hierarchy and code blocks.
+
+```typescript
+class NotionChunkingService {
+  /**
+   * Chunk Notion blocks intelligently:
+   * - Parse heading hierarchy (h1/h2/h3) into sections
+   * - Keep code blocks, tables, callouts intact (no splitting)
+   * - Add rich metadata: section_path, chunk_type, code_language, etc.
+   */
+  chunkNotionBlocks(blocks: NotionBlock[], page: NotionPage): NotionChunk[];
+}
+```
+
+**Key Features:**
+- **Heading-aware sections** - Builds hierarchy from h1 → h2 → h3
+- **Dedicated code chunks** - SQL/TypeScript/JSON blocks stay together (up to 1500 tokens)
+- **Table preservation** - Tables not split mid-row
+- **Section breadcrumbs** - Each chunk knows its place: `["Parent", "Child", "Grandchild"]`
+- **Type classification** - Chunks tagged as `code`, `table`, `list`, `text`, `callout`, `quote`
+
+#### 5. Ingestion Service (`ingestion.service.ts`)
 
 ```typescript
 class IngestionService {
@@ -96,7 +122,11 @@ class IngestionService {
     workspaceId: string,
     workspaceName: string,
     botId: string
-  ): Promise<void>;
+  ): Promise<void> {
+    // 🆕 Uses NotionChunkingService instead of generic chunking
+    const smartChunks = notionChunkingService.chunkNotionBlocks(blocks, page);
+    // Generates embeddings and stores with rich metadata
+  }
 }
 ```
 
@@ -105,9 +135,11 @@ class IngestionService {
 1. Fetch all shared pages via Search API
 2. For each page, recursively fetch all blocks
 3. Filter empty blocks
-4. Process in batches of 10
-5. Generate embeddings via OpenAI
-6. Store in Pinecone with rich metadata
+4. 🆕 **Smart chunking** via NotionChunkingService
+5. Process in batches of 100
+6. Generate embeddings via OpenAI
+7. Store in Pinecone with rich structure-aware metadata
+8. Mirror in PostgreSQL for hybrid search
 
 ### Frontend Components
 
@@ -143,8 +175,8 @@ INSERT INTO integrations (
   organizationId,
   provider,
   status,
-  accessToken,
-  refreshToken,
+  accessTokenEncrypted,  -- 🔐 ENCRYPTED (AES-256)
+  refreshTokenEncrypted,  -- 🔐 ENCRYPTED (AES-256)
   tokenExpiresAt,
   metadata,
   lastSyncedAt,
@@ -154,8 +186,8 @@ INSERT INTO integrations (
   'org-uuid',
   'notion',
   'connected',
-  'secret_abc123',
-  'secret_xyz789',
+  'U2FsdGVkX1...',  -- Encrypted with ENCRYPTION_KEY
+  'U2FsdGVkX1...',  -- Encrypted with ENCRYPTION_KEY
   '2026-01-15T00:00:00Z',  -- Estimated 90 days from auth
   '{
     "bot_id": "abc-123",
@@ -197,12 +229,12 @@ INSERT INTO sync_logs (
 ### Vector ID Format
 
 ```
-notion-{pageId}-{blockId}
+notion-{pageId}-{sectionId}-chunk-{chunkIndex}
 ```
 
-Example: `notion-abc123-def456`
+Example: `notion-abc123-section-0-chunk-0`
 
-### Metadata Structure
+### Metadata Structure 🆕 Enhanced
 
 ```typescript
 {
@@ -217,8 +249,24 @@ Example: `notion-abc123-def456`
   page_url: string,                // Notion URL
 
   // Block-level details
-  block_id: string,
+  block_id: string,                // Primary block ID
   block_type: string,              // paragraph, heading_1, etc.
+
+  // 🆕 STRUCTURE-AWARE METADATA (Migration 0010)
+  section_path: string,            // JSON: ["Parent Section", "Child Section"]
+  section_title: string,           // Current section title
+  section_id: string,              // Unique section identifier
+  heading_level?: number,          // 1, 2, or 3 (if under a heading)
+
+  chunk_type: string,              // "code" | "table" | "list" | "text" | "callout" | "quote"
+  has_code: boolean,               // True if chunk contains code
+  has_table: boolean,              // True if chunk contains table
+  has_list: boolean,               // True if chunk contains list
+  code_language?: string,          // "sql" | "typescript" | "json" | etc.
+
+  chunk_index: number,             // Position in document
+  total_chunks: number,            // Total chunks for this page
+  is_chunked: boolean,             // True if page was split
 
   // Authorship
   created_by_id: string,
@@ -246,27 +294,44 @@ Example: `notion-abc123-def456`
 }
 ```
 
-### Example Vector
+### Example Vector (SQL Code Block) 🆕
 
 ```json
 {
-  "id": "notion-1429989fe8ac-4effbc8f57f5",
+  "id": "notion-1429989fe8ac-section-2-chunk-0",
   "values": [0.123, -0.456, ...],  // 1536 dimensions
   "metadata": {
-    "text": "Our deployment process uses GitHub Actions for CI/CD...",
+    "text": "INSERT INTO integrations (organizationId, provider, status, accessTokenEncrypted...",
     "source": "notion",
     "source_type": "block",
     "page_id": "1429989fe8ac4effbc8f57f56486db54",
-    "page_title": "Engineering Docs",
-    "page_url": "https://notion.so/Engineering-Docs-142998...",
+    "page_title": "NOTION_INTEGRATION 2",
+    "page_url": "https://notion.so/NOTION_INTEGRATION-2-142998...",
     "block_id": "4effbc8f57f564",
-    "block_type": "paragraph",
+    "block_type": "code",
+    
+    // 🆕 Structure-aware metadata
+    "section_path": "[\"Database Schema\",\"Integrations Table\"]",
+    "section_title": "Integrations Table",
+    "section_id": "section-2",
+    "heading_level": 2,
+    
+    "chunk_type": "code",
+    "has_code": true,
+    "has_table": false,
+    "has_list": false,
+    "code_language": "sql",
+    
+    "chunk_index": 0,
+    "total_chunks": 1,
+    "is_chunked": false,
+    
     "created_time": "2025-01-15T10:30:00.000Z",
-    "last_edited_time": "2025-10-17T14:20:00.000Z",
-    "timestamp": 1729177200,
-    "date": "2025-10-17",
+    "last_edited_time": "2025-11-25T14:20:00.000Z",
+    "timestamp": 1732545600,
+    "date": "2025-11-25",
     "year": 2025,
-    "month": 10,
+    "month": 11,
     "organization_id": "2690a3e8-4d61-43ba-9f68-6de4916ffc77",
     "workspace_id": "workspace-abc123",
     "workspace_name": "Lorikeet",
@@ -626,6 +691,40 @@ npm run dev:admin:windows
 
 ---
 
+## Recent Enhancements (November 2025)
+
+### ✅ Completed
+
+- [x] **Token Encryption** - AES-256 encryption for access/refresh tokens
+- [x] **Structure-Aware Chunking** - Intelligent chunking via NotionChunkingService
+- [x] **Rich Metadata** - Section paths, chunk types, code languages
+- [x] **Smart Retrieval Boosting** - SQL 8x, tables 3x, code 5x
+- [x] **Database Schema Updates** - Migration 0010 adds new metadata columns
+- [x] **Hybrid Search** - PostgreSQL + Pinecone with RRF merging
+
+### Retrieval Improvements 🆕
+
+The new NotionRetriever applies intelligent boosting:
+
+```typescript
+// SQL code blocks: 8x boost (schema queries)
+if (block.codeLanguage === 'sql') {
+  score = score * 8.0;
+}
+
+// Other code blocks: 5x boost
+if (block.chunkType === 'code' || block.hasCode) {
+  score = score * 5.0;
+}
+
+// Tables: 3x boost
+if (block.chunkType === 'table' || block.hasTable) {
+  score = score * 3.0;
+}
+```
+
+**Result:** Technical queries like "What are the table schemas?" now surface SQL INSERT statements first, not generic headings.
+
 ## Future Enhancements
 
 ### Planned Features
@@ -635,15 +734,16 @@ npm run dev:admin:windows
 - [ ] **Database Properties** - Extract structured data from databases
 - [ ] **Webhook Support** - Real-time updates when pages change
 - [ ] **Selective Sync** - Let users choose specific pages to sync
-- [ ] **Sync Scheduling** - Automatic periodic syncs
+- [ ] **Sync Scheduling** - Automatic periodic syncs (Railway cron)
 
 ### Code Improvements
 
-- [ ] Add unit tests for `notion.service.ts`
+- [ ] Add unit tests for `notion-chunking.service.ts`
 - [ ] Add integration tests for OAuth flow
 - [ ] Improve error messages
 - [ ] Add retry logic for failed API calls
 - [ ] Optimize batch sizes based on content
+- [ ] Implement encryption key rotation
 
 ---
 
@@ -670,11 +770,14 @@ Use Notion's free plan for testing. Create test pages with various block types.
 
 ## Security Considerations
 
-### Token Storage
+### Token Storage 🔐
 
-- **Current:** Tokens stored as plain text in PostgreSQL
-- **Recommended:** Encrypt tokens at rest using AES-256
-- **Future:** Use vault service (e.g., AWS Secrets Manager, HashiCorp Vault)
+- **✅ IMPLEMENTED:** Tokens encrypted at rest using AES-256-CBC
+- **Storage:** `accessTokenEncrypted` and `refreshTokenEncrypted` columns
+- **Encryption Key:** `ENCRYPTION_KEY` environment variable (32-byte key)
+- **Algorithm:** AES-256 with random IV per encryption
+- **Access:** Decrypted only when needed for API calls
+- **Future:** Rotate encryption keys periodically
 
 ### OAuth State Parameter
 
@@ -724,6 +827,7 @@ Use Notion's free plan for testing. Create test pages with various block types.
 
 ---
 
-**Last Updated:** October 17, 2025  
-**Version:** 1.0.0  
-**Status:** Production Ready ✅
+**Last Updated:** November 25, 2025  
+**Version:** 2.0.0  
+**Status:** Production Ready ✅  
+**Major Update:** Structure-aware chunking + token encryption

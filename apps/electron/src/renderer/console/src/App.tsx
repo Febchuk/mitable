@@ -11,7 +11,6 @@ import HomeView from "./components/views/employee/HomeView";
 import RoadmapView from "./components/views/employee/RoadmapView";
 import RoadmapTaskDetail from "./components/views/employee/RoadmapView/RoadmapTaskDetail";
 import NudgesView from "./components/views/employee/NudgesView";
-import NudgeDetail from "./components/views/employee/NudgesView/NudgeDetail";
 import CreateNudge from "./components/views/employee/NudgesView/CreateNudge";
 import ChatsView from "./components/views/employee/ChatsView";
 import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
@@ -33,10 +32,13 @@ function NavigationHandler() {
 
   useEffect(() => {
     // Listen for navigation requests from main process (e.g., from Agent window)
-    window.consoleAPI.onNavigateToChat((conversationId: string) => {
+    const unsubscribe = window.consoleAPI.onNavigateToChat((conversationId: string) => {
       console.log("[Console] Navigating to chat:", conversationId);
       navigate(`/chats/${conversationId}`);
     });
+
+    // Cleanup listener on unmount
+    return unsubscribe;
   }, [navigate]);
 
   return null;
@@ -119,7 +121,7 @@ function App() {
               <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
               <Route path="nudges" element={<NudgesView />} />
               <Route path="nudges/new" element={<CreateNudge />} />
-              <Route path="nudges/:nudgeId" element={<NudgeDetail />} />
+              {/* NudgeDetail now uses NudgesLayout which handles nudgeId internally */}
               <Route path="chats" element={<ChatsView />} />
               <Route path="chats/new" element={<NewChat />} />
               <Route path="chats/:chatId" element={<ChatDetail />} />

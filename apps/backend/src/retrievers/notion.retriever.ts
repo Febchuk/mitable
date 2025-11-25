@@ -24,6 +24,13 @@ export interface NotionRetrievalContext {
   pageIds?: string[];        // Filter to specific pages
   dateFrom?: Date;
   dateTo?: Date;
+  
+  // NEW: Structure-aware filtering
+  chunkTypes?: string[];     // Filter by chunk type: "code", "table", "text", etc.
+  hasCode?: boolean;         // Only return chunks with code
+  hasTables?: boolean;       // Only return chunks with tables
+  codeLanguages?: string[];  // Filter by code language: "sql", "typescript", etc.
+  sectionIds?: string[];     // Filter to specific sections
 }
 
 export interface NotionBlock {
@@ -37,6 +44,17 @@ export interface NotionBlock {
   pageUrl?: string;
   blockId: string;
   blockType: string;         // "paragraph" | "heading" | "code" | etc.
+  
+  // NEW: Structure-aware metadata
+  sectionPath?: string[];    // ["Parent Section", "Child Section"]
+  sectionTitle?: string;
+  sectionId?: string;
+  headingLevel?: number;     // 1, 2, 3, or null
+  chunkType?: string;        // "code" | "table" | "list" | "text" | etc.
+  hasCode?: boolean;
+  hasTable?: boolean;
+  hasList?: boolean;
+  codeLanguage?: string;     // "sql" | "typescript" | "python" | etc.
   
   // Temporal
   lastEditedTime?: string;   // ISO date string
@@ -90,16 +108,34 @@ export class NotionRetriever {
       this.keywordSearch(query, context, topK * 2),
     ]);
     
-    // Step 2: Merge with RRF (80/20 for docs, not 70/30 like Slack)
+    // Step 2: Merge with RRF (60/40 for technical docs with exact terms)
     const merged = this.mergeWithRRF(semanticResults, keywordResults);
     
-    // Step 3: Optional light recency boost (much lighter than Slack)
-    const boosted = this.applyLightRecencyBoost(merged);
+    // Step 3: Boost by chunk type (use new metadata!)
+    const typeBoosted = merged.map(block => {
+      // Use chunk_type if available (new metadata), fallback to block_type (old)
+      const type = block.chunkType || block.blockType;
+      
+      if (type === 'code' || block.hasCode) {
+        // Extra boost for SQL schemas
+        if (block.codeLanguage === 'sql') {
+          return { ...block, score: block.score * 8.0 };  // 8x for SQL!
+        }
+        return { ...block, score: block.score * 5.0 };  // 5x for other code
+      }
+      if (type === 'table' || block.hasTable) {
+        return { ...block, score: block.score * 3.0 };  // 3x for tables
+      }
+      return block;
+    });
     
-    // Step 4: Take top K
+    // Step 4: Optional light recency boost (much lighter than Slack)
+    const boosted = this.applyLightRecencyBoost(typeBoosted);
+    
+    // Step 5: Take top K
     const topBlocks = boosted.sort((a, b) => b.score - a.score).slice(0, topK);
     
-    // Step 5: Group by page
+    // Step 6: Group by page (just the matched blocks)
     const pages = this.groupByPage(topBlocks);
     
     const searchTime = Date.now() - startTime;
@@ -136,6 +172,13 @@ export class NotionRetriever {
       if (context.dateTo) timestampFilter.$lte = Math.floor(context.dateTo.getTime() / 1000);
       filter.timestamp = timestampFilter;
     }
+    
+    // NEW: Structure-aware filters
+    if (context.chunkTypes) filter.chunk_type = { $in: context.chunkTypes };
+    if (context.hasCode !== undefined) filter.has_code = context.hasCode;
+    if (context.hasTables !== undefined) filter.has_table = context.hasTables;
+    if (context.codeLanguages) filter.code_language = { $in: context.codeLanguages };
+    if (context.sectionIds) filter.section_id = { $in: context.sectionIds };
     
     console.log(`[NotionRetriever] Pinecone filter:`, JSON.stringify(filter));
     
@@ -201,7 +244,7 @@ export class NotionRetriever {
   /**
    * Merge semantic + keyword with RRF
    * 
-   * 80/20 weighting for docs (semantic is more important than keyword)
+   * 60/40 weighting for docs (balanced for technical terms like "schema", "table")
    */
   private mergeWithRRF(
     semantic: NotionBlock[],
@@ -209,22 +252,23 @@ export class NotionRetriever {
   ): NotionBlock[] {
     const resultsMap = new Map<string, NotionBlock>();
     
-    // RRF formula: score = 0.8 * (1/(60 + semantic_rank)) + 0.2 * (1/(60 + keyword_rank))
+    // RRF formula: score = 0.6 * (1/(60 + semantic_rank)) + 0.4 * (1/(60 + keyword_rank))
+    // Higher keyword weight helps with exact technical terms
     semantic.forEach((block, rank) => {
       resultsMap.set(block.id, {
         ...block,
-        score: 0.8 * (1 / (60 + rank)),  // 80% semantic for docs
+        score: 0.6 * (1 / (60 + rank)),  // 60% semantic
       });
     });
     
     keyword.forEach((block, rank) => {
       if (resultsMap.has(block.id)) {
         const existing = resultsMap.get(block.id)!;
-        existing.score += 0.2 * (1 / (60 + rank));  // 20% keyword
+        existing.score += 0.4 * (1 / (60 + rank));  // 40% keyword (boosted for technical terms)
       } else {
         resultsMap.set(block.id, {
           ...block,
-          score: 0.2 * (1 / (60 + rank)),
+          score: 0.4 * (1 / (60 + rank)),
         });
       }
     });
@@ -264,6 +308,7 @@ export class NotionRetriever {
 
   /**
    * Group blocks by page for coherent context
+   * Returns only the matched blocks, not entire pages
    */
   private groupByPage(blocks: NotionBlock[]): NotionPage[] {
     const pagesMap = new Map<string, NotionPage>();
@@ -301,6 +346,16 @@ export class NotionRetriever {
    * Transform Pinecone result to NotionBlock
    */
   private transformToNotionBlock(result: any): NotionBlock {
+    // Parse section_path from JSON string if present
+    let sectionPath: string[] | undefined;
+    if (result.metadata.section_path) {
+      try {
+        sectionPath = JSON.parse(result.metadata.section_path);
+      } catch {
+        sectionPath = undefined;
+      }
+    }
+    
     return {
       id: result.id,
       score: result.score,
@@ -310,6 +365,18 @@ export class NotionRetriever {
       pageUrl: result.metadata.page_url,
       blockId: result.metadata.block_id || "",
       blockType: result.metadata.block_type || "paragraph",
+      
+      // NEW: Structure-aware metadata
+      sectionPath,
+      sectionTitle: result.metadata.section_title,
+      sectionId: result.metadata.section_id,
+      headingLevel: result.metadata.heading_level,
+      chunkType: result.metadata.chunk_type,
+      hasCode: result.metadata.has_code,
+      hasTable: result.metadata.has_table,
+      hasList: result.metadata.has_list,
+      codeLanguage: result.metadata.code_language,
+      
       lastEditedTime: result.metadata.last_edited_time,
     };
   }
