@@ -10,7 +10,7 @@ import { slackRetriever } from "../retrievers/slack.retriever";
 
 /**
  * Clean KnowledgeAgent following Groq's recommended pattern
- * 
+ *
  * Pattern from Groq docs:
  * 1. Define tools
  * 2. Simple agentic loop: while model wants tools → execute → call again
@@ -167,19 +167,16 @@ export class KnowledgeAgent extends BaseAgent {
         content:
           "You are a helpful AI assistant with access to search tools. " +
           "Your goal is to provide COMPREHENSIVE, DETAILED answers by gathering all relevant information.\n\n" +
-          
           "BREVITY GUIDELINES:\n" +
           "- For timeline/status questions (what happened this week, what did we discuss, current status): " +
           "provide a 2-8 sentence executive summary unless user explicitly asks for details.\n" +
           "- For technical/architectural questions: provide complete answers with all necessary context.\n" +
           "- Always prioritize clarity and usefulness over verbosity.\n\n" +
-          
           "For complex questions (especially about integrations, architecture, or 'how does X work'), DECOMPOSE them into sub-questions:\n" +
           "- What is the data model? (database schemas, tables, fields)\n" +
           "- What is the authentication/OAuth flow?\n" +
           "- What are the implementation details? (sync pipeline, API calls, code)\n" +
           "- What are edge cases or limitations?\n\n" +
-          
           "Use MULTIPLE targeted searches to gather complete information:\n" +
           "- First, call get_org_info to see what data sources are available\n" +
           "- Then search each relevant domain with SPECIFIC queries\n" +
@@ -188,7 +185,6 @@ export class KnowledgeAgent extends BaseAgent {
           "  2. 'Notion OAuth flow authorization'\n" +
           "  3. 'Notion sync pipeline ingestion'\n" +
           "  4. 'Notion integration implementation code'\n\n" +
-          
           "Quality over speed: Take 5-8 tool calls if needed to provide a complete answer.\n" +
           "When multiple documents contain similar information, prefer the most recently edited one (check last_edited field).",
       });
@@ -241,9 +237,7 @@ export class KnowledgeAgent extends BaseAgent {
 
         // Check if LLM wants to call tools
         if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
-          console.log(
-            `[KnowledgeAgent] LLM called ${responseMessage.tool_calls.length} tool(s)`
-          );
+          console.log(`[KnowledgeAgent] LLM called ${responseMessage.tool_calls.length} tool(s)`);
 
           // Add assistant message to history
           messages.push({
@@ -262,9 +256,7 @@ export class KnowledgeAgent extends BaseAgent {
             try {
               const result = await this.executeTool(toolName, args, context);
 
-              console.log(
-                `[KnowledgeAgent] Tool result: ${result.substring(0, 200)}...`
-              );
+              console.log(`[KnowledgeAgent] Tool result: ${result.substring(0, 200)}...`);
 
               return {
                 role: "tool" as const,
@@ -283,9 +275,9 @@ export class KnowledgeAgent extends BaseAgent {
 
           // Wait for all tool calls to complete in parallel
           const toolResults = await Promise.all(toolCallPromises);
-          
+
           // Add all results to message history
-          toolResults.forEach(result => messages.push(result));
+          toolResults.forEach((result) => messages.push(result));
 
           // Loop continues - call LLM again with tool results
           continue;
@@ -329,10 +321,7 @@ export class KnowledgeAgent extends BaseAgent {
    * Search company knowledge base and return raw results
    * Used by other agents (like VisualGuidanceAgent) that need raw sources for their own synthesis
    */
-  async search(
-    query: string,
-    context: ToolContext
-  ): Promise<{ sources: any[] }> {
+  async search(query: string, context: ToolContext): Promise<{ sources: any[] }> {
     // Call slack retriever directly for raw results
     const results = await slackRetriever.retrieve(
       query,
@@ -357,11 +346,7 @@ export class KnowledgeAgent extends BaseAgent {
   /**
    * Execute a specific tool and return its result as a string
    */
-  private async executeTool(
-    toolName: string,
-    args: any,
-    context: ToolContext
-  ): Promise<string> {
+  private async executeTool(toolName: string, args: any, context: ToolContext): Promise<string> {
     const topK = args.topK || 20; // More context per targeted search for comprehensive answers
 
     switch (toolName) {

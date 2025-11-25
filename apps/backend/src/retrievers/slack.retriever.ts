@@ -1,15 +1,15 @@
 /**
  * SlackRetriever - Domain-specific retrieval for Slack conversations
- * 
+ *
  * Purpose: Find relevant Slack messages, threads, and discussions
- * 
+ *
  * Priorities (different from code and docs):
  * 1. Recency matters MORE - Recent discussions are more relevant (1.5x boost for last 7 days)
  * 2. Thread context is CRITICAL - Need parent + all replies
  * 3. Conversational grouping - Group by thread, not individual messages
  * 4. Channel context - Channel names provide important context
  * 5. User attribution - Who said it matters
- * 
+ *
  * This is FOCUSED on Slack's conversational nature.
  */
 
@@ -21,8 +21,8 @@ import { sql, and, eq, gte, lte, desc } from "drizzle-orm";
 
 export interface SlackRetrievalContext {
   organizationId: string;
-  channels?: string[];      // Filter to specific channels
-  users?: string[];          // Filter by user
+  channels?: string[]; // Filter to specific channels
+  users?: string[]; // Filter by user
   dateFrom?: Date;
   dateTo?: Date;
 }
@@ -31,32 +31,32 @@ export interface SlackMessage {
   id: string;
   score: number;
   text: string;
-  
+
   // Slack context
   channelId: string;
   channelName: string;
   userId?: string;
   username: string;
   messageUrl?: string;
-  messageTs: string;         // Slack's message timestamp (unique ID)
-  threadTs?: string;         // Parent thread timestamp
-  
+  messageTs: string; // Slack's message timestamp (unique ID)
+  threadTs?: string; // Parent thread timestamp
+
   // Temporal
-  timestamp: number;         // Unix timestamp (seconds)
-  date: string;              // ISO date string
+  timestamp: number; // Unix timestamp (seconds)
+  date: string; // ISO date string
 }
 
 export interface SlackThread {
   channelId: string;
   channelName: string;
-  threadTs: string;          // Parent message timestamp
-  messages: SlackMessage[];  // Parent + all replies
-  topScore: number;          // Highest message score in thread
-  permalink?: string;        // Link to thread
+  threadTs: string; // Parent message timestamp
+  messages: SlackMessage[]; // Parent + all replies
+  topScore: number; // Highest message score in thread
+  permalink?: string; // Link to thread
 }
 
 export interface SlackRetrievalResult {
-  threads: SlackThread[];    // Grouped by thread
+  threads: SlackThread[]; // Grouped by thread
   totalMessages: number;
   searchTime: number;
 }
@@ -64,7 +64,7 @@ export interface SlackRetrievalResult {
 export class SlackRetriever {
   /**
    * Retrieve Slack messages and threads relevant to the query
-   * 
+   *
    * Strategy:
    * 1. Semantic search via Pinecone
    * 2. Keyword search via PostgreSQL FTS
@@ -82,7 +82,7 @@ export class SlackRetriever {
   ): Promise<SlackRetrievalResult> {
     const startTime = Date.now();
     const { topK = 20 } = options;
-    
+
     console.log(`[SlackRetriever] Searching for: "${query}"`, {
       organizationId: context.organizationId,
       channels: context.channels,
@@ -94,26 +94,28 @@ export class SlackRetriever {
       this.semanticSearch(query, context, topK * 2),
       this.keywordSearch(query, context, topK * 2),
     ]);
-    
+
     // Step 2: Merge with RRF
     const merged = this.mergeWithRRF(semanticResults, keywordResults);
-    
+
     // Step 3: Apply recency boost
     const boosted = this.applyRecencyBoost(merged);
-    
+
     // Step 4: Take top K
     const topMessages = boosted.sort((a, b) => b.score - a.score).slice(0, topK);
-    
+
     // Step 5: Expand threads (fetch full conversation context)
     const expanded = await this.expandThreads(topMessages);
-    
+
     // Step 6: Group by thread
     const threads = this.groupByThread(expanded);
-    
+
     const searchTime = Date.now() - startTime;
-    
-    console.log(`[SlackRetriever] Found ${threads.length} threads (${expanded.length} messages) in ${searchTime}ms`);
-    
+
+    console.log(
+      `[SlackRetriever] Found ${threads.length} threads (${expanded.length} messages) in ${searchTime}ms`
+    );
+
     return {
       threads,
       totalMessages: expanded.length,
@@ -130,12 +132,12 @@ export class SlackRetriever {
     limit: number
   ): Promise<SlackMessage[]> {
     const [embedding] = await embeddingService.embedTexts([query]);
-    
+
     // Build Pinecone filter to scope search BEFORE retrieval
     const filter: Record<string, any> = {
       source: "slack",
     };
-    
+
     // Add optional context filters
     if (context.channels) filter.channel_id = { $in: context.channels };
     if (context.users) filter.user_id = { $in: context.users };
@@ -145,17 +147,19 @@ export class SlackRetriever {
       if (context.dateTo) timestampFilter.$lte = Math.floor(context.dateTo.getTime() / 1000);
       filter.timestamp = timestampFilter;
     }
-    
+
     console.log(`[SlackRetriever] Pinecone filter:`, JSON.stringify(filter));
-    
+
     // Query Pinecone WITH METADATA FILTER (scoped BEFORE ranking)
     const namespace = `org-${context.organizationId}`;
     const results = await vectorService.queryVectors(embedding, limit, namespace, filter);
-    
-    console.log(`[SlackRetriever] Semantic search: ${results.length} messages (filtered at query time)`);
-    
+
+    console.log(
+      `[SlackRetriever] Semantic search: ${results.length} messages (filtered at query time)`
+    );
+
     // Transform to SlackMessage (no need to filter again, already filtered by Pinecone)
-    return results.map(r => this.transformToSlackMessage(r));
+    return results.map((r) => this.transformToSlackMessage(r));
   }
 
   /**
@@ -166,10 +170,8 @@ export class SlackRetriever {
     context: SlackRetrievalContext,
     limit: number
   ): Promise<SlackMessage[]> {
-    const conditions = [
-      eq(searchContent.source, "slack"),
-    ];
-    
+    const conditions = [eq(searchContent.source, "slack")];
+
     // Add date filters if present
     if (context.dateFrom) {
       conditions.push(gte(searchContent.timestamp, Math.floor(context.dateFrom.getTime() / 1000)));
@@ -177,24 +179,21 @@ export class SlackRetriever {
     if (context.dateTo) {
       conditions.push(lte(searchContent.timestamp, Math.floor(context.dateTo.getTime() / 1000)));
     }
-    
+
     const results = await db
       .select()
       .from(searchContent)
       .where(
-        and(
-          ...conditions,
-          sql`${searchContent.textVector} @@ plainto_tsquery('english', ${query})`
-        )
+        and(...conditions, sql`${searchContent.textVector} @@ plainto_tsquery('english', ${query})`)
       )
       .orderBy(
         desc(sql`ts_rank(${searchContent.textVector}, plainto_tsquery('english', ${query}))`)
       )
       .limit(limit);
-    
+
     console.log(`[SlackRetriever] Keyword: ${results.length} results`);
-    
-    return results.map(r => ({
+
+    return results.map((r) => ({
       id: r.id,
       score: 0.5,
       text: r.text || "",
@@ -203,7 +202,7 @@ export class SlackRetriever {
       userId: r.userId || undefined,
       username: r.username || "unknown",
       messageUrl: undefined,
-      messageTs: r.id.split("-")[2] || "",  // Extract from ID
+      messageTs: r.id.split("-")[2] || "", // Extract from ID
       threadTs: undefined,
       timestamp: r.timestamp || 0,
       date: r.timestamp ? new Date(r.timestamp * 1000).toISOString() : "",
@@ -213,12 +212,9 @@ export class SlackRetriever {
   /**
    * Merge semantic + keyword with RRF
    */
-  private mergeWithRRF(
-    semantic: SlackMessage[],
-    keyword: SlackMessage[]
-  ): SlackMessage[] {
+  private mergeWithRRF(semantic: SlackMessage[], keyword: SlackMessage[]): SlackMessage[] {
     const resultsMap = new Map<string, SlackMessage>();
-    
+
     // RRF formula: score = 0.7 * (1/(60 + semantic_rank)) + 0.3 * (1/(60 + keyword_rank))
     semantic.forEach((msg, rank) => {
       resultsMap.set(msg.id, {
@@ -226,7 +222,7 @@ export class SlackRetriever {
         score: 0.7 * (1 / (60 + rank)),
       });
     });
-    
+
     keyword.forEach((msg, rank) => {
       if (resultsMap.has(msg.id)) {
         const existing = resultsMap.get(msg.id)!;
@@ -238,30 +234,30 @@ export class SlackRetriever {
         });
       }
     });
-    
+
     return Array.from(resultsMap.values());
   }
 
   /**
    * Apply recency boost - Recent Slack messages are MORE relevant
-   * 
+   *
    * CRITICAL for Slack (unlike code where old = often correct)
    */
   private applyRecencyBoost(messages: SlackMessage[]): SlackMessage[] {
     const now = Date.now() / 1000; // Current time in seconds
     const SEVEN_DAYS = 7 * 24 * 60 * 60;
     const THIRTY_DAYS = 30 * 24 * 60 * 60;
-    
-    return messages.map(msg => {
+
+    return messages.map((msg) => {
       const age = now - msg.timestamp;
       let boost = 1.0;
-      
+
       if (age < SEVEN_DAYS) {
         boost = 1.5; // 50% boost for last 7 days
       } else if (age < THIRTY_DAYS) {
         boost = 1.2; // 20% boost for last 30 days
       }
-      
+
       return {
         ...msg,
         score: msg.score * boost,
@@ -271,29 +267,27 @@ export class SlackRetriever {
 
   /**
    * Expand threads - Fetch parent + all replies for complete context
-   * 
+   *
    * Slack-specific: Messages in threads need full conversation
    */
-  private async expandThreads(
-    messages: SlackMessage[]
-  ): Promise<SlackMessage[]> {
+  private async expandThreads(messages: SlackMessage[]): Promise<SlackMessage[]> {
     // Identify thread messages
     const threadTsSet = new Set<string>();
-    messages.forEach(msg => {
+    messages.forEach((msg) => {
       if (msg.threadTs) threadTsSet.add(msg.threadTs);
     });
-    
+
     if (threadTsSet.size === 0) {
       return messages; // No threads to expand
     }
-    
+
     console.log(`[SlackRetriever] Expanding ${threadTsSet.size} threads...`);
-    
+
     // Build LIKE patterns for thread messages
     // Slack message IDs are in format: slack-{channelId}-{messageTs}-{index}
     // We want to match all messages where the ID starts with "slack-%" and contains the thread_ts
-    const threadPatterns = Array.from(threadTsSet).map(ts => `slack-%-${ts}-%`);
-    
+    const threadPatterns = Array.from(threadTsSet).map((ts) => `slack-%-${ts}-%`);
+
     // Fetch all messages in these threads from PostgreSQL
     const threadMessages = await db
       .select()
@@ -302,19 +296,19 @@ export class SlackRetriever {
         and(
           eq(searchContent.source, "slack"),
           sql`${searchContent.id} LIKE ANY(ARRAY[${sql.join(
-            threadPatterns.map(pattern => sql.raw(`'${pattern}'`)),
+            threadPatterns.map((pattern) => sql.raw(`'${pattern}'`)),
             sql`, `
           )}])`
         )
       );
-    
+
     console.log(`[SlackRetriever] Found ${threadMessages.length} thread messages`);
-    
+
     // Combine with original results
     const allMessages = [...messages];
-    
-    threadMessages.forEach(tm => {
-      if (!allMessages.some(m => m.id === tm.id)) {
+
+    threadMessages.forEach((tm) => {
+      if (!allMessages.some((m) => m.id === tm.id)) {
         allMessages.push({
           id: tm.id,
           score: 0, // Thread context messages get 0 score (included for context)
@@ -329,7 +323,7 @@ export class SlackRetriever {
         });
       }
     });
-    
+
     return allMessages;
   }
 
@@ -338,10 +332,10 @@ export class SlackRetriever {
    */
   private groupByThread(messages: SlackMessage[]): SlackThread[] {
     const threadsMap = new Map<string, SlackThread>();
-    
-    messages.forEach(msg => {
+
+    messages.forEach((msg) => {
       const threadKey = msg.threadTs || msg.messageTs; // Parent or standalone
-      
+
       if (!threadsMap.has(threadKey)) {
         threadsMap.set(threadKey, {
           channelId: msg.channelId,
@@ -351,15 +345,14 @@ export class SlackRetriever {
           topScore: 0,
         });
       }
-      
+
       const thread = threadsMap.get(threadKey)!;
       thread.messages.push(msg);
       thread.topScore = Math.max(thread.topScore, msg.score);
     });
-    
+
     // Sort threads by top score
-    return Array.from(threadsMap.values())
-      .sort((a, b) => b.topScore - a.topScore);
+    return Array.from(threadsMap.values()).sort((a, b) => b.topScore - a.topScore);
   }
 
   /**

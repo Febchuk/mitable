@@ -1,6 +1,6 @@
 /**
  * Migration 0011: Add Slack structure-aware metadata columns
- * 
+ *
  * Run with: npm run migrate:0011
  */
 
@@ -19,7 +19,10 @@ async function runMigration() {
     console.log("Starting migration 0011: Add Slack structure-aware metadata...");
 
     // Read the SQL migration file
-    const migrationPath = path.join(__dirname, "../db/migrations/0011_add_slack_structure_metadata.sql");
+    const migrationPath = path.join(
+      __dirname,
+      "../db/migrations/0011_add_slack_structure_metadata.sql"
+    );
     const migrationSQL = fs.readFileSync(migrationPath, "utf-8");
 
     // Execute the migration

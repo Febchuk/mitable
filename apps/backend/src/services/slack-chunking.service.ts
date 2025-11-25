@@ -1,10 +1,10 @@
 /**
  * SlackChunkingService - Thread-aware intelligent chunking for Slack conversations
- * 
+ *
  * Philosophy:
  * - The unit of meaning in Slack is: Workspace → Channel → Thread → Messages
  * - Not "1000 tokens" — but conversation structure
- * 
+ *
  * Chunking Strategy:
  * 1. Group messages by thread_ts (conversation context)
  * 2. Create thread-aware chunks that preserve conversation flow
@@ -95,7 +95,7 @@ const CHUNK_CONFIG = {
 class SlackChunkingService {
   /**
    * Main entry point: chunk Slack messages intelligently
-   * 
+   *
    * @param messages - Raw Slack messages from API
    * @param channel - Channel metadata
    * @param workspace - Workspace metadata
@@ -108,9 +108,7 @@ class SlackChunkingService {
   ): SlackChunk[] {
     if (messages.length === 0) return [];
 
-    console.log(
-      `[SlackChunking] Processing ${messages.length} messages from #${channel.name}`
-    );
+    console.log(`[SlackChunking] Processing ${messages.length} messages from #${channel.name}`);
 
     // Step 1: Build threads from messages
     const threads = this.buildThreads(messages, channel);
@@ -174,10 +172,7 @@ class SlackChunkingService {
    * 2. Code chunks (technical snippets)
    * 3. Thread summary (optional, future)
    */
-  private chunkThread(
-    thread: SlackThread,
-    workspace: { id: string; name: string }
-  ): SlackChunk[] {
+  private chunkThread(thread: SlackThread, workspace: { id: string; name: string }): SlackChunk[] {
     const chunks: SlackChunk[] = [];
 
     // Detect code-heavy messages first
@@ -279,7 +274,9 @@ class SlackChunkingService {
         continue;
       }
 
-      const allAuthors = [...new Set(windowMsgs.map((m) => m.user_real_name || m.user_name || m.user))];
+      const allAuthors = [
+        ...new Set(windowMsgs.map((m) => m.user_real_name || m.user_name || m.user)),
+      ];
       const allMentions = windowMsgs.flatMap((m) => this.extractMentions(m.text));
       const hasCode = windowMsgs.some((m) => this.hasCodeBlocks(m.text));
       const hasLinks = windowMsgs.some((m) => this.hasLinks(m.text));
@@ -357,7 +354,8 @@ class SlackChunkingService {
       const code = match[2].trim();
 
       // Detect if it looks like a log (no specific language marker)
-      const isLog = !match[1] && (code.includes("ERROR") || code.includes("WARN") || code.includes("["));
+      const isLog =
+        !match[1] && (code.includes("ERROR") || code.includes("WARN") || code.includes("["));
 
       blocks.push({
         code: match[0], // Full block with ```

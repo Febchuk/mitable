@@ -272,7 +272,9 @@ class IngestionService {
               result.messagesEmbedded += chunksCreated; // Track chunks, not raw messages
               channelMessageCount += batch.length; // Track raw messages for display
 
-              console.log(`   📊 Batch complete: +${chunksCreated} chunks (total: ${result.messagesEmbedded})`);
+              console.log(
+                `   📊 Batch complete: +${chunksCreated} chunks (total: ${result.messagesEmbedded})`
+              );
 
               // Update progress
               onProgress?.({
@@ -384,7 +386,9 @@ class IngestionService {
         }
       );
 
-      console.log(`[Ingestion] Generated ${smartChunks.length} smart chunks from ${validMessages.length} messages`);
+      console.log(
+        `[Ingestion] Generated ${smartChunks.length} smart chunks from ${validMessages.length} messages`
+      );
 
       if (smartChunks.length === 0) return 0;
 
@@ -426,7 +430,9 @@ class IngestionService {
             has_links: chunk.has_links,
             has_attachments: chunk.has_attachments,
             has_reactions: chunk.has_reactions,
-            ...(chunk.reaction_summary && { reaction_summary: JSON.stringify(chunk.reaction_summary) }),
+            ...(chunk.reaction_summary && {
+              reaction_summary: JSON.stringify(chunk.reaction_summary),
+            }),
 
             // Chunk metadata
             chunk_index: chunk.chunk_index,

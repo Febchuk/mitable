@@ -1,6 +1,6 @@
 /**
  * Temporal Query Parser
- * 
+ *
  * Extracts temporal expressions from natural language queries and converts them to date ranges.
  * Examples:
  * - "this week" → Monday to today
