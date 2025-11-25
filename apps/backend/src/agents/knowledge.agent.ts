@@ -326,7 +326,36 @@ export class KnowledgeAgent extends BaseAgent {
   }
 
   /**
-   * Execute a tool and return formatted result
+   * Search company knowledge base and return raw results
+   * Used by other agents (like VisualGuidanceAgent) that need raw sources for their own synthesis
+   */
+  async search(
+    query: string,
+    context: ToolContext
+  ): Promise<{ sources: any[] }> {
+    // Call slack retriever directly for raw results
+    const results = await slackRetriever.retrieve(
+      query,
+      { organizationId: context.organizationId },
+      { topK: 20 }
+    );
+
+    // Format results similar to old search format
+    const sources = results.threads.flatMap((thread: any) =>
+      thread.messages.map((msg: any) => ({
+        channel: thread.channelName,
+        user: msg.username,
+        text: msg.text,
+        timestamp: msg.timestamp,
+        source: "slack",
+      }))
+    );
+
+    return { sources };
+  }
+
+  /**
+   * Execute a specific tool and return its result as a string
    */
   private async executeTool(
     toolName: string,
