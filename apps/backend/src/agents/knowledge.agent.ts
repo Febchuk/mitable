@@ -1,10 +1,11 @@
 import Groq from "groq-sdk";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
-import type { StreamChunk, ToolContext } from "../tools/base.tool";
+import type { StreamChunk, ToolContext, Source } from "../tools/base.tool";
 // import { codeRetriever } from "../retrievers/code.retriever";
 // import { workRetriever } from "../retrievers/work.retriever";
 import { slackRetriever } from "../retrievers/slack.retriever";
+import { TemporalQueryParser } from "../utils/temporal-parser";
 // import { notionRetriever } from "../retrievers/notion.retriever";
 // import { orgContextService } from "../services/org-context.service";
 
@@ -19,10 +20,70 @@ import { slackRetriever } from "../retrievers/slack.retriever";
 export class KnowledgeAgent extends BaseAgent {
   readonly name = "knowledge";
   private groq: Groq;
+  private temporalParser: TemporalQueryParser;
 
   constructor() {
     super();
     this.groq = new Groq({ apiKey: config.groq.apiKey });
+    this.temporalParser = new TemporalQueryParser();
+  }
+
+  /**
+   * Parse sources from LLM response
+   * Extracts **Sources:** section and structures it
+   */
+  private parseSources(content: string): { cleanContent: string; sources: Source[] } {
+    // Try to find **Sources:** header first
+    let sourcesMatch = content.match(/\*\*Sources:\*\*([\s\S]*?)$/i);
+    let cleanContent = content;
+    let sourcesText = "";
+
+    if (sourcesMatch) {
+      // Found header - use everything after it
+      cleanContent = content.substring(0, sourcesMatch.index).trim();
+      sourcesText = sourcesMatch[1];
+    } else {
+      // No header - check if there are source-like lines at the end
+      const lines = content.split("\n");
+      let firstSourceLineIndex = -1;
+
+      // Find first line that looks like a source (starts with - and has [Slack] or [Notion])
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i].trim();
+        if (line.startsWith("-") && /\[(Slack|Notion|GitHub)\]/.test(line)) {
+          firstSourceLineIndex = i;
+        } else if (line && firstSourceLineIndex !== -1) {
+          // Found non-source line, stop
+          break;
+        }
+      }
+
+      if (firstSourceLineIndex !== -1) {
+        cleanContent = lines.slice(0, firstSourceLineIndex).join("\n").trim();
+        sourcesText = lines.slice(firstSourceLineIndex).join("\n");
+      }
+    }
+
+    const sources: Source[] = [];
+
+    // Parse each source line: - Title ([Type](url))
+    const sourceLines = sourcesText.split("\n").filter((line) => line.trim().startsWith("-"));
+
+    for (const line of sourceLines) {
+      // Match: - Title ([Slack](url)) or - Title ([Notion](url))
+      const match = line.match(/-\s*(.+?)\s*\(\[(Slack|Notion|GitHub)\]\(([^)]+)\)\)/);
+
+      if (match) {
+        const [, title, type, url] = match;
+        sources.push({
+          title: title.trim(),
+          url: url.trim(),
+          snippet: `From ${type}`, // Type indicator
+        });
+      }
+    }
+
+    return { cleanContent, sources };
   }
 
   /**
@@ -186,7 +247,22 @@ export class KnowledgeAgent extends BaseAgent {
           "  3. 'Notion sync pipeline ingestion'\n" +
           "  4. 'Notion integration implementation code'\n\n" +
           "Quality over speed: Take 5-8 tool calls if needed to provide a complete answer.\n" +
-          "When multiple documents contain similar information, prefer the most recently edited one (check last_edited field).",
+          "When multiple documents contain similar information, prefer the most recently edited one (check last_edited field).\n\n" +
+          "CRITICAL SOURCE FORMATTING - ALWAYS INCLUDE SOURCES:\n" +
+          "1. DO NOT cite sources inline in your response text - no '(Notion)' or '(Slack)' in sentences\n" +
+          "2. ALWAYS end with a **Sources:** section heading - this is MANDATORY\n" +
+          "3. After your answer, add a blank line, then EXACTLY this heading: **Sources:**\n" +
+          "4. Format each source on its own line starting with a dash:\n\n" +
+          "**Sources:**\n" +
+          "- #channel - username ([Slack](url))\n" +
+          "- Document Title ([Notion](url))\n\n" +
+          "Examples:\n" +
+          "  ✅ CORRECT: '- #engineering - febe.chukwuma ([Slack](https://slack.com/msg))'\n" +
+          "  ✅ CORRECT: '- Product Requirements Document ([Notion](https://notion.so/page))'\n" +
+          "  ❌ WRONG: 'According to the Slack discussion...' - no inline citations\n" +
+          "  ❌ WRONG: Sources without **Sources:** heading - MUST include heading\n" +
+          "  ❌ WRONG: No sources section at end - MANDATORY\n\n" +
+          "REMEMBER: You MUST include the **Sources:** heading before the list!",
       });
 
       for (const msg of context.conversationHistory) {
@@ -287,17 +363,32 @@ export class KnowledgeAgent extends BaseAgent {
         const finalAnswer = responseMessage?.content || "I couldn't generate an answer.";
 
         console.log(`[KnowledgeAgent] Final answer (${finalAnswer.length} chars)`);
+        console.log(`[KnowledgeAgent] Raw LLM response:\n${finalAnswer.substring(0, 500)}...`);
 
-        // Stream the answer to user
+        // Parse sources from response
+        const { cleanContent, sources } = this.parseSources(finalAnswer);
+
+        console.log(`[KnowledgeAgent] Parsed ${sources.length} sources`);
+        if (sources.length === 0 && finalAnswer.toLowerCase().includes("source")) {
+          console.log(
+            `[KnowledgeAgent] WARNING: Response mentions 'source' but parsing found 0. Checking format...`
+          );
+          console.log(
+            `[KnowledgeAgent] Last 300 chars:\n${finalAnswer.substring(finalAnswer.length - 300)}`
+          );
+        }
+
+        // Stream the clean answer (without sources section) to user
         yield {
           type: "chunk",
-          content: finalAnswer,
+          content: cleanContent,
         };
 
         yield {
           type: "complete",
           messageType: "text",
-          content: finalAnswer,
+          content: cleanContent,
+          sources: sources.length > 0 ? sources : undefined,
         };
 
         return;
@@ -376,11 +467,24 @@ export class KnowledgeAgent extends BaseAgent {
       // }
 
       case "search_slack": {
-        const results = await slackRetriever.retrieve(
-          args.query,
-          { organizationId: context.organizationId },
-          { topK }
-        );
+        // Parse temporal expressions from query
+        const temporalRange = this.temporalParser.parse(args.query);
+
+        const retrievalContext: any = { organizationId: context.organizationId };
+        if (temporalRange?.dateFrom) {
+          retrievalContext.dateFrom = temporalRange.dateFrom;
+          console.log(
+            `[KnowledgeAgent] Temporal filter: dateFrom = ${temporalRange.dateFrom.toISOString()}`
+          );
+        }
+        if (temporalRange?.dateTo) {
+          retrievalContext.dateTo = temporalRange.dateTo;
+          console.log(
+            `[KnowledgeAgent] Temporal filter: dateTo = ${temporalRange.dateTo.toISOString()}`
+          );
+        }
+
+        const results = await slackRetriever.retrieve(args.query, retrievalContext, { topK });
 
         const formatted = results.threads.flatMap((thread: any) =>
           thread.messages.map((msg: any) => ({

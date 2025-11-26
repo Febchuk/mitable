@@ -7,8 +7,6 @@ import { VisualGuidanceAgent } from "../agents/visual-guidance.agent";
 import { ExpertMatchingAgent } from "../agents/expert-matching.agent";
 import { BaseAgent } from "../agents/base.agent";
 import { guideGenerationService } from "./guideGeneration.service";
-import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
-import { cacheService } from "./cache.service";
 
 /**
  * Intent classification types
@@ -69,40 +67,17 @@ export class OrchestratorService {
   private knowledgeAgent: KnowledgeAgent;
   private visualGuidanceAgent: VisualGuidanceAgent;
   private expertMatchingAgent: ExpertMatchingAgent;
-  private searchTool: SearchKnowledgeTool;
 
   constructor() {
     this.gemini = new GoogleGenerativeAI(config.gemini.apiKey);
 
-    // Initialize agents
+    // Initialize agents (order matters for dependencies)
     this.textAgent = new TextResponseAgent();
     this.knowledgeAgent = new KnowledgeAgent();
     this.expertMatchingAgent = new ExpertMatchingAgent();
 
     // Visual Guidance Agent depends on Knowledge Agent and Text Response Agent
     this.visualGuidanceAgent = new VisualGuidanceAgent(this.knowledgeAgent, this.textAgent);
-    this.searchTool = new SearchKnowledgeTool();
-  }
-
-  // Generate a concise 1–2 sentence definition using TextResponseAgent and truncate
-  private async getShortDefinition(context: ToolContext): Promise<string> {
-    try {
-      let full = "";
-      for await (const chunk of this.textAgent.execute(context)) {
-        if (chunk.type === "chunk" && "content" in chunk && typeof chunk.content === "string") {
-          full += chunk.content;
-        }
-        if (chunk.type === "complete" && "content" in chunk && typeof chunk.content === "string") {
-          full = chunk.content as string;
-        }
-      }
-      const cleaned = full.trim().replace(/\s+/g, " ");
-      const match = cleaned.match(/([^.!?]*[.!?]){1,2}/);
-      const twoSentences = match ? match[0] : cleaned.slice(0, 300);
-      return twoSentences.trim();
-    } catch {
-      return "";
-    }
   }
 
   /**
@@ -159,28 +134,7 @@ export class OrchestratorService {
         confidence: intent.confidence,
       });
 
-      // Step 4: Blended mode — encyclopedic + strong KB → definition then internal context
-      const lastUserMessage = context.conversationHistory.filter((m) => m.role === "user").pop();
-      const userMsg = lastUserMessage?.content || "";
-      const ENCYCLOPEDIA_HINT =
-        /\b(what|who|where|when|why|how)\s+(is|are|was|were)\b|^define\b|^explain\b/i;
-      const encyclopedic = ENCYCLOPEDIA_HINT.test(userMsg);
-      if (encyclopedic) {
-        const pf = await this.kbPreflight(userMsg, context);
-        const strongKB = pf.top >= 0.35 && pf.strongCount >= 2;
-        if (strongKB) {
-          const def = await this.getShortDefinition(context);
-          if (def) {
-            const preface = `In short: ${def}\n\n`;
-            yield { type: "chunk", content: preface };
-          }
-          // Then stream internal context with sources
-          yield* this.knowledgeAgent.execute(context);
-          return;
-        }
-      }
-
-      // Step 5: Route based on intent
+      // Step 4: Route based on intent
       const agent = await this.routeByIntent(intent, context);
 
       console.log("[Orchestrator] Routing: intent � Agent:", agent.name);
@@ -193,46 +147,6 @@ export class OrchestratorService {
         type: "error",
         error: error instanceof Error ? error.message : "Unknown orchestration error",
       };
-    }
-  }
-
-  /**
-   * Quick non-streaming KB probe to gauge evidence strength
-   * Returns both scores AND full search results for caching
-   */
-  private async kbPreflight(
-    query: string,
-    ctx: ToolContext
-  ): Promise<{ top: number; strongCount: number; results?: any; preview?: string }> {
-    try {
-      // Check cache first
-      const cacheKey = `kb-preflight:${ctx.organizationId}:${query}`;
-      const cached = cacheService.get<any>(cacheKey);
-      if (cached) {
-        console.log("[Orchestrator] KB preflight cache hit");
-        return cached;
-      }
-
-      // Do quick search
-      const res = await this.searchTool.execute({ query, topK: 6 }, ctx);
-      const scores = (res.sources ?? []).map((s: any) =>
-        Number.isFinite(s.score) ? Number(s.score) : 0
-      );
-      const top = scores[0] ?? 0;
-      const strongCount = scores.filter((x) => x >= 0.35).length;
-
-      // Create preview from top result
-      const preview = res.sources?.[0]?.snippet?.slice(0, 150) || "";
-
-      const result = { top, strongCount, results: res, preview };
-
-      // Cache for 5 minutes (shorter TTL for fresher routing)
-      cacheService.set(cacheKey, result, 300);
-
-      return result;
-    } catch (error) {
-      // On error, treat as weak to avoid dead-ends
-      return { top: 0, strongCount: 0 };
     }
   }
 
@@ -323,35 +237,11 @@ export class OrchestratorService {
         return { type: "general_chat", confidence: 1.0 };
       }
 
-      // (0b) For ambiguous queries, do KB preflight BEFORE routing decision
-      const GENERIC_QA = /\b(what|who|where|when|why|how|define|explain|summarize)\b/i;
+      // Has org hints → route to knowledge search
       const ORG_HINT =
         /\b(slack|notion|policy|policies|handbook|doc|docs|documentation|meeting|notes|recap|decision|roadmap|update|channel|thread|conversation|discuss|discussed|talk|talked|mention|mentioned|said|internal|wiki|sop|prd|spec|org|organization|company|team|we|our|us|locally|setup|set up|environment|configure|config|install|deploy|january|february|march|april|may|june|july|august|september|october|november|december|today|yesterday|week|month|year|ago|recent|latest)\b/i;
 
-      const isAmbiguous = GENERIC_QA.test(userMessage);
-      let kbContext = null;
-
-      // Do KB preflight for ambiguous queries to inform routing
-      if (isAmbiguous && !ORG_HINT.test(userMessage)) {
-        console.log("[Orchestrator] Ambiguous query → checking KB first");
-        kbContext = await this.kbPreflight(userMessage, context);
-
-        // If KB has NO relevant content, route to open_domain_qa
-        const weakKB = kbContext.top < 0.28 || kbContext.strongCount < 1;
-        if (weakKB) {
-          console.log("[Orchestrator] No KB content → open_domain_qa");
-          return { type: "open_domain_qa", confidence: 0.95 };
-        } else {
-          // KB has content! Route to knowledge_search and cache results
-          console.log("[Orchestrator] KB has content → knowledge_search (preflight cached)");
-          const intent: any = { type: "knowledge_search", confidence: 0.9 };
-          intent.kbPreflightCache = kbContext; // Attach for reuse
-          return intent;
-        }
-      }
-
-      // Has org hints → likely knowledge query
-      if (isAmbiguous && ORG_HINT.test(userMessage)) {
+      if (ORG_HINT.test(userMessage)) {
         console.log("[Orchestrator] Has org hints → knowledge_search");
         return { type: "knowledge_search", confidence: 0.9 };
       }
@@ -411,19 +301,6 @@ Return STRICT JSON only:
           type: "open_domain_qa",
           confidence: Math.min(0.9, Math.max(0.6, intent.confidence)),
         } as Intent;
-      }
-
-      // (4c) KB preflight: if intent is knowledge_search but we haven't checked KB yet, do it now
-      if (intent.type === "knowledge_search" && !(intent as any).kbPreflightCache) {
-        const pf = await this.kbPreflight(userMessage, context);
-        const weakKB = pf.top < 0.28 || pf.strongCount < 2;
-        if (weakKB) {
-          console.log("[Orchestrator] KB preflight weak → open_domain_qa");
-          intent = { type: "open_domain_qa", confidence: 0.8 } as Intent;
-        } else {
-          // Cache for potential reuse
-          (intent as any).kbPreflightCache = pf;
-        }
       }
 
       return intent;
