@@ -34,7 +34,7 @@ export class KnowledgeAgent extends BaseAgent {
    */
   private parseSources(content: string): { cleanContent: string; sources: Source[] } {
     // Try to find **Sources:** header first
-    let sourcesMatch = content.match(/\*\*Sources:\*\*([\s\S]*?)$/i);
+    const sourcesMatch = content.match(/\*\*Sources:\*\*([\s\S]*?)$/i);
     let cleanContent = content;
     let sourcesText = "";
 
