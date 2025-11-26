@@ -391,7 +391,17 @@ export class KnowledgeAgent extends BaseAgent {
           }))
         );
 
-        return JSON.stringify(formatted);
+        // Add metadata about truncation
+        const response: any = { messages: formatted };
+        if (results.truncated) {
+          response._meta = {
+            truncated: true,
+            estimatedTokens: results.estimatedTokens,
+            note: "Results were truncated to fit token budget. You can request more specific searches or filter by time/channel if needed.",
+          };
+        }
+
+        return JSON.stringify(response);
       }
 
       // TODO: Re-enable after Slack chunking is complete

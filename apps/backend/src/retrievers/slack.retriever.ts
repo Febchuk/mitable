@@ -59,6 +59,8 @@ export interface SlackRetrievalResult {
   threads: SlackThread[]; // Grouped by thread
   totalMessages: number;
   searchTime: number;
+  truncated: boolean; // True if results were truncated due to token budget
+  estimatedTokens: number; // Estimated tokens in returned context
 }
 
 export class SlackRetriever {
@@ -78,10 +80,11 @@ export class SlackRetriever {
     context: SlackRetrievalContext,
     options: {
       topK?: number;
+      maxTokens?: number; // Token budget for context (default: 90k for 131k model, leaves 41k for system+response)
     } = {}
   ): Promise<SlackRetrievalResult> {
     const startTime = Date.now();
-    const { topK = 20 } = options;
+    const { topK = 20, maxTokens = 90000 } = options;
 
     console.log(`[SlackRetriever] Searching for: "${query}"`, {
       organizationId: context.organizationId,
@@ -110,16 +113,27 @@ export class SlackRetriever {
     // Step 6: Group by thread
     const threads = this.groupByThread(expanded);
 
+    // Step 7: Apply token budget (prevent hitting LLM context limits)
+    const { truncatedThreads, truncated, estimatedTokens } = this.applyTokenBudget(
+      threads,
+      maxTokens
+    );
+
     const searchTime = Date.now() - startTime;
 
     console.log(
-      `[SlackRetriever] Found ${threads.length} threads (${expanded.length} messages) in ${searchTime}ms`
+      `[SlackRetriever] Found ${truncatedThreads.length} threads (${expanded.length} messages) in ${searchTime}ms`
+    );
+    console.log(
+      `[SlackRetriever] Estimated tokens: ${estimatedTokens} / ${maxTokens} (truncated: ${truncated})`
     );
 
     return {
-      threads,
+      threads: truncatedThreads,
       totalMessages: expanded.length,
       searchTime,
+      truncated,
+      estimatedTokens,
     };
   }
 
@@ -325,6 +339,53 @@ export class SlackRetriever {
     });
 
     return allMessages;
+  }
+
+  /**
+   * Apply token budget to prevent hitting LLM context limits
+   * Strategy:
+   * 1. Estimate tokens per thread (rough: 1 token ≈ 0.75 words, avg msg = 50 words = ~67 tokens)
+   * 2. Keep highest-scoring threads until budget exhausted
+   * 3. Never split a thread mid-conversation (preserve coherence)
+   */
+  private applyTokenBudget(
+    threads: SlackThread[],
+    maxTokens: number
+  ): { truncatedThreads: SlackThread[]; truncated: boolean; estimatedTokens: number } {
+    // Sort threads by topScore (keep most relevant)
+    const sortedThreads = threads.sort((a, b) => b.topScore - a.topScore);
+
+    const result: SlackThread[] = [];
+    let totalTokens = 0;
+    let truncated = false;
+
+    for (const thread of sortedThreads) {
+      // Estimate tokens for this thread
+      // Formula: chars / 4 (rough approximation, 1 token ≈ 4 chars)
+      const threadText = thread.messages.map((m) => m.text).join(" ");
+      const estimatedThreadTokens = Math.ceil(threadText.length / 4);
+
+      // Check if adding this thread would exceed budget
+      if (totalTokens + estimatedThreadTokens > maxTokens) {
+        console.log(
+          `[SlackRetriever] Token budget reached: ${totalTokens} + ${estimatedThreadTokens} > ${maxTokens}`
+        );
+        console.log(
+          `[SlackRetriever] Truncated ${sortedThreads.length - result.length} threads (LLM can request more in next turn)`
+        );
+        truncated = true;
+        break;
+      }
+
+      result.push(thread);
+      totalTokens += estimatedThreadTokens;
+    }
+
+    return {
+      truncatedThreads: result,
+      truncated,
+      estimatedTokens: totalTokens,
+    };
   }
 
   /**
