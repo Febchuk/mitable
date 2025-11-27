@@ -589,7 +589,6 @@ function setupIPC() {
   //   }
   // );
 
-
   // NEW: Direct nudge creation from conversation window (inline expert cards)
   ipcMain.on(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, (_event, data) => {
     console.log("[Main] Opening Console nudge form with inline expert data:", data);
