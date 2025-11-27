@@ -302,7 +302,7 @@ export class KnowledgeAgent extends BaseAgent {
         console.log(`[KnowledgeAgent] Iteration ${iteration}/${MAX_ITERATIONS}`);
 
         const response = await this.groq.chat.completions.create({
-          model: "openai/gpt-oss-120b",
+          model: config.groq.chatModel,
           messages: messages,
           tools: tools,
           tool_choice: "auto",
