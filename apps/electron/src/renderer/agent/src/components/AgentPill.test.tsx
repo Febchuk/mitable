@@ -2,6 +2,35 @@ import { render } from "@testing-library/react";
 import { screen, fireEvent } from "@testing-library/dom";
 import AgentPill from "./AgentPill";
 
+// Mock window.agentAPI for Electron preload bridge
+beforeAll(() => {
+  Object.defineProperty(window, "agentAPI", {
+    value: {
+      toggle: jest.fn(),
+      showConsole: jest.fn(),
+      setIgnoreMouseEvents: jest.fn(),
+      resizeWindow: jest.fn(),
+      showConversation: jest.fn(),
+      hideConversation: jest.fn(),
+      toggleConversation: jest.fn(),
+      sendMessageToConversation: jest.fn(),
+      captureScreenshot: jest.fn(),
+      getAuthToken: jest.fn(),
+      onAuthTokenUpdated: jest.fn(),
+      showNudge: jest.fn(),
+      startGuide: jest.fn(),
+      onGuideNextStep: jest.fn(),
+      toggleWatchMode: jest.fn(),
+      unselectWindow: jest.fn(),
+      getSelectedWindows: jest.fn().mockResolvedValue([]),
+      onWatchWindowsUpdated: jest.fn(),
+      offWatchWindowsUpdated: jest.fn(),
+      openConversationInConsole: jest.fn(),
+    },
+    writable: true,
+  });
+});
+
 describe("AgentPill Component", () => {
   const mockOnSubmit = jest.fn();
 
