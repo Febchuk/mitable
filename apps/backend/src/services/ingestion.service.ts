@@ -3,6 +3,7 @@ import { notionService } from "./notion.service.js";
 import { embeddingService } from "./embedding.service.js";
 import { vectorService } from "./vector.service.js";
 import { chunkingService } from "./chunking.service.js";
+import { slackChunkingService } from "./slack-chunking.service.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, sql, desc } from "drizzle-orm";
@@ -197,6 +198,12 @@ class IngestionService {
         console.log(`🔄 Sync Mode: ${syncMode} (first sync)`);
       }
 
+      // User info cache (to avoid redundant API calls)
+      const userCache = new Map<
+        string,
+        { id?: string; name?: string; real_name?: string; email?: string } | null
+      >();
+
       // Process each channel
       for (let i = 0; i < selectedChannels.length; i++) {
         const channelId = selectedChannels[i];
@@ -231,10 +238,29 @@ class IngestionService {
 
             if (messages.length === 0) break;
 
+            // Enrich messages with user info (name, real_name) using cache
+            const enrichedMessages = await Promise.all(
+              messages.map(async (msg) => {
+                // Check cache first
+                if (!userCache.has(msg.user)) {
+                  // Fetch and cache user info
+                  const userInfo = await slackService.getUserInfo(organizationId, msg.user);
+                  userCache.set(msg.user, userInfo);
+                }
+
+                const userInfo = userCache.get(msg.user);
+                return {
+                  ...msg,
+                  user_name: userInfo?.name || msg.user,
+                  user_real_name: userInfo?.real_name || userInfo?.name || msg.user,
+                };
+              })
+            );
+
             // Process messages in batches
-            for (let j = 0; j < messages.length; j += SYNC_CONFIG.BATCH_SIZE) {
-              const batch = messages.slice(j, j + SYNC_CONFIG.BATCH_SIZE);
-              await this.processBatch(
+            for (let j = 0; j < enrichedMessages.length; j += SYNC_CONFIG.BATCH_SIZE) {
+              const batch = enrichedMessages.slice(j, j + SYNC_CONFIG.BATCH_SIZE);
+              const chunksCreated = await this.processBatch(
                 batch,
                 organizationId,
                 workspaceId,
@@ -243,8 +269,12 @@ class IngestionService {
                 channelInfo?.is_private || false
               );
 
-              result.messagesEmbedded += batch.length;
-              channelMessageCount += batch.length;
+              result.messagesEmbedded += chunksCreated; // Track chunks, not raw messages
+              channelMessageCount += batch.length; // Track raw messages for display
+
+              console.log(
+                `   📊 Batch complete: +${chunksCreated} chunks (total: ${result.messagesEmbedded})`
+              );
 
               // Update progress
               onProgress?.({
@@ -269,9 +299,15 @@ class IngestionService {
           const errorMsg = `Failed to process channel ${channelId}: ${
             error instanceof Error ? error.message : "Unknown error"
           }`;
+          console.error(`❌ Channel error:`, errorMsg);
+          if (error instanceof Error && error.stack) {
+            console.error(error.stack);
+          }
           result.errors.push(errorMsg);
         }
       }
+
+      console.log(`👥 User cache: ${userCache.size} unique users fetched`);
 
       // Update sync log
       await db
@@ -295,6 +331,8 @@ class IngestionService {
       result.success = true;
       result.duration = Date.now() - startTime;
 
+      console.log(`\n📊 Final Result:`, JSON.stringify(result, null, 2));
+
       return result;
     } catch (error) {
       // Update sync log as failed
@@ -317,6 +355,8 @@ class IngestionService {
 
   /**
    * Process a batch of Slack messages: chunk, embed, and dual-write to Pinecone + PostgreSQL
+   * NOW USING: Thread-aware SlackChunkingService
+   * Returns: Number of chunks created
    */
   private async processBatch(
     messages: any[],
@@ -325,80 +365,95 @@ class IngestionService {
     workspaceName: string,
     channelName: string,
     isPrivate: boolean
-  ): Promise<void> {
+  ): Promise<number> {
     const validMessages = messages.filter((msg) => msg.text && msg.text.trim().length > 0);
 
-    if (validMessages.length === 0) return;
+    if (validMessages.length === 0) return 0;
 
     try {
-      const allChunks: Array<{
-        chunkText: string;
-        chunkIndex: number;
-        totalChunks: number;
-        parentMessage: any;
-      }> = [];
-
-      for (const msg of validMessages) {
-        const chunks = chunkingService.chunkText(msg.text);
-        for (const chunk of chunks) {
-          allChunks.push({
-            chunkText: chunk.text,
-            chunkIndex: chunk.chunkIndex,
-            totalChunks: chunk.totalChunks,
-            parentMessage: msg,
-          });
+      // 🆕 Use thread-aware chunking instead of generic token-based chunking
+      const smartChunks = slackChunkingService.chunkSlackMessages(
+        validMessages,
+        {
+          id: validMessages[0].channel,
+          name: channelName,
+          is_dm: false, // TODO: Pass actual channel type
+          is_group_dm: false,
+        },
+        {
+          id: organizationId,
+          name: workspaceName,
         }
-      }
+      );
 
-      const texts = allChunks.map((c) => c.chunkText);
+      console.log(
+        `[Ingestion] Generated ${smartChunks.length} smart chunks from ${validMessages.length} messages`
+      );
+
+      if (smartChunks.length === 0) return 0;
+
+      const texts = smartChunks.map((c) => c.text);
       const embeddings = await embeddingService.embedTexts(texts);
 
-      const vectors = await Promise.all(
-        allChunks.map(async (chunkData, idx) => {
-          const msg = chunkData.parentMessage;
-          const userInfo = await slackService.getUserInfo(organizationId, msg.user);
-          const timestamp = parseFloat(msg.ts);
-          const date = new Date(timestamp * 1000);
+      // 🆕 Build vectors with rich metadata from smart chunks
+      const vectors = smartChunks.map((chunk, idx) => {
+        const threadStartDate = new Date(chunk.thread_start_ts * 1000);
 
-          return {
-            id: `slack-${msg.channel}-${msg.ts}-chunk-${chunkData.chunkIndex}`,
-            values: embeddings[idx],
-            metadata: {
-              text: chunkData.chunkText,
-              source: "slack",
-              source_type: msg.thread_ts ? "thread_reply" : "message",
+        return {
+          id: `slack-${chunk.channel_id}-${chunk.thread_id}-chunk-${chunk.chunk_index}`,
+          values: embeddings[idx],
+          metadata: {
+            text: chunk.text,
+            source: "slack",
+            source_type: chunk.is_thread_root ? "thread_root" : "thread_reply",
 
-              channel_id: msg.channel,
-              channel_name: channelName,
-              message_ts: msg.ts,
-              ...(msg.thread_ts && { thread_ts: msg.thread_ts }),
+            // Channel context
+            channel_id: chunk.channel_id,
+            channel_name: chunk.channel_name,
+            is_dm: chunk.is_dm,
+            is_group_dm: chunk.is_group_dm,
+            is_private_channel: isPrivate,
+            channel_type: isPrivate ? "private_channel" : "public_channel",
 
-              chunk_index: chunkData.chunkIndex,
-              total_chunks: chunkData.totalChunks,
-              is_chunked: chunkData.totalChunks > 1,
+            // Thread context
+            thread_id: chunk.thread_id,
+            thread_ts: chunk.thread_id,
+            message_ids: chunk.message_ids,
+            is_thread_root: chunk.is_thread_root,
 
-              user_id: msg.user,
-              username: userInfo?.name || "unknown",
-              user_real_name: userInfo?.real_name || "Unknown User",
+            // 🆕 STRUCTURE-AWARE METADATA
+            chunk_type: chunk.chunk_type,
+            authors: chunk.authors,
+            mentioned_users: chunk.mentioned_users,
+            has_code: chunk.has_code,
+            ...(chunk.code_language && { code_language: chunk.code_language }),
+            has_links: chunk.has_links,
+            has_attachments: chunk.has_attachments,
+            has_reactions: chunk.has_reactions,
+            ...(chunk.reaction_summary && {
+              reaction_summary: JSON.stringify(chunk.reaction_summary),
+            }),
 
-              message_url: msg.permalink,
+            // Chunk metadata
+            chunk_index: chunk.chunk_index,
+            total_chunks: chunk.total_chunks,
+            is_chunked: chunk.total_chunks > 1,
 
-              timestamp: Math.floor(timestamp),
-              date: date.toISOString().split("T")[0],
-              year: date.getFullYear(),
-              month: date.getMonth() + 1,
-              day_of_week: date.toLocaleDateString("en-US", { weekday: "long" }),
+            // Timestamps
+            timestamp: Math.floor(chunk.thread_start_ts),
+            date: threadStartDate.toISOString().split("T")[0],
+            year: threadStartDate.getFullYear(),
+            month: threadStartDate.getMonth() + 1,
+            day_of_week: threadStartDate.toLocaleDateString("en-US", { weekday: "long" }),
+            created_at: chunk.created_at,
 
-              organization_id: organizationId,
-              workspace_id: workspaceId,
-              workspace_name: workspaceName,
-
-              is_private_channel: isPrivate,
-              channel_type: isPrivate ? "private_channel" : "public_channel",
-            },
-          };
-        })
-      );
+            // Organization context
+            organization_id: organizationId,
+            workspace_id: workspaceId,
+            workspace_name: chunk.workspace_name,
+          },
+        };
+      });
 
       const namespace = `org-${organizationId}`;
 
@@ -423,8 +478,15 @@ class IngestionService {
             updatedAt: new Date(),
           },
         });
+
+      // Return number of chunks created
+      return smartChunks.length;
     } catch (error) {
-      throw new Error("Failed to process message batch", { cause: error });
+      console.error("❌ processBatch error:", error);
+      if (error instanceof Error) {
+        console.error("Stack:", error.stack);
+      }
+      throw error; // Re-throw original error, don't wrap it
     }
   }
 

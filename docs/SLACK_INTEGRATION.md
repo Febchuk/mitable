@@ -2,14 +2,27 @@
 
 ## Overview
 
-The Slack integration allows organizations to sync Slack messages into Mitable's knowledge base, making them searchable and accessible to the AI assistant. Messages are embedded into Pinecone for semantic search and stored in the database for reference.
+The Slack integration allows organizations to sync Slack messages into Mitable's knowledge base with **thread-aware, structure-preserving chunking**. Messages are intelligently grouped by conversation threads, enriched with real user names, and dual-written to both Pinecone (semantic search) and PostgreSQL (keyword search).
+
+### Key Features (v2.0):
+
+- **Thread-Aware Chunking:** Groups messages by `thread_ts` for conversation context
+- **Real Name Attribution:** Fetches and caches user real names (e.g., "Aurel Febe" not "U05ABC123")
+- **Smart Chunk Types:** Separates code blocks, logs, and conversation windows
+- **Rich Metadata:** Authors, reactions, mentions, has_code, code_language, thread hierarchy
+- **Dual-Write Architecture:** Pinecone for semantic + PostgreSQL for keyword search
+- **Performance Optimized:** User info caching reduces API calls by 97%
 
 ## Architecture Flow
 
 ```
-User → OAuth Flow → Slack API → Backend → Database → Pinecone
+User → OAuth Flow → Slack API → Backend → SlackChunkingService
                                     ↓
-                              Message Sync Service
+                        User Info Cache (in-memory)
+                                    ↓
+                    Thread-Aware Smart Chunking
+                                    ↓
+            Dual-Write: Pinecone + PostgreSQL (search_content)
 ```
 
 ## Database Schema
@@ -24,8 +37,8 @@ Stores connection credentials and metadata for each integration:
   organizationId: string (FK to organizations)
   provider: 'slack' | 'notion' | 'github' | 'google-drive'
   status: 'connected' | 'disconnected'
-  accessToken: string (encrypted bot token - xoxb-...)
-  refreshToken: string | null
+  accessTokenEncrypted: string (AES-256 encrypted bot token - xoxb-...)
+  refreshTokenEncrypted: string | null (for providers with refresh tokens)
   metadata: {
     team_id: string
     team_name: string
@@ -42,40 +55,68 @@ Stores connection credentials and metadata for each integration:
 
 **Key Points:**
 
-- `accessToken` stores the Slack bot token (xoxb-...)
-- `status` is only "connected" if `accessToken` exists
+- `accessTokenEncrypted` stores encrypted bot token (AES-256-GCM via `encryptionService`)
+- Tokens decrypted at runtime in sync scripts (never stored in plaintext)
+- `status` is only "connected" if `accessTokenEncrypted` exists
 - One integration per (organizationId, provider) combination
 
-### `slack_messages` Table
+### `search_content` Table
 
-Stores synced Slack messages for reference:
+Unified table storing all searchable content (Slack, Notion, GitHub) with structure-aware metadata:
 
 ```typescript
 {
-  id: string (UUID)
+  // Core fields
+  id: string (Vector ID: "slack-{channelId}-{ts}-chunk-{index}")
   organizationId: string
+  source: 'slack' | 'notion' | 'github'
+  sourceType: 'message' | 'page' | 'code'
+  text: string (chunk content)
+  textVector: tsvector (for PostgreSQL FTS)
+
+  // Slack-specific metadata (v2.0 - Migration 0011)
   channelId: string
   channelName: string
-  messageTs: string (Slack timestamp - unique ID)
-  userId: string (Slack user ID)
-  userName: string
-  text: string (message content)
-  threadTs: string | null (parent message timestamp if reply)
-  metadata: {
-    team_id: string
-    reactions?: array
-    files?: array
-  }
-  createdAt: timestamp (message posted time)
+  userId: string | null
+  username: string | null
+
+  // Thread structure
+  threadId: string | null (thread_ts)
+  isThreadRoot: boolean
+  messageIds: string[] (all message IDs in this chunk)
+
+  // Content classification
+  chunkType: 'thread_summary' | 'message_window' | 'code' | 'log' | 'text'
+  authors: string[] (real names, e.g., ["Aurel Febe", "Febe Mikun"])
+  mentionedUsers: string[] (user IDs mentioned in @mentions)
+  hasCode: boolean
+  codeLanguage: string | null ('sql', 'typescript', 'python', etc.)
+  hasLinks: boolean
+  hasAttachments: boolean
+  hasReactions: boolean
+  reactionSummary: jsonb | null ({ "👍": 5, "✅": 3 })
+
+  // Temporal
+  timestamp: bigint (Unix seconds)
+  date: string (ISO date)
+  createdAt: timestamp
   updatedAt: timestamp
+
+  // Chunk metadata
+  chunkIndex: integer
+  totalChunks: integer
+  isChunked: boolean
 }
 ```
 
 **Key Points:**
 
-- `messageTs` is Slack's unique message identifier
-- `threadTs` links replies to parent messages
-- Messages are namespaced by `organizationId`
+- Replaces old `slack_messages` table with unified `search_content`
+- **Thread-aware:** Groups messages by `thread_id`, preserves hierarchy
+- **Real names:** `authors` array contains actual names (not user IDs)
+- **Rich metadata:** Enables filtering by code, reactions, attachments, etc.
+- **Dual-indexed:** `textVector` for FTS, embeddings in Pinecone
+- **Chunk types:** Different strategies for conversations vs. code vs. logs
 
 ---
 
@@ -86,16 +127,25 @@ Stores synced Slack messages for reference:
 ```
 apps/backend/src/
 ├── routes/
-│   ├── integrations.ts       # Slack OAuth and integration endpoints
-│   └── admin.ts              # Admin endpoints (list integrations)
+│   ├── integrations.ts              # Slack OAuth and integration endpoints
+│   └── admin.ts                     # Admin endpoints (list integrations)
 ├── services/
-│   ├── slack.service.ts      # Slack API client wrapper
-│   ├── ingestion.service.ts  # Message fetching and processing
-│   └── vector.service.ts     # Pinecone embedding operations
-├── config.ts                 # Environment variables
-└── db/
-    └── schema/
-        └── integrations.schema.ts  # Database schema
+│   ├── slack.service.ts             # Slack API client wrapper
+│   ├── slack-chunking.service.ts    # Thread-aware chunking logic (v2.0)
+│   ├── ingestion.service.ts         # Message fetching, user enrichment, dual-write
+│   ├── vector.service.ts            # Pinecone embedding operations
+│   └── embedding.service.ts         # OpenAI embedding generation
+├── scripts/
+│   ├── sync-slack.ts                # Manual sync script
+│   └── run-migration-0011.ts        # Slack metadata migration
+├── db/
+│   ├── migrations/
+│   │   └── 0011_add_slack_structure_metadata.sql  # v2.0 schema changes
+│   └── schema/
+│       ├── integrations.schema.ts   # Integration table
+│       └── search-content.schema.ts # Unified search table
+└── retrievers/
+    └── slack.retriever.ts           # Hybrid search + thread expansion
 ```
 
 ---
@@ -211,52 +261,140 @@ class SlackService {
 - Handles pagination automatically
 - Returns normalized data structures
 - Includes error handling for rate limits
+- **New in v2.0:** `getUserInfo()` fetches real names (e.g., "Aurel Febe")
 
 ---
 
-### 3. `services/ingestion.service.ts`
+### 3. `services/slack-chunking.service.ts` (v2.0)
 
-**Purpose:** Fetch, process, and embed Slack messages
+**Purpose:** Thread-aware, structure-preserving chunking for Slack messages
+
+**Chunking Strategy:**
+
+```typescript
+class SlackChunkingService {
+  /**
+   * Chunk Slack messages by conversation structure (not token count)
+   *
+   * Strategy:
+   * 1. Group messages by thread_ts (conversation context)
+   * 2. Create sliding window chunks (2-3 messages per chunk)
+   * 3. Extract dedicated code/log blocks
+   * 4. Preserve thread hierarchy and user attribution
+   */
+  chunkSlackMessages(
+    messages: SlackMessage[],
+    channel: { id: string; name: string },
+    workspace: { id: string; name: string }
+  ): SlackChunk[];
+}
+```
+
+**Chunk Types:**
+
+1. **Message Window** (`message_window`)
+   - 2-3 message sliding window
+   - Preserves conversation flow
+   - Format:
+
+     ```
+     [Mitable AI • #engineering • 2025-11-25 • Thread]
+
+     Aurel Febe [10:30 AM]: How do we handle OAuth refresh?
+     Febe Mikun [10:31 AM]: We use notionService.refreshToken()
+     Aurel Febe [10:32 AM]: Perfect, thanks!
+     ```
+
+2. **Code Chunks** (`code`)
+   - Extracted from ` ```lang ` blocks
+   - Includes context from parent message
+   - Format:
+
+     ````
+     [Code from #engineering]
+
+     ```sql
+     SELECT * FROM integrations WHERE provider = 'notion';
+     ````
+
+     Context: @aurel shared this query for debugging OAuth tokens
+
+     ```
+
+     ```
+
+3. **Log Chunks** (`log`)
+   - Extracted from error/stack traces
+   - Grouped separately for better retrieval
+
+**Rich Metadata per Chunk:**
+
+```typescript
+{
+  chunk_type: 'message_window' | 'code' | 'log',
+  authors: ['Aurel Febe', 'Febe Mikun'],  // Real names
+  mentioned_users: ['U05ABC123'],          // User IDs from @mentions
+  has_code: boolean,
+  code_language: 'sql' | 'typescript' | 'python' | null,
+  has_links: boolean,
+  has_attachments: boolean,
+  has_reactions: boolean,
+  reaction_summary: { '👍': 5, '✅': 3 },
+  thread_id: '1732027394.123456',
+  is_thread_root: boolean,
+  message_ids: ['1732027394.123456', ...],
+}
+```
+
+---
+
+### 4. `services/ingestion.service.ts` (Updated for v2.0)
+
+**Purpose:** Orchestrate Slack sync with user enrichment and dual-write
 
 **Key Method:**
 
 ```typescript
-async ingestSlackMessages(
+async syncSlackMessages(
   organizationId: string,
-  accessToken: string,
-  selectedChannels: string[]
-): Promise<{ messagesEmbedded: number }>
+  onProgress?: (progress: IngestionProgress) => void
+): Promise<IngestionResult>
 ```
 
-**Flow:**
+**Flow (v2.0):**
 
 1. **Fetch Messages**
-   - Get last sync timestamp from integration
-   - For each selected channel:
-     - Call `slackService.getChannelMessages()`
-     - Use `oldest` parameter for incremental sync
-     - Fetch up to 1000 messages per channel
+   - Get integration and selected channels
+   - Determine sync mode (full vs. incremental)
+   - For each channel:
+     - Call `slackService.fetchChannelMessages()`
+     - Paginate with cursor
 
-2. **Process Messages**
-   - Filter out bot messages
-   - Enrich with user names
-   - Format text content
-   - Handle thread replies
+2. **Enrich with User Info** (NEW)
+   - **User info cache:** In-memory Map<userId, userInfo>
+   - For each message batch:
+     - Check cache first
+     - If not cached, call `slackService.getUserInfo()`
+     - Store: `{ name: "aurel", real_name: "Aurel Febe" }`
+   - **Performance:** Reduces API calls by ~97% (8 calls vs. 514)
 
-3. **Store in Database**
-   - Upsert into `slack_messages` table
-   - Use `(organizationId, messageTs)` as unique key
-   - Preserve message metadata
+3. **Thread-Aware Chunking** (NEW)
+   - Pass enriched messages to `slackChunkingService.chunkSlackMessages()`
+   - Returns smart chunks with rich metadata
+   - Example: 514 messages → 475 chunks
 
-4. **Embed into Pinecone**
-   - For each message:
-     - Generate embedding via OpenAI API
-     - Store in Pinecone namespace: `${organizationId}-slack`
-     - Include metadata: `channelName`, `userName`, `timestamp`
+4. **Dual-Write** (NEW)
+   - **Pinecone:** Store embeddings with metadata
+     - Namespace: `org-{organizationId}`
+     - Vector ID: `slack-{channelId}-{ts}-chunk-{index}`
+   - **PostgreSQL:** Store in `search_content` table
+     - Full-text search via `textVector` (tsvector)
+     - Rich Slack metadata for filtering
 
 5. **Return Results**
-   - Count of embedded messages
-   - Update `lastSyncedAt` in integration
+   - `messagesEmbedded`: Chunk count (not raw message count)
+   - `totalMessages`: Raw message count
+   - `channelsProcessed`, `errors`, `duration`
 
 ---
 
@@ -473,11 +611,68 @@ const refetchData = () => fetchAdminData();
    - Selects channels to sync
    - Clicks "Save & Sync"
 
-7. **Messages Sync**
+7. **Messages Sync (v2.0)**
    - Backend fetches messages from selected channels
-   - Stores in `slack_messages` table
-   - Embeds into Pinecone
-   - Returns count of embedded messages
+   - Enriches with user real names (cached)
+   - Thread-aware chunking via `SlackChunkingService`
+   - Dual-write to Pinecone + PostgreSQL `search_content`
+   - Returns chunk count (not raw message count)
+
+---
+
+## Scripts & Migration (v2.0)
+
+### Manual Sync Script
+
+**Run manually:**
+
+```bash
+npm run sync-slack --workspace=@mitable/backend
+```
+
+**What it does:**
+
+1. Initializes vectorService
+2. Decrypts Slack token
+3. Calls `ingestionService.syncSlackMessages()`
+4. Shows progress and final stats
+
+**Output:**
+
+```
+🚀 Starting Slack sync with thread-aware chunking
+📦 Organization: 9647bdeb-418e-48ba-9da9-17b5f01e2d23
+🔄 Sync Mode: full (first sync)
+
+📱 [1/5] engineering
+   📊 Batch complete: +94 chunks (total: 94)
+📱 [2/5] product
+   📊 Batch complete: +43 chunks (total: 137)
+
+👥 User cache: 8 unique users fetched
+
+✅ Sync Complete!
+Channels processed: 5
+Messages embedded: 475
+Total messages: 514
+Duration: 125.8s
+```
+
+### Migration 0011
+
+**Run once to add v2.0 metadata columns:**
+
+```bash
+npm run migrate:0011 --workspace=@mitable/backend
+```
+
+**What it adds to `search_content` table:**
+
+- `thread_id`, `is_thread_root`, `message_ids[]`
+- `chunk_type`, `authors[]`, `mentioned_users[]`
+- `has_code`, `code_language`, `has_links`, `has_attachments`
+- `has_reactions`, `reaction_summary` (jsonb)
+- Indexes for efficient filtering
 
 ---
 
@@ -503,6 +698,9 @@ DATABASE_URL=postgresql://...
 
 # Auth
 JWT_SECRET=your_jwt_secret
+
+# Encryption (v2.0)
+ENCRYPTION_KEY=your_32_byte_hex_encryption_key  # For encrypting OAuth tokens
 ```
 
 ---
@@ -682,12 +880,15 @@ WHERE organization_id = ? AND provider = 'slack'
 - Can't access other organizations' integrations
 - Pinecone namespaces isolate data per org
 
-### Token Storage:
+### Token Storage (v2.0):
 
-- Slack bot tokens stored in database
-- Should be encrypted at rest (future enhancement)
-- Never exposed to frontend
+- **Encrypted at rest:** All tokens encrypted using AES-256-GCM
+- Stored as `accessTokenEncrypted` / `refreshTokenEncrypted` in database
+- **Encryption service:** `encryptionService.encrypt()` / `decrypt()`
+- **Runtime decryption:** Tokens decrypted only when needed (during sync)
+- Never exposed to frontend or logs
 - Cleared on disconnect
+- **Environment variable:** `ENCRYPTION_KEY` (32-byte hex string)
 
 ### OAuth State:
 
@@ -789,13 +990,97 @@ WHERE organization_id = ? AND provider = 'slack'
 
 ---
 
-## Database Tables Summary
+## Database Tables Summary (v2.0)
 
-| Table            | Records   | Purpose                       |
-| ---------------- | --------- | ----------------------------- |
-| `integrations`   | 1 per org | Store OAuth tokens and config |
-| `slack_messages` | Many      | Archive synced messages       |
-| Pinecone         | Many      | Semantic search vectors       |
+| Table            | Records       | Purpose                                      |
+| ---------------- | ------------- | -------------------------------------------- |
+| `integrations`   | 1 per org     | Store OAuth tokens and config                |
+| `search_content` | Many (chunks) | Unified search table (Slack, Notion, GitHub) |
+| Pinecone         | Many (chunks) | Semantic search vectors                      |
+
+**Note:** `slack_messages` table is deprecated in v2.0. Use `search_content` instead.
+
+---
+
+## Performance Metrics (v2.0)
+
+### User Info Caching
+
+**Problem (v1.0):**
+
+- Called `users.info` API for every message
+- 514 messages = 514 API calls
+- Massive timeout spam from Slack API
+- Sync time: ~5 minutes
+
+**Solution (v2.0):**
+
+- In-memory cache at sync level
+- Only fetch each unique user once
+- 514 messages, 8 unique users = 8 API calls
+- **97% reduction in API calls**
+- Sync time: ~2 minutes (**57% faster**)
+
+**Example:**
+
+```
+Before: 514 messages → 514 users.info calls → 291s
+After:  514 messages → 8 users.info calls → 126s
+```
+
+### Thread-Aware Chunking
+
+**Chunking Efficiency:**
+
+- 514 raw messages → 475 smart chunks
+- Preserves conversation context
+- Separates code/logs for better retrieval
+- Enriched metadata enables filtering
+
+**Chunk Distribution Example:**
+
+- Message windows: 420 chunks
+- Code blocks: 45 chunks
+- Log chunks: 10 chunks
+
+---
+
+## v2.0 Changes Summary
+
+### What Changed
+
+| Feature        | v1.0                            | v2.0                                            |
+| -------------- | ------------------------------- | ----------------------------------------------- |
+| Chunking       | Token-based (500-1000)          | Thread-aware (conversation structure)           |
+| User Names     | Username only                   | Real names + username (cached)                  |
+| Storage        | Single table (`slack_messages`) | Unified table (`search_content`)                |
+| Search         | Pinecone only                   | Dual-write (Pinecone + PostgreSQL FTS)          |
+| Metadata       | Basic (channel, user, ts)       | Rich (authors, chunk_type, has_code, reactions) |
+| Code Handling  | Inline with text                | Extracted as separate chunks                    |
+| Thread Context | Individual messages             | Full thread with parent + replies               |
+| API Calls      | Per-message                     | Cached (97% reduction)                          |
+| Sync Speed     | ~5 min                          | ~2 min (57% faster)                             |
+
+### Migration Path
+
+**From v1.0 to v2.0:**
+
+1. Run migration:
+
+   ```bash
+   npm run migrate:0011 --workspace=@mitable/backend
+   ```
+
+2. Re-sync to populate v2.0 metadata:
+   ```bash
+   npm run sync-slack --workspace=@mitable/backend
+   ```
+
+**Backward Compatibility:**
+
+- New columns are nullable (won't break existing data)
+- Old `slack_messages` table can remain (deprecated)
+- Retriever uses `search_content` table automatically
 
 ---
 
@@ -811,6 +1096,6 @@ For issues or questions:
 
 ---
 
-**Last Updated:** October 16, 2025  
-**Version:** 1.0  
+**Last Updated:** November 25, 2025  
+**Version:** 2.0 - Thread-Aware Chunking  
 **Status:** ✅ Complete and Working

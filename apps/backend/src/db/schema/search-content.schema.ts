@@ -9,6 +9,7 @@ import {
   bigint,
   uuid,
   customType,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { organizations } from "./organizations.schema";
@@ -73,6 +74,20 @@ export const searchContent = pgTable(
     chunkIndex: integer("chunk_index").default(0),
     totalChunks: integer("total_chunks").default(1),
     isChunked: boolean("is_chunked").default(false),
+
+    // 🆕 SLACK STRUCTURE-AWARE METADATA (Migration 0011)
+    chunkType: text("chunk_type"), // 'message_window' | 'code' | 'log' | 'thread_summary' | 'text'
+    authors: text("authors").array(), // Array of usernames
+    mentionedUsers: text("mentioned_users").array(), // Array of mentioned user IDs
+    hasCode: boolean("has_code").default(false),
+    codeLanguage: text("code_language"), // 'sql' | 'typescript' | 'python' | etc.
+    hasLinks: boolean("has_links").default(false),
+    hasAttachments: boolean("has_attachments").default(false),
+    hasReactions: boolean("has_reactions").default(false),
+    reactionSummary: jsonb("reaction_summary"), // { "👍": 5, "✅": 3 }
+    threadId: text("thread_id"), // Slack thread_ts identifier
+    isThreadRoot: boolean("is_thread_root").default(false),
+    messageIds: text("message_ids").array(), // Array of message timestamps
 
     // Temporal metadata for filtering
     timestamp: bigint("timestamp", { mode: "number" }), // Unix timestamp (milliseconds)
