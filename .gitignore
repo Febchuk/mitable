@@ -63,6 +63,9 @@ coverage/
 # Misc
 *.tsbuildinfo
 
+# Debug/temp files
+temp/
+
 # OCR/ML Models (auto-downloaded by tesseract.js)
 *.traineddata
 

@@ -1,31 +1,7 @@
 import { useState } from "react";
 import AgentPill from "./components/AgentPill";
 import { createConversation } from "../../lib/api/conversations";
-
-declare global {
-  interface Window {
-    agentAPI: {
-      toggle: () => void;
-      showConsole: () => void;
-      setIgnoreMouseEvents: (ignore: boolean) => void;
-      resizeWindow: (
-        options:
-          | { width?: number; height?: number }
-          | "pill"
-          | "conversation"
-          | "text-mode"
-          | "audio-mode"
-      ) => void;
-      showConversation: () => void;
-      hideConversation: () => void;
-      toggleConversation: () => void; // NEW: Toggle collapsed combobox
-      sendMessageToConversation: (messageData: any, screenshot: string | null) => void;
-      captureScreenshot: () => Promise<{ dataUrl: string; metadata?: any } | null>;
-      getAuthToken: () => Promise<string | null>;
-      onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
-    };
-  }
-}
+// Types are defined in ./global.d.ts
 
 function App() {
   const [conversationId, setConversationId] = useState<string | null>(null);
