@@ -5,9 +5,8 @@ import * as schema from "../db/schema/index";
 import { requireAuth } from "../middleware/auth";
 import { OrchestratorService } from "../services/orchestrator.service";
 import { workflowService } from "../services/workflow.service";
-import { ScreenshotAnnotator } from "../utils/screenshot-annotator";
-import { coordinateConverterService } from "../services/coordinate-converter.service";
 import { screenshotLimiter } from "../middleware/rateLimiter.js";
+import type { WindowScreenshot } from "@mitable/shared";
 
 // Initialize orchestrator (replaces old agentService)
 const orchestrator = new OrchestratorService();
@@ -673,12 +672,29 @@ router.post(
  *                 type: string
  *                 description: User message content
  *                 example: How do I submit a pull request?
- *               screenshot:
- *                 type: string
- *                 description: Base64 encoded screenshot (optional)
- *               screenshotMetadata:
- *                 type: object
- *                 description: Screenshot metadata (optional)
+ *               screenshots:
+ *                 type: array
+ *                 description: Array of captured window screenshots (optional)
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     windowId:
+ *                       type: string
+ *                     windowTitle:
+ *                       type: string
+ *                     appName:
+ *                       type: string
+ *                     dataUrl:
+ *                       type: string
+ *                     metadata:
+ *                       type: object
+ *                       properties:
+ *                         width:
+ *                           type: number
+ *                         height:
+ *                           type: number
+ *                         scaleFactor:
+ *                           type: number
  *               metadata:
  *                 type: object
  *                 description: Metadata from WorkflowOptions UI interactions (optional)
@@ -728,15 +744,21 @@ router.post(
     const userId = req.user?.id || req.userId;
 
     const { conversationId } = req.params;
-    const { content, screenshot, screenshotMetadata, metadata } = req.body;
+    const {
+      content,
+      screenshots,
+      metadata,
+    }: {
+      content?: string;
+      screenshots?: WindowScreenshot[];
+      metadata?: any;
+    } = req.body;
 
     console.log("[Conversations] Request received:", {
       conversationId,
       userId,
       contentLength: content?.length || 0,
-      hasScreenshot: !!screenshot,
-      screenshotLength: screenshot?.length || 0,
-      screenshotMetadata,
+      screenshotCount: screenshots?.length || 0,
       metadata,
     });
 
@@ -831,7 +853,7 @@ router.post(
           "user",
           content,
           currentStepIndex,
-          { screenshot, screenshotMetadata }
+          { screenshots }
         );
         console.log(`[Stream] Workflow interaction saved for user question`);
       }
@@ -899,8 +921,7 @@ router.post(
           conversationId,
           userId,
           organizationId: user.organizationId, // Required for multi-agent architecture
-          screenshot: screenshot || undefined, // Pass screenshot if provided
-          screenshotMetadata: screenshotMetadata || undefined, // Pass metadata (scaleFactor, dimensions)
+          screenshots: screenshots && screenshots.length ? screenshots : undefined,
           metadata: metadata || undefined, // Pass metadata from WorkflowOptions UI interactions
           userProfile: {
             name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
@@ -1034,14 +1055,21 @@ router.post(
           );
         }
 
+        // Note: We only persist the first screenshot for PII debugging to minimize disk usage.
+        // Multi-window captures can include several high-resolution images; saving just one keeps
+        // the debug helper lightweight while still letting us inspect redaction fidelity.
+        const primaryScreenshot = screenshots?.[0];
+
         // Debug: Save PII testing screenshots (before/after redaction)
-        if (process.env.DEBUG_SAVE_SCREENSHOTS === "true" && screenshot) {
+        if (
+          process.env.DEBUG_SAVE_SCREENSHOTS === "true" &&
+          primaryScreenshot &&
+          typeof primaryScreenshot.dataUrl === "string"
+        ) {
           try {
             console.log("[DEBUG PII] Saving PII test screenshots...", {
-              screenshotType: typeof screenshot,
-              isBuffer: Buffer.isBuffer(screenshot),
-              screenshotPreview:
-                typeof screenshot === "string" ? screenshot.substring(0, 50) : "Buffer",
+              screenshotPreview: primaryScreenshot.dataUrl.substring(0, 50),
+              hasMetadata: !!primaryScreenshot.metadata,
             });
             const fs = await import("fs/promises");
             const path = await import("path");
@@ -1062,33 +1090,8 @@ router.post(
             await fs.mkdir(sessionDir, { recursive: true });
 
             // Save original (after redaction)
-            let originalBuffer: Buffer;
-            if (Buffer.isBuffer(screenshot)) {
-              originalBuffer = screenshot;
-            } else if (typeof screenshot === "string") {
-              const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
-              originalBuffer = Buffer.from(base64Data, "base64");
-            } else if (typeof screenshot === "object" && screenshot !== null) {
-              // Handle object case - convert to Buffer
-              console.log("[DEBUG PII] Screenshot object keys:", Object.keys(screenshot));
-              const screenshotObj = screenshot as any;
-
-              if ("dataUrl" in screenshotObj && typeof screenshotObj.dataUrl === "string") {
-                const base64Data = screenshotObj.dataUrl.replace(/^data:image\/\w+;base64,/, "");
-                originalBuffer = Buffer.from(base64Data, "base64");
-              } else if ("data" in screenshotObj && Buffer.isBuffer(screenshotObj.data)) {
-                originalBuffer = screenshotObj.data;
-              } else if ("data" in screenshotObj && typeof screenshotObj.data === "string") {
-                const base64Data = screenshotObj.data.replace(/^data:image\/\w+;base64,/, "");
-                originalBuffer = Buffer.from(base64Data, "base64");
-              } else {
-                throw new Error(
-                  `Screenshot object missing valid data. Keys: ${Object.keys(screenshotObj).join(", ")}`
-                );
-              }
-            } else {
-              throw new Error(`Unexpected screenshot type: ${typeof screenshot}`);
-            }
+            const base64Data = primaryScreenshot.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+            const originalBuffer = Buffer.from(base64Data, "base64");
             const originalPath = path.join(sessionDir, "redacted.png");
             await fs.writeFile(originalPath, originalBuffer);
 
@@ -1101,7 +1104,11 @@ router.post(
                   timestamp: new Date().toISOString(),
                   query: content,
                   piiRedacted: true,
-                  hasScreenshotMetadata: !!screenshotMetadata,
+                  windowTitle: primaryScreenshot.windowTitle,
+                  appName: primaryScreenshot.appName,
+                  width: primaryScreenshot.metadata.width,
+                  height: primaryScreenshot.metadata.height,
+                  scaleFactor: primaryScreenshot.metadata.scaleFactor,
                 },
                 null,
                 2
@@ -1118,87 +1125,11 @@ router.post(
           }
         }
 
-        // Debug: Save annotated screenshot if enabled and has visual guidance
+        // Debug: previously saved annotated screenshots, but bounding boxes are no longer produced.
         if (process.env.DEBUG_SAVE_SCREENSHOTS === "true") {
-          console.log("[DEBUG SCREENSHOT] Debug mode active, checking conditions:", {
-            envVariableSet: process.env.DEBUG_SAVE_SCREENSHOTS === "true",
-            hasScreenshot: !!screenshot,
-            hasMetadata: !!screenshotMetadata,
-            hasVisualGuidance: !!finalCardData?.visualGuidance,
-            hasElement: !!finalCardData?.visualGuidance?.element,
-            hasBoundingBox: !!finalCardData?.visualGuidance?.element?.boundingBox,
-            boundingBoxValue: finalCardData?.visualGuidance?.element?.boundingBox,
-          });
-
-          if (screenshot && screenshotMetadata) {
-            try {
-              // Check if the response has visual guidance data with bounding box
-              const visualGuidance = finalCardData?.visualGuidance;
-              if (visualGuidance?.element?.boundingBox) {
-                console.log("[DEBUG SCREENSHOT] All conditions met, saving annotated screenshot");
-                const annotator = new ScreenshotAnnotator();
-
-                // Convert pixel coordinates back to normalized for annotation
-                // (gemini-vision.service.ts already converted normalized → pixels for overlay rendering)
-                const normalizedBoundingBox = coordinateConverterService.convertToNormalized(
-                  visualGuidance.element.boundingBox,
-                  {
-                    width: screenshotMetadata.width,
-                    height: screenshotMetadata.height,
-                  }
-                );
-
-                console.log("[DEBUG SCREENSHOT] Coordinate conversion for annotation:", {
-                  pixels: visualGuidance.element.boundingBox,
-                  normalized: normalizedBoundingBox,
-                });
-
-                console.log("[DEBUG SCREENSHOT] Annotation metadata:", {
-                  instruction:
-                    visualGuidance.clarifiedDescription || visualGuidance.elementDescription,
-                  clarifiedDescription: visualGuidance.clarifiedDescription,
-                  elementDescription: visualGuidance.elementDescription,
-                  userOriginalMessage: content,
-                });
-
-                const result = await annotator.annotate(
-                  screenshot,
-                  normalizedBoundingBox,
-                  {
-                    width: screenshotMetadata.width,
-                    height: screenshotMetadata.height,
-                  },
-                  {
-                    label:
-                      visualGuidance.elementDescription ||
-                      visualGuidance.element.label ||
-                      "Target Element",
-                    confidence: visualGuidance.element.confidence || 0.5,
-                    instruction:
-                      visualGuidance.clarifiedDescription || visualGuidance.elementDescription, // Use clarified description (Phase 1 output)
-                    clarifiedDescription: visualGuidance.clarifiedDescription, // Store clarified description
-                    elementType: visualGuidance.element.type,
-                  }
-                );
-                console.log("[DEBUG SCREENSHOT] Screenshot saved successfully:", result);
-              } else {
-                console.warn(
-                  "[DEBUG SCREENSHOT] Skipping annotation - no bounding box in visual guidance response"
-                );
-              }
-            } catch (debugError) {
-              console.error("[DEBUG SCREENSHOT] Failed to save annotated screenshot:", debugError);
-              // Don't fail the request, just log the error
-            }
-          } else {
-            console.warn(
-              "[DEBUG SCREENSHOT] Skipping annotation - missing screenshot or metadata",
-              {
-                hasScreenshot: !!screenshot,
-                hasMetadata: !!screenshotMetadata,
-              }
-            );
-          }
+          console.warn(
+            "[DEBUG SCREENSHOT] Annotated screenshot saving is disabled for conversational-only guidance output (no bounding boxes available)."
+          );
         }
 
         // Generate conversation title if this is the first exchange

@@ -1,70 +1,20 @@
-import {
-  app,
-  BrowserWindow,
-  globalShortcut,
-  ipcMain,
-  screen,
-  shell,
-  Tray,
-  Menu,
-  nativeImage,
-} from "electron";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { createWriteStream, existsSync } from "fs";
+import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from "electron";
+import { join } from "path";
 import { IPC_CHANNELS } from "@mitable/shared";
-import {
-  captureService,
-  CaptureOptions,
-  CaptureResult,
-  ConversationContext,
-} from "./services/captureService";
-
-// ES Module __dirname equivalent (required because package.json has "type": "module")
-// Use custom variable names to avoid conflict with electron-vite's injected __dirname
-const _filename = fileURLToPath(import.meta.url);
-const _dirname = dirname(_filename);
-
-// Use electron-vite's injected __dirname if available, otherwise use our calculated path
-const MAIN_DIR = typeof __dirname !== "undefined" ? __dirname : _dirname;
-
-// Production logging setup - write to file for debugging
-if (app.isPackaged) {
-  const logPath = join(app.getPath("userData"), "app.log");
-  const logStream = createWriteStream(logPath, { flags: "a" });
-
-  const originalLog = console.log;
-  const originalError = console.error;
-
-  console.log = (...args: any[]) => {
-    const message = args
-      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
-      .join(" ");
-    logStream.write(`[LOG] ${new Date().toISOString()} - ${message}\n`);
-    originalLog(...args);
-  };
-
-  console.error = (...args: any[]) => {
-    const message = args
-      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
-      .join(" ");
-    logStream.write(`[ERROR] ${new Date().toISOString()} - ${message}\n`);
-    originalError(...args);
-  };
-
-  console.log("[PRODUCTION] App starting...");
-  console.log("[PRODUCTION] Log file:", logPath);
-  console.log("[PRODUCTION] MAIN_DIR:", MAIN_DIR);
-  console.log("[PRODUCTION] userData:", app.getPath("userData"));
-  console.log("[PRODUCTION] appPath:", app.getAppPath());
-}
+import { captureService } from "./services/captureService";
+import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
+import { windowDetectionService } from "./services/windowDetectionService";
+import { isBlockedByPolicy } from "./services/capturePolicy";
+import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
+import { initActiveWindowBridge } from "./main/activeWindowBridge";
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
-let tray: Tray | null = null;
-let isQuitting = false; // Track if app is intentionally quitting
+
+// Watch button windows tracking (module scope for cleanup from multiple handlers)
+const watchButtonWindows: Map<string, BrowserWindow> = new Map();
 
 // Auth token storage (shared across all windows)
 const authTokens: {
@@ -95,7 +45,7 @@ function createAgentWindow() {
     skipTaskbar: true,
     show: false,
     webPreferences: {
-      preload: join(MAIN_DIR, "../preload/agent.cjs"),
+      preload: join(__dirname, "../preload/agent.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -121,11 +71,7 @@ function createAgentWindow() {
   if (!app.isPackaged) {
     agentWindow.loadURL("http://localhost:5173/agent/index.html");
   } else {
-    const agentPath = join(MAIN_DIR, "../renderer/agent/index.html");
-    console.log("[Agent] Loading from:", agentPath);
-    console.log("[Agent] File exists:", existsSync(agentPath));
-    agentWindow.loadFile(agentPath);
-    // Don't auto-show - user must trigger with Ctrl+H or minimize from chat
+    agentWindow.loadFile(join(__dirname, "../renderer/agent.html"));
   }
 
   // Listen for pill movement - reposition conversation in real-time
@@ -189,7 +135,7 @@ function createConversationWindow() {
     show: false,
     modal: false, // Non-modal so pill remains interactive
     webPreferences: {
-      preload: join(MAIN_DIR, "../preload/conversation.cjs"),
+      preload: join(__dirname, "../preload/conversation.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -218,10 +164,7 @@ function createConversationWindow() {
   if (!app.isPackaged) {
     conversationWindow.loadURL("http://localhost:5173/conversation/index.html");
   } else {
-    const conversationPath = join(MAIN_DIR, "../renderer/conversation/index.html");
-    console.log("[Conversation] Loading from:", conversationPath);
-    console.log("[Conversation] File exists:", existsSync(conversationPath));
-    conversationWindow.loadFile(conversationPath);
+    conversationWindow.loadFile(join(__dirname, "../renderer/conversation.html"));
   }
 
   // Wait for renderer to be ready before allowing IPC
@@ -240,19 +183,19 @@ function createConversationWindow() {
 
 function createConsoleWindow() {
   console.log("[Console] Creating console window...");
-  console.log("[Console] Preload script path:", join(MAIN_DIR, "../preload/console.cjs"));
+  console.log("[Console] Preload script path:", join(__dirname, "../preload/console.cjs"));
 
   consoleWindow = new BrowserWindow({
     width: 1264,
     height: 888,
-    transparent: process.platform === "darwin", // Only transparent on macOS
+    transparent: true,
     // Hidden title bar on macOS for native traffic lights with custom positioning
     titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
     trafficLightPosition: process.platform === "darwin" ? { x: 6, y: 10 } : undefined,
     frame: process.platform !== "darwin",
-    maximizable: true, // Allow maximizing on Windows
+    maximizable: false,
     webPreferences: {
-      preload: join(MAIN_DIR, "../preload/console.cjs"),
+      preload: join(__dirname, "../preload/console.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -261,11 +204,6 @@ function createConsoleWindow() {
   // Log when preload script finishes loading
   consoleWindow.webContents.on("did-finish-load", () => {
     console.log("[Console] Window finished loading - preload script should be ready");
-    // Show console window on startup (main window)
-    if (consoleWindow && !consoleWindow.isDestroyed()) {
-      consoleWindow.show();
-      console.log("[Console] Window shown");
-    }
   });
 
   // Log when DOM is ready
@@ -296,129 +234,13 @@ function createConsoleWindow() {
     consoleWindow.loadURL("http://localhost:5173/console/index.html");
     consoleWindow.webContents.openDevTools();
   } else {
-    const consolePath = join(MAIN_DIR, "../renderer/console/index.html");
-    console.log("[Console] Loading from:", consolePath);
-    console.log("[Console] File exists:", existsSync(consolePath));
-    consoleWindow.loadFile(consolePath);
+    consoleWindow.loadFile(join(__dirname, "../renderer/console.html"));
   }
 
-  consoleWindow.on("close", (event) => {
-    // On Windows: hide to tray instead of quitting (unless app is quitting)
-    // On macOS: follow standard behavior (quit when closed)
-    if (process.platform === "win32" && !isQuitting) {
-      event.preventDefault();
-      consoleWindow?.hide();
-      console.log("[Console] Window hidden to tray (Windows)");
-    }
-    // On macOS or when isQuitting=true, let it close normally
-  });
-
   consoleWindow.on("closed", () => {
-    // Only quit on macOS
-    if (process.platform !== "win32") {
-      app.quit();
-    }
+    app.quit(); // Quit app when main console window is closed
   });
 }
-
-/**
- * DEPRECATED: Overlay Window
- *
- * The overlay window has been deprecated - visual guidance is now handled differently.
- * Previously showed transparent overlays with bounding boxes and highlights.
- *
- * Kept for reference only - can be deleted after confirming new system works.
- */
-// function createOverlayWindow() {
-//   if (!guideWindow || guideWindow.isDestroyed()) {
-//     console.error("[Overlay] Cannot create overlay window - guide window not available");
-//     return;
-//   }
-//
-//   const primaryDisplay = screen.getPrimaryDisplay();
-//   const { width, height } = primaryDisplay.bounds;
-//
-//   overlayWindow = new BrowserWindow({
-//     width,
-//     height,
-//     x: 0,
-//     y: 0,
-//     transparent: true,
-//     frame: false,
-//     skipTaskbar: true,
-//     resizable: false,
-//     movable: false,
-//     focusable: false,
-//     show: false,
-//     modal: false, // Non-modal so other windows remain interactive
-//     webPreferences: {
-//       preload: join(MAIN_DIR, "../preload/overlay.cjs"),
-//       contextIsolation: true,
-//       nodeIntegration: false,
-//     },
-//   });
-//
-//   overlayWindow.setIgnoreMouseEvents(true, { forward: true });
-//
-//   if (!app.isPackaged) {
-//     overlayWindow.loadURL("http://localhost:5173/overlay/index.html");
-//   } else {
-//     overlayWindow.loadFile(join(MAIN_DIR, "../renderer/overlay/index.html"));
-//   }
-//
-//   overlayWindow.on("closed", () => {
-//     overlayWindow = null;
-//   });
-// }
-
-/**
- * DEPRECATED: Guide Window
- *
- * The guide window has been removed - all workflow UI now appears in the conversation window.
- * Previously showed step-by-step instructions in a separate floating panel.
- * Now WorkflowOptions and StepList components render directly in conversation messages.
- *
- * Kept for reference only - can be deleted after confirming new system works.
- */
-// function createGuideWindow() {
-//   if (!agentWindow || agentWindow.isDestroyed()) {
-//     console.error("[Guide] Cannot create guide window - agent window not available");
-//     return;
-//   }
-
-//   guideWindow = new BrowserWindow({
-//     width: 400,
-//     height: 600,
-//     frame: false,
-//     transparent: true,
-//     alwaysOnTop: true,
-//     show: false,
-//     modal: false, // Non-modal so other windows remain interactive
-//     webPreferences: {
-//       preload: join(MAIN_DIR, "../preload/guide.cjs"),
-//       contextIsolation: true,
-//       nodeIntegration: false,
-//     },
-//   });
-
-//   // Add platform-specific always-on-top for proper z-order
-//   if (process.platform === "darwin") {
-//     guideWindow.setAlwaysOnTop(true, "modal-panel");
-//     guideWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-//   } else {
-//     guideWindow.setAlwaysOnTop(true, "normal", 1);
-//   }
-
-//   if (!app.isPackaged) {
-//     guideWindow.loadURL("http://localhost:5173/guide/index.html");
-//   } else {
-//     guideWindow.loadFile(join(MAIN_DIR, "../renderer/guide.html"));
-//   }
-
-//   guideWindow.on("closed", () => {
-//     guideWindow = null;
-//   });
-// }
 
 // IPC Handlers
 function setupIPC() {
@@ -469,6 +291,10 @@ function setupIPC() {
         screenshot
       );
     }
+
+    // Close all watch button windows when message is sent
+    // This prevents visual clutter after user submits help request
+    closeAllWatchButtonWindows(watchButtonWindows);
   });
 
   // NEW: Toggle conversation (collapsed combobox)
@@ -576,8 +402,7 @@ function setupIPC() {
       }
 
       // Fetch from backend (without messages for performance)
-      const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-      console.log(`[Conversation] Fetching from: ${API_BASE_URL}/api/conversations`);
+      const API_BASE_URL = "http://localhost:3000"; // TODO: Move to config
       const response = await fetch(`${API_BASE_URL}/api/conversations?includeMessages=false`, {
         headers: { Authorization: `Bearer ${authTokens.accessToken}` },
       });
@@ -764,8 +589,6 @@ function setupIPC() {
   //   }
   // );
 
-  // Nudge system - handled via Console
-
   // NEW: Direct nudge creation from conversation window (inline expert cards)
   ipcMain.on(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, (_event, data) => {
     console.log("[Main] Opening Console nudge form with inline expert data:", data);
@@ -783,7 +606,7 @@ function setupIPC() {
     }
   });
 
-  // Dynamic mouse events
+  // Dynamic mouse events for agent window
   ipcMain.on(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, (_event, ignore: boolean) => {
     if (agentWindow && !agentWindow.isDestroyed()) {
       agentWindow.setIgnoreMouseEvents(ignore, { forward: true });
@@ -905,84 +728,329 @@ function setupIPC() {
     });
   });
 
-  // Screenshot Capture - using enhanced CaptureService with conditional capture
+  // Screenshot Capture - Multi-window capture only
   ipcMain.handle(
     IPC_CHANNELS.CAPTURE_SCREENSHOT,
     async (
       _event,
       payload?: {
-        options?: CaptureOptions;
         message?: string;
-        context?: ConversationContext;
       }
-    ): Promise<Pick<CaptureResult, "dataUrl" | "metadata"> | null> => {
-      console.log("[Screenshot] IPC handler called", {
+    ): Promise<MultiWindowCaptureResult> => {
+      console.log("[Screenshot] Multi-window capture requested", {
         hasMessage: !!payload?.message,
-        hasContext: !!payload?.context,
-        options: payload?.options,
       });
 
       try {
-        // If message and context provided, use conditional capture (heuristics)
-        if (payload?.message && payload?.context) {
-          console.log("[Screenshot] Using conditional capture with heuristics");
-          const { decision, result } = await captureService.conditionalCapture(
-            payload.message,
-            payload.context,
-            payload.options || { mode: "full-screen" }
-          );
+        // Get currently selected windows for filtering
+        const selectedWindows = windowDetectionService.getSelectedWindows();
+        const selectedWindowIds = selectedWindows.map((window) => window.windowId);
+        const hasSelectedWindows = selectedWindowIds.length > 0;
 
-          console.log("[Screenshot] Conditional capture decision:", {
-            shouldCapture: decision.shouldCapture,
-            confidence: decision.confidence,
-            reason: decision.reason,
-          });
-
-          if (!result) {
-            console.log("[Screenshot] No screenshot captured (heuristics determined not needed)");
-            return null;
-          }
-
-          console.log("[Screenshot] Screenshot captured via heuristics:", {
-            mode: result.metadata.captureMode,
-            width: result.metadata.width,
-            height: result.metadata.height,
-          });
-
-          return {
-            dataUrl: result.dataUrl,
-            metadata: result.metadata,
-          };
-        }
-
-        // Fallback: unconditional capture (legacy behavior)
-        console.log("[Screenshot] Using unconditional capture (no heuristics)");
-        const result = await captureService.capture(payload?.options || { mode: "full-screen" });
-
-        if (!result) {
-          console.error("[Screenshot] Capture failed - no result returned");
-          return null;
-        }
-
-        console.log("[Screenshot] Capture successful:", {
-          mode: result.metadata.captureMode,
-          width: result.metadata.width,
-          height: result.metadata.height,
+        console.log("[Screenshot] Capture with filters:", {
+          hasSelectedWindows,
+          selectedWindows:
+            selectedWindows
+              .map((window) => `${window.appName} - ${window.windowTitle}`)
+              .join(", ") || "none",
         });
 
-        // Return both data URL and metadata (omit filePath for security)
-        return {
-          dataUrl: result.dataUrl,
-          metadata: result.metadata,
-        };
+        // Capture with optional filtering
+        const result = await captureService.captureVisibleWindows(
+          false, // saveToFile
+          hasSelectedWindows ? selectedWindowIds : undefined // Only filter if windows are selected
+        );
+
+        console.log("[Screenshot] Multi-window capture result:", {
+          success: result.success,
+          screenshotCount: result.success ? result.screenshots.length : 0,
+          blockedCount: result.success ? result.blockedWindows.length : 0,
+          totalDetected: result.success ? result.totalWindowsDetected : 0,
+        });
+
+        return result;
       } catch (error) {
         console.error("[Screenshot] Capture failed with error:", error);
-        return null;
+        return {
+          success: false,
+          error: `Failed to capture windows: ${error instanceof Error ? error.message : "Unknown error"}`,
+          reason: "technical_error",
+        };
       }
     }
   );
 
-  console.log("[IPC] Screenshot capture handler registered successfully");
+  // Display Metadata - for multi-monitor support
+  ipcMain.handle(IPC_CHANNELS.GET_DISPLAY_METADATA, () => {
+    const displays = screen.getAllDisplays();
+    return displays.map((display) => ({
+      bounds: display.bounds,
+      scaleFactor: display.scaleFactor,
+    }));
+  });
+
+  console.log("[IPC] Screenshot capture and display metadata handlers registered successfully");
+
+  // Watch Mode IPC Handlers
+  setupWatchModeHandlers();
+}
+
+// Watch mode handlers for selective screenshot capture
+function setupWatchModeHandlers() {
+  // Toggle watch mode on/off
+  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_TOGGLE, async (_event, enabled: boolean) => {
+    console.log(`[Watch Mode] Toggling watch mode: ${enabled}`);
+
+    windowDetectionService.setWatchingMode(enabled);
+
+    if (enabled) {
+      // Get all visible windows
+      const windows = await windowDetectionService.getAllVisibleWindows();
+      console.log(`[Watch Mode] Found ${windows.length} watchable windows`);
+
+      // Create overlay buttons for ALL windows (including blocked ones to show policy)
+      for (const window of windows) {
+        createWatchButtonWindow(window, watchButtonWindows);
+      }
+    } else {
+      // Close all watch button windows
+      console.log("[Watch Mode] Closing all watch button windows");
+      for (const [windowId, buttonWindow] of watchButtonWindows.entries()) {
+        if (!buttonWindow.isDestroyed()) {
+          buttonWindow.close();
+        }
+        watchButtonWindows.delete(windowId);
+      }
+      windowDetectionService.clearAll();
+    }
+  });
+
+  // Select a window to watch
+  ipcMain.handle(
+    IPC_CHANNELS.WATCH_WINDOW_SELECT,
+    async (_event, windowInfo: SelectedWindowInfo) => {
+      console.log(
+        `[Watch Mode] Selecting window: ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowInfo.windowId}]`
+      );
+
+      const windowDetails = windowDetectionService.getWindowDetails(windowInfo.windowId);
+
+      if (!windowDetails) {
+        console.warn(
+          "[Watch Mode] Window details not found for selection, likely closed or stale",
+          {
+            windowId: windowInfo.windowId,
+            appName: windowInfo.appName,
+            windowTitle: windowInfo.windowTitle,
+          }
+        );
+        return {
+          allowed: false,
+          reason: "This window is no longer available. Please try again.",
+        };
+      }
+
+      // On non-macOS platforms, block all browser windows from watch mode
+      if (process.platform !== "darwin") {
+        const isBrowser = isBrowserProcess(windowDetails.appName, windowDetails.path);
+        if (isBrowser) {
+          console.log("[Watch Mode] Blocking browser window selection on non-macOS platform", {
+            appName: windowDetails.appName,
+            path: windowDetails.path,
+          });
+          return {
+            allowed: false,
+            reason: "Browser windows cannot be watched on this platform to protect sensitive data.",
+          };
+        }
+
+        return selectWindowForWatch(windowInfo);
+      }
+
+      // macOS: only run focus + URL resolution for browser apps
+      let resolvedTitle = windowDetails.title;
+      let resolvedAppName = windowDetails.appName;
+      let resolvedUrl: string | undefined = undefined;
+
+      const isBrowserApp = isBrowserProcess(windowDetails.appName, windowDetails.path);
+
+      if (isBrowserApp) {
+        const resolved = await resolveWindowUrlForWatchSelection({
+          processId: windowDetails.processId,
+          appName: windowDetails.appName,
+          windowTitle: windowDetails.title,
+        });
+
+        resolvedTitle = resolved.title;
+        resolvedAppName = resolved.appName;
+        resolvedUrl = resolved.url;
+      }
+
+      const policyDecision = isBlockedByPolicy(
+        resolvedTitle,
+        resolvedAppName,
+        undefined,
+        resolvedUrl
+      );
+
+      if (policyDecision.blocked) {
+        console.log("[Watch Mode] Selection blocked by capture policy", {
+          title: resolvedTitle,
+          appName: resolvedAppName,
+          reason: policyDecision.reason,
+          hasUrl: !!resolvedUrl,
+        });
+        return {
+          allowed: false,
+          reason: policyDecision.reason || "Blocked by capture policy.",
+        };
+      }
+
+      return selectWindowForWatch(windowInfo);
+    }
+  );
+
+  // Unselect a window
+  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, async (_event, windowId: string) => {
+    console.log(`[Watch Mode] Unselecting window: ${windowId}`);
+    const removed = windowDetectionService.removeWindow(windowId);
+
+    if (removed) {
+      broadcastWatchWindowsUpdate();
+    }
+  });
+
+  // Get currently selected windows
+  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED, async () => {
+    const selectedWindows = windowDetectionService.getSelectedWindows();
+    console.log(`[Watch Mode] Returning ${selectedWindows.length} selected windows`);
+    return selectedWindows;
+  });
+
+  // Broadcast updated window list to all windows
+  function broadcastWatchWindowsUpdate() {
+    const selectedWindows = windowDetectionService.getSelectedWindows();
+    const windows = [agentWindow, conversationWindow];
+
+    for (const window of windows) {
+      if (window && !window.isDestroyed()) {
+        window.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
+      }
+    }
+
+    console.log(
+      `[Watch Mode] Broadcasted update to windows. Selected windows: ${
+        selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
+        "none"
+      }`
+    );
+  }
+
+  function selectWindowForWatch(windowInfo: SelectedWindowInfo): { allowed: boolean } {
+    const added = windowDetectionService.addWindow(windowInfo);
+
+    if (added) {
+      const buttonWindow = watchButtonWindows.get(windowInfo.windowId);
+
+      if (buttonWindow && !buttonWindow.isDestroyed()) {
+        console.log(
+          `[Watch Mode] Closing button for selected window: ${windowInfo.appName} (windowId: ${windowInfo.windowId})`
+        );
+        buttonWindow.close();
+      }
+
+      watchButtonWindows.delete(windowInfo.windowId);
+      broadcastWatchWindowsUpdate();
+    }
+
+    return { allowed: true };
+  }
+
+  console.log("[IPC] Watch mode handlers registered successfully");
+}
+
+function isBrowserProcess(appName: string, appPath?: string): boolean {
+  const haystack = `${appName || ""} ${appPath || ""}`.toLowerCase();
+
+  // Simple heuristic for common browsers across platforms
+  const browserPatterns = [
+    "chrome",
+    "google chrome",
+    "msedge",
+    "edge",
+    "firefox",
+    "safari",
+    "brave",
+    "opera",
+    "vivaldi",
+    "arc",
+  ];
+
+  return browserPatterns.some((pattern) => haystack.includes(pattern));
+}
+
+// Helper function to create a watch button window
+function createWatchButtonWindow(window: any, watchButtonWindows: Map<string, BrowserWindow>) {
+  const buttonWindow = new BrowserWindow({
+    width: 250,
+    height: 50,
+    x: window.bounds.x + 10,
+    y: window.bounds.y + 10,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    focusable: true,
+    hasShadow: false,
+    webPreferences: {
+      preload: join(__dirname, "../preload/watchButton.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Pass data via query parameters
+  const queryParams = new URLSearchParams({
+    windowId: window.windowId,
+    appName: window.appName,
+    windowTitle: window.windowTitle,
+  });
+
+  if (!app.isPackaged) {
+    buttonWindow.loadURL(`http://localhost:5173/watchButton/index.html?${queryParams.toString()}`);
+  } else {
+    buttonWindow.loadFile(join(__dirname, "../renderer/watchButton.html"), {
+      query: Object.fromEntries(queryParams.entries()),
+    });
+  }
+
+  // Cleanup on close
+  buttonWindow.on("closed", () => {
+    console.log(`[Watch Mode] Button window closed for: ${window.appName}`);
+    watchButtonWindows.delete(window.windowId);
+  });
+
+  watchButtonWindows.set(window.windowId, buttonWindow);
+
+  console.log(
+    `[Watch Mode] Created button for ${window.appName} at (${window.bounds.x + 10}, ${window.bounds.y + 10})`
+  );
+}
+
+// Helper function to close all watch button windows
+function closeAllWatchButtonWindows(watchButtonWindows: Map<string, BrowserWindow>) {
+  const count = watchButtonWindows.size;
+  console.log(`[Watch Mode] Closing ${count} watch button windows`);
+
+  for (const [windowId, buttonWindow] of watchButtonWindows.entries()) {
+    if (!buttonWindow.isDestroyed()) {
+      buttonWindow.close();
+    }
+    watchButtonWindows.delete(windowId);
+  }
+
+  console.log(`[Watch Mode] ✅ Closed ${count} watch button windows`);
 }
 
 // Global shortcut for help (Cmd+H / Ctrl+H)
@@ -1001,159 +1069,21 @@ function registerGlobalShortcuts() {
       }
     }
   });
-
-  // DevTools shortcuts (F12 and Ctrl+Shift+I)
-  globalShortcut.register("F12", () => {
-    const focusedWindow = BrowserWindow.getFocusedWindow();
-    if (focusedWindow) {
-      focusedWindow.webContents.toggleDevTools();
-    }
-  });
-
-  globalShortcut.register("CommandOrControl+Shift+I", () => {
-    const focusedWindow = BrowserWindow.getFocusedWindow();
-    if (focusedWindow) {
-      focusedWindow.webContents.toggleDevTools();
-    }
-  });
 }
-
-// Create system tray (Windows only)
-function createTray() {
-  console.log("[Tray] createTray() called, platform:", process.platform);
-
-  if (process.platform !== "win32") {
-    console.log("[Tray] Not Windows, skipping tray creation");
-    return; // Only show tray on Windows
-  }
-
-  console.log("[Tray] Windows detected, creating tray...");
-
-  try {
-    // Create a simple colored icon programmatically as fallback
-    // Windows tray needs a 16x16 icon
-    let trayIcon: Electron.NativeImage;
-
-    // Try to load from file first (use ICO for Windows tray)
-    let iconPath: string;
-    if (app.isPackaged) {
-      iconPath = join(process.resourcesPath, "assets", "icon.ico");
-    } else {
-      // In dev mode, go up to the src directory
-      iconPath = join(MAIN_DIR, "../../src/renderer/assets/icon.ico");
-    }
-
-    console.log("[Tray] Loading icon from:", iconPath);
-
-    const icon = nativeImage.createFromPath(iconPath);
-    if (!icon.isEmpty()) {
-      console.log("[Tray] Icon loaded, size:", icon.getSize());
-      trayIcon = icon.resize({ width: 16, height: 16 });
-    } else {
-      console.warn("[Tray] Failed to load ICO, creating simple colored icon as fallback");
-      // Create a simple 16x16 purple square as fallback
-      const canvas = Buffer.from(
-        `<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
-          <rect width="16" height="16" fill="#8b5cf6" rx="3"/>
-          <text x="8" y="12" font-size="10" fill="white" text-anchor="middle" font-weight="bold">M</text>
-        </svg>`
-      );
-      trayIcon = nativeImage.createFromBuffer(canvas);
-    }
-
-    tray = new Tray(trayIcon);
-
-    console.log("[Tray] Tray instance created:", tray);
-    console.log("[Tray] Tray is destroyed?", tray.isDestroyed());
-
-    // Prevent garbage collection by keeping a strong reference
-    // This is critical on Windows - without this, the tray can disappear
-    (global as any).appTray = tray;
-
-    tray.setToolTip("Mitable");
-
-    console.log("[Tray] Tray tooltip set, checking if still exists...");
-    console.log("[Tray] Tray is destroyed after setup?", tray.isDestroyed());
-
-    // Function to show the app
-    const showApp = () => {
-      console.log("[Tray] Show app triggered");
-      if (consoleWindow && !consoleWindow.isDestroyed()) {
-        consoleWindow.show();
-        consoleWindow.restore(); // Restore if minimized
-        consoleWindow.focus();
-        console.log("[Tray] Console window shown");
-      } else {
-        console.error("[Tray] Console window is destroyed or null");
-      }
-      // Don't show agent pill - user can toggle it with Cmd+H if needed
-    };
-
-    // Create context menu
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: "Show Mitable",
-        click: showApp,
-      },
-      {
-        type: "separator",
-      },
-      {
-        label: "Quit",
-        click: () => {
-          console.log("[Tray] Quit clicked");
-          isQuitting = true; // Set flag before quitting
-          app.quit();
-        },
-      },
-    ]);
-
-    tray.setContextMenu(contextMenu);
-
-    // Click (Windows) or double-click to show console
-    tray.on("click", showApp);
-    tray.on("double-click", showApp);
-
-    console.log("[Tray] System tray initialized");
-  } catch (error) {
-    console.error("[Tray] Failed to create system tray:", error);
-  }
-}
-
-// Uncaught exception handlers - prevent silent crashes
-process.on("uncaughtException", (error) => {
-  console.error("[UNCAUGHT EXCEPTION]", error.message);
-  console.error("[STACK]", error.stack);
-  // Don't exit immediately - try to keep app running
-});
-
-process.on("unhandledRejection", (reason: any, promise) => {
-  console.error("[UNHANDLED REJECTION] at:", promise);
-  console.error("[REASON]", reason);
-});
 
 app.whenReady().then(() => {
+  // Initialize active window bridge for capture policy
+  initActiveWindowBridge();
+
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
   createConsoleWindow();
-  createTray(); // Create system tray on Windows
 
   setupIPC();
   registerGlobalShortcuts();
 });
 
-app.on("before-quit", () => {
-  // Set flag when app is quitting to allow windows to close
-  isQuitting = true;
-});
-
 app.on("window-all-closed", () => {
-  // On Windows, keep app running in tray
-  // On macOS, follow standard behavior (quit unless dock icon clicked)
-  if (process.platform === "win32") {
-    // Don't quit - keep running in system tray
-    return;
-  }
   if (process.platform !== "darwin") {
     app.quit();
   }

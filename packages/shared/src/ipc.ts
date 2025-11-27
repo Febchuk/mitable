@@ -9,9 +9,39 @@ export const IPC_CHANNELS = {
   CAPTURE_FEEDBACK: "capture-feedback", // Visual/audio feedback on capture success/failure
   CAPTURE_CANCEL: "capture-cancel", // Cancel ongoing capture operation
 
-  // Nudge system (Console-based)
+  // Guide system
+  GUIDE_START: "guide-start",
+  GUIDE_NEXT_STEP: "guide-next-step",
+  GUIDE_STEP_UPDATE: "guide-step-update",
+  GUIDE_COMPLETE: "guide-complete",
+  GUIDE_CANCEL: "guide-cancel",
+  GUIDE_DATA: "guide-data",
+
+  // Overlay system
+  OVERLAY_SHOW: "overlay-show",
+  OVERLAY_HIDE: "overlay-hide",
+  OVERLAY_HIGHLIGHT_UPDATE: "overlay-highlight-update",
+  GET_DISPLAY_METADATA: "get-display-metadata",
+
+  // Watch mode for selective screenshot capture
+  WATCH_WINDOWS_TOGGLE: "watch-windows-toggle",
+  WATCH_WINDOWS_GET_ALL: "watch-windows-get-all",
+  WATCH_WINDOW_SELECT: "watch-window-select",
+  WATCH_WINDOW_UNSELECT: "watch-window-unselect",
+  WATCH_WINDOWS_GET_SELECTED: "watch-windows-get-selected",
+  WATCH_BUTTON_WINDOW_CREATE: "watch-button-window-create",
+  WATCH_BUTTON_WINDOW_CLOSE: "watch-button-window-close",
+  WATCH_WINDOWS_UPDATED: "watch-windows-updated", // Broadcast event when selected windows change
+
+  // Nudge system
+  NUDGE_SHOW: "nudge-show",
+  NUDGE_HIDE: "nudge-hide",
+  NUDGE_ACCEPT: "nudge-accept",
+  NUDGE_DISMISS: "nudge-dismiss",
+  NUDGE_CREATE_REQUEST: "nudge-create-request",
   NUDGE_OPEN_CREATOR: "nudge-open-creator",
   OPEN_CONSOLE_NUDGE_FORM: "open-console-nudge-form", // Direct Agent → Console nudge creation
+  NUDGE_RESIZE: "nudge-resize", // Dynamic window resizing (collapsed/expanded)
 
   // Window management
   WINDOW_SHOW: "window-show",
@@ -24,6 +54,7 @@ export const IPC_CHANNELS = {
   AGENT_TOGGLE: "agent-toggle",
   AGENT_SHOW_CONSOLE: "agent-show-console",
   AGENT_RESIZE: "agent-resize",
+  AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step", // Triggered when Guide "Done" button clicked
   AGENT_OPEN_CONVERSATION: "agent-open-conversation", // Console → Main (open specific conversation in agent)
   CONSOLE_OPEN_CHAT: "console-open-chat", // Agent/Conversation → Main (open conversation in console)
 

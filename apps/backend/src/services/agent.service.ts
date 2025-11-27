@@ -289,7 +289,7 @@ export class AgentService {
       console.log("[AgentService] Workflow detection:", {
         shouldEnterWorkflow,
         userMessage: userMessage.substring(0, 50),
-        hasScreenshot: !!context.screenshot,
+        screenshotCount: context.screenshots?.length || 0,
       });
 
       /**
@@ -426,7 +426,7 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
 
       // Inject context about screenshot availability and workflow intent
       // This critical information helps OpenAI make informed tool selection decisions
-      if (context.screenshot) {
+      if (context.screenshots && context.screenshots.length > 0) {
         messages.push({
           role: "system",
           content:
@@ -697,7 +697,8 @@ Today is ${dateStr}. When searching for or discussing information, prioritize re
           const shouldContinueForGuidance =
             functionName === "search_knowledge" &&
             shouldEnterWorkflow &&
-            context.screenshot &&
+            context.screenshots &&
+            context.screenshots.length > 0 &&
             !isIncompleteResult; // search succeeded
 
           console.log("[AgentService] Completion decision:", {

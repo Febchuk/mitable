@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
 import UserMessage from "../../components/domain/messages/UserMessage";
 import AIMessage from "../../components/domain/messages/AIMessage";
-import { sendMessageStream } from "../../lib/api/conversations";
+import { ErrorBoundary } from "../../components/common/ErrorBoundary";
+import { sendMessageStream, pauseWorkflow } from "../../lib/api/conversations";
 import CollapsedView from "./components/CollapsedView";
-import WorkflowOptions, { WorkflowPhase } from "../../components/domain/workflow/WorkflowOptions";
-import StepList from "../../components/domain/workflow/StepList";
 import ExpertsCard from "./components/ExpertsCard";
+import { WorkflowAccordion } from "./components/WorkflowAccordion";
+import LoadingMessage from "./components/LoadingMessage";
+import type { Message } from "./types";
+import type { MultiWindowCaptureResult } from "@mitable/shared";
 
 declare global {
   interface Window {
@@ -18,6 +21,9 @@ declare global {
       ) => () => void;
       updateMessages: (messages: any[]) => void;
       onPositionUpdate: (callback: (x: number, y: number) => void) => () => void;
+      showNudge: (data: unknown) => void;
+      startGuide: (data: unknown) => void;
+      showOverlay?: (data: unknown) => void;
       getAuthToken: () => Promise<string | null>;
       onAuthTokenUpdated: (callback: (token: string | null) => void) => () => void;
       // NEW: State management
@@ -51,29 +57,9 @@ declare global {
           messageCount: number;
           lastMessageHadCardData?: boolean;
         };
-      }) => Promise<{
-        dataUrl: string;
-        metadata: {
-          width: number;
-          height: number;
-          originalWidth: number;
-          originalHeight: number;
-          captureMode: string;
-          timestamp: number;
-        };
-      } | null>;
+      }) => Promise<MultiWindowCaptureResult>;
     };
   }
-}
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  type?: "text" | "card";
-  messageType?: string;
-  cardData?: any;
-  sources?: any[];
 }
 
 type ViewState = "hidden" | "collapsed" | "expanded";
@@ -89,6 +75,19 @@ function App() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Loading state for progress messages
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+
+  // Workflow-specific loading state (for inline loading in WorkflowAccordion)
+  const [workflowLoadingMessage, setWorkflowLoadingMessage] = useState<string | null>(null);
+
+  // Workflow custom question state (for "Type something" button)
+  const [awaitingCustomQuestion, setAwaitingCustomQuestion] = useState<{
+    conversationId: string;
+    workflowSessionId: string | null;
+    relatedStepIndex: number | null;
+  } | null>(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -128,8 +127,8 @@ function App() {
       async (messageData: any, screenshot: string | null) => {
         console.log("[Conversation] Message received from Agent:", messageData);
 
-        // If we're not already expanded, expand to show the conversation
-        if (viewState !== "expanded") {
+        // If we're in collapsed state, expand to show the conversation
+        if (viewState === "collapsed") {
           window.conversationAPI.setViewState("expanded");
         }
 
@@ -149,16 +148,18 @@ function App() {
             role: "user",
             content: userMessage,
             type: "text",
+            // If awaiting custom question, attach workflow fields so message appears in accordion
+            workflowSessionId: awaitingCustomQuestion?.workflowSessionId || undefined,
+            relatedStepIndex: awaitingCustomQuestion?.relatedStepIndex ?? undefined,
           };
           setMessages((prev) => [...prev, userMsg]);
-          console.log("[Conversation] User message added to UI:", userMsg);
         }
 
-        // Conditionally capture screenshot based on message content and conversation context
-        let capturedScreenshot: string | null = screenshot; // Use provided screenshot if available
+        // Capture multi-window screenshots
+        let multiWindowCapture: any = null;
 
-        if (!capturedScreenshot) {
-          // Build conversation context for heuristics
+        if (!screenshot) {
+          // Build conversation context
           const lastMessage = messages[messages.length - 1];
           const hasActiveWorkflow =
             lastMessage?.messageType === "workflow" || !!lastMessage?.cardData?.workflowActive;
@@ -170,29 +171,30 @@ function App() {
             lastMessageHadCardData: !!lastMessage?.cardData,
           };
 
-          console.log("[Conversation] Evaluating screenshot capture need:", {
+          console.log("[Conversation] Requesting multi-window capture:", {
             message,
             context,
           });
 
-          // Capture screenshot conditionally using IPC API with heuristics
-          // The main process will use CaptureService.conditionalCapture() to decide
+          // Capture multi-window screenshots using IPC API
           try {
             const result = await window.conversationAPI.captureScreenshot({
               message,
               context,
             });
 
-            if (result) {
-              capturedScreenshot = result.dataUrl;
-              console.log("[Conversation] Screenshot captured via heuristics:", {
-                size: capturedScreenshot.length,
-                metadata: result.metadata,
+            if (result && result.success) {
+              // Multi-window capture successful
+              console.log("[Conversation] Multi-window capture successful:", {
+                screenshotCount: result.screenshots.length,
+                blockedCount: result.blockedWindows.length,
+                totalDetected: result.totalWindowsDetected,
               });
+              multiWindowCapture = result;
+            } else if (result && !result.success) {
+              console.warn("[Conversation] Capture blocked or failed:", result.error);
             } else {
-              console.log(
-                "[Conversation] No screenshot captured (heuristics determined not needed)"
-              );
+              console.log("[Conversation] No windows available to capture");
             }
           } catch (error) {
             console.error("[Conversation] Screenshot capture failed:", error);
@@ -212,65 +214,126 @@ function App() {
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
-        console.log("[Conversation] Placeholder AI message created, starting stream...");
 
-        // Stream the response with conditionally captured screenshot
+        // Prepare metadata if this is a custom question during workflow
+        const metadata = awaitingCustomQuestion
+          ? {
+              workflowAction: "custom_question",
+              selectedOption: 2,
+              workflowSessionId: awaitingCustomQuestion.workflowSessionId,
+              currentStepIndex: awaitingCustomQuestion.relatedStepIndex,
+            }
+          : undefined;
+
+        console.log("[Conversation] Sending message with metadata:", metadata);
+
+        // Set initial loading state
+        setLoadingMessage("Thinking...");
+
+        // Stream the response with multi-window captures
         try {
-          await sendMessageStream(convId, message, capturedScreenshot, {
-            onChunk: (chunk) => {
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
-                )
-              );
-            },
-            onComplete: (fullContent, messageId, messageType, cardData) => {
-              console.log("[Conversation] onComplete received:", {
+          await sendMessageStream(
+            convId,
+            message,
+            multiWindowCapture, // Multi-window capture result
+            {
+              onChunk: (chunk, workflowSessionId, relatedStepIndex) => {
+                // Clear loading message on first chunk
+                setLoadingMessage(null);
+                setMessages((prev) =>
+                  prev.map(
+                    (msg): Message =>
+                      msg.id === streamingMessageId
+                        ? {
+                            ...msg,
+                            content: msg.content + chunk,
+                            // Add workflow routing metadata from first chunk
+                            workflowSessionId: msg.workflowSessionId ?? workflowSessionId,
+                            relatedStepIndex: msg.relatedStepIndex ?? relatedStepIndex,
+                          }
+                        : msg
+                  )
+                );
+              },
+              onComplete: (
+                fullContent,
                 messageId,
                 messageType,
-                hasCardData: !!cardData,
-              });
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === streamingMessageId
-                    ? {
-                        ...msg,
-                        id: messageId,
-                        content: fullContent,
-                        type: cardData ? "card" : "text",
-                        messageType,
-                        cardData,
-                      }
-                    : msg
-                )
-              );
-              streamingMessageIdRef.current = null;
+                cardData,
+                workflowSessionId,
+                relatedStepIndex
+              ) => {
+                console.log("[Conversation] onComplete received:", {
+                  messageId,
+                  messageType,
+                  hasCardData: !!cardData,
+                  workflowSessionId,
+                  relatedStepIndex,
+                });
+
+                // Clear loading message on complete (in case onChunk never fired)
+                setLoadingMessage(null);
+
+                setMessages((prev) =>
+                  prev.map(
+                    (msg): Message =>
+                      msg.id === streamingMessageId
+                        ? {
+                            ...msg,
+                            id: messageId,
+                            content: fullContent,
+                            type: cardData ? "card" : "text",
+                            messageType: messageType as "workflow" | "experts" | "text",
+                            cardData,
+                            workflowSessionId,
+                            relatedStepIndex,
+                          }
+                        : msg
+                  )
+                );
+                streamingMessageIdRef.current = null;
+                // Clear awaiting custom question state after successful completion
+                if (awaitingCustomQuestion) {
+                  setAwaitingCustomQuestion(null);
+                }
+              },
+              onError: (error) => {
+                console.error("Streaming error:", error);
+
+                // Clear loading message on error
+                setLoadingMessage(null);
+
+                setMessages((prev) =>
+                  prev.map(
+                    (msg): Message =>
+                      msg.id === streamingMessageId
+                        ? {
+                            ...msg,
+                            content: `Error: ${error}. Please try again.`,
+                          }
+                        : msg
+                  )
+                );
+                streamingMessageIdRef.current = null;
+              },
+              onProgress: (phase, message) => {
+                console.log(`[Conversation] Progress update: ${phase} - ${message}`);
+                setLoadingMessage(message);
+              },
             },
-            onError: (error) => {
-              console.error("Streaming error:", error);
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === streamingMessageId
-                    ? {
-                        ...msg,
-                        content: `Error: ${error}. Please try again.`,
-                      }
-                    : msg
-                )
-              );
-              streamingMessageIdRef.current = null;
-            },
-          });
+            metadata // Workflow metadata only
+          );
         } catch (error) {
           console.error("Failed to send message:", error);
           setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === streamingMessageId
-                ? {
-                    ...msg,
-                    content: "Failed to send message. Please try again.",
-                  }
-                : msg
+            prev.map(
+              (msg): Message =>
+                msg.id === streamingMessageId
+                  ? {
+                      ...msg,
+                      content: "Failed to send message. Please try again.",
+                    }
+                  : msg
             )
           );
           streamingMessageIdRef.current = null;
@@ -280,7 +343,7 @@ function App() {
 
     // Cleanup listener on unmount or remount
     return cleanup;
-  }, [viewState]);
+  }, [viewState, awaitingCustomQuestion]);
 
   const handleNewChat = () => {
     console.log("[Conversation] Creating new chat");
@@ -321,6 +384,9 @@ function App() {
         messageType: msg.messageType,
         cardData: msg.cardData,
         sources: msg.sources,
+        windowTrigger: msg.windowTrigger,
+        workflowSessionId: msg.workflowSessionId,
+        relatedStepIndex: msg.relatedStepIndex,
       }));
 
       setMessages(uiMessages);
@@ -338,6 +404,43 @@ function App() {
     console.log("[Conversation] Closing to collapsed state");
     // Don't clear messages or conversation - just collapse back to combobox
     window.conversationAPI.setViewState("collapsed");
+  };
+
+  const handleExitWorkflow = async () => {
+    if (!conversationId) {
+      console.error("[Conversation] No conversation ID for exit workflow");
+      return;
+    }
+
+    try {
+      console.log("[Conversation] Exiting workflow for conversation:", conversationId);
+
+      // Call backend to pause workflow and get updated state
+      const updatedWorkflow = await pauseWorkflow(conversationId);
+
+      console.log("[Conversation] Workflow paused:", updatedWorkflow.workflowSessionId);
+
+      // Update cardData status to "paused" for all messages in this workflow
+      // Keep everything else (step indexes, content, etc.) unchanged
+      setMessages((prev) =>
+        prev.map((msg): Message => {
+          if (msg.workflowSessionId === updatedWorkflow.workflowSessionId && msg.cardData) {
+            return {
+              ...msg,
+              cardData: {
+                ...msg.cardData,
+                status: "paused", // Only change status
+              },
+            };
+          }
+          return msg;
+        })
+      );
+
+      console.log("[Conversation] Workflow status updated to paused");
+    } catch (error) {
+      console.error("[Conversation] Error pausing workflow:", error);
+    }
   };
 
   const handleWorkflowOptionSelect = async (option: any) => {
@@ -367,16 +470,13 @@ function App() {
           workflowAction: "custom_question",
           selectedOption: 2,
         };
-        message = label; // The actual question text
+        message = label; // The actual question text (will be "Type something" for now, fixed later)
         break;
 
       case "exit_workflow":
-        metadata = {
-          workflowAction: "exit_workflow",
-          selectedOption: 3,
-        };
-        message = "Exit workflow";
-        break;
+        // Handle exit workflow separately - pause workflow without sending message
+        await handleExitWorkflow();
+        return; // Don't continue with sending message
 
       case "confirm_start":
         metadata = {
@@ -390,16 +490,50 @@ function App() {
         message = label;
     }
 
-    console.log("[Conversation] Workflow option selected:", { action, message, metadata });
+    // Find the LATEST workflow message to get current workflowSessionId and currentStepIndex
+    // Use reverse() to start from most recent messages
+    const activeWorkflowMessage = [...messages]
+      .reverse()
+      .find((m) => m.messageType === "workflow" && m.cardData?.workflowSessionId);
+    const workflowSessionId = activeWorkflowMessage?.cardData?.workflowSessionId || null;
+    const currentStepIndex = activeWorkflowMessage?.cardData?.currentStepIndex ?? null;
 
-    // Add user message to UI
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: message,
-      type: "text",
-    };
-    setMessages((prev) => [...prev, userMsg]);
+    console.log("[Conversation] Workflow option selected:", {
+      action,
+      message,
+      metadata,
+      workflowSessionId,
+      currentStepIndex,
+    });
+
+    // Handle "Type something" / "ask questions" actions - enable custom input mode
+    if (action === "custom_question" || action === "ask_questions") {
+      console.log("[Conversation] Enabling custom question mode");
+      setAwaitingCustomQuestion({
+        conversationId,
+        workflowSessionId,
+        relatedStepIndex: currentStepIndex,
+      });
+      // Don't send message yet - wait for user to type their actual question in agent pill
+      return;
+    }
+
+    // Only create user message for actions where user intent should be visible
+    // Control actions (progress_step, exit_workflow) should NOT create visible bubbles
+    const shouldCreateUserMessage = action === "confirm_start";
+
+    if (shouldCreateUserMessage) {
+      // Add user message to UI with workflow fields so it appears inside WorkflowAccordion
+      const userMsg: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: message,
+        type: "text",
+        workflowSessionId,
+        relatedStepIndex: currentStepIndex,
+      };
+      setMessages((prev) => [...prev, userMsg]);
+    }
 
     // Create placeholder for streaming assistant message
     const streamingMessageId = `streaming-${Date.now()}`;
@@ -414,20 +548,34 @@ function App() {
 
     setMessages((prev) => [...prev, assistantMessage]);
 
+    // Set workflow-specific loading state
+    setWorkflowLoadingMessage("Thinking...");
+
     // Capture screenshot for workflow actions (progress_step and custom_question)
-    let screenshot: string | null = null;
+    let multiWindowCapture: any = null;
     if (
       option.action === "progress_step" ||
       option.action === "custom_question" ||
       option.action === "confirm_start"
     ) {
       console.log("[Conversation] Capturing screenshot for workflow action:", option.action);
-      const screenshotResult = await window.conversationAPI?.captureScreenshot?.();
-      if (screenshotResult) {
-        screenshot = screenshotResult.dataUrl;
-        console.log("[Conversation] Screenshot captured successfully");
-      } else {
-        console.warn("[Conversation] Screenshot capture failed");
+      try {
+        const result = await window.conversationAPI?.captureScreenshot?.();
+        if (result && result.success) {
+          console.log("[Conversation] Multi-window capture successful", {
+            windowCount: result.screenshots.length,
+            blockedCount: result.blockedWindows.length,
+            totalDetected: result.totalWindowsDetected,
+          });
+          multiWindowCapture = result;
+        } else if (result && !result.success) {
+          console.warn("[Conversation] Capture blocked or failed:", result.error);
+        } else {
+          console.log("[Conversation] No windows available to capture");
+        }
+      } catch (error) {
+        console.error("[Conversation] Screenshot capture failed:", error);
+        // Continue without screenshot - backend will handle gracefully
       }
     }
 
@@ -436,43 +584,69 @@ function App() {
       await sendMessageStream(
         conversationId,
         message,
-        screenshot,
+        multiWindowCapture,
         {
           onChunk: (chunk) => {
+            // Clear workflow loading state on first chunk
+            setWorkflowLoadingMessage(null);
+
             setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
+              prev.map(
+                (msg): Message =>
+                  msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
               )
             );
           },
-          onComplete: (fullContent, messageId, messageType, cardData) => {
+          onComplete: (
+            fullContent,
+            messageId,
+            messageType,
+            cardData,
+            workflowSessionId,
+            relatedStepIndex
+          ) => {
+            // Clear workflow loading state on complete (in case onChunk never fired)
+            setWorkflowLoadingMessage(null);
+
             setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === streamingMessageId
-                  ? {
-                      ...msg,
-                      id: messageId,
-                      content: fullContent,
-                      type: cardData ? "card" : "text",
-                      messageType,
-                      cardData,
-                    }
-                  : msg
+              prev.map(
+                (msg): Message =>
+                  msg.id === streamingMessageId
+                    ? {
+                        ...msg,
+                        id: messageId,
+                        content: fullContent,
+                        type: cardData ? "card" : "text",
+                        messageType: messageType as "workflow" | "experts" | "text",
+                        cardData,
+                        workflowSessionId,
+                        relatedStepIndex,
+                      }
+                    : msg
               )
             );
             streamingMessageIdRef.current = null;
           },
           onError: (error) => {
             console.error("Workflow streaming error:", error);
+
+            // Clear workflow loading state on error
+            setWorkflowLoadingMessage(null);
+
             setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === streamingMessageId ? { ...msg, content: `Error: ${error}` } : msg
+              prev.map(
+                (msg): Message =>
+                  msg.id === streamingMessageId ? { ...msg, content: `Error: ${error}` } : msg
               )
             );
             streamingMessageIdRef.current = null;
           },
+          onProgress: (phase, message) => {
+            console.log(`[Conversation] Workflow progress update: ${phase} - ${message}`);
+            setWorkflowLoadingMessage(message);
+          },
         },
-        metadata // Pass metadata to the API
+        metadata // Pass workflow metadata to the API
       );
     } catch (error) {
       console.error("Failed to send workflow message:", error);
@@ -500,17 +674,31 @@ function App() {
           className="w-full h-full flex items-center justify-center p-4"
         >
           <div className="relative w-full h-[600px] flex flex-col bg-background-secondary rounded-2xl overflow-hidden app-drag">
-            {/* Close Button - Subtle gray background with hover effect */}
+            {/* Open in Console Button */}
+            <button
+              onClick={() => {
+                if (conversationId) {
+                  console.log("[Conversation] Opening in console:", conversationId);
+                  window.conversationAPI.openConversationInConsole(conversationId);
+                }
+              }}
+              className="absolute top-4 left-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag"
+              aria-label="Open in Console"
+            >
+              <ExternalLink size={16} className="text-white" />
+            </button>
+
+            {/* Close Button */}
             <button
               onClick={handleClose}
-              className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag shadow-lg"
+              className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors app-no-drag"
               aria-label="Close"
             >
-              <X size={18} className="text-white" />
+              <X size={16} className="text-white" />
             </button>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 pt-16 pb-8 app-no-drag scrollbar-hide">
+            <div className="flex-1 overflow-y-auto p-4 pt-16 app-no-drag">
               {messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center text-gray-400">
@@ -520,69 +708,108 @@ function App() {
                 </div>
               )}
 
-              {messages.map((message) => {
-                // Render user messages
-                if (message.role === "user") {
-                  return <UserMessage key={message.id} content={message.content} />;
-                }
+              {(() => {
+                // Track which workflow sessions have been rendered to avoid duplicates
+                const renderedWorkflowSessions = new Set<string>();
 
-                // Render AI messages (assistant)
-                const isWorkflowMessage =
-                  message.messageType === "workflow" && message.cardData?.workflowActive;
-                const workflowPhase = message.cardData?.workflowPhase as WorkflowPhase | undefined;
+                return messages.map((message) => {
+                  // Skip user messages that belong to a workflow (they'll be shown inside WorkflowAccordion)
+                  if (message.role === "user") {
+                    // Only render user message in main flow if it's NOT part of a workflow
+                    if (!message.workflowSessionId) {
+                      return <UserMessage key={message.id} content={message.content} />;
+                    }
+                    // User messages with workflowSessionId are rendered inside WorkflowAccordion
+                    return null;
+                  }
 
-                // Determine if we should show step list based on phase
-                const shouldShowStepList =
-                  isWorkflowMessage && workflowPhase && workflowPhase !== "custom_question";
-                const shouldShowCheckboxes = workflowPhase === "step_progression";
+                  // Render AI messages (assistant)
+                  const isWorkflowMessage =
+                    message.messageType === "workflow" && message.cardData?.workflowSessionId;
 
-                return (
-                  <div key={message.id} className="space-y-3">
-                    {/* Show workflow components for active workflows */}
-                    {isWorkflowMessage && (
-                      <>
-                        {/* 1. FIRST: Show step list for initial_proposal and step_progression phases */}
-                        {shouldShowStepList && message.cardData.stepList && (
-                          <StepList
-                            steps={message.cardData.stepList}
-                            currentStepIndex={message.cardData.currentStepIndex || 0}
-                            showCheckboxes={shouldShowCheckboxes}
-                          />
-                        )}
+                  // Check if this is a workflow with an accordion
+                  if (isWorkflowMessage && message.cardData) {
+                    const workflowSessionId = message.cardData.workflowSessionId!;
 
-                        {/* 2. SECOND: Show AI text response (conversational message) */}
-                        {message.content && <AIMessage content={message.content} />}
+                    // Skip if we've already rendered this workflow session
+                    if (renderedWorkflowSessions.has(workflowSessionId)) {
+                      return null;
+                    }
 
-                        {/* Always show WorkflowOptions for workflow messages */}
-                        {workflowPhase && (
-                          <WorkflowOptions
-                            phase={workflowPhase}
+                    // Mark this workflow session as rendered
+                    renderedWorkflowSessions.add(workflowSessionId);
+
+                    // Filter all messages for this workflow
+                    const workflowMessages = messages.filter(
+                      (m) => m.workflowSessionId === workflowSessionId
+                    );
+
+                    // Get the LATEST workflow state from the most recent workflow message with cardData
+                    // This ensures we show the current step index, status, etc.
+                    const latestWorkflowMessage = [...workflowMessages]
+                      .reverse()
+                      .find((m) => m.messageType === "workflow" && m.cardData);
+                    // Type assertion: backend guarantees workflow messages have complete SolutionObject in cardData
+                    const currentWorkflowState = (latestWorkflowMessage?.cardData ||
+                      message.cardData) as any;
+
+                    // Check if ANY message in this workflow is currently streaming
+                    const isCurrentlyStreaming = workflowMessages.some(
+                      (m) => streamingMessageIdRef.current === m.id
+                    );
+
+                    // Check if we're awaiting a custom question for this workflow
+                    const isAwaitingCustomQuestion =
+                      awaitingCustomQuestion?.workflowSessionId === workflowSessionId;
+
+                    // Render WorkflowAccordion ONCE per workflow session
+                    return (
+                      <div key={workflowSessionId}>
+                        <ErrorBoundary
+                          fallback={
+                            <div className="workflow-error bg-status-error/10 border border-status-error/30 rounded-lg p-4 mb-4">
+                              <p className="text-sm text-text-secondary text-center">
+                                Unable to load workflow. Please try refreshing the conversation.
+                              </p>
+                            </div>
+                          }
+                        >
+                          <WorkflowAccordion
+                            workflow={currentWorkflowState}
+                            messages={workflowMessages}
                             onOptionSelect={handleWorkflowOptionSelect}
+                            isStreaming={isCurrentlyStreaming}
+                            awaitingCustomQuestion={isAwaitingCustomQuestion}
+                            workflowLoadingMessage={workflowLoadingMessage}
                           />
-                        )}
-                      </>
-                    )}
+                        </ErrorBoundary>
+                      </div>
+                    );
+                  }
 
-                    {/* Show AI message for non-workflow messages */}
-                    {!isWorkflowMessage &&
-                      (() => {
-                        const isCurrentStreaming =
-                          message.id === streamingMessageIdRef.current && !message.content;
-                        const content = isCurrentStreaming ? "Thinking..." : message.content || "";
-                        return <AIMessage content={content} isStreaming={isCurrentStreaming} />;
-                      })()}
+                  return (
+                    <div key={message.id} className="space-y-3">
+                      {/* Show AI message for non-workflow messages */}
+                      {!isWorkflowMessage && message.content && (
+                        <AIMessage content={message.content} />
+                      )}
 
-                    {/* Show inline ExpertsCard for experts messages */}
-                    {message.messageType === "experts" && message.cardData?.experts && (
-                      <ExpertsCard
-                        experts={message.cardData.experts}
-                        suggestedNudge={message.cardData.suggestedNudge}
-                        conversationId={conversationId || ""}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+                      {/* Show inline ExpertsCard for experts messages */}
+                      {message.messageType === "experts" && message.cardData?.experts && (
+                        <ExpertsCard
+                          experts={message.cardData.experts}
+                          suggestedNudge={message.cardData.suggestedNudge}
+                          conversationId={conversationId || ""}
+                        />
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+
+              {/* Loading message - show when backend is processing */}
+              {loadingMessage && <LoadingMessage message={loadingMessage} />}
+
               <div ref={messagesEndRef} />
             </div>
           </div>

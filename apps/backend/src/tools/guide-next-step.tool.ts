@@ -78,7 +78,7 @@ DO NOT USE:
     console.log("[GuideNextStepTool] Progressing workflow in conversation:", conversationId);
 
     // Validate screenshot is present
-    if (!context.screenshot) {
+    if (!context.screenshots || context.screenshots.length === 0) {
       console.error("[GuideNextStepTool] No screenshot provided");
       return {
         messageType: "text",
@@ -125,7 +125,7 @@ DO NOT USE:
       // Step 3: ALWAYS evaluate if plan needs adjustment
       console.log("[GuideNextStepTool] Evaluating if plan needs adjustment...");
       const evaluation = await geminiVisionService.evaluateProgress(
-        context.screenshot,
+        context.screenshots,
         currentSolution,
         context.conversationHistory,
         nextStepIndex
@@ -174,7 +174,7 @@ DO NOT USE:
       });
 
       const visualGuidance = await geminiVisionService.analyzeStepExecution(
-        context.screenshot,
+        context.screenshots,
         updatedSolution,
         nextStep,
         context.conversationHistory
@@ -187,14 +187,9 @@ DO NOT USE:
       });
 
       // Step 7: Build conversational message
-      let message = visualGuidance.conversationalMessage;
-
-      // If plan was ACTUALLY adjusted (new steps provided), communicate it to the user
-      // Don't show adjustment notice if Gemini just confirmed no changes needed
-      if (evaluation.needsAdjustment && evaluation.adjustedStepList) {
-        message = `📝 *Plan Updated:* ${evaluation.adjustmentReason}\n\n${message}`;
-        console.log("[GuideNextStepTool] Including adjustment notice in response");
-      }
+      // Note: Don't include adjustment notice here - it's shown in the warning banner
+      // on the frontend (WorkflowAccordion reads from adjustmentHistory)
+      const message = visualGuidance.conversationalMessage;
 
       console.log("[GuideNextStepTool] Workflow progressed successfully:", {
         newStepIndex: nextStepIndex,

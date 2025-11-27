@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { MultiWindowCaptureResult } from "@mitable/shared";
 
 // IPC channel constants (inlined to avoid chunking issues)
 const IPC_CHANNELS = {
@@ -20,6 +21,7 @@ const IPC_CHANNELS = {
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
   CAPTURE_SCREENSHOT: "capture-screenshot",
+  GET_ACTIVE_WINDOW: "mitable:get-active-window",
 } as const;
 
 contextBridge.exposeInMainWorld("conversationAPI", {
@@ -144,9 +146,9 @@ contextBridge.exposeInMainWorld("conversationAPI", {
     conversationId: string;
   }) => ipcRenderer.send(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, data),
 
-  // Screenshot capture - for workflow visual guidance
+  // Screenshot capture - multi-window capture with policy filtering
   // Supports conditional capture with heuristics when message and context provided
-  // Returns {dataUrl: string, metadata: ScreenshotMetadata} or null on failure/not needed
+  // Returns MultiWindowCaptureResult (success with screenshots array or error)
   captureScreenshot: (payload?: {
     message?: string;
     context?: {
@@ -155,22 +157,20 @@ contextBridge.exposeInMainWorld("conversationAPI", {
       messageCount: number;
       lastMessageHadCardData?: boolean;
     };
-  }): Promise<{
-    dataUrl: string;
-    metadata: {
-      width: number;
-      height: number;
-      timestamp: number;
-      boundingBoxes?: unknown[];
-      window?: unknown;
-    };
-  } | null> => {
+  }): Promise<MultiWindowCaptureResult> => {
     console.log("[Conversation Preload] captureScreenshot() called from renderer", {
       hasMessage: !!payload?.message,
       hasContext: !!payload?.context,
     });
     return ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT, payload);
   },
+
+  // Get active window info - for capture policy enforcement
+  getActiveWindow: (): Promise<{
+    title: string;
+    appName: string;
+    processId?: number;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.GET_ACTIVE_WINDOW),
 
   // Auth management - Conversation requests token from main process
   getAuthToken: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_TOKEN),

@@ -63,7 +63,13 @@ coverage/
 # Misc
 *.tsbuildinfo
 
+# Debug/temp files
+temp/
+
 # OCR/ML Models (auto-downloaded by tesseract.js)
 *.traineddata
 
 .mcp.json
+
+# User specific files
+*cursor-rules.mdc

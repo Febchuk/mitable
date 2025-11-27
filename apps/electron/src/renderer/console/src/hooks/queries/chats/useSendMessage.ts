@@ -3,12 +3,12 @@ import { sendStreamingMessage, type StreamCallbacks } from "../../../services/ch
 import { useUser } from "../../../context/UserContext";
 import { authService } from "../../../services/authService";
 import type { Message } from "../../../types";
+import type { MultiWindowCaptureResult } from "@mitable/shared";
 
 export interface SendMessageOptions {
   onChunk?: (content: string) => void;
   onComplete?: (fullContent: string) => void;
   onError?: (error: string) => void;
-  onWindowTrigger?: (window: string, data: any) => void;
   captureScreenshot?: boolean; // Whether to capture screenshot before sending
 }
 
@@ -21,14 +21,12 @@ export function useSendMessage(options?: SendMessageOptions) {
       chatId,
       content,
       metadata,
-      screenshot: providedScreenshot,
-      screenshotMetadata,
+      multiWindowCapture: providedCapture,
     }: {
       chatId: string;
       content: string;
       metadata?: any;
-      screenshot?: string | null;
-      screenshotMetadata?: any;
+      multiWindowCapture?: MultiWindowCaptureResult | null;
     }) => {
       const token = authService.getAccessToken();
 
@@ -36,8 +34,7 @@ export function useSendMessage(options?: SendMessageOptions) {
         chatId,
         contentLength: content.length,
         hasMetadata: !!metadata,
-        hasProvidedScreenshot: !!providedScreenshot,
-        hasScreenshotMetadata: !!screenshotMetadata,
+        hasProvidedCapture: !!providedCapture,
         captureScreenshotOption: options?.captureScreenshot,
         hasWindow: typeof window !== "undefined",
         hasConsoleAPI: typeof window !== "undefined" && !!window.consoleAPI,
@@ -48,12 +45,12 @@ export function useSendMessage(options?: SendMessageOptions) {
         throw new Error("No authentication token");
       }
 
-      // Use provided screenshot or capture if requested (for workflow mode)
-      let screenshot: string | undefined = providedScreenshot || undefined;
+      // Use provided capture or capture if requested (for workflow mode)
+      let multiWindowCapture: MultiWindowCaptureResult | null | undefined = providedCapture;
 
-      // Only auto-capture if no screenshot provided and option is set
-      if (!screenshot && options?.captureScreenshot) {
-        console.log("[useSendMessage] Screenshot capture requested");
+      // Only auto-capture if no capture provided and option is set
+      if (!multiWindowCapture && options?.captureScreenshot) {
+        console.log("[useSendMessage] Multi-window screenshot capture requested");
 
         if (!window.consoleAPI) {
           console.error("[useSendMessage] window.consoleAPI is not available!");
@@ -62,11 +59,18 @@ export function useSendMessage(options?: SendMessageOptions) {
         } else {
           try {
             console.log("[useSendMessage] Calling captureScreenshot...");
-            screenshot = (await window.consoleAPI.captureScreenshot()) || undefined;
-            console.log("[useSendMessage] Screenshot captured:", {
-              hasScreenshot: !!screenshot,
-              size: screenshot?.length || 0,
-            });
+            multiWindowCapture = await window.consoleAPI.captureScreenshot();
+            if (multiWindowCapture?.success) {
+              console.log("[useSendMessage] Multi-window capture successful:", {
+                screenshotCount: multiWindowCapture.screenshots.length,
+                blockedCount: multiWindowCapture.blockedWindows.length,
+              });
+            } else {
+              console.log(
+                "[useSendMessage] Capture blocked or failed:",
+                multiWindowCapture?.success === false ? multiWindowCapture.error : "Unknown"
+              );
+            }
           } catch (error) {
             console.error("[useSendMessage] Screenshot capture failed:", error);
             // Continue without screenshot
@@ -85,21 +89,10 @@ export function useSendMessage(options?: SendMessageOptions) {
         onError: (error: string) => {
           options?.onError?.(error);
         },
-        onWindowTrigger: (window: string, data: any) => {
-          options?.onWindowTrigger?.(window, data);
-        },
       };
 
-      // Start streaming with optional screenshot, metadata, and screenshotMetadata
-      await sendStreamingMessage(
-        chatId,
-        content,
-        callbacks,
-        token,
-        screenshot,
-        metadata,
-        screenshotMetadata
-      );
+      // Start streaming with optional multi-window capture and metadata
+      await sendStreamingMessage(chatId, content, callbacks, token, multiWindowCapture, metadata);
     },
 
     // Optimistic update for user message

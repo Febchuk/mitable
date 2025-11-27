@@ -5,21 +5,14 @@
  * Works with both Agent and Conversation windows
  */
 
+import type { Message as MessageType } from "../../conversation/src/types";
+import type { MultiWindowCaptureResult, WindowScreenshot } from "@mitable/shared";
+
+// Base URL for backend API (configurable via Vite env)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-export interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp?: Date;
-  messageType?: string;
-  cardData?: any;
-  sources?: any[];
-  windowTrigger?: {
-    window: "nudge" | "guide";
-    data: any;
-  };
-}
+// Re-export Message type for convenience
+export type Message = MessageType;
 
 export interface Conversation {
   id: string;
@@ -30,16 +23,20 @@ export interface Conversation {
 }
 
 export interface StreamChunk {
-  type: "chunk" | "complete" | "error" | "window_trigger" | "done";
+  type: "chunk" | "complete" | "error" | "window_trigger" | "done" | "progress";
   content?: string;
   messageId?: string;
   error?: string;
-  messageType?: string;
+  messageType?: "text" | "workflow" | "experts";
   cardData?: any;
   sources?: any[];
-  windowTrigger?: {
-    window: "nudge" | "guide";
-    data: any;
+  // Workflow routing metadata (added by backend)
+  workflowSessionId?: string | null;
+  relatedStepIndex?: number | null;
+  // Progress updates for long-running operations
+  progress?: {
+    phase: string;
+    message: string;
   };
 }
 
@@ -124,55 +121,108 @@ export async function getConversationMessages(conversationId: string): Promise<M
 }
 
 /**
+ * Pause an active workflow
+ * Returns the updated workflow state with status: "paused"
+ */
+export async function pauseWorkflow(conversationId: string): Promise<{
+  success: boolean;
+  workflowSessionId: string;
+  status: string;
+  workflowData: any;
+  currentStepIndex: number;
+}> {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/conversations/${conversationId}/workflow/pause`,
+    {
+      method: "POST",
+      headers,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to pause workflow: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+/**
  * Send a message and stream the response
  *
  * @param conversationId - Conversation ID
  * @param content - Message content
- * @param screenshot - Optional base64-encoded screenshot for visual guidance
+ * @param multiWindowCapture - Optional multi-window capture result with screenshots
+ * @param callbacks - Streaming callbacks
+ * @param callbacks.onChunk - Callback for each streaming chunk (with workflow metadata)
+ * @param callbacks.onComplete - Callback when streaming completes (with workflow metadata)
+ * @param callbacks.onError - Callback for errors
+ * @param callbacks.onWindowTrigger - Callback for window triggers (Nudge/Guide)
+ * @param callbacks.onProgress - Callback for progress updates
  * @param metadata - Optional metadata for workflow actions
- * @param onChunk - Callback for each streaming chunk
- * @param onComplete - Callback when streaming completes
- * @param onError - Callback for errors
- * @param onWindowTrigger - Callback for window triggers (Nudge/Guide)
  */
 export async function sendMessageStream(
   conversationId: string,
   content: string,
-  screenshot: string | null | undefined,
+  multiWindowCapture: MultiWindowCaptureResult | null | undefined,
   callbacks: {
-    onChunk?: (chunk: string) => void;
+    onChunk?: (
+      chunk: string,
+      workflowSessionId?: string | null,
+      relatedStepIndex?: number | null
+    ) => void;
     onComplete?: (
       fullContent: string,
       messageId: string,
       messageType?: string,
       cardData?: any,
-      windowTrigger?: { window: "nudge" | "guide"; data: any }
+      workflowSessionId?: string | null,
+      relatedStepIndex?: number | null
     ) => void;
     onError?: (error: string) => void;
-    onWindowTrigger?: (window: "nudge" | "guide", data: any) => void;
+    onProgress?: (phase: string, message: string) => void;
   },
   metadata?: any
 ): Promise<void> {
+  // Forward all captured screenshots (if any) from multi-window capture
+  let screenshotsPayload: WindowScreenshot[] | undefined;
+  if (multiWindowCapture && multiWindowCapture.success && multiWindowCapture.screenshots.length) {
+    screenshotsPayload = multiWindowCapture.screenshots;
+
+    console.log("[API] Sending multi-window capture payload:", {
+      screenshotCount: screenshotsPayload.length,
+      apps: screenshotsPayload.map((s) => s.appName).join(", "),
+    });
+  } else if (multiWindowCapture && !multiWindowCapture.success) {
+    console.log("[API] Screenshot capture blocked or failed:", multiWindowCapture.error);
+  } else {
+    console.log("[API] Sending message without screenshots");
+  }
+
   console.log("[API] 📨 Starting message stream:", {
     conversationId,
     contentLength: content.length,
-    hasScreenshot: !!screenshot,
+    screenshotCount: screenshotsPayload?.length || 0,
   });
 
   const headers = await getAuthHeaders();
   console.log("[API] Auth headers obtained for streaming");
 
-  // Build request body with optional screenshot and metadata
-  const requestBody: { content: string; screenshot?: string; metadata?: any } = { content };
-  if (screenshot) {
-    requestBody.screenshot = screenshot;
-    console.log(`[API] Sending message with screenshot (${screenshot.length} bytes)`);
-  } else {
-    console.log("[API] Sending message without screenshot");
+  // Build request body with optional screenshots and metadata
+  const requestBody: {
+    content: string;
+    screenshots?: WindowScreenshot[];
+    metadata?: any;
+  } = { content };
+
+  if (screenshotsPayload) {
+    requestBody.screenshots = screenshotsPayload;
   }
+
   if (metadata) {
     requestBody.metadata = metadata;
-    console.log(`[API] Sending message with metadata:`, metadata);
+    console.log("[API] Sending message with metadata:", metadata);
   }
 
   const response = await fetch(
@@ -195,7 +245,6 @@ export async function sendMessageStream(
     return;
   }
 
-  // Read the entire SSE stream and collect the full content
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -203,46 +252,105 @@ export async function sendMessageStream(
   let messageId = "";
   let messageType: string | undefined;
   let cardData: any = undefined;
-  let windowTriggerData: { window: "nudge" | "guide"; data: any } | undefined;
+  let workflowSessionId: string | null | undefined;
+  let relatedStepIndex: number | null | undefined;
 
   try {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const { done, value } = await reader.read();
 
-      if (done) break;
+      if (done) {
+        break;
+      }
 
+      // Decode the chunk
       buffer += decoder.decode(value, { stream: true });
+
+      // Process complete lines
       const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      buffer = lines.pop() || ""; // Keep incomplete line in buffer
 
       for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          if (data === "" || data.startsWith(":")) continue;
+        // Skip empty lines and ping messages
+        if (!line.trim() || line.startsWith(":")) {
+          continue;
+        }
 
+        // Parse SSE data
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6); // Remove "data: " prefix
           try {
             const chunk: StreamChunk = JSON.parse(data);
 
-            // Stream chunks directly to UI as they arrive (real-time!)
-            if (chunk.type === "chunk" && chunk.content) {
-              fullContent += chunk.content;
-              callbacks.onChunk?.(chunk.content);
-            } else if (chunk.type === "complete") {
-              if (chunk.content) fullContent = chunk.content;
-              if (chunk.messageType) messageType = chunk.messageType;
-              if (chunk.cardData) cardData = chunk.cardData;
-            } else if (chunk.type === "window_trigger" && chunk.windowTrigger) {
-              windowTriggerData = chunk.windowTrigger;
-              callbacks.onWindowTrigger?.(chunk.windowTrigger.window, chunk.windowTrigger.data);
-            } else if (chunk.type === "done" && chunk.messageId) {
-              messageId = chunk.messageId;
-            } else if (chunk.type === "error") {
-              callbacks.onError?.(chunk.error || "Unknown error");
-              return;
+            switch (chunk.type) {
+              case "chunk": {
+                // Extract workflow metadata from first chunk
+                if (workflowSessionId === undefined) {
+                  workflowSessionId = chunk.workflowSessionId ?? null;
+                  relatedStepIndex = chunk.relatedStepIndex ?? null;
+                }
+
+                if (chunk.content) {
+                  fullContent += chunk.content;
+                  callbacks.onChunk?.(chunk.content, workflowSessionId, relatedStepIndex);
+                }
+                break;
+              }
+
+              case "complete": {
+                if (chunk.content) {
+                  fullContent = chunk.content;
+                }
+                if (chunk.messageType) {
+                  messageType = chunk.messageType;
+                }
+                if (chunk.cardData) {
+                  cardData = chunk.cardData;
+                }
+                break;
+              }
+
+              case "done": {
+                if (chunk.messageId) {
+                  messageId = chunk.messageId;
+                }
+                if (chunk.workflowSessionId !== undefined) {
+                  workflowSessionId = chunk.workflowSessionId;
+                }
+                if (chunk.relatedStepIndex !== undefined) {
+                  relatedStepIndex = chunk.relatedStepIndex;
+                }
+
+                callbacks.onComplete?.(
+                  fullContent,
+                  messageId,
+                  messageType,
+                  cardData,
+                  workflowSessionId,
+                  relatedStepIndex
+                );
+                break;
+              }
+
+              case "progress": {
+                if (chunk.progress) {
+                  callbacks.onProgress?.(chunk.progress.phase, chunk.progress.message);
+                }
+                break;
+              }
+
+              case "error": {
+                callbacks.onError?.(chunk.error || "Unknown error");
+                break;
+              }
+
+              default: {
+                console.warn("[API] Unknown chunk type received:", chunk.type, chunk);
+              }
             }
-          } catch (e) {
-            // Skip parse errors
+          } catch (parseError) {
+            console.error("[API] Failed to parse SSE data:", parseError, data);
           }
         }
       }
@@ -254,10 +362,17 @@ export async function sendMessageStream(
       return;
     }
 
-    console.log("[API] ✅ Real-time streaming complete, calling onComplete");
-
-    // Signal completion
-    callbacks.onComplete?.(fullContent, messageId, messageType, cardData, windowTriggerData);
+    // If we somehow exit the loop without a "done" event, still call onComplete once
+    if (!messageId) {
+      callbacks.onComplete?.(
+        fullContent,
+        messageId,
+        messageType,
+        cardData,
+        workflowSessionId,
+        relatedStepIndex
+      );
+    }
   } catch (error) {
     console.error("Stream reading error:", error);
     callbacks.onError?.(error instanceof Error ? error.message : "Stream reading error");

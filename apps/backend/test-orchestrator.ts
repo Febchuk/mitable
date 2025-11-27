@@ -206,16 +206,20 @@ async function testWorkflowStart() {
         createdAt: new Date(),
       },
     ],
-    screenshot: MOCK_SCREENSHOT,
-    screenshotMetadata: {
-      width: 1920,
-      height: 1080,
-      originalWidth: 1920,
-      originalHeight: 1080,
-      scaleFactor: 1,
-      captureMode: "full-screen",
-      timestamp: Date.now(),
-    },
+    screenshots: [
+      {
+        windowId: "window-1",
+        windowTitle: "Mock Window",
+        appName: "Mock App",
+        dataUrl: MOCK_SCREENSHOT,
+        metadata: {
+          width: 1920,
+          height: 1080,
+          scaleFactor: 1,
+          bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        },
+      },
+    ],
     userProfile: {
       name: "Test User",
       email: "test@example.com",

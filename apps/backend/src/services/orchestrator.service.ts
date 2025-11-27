@@ -127,7 +127,7 @@ export class OrchestratorService {
 
       console.log("[Orchestrator] Processing message:", {
         conversationId: context.conversationId,
-        hasScreenshot: !!context.screenshot,
+        screenshotCount: context.screenshots?.length || 0,
         hasWorkflowState: !!workflowState,
         workflowAction: context.metadata?.workflowAction,
       });
@@ -386,7 +386,7 @@ Rules:
 - Use "expert_request" when user explicitly wants to find/talk to someone
 
 User: ${JSON.stringify(userMessage)}
-screenshot_available: ${context.screenshot ? "yes" : "no"}
+screenshot_available: ${context.screenshots && context.screenshots.length > 0 ? "yes" : "no"}
 
 Return STRICT JSON only:
 {"type":"<intent>","confidence":0.0-1.0}`;
@@ -397,7 +397,11 @@ Return STRICT JSON only:
       console.log("[Orchestrator] Gemini classified:", intent);
 
       // (4) Safety: prefer RAG if "workflow_start" without screenshot and low confidence
-      if (intent.type === "workflow_start" && !context.screenshot && intent.confidence < 0.8) {
+      if (
+        intent.type === "workflow_start" &&
+        (!context.screenshots || context.screenshots.length === 0) &&
+        intent.confidence < 0.8
+      ) {
         console.log(
           "[Orchestrator] Downgrading workflow_start → knowledge_search (no screenshot + low confidence)"
         );
@@ -439,7 +443,7 @@ Return STRICT JSON only:
    */
   private async routeByIntent(intent: Intent, context: ToolContext): Promise<BaseAgent> {
     // Workflow start requires screenshot
-    if (intent.type === "workflow_start" && context.screenshot) {
+    if (intent.type === "workflow_start" && context.screenshots && context.screenshots.length > 0) {
       return this.visualGuidanceAgent;
     }
 

@@ -87,7 +87,7 @@ export class VisualGuidanceAgent extends BaseAgent {
   async *execute(context: ToolContext): AsyncIterable<StreamChunk> {
     try {
       // Check if screenshot is available
-      if (!context.screenshot) {
+      if (!context.screenshots || context.screenshots.length === 0) {
         yield {
           type: "complete",
           messageType: "text",
@@ -209,6 +209,15 @@ export class VisualGuidanceAgent extends BaseAgent {
       // Start new workflow: STEP 1 - Search knowledge, STEP 2 - Synthesize workflow with GPT-4
       console.log("[VisualGuidanceAgent] Starting knowledge-grounded workflow");
 
+      // Emit progress event: Searching knowledge base
+      yield {
+        type: "progress",
+        progress: {
+          phase: "searching",
+          message: "Searching knowledge base...",
+        },
+      };
+
       // STEP 1: Call KnowledgeAgent for company documentation
       const searchResult = await this.knowledgeAgent.search(lastUserMessage.content, context);
 
@@ -226,7 +235,7 @@ export class VisualGuidanceAgent extends BaseAgent {
           model: "gemini-2.0-flash-exp",
         });
 
-        const base64Data = context.screenshot.replace(/^data:image\/\w+;base64,/, "");
+        const base64Data = context.screenshots[0].dataUrl.replace(/^data:image\/\w+;base64,/, "");
 
         const screenAnalysisPrompt = `Look at this screenshot and identify:
 1. What application/program is currently visible and focused?
@@ -494,6 +503,15 @@ DETAILED INSTRUCTIONS FOR EACH FIELD
 Generate the complete JSON object now with ALL required fields.`;
 
       console.log("[VisualGuidanceAgent] Calling GPT-4 for workflow synthesis");
+
+      // Emit progress event: Generating workflow
+      yield {
+        type: "progress",
+        progress: {
+          phase: "generating",
+          message: "Generating step-by-step guide...",
+        },
+      };
 
       // Call GPT-4 with JSON mode (no function calling)
       const response = await this.openai.chat.completions.create({

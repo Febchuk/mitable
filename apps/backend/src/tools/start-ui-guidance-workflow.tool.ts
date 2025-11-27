@@ -327,7 +327,7 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
 
     console.log("[StartUIGuidanceWorkflowTool] Execute:", args.solution);
 
-    if (!context.screenshot) {
+    if (!context.screenshots || context.screenshots.length === 0) {
       return {
         messageType: "text",
         content: "I need to see your screen to provide step-by-step guidance.",

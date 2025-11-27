@@ -1,5 +1,11 @@
 import type { Message } from "../db/schema/conversations.schema";
-import type { SolutionObject, EmbeddingMatch, Step, AdjustmentRecord } from "@mitable/shared";
+import type {
+  SolutionObject,
+  EmbeddingMatch,
+  Step,
+  AdjustmentRecord,
+  WindowScreenshot,
+} from "@mitable/shared";
 import type { ExpertMatch } from "../services/expertMatching.service";
 
 // ============================================================================
@@ -40,17 +46,7 @@ export interface ToolContext {
   userId: string;
   organizationId: string; // Added for multi-agent architecture
   conversationHistory: Message[];
-  screenshot?: string; // Base64 encoded screenshot
-  screenshotMetadata?: {
-    // Screenshot metadata from capture service
-    width: number; // Resized width (typically 1920)
-    height: number; // Resized height (typically 1080)
-    originalWidth: number; // Physical display width
-    originalHeight: number; // Physical display height
-    scaleFactor: number; // Display scale factor (1 = standard, 2 = Retina)
-    captureMode: string;
-    timestamp: number;
-  };
+  screenshots?: WindowScreenshot[]; // Array of window screenshots (base64 data URLs + metadata)
   userProfile?: {
     name: string;
     email: string;
@@ -164,7 +160,7 @@ export type ToolResult = TextMessage | WorkflowMessage | ExpertsMessage;
  * Streaming chunk for real-time responses
  */
 export interface StreamChunk {
-  type: "chunk" | "complete" | "error" | "window_trigger";
+  type: "chunk" | "complete" | "error" | "window_trigger" | "progress";
   content?: string;
   messageId?: string;
   messageType?: "text" | "workflow" | "experts";
@@ -176,6 +172,10 @@ export interface StreamChunk {
   }>;
   error?: string;
   windowTrigger?: WindowTrigger; // Window trigger for UI coordination
+  progress?: {
+    phase: string; // e.g., "searching", "analyzing", "generating"
+    message: string; // e.g., "Searching knowledge base..."
+  };
 }
 
 /**

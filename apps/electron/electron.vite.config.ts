@@ -35,6 +35,7 @@ export default defineConfig({
           agent: resolve(__dirname, "src/preload/agent.ts"),
           console: resolve(__dirname, "src/preload/console.ts"),
           conversation: resolve(__dirname, "src/preload/conversation.ts"),
+          watchButton: resolve(__dirname, "src/preload/watchButton.ts"),
         },
         output: {
           format: "cjs",
@@ -61,6 +62,7 @@ export default defineConfig({
           agent: resolve(__dirname, "src/renderer/agent/index.html"),
           console: resolve(__dirname, "src/renderer/console/index.html"),
           conversation: resolve(__dirname, "src/renderer/conversation/index.html"),
+          watchButton: resolve(__dirname, "src/renderer/watchButton/index.html"),
         },
       },
     },
