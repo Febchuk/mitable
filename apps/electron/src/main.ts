@@ -10,6 +10,7 @@ import { initActiveWindowBridge } from "./main/activeWindowBridge";
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
+let agentPanelWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 
@@ -178,6 +179,62 @@ function createConversationWindow() {
 
   conversationWindow.on("closed", () => {
     conversationWindow = null;
+  });
+}
+
+function createAgentPanelWindow() {
+  // Get screen dimensions for right-docked positioning
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+  const panelWidth = 450;
+
+  agentPanelWindow = new BrowserWindow({
+    width: panelWidth,
+    height: screenHeight,
+    x: screenWidth - panelWidth, // Right edge of screen
+    y: 0,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: true,
+    skipTaskbar: true,
+    show: false, // Hidden by default
+    webPreferences: {
+      preload: join(__dirname, "../preload/agentpanel.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top behavior
+  if (process.platform === "darwin") {
+    agentPanelWindow.setAlwaysOnTop(true, "modal-panel");
+    agentPanelWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    agentPanelWindow.setAlwaysOnTop(true, "normal", 1);
+  }
+
+  // Handle external links
+  agentPanelWindow.webContents.setWindowOpenHandler(({ url }) => {
+    console.log("[AgentPanel] External link clicked:", url);
+    shell.openExternal(url).catch((err) => {
+      console.error("[AgentPanel] Failed to open external link:", err);
+    });
+    return { action: "deny" };
+  });
+
+  if (!app.isPackaged) {
+    agentPanelWindow.loadURL("http://localhost:5173/agentpanel/index.html");
+  } else {
+    agentPanelWindow.loadFile(join(__dirname, "../renderer/agentpanel.html"));
+  }
+
+  agentPanelWindow.webContents.on("did-finish-load", () => {
+    console.log("[AgentPanel] Window finished loading");
+  });
+
+  agentPanelWindow.on("closed", () => {
+    agentPanelWindow = null;
   });
 }
 
@@ -386,6 +443,67 @@ function setupIPC() {
     }
     if (conversationWindow && !conversationWindow.isDestroyed()) {
       conversationWindow.hide();
+    }
+  });
+
+  // ==================== Agent Panel IPC Handlers ====================
+
+  // Toggle Agent Panel visibility
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_TOGGLE, () => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      if (agentPanelWindow.isVisible()) {
+        agentPanelWindow.hide();
+      } else {
+        agentPanelWindow.show();
+      }
+    }
+  });
+
+  // Show Agent Panel
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_SHOW, () => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      agentPanelWindow.show();
+    }
+  });
+
+  // Hide Agent Panel
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_HIDE, () => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      agentPanelWindow.hide();
+    }
+  });
+
+  // Resize Agent Panel width
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_RESIZE, (_event, width: number) => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+
+      // Clamp width between 350 and 600
+      const clampedWidth = Math.max(350, Math.min(600, width));
+
+      agentPanelWindow.setBounds(
+        {
+          x: screenWidth - clampedWidth,
+          y: 0,
+          width: clampedWidth,
+          height: screenHeight,
+        },
+        true // animate
+      );
+    }
+  });
+
+  // Load conversation in Agent Panel (from Console)
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_LOAD_CONVERSATION, (_event, conversationId: string) => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      // Show panel if hidden
+      if (!agentPanelWindow.isVisible()) {
+        agentPanelWindow.show();
+      }
+
+      // Forward to renderer
+      agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_LOAD_CONVERSATION, conversationId);
     }
   });
 
@@ -699,7 +817,7 @@ function setupIPC() {
     authTokens.refreshToken = refreshToken;
 
     // Broadcast token update to all windows
-    const allWindows = [agentWindow, conversationWindow, consoleWindow];
+    const allWindows = [agentWindow, agentPanelWindow, conversationWindow, consoleWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, accessToken);
@@ -720,7 +838,7 @@ function setupIPC() {
     authTokens.refreshToken = null;
 
     // Broadcast token clear to all windows
-    const allWindows = [agentWindow, conversationWindow, consoleWindow];
+    const allWindows = [agentWindow, agentPanelWindow, conversationWindow, consoleWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, null);
@@ -930,7 +1048,7 @@ function setupWatchModeHandlers() {
   // Broadcast updated window list to all windows
   function broadcastWatchWindowsUpdate() {
     const selectedWindows = windowDetectionService.getSelectedWindows();
-    const windows = [agentWindow, conversationWindow];
+    const windows = [agentWindow, agentPanelWindow, conversationWindow];
 
     for (const window of windows) {
       if (window && !window.isDestroyed()) {
@@ -1055,6 +1173,7 @@ function closeAllWatchButtonWindows(watchButtonWindows: Map<string, BrowserWindo
 
 // Global shortcut for help (Cmd+H / Ctrl+H)
 function registerGlobalShortcuts() {
+  // Old Agent pill (Cmd+H)
   globalShortcut.register("CommandOrControl+H", () => {
     if (!agentWindow || agentWindow.isDestroyed()) {
       // Recreate window if it was closed
@@ -1069,6 +1188,18 @@ function registerGlobalShortcuts() {
       }
     }
   });
+
+  // Agent Panel (Cmd+Shift+A)
+  globalShortcut.register("CommandOrControl+Shift+A", () => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      if (agentPanelWindow.isVisible()) {
+        agentPanelWindow.hide();
+      } else {
+        agentPanelWindow.show();
+        agentPanelWindow.focus();
+      }
+    }
+  });
 }
 
 app.whenReady().then(() => {
@@ -1077,6 +1208,7 @@ app.whenReady().then(() => {
 
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
+  createAgentPanelWindow(); // Create Agent Panel (right-docked chat panel)
   createConsoleWindow();
 
   setupIPC();

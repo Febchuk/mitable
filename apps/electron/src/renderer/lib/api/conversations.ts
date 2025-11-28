@@ -42,13 +42,15 @@ export interface StreamChunk {
 
 /**
  * Get auth token from main process
- * Works with both agentAPI and conversationAPI
+ * Works with agentAPI, agentPanelAPI, and conversationAPI
  */
 async function getAuthHeaders(): Promise<HeadersInit> {
   let token: string | null = null;
 
   // Check which window API is available
-  if ("agentAPI" in window && window.agentAPI?.getAuthToken) {
+  if ("agentPanelAPI" in window && window.agentPanelAPI?.getAuthToken) {
+    token = await window.agentPanelAPI.getAuthToken();
+  } else if ("agentAPI" in window && window.agentAPI?.getAuthToken) {
     token = await window.agentAPI.getAuthToken();
   } else if ("conversationAPI" in window && window.conversationAPI?.getAuthToken) {
     token = await window.conversationAPI.getAuthToken();

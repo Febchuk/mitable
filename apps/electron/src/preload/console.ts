@@ -10,8 +10,9 @@ const IPC_CHANNELS = {
   CAPTURE_SCREENSHOT: "capture-screenshot",
   CONVERSATION_NEW: "conversation-new",
   CONVERSATION_LOAD: "conversation-load",
-  AGENT_OPEN_CONVERSATION: "agent-open-conversation", // NEW: Send conversation to Agent
-  CONSOLE_MINIMIZE: "console-minimize", // NEW: Minimize console window
+  AGENT_OPEN_CONVERSATION: "agent-open-conversation", // Legacy: Send conversation to Agent
+  AGENTPANEL_LOAD_CONVERSATION: "agentpanel-load-conversation", // NEW: Send to Agent Panel
+  CONSOLE_MINIMIZE: "console-minimize",
   NUDGE_OPEN_CREATOR: "nudge-open-creator",
   AUTH_SET_TOKENS: "auth-set-tokens",
   AUTH_CLEAR: "auth-clear",
@@ -49,7 +50,9 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   newConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_NEW),
   loadConversation: (id: string) => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_LOAD, id),
   sendToAgent: (conversationId: string) =>
-    ipcRenderer.send(IPC_CHANNELS.AGENT_OPEN_CONVERSATION, conversationId), // NEW: Send conversation to Agent window
+    ipcRenderer.send(IPC_CHANNELS.AGENT_OPEN_CONVERSATION, conversationId), // Legacy: Send to old Agent window
+  sendToAgentPanel: (conversationId: string) =>
+    ipcRenderer.send(IPC_CHANNELS.AGENTPANEL_LOAD_CONVERSATION, conversationId), // NEW: Send to Agent Panel
 
   // Window management
   minimizeWindow: () => ipcRenderer.send(IPC_CHANNELS.CONSOLE_MINIMIZE),
