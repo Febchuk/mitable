@@ -16,6 +16,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 ### Why Dual-Domain?
 
 **Problem:** Users have fundamentally different search needs:
+
 - "How does authentication work?" → Need current code implementation
 - "What did Aurel work on this week?" → Need commit metadata and activity
 
@@ -28,6 +29,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 **Source:** GitHub Tree API (recursive snapshot of default branch HEAD)
 
 **What we index:**
+
 - Actual source code with structure-aware chunking
 - Function/class/export definitions
 - File roles and monorepo areas
@@ -36,6 +38,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 **Use case:** "How does our authentication work?" or "Find the Slack sync service"
 
 **Storage:**
+
 - Pinecone namespace: `org-{orgId}`
 - Filter: `{ source: "github", source_type: ["function", "class", "file_overview", etc.] }`
 - PostgreSQL table: `search_content`
@@ -47,6 +50,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 **Source:** GitHub Commits API (chronological history)
 
 **What we index:**
+
 - Commit messages, SHAs, timestamps
 - Author names and emails
 - Changed file paths and line counts
@@ -56,6 +60,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 **Use case:** "What did Aurel work on this week?" or "Show recent database changes"
 
 **Storage:**
+
 - PostgreSQL tables: `github_commits`, `github_commit_files`, `github_pull_requests`, `github_issues`
 - Pinecone namespace: `org-{orgId}`
 - Filter: `{ source: "github", source_type: ["commit_summary", "pr_summary", "issue_summary", etc.] }`
@@ -65,6 +70,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 ## Data Model
 
 ### GitHub Repos (`github_repos`)
+
 ```typescript
 {
   id: uuid,
@@ -85,6 +91,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 ```
 
 ### GitHub Commits (`github_commits`)
+
 ```typescript
 {
   id: uuid,
@@ -101,6 +108,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 ```
 
 ### GitHub Commit Files (`github_commit_files`)
+
 ```typescript
 {
   id: uuid,
@@ -115,6 +123,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 ```
 
 ### GitHub Pull Requests (`github_pull_requests`)
+
 ```typescript
 {
   id: uuid,
@@ -131,6 +140,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 ```
 
 ### GitHub Issues (`github_issues`)
+
 ```typescript
 {
   id: uuid,
@@ -147,6 +157,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
 ```
 
 ### Search Content (`search_content`)
+
 ```typescript
 {
   id: uuid,
@@ -155,7 +166,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
   sourceType: string, // "function" | "class" | "config" | "commit_summary" | etc.
   text: text,
   textVector: tsvector, // PostgreSQL FTS
-  
+
   // GitHub-specific fields
   repoId: uuid,
   repoFullName: string,
@@ -165,7 +176,7 @@ This architecture follows the enterprise RAG pattern established in Slack v2.0, 
   fileRole: string,
   commitSha: string,
   // ... (see search_content.schema.ts for full schema)
-  
+
   timestamp: number,
   createdAt: timestamp,
   updatedAt: timestamp
@@ -189,6 +200,7 @@ When you ask "How does authentication work?", you want the `authenticate()` func
 **Parser:** Babel (primary) + TypeScript API (fallback)
 
 **Chunk Types:**
+
 1. **`file_overview`** - Path, exports, role, language (deterministic metadata)
 2. **`function`** - Individual function definitions
 3. **`class`** - Class definitions with methods
@@ -235,6 +247,7 @@ Detected from path patterns:
 ### Smart Skip Patterns
 
 **Never index:**
+
 - Dependencies: `node_modules/`, `vendor/`
 - Build artifacts: `dist/`, `build/`, `.next/`, `coverage/`
 - Minified: `*.min.js`, `*.min.css`
@@ -248,6 +261,7 @@ Detected from path patterns:
 - Drizzle snapshots: `/migrations/meta/*.json` (auto-generated, massive)
 
 **Explicitly allow (config files):**
+
 - `package.json`
 - `tsconfig.json`, `tsconfig.*.json`
 - `.eslintrc.json`
@@ -275,7 +289,7 @@ Detected from path patterns:
   repo_name: "Febchuk/mitable",
   repo_id: "uuid",
   default_branch: "main",
-  
+
   // File identification
   file_path: "apps/backend/src/services/slack.service.ts",
   file_name: "slack.service.ts",
@@ -283,13 +297,13 @@ Detected from path patterns:
   file_role: "service", // auto-detected
   area: "backend-services", // auto-detected
   language: "typescript",
-  
+
   // Chunk metadata
   chunk_type: "function" | "class" | "file_overview" | "config" | "type",
   start_line: 95,
   end_line: 125,
   token_count: 450,
-  
+
   // Symbol metadata
   function_name: "fetchChannelMessages",
   class_name: "SlackService",
@@ -297,7 +311,7 @@ Detected from path patterns:
   is_exported: true,
   is_test_file: false,
   is_generated: false,
-  
+
   // Chunking metadata
   chunk_index: 2,
   total_chunks: 5,
@@ -315,7 +329,7 @@ Detected from path patterns:
   source_type: "commit_summary", // or "pr_summary", "issue_summary", etc.
   repo_name: "Febchuk/mitable",
   repo_id: "uuid",
-  
+
   // Commit metadata
   chunk_type: "commit_summary",
   commit_sha: "a1b2c3d",
@@ -323,7 +337,7 @@ Detected from path patterns:
   author_email: "aurel@example.com",
   committed_at: "2025-11-27T20:15:00Z",
   message: "feat(knowledge-agent): add temporal filtering + sources display",
-  
+
   // File changes
   files_changed: [
     "apps/backend/src/agents/knowledge.agent.ts",
@@ -341,10 +355,12 @@ Detected from path patterns:
 ### Initial Sync (First Integration)
 
 **Commits:** Last 50 only (prevents massive data load)
+
 - Configurable via `INITIAL_SYNC_LIMIT` constant
 - Saves commits to `github_commits` + `github_commit_files`
 
 **Code:** Full Tree API snapshot of default branch HEAD
+
 - Recursive fetch of entire repo structure
 - Filters code files via extensions + skip patterns
 - Chunks with `github-chunking.service.ts`
@@ -355,16 +371,19 @@ Detected from path patterns:
 ### Incremental Sync (Follow-Up)
 
 **Commits:** Only fetch `since: lastSyncedAt`
+
 - Uses GitHub API `since` parameter
 - Only fetches new commits since last sync
 
 **Code:** Intelligent incremental update via `incrementalUpdate()`
+
 - Compares `lastIndexedCommitSha` with current HEAD
 - Only re-processes changed/added files from recent commits
 - Deletes chunks for removed files
 - Upsert strategy: existing chunks updated with deterministic IDs
 
 **PRs & Issues:** Synced on every run
+
 - Fetches all PRs (open + closed)
 - Fetches all issues (open + closed)
 - Upserts to `github_pull_requests` and `github_issues`
@@ -455,6 +474,7 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 **Strategy:** 70% semantic + 30% keyword (RRF)
 
 **Filters:**
+
 - `source: "github"`
 - `source_type: ["function", "class", "file_overview", etc.]`
 - `repo_id: [selected repos]` (optional)
@@ -462,6 +482,7 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 - `area: [backend-api|frontend-ui]` (optional)
 
 **Boosting:**
+
 - Recency: 1.5x for files modified in last 7 days, 1.2x for last 30 days
 - File role: 1.3x for matching role (e.g., "service" query boosts services)
 - Exports: 1.2x for exported symbols
@@ -473,6 +494,7 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 **Strategy:** 70% semantic + 30% keyword (RRF)
 
 **Filters:**
+
 - `source: "github"`
 - `source_type: ["commit_summary", "pr_summary", "issue_summary", etc.]`
 - `repo_id: [selected repos]` (optional)
@@ -480,6 +502,7 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 - `committed_at: { $gte: dateFrom, $lte: dateTo }` (optional, via temporal-parser)
 
 **Boosting:**
+
 - Recency: 2.0x for commits in last 7 days, 1.5x for last 30 days
 - Author: 1.5x for specific author matches
 
@@ -492,6 +515,7 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 ### Sync Performance
 
 **First sync (example: Mitable repo):**
+
 - Commits: 50 (limited)
 - Files: ~200 code files
 - Chunks: ~800 chunks
@@ -499,6 +523,7 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 - Duration: ~3-5 minutes
 
 **Incremental sync:**
+
 - Commits: 5-10 new commits
 - Files: ~20 changed files
 - Chunks: ~50 new/updated chunks
@@ -507,22 +532,26 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 ### Rate Limits
 
 **GitHub API:**
+
 - Installation: 5000 requests/hour
 - Tree API: Recursive, counts as 1 request per tree level
 - Commits API: Paginated (100 per page)
 
 **OpenAI Embeddings:**
+
 - 3000 requests/minute (tier 1)
 - Batch in groups of 100 to stay under limit
 
 ### Storage Estimates
 
 **Code domain (per 1000 files):**
+
 - Pinecone: ~4000 vectors (4 chunks per file avg)
 - PostgreSQL: ~4000 rows in `search_content`
 - Storage: ~50 MB in Pinecone, ~100 MB in PostgreSQL
 
 **Work domain (per 1000 commits):**
+
 - PostgreSQL: ~1000 rows in `github_commits`, ~5000 rows in `github_commit_files`
 - Pinecone: ~1000 vectors
 - Storage: ~10 MB in Pinecone, ~50 MB in PostgreSQL
@@ -532,23 +561,27 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 ## Key Services
 
 ### `github.service.ts`
+
 - GitHub App client wrapper
 - Octokit instance management
 - Installation token generation
 
 ### `github-sync.service.ts`
+
 - Orchestrates work domain sync
 - Fetches commits, PRs, issues
 - Saves metadata to PostgreSQL
 - Respects 50-commit initial limit
 
 ### `github-code-snapshot.service.ts`
+
 - Fetches Tree API snapshot
 - Filters code files
 - Fetches blob contents
 - Coordinates chunking + embedding
 
 ### `github-chunking.service.ts`
+
 - **Core chunking logic**
 - Babel + TypeScript AST parsing
 - Function/class extraction
@@ -556,18 +589,21 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 - Smart skip patterns
 
 ### `github-ingestion.service.ts`
+
 - Orchestrates code domain sync
 - Coordinates snapshot + chunking
 - Dual-write to Pinecone + PostgreSQL
 - Updates sync logs
 
 ### `code.retriever.ts`
+
 - Hybrid search for code files
 - Semantic + keyword fusion
 - File role/area filtering
 - Recency boosting
 
 ### `work.retriever.ts`
+
 - Hybrid search for commits/PRs/issues
 - Author filtering
 - Temporal filtering (date ranges)
@@ -578,10 +614,13 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 ## Scripts
 
 ### `inspect-github-data.ts`
+
 ```bash
 npm run inspect-github --workspace=apps/backend
 ```
+
 Shows:
+
 - Repos synced
 - Commit count
 - PR count
@@ -590,10 +629,13 @@ Shows:
 - Sample chunks
 
 ### `clean-github-data.ts`
+
 ```bash
 npm run clean-github --workspace=apps/backend
 ```
+
 **DANGER:** Deletes ALL GitHub data:
+
 - PostgreSQL: `github_repos`, `github_commits`, `github_commit_files`, `github_pull_requests`, `github_issues`, integrations (GitHub only), `search_content` (GitHub chunks)
 - Pinecone: All vectors with `source='github'`
 
@@ -643,6 +685,7 @@ This integration replicates the domain-specific retrieval pattern established in
 ## Future Enhancements
 
 ### Phase 2: Multi-Language Support
+
 - Python (`.py`)
 - Go (`.go`)
 - Rust (`.rs`)
@@ -655,6 +698,7 @@ This integration replicates the domain-specific retrieval pattern established in
 **Implementation:** Tree-sitter parsers (requires Node 20+)
 
 ### Phase 3: Advanced Features
+
 - Branch comparison ("What changed between main and feature/X?")
 - Code review summarization
 - Dependency graph analysis
@@ -666,23 +710,28 @@ This integration replicates the domain-specific retrieval pattern established in
 ## Troubleshooting
 
 ### "GitHub integration not found"
+
 - Check that integration exists in `integrations` table
 - Verify `provider = 'github'`
 - Check `status = 'connected'`
 
 ### "Installation ID missing"
+
 - Reconnect GitHub integration
 - Check `integrations.metadata.installationId` is set
 
 ### "No repos selected"
+
 - Verify `github_repos.isSelected = true` for at least one repo
 - Re-sync to fetch repos if empty
 
 ### "Rate limit exceeded"
+
 - GitHub: Wait 1 hour for rate limit reset
 - OpenAI: Reduce batch size or wait for tier upgrade
 
 ### "Chunks not appearing in search"
+
 - Check Pinecone namespace: `org-{orgId}`
 - Verify embeddings were created
 - Check `search_content` table has rows with `source = 'github'`
