@@ -14,7 +14,7 @@
 import { db } from "../db/client.js";
 import { integrations } from "../db/schema/integrations.schema.js";
 import { eq } from "drizzle-orm";
-import { ingestionService } from "../services/ingestion.service.js";
+import { slackIngestionService } from "../services/slack-ingestion.service.js";
 import { vectorService } from "../services/vector.service.js";
 import { validateConfig } from "../config.js";
 
@@ -50,8 +50,8 @@ async function main() {
     console.log(`📦 Organization: ${orgId}`);
     console.log();
 
-    // Use ingestionService which calls SlackChunkingService
-    const result = await ingestionService.syncSlackMessages(orgId, (progress) => {
+    // Use slackIngestionService which calls SlackChunkingService
+    const result = await slackIngestionService.syncMessages(orgId, (progress) => {
       // Progress callback
       if (progress.currentChannel) {
         console.log(
