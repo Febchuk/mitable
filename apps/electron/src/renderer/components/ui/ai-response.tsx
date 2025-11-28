@@ -209,7 +209,9 @@ export const Response = memo(
                 {...props}
               />
             ),
-            td: ({ ...props }) => <td className="px-4 py-2 text-sm text-text-primary break-words" {...props} />,
+            td: ({ ...props }) => (
+              <td className="px-4 py-2 text-sm text-text-primary break-words" {...props} />
+            ),
 
             // Code
             code: ({ className, ...props }: ComponentProps<"code">) => {
