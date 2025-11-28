@@ -58,6 +58,13 @@ export const IPC_CHANNELS = {
   AGENT_OPEN_CONVERSATION: "agent-open-conversation", // Console → Main (open specific conversation in agent)
   CONSOLE_OPEN_CHAT: "console-open-chat", // Agent/Conversation → Main (open conversation in console)
 
+  // Agent Panel window (right-docked chat panel)
+  AGENTPANEL_TOGGLE: "agentpanel-toggle", // Toggle visibility
+  AGENTPANEL_SHOW: "agentpanel-show", // Show panel
+  AGENTPANEL_HIDE: "agentpanel-hide", // Hide panel
+  AGENTPANEL_RESIZE: "agentpanel-resize", // Resize panel width
+  AGENTPANEL_LOAD_CONVERSATION: "agentpanel-load-conversation", // Console → AgentPanel (load conversation)
+
   // Conversation window (parent-child with agent)
   CONVERSATION_SHOW: "conversation-show", // Agent → Main (show conversation window)
   CONVERSATION_HIDE: "conversation-hide", // Agent/Conversation → Main (hide conversation window)

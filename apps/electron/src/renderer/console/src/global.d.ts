@@ -17,7 +17,8 @@ interface ConsoleAPI {
   // Conversation management
   newConversation: () => void;
   loadConversation: (id: string) => void;
-  sendToAgent: (conversationId: string) => void; // NEW: Send conversation to Agent window
+  sendToAgent: (conversationId: string) => void; // Legacy: Send to old Agent window
+  sendToAgentPanel: (conversationId: string) => void; // NEW: Send to Agent Panel
 
   // Window management
   minimizeWindow: () => void;

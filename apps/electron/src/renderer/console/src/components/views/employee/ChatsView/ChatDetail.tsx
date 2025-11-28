@@ -499,14 +499,14 @@ export default function ChatDetail() {
               className="gap-2 text-text-secondary hover:text-white hover:bg-primary rounded-full px-4 py-2 h-auto"
               onClick={() => {
                 if (chatId) {
-                  console.log("Launch in Pill clicked, sending conversation:", chatId);
-                  window.consoleAPI.sendToAgent(chatId);
+                  console.log("Send to Agent Panel clicked, sending conversation:", chatId);
+                  window.consoleAPI.sendToAgentPanel(chatId);
                   window.consoleAPI.minimizeWindow();
                 }
               }}
             >
               <ExternalLink size={14} />
-              <span className="text-xs">Launch in Pill</span>
+              <span className="text-xs">Send to Agent Panel</span>
             </Button>
           </div>
         </div>
