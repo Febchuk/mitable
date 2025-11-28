@@ -101,47 +101,84 @@ class EmbeddingService {
   }
 
   /**
+   * Estimate token count for a text (rough approximation: 1 token ≈ 4 characters)
+   */
+  private estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4);
+  }
+
+  /**
    * Generate embeddings for multiple text inputs
    * Automatically chunks large batches to respect OpenAI API limits:
    * - Max 2048 inputs per request
    * - Each input max 8192 tokens
-   * - Total request limit ~300K tokens
+   * - Total request limit 8192 tokens per batch (conservative for safety)
    *
    * @param texts - Array of texts to embed
-   * @param chunkSize - Maximum number of texts per batch (default: 2048)
    * @returns Promise resolving to array of embedding vectors
    */
-  async embedTexts(texts: string[], chunkSize: number = 2048): Promise<number[][]> {
+  async embedTexts(texts: string[]): Promise<number[][]> {
     // Handle empty input
     if (texts.length === 0) {
       return [];
     }
 
-    // If within batch size limit, process directly
-    if (texts.length <= chunkSize) {
-      return this.retryWithBackoff(async () => {
-        const response = await this.client.embeddings.create({
-          model: this.model,
-          input: texts,
-        });
-        return response.data.map((item) => item.embedding);
-      }, `embedTexts (${texts.length} texts)`);
+    const MAX_TOKENS_PER_BATCH = 8000; // Conservative limit (8192 is max)
+    const MAX_TEXTS_PER_BATCH = 2048;
+
+    const allEmbeddings: number[][] = [];
+    let currentBatch: string[] = [];
+    let currentBatchTokens = 0;
+
+    for (let i = 0; i < texts.length; i++) {
+      const text = texts[i];
+      const estimatedTokens = this.estimateTokens(text);
+
+      // Check if adding this text would exceed limits
+      const wouldExceedTokens = currentBatchTokens + estimatedTokens > MAX_TOKENS_PER_BATCH;
+      const wouldExceedCount = currentBatch.length >= MAX_TEXTS_PER_BATCH;
+
+      // If batch is full, process it
+      if (currentBatch.length > 0 && (wouldExceedTokens || wouldExceedCount)) {
+        const chunkNumber = Math.floor(allEmbeddings.length / MAX_TEXTS_PER_BATCH) + 1;
+        console.log(
+          `         📦 Embedding batch ${chunkNumber}: ${currentBatch.length} chunks (~${currentBatchTokens} tokens)`
+        );
+
+        const embeddings = await this.retryWithBackoff(async () => {
+          const response = await this.client.embeddings.create({
+            model: this.model,
+            input: currentBatch,
+          });
+          return response.data.map((item) => item.embedding);
+        }, `embedTexts batch ${chunkNumber}`);
+
+        allEmbeddings.push(...embeddings);
+
+        // Reset batch
+        currentBatch = [];
+        currentBatchTokens = 0;
+      }
+
+      // Add current text to batch
+      currentBatch.push(text);
+      currentBatchTokens += estimatedTokens;
     }
 
-    // For large batches, chunk and process sequentially
-    const allEmbeddings: number[][] = [];
-
-    for (let i = 0; i < texts.length; i += chunkSize) {
-      const chunk = texts.slice(i, i + chunkSize);
-      const chunkNumber = Math.floor(i / chunkSize) + 1;
+    // Process final batch if not empty
+    if (currentBatch.length > 0) {
+      const chunkNumber = Math.floor(allEmbeddings.length / MAX_TEXTS_PER_BATCH) + 1;
+      console.log(
+        `         📦 Embedding batch ${chunkNumber}: ${currentBatch.length} chunks (~${currentBatchTokens} tokens)`
+      );
 
       const embeddings = await this.retryWithBackoff(async () => {
         const response = await this.client.embeddings.create({
           model: this.model,
-          input: chunk,
+          input: currentBatch,
         });
         return response.data.map((item) => item.embedding);
-      }, `embedTexts chunk ${chunkNumber}`);
+      }, `embedTexts batch ${chunkNumber}`);
 
       allEmbeddings.push(...embeddings);
     }

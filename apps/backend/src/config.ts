@@ -98,6 +98,19 @@ export const config = {
     apiVersion: "2022-06-28",
   },
 
+  // GitHub App Configuration
+  github: {
+    appId: parseInt(process.env.GITHUB_APP_ID || "0", 10),
+    clientId: (process.env.GITHUB_APP_CLIENT_ID || "").trim(),
+    clientSecret: (process.env.GITHUB_APP_CLIENT_SECRET || "").trim(),
+    appSlug: (process.env.GITHUB_APP_SLUG || "").trim(),
+    privateKey: (process.env.GITHUB_APP_PRIVATE_KEY || "").trim(),
+    installationRedirectUri: (
+      process.env.GITHUB_APP_REDIRECT_URI ||
+      `http://localhost:${PORT}/api/integrations/github/callback`
+    ).trim(),
+  },
+
   // Google Cloud DLP Configuration (for PII redaction)
   googleCloud: {
     projectId: (process.env.GOOGLE_CLOUD_PROJECT_ID || "").trim(),

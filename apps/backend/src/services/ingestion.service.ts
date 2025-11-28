@@ -4,6 +4,7 @@ import { embeddingService } from "./embedding.service.js";
 import { vectorService } from "./vector.service.js";
 import { chunkingService } from "./chunking.service.js";
 import { slackChunkingService } from "./slack-chunking.service.js";
+import { githubChunkingService } from "./github-chunking.service.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, sql, desc } from "drizzle-orm";
@@ -96,6 +97,26 @@ class IngestionService {
       pageTitle: metadata.page_title,
       blockId: metadata.block_id,
       blockType: metadata.block_type,
+
+      // GitHub-specific fields
+      repoId: metadata.repo_id,
+      repoFullName: metadata.repo_full_name,
+      filePath: metadata.path,
+      fileName: metadata.file_name,
+      language: metadata.language,
+      fileRole: metadata.file_role,
+      area: metadata.area,
+      commitSha: metadata.commit_sha,
+      gitAuthor: metadata.git_author,
+      committedAt: metadata.committed_at ? new Date(metadata.committed_at) : null,
+      startLine: metadata.start_line,
+      endLine: metadata.end_line,
+      functionName: metadata.function_name,
+      className: metadata.class_name,
+      exports: metadata.exports,
+      isExported: metadata.is_exported || false,
+      isTestFile: metadata.is_test_file || false,
+      isGenerated: metadata.is_generated || false,
 
       // Chunk metadata
       chunkIndex: metadata.chunk_index || 0,
@@ -801,6 +822,314 @@ class IngestionService {
         });
     } catch (error) {
       throw new Error("Failed to process Notion block batch", { cause: error });
+    }
+  }
+
+  /**
+   * Sync GitHub code files for an organization
+   * Follows the Slack v2.0 pattern: fetch → smart chunk → embed → dual-write
+   */
+  async syncGitHubCode(organizationId: string): Promise<IngestionResult> {
+    const startTime = Date.now();
+    const result: IngestionResult = {
+      success: false,
+      channelsProcessed: 0, // Repurpose as reposProcessed
+      messagesEmbedded: 0, // Repurpose as chunksCreated
+      totalMessages: 0, // Repurpose as filesProcessed
+      errors: [],
+      duration: 0,
+    };
+
+    let syncLogId: string | null = null;
+
+    try {
+      // Get GitHub integration
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.organizationId, organizationId),
+            eq(schema.integrations.provider, "github")
+          )
+        )
+        .limit(1);
+
+      if (!integration) {
+        throw new Error("GitHub integration not found");
+      }
+
+      console.log(`\n🚀 Starting GitHub code sync for org: ${organizationId}`);
+
+      // Create sync log
+      const [syncLog] = await db
+        .insert(schema.syncLogs)
+        .values({
+          integrationId: integration.id,
+          status: "in_progress",
+          itemsSynced: 0,
+          startedAt: new Date(),
+        })
+        .returning();
+
+      syncLogId = syncLog.id;
+
+      // Get selected repos
+      const repos = await db
+        .select()
+        .from(schema.githubRepos)
+        .where(
+          and(
+            eq(schema.githubRepos.integrationId, integration.id),
+            eq(schema.githubRepos.isSelected, true)
+          )
+        );
+
+      if (repos.length === 0) {
+        console.log(`⚠️  No repos selected for syncing`);
+        result.success = true;
+        result.duration = Date.now() - startTime;
+        return result;
+      }
+
+      console.log(`📚 Processing ${repos.length} selected repos`);
+
+      // Process each repo
+      for (const repo of repos) {
+        try {
+          console.log(`\n📂 Repo: ${repo.fullName}`);
+
+          // Get latest commit for this repo (default branch HEAD)
+          const [latestCommit] = await db
+            .select()
+            .from(schema.githubCommits)
+            .where(eq(schema.githubCommits.repoId, repo.id))
+            .orderBy(desc(schema.githubCommits.committedAt))
+            .limit(1);
+
+          if (!latestCommit) {
+            console.log(`   ⚠️  No commits found, skipping`);
+            continue;
+          }
+
+          // Get files from the latest commit
+          const files = await db
+            .select()
+            .from(schema.githubCommitFiles)
+            .where(
+              and(
+                eq(schema.githubCommitFiles.commitId, latestCommit.id),
+                eq(schema.githubCommitFiles.repoId, repo.id)
+              )
+            );
+
+          console.log(`   📄 Found ${files.length} files in latest commit`);
+
+          // Process files in batches
+          for (let i = 0; i < files.length; i += SYNC_CONFIG.BATCH_SIZE) {
+            const batch = files.slice(i, i + SYNC_CONFIG.BATCH_SIZE);
+            const chunksCreated = await this.processCodeBatch(
+              batch,
+              organizationId,
+              repo,
+              latestCommit
+            );
+
+            result.messagesEmbedded += chunksCreated;
+            result.totalMessages += batch.length;
+
+            console.log(
+              `   📊 Batch complete: +${chunksCreated} chunks (${i + batch.length}/${files.length} files)`
+            );
+          }
+
+          result.channelsProcessed++; // reposProcessed
+        } catch (error) {
+          const errorMsg = `Failed to process repo ${repo.fullName}: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`;
+          console.error(`❌ Repo error:`, errorMsg);
+          result.errors.push(errorMsg);
+        }
+      }
+
+      // Update sync log
+      await db
+        .update(schema.syncLogs)
+        .set({
+          status: "success",
+          itemsSynced: result.messagesEmbedded,
+          completedAt: new Date(),
+        })
+        .where(eq(schema.syncLogs.id, syncLogId));
+
+      // Update integration lastSyncedAt
+      await db
+        .update(schema.integrations)
+        .set({
+          lastSyncedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integration.id));
+
+      result.success = true;
+      result.duration = Date.now() - startTime;
+
+      console.log(`\n✅ GitHub sync complete:`, {
+        repos: result.channelsProcessed,
+        files: result.totalMessages,
+        chunks: result.messagesEmbedded,
+        duration: `${result.duration}ms`,
+      });
+
+      return result;
+    } catch (error) {
+      // Update sync log as failed
+      if (syncLogId) {
+        await db
+          .update(schema.syncLogs)
+          .set({
+            status: "failed",
+            errorMessage: error instanceof Error ? error.message : "Unknown error",
+            completedAt: new Date(),
+          })
+          .where(eq(schema.syncLogs.id, syncLogId));
+      }
+
+      result.errors.push(error instanceof Error ? error.message : "Unknown error");
+      result.duration = Date.now() - startTime;
+      return result;
+    }
+  }
+
+  /**
+   * Process a batch of GitHub code files: chunk, embed, and dual-write
+   * Follows Slack v2.0 pattern with smart chunking
+   */
+  private async processCodeBatch(
+    files: any[],
+    organizationId: string,
+    repo: any,
+    commit: any
+  ): Promise<number> {
+    const validFiles = files.filter((f) => f.content && f.content.trim().length > 0);
+
+    if (validFiles.length === 0) return 0;
+
+    try {
+      let totalChunks = 0;
+
+      // Process each file
+      for (const file of validFiles) {
+        // Use smart chunking service (like Slack v2.0)
+        const chunks = githubChunkingService.chunkFile(
+          {
+            repoId: repo.id,
+            repoFullName: repo.fullName,
+            path: file.path,
+            fileName: file.path.split("/").pop() || file.path,
+            content: file.content,
+            commitSha: commit.sha,
+            author: commit.authorName,
+            committedAt: commit.committedAt.toISOString(),
+            defaultBranch: repo.defaultBranch,
+          },
+          organizationId
+        );
+
+        if (chunks.length === 0) continue;
+
+        const texts = chunks.map((c) => c.text);
+        const embeddings = await embeddingService.embedTexts(texts);
+
+        // Build vectors with rich metadata
+        const vectors = chunks.map((chunk, idx) => {
+          const committedDate = new Date(chunk.committed_at);
+
+          return {
+            id: `github-${chunk.repo_id}-${chunk.commit_sha.slice(0, 7)}-${chunk.path}-chunk-${chunk.chunk_index}`,
+            values: embeddings[idx],
+            metadata: {
+              text: chunk.text,
+              source: "github",
+              source_type: chunk.chunk_type,
+
+              // Repo context
+              repo_id: chunk.repo_id,
+              repo_full_name: chunk.repo_full_name,
+              org_id: chunk.org_id,
+
+              // File context
+              path: chunk.path,
+              file_name: chunk.file_name,
+              language: chunk.language,
+              file_role: chunk.file_role,
+              area: chunk.area,
+
+              // Git context
+              commit_sha: chunk.commit_sha,
+              git_author: chunk.author,
+              committed_at: chunk.committed_at,
+              default_branch: chunk.default_branch,
+
+              // Symbol metadata
+              start_line: chunk.start_line,
+              end_line: chunk.end_line,
+              function_name: chunk.function_name,
+              className: chunk.class_name,
+              exports: chunk.exports,
+              is_exported: chunk.is_exported,
+              is_test_file: chunk.is_test_file,
+              is_generated: chunk.is_generated,
+
+              // Chunk metadata
+              chunk_index: chunk.chunk_index,
+              total_chunks: chunk.total_chunks,
+              is_chunked: chunk.total_chunks > 1,
+              token_count: chunk.token_count,
+
+              // Timestamps
+              timestamp: Math.floor(committedDate.getTime() / 1000),
+              date: committedDate.toISOString().split("T")[0],
+              year: committedDate.getFullYear(),
+              month: committedDate.getMonth() + 1,
+
+              // Organization context
+              organization_id: organizationId,
+            },
+          };
+        });
+
+        const namespace = `org-${organizationId}`;
+
+        // DUAL-WRITE: Store in both Pinecone (semantic) and PostgreSQL (keyword)
+        await vectorService.upsertVectors(vectors, namespace);
+
+        // Transform vectors to PostgreSQL format and upsert
+        const searchContentRecords = vectors.map((v) =>
+          this.transformVectorToSearchContent(v, organizationId)
+        );
+
+        await db
+          .insert(schema.searchContent)
+          .values(searchContentRecords)
+          .onConflictDoUpdate({
+            target: schema.searchContent.id,
+            set: {
+              text: sql`EXCLUDED.text`,
+              timestamp: sql`EXCLUDED.timestamp`,
+              date: sql`EXCLUDED.date`,
+              updatedAt: new Date(),
+            },
+          });
+
+        totalChunks += chunks.length;
+      }
+
+      return totalChunks;
+    } catch (error) {
+      console.error("❌ processCodeBatch error:", error);
+      throw error;
     }
   }
 }

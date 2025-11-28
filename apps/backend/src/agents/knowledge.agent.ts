@@ -2,8 +2,8 @@ import Groq from "groq-sdk";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
 import type { StreamChunk, ToolContext, Source } from "../tools/base.tool";
-// import { codeRetriever } from "../retrievers/code.retriever";
-// import { workRetriever } from "../retrievers/work.retriever";
+import { codeRetriever } from "../retrievers/code.retriever.js";
+import { workRetriever } from "../retrievers/work.retriever.js";
 import { slackRetriever } from "../retrievers/slack.retriever";
 import { TemporalQueryParser } from "../utils/temporal-parser";
 // import { notionRetriever } from "../retrievers/notion.retriever";
@@ -168,55 +168,58 @@ export class KnowledgeAgent extends BaseAgent {
             },
           },
         },
-        // TODO: Re-enable after Slack chunking is complete
-        // {
-        //   type: "function",
-        //   function: {
-        //     name: "search_code",
-        //     description:
-        //       "Search GitHub codebase for implementations, functions, classes, and files. " +
-        //       "Returns code chunks with file paths and line numbers.",
-        //     parameters: {
-        //       type: "object",
-        //       properties: {
-        //         query: {
-        //           type: "string",
-        //           description: "Search query for code",
-        //         },
-        //         topK: {
-        //           type: "number",
-        //           description: "Number of results (default: 10)",
-        //           default: 10,
-        //         },
-        //       },
-        //       required: ["query"],
-        //     },
-        //   },
-        // },
-        // {
-        //   type: "function",
-        //   function: {
-        //     name: "search_work",
-        //     description:
-        //       "Search GitHub work items: commits, pull requests, and issues. " +
-        //       "Returns PRs, commits, and issues with metadata.",
-        //     parameters: {
-        //       type: "object",
-        //       properties: {
-        //         query: {
-        //           type: "string",
-        //           description: "Search query for PRs/commits/issues",
-        //         },
-        //         topK: {
-        //           type: "number",
-        //           description: "Number of results (default: 10)",
-        //           default: 10,
-        //         },
-        //       },
-        //       required: ["query"],
-        //     },
-        //   },
-        // },
+        {
+          type: "function",
+          function: {
+            name: "search_code",
+            description:
+              "Search GitHub codebase for implementations, functions, classes, types, and files. " +
+              "Use this for 'where/what/how is X implemented' questions. " +
+              "Returns code chunks with file paths, line numbers, and function/class names.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description:
+                    "Search query for code (e.g., 'Notion sync implementation', 'authentication functions')",
+                },
+                topK: {
+                  type: "number",
+                  description: "Number of results (default: 10)",
+                  default: 10,
+                },
+              },
+              required: ["query"],
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "search_work",
+            description:
+              "Search GitHub work items: commits, pull requests, and issues. " +
+              "Use this for 'when/why/who decided' questions about changes, features, or discussions. " +
+              "Returns PRs, commits, and issues with metadata, labels, and timestamps.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description:
+                    "Search query for PRs/commits/issues (e.g., 'recent PR about Slack', 'bug fixes last week')",
+                },
+                topK: {
+                  type: "number",
+                  description: "Number of results (default: 10)",
+                  default: 10,
+                },
+              },
+              required: ["query"],
+            },
+          },
+        },
       ];
 
       // Build messages array from conversation history
@@ -508,43 +511,71 @@ export class KnowledgeAgent extends BaseAgent {
         return JSON.stringify(response);
       }
 
-      // TODO: Re-enable after Slack chunking is complete
-      // case "search_code": {
-      //   const results = await codeRetriever.retrieve(
-      //     args.query,
-      //     { organizationId: context.organizationId },
-      //     { topK, includeTypes: ["code"] }
-      //   );
+      case "search_code": {
+        const results = await codeRetriever.retrieve(
+          args.query,
+          { organizationId: context.organizationId },
+          { topK }
+        );
 
-      //   const formatted = results.files.flatMap((file: any) =>
-      //     file.chunks.map((chunk: any) => ({
-      //       file: file.path,
-      //       lines: `${chunk.startLine}-${chunk.endLine}`,
-      //       code: chunk.text, // Full code chunk
-      //       repo: file.repoFullName,
-      //     }))
-      //   );
+        const formatted = results.chunks.map((chunk: any) => ({
+          file: chunk.path,
+          fileName: chunk.fileName,
+          repo: chunk.repoFullName,
+          lines: `${chunk.startLine}-${chunk.endLine}`,
+          code: chunk.text, // Full code chunk
+          language: chunk.language,
+          role: chunk.fileRole,
+          area: chunk.area,
+          functionName: chunk.functionName,
+          className: chunk.className,
+          isExported: chunk.isExported,
+        }));
 
-      //   return JSON.stringify(formatted);
-      // }
+        // Add metadata about truncation
+        const response: any = { code: formatted };
+        if (results.truncated) {
+          response._meta = {
+            truncated: true,
+            estimatedTokens: results.estimatedTokens,
+            note: "Results were truncated to fit token budget. Use more specific queries if needed.",
+          };
+        }
 
-      // case "search_work": {
-      //   const results = await workRetriever.retrieve(
-      //     args.query,
-      //     { organizationId: context.organizationId },
-      //     { topK }
-      //   );
+        return JSON.stringify(response);
+      }
 
-      //   const formatted = results.items.map((item: any) => ({
-      //     type: item.type,
-      //     title: item.title,
-      //     description: item.description, // Full description
-      //     author: item.author,
-      //     created: item.createdAt,
-      //   }));
+      case "search_work": {
+        const results = await workRetriever.retrieve(
+          args.query,
+          { organizationId: context.organizationId },
+          { topK }
+        );
 
-      //   return JSON.stringify(formatted);
-      // }
+        const formatted = results.chunks.map((chunk: any) => ({
+          type: chunk.chunkType, // commit_summary | pr_summary | issue_summary | pr_comments | issue_comments
+          repo: chunk.repoFullName,
+          content: chunk.text, // Full description/summary
+          author: chunk.author,
+          date: chunk.committedAt,
+          area: chunk.area,
+          labels: chunk.labels,
+          state: chunk.state,
+          isMerged: chunk.isMerged,
+        }));
+
+        // Add metadata about truncation
+        const response: any = { work: formatted };
+        if (results.truncated) {
+          response._meta = {
+            truncated: true,
+            estimatedTokens: results.estimatedTokens,
+            note: "Results were truncated to fit token budget. Use more specific queries or date filters if needed.",
+          };
+        }
+
+        return JSON.stringify(response);
+      }
 
       default:
         throw new Error(`Unknown tool: ${toolName}`);

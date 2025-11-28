@@ -5,6 +5,7 @@ import SlackConnectDialog from "./components/SlackConnectDialog";
 import SlackConfigureDialog from "./components/SlackConfigureDialog";
 import NotionConnectDialog from "./components/NotionConnectDialog";
 import NotionConfigureDialog from "./components/NotionConfigureDialog";
+import GitHubConnectDialog from "./components/GitHubConnectDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +30,7 @@ export default function IntegrationsView() {
   const [slackConfigureDialogOpen, setSlackConfigureDialogOpen] = useState(false);
   const [notionDialogOpen, setNotionDialogOpen] = useState(false);
   const [notionConfigureDialogOpen, setNotionConfigureDialogOpen] = useState(false);
+  const [githubDialogOpen, setGithubDialogOpen] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSlackConnect = () => {
@@ -61,6 +63,50 @@ export default function IntegrationsView() {
     // Close configure dialog and open connect dialog to re-auth
     setNotionConfigureDialogOpen(false);
     setNotionDialogOpen(true);
+  };
+
+  const handleGithubConnect = () => {
+    setGithubDialogOpen(true);
+  };
+
+  const handleGithubOAuthComplete = () => {
+    // Start polling for GitHub installation completion
+    console.log("[IntegrationsView] GitHub OAuth complete, starting polling...");
+
+    let pollCount = 0;
+    const pollInterval = setInterval(async () => {
+      pollCount++;
+
+      if (pollCount > POLLING_CONFIG.MAX_POLLS) {
+        clearInterval(pollInterval);
+        console.log("[IntegrationsView] Polling timeout - stopping");
+        toast({
+          title: "Timeout",
+          description: "GitHub installation check timed out. Please refresh the page.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        await refetch();
+        const githubIntegration = integrations.find((i) => i.provider === "github");
+
+        if (githubIntegration) {
+          clearInterval(pollInterval);
+          console.log("[IntegrationsView] GitHub integration detected!");
+
+          toast({
+            title: "Connected",
+            description: "GitHub has been connected successfully.",
+          });
+        }
+      } catch (error) {
+        console.error("[IntegrationsView] Polling error:", error);
+      }
+    }, POLLING_CONFIG.INTERVAL_MS);
+
+    pollingIntervalRef.current = pollInterval;
   };
 
   // Stub handlers for IntegrationCard (not used for Slack, but required by component)
@@ -365,7 +411,9 @@ export default function IntegrationsView() {
                       ? handleSlackConnect
                       : integration.provider === "notion"
                         ? handleNotionConnect
-                        : undefined
+                        : integration.provider === "github"
+                          ? handleGithubConnect
+                          : undefined
                   }
                   position={getCardPosition(index, sortedIntegrations.length)}
                 />
@@ -406,7 +454,9 @@ export default function IntegrationsView() {
                         ? handleSlackConnect
                         : integration.provider === "notion"
                           ? handleNotionConnect
-                          : undefined
+                          : integration.provider === "github"
+                            ? handleGithubConnect
+                            : undefined
                     }
                     position={getCardPosition(index, connectedIntegrations.length)}
                   />
@@ -442,7 +492,9 @@ export default function IntegrationsView() {
                         ? handleSlackConnect
                         : integration.provider === "notion"
                           ? handleNotionConnect
-                          : undefined
+                          : integration.provider === "github"
+                            ? handleGithubConnect
+                            : undefined
                     }
                     position={getCardPosition(index, availableIntegrations.length)}
                   />
@@ -484,6 +536,13 @@ export default function IntegrationsView() {
         onOpenChange={setNotionConfigureDialogOpen}
         onSave={handleNotionConfigureSave}
         onReconnect={handleNotionReconnect}
+      />
+
+      {/* GitHub Connect Dialog */}
+      <GitHubConnectDialog
+        open={githubDialogOpen}
+        onOpenChange={setGithubDialogOpen}
+        onConnect={handleGithubOAuthComplete}
       />
     </div>
   );

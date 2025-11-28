@@ -188,12 +188,12 @@ function createConsoleWindow() {
   consoleWindow = new BrowserWindow({
     width: 1264,
     height: 888,
-    transparent: true,
+    transparent: process.platform === "darwin", // Only transparent on macOS
     // Hidden title bar on macOS for native traffic lights with custom positioning
     titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
     trafficLightPosition: process.platform === "darwin" ? { x: 6, y: 10 } : undefined,
-    frame: process.platform !== "darwin",
-    maximizable: false,
+    frame: process.platform !== "darwin", // Native frame on Windows/Linux
+    maximizable: true, // Allow maximize on Windows
     webPreferences: {
       preload: join(__dirname, "../preload/console.cjs"),
       contextIsolation: true,
