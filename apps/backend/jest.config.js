@@ -15,6 +15,9 @@ export default {
       },
     ],
   },
+  transformIgnorePatterns: [
+    "node_modules/(?!(@octokit)/)",
+  ],
   testMatch: ["**/?(*.)+(spec|test).[tj]s?(x)"],
   collectCoverageFrom: ["src/**/*.{ts,tsx}", "!src/**/*.d.ts"],
 };
