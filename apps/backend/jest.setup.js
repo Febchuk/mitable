@@ -17,3 +17,9 @@ process.env.GEMINI_API_KEY = "test-gemini-key";
 process.env.GROQ_API_KEY = "test-groq-key";
 process.env.JWT_SECRET = "test-jwt-secret";
 process.env.ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // 64 hex chars (32 bytes) for AES-256
+process.env.GITHUB_APP_ID = "123456";
+process.env.GITHUB_APP_CLIENT_ID = "test-github-client-id";
+process.env.GITHUB_APP_CLIENT_SECRET = "test-github-client-secret";
+process.env.GITHUB_APP_PRIVATE_KEY =
+  "-----BEGIN RSA PRIVATE KEY-----\ntest-key\n-----END RSA PRIVATE KEY-----";
+process.env.GITHUB_APP_SLUG = "test-app";
