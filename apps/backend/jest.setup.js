@@ -17,3 +17,12 @@ process.env.GEMINI_API_KEY = "test-gemini-key";
 process.env.GROQ_API_KEY = "test-groq-key";
 process.env.JWT_SECRET = "test-jwt-secret";
 process.env.ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // 64 hex chars (32 bytes) for AES-256
+
+// Mock Octokit (GitHub SDK) - ESM-only modules that Jest can't handle
+jest.mock("@octokit/app", () => ({
+  App: jest.fn(),
+}));
+
+jest.mock("@octokit/core", () => ({
+  Octokit: jest.fn(),
+}));
