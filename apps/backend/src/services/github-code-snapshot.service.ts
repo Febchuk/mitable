@@ -516,7 +516,12 @@ class GitHubCodeSnapshotService {
         );
 
         const validSnapshots = snapshots.filter((s): s is FileSnapshot => s !== null);
-        result.skippedFiles += batch.length - validSnapshots.length;
+        const failedCount = batch.length - validSnapshots.length;
+        result.skippedFiles += failedCount;
+
+        if (failedCount > 0) {
+          console.warn(`      ⚠️  ${failedCount} files failed to fetch in this batch`);
+        }
 
         // Get commit metadata for chunks
         const [latestCommit] = await db
@@ -546,18 +551,31 @@ class GitHubCodeSnapshotService {
         );
       }
 
-      // Step 6: Update lastIndexedCommitSha
-      await db
-        .update(schema.githubRepos)
-        .set({
-          lastIndexedCommitSha: commitSha,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.githubRepos.id, repo.id));
+      // Step 6: Update lastIndexedCommitSha only if all files succeeded
+      const expectedFileCount = codeFiles.length;
+      const actualFileCount = result.filesProcessed;
+      const hasFailures = result.skippedFiles > 0 || actualFileCount < expectedFileCount;
 
-      console.log(
-        `\n   ✅ Repository snapshot complete: ${result.filesProcessed} files, ${result.chunksCreated} chunks`
-      );
+      if (hasFailures) {
+        console.warn(
+          `\n   ⚠️  Partial snapshot: ${result.skippedFiles} files failed to fetch. NOT updating lastIndexedCommitSha.`
+        );
+        console.warn(`      Expected: ${expectedFileCount}, Got: ${actualFileCount}`);
+        console.warn(`      Re-run sync to retry failed files.`);
+      } else {
+        // All files successfully fetched - safe to update
+        await db
+          .update(schema.githubRepos)
+          .set({
+            lastIndexedCommitSha: commitSha,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.githubRepos.id, repo.id));
+
+        console.log(
+          `\n   ✅ Repository snapshot complete: ${result.filesProcessed} files, ${result.chunksCreated} chunks`
+        );
+      }
 
       return result;
     } catch (error) {
@@ -682,6 +700,12 @@ class GitHubCodeSnapshotService {
           );
 
           const validSnapshots = snapshots.filter((s): s is FileSnapshot => s !== null);
+          const failedCount = batch.length - validSnapshots.length;
+
+          if (failedCount > 0) {
+            result.skippedFiles += failedCount;
+            console.warn(`      ⚠️  ${failedCount} files failed to fetch in this batch`);
+          }
 
           const [latestCommit] = await db
             .select()
@@ -706,18 +730,31 @@ class GitHubCodeSnapshotService {
         }
       }
 
-      // Update lastIndexedCommitSha
-      await db
-        .update(schema.githubRepos)
-        .set({
-          lastIndexedCommitSha: commitSha,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.githubRepos.id, repo.id));
+      // Only update lastIndexedCommitSha if ALL files were successfully fetched
+      const expectedFileCount = toUpdate.length;
+      const actualFileCount = result.filesProcessed;
+      const hasFailures = result.skippedFiles > 0 || actualFileCount < expectedFileCount;
 
-      console.log(
-        `\n   ✅ Incremental update complete: ${result.filesProcessed} files updated, ${toDelete.length} deleted`
-      );
+      if (hasFailures) {
+        console.warn(
+          `\n   ⚠️  Partial sync: ${result.skippedFiles} files failed to fetch. NOT updating lastIndexedCommitSha.`
+        );
+        console.warn(`      Expected: ${expectedFileCount}, Got: ${actualFileCount}`);
+        console.warn(`      Re-run sync to retry failed files.`);
+      } else {
+        // All files successfully fetched - safe to update
+        await db
+          .update(schema.githubRepos)
+          .set({
+            lastIndexedCommitSha: commitSha,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.githubRepos.id, repo.id));
+
+        console.log(
+          `\n   ✅ Incremental update complete: ${result.filesProcessed} files updated, ${toDelete.length} deleted`
+        );
+      }
 
       return result;
     } catch (error) {
