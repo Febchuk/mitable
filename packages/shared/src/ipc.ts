@@ -57,6 +57,7 @@ export const IPC_CHANNELS = {
   AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step", // Triggered when Guide "Done" button clicked
   AGENT_OPEN_CONVERSATION: "agent-open-conversation", // Console → Main (open specific conversation in agent)
   CONSOLE_OPEN_CHAT: "console-open-chat", // Agent/Conversation → Main (open conversation in console)
+  CONSOLE_OPEN_CHATS: "console-open-chats", // AgentPanel → Main (open chats tab in console)
 
   // Agent Panel window (right-docked chat panel)
   AGENTPANEL_TOGGLE: "agentpanel-toggle", // Toggle visibility

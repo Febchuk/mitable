@@ -29,6 +29,7 @@ export interface AgentPanelAPI {
 
   // Console integration
   openInConsole(conversationId: string): void;
+  openChats(): void;
   onLoadConversation(callback: (conversationId: string) => void): void;
   offLoadConversation(callback: (conversationId: string) => void): void;
 }

@@ -24,6 +24,7 @@ const IPC_CHANNELS = {
 
   // Console integration
   CONSOLE_OPEN_CHAT: "console-open-chat",
+  CONSOLE_OPEN_CHATS: "console-open-chats",
   AGENTPANEL_LOAD_CONVERSATION: "agentpanel-load-conversation",
 } as const;
 
@@ -76,6 +77,7 @@ contextBridge.exposeInMainWorld("agentPanelAPI", {
   // Console integration
   openInConsole: (conversationId: string) =>
     ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHAT, conversationId),
+  openChats: () => ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHATS),
 
   // Listen for conversation load requests from Console
   onLoadConversation: (callback: (conversationId: string) => void) => {
