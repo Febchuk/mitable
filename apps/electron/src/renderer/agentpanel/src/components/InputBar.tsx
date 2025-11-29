@@ -68,7 +68,7 @@ function InputBar({
   };
 
   return (
-    <div className="border-t border-border px-4 py-3 space-y-3">
+    <div className="border-t border-white/10 px-4 py-3 space-y-3">
       {/* Input row */}
       <div className="relative flex items-end gap-2">
         <Textarea
@@ -78,7 +78,7 @@ function InputBar({
           onKeyDown={handleKeyDown}
           placeholder="How can I help?"
           disabled={disabled || inputMode === "voice"}
-          className="min-h-[40px] max-h-[120px] resize-none pr-12 bg-muted/50 border-0 focus-visible:ring-1"
+          className="min-h-[40px] max-h-[120px] resize-none pr-12 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-1 focus-visible:ring-white/30"
           rows={1}
         />
 
@@ -109,7 +109,7 @@ function InputBar({
                 variant={inputMode === "voice" ? "secondary" : "ghost"}
                 size="sm"
                 onClick={toggleMode}
-                className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                className="flex items-center gap-1.5 text-white/70 hover:text-white hover:bg-white/10"
               >
                 {inputMode === "voice" ? (
                   <MessageSquare className="h-4 w-4" />
@@ -135,7 +135,7 @@ function InputBar({
                 variant={watchingScreen ? "secondary" : "ghost"}
                 size="sm"
                 onClick={onToggleWatch}
-                className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                className="flex items-center gap-1.5 text-white/70 hover:text-white hover:bg-white/10"
               >
                 <Eye className="h-4 w-4" />
                 {selectedWindowCount > 0 && (

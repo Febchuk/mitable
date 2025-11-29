@@ -9,10 +9,10 @@ interface HeaderProps {
 
 function Header({ onOpenInConsole, onClose, hasConversation }: HeaderProps) {
   return (
-    <header className="flex items-center justify-between px-4 py-3 border-b border-border app-drag">
+    <header className="flex items-center justify-between px-4 py-3 border-b border-white/10 app-drag">
       {/* Left: Branding */}
       <div className="flex items-center gap-2">
-        <span className="text-lg font-semibold text-foreground">Mitable</span>
+        <span className="text-lg font-semibold text-white">Mitable</span>
       </div>
 
       {/* Right: Actions */}
@@ -22,7 +22,7 @@ function Header({ onOpenInConsole, onClose, hasConversation }: HeaderProps) {
             variant="ghost"
             size="sm"
             onClick={onOpenInConsole}
-            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1.5 text-white/70 hover:text-white hover:bg-white/10"
           >
             <ExternalLink className="w-4 h-4" />
             <span className="text-sm">Console</span>
@@ -32,7 +32,7 @@ function Header({ onOpenInConsole, onClose, hasConversation }: HeaderProps) {
           variant="ghost"
           size="icon"
           onClick={onClose}
-          className="text-muted-foreground hover:text-foreground"
+          className="text-white/70 hover:text-white hover:bg-white/10"
         >
           <X className="w-5 h-5" />
         </Button>
