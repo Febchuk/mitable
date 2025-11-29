@@ -35,8 +35,8 @@ function MessageBubble({ message }: MessageBubbleProps) {
         <div
           className={`rounded-2xl px-4 py-3 ${
             isUser
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-foreground"
+              ? "bg-primary text-white"
+              : "bg-white/10 text-white"
           }`}
         >
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -45,7 +45,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
         {/* Hover actions */}
         {showActions && (
           <div
-            className={`absolute ${isUser ? "left-0" : "right-0"} -top-8 flex items-center gap-1 bg-popover border border-border rounded-lg p-1 shadow-sm`}
+            className={`absolute ${isUser ? "left-0" : "right-0"} -top-8 flex items-center gap-1 bg-black/60 border border-white/20 rounded-lg p-1 shadow-sm`}
           >
             <TooltipProvider delayDuration={300}>
               {!isUser && (
@@ -54,7 +54,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                     </Button>
@@ -68,7 +68,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -82,10 +82,10 @@ function MessageBubble({ message }: MessageBubbleProps) {
                     variant="ghost"
                     size="icon"
                     onClick={handleCopy}
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10"
                   >
                     {copied ? (
-                      <Check className="h-3.5 w-3.5 text-green-500" />
+                      <Check className="h-3.5 w-3.5 text-green-400" />
                     ) : (
                       <Copy className="h-3.5 w-3.5" />
                     )}
@@ -100,7 +100,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
                     </Button>

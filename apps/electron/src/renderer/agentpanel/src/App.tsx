@@ -236,7 +236,7 @@ function App() {
   const hasConversation = messages.length > 0;
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground">
+    <div className="flex flex-col h-screen text-white bg-black/20 border-l border-white/10">
       {/* Header */}
       <Header
         onOpenInConsole={handleOpenInConsole}

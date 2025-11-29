@@ -199,6 +199,14 @@ function createAgentPanelWindow() {
     resizable: true,
     skipTaskbar: true,
     show: false, // Hidden by default
+    // Native frosted glass - platform specific
+    ...(process.platform === "darwin" && {
+      vibrancy: "under-window" as const,
+      visualEffectState: "active" as const,
+    }),
+    ...(process.platform === "win32" && {
+      backgroundMaterial: "acrylic" as const,
+    }),
     webPreferences: {
       preload: join(__dirname, "../preload/agentpanel.cjs"),
       contextIsolation: true,

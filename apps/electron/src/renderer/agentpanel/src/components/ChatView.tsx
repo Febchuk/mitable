@@ -29,12 +29,12 @@ function ChatView({ messages, isStreaming, streamingContent }: ChatViewProps) {
         {/* Streaming indicator */}
         {isStreaming && (
           <div className="flex justify-start">
-            <div className="bg-muted rounded-2xl px-4 py-3 max-w-[85%]">
+            <div className="bg-white/10 text-white rounded-2xl px-4 py-3 max-w-[85%]">
               {streamingContent || (
                 <span className="flex gap-1">
-                  <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                  <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                  <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-white/50 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-2 h-2 bg-white/50 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-2 h-2 bg-white/50 rounded-full animate-bounce" />
                 </span>
               )}
             </div>
