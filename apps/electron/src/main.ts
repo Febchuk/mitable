@@ -71,7 +71,7 @@ function createAgentWindow() {
   if (!app.isPackaged) {
     agentWindow.loadURL("http://localhost:5173/agent/index.html");
   } else {
-    agentWindow.loadFile(join(__dirname, "../renderer/agent.html"));
+    agentWindow.loadFile(join(__dirname, "../renderer/agent/index.html"));
   }
 
   // Listen for pill movement - reposition conversation in real-time
@@ -164,7 +164,7 @@ function createConversationWindow() {
   if (!app.isPackaged) {
     conversationWindow.loadURL("http://localhost:5173/conversation/index.html");
   } else {
-    conversationWindow.loadFile(join(__dirname, "../renderer/conversation.html"));
+    conversationWindow.loadFile(join(__dirname, "../renderer/conversation/index.html"));
   }
 
   // Wait for renderer to be ready before allowing IPC
@@ -234,7 +234,7 @@ function createConsoleWindow() {
     consoleWindow.loadURL("http://localhost:5173/console/index.html");
     consoleWindow.webContents.openDevTools();
   } else {
-    consoleWindow.loadFile(join(__dirname, "../renderer/console.html"));
+    consoleWindow.loadFile(join(__dirname, "../renderer/console/index.html"));
   }
 
   consoleWindow.on("closed", () => {
@@ -1020,7 +1020,7 @@ function createWatchButtonWindow(window: any, watchButtonWindows: Map<string, Br
   if (!app.isPackaged) {
     buttonWindow.loadURL(`http://localhost:5173/watchButton/index.html?${queryParams.toString()}`);
   } else {
-    buttonWindow.loadFile(join(__dirname, "../renderer/watchButton.html"), {
+    buttonWindow.loadFile(join(__dirname, "../renderer/watchButton/index.html"), {
       query: Object.fromEntries(queryParams.entries()),
     });
   }

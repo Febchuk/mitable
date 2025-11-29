@@ -6,7 +6,7 @@
  */
 
 import { ipcMain } from "electron";
-import activeWin from "active-win";
+// Dynamic import for active-win (ESM-only package) - used in IPC handler
 
 export type ActiveWindowInfo = {
   title: string;
@@ -22,6 +22,8 @@ const IPC_CHANNEL = "mitable:get-active-window";
 export function registerActiveWindowIPC(): void {
   ipcMain.handle(IPC_CHANNEL, async () => {
     try {
+      // Dynamic import for ESM-only package (required for CJS main process)
+      const activeWin = (await import("active-win")).default;
       const activeWindow = await activeWin();
 
       if (!activeWindow) {
