@@ -1,12 +1,7 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ArrowUp, Mic, Eye, MessageSquare, Square } from "lucide-react";
 
 interface InputBarProps {
@@ -68,7 +63,7 @@ function InputBar({
   };
 
   return (
-    <div className="border-t border-white/10 px-4 py-3 space-y-3">
+    <div className="px-4 py-3 space-y-3">
       {/* Input row */}
       <div className="relative flex items-end gap-2">
         <Textarea
@@ -143,15 +138,11 @@ function InputBar({
                     {selectedWindowCount}
                   </span>
                 )}
-                {selectedWindowCount === 0 && (
-                  <span className="text-xs">Watch</span>
-                )}
+                {selectedWindowCount === 0 && <span className="text-xs">Watch</span>}
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              {watchingScreen
-                ? "Stop watching screen"
-                : "Watch screen for context"}
+              {watchingScreen ? "Stop watching screen" : "Watch screen for context"}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

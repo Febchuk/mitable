@@ -454,6 +454,18 @@ function setupIPC() {
     }
   });
 
+  // NEW: Open Chats tab in Console (from Agent Panel)
+  ipcMain.on(IPC_CHANNELS.CONSOLE_OPEN_CHATS, () => {
+    if (!consoleWindow || consoleWindow.isDestroyed()) return;
+
+    // Show and focus console window
+    consoleWindow.show();
+    consoleWindow.focus();
+
+    // Send navigation message to console to open chats tab
+    consoleWindow.webContents.send("navigate-to-chats");
+  });
+
   // ==================== Agent Panel IPC Handlers ====================
 
   // Toggle Agent Panel visibility

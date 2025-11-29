@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Response } from "@/components/ui/ai-response";
 import MessageBubble from "./MessageBubble";
 import type { Message } from "../App";
 
@@ -26,11 +27,15 @@ function ChatView({ messages, isStreaming, streamingContent }: ChatViewProps) {
           <MessageBubble key={message.id} message={message} />
         ))}
 
-        {/* Streaming indicator */}
+        {/* Streaming indicator - matches AI message style (no bubble) */}
         {isStreaming && (
-          <div className="flex justify-start">
-            <div className="bg-white/10 text-white rounded-2xl px-4 py-3 max-w-[85%]">
-              {streamingContent || (
+          <div className="mb-4 max-w-[85%]">
+            <div className="text-[15px] leading-[1.6] text-white">
+              {streamingContent ? (
+                <Response parseIncompleteMarkdown={true}>
+                  {streamingContent}
+                </Response>
+              ) : (
                 <span className="flex gap-1">
                   <span className="w-2 h-2 bg-white/50 rounded-full animate-bounce [animation-delay:-0.3s]" />
                   <span className="w-2 h-2 bg-white/50 rounded-full animate-bounce [animation-delay:-0.15s]" />
