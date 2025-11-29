@@ -207,8 +207,9 @@ DO NOT USE:
         cardData: {
           ...updatedSolution,
           workflowSessionId: workflowSession?.id || context.workflowState?.workflowSessionId,
-          workflowActive: true, // Used by agent window
-          workflowPhase: "step_progression", // Used by agent window
+          workflowActive: true,
+          workflowPhase: "step_progression",
+          status: "active" as const,
         },
         streamable: true,
       };

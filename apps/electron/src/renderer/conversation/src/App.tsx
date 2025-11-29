@@ -713,13 +713,22 @@ function App() {
                 const renderedWorkflowSessions = new Set<string>();
 
                 return messages.map((message) => {
-                  // Skip user messages that belong to a workflow (they'll be shown inside WorkflowAccordion)
+                  // User messages: decide whether to show in main flow vs inside WorkflowAccordion
                   if (message.role === "user") {
-                    // Only render user message in main flow if it's NOT part of a workflow
-                    if (!message.workflowSessionId) {
+                    const isInWorkflow = !!message.workflowSessionId;
+                    const hasValidStepIndex =
+                      message.relatedStepIndex !== undefined &&
+                      message.relatedStepIndex !== null &&
+                      message.relatedStepIndex >= 0;
+
+                    // Show in main flow if not part of a workflow OR if it's a pre-flight/custom question
+                    // (relatedStepIndex < 0) that doesn't belong to any concrete step
+                    if (!isInWorkflow || !hasValidStepIndex) {
                       return <UserMessage key={message.id} content={message.content} />;
                     }
-                    // User messages with workflowSessionId are rendered inside WorkflowAccordion
+
+                    // True step-level workflow user messages (relatedStepIndex >= 0)
+                    // are rendered inside WorkflowAccordion only
                     return null;
                   }
 
