@@ -13,7 +13,7 @@ mac:
         - x64
         - arm64
   category: public.app-category.productivity
-  # icon: build/icon.icns  # TODO: Add custom icon
+  icon: build/icon.png
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
@@ -22,7 +22,7 @@ mac:
 # DMG Configuration
 dmg:
   title: "${productName} ${version}"
-  # icon: build/icon.icns  # TODO: Add custom icon
+  icon: build/icon.png
   iconSize: 100
   contents:
     - x: 410
@@ -39,7 +39,7 @@ win:
     - target: squirrel
       arch:
         - x64
-  icon: build/icon.ico  # Windows ICO file with multiple sizes
+  icon: build/icon.ico
   # Disable code signing for dev builds (enable for production)
   sign: null
   certificateSubjectName: null
@@ -58,8 +58,8 @@ squirrelWindows:
 
 # Extra resources (copied to app resources folder for runtime access)
 extraResources:
-  - from: "src/renderer/assets/icon.ico"
-    to: "assets/icon.ico"
+  - from: "build/icon.png"
+    to: "assets/icon.png"
 
 # File associations and metadata
 files:

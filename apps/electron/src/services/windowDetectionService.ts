@@ -16,7 +16,7 @@
 
 import type { SelectedWindowInfo, WatchableWindow, WatchState } from "@mitable/shared";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
-import { openWindows } from "get-windows";
+// Dynamic import for get-windows (ESM-only package) - see getAllVisibleWindows()
 
 // Type declaration for get-windows package
 interface GetWindowsResult {
@@ -68,6 +68,8 @@ class WindowDetectionService {
    */
   async getAllVisibleWindows(): Promise<WatchableWindow[]> {
     try {
+      // Dynamic import for ESM-only package (required for CJS main process)
+      const { openWindows } = await import("get-windows");
       // Get all windows using get-windows library
       const allWindows = await openWindows();
 

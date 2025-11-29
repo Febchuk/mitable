@@ -24,6 +24,10 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, "src/main.ts"),
         },
+        output: {
+          format: "cjs", // CommonJS has native __dirname (ESM import.meta.dirname needs Node 20.11+)
+          entryFileNames: "[name].cjs", // .cjs extension ensures CommonJS despite "type": "module" in package.json
+        },
       },
     },
   },

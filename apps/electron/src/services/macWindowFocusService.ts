@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import activeWin from "active-win";
+// Dynamic import for active-win (ESM-only package) - used in resolveWindowUrlForWatchSelection()
 
 const execFileAsync = promisify(execFile);
 
@@ -67,6 +67,8 @@ export async function resolveWindowUrlForWatchSelection(
     // Small delay to allow macOS to bring the app to the front
     await delay(200);
 
+    // Dynamic import for ESM-only package (required for CJS main process)
+    const activeWin = (await import("active-win")).default;
     const activeWindow = await activeWin();
 
     if (!activeWindow) {
