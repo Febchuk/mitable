@@ -6,9 +6,12 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  messageType?: string;
+  messageType?: "text" | "workflow" | "experts";
   cardData?: any;
   sources?: any[];
+  // Workflow routing fields - links message to specific workflow session and step
+  workflowSessionId?: string | null;
+  relatedStepIndex?: number | null;
 }
 
 export interface Chat {
@@ -97,23 +100,49 @@ export async function sendMessage(
 }
 
 /**
- * Stream chunk from SSE (console client uses a minimal subset)
+ * Stream chunk from SSE - includes workflow metadata for routing
  */
 export interface StreamChunk {
-  type: "chunk" | "complete" | "error" | "done";
+  type: "chunk" | "complete" | "error" | "done" | "progress";
   content?: string;
   messageId?: string;
   error?: string;
+  messageType?: "text" | "workflow" | "experts";
+  cardData?: any;
+  sources?: any[];
+  // Workflow routing metadata (added by backend to every chunk)
+  workflowSessionId?: string | null;
+  relatedStepIndex?: number | null;
+  // Progress updates for long-running operations
+  progress?: {
+    phase: string;
+    message: string;
+  };
 }
 
 /**
- * Stream callbacks
+ * Stream callbacks - includes workflow metadata for proper message routing
  */
 export interface StreamCallbacks {
-  onChunk?: (content: string) => void;
-  onComplete?: (fullContent: string) => void;
-  onDone?: (messageId: string) => void;
+  onChunk?: (
+    content: string,
+    workflowSessionId?: string | null,
+    relatedStepIndex?: number | null
+  ) => void;
+  onComplete?: (
+    fullContent: string,
+    messageType?: string,
+    cardData?: any,
+    workflowSessionId?: string | null,
+    relatedStepIndex?: number | null
+  ) => void;
+  onDone?: (
+    messageId: string,
+    workflowSessionId?: string | null,
+    relatedStepIndex?: number | null
+  ) => void;
   onError?: (error: string) => void;
+  onProgress?: (phase: string, message: string) => void;
 }
 
 /**
@@ -194,11 +223,15 @@ export async function sendStreamingMessage(
       throw new Error("No response body");
     }
 
-    // Real-time SSE streaming - pass chunks directly to UI
+    // Real-time SSE streaming - pass chunks directly to UI with workflow metadata
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let fullContent = "";
+    let messageType: string | undefined;
+    let cardData: any = undefined;
+    let workflowSessionId: string | null | undefined;
+    let relatedStepIndex: number | null | undefined;
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
@@ -211,28 +244,83 @@ export async function sendStreamingMessage(
       buffer = lines.pop() || "";
 
       for (const line of lines) {
+        // Skip empty lines and ping messages
+        if (!line.trim() || line.startsWith(":")) continue;
+
         if (line.startsWith("data: ")) {
           const data = line.slice(6);
-          if (data === "" || data.startsWith(":")) continue;
 
           try {
             const chunk: StreamChunk = JSON.parse(data);
 
-            // Stream chunks directly to UI as they arrive (real-time!)
-            if (chunk.type === "chunk" && chunk.content) {
-              fullContent += chunk.content;
-              callbacks.onChunk?.(chunk.content);
-            } else if (chunk.type === "complete" && chunk.content) {
-              fullContent = chunk.content;
-              callbacks.onComplete?.(fullContent);
-            } else if (chunk.type === "done" && chunk.messageId) {
-              callbacks.onDone?.(chunk.messageId);
-            } else if (chunk.type === "error" && chunk.error) {
-              callbacks.onError?.(chunk.error);
-              throw new Error(chunk.error);
+            switch (chunk.type) {
+              case "chunk": {
+                // Extract workflow metadata from first chunk
+                if (workflowSessionId === undefined) {
+                  workflowSessionId = chunk.workflowSessionId ?? null;
+                  relatedStepIndex = chunk.relatedStepIndex ?? null;
+                }
+
+                if (chunk.content) {
+                  fullContent += chunk.content;
+                  callbacks.onChunk?.(chunk.content, workflowSessionId, relatedStepIndex);
+                }
+                break;
+              }
+
+              case "complete": {
+                if (chunk.content) {
+                  fullContent = chunk.content;
+                }
+                if (chunk.messageType) {
+                  messageType = chunk.messageType;
+                }
+                if (chunk.cardData) {
+                  cardData = chunk.cardData;
+                }
+                // Call onComplete with all metadata
+                callbacks.onComplete?.(
+                  fullContent,
+                  messageType,
+                  cardData,
+                  workflowSessionId,
+                  relatedStepIndex
+                );
+                break;
+              }
+
+              case "done": {
+                if (chunk.workflowSessionId !== undefined) {
+                  workflowSessionId = chunk.workflowSessionId;
+                }
+                if (chunk.relatedStepIndex !== undefined) {
+                  relatedStepIndex = chunk.relatedStepIndex;
+                }
+                if (chunk.messageId) {
+                  callbacks.onDone?.(chunk.messageId, workflowSessionId, relatedStepIndex);
+                }
+                break;
+              }
+
+              case "progress": {
+                if (chunk.progress) {
+                  callbacks.onProgress?.(chunk.progress.phase, chunk.progress.message);
+                }
+                break;
+              }
+
+              case "error": {
+                callbacks.onError?.(chunk.error || "Unknown error");
+                throw new Error(chunk.error);
+              }
             }
           } catch (e) {
-            // Skip parse errors
+            // Only log actual parse errors, not re-thrown errors
+            if (e instanceof SyntaxError) {
+              console.warn("[chatsService] Failed to parse SSE data:", data);
+            } else {
+              throw e;
+            }
           }
         }
       }
@@ -243,7 +331,16 @@ export async function sendStreamingMessage(
     }
 
     // Final completion signal (in case backend didn't send an explicit "complete")
-    callbacks.onComplete?.(fullContent);
+    // Only call if onComplete wasn't already called
+    if (!messageType && !cardData) {
+      callbacks.onComplete?.(
+        fullContent,
+        messageType,
+        cardData,
+        workflowSessionId,
+        relatedStepIndex
+      );
+    }
   } catch (error) {
     console.error("Message send error:", error);
     callbacks.onError?.(error instanceof Error ? error.message : "Failed to send message");

@@ -822,8 +822,9 @@ router.post(
       // Check if there's an active workflow for this conversation
       const activeWorkflow = await workflowService.getActiveWorkflow(conversationId);
       const workflowSessionId = activeWorkflow?.id || metadata?.workflowSessionId || null;
+      // Use nullish coalescing (??) instead of || to handle step index 0 correctly
       const currentStepIndex =
-        activeWorkflow?.currentStepIndex || metadata?.currentStepIndex || null;
+        activeWorkflow?.currentStepIndex ?? metadata?.currentStepIndex ?? null;
 
       // Save user message to database with workflow fields
       const [userMessage] = await db

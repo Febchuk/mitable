@@ -6,9 +6,25 @@ import type { Message } from "../../../types";
 import type { MultiWindowCaptureResult } from "@mitable/shared";
 
 export interface SendMessageOptions {
-  onChunk?: (content: string) => void;
-  onComplete?: (fullContent: string) => void;
+  onChunk?: (
+    content: string,
+    workflowSessionId?: string | null,
+    relatedStepIndex?: number | null
+  ) => void;
+  onComplete?: (
+    fullContent: string,
+    messageType?: string,
+    cardData?: any,
+    workflowSessionId?: string | null,
+    relatedStepIndex?: number | null
+  ) => void;
+  onDone?: (
+    messageId: string,
+    workflowSessionId?: string | null,
+    relatedStepIndex?: number | null
+  ) => void;
   onError?: (error: string) => void;
+  onProgress?: (phase: string, message: string) => void;
   captureScreenshot?: boolean; // Whether to capture screenshot before sending
 }
 
@@ -22,11 +38,15 @@ export function useSendMessage(options?: SendMessageOptions) {
       content,
       metadata,
       multiWindowCapture: providedCapture,
+      workflowSessionId,
+      relatedStepIndex,
     }: {
       chatId: string;
       content: string;
       metadata?: any;
       multiWindowCapture?: MultiWindowCaptureResult | null;
+      workflowSessionId?: string | null;
+      relatedStepIndex?: number | null;
     }) => {
       const token = authService.getAccessToken();
 
@@ -78,16 +98,28 @@ export function useSendMessage(options?: SendMessageOptions) {
         }
       }
 
-      // Define streaming callbacks
+      // Define streaming callbacks - forward all workflow metadata to consumer
       const callbacks: StreamCallbacks = {
-        onChunk: (chunk: string) => {
-          options?.onChunk?.(chunk);
+        onChunk: (chunk, workflowSessionId, relatedStepIndex) => {
+          options?.onChunk?.(chunk, workflowSessionId, relatedStepIndex);
         },
-        onComplete: (fullContent: string) => {
-          options?.onComplete?.(fullContent);
+        onComplete: (fullContent, messageType, cardData, workflowSessionId, relatedStepIndex) => {
+          options?.onComplete?.(
+            fullContent,
+            messageType,
+            cardData,
+            workflowSessionId,
+            relatedStepIndex
+          );
         },
-        onError: (error: string) => {
+        onDone: (messageId, workflowSessionId, relatedStepIndex) => {
+          options?.onDone?.(messageId, workflowSessionId, relatedStepIndex);
+        },
+        onError: (error) => {
           options?.onError?.(error);
+        },
+        onProgress: (phase, message) => {
+          options?.onProgress?.(phase, message);
         },
       };
 
@@ -96,7 +128,7 @@ export function useSendMessage(options?: SendMessageOptions) {
     },
 
     // Optimistic update for user message
-    onMutate: async ({ chatId, content }) => {
+    onMutate: async ({ chatId, content, workflowSessionId, relatedStepIndex }) => {
       // Cancel any outgoing refetches for this conversation
       await queryClient.cancelQueries({ queryKey: ["conversation-messages", chatId] });
 
@@ -109,6 +141,9 @@ export function useSendMessage(options?: SendMessageOptions) {
         content,
         type: "text",
         timestamp: new Date(),
+        // Include workflow routing fields for proper accordion rendering
+        workflowSessionId: workflowSessionId ?? undefined,
+        relatedStepIndex: relatedStepIndex ?? undefined,
       };
 
       // Optimistically update the conversation messages

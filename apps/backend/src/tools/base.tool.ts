@@ -129,6 +129,7 @@ export interface WorkflowMessage extends BaseMessage {
     workflowActive: true;
     workflowPhase: WorkflowPhase;
     workflowSessionId?: string; // Added for workflow session tracking
+    status?: "active" | "completed" | "abandoned" | "paused"; // Workflow status from SolutionObject
   };
 }
 

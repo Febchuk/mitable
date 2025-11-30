@@ -16,7 +16,7 @@ describe("VisualGuidanceAgent routing", () => {
     };
 
     mockTextAgent = {
-      execute: jest.fn<[], AsyncIterable<StreamChunk>>().mockImplementation(async function* () {
+      execute: jest.fn<() => AsyncIterable<StreamChunk>>().mockImplementation(async function* () {
         yield {
           type: "complete",
           messageType: "workflow",
@@ -30,15 +30,15 @@ describe("VisualGuidanceAgent routing", () => {
   });
 
   it("uses ClarifyIntent for entry-point vague prompts with no workflow", async () => {
-    const clarifyExecuteMock = jest.fn().mockResolvedValue({
+    const clarifyExecuteMock = jest.fn<() => Promise<any>>().mockResolvedValue({
       messageType: "text",
       content: "Clarified intent",
       cardData: null,
     });
     (agent as any).clarifyIntentTool = { execute: clarifyExecuteMock };
 
-    (agent as any).isVaguePrompt = jest.fn().mockResolvedValue(true);
-    const classifySpy = jest.spyOn<any, any>(agent as any, "classifyWorkflowQuestion");
+    (agent as any).isVaguePrompt = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const classifySpy = jest.spyOn(agent as any, "classifyWorkflowQuestion");
 
     const context: ToolContext = {
       conversationId: "conv-1",
@@ -50,7 +50,7 @@ describe("VisualGuidanceAgent routing", () => {
           windowTitle: "Test",
           appName: "TestApp",
           dataUrl: "data:image/png;base64,xxx",
-          metadata: { width: 100, height: 100, scaleFactor: 1 },
+          metadata: { width: 100, height: 100, scaleFactor: 1, bounds: { x: 0, y: 0, width: 100, height: 100 } },
         },
       ],
       metadata: undefined,
@@ -93,8 +93,8 @@ describe("VisualGuidanceAgent routing", () => {
     const clarifyExecuteMock = jest.fn();
     (agent as any).clarifyIntentTool = { execute: clarifyExecuteMock };
 
-    (agent as any).isVaguePrompt = jest.fn().mockResolvedValue(true);
-    (agent as any).classifyWorkflowQuestion = jest.fn().mockResolvedValue("directly_answerable");
+    (agent as any).isVaguePrompt = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    (agent as any).classifyWorkflowQuestion = jest.fn<() => Promise<string>>().mockResolvedValue("directly_answerable");
 
     const context: ToolContext = {
       conversationId: "conv-2",
@@ -106,7 +106,7 @@ describe("VisualGuidanceAgent routing", () => {
           windowTitle: "Test",
           appName: "TestApp",
           dataUrl: "data:image/png;base64,xxx",
-          metadata: { width: 100, height: 100, scaleFactor: 1 },
+          metadata: { width: 100, height: 100, scaleFactor: 1, bounds: { x: 0, y: 0, width: 100, height: 100 } },
         },
       ],
       metadata: {
@@ -168,4 +168,3 @@ describe("VisualGuidanceAgent routing", () => {
     expect(chunks[0].content).toBe("Workflow-aware answer");
   });
 });
-
