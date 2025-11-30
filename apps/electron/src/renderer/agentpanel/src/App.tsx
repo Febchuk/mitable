@@ -255,6 +255,125 @@ function App() {
     window.agentPanelAPI?.hide();
   };
 
+  // Workflow option handler
+  const handleWorkflowOptionSelect = useCallback(
+    async (option: { id: number; label: string; action: string }) => {
+      if (!conversationId || isStreaming) return;
+
+      const { action, label } = option;
+      let metadata: Record<string, unknown> = {};
+      let message = "";
+
+      // Map workflow actions
+      switch (action) {
+        case "progress_step":
+          metadata = { workflowAction: "progress_step", selectedOption: 1 };
+          message = "Move on to next step";
+          break;
+        case "custom_question":
+        case "ask_questions":
+          metadata = { workflowAction: "custom_question", selectedOption: 2 };
+          message = label || "I have a question";
+          break;
+        case "exit_workflow":
+          metadata = { workflowAction: "exit_workflow", selectedOption: 3 };
+          message = "Exit workflow";
+          break;
+        case "confirm_start":
+          metadata = { workflowAction: "progress_step", selectedOption: 1 };
+          message = "Yes, let's get started!";
+          break;
+        default:
+          message = label || action;
+      }
+
+      // Capture screenshot if in watch mode
+      let captureResult: MultiWindowCaptureResult | null = null;
+      if (
+        selectedWindows.length > 0 &&
+        ["progress_step", "custom_question", "confirm_start"].includes(action)
+      ) {
+        console.log("[AgentPanel] Capturing screenshot for workflow action...");
+        captureResult = (await window.agentPanelAPI?.captureScreenshot()) || null;
+      }
+
+      // Add user message
+      const userMessage: Message = {
+        id: `msg-${Date.now()}`,
+        role: "user",
+        content: message,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      setIsStreaming(true);
+      setStreamingContent("");
+
+      try {
+        // Send with metadata as 5th argument
+        await sendMessageStream(
+          conversationId,
+          message,
+          captureResult,
+          {
+            onChunk: (chunk) => {
+              setStreamingContent((prev) => prev + chunk);
+            },
+            onComplete: (fullContent, messageId, messageType, cardData) => {
+              console.log("[AgentPanel] Workflow stream complete:", {
+                messageId,
+                messageType,
+                hasCardData: !!cardData,
+              });
+
+              const assistantMessage: Message = {
+                id: messageId || `msg-${Date.now()}`,
+                role: "assistant",
+                content: fullContent,
+                timestamp: new Date(),
+                messageType: messageType as "text" | "workflow" | "experts",
+                cardData,
+              };
+
+              setMessages((prev) => [...prev, assistantMessage]);
+              setStreamingContent("");
+              setIsStreaming(false);
+            },
+            onError: (error) => {
+              console.error("[AgentPanel] Workflow stream error:", error);
+              setStreamingContent("");
+              setIsStreaming(false);
+
+              const errorMessage: Message = {
+                id: `msg-error-${Date.now()}`,
+                role: "assistant",
+                content: `Sorry, I encountered an error: ${error}`,
+                timestamp: new Date(),
+              };
+              setMessages((prev) => [...prev, errorMessage]);
+            },
+            onProgress: (phase, progressMessage) => {
+              console.log("[AgentPanel] Workflow progress:", phase, progressMessage);
+            },
+          },
+          metadata
+        );
+      } catch (error) {
+        console.error("[AgentPanel] Error in workflow action:", error);
+        setIsStreaming(false);
+        setStreamingContent("");
+
+        const errorMessage: Message = {
+          id: `msg-error-${Date.now()}`,
+          role: "assistant",
+          content: `Sorry, I couldn't process that action. Please try again.`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      }
+    },
+    [conversationId, isStreaming, selectedWindows.length]
+  );
+
   const hasConversation = messages.length > 0;
 
   return (
@@ -281,6 +400,7 @@ function App() {
             messages={messages}
             isStreaming={isStreaming}
             streamingContent={streamingContent}
+            onWorkflowOptionSelect={handleWorkflowOptionSelect}
           />
         ) : (
           <EmptyState userName={userName} />
