@@ -46,8 +46,8 @@ function MessageBubble({ message }: MessageBubbleProps) {
       onMouseLeave={() => setShowActions(false)}
     >
       <div className="relative group max-w-[85%]">
-        {/* User message bubble - dark rounded box */}
-        <div className="bg-[#2A2A2A] text-white rounded-2xl px-4 py-3">
+        {/* User message bubble - dark rounded box with tail on bottom-left */}
+        <div className="bg-[#2A2A2A] text-white rounded-tl-2xl rounded-tr-2xl rounded-br-2xl rounded-bl-sm px-4 py-3">
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         </div>
 

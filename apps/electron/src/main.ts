@@ -1,12 +1,12 @@
+import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
+import { IPC_CHANNELS } from "@mitable/shared";
 import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from "electron";
 import { join } from "path";
-import { IPC_CHANNELS } from "@mitable/shared";
-import { captureService } from "./services/captureService";
-import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
-import { windowDetectionService } from "./services/windowDetectionService";
-import { isBlockedByPolicy } from "./services/capturePolicy";
-import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
+import { isBlockedByPolicy } from "./services/capturePolicy";
+import { captureService } from "./services/captureService";
+import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
+import { windowDetectionService } from "./services/windowDetectionService";
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
@@ -253,12 +253,18 @@ function createConsoleWindow() {
   consoleWindow = new BrowserWindow({
     width: 1264,
     height: 888,
-    transparent: process.platform === "darwin", // Only transparent on macOS
+    transparent: true,
+    backgroundColor: "#00000000", // Fully transparent hex for vibrancy support
     // Hidden title bar on macOS for native traffic lights with custom positioning
     titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
     trafficLightPosition: process.platform === "darwin" ? { x: 6, y: 10 } : undefined,
-    frame: process.platform !== "darwin", // Native frame on Windows/Linux
-    maximizable: true, // Allow maximize on Windows
+    frame: process.platform !== "darwin",
+    maximizable: false,
+    // Native frosted glass - platform specific
+    ...(process.platform === "darwin" && {
+      vibrancy: "under-window" as const,
+      visualEffectState: "active" as const,
+    }),
     webPreferences: {
       preload: join(__dirname, "../preload/console.cjs"),
       contextIsolation: true,
