@@ -18,7 +18,7 @@ export default function Sidebar() {
   return (
     <aside
       className={`
-        flex flex-col h-screen bg-transparent text-white
+        flex flex-col h-full bg-transparent text-white
         transition-all duration-300 ease-in-out relative z-10
         ${open ? "w-64" : "w-16"}
       `}

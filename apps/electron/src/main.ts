@@ -257,7 +257,6 @@ function createConsoleWindow() {
     backgroundColor: "#00000000", // Fully transparent hex for vibrancy support
     // Hidden title bar on macOS for native traffic lights with custom positioning
     titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
-    trafficLightPosition: process.platform === "darwin" ? { x: 6, y: 10 } : undefined,
     frame: process.platform !== "darwin",
     maximizable: false,
     // Native frosted glass - platform specific
