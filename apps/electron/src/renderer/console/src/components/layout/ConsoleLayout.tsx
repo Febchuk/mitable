@@ -27,7 +27,8 @@ export default function ConsoleLayout() {
 
   return (
     <SidebarProvider>
-      <div className="relative flex h-screen overflow-hidden">
+      {/* Root container with transparent background to let Electron vibrancy show through */}
+      <div className="relative flex h-screen overflow-hidden bg-black/20">
         {/* Invisible draggable overlay at top - allows window dragging */}
         <div
           className="absolute top-0 left-0 right-0 h-10 z-50 pointer-events-auto"
@@ -35,9 +36,15 @@ export default function ConsoleLayout() {
         />
 
         <Sidebar />
-        <ScrollArea className="flex-1 bg-background-secondary">
-          <Outlet />
-        </ScrollArea>
+        
+        {/* Main Content Area - Floating Card Style */}
+        <div className="flex-1 flex flex-col h-full py-3 pr-3 overflow-hidden">
+          <div className="flex-1 overflow-hidden rounded-2xl shadow-2xl border border-white/5 bg-background-secondary/95 backdrop-blur-sm relative">
+             <ScrollArea className="h-full w-full">
+               <Outlet />
+             </ScrollArea>
+          </div>
+        </div>
       </div>
     </SidebarProvider>
   );
