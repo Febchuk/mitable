@@ -22,8 +22,11 @@ import type { VectorRecord } from "./vector.service.js";
 import type { NewSearchContent } from "../db/schema/search-content.schema.js";
 
 const SYNC_CONFIG = {
-  BATCH_SIZE: 100,
+  BATCH_SIZE: 25, // Reduced from 100 to avoid GitHub API timeouts
   MAX_FILE_SIZE: 1_000_000, // 1 MB in bytes
+  RETRY_ATTEMPTS: 3, // Number of retry attempts for failed fetches
+  RETRY_DELAY_MS: 1000, // Initial delay between retries (exponential backoff)
+  BATCH_DELAY_MS: 2000, // Delay between batches to avoid rate limiting
 } as const;
 
 // Files/directories to skip during code ingestion
@@ -207,7 +210,25 @@ class GitHubCodeSnapshotService {
   }
 
   /**
-   * Fetch blob content for a file
+   * Retry helper with exponential backoff
+   */
+  private async retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    retries: number = SYNC_CONFIG.RETRY_ATTEMPTS,
+    delayMs: number = SYNC_CONFIG.RETRY_DELAY_MS
+  ): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      if (retries === 0) throw error;
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return this.retryWithBackoff(fn, retries - 1, delayMs * 2); // Exponential backoff
+    }
+  }
+
+  /**
+   * Fetch blob content for a file with retry logic
    */
   private async fetchBlobContent(
     octokit: Octokit,
@@ -216,11 +237,13 @@ class GitHubCodeSnapshotService {
     entry: TreeEntry
   ): Promise<FileSnapshot | null> {
     try {
-      const { data } = await octokit.request("GET /repos/{owner}/{repo}/git/blobs/{file_sha}", {
-        owner,
-        repo,
-        file_sha: entry.sha,
-        mediaType: { format: "raw" },
+      const { data } = await this.retryWithBackoff(async () => {
+        return await octokit.request("GET /repos/{owner}/{repo}/git/blobs/{file_sha}", {
+          owner,
+          repo,
+          file_sha: entry.sha,
+          mediaType: { format: "raw" },
+        });
       });
 
       // GitHub returns raw content as string
@@ -345,7 +368,9 @@ class GitHubCodeSnapshotService {
       console.log(`         ✅ Generated ${chunks.length} chunks`);
       console.log(`         📊 Types: ${chunks.map((c: any) => c.chunk_type).join(", ")}`);
 
-      const texts = chunks.map((c: any) => c.text);
+      // Use _embeddingText (full code) for embedding generation
+      // Fall back to text for non-code chunks (file_overview, config, etc.)
+      const texts = chunks.map((c: any) => c._embeddingText || c.text);
       const embeddings = await embeddingService.embedTexts(texts);
 
       // Build vectors with rich metadata
@@ -356,7 +381,7 @@ class GitHubCodeSnapshotService {
           id: `github-${chunk.repo_id}-${chunk.commit_sha.slice(0, 7)}-${chunk.path}-chunk-${chunk.chunk_index}`,
           values: embeddings[idx],
           metadata: {
-            text: chunk.text,
+            text: chunk.text, // ← Only metadata (no raw code)
             source: "github",
             source_type: chunk.chunk_type,
 
@@ -549,6 +574,12 @@ class GitHubCodeSnapshotService {
         console.log(
           `      ✅ Batch complete: +${chunksCreated} chunks (${i + batch.length}/${codeFiles.length} files processed)`
         );
+
+        // Add delay between batches to avoid rate limiting (except for last batch)
+        const isLastBatch = i + batch.length >= codeFiles.length;
+        if (!isLastBatch) {
+          await new Promise((resolve) => setTimeout(resolve, SYNC_CONFIG.BATCH_DELAY_MS));
+        }
       }
 
       // Step 6: Update lastIndexedCommitSha only if all files succeeded
@@ -727,6 +758,12 @@ class GitHubCodeSnapshotService {
 
           result.chunksCreated += chunksCreated;
           result.filesProcessed += validSnapshots.length;
+
+          // Add delay between batches to avoid rate limiting (except for last batch)
+          const isLastBatch = i + batch.length >= codeFiles.length;
+          if (!isLastBatch) {
+            await new Promise((resolve) => setTimeout(resolve, SYNC_CONFIG.BATCH_DELAY_MS));
+          }
         }
       }
 

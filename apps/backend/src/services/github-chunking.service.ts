@@ -179,7 +179,8 @@ export interface CodeSymbol {
  */
 export interface GitHubCodeChunk {
   // ===== CONTENT =====
-  text: string; // What the model will see (includes header)
+  text: string; // What gets stored (empty for security - no raw code)
+  _embeddingText?: string; // INTERNAL: Full text for embedding generation (not persisted)
 
   // ===== REPO CONTEXT =====
   repo_id: string;
@@ -826,11 +827,13 @@ class GitHubChunkingService {
     // If symbol fits in one chunk, create single chunk
     if (tokenCount <= CHUNK_CONFIG.MAX_TOKENS) {
       const header = `[${file.repoFullName} / ${file.path} • ${symbol.type} ${symbol.name}]\nLines ${symbol.startLine}-${symbol.endLine}\n\n`;
-      const text = header + symbol.code;
+      const fullText = header + symbol.code; // For embedding only
+      const storedText = header; // Metadata only (no code)
 
       return [
         {
-          text,
+          text: storedText, // ← Only metadata stored
+          _embeddingText: fullText, // ← Full code for embedding (not persisted)
           repo_id: file.repoId,
           repo_full_name: file.repoFullName,
           org_id: orgId,
@@ -846,7 +849,7 @@ class GitHubChunkingService {
           chunk_type: symbol.type === "method" ? "method" : (symbol.type as any),
           start_line: symbol.startLine,
           end_line: symbol.endLine,
-          token_count: this.countTokens(text),
+          token_count: this.countTokens(fullText),
           function_name: symbol.type === "function" ? symbol.name : undefined,
           class_name: symbol.type === "class" ? symbol.name : symbol.parentClass,
           is_exported: symbol.isExported,
@@ -903,10 +906,12 @@ class GitHubChunkingService {
         const totalSegments = Math.ceil(lines.length / targetLinesPerSegment);
 
         const header = `[${file.repoFullName} / ${file.path} • ${symbol.type} ${symbol.name} (segment ${segmentIndex + 1}/${totalSegments})]\nLines ${segmentStartLine}-${segmentEndLine}\n\n`;
-        const text = header + segmentCode;
+        const fullText = header + segmentCode; // For embedding only
+        const storedText = header; // Metadata only (no code)
 
         chunks.push({
-          text,
+          text: storedText, // ← Only metadata stored
+          _embeddingText: fullText, // ← Full code for embedding (not persisted)
           repo_id: file.repoId,
           repo_full_name: file.repoFullName,
           org_id: orgId,
@@ -922,7 +927,7 @@ class GitHubChunkingService {
           chunk_type: symbol.type === "method" ? "method" : (symbol.type as any),
           start_line: segmentStartLine,
           end_line: segmentEndLine,
-          token_count: this.countTokens(text),
+          token_count: this.countTokens(fullText),
           function_name: symbol.type === "function" ? symbol.name : undefined,
           class_name: symbol.type === "class" ? symbol.name : symbol.parentClass,
           is_exported: symbol.isExported,

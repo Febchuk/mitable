@@ -106,6 +106,18 @@ export class CodeRetriever {
     // Step 3: Apply code-specific boosting
     const boosted = this.applyCodeBoosting(merged, query);
 
+    // Log top boosted results to show code prioritization
+    const topBoosted = boosted.sort((a, b) => b.score - a.score).slice(0, 5);
+    console.log(`[CodeRetriever] Top 5 after boosting:`);
+    topBoosted.forEach((chunk, i) => {
+      const fileType = chunk.path.match(/\.(ts|tsx|js|jsx|py|java|go|rs|cpp|c|h)$/i)
+        ? "CODE"
+        : chunk.path.match(/\.md$/i)
+          ? "DOCS"
+          : "OTHER";
+      console.log(`  ${i + 1}. [${fileType}] ${chunk.path} (score: ${chunk.score.toFixed(4)})`);
+    });
+
     // Step 4: Filter out tests/configs unless explicitly requested
     const filtered = this.filterByContext(boosted, context);
 
@@ -284,6 +296,7 @@ export class CodeRetriever {
    * Apply code-specific boosting
    *
    * Unlike Slack (where recency matters), code search prioritizes:
+   * - ACTUAL CODE FILES over documentation (5x boost - CODE IS GROUND TRUTH)
    * - Exact symbol name matches
    * - file_overview for "where" questions
    * - Services/controllers over configs/tests
@@ -294,6 +307,17 @@ export class CodeRetriever {
 
     return chunks.map((chunk) => {
       let boost = 1.0;
+
+      // CRITICAL: Code files are the source of truth - 5x boost over docs
+      // Docs can be outdated, but code is what's actually running
+      const isCodeFile = chunk.path.match(/\.(ts|tsx|js|jsx|py|java|go|rs|cpp|c|h)$/i);
+      const isDocFile = chunk.path.match(/\.md$/i);
+
+      if (isCodeFile) {
+        boost *= 5.0; // Holy grail of accuracy
+      } else if (isDocFile) {
+        boost *= 1.0; // No boost - docs are secondary
+      }
 
       // Boost exact function/class name matches (2x)
       if (chunk.functionName && queryWords.includes(chunk.functionName.toLowerCase())) {

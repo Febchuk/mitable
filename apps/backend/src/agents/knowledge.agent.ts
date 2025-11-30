@@ -194,6 +194,44 @@ export class KnowledgeAgent extends BaseAgent {
             },
           },
         },
+        // view_code tool - Fetch actual code from GitHub (ephemeral)
+        {
+          type: "function",
+          function: {
+            name: "view_code",
+            description:
+              "Fetch the actual code for a specific function/class from GitHub. " +
+              "Use this when search_code metadata isn't sufficient and you need to see implementation details. " +
+              "Returns the raw code for that function/class. This is NOT persisted.",
+            parameters: {
+              type: "object",
+              properties: {
+                repo_full_name: {
+                  type: "string",
+                  description: "Repository full name (e.g., 'Npounengnong/mitableai')",
+                },
+                file_path: {
+                  type: "string",
+                  description:
+                    "File path in repo (e.g., 'apps/backend/src/services/auth.service.ts')",
+                },
+                start_line: {
+                  type: "number",
+                  description: "Start line number of function/class",
+                },
+                end_line: {
+                  type: "number",
+                  description: "End line number of function/class",
+                },
+                function_name: {
+                  type: "string",
+                  description: "Name of function/class (for context)",
+                },
+              },
+              required: ["repo_full_name", "file_path", "start_line", "end_line"],
+            },
+          },
+        },
         {
           type: "function",
           function: {
@@ -224,6 +262,7 @@ export class KnowledgeAgent extends BaseAgent {
 
       // Build messages array from conversation history
       const messages: Groq.Chat.ChatCompletionMessageParam[] = [];
+      const ephemeralMessageIds = new Set<string>(); // Track ephemeral tool results
 
       // Add system prompt to guide multi-query decomposition and thorough research
       messages.push({
@@ -231,6 +270,21 @@ export class KnowledgeAgent extends BaseAgent {
         content:
           "You are a helpful AI assistant with access to search tools. " +
           "Your goal is to provide COMPREHENSIVE, DETAILED answers by gathering all relevant information.\n\n" +
+          "🚫 CRITICAL FORMATTING RULE - NEVER USE TABLES:\n" +
+          "- NEVER EVER use markdown tables (anything with pipes | )\n" +
+          "- NEVER format data in rows and columns with | symbols\n" +
+          "- If you need to show structured data, use bullet points or numbered lists instead\n\n" +
+          "Example - DO NOT do this:\n" +
+          "| Layer | Responsibility | Implementation |\n" +
+          "|-------|----------------|----------------|\n" +
+          "| Agent | Routing | agent.service.ts |\n\n" +
+          "Instead, DO this:\n" +
+          "## Architecture Layers\n" +
+          "- **Agent Layer**: Handles routing decisions\n" +
+          "  - Implementation: `agent.service.ts`\n" +
+          "- **Service Layer**: Core business logic\n" +
+          "  - Implementation: `guideGeneration.service.ts`\n\n" +
+          "Use headers (##, ###), bullet points (-), and numbered lists (1., 2., 3.) ONLY.\n\n" +
           "BREVITY GUIDELINES:\n" +
           "- For timeline/status questions (what happened this week, what did we discuss, current status): " +
           "provide a 2-8 sentence executive summary unless user explicitly asks for details.\n" +
@@ -242,8 +296,7 @@ export class KnowledgeAgent extends BaseAgent {
           "- What are the implementation details? (sync pipeline, API calls, code)\n" +
           "- What are edge cases or limitations?\n\n" +
           "Use MULTIPLE targeted searches to gather complete information:\n" +
-          "- First, call get_org_info to see what data sources are available\n" +
-          "- Then search each relevant domain with SPECIFIC queries\n" +
+          "- Search each relevant domain with SPECIFIC queries\n" +
           "- Example: For 'How does Notion integration work?', search for:\n" +
           "  1. 'Notion integration database schema tables'\n" +
           "  2. 'Notion OAuth flow authorization'\n" +
@@ -265,7 +318,24 @@ export class KnowledgeAgent extends BaseAgent {
           "  ❌ WRONG: 'According to the Slack discussion...' - no inline citations\n" +
           "  ❌ WRONG: Sources without **Sources:** heading - MUST include heading\n" +
           "  ❌ WRONG: No sources section at end - MANDATORY\n\n" +
-          "REMEMBER: You MUST include the **Sources:** heading before the list!",
+          "REMEMBER: You MUST include the **Sources:** heading before the list!\n\n" +
+          "AVAILABLE TOOLS (use ONLY these):\n" +
+          "1. search_code - Search code files (returns metadata only: file paths, function names, line numbers)\n" +
+          "2. view_code - Fetch actual code from a specific file (use after search_code)\n" +
+          "3. search_slack - Search Slack messages\n" +
+          "4. search_work - Search GitHub PRs, commits, issues\n\n" +
+          "DO NOT invent or hallucinate other tool names like 'repo_browser', 'open_file', 'get_org_info', 'search_notion', etc. They don't exist.\n\n" +
+          "CODE SEARCH WORKFLOW:\n" +
+          "1. Start with search_code to find relevant files and functions (metadata only)\n" +
+          "2. If metadata isn't enough, call view_code on specific functions you identified\n" +
+          "3. view_code requires: repo_full_name, file_path, start_line, end_line\n" +
+          "4. DO NOT try to call search_code without a 'query' parameter - it's required\n" +
+          "5. DO NOT hallucinate implementation details - use view_code if you need them\n\n" +
+          "Example:\n" +
+          'search_code({"query": "authentication"})\n' +
+          "→ Found: AuthService.authenticateUser (lines 45-89)\n" +
+          'view_code({"repo_full_name": "Npounengnong/mitableai", "file_path": "apps/backend/src/services/auth.service.ts", "start_line": 45, "end_line": 89})\n' +
+          "→ Now you have the actual code",
       });
 
       for (const msg of context.conversationHistory) {
@@ -304,13 +374,51 @@ export class KnowledgeAgent extends BaseAgent {
         iteration++;
         console.log(`[KnowledgeAgent] Iteration ${iteration}/${MAX_ITERATIONS}`);
 
-        const response = await this.groq.chat.completions.create({
-          model: config.groq.chatModel,
-          messages: messages,
-          tools: tools,
-          tool_choice: "auto",
-          temperature: config.groq.temperature,
-        });
+        let response;
+        try {
+          response = await this.groq.chat.completions.create({
+            model: config.groq.chatModel,
+            messages: messages,
+            tools: tools,
+            tool_choice: "auto",
+            temperature: config.groq.temperature,
+          });
+        } catch (error: any) {
+          // Handle tool hallucination errors (e.g., LLM tries to call non-existent tools)
+          if (error?.status === 400 && error?.error?.code === "tool_use_failed") {
+            console.warn(
+              `[KnowledgeAgent] Tool hallucination detected:`,
+              error.error.failed_generation
+            );
+
+            // Extract what the LLM tried to call
+            const failedTool = error.error.failed_generation;
+
+            // Add error message to guide LLM to correct tools
+            messages.push({
+              role: "system",
+              content:
+                `ERROR: You tried to call a tool that doesn't exist: ${failedTool}\n\n` +
+                `Available tools are:\n` +
+                `- search_code: Search code files (metadata only)\n` +
+                `- view_code: Fetch actual code from a specific file\n` +
+                `- search_slack: Search Slack messages\n` +
+                `- search_work: Search GitHub PRs, commits, issues\n\n` +
+                `If you need to view a specific file, use view_code with parameters:\n` +
+                `- repo_full_name: "Npounengnong/mitableai"\n` +
+                `- file_path: "apps/backend/src/..."\n` +
+                `- start_line: number\n` +
+                `- end_line: number\n\n` +
+                `Please retry with the correct tool.`,
+            });
+
+            // Continue to next iteration to let LLM retry
+            continue;
+          }
+
+          // Re-throw other errors
+          throw error;
+        }
 
         const responseMessage = response.choices[0]?.message;
 
@@ -337,10 +445,26 @@ export class KnowledgeAgent extends BaseAgent {
 
               console.log(`[KnowledgeAgent] Tool result: ${result.substring(0, 200)}...`);
 
+              // Check if result is ephemeral (shouldn't be persisted)
+              let isEphemeral = false;
+              try {
+                const parsed = JSON.parse(result);
+                isEphemeral = parsed._ephemeral === true;
+                if (isEphemeral) {
+                  console.log(
+                    `[KnowledgeAgent] Tool ${toolName} marked as ephemeral (not persisted)`
+                  );
+                  ephemeralMessageIds.add(toolCall.id); // Track separately
+                }
+              } catch {
+                // Not JSON or no _ephemeral flag - treat as normal
+              }
+
               return {
                 role: "tool" as const,
                 tool_call_id: toolCall.id,
                 content: result,
+                // NO custom properties - Groq doesn't support them!
               };
             } catch (error) {
               console.error(`[KnowledgeAgent] Tool ${toolName} failed:`, error);
@@ -355,7 +479,8 @@ export class KnowledgeAgent extends BaseAgent {
           // Wait for all tool calls to complete in parallel
           const toolResults = await Promise.all(toolCallPromises);
 
-          // Add all results to message history
+          // Add all results to message history (including ephemeral for THIS iteration)
+          // Note: Ephemeral results will be filtered out before saving to DB
           toolResults.forEach((result) => messages.push(result));
 
           // Loop continues - call LLM again with tool results
@@ -575,6 +700,15 @@ export class KnowledgeAgent extends BaseAgent {
         }
 
         return JSON.stringify(response);
+      }
+
+      case "view_code": {
+        const { ViewCodeTool } = await import("../tools/view-code.tool.js");
+        const viewCodeTool = new ViewCodeTool();
+        const result = await viewCodeTool.execute(args, {
+          organizationId: context.organizationId,
+        });
+        return JSON.stringify(result); // Includes _ephemeral flag
       }
 
       default:
