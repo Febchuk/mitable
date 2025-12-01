@@ -1,11 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Copy, Pencil, Check } from "lucide-react";
 import { Response } from "@/components/ui/ai-response";
 import type { Message } from "../App";
@@ -30,9 +25,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
     return (
       <div className="mb-4 max-w-[85%]">
         <div className="text-[15px] leading-[1.6] text-white">
-          <Response parseIncompleteMarkdown={message.isStreaming}>
-            {message.content}
-          </Response>
+          <Response parseIncompleteMarkdown={message.isStreaming}>{message.content}</Response>
         </div>
       </div>
     );

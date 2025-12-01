@@ -123,10 +123,9 @@ export async function getConversations(
 }> {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/conversations?page=${page}&limit=${limit}`,
-    { headers }
-  );
+  const response = await fetch(`${API_BASE_URL}/api/conversations?page=${page}&limit=${limit}`, {
+    headers,
+  });
 
   if (!response.ok) {
     throw new Error(`Failed to get conversations: ${response.statusText}`);

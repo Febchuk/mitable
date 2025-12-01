@@ -501,22 +501,14 @@ function setupIPC() {
 
   // Vibrancy control for animation coordination (macOS only)
   ipcMain.on(IPC_CHANNELS.AGENTPANEL_VIBRANCY_ON, () => {
-    if (
-      process.platform === "darwin" &&
-      agentPanelWindow &&
-      !agentPanelWindow.isDestroyed()
-    ) {
+    if (process.platform === "darwin" && agentPanelWindow && !agentPanelWindow.isDestroyed()) {
       // Fade in vibrancy after content animation completes
       agentPanelWindow.setVibrancy("under-window");
     }
   });
 
   ipcMain.on(IPC_CHANNELS.AGENTPANEL_VIBRANCY_OFF, () => {
-    if (
-      process.platform === "darwin" &&
-      agentPanelWindow &&
-      !agentPanelWindow.isDestroyed()
-    ) {
+    if (process.platform === "darwin" && agentPanelWindow && !agentPanelWindow.isDestroyed()) {
       // Fade out vibrancy before/during exit animation
       agentPanelWindow.setVibrancy(null);
     }

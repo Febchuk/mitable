@@ -3,9 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Response } from "@/components/ui/ai-response";
 import MessageBubble from "./MessageBubble";
 import StepList from "@/components/domain/workflow/StepList";
-import WorkflowOptions, {
-  type WorkflowPhase,
-} from "@/components/domain/workflow/WorkflowOptions";
+import WorkflowOptions, { type WorkflowPhase } from "@/components/domain/workflow/WorkflowOptions";
 import type { Message } from "../App";
 
 interface WorkflowOption {
@@ -62,10 +60,7 @@ function ChatView({
             const shouldShowCheckboxes = workflowPhase === "step_progression";
             const isLastMessage = index === messages.length - 1;
             const shouldShowOptions =
-              isLastMessage &&
-              cardData.workflowActive &&
-              workflowPhase &&
-              !isStreaming;
+              isLastMessage && cardData.workflowActive && workflowPhase && !isStreaming;
 
             return (
               <div key={message.id} className="space-y-3">
@@ -110,9 +105,7 @@ function ChatView({
           <div className="mb-4 max-w-[85%]">
             <div className="text-[15px] leading-[1.6] text-white">
               {streamingContent ? (
-                <Response parseIncompleteMarkdown={true}>
-                  {streamingContent}
-                </Response>
+                <Response parseIncompleteMarkdown={true}>{streamingContent}</Response>
               ) : (
                 <span className="flex gap-1">
                   <span className="w-2 h-2 bg-white/50 rounded-full animate-bounce [animation-delay:-0.3s]" />
