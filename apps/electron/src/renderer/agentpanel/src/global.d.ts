@@ -9,6 +9,10 @@ export interface AgentPanelAPI {
   hide(): void;
   resize(width: number): void;
 
+  // Vibrancy control for animation coordination
+  vibrancyOn(): void;
+  vibrancyOff(): void;
+
   // Screenshot capture - returns multi-window capture result
   captureScreenshot(): Promise<MultiWindowCaptureResult>;
 
@@ -16,12 +20,8 @@ export interface AgentPanelAPI {
   toggleWatchMode(enabled: boolean): Promise<void>;
   unselectWindow(windowId: string): Promise<void>;
   getSelectedWindows(): Promise<SelectedWindowInfo[]>;
-  onWatchWindowsUpdated(
-    callback: (windows: SelectedWindowInfo[]) => void
-  ): void;
-  offWatchWindowsUpdated(
-    callback: (windows: SelectedWindowInfo[]) => void
-  ): void;
+  onWatchWindowsUpdated(callback: (windows: SelectedWindowInfo[]) => void): void;
+  offWatchWindowsUpdated(callback: (windows: SelectedWindowInfo[]) => void): void;
 
   // Auth
   getAuthToken(): Promise<string | null>;
@@ -32,6 +32,9 @@ export interface AgentPanelAPI {
   openChats(): void;
   onLoadConversation(callback: (conversationId: string) => void): void;
   offLoadConversation(callback: (conversationId: string) => void): void;
+
+  // Panel show event (for entrance animation)
+  onPanelShow(callback: () => void): void;
 }
 
 declare global {

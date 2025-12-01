@@ -7,7 +7,10 @@ const IPC_CHANNELS = {
   AGENTPANEL_TOGGLE: "agentpanel-toggle",
   AGENTPANEL_SHOW: "agentpanel-show",
   AGENTPANEL_HIDE: "agentpanel-hide",
+  AGENTPANEL_SHOWN: "agentpanel-shown", // Fired after panel is shown (for animation)
   AGENTPANEL_RESIZE: "agentpanel-resize",
+  AGENTPANEL_VIBRANCY_ON: "agentpanel-vibrancy-on", // Fade in vibrancy after animation
+  AGENTPANEL_VIBRANCY_OFF: "agentpanel-vibrancy-off", // Fade out vibrancy before animation
 
   // Screenshot capture
   CAPTURE_SCREENSHOT: "capture-screenshot",
@@ -33,8 +36,11 @@ contextBridge.exposeInMainWorld("agentPanelAPI", {
   toggle: () => ipcRenderer.send(IPC_CHANNELS.AGENTPANEL_TOGGLE),
   show: () => ipcRenderer.send(IPC_CHANNELS.AGENTPANEL_SHOW),
   hide: () => ipcRenderer.send(IPC_CHANNELS.AGENTPANEL_HIDE),
-  resize: (width: number) =>
-    ipcRenderer.send(IPC_CHANNELS.AGENTPANEL_RESIZE, width),
+  resize: (width: number) => ipcRenderer.send(IPC_CHANNELS.AGENTPANEL_RESIZE, width),
+
+  // Vibrancy control for animation coordination
+  vibrancyOn: () => ipcRenderer.send(IPC_CHANNELS.AGENTPANEL_VIBRANCY_ON),
+  vibrancyOff: () => ipcRenderer.send(IPC_CHANNELS.AGENTPANEL_VIBRANCY_OFF),
 
   // Screenshot capture - returns multi-window capture result
   captureScreenshot: (): Promise<MultiWindowCaptureResult> => {
@@ -51,26 +57,19 @@ contextBridge.exposeInMainWorld("agentPanelAPI", {
     ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED),
 
   // Watch mode event listeners
-  onWatchWindowsUpdated: (
-    callback: (windows: SelectedWindowInfo[]) => void
-  ) => {
-    const listener = (_event: unknown, windows: SelectedWindowInfo[]) =>
-      callback(windows);
+  onWatchWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => {
+    const listener = (_event: unknown, windows: SelectedWindowInfo[]) => callback(windows);
     ipcRenderer.on(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, listener);
   },
-  offWatchWindowsUpdated: (
-    _callback: (windows: SelectedWindowInfo[]) => void
-  ) => {
+  offWatchWindowsUpdated: (_callback: (windows: SelectedWindowInfo[]) => void) => {
     ipcRenderer.removeAllListeners(IPC_CHANNELS.WATCH_WINDOWS_UPDATED);
   },
 
   // Auth management
-  getAuthToken: (): Promise<string | null> =>
-    ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_TOKEN),
+  getAuthToken: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_TOKEN),
   onAuthTokenUpdated: (callback: (token: string | null) => void) => {
-    ipcRenderer.on(
-      IPC_CHANNELS.AUTH_TOKEN_UPDATED,
-      (_event, token: string | null) => callback(token)
+    ipcRenderer.on(IPC_CHANNELS.AUTH_TOKEN_UPDATED, (_event, token: string | null) =>
+      callback(token)
     );
   },
 
@@ -79,10 +78,14 @@ contextBridge.exposeInMainWorld("agentPanelAPI", {
     ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHAT, conversationId),
   openChats: () => ipcRenderer.send(IPC_CHANNELS.CONSOLE_OPEN_CHATS),
 
+  // Panel show event (for entrance animation)
+  onPanelShow: (callback: () => void) => {
+    ipcRenderer.on(IPC_CHANNELS.AGENTPANEL_SHOWN, () => callback());
+  },
+
   // Listen for conversation load requests from Console
   onLoadConversation: (callback: (conversationId: string) => void) => {
-    const listener = (_event: unknown, conversationId: string) =>
-      callback(conversationId);
+    const listener = (_event: unknown, conversationId: string) => callback(conversationId);
     ipcRenderer.on(IPC_CHANNELS.AGENTPANEL_LOAD_CONVERSATION, listener);
   },
   offLoadConversation: (_callback: (conversationId: string) => void) => {

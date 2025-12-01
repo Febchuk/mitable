@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Header from "./components/Header";
 import EmptyState from "./components/EmptyState";
 import ChatView from "./components/ChatView";
@@ -13,6 +14,46 @@ import type { SelectedWindowInfo } from "./global";
 import type { MultiWindowCaptureResult } from "@mitable/shared";
 
 type PanelView = "chat" | "chats-list";
+
+// ============================================================
+// Animation Presets - Change ANIMATION_PRESET to try different animations
+// ============================================================
+type AnimationPreset = "scale-pop" | "fade-bounce" | "slide-right" | "fade-drift";
+const ANIMATION_PRESET: AnimationPreset = "scale-pop"; // <-- Default to scale-pop with vibrancy coordination
+
+// Animation duration in ms (used for vibrancy coordination timing)
+const ANIMATION_DURATION_MS = 250;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const animationVariants: Record<AnimationPreset, any> = {
+  "scale-pop": {
+    // Scale animation now works because window is transparent during animation
+    initial: { opacity: 0, scale: 0.95 },
+    animate: { opacity: 1, scale: 1 },
+    exit: { opacity: 0, scale: 1.02 },
+    transition: { duration: ANIMATION_DURATION_MS / 1000, ease: [0.34, 1.56, 0.64, 1] },
+  },
+  "fade-bounce": {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+    transition: { duration: ANIMATION_DURATION_MS / 1000, ease: [0.34, 1.56, 0.64, 1] },
+  },
+  "slide-right": {
+    initial: { opacity: 0, x: 50 },
+    animate: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: 50 },
+    transition: { duration: 0.2, ease: "easeOut" },
+  },
+  "fade-drift": {
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -10 },
+    transition: { duration: 0.2, ease: "easeOut" },
+  },
+};
+
+const currentAnimation = animationVariants[ANIMATION_PRESET];
 
 export interface Message {
   id: string;
@@ -45,6 +86,9 @@ function App() {
   // View state (chat view or chats list)
   const [currentView, setCurrentView] = useState<PanelView>("chat");
 
+  // Animation visibility state
+  const [isVisible, setIsVisible] = useState(true);
+
   // Initialize auth token listener
   useEffect(() => {
     // Listen for auth token updates (tokens are managed by main process)
@@ -56,6 +100,16 @@ function App() {
     return () => {
       // Cleanup if needed
     };
+  }, []);
+
+  // Listen for panel show events to trigger entrance animation with vibrancy coordination
+  useEffect(() => {
+    window.agentPanelAPI?.onPanelShow(() => {
+      // Turn on vibrancy first (frosted glass appears)
+      window.agentPanelAPI?.vibrancyOn();
+      // Then animate content in
+      setIsVisible(true);
+    });
   }, []);
 
   // Listen for conversation load requests from Console
@@ -252,7 +306,13 @@ function App() {
   };
 
   const handleClose = () => {
-    window.agentPanelAPI?.hide();
+    // Start exit animation and fade out vibrancy simultaneously
+    setIsVisible(false);
+    window.agentPanelAPI?.vibrancyOff();
+    // Wait for animation to complete before hiding window
+    setTimeout(() => {
+      window.agentPanelAPI?.hide();
+    }, ANIMATION_DURATION_MS);
   };
 
   // Workflow option handler
@@ -377,51 +437,62 @@ function App() {
   const hasConversation = messages.length > 0;
 
   return (
-    <div className="flex flex-col h-screen bg-black/20 text-white  border-l border-white/10">
-      {/* Header */}
-      <Header
-        onNewChat={handleNewChat}
-        onOpenChats={handleOpenChats}
-        onOpenInConsole={handleOpenInConsole}
-        onClose={handleClose}
-        hasConversation={hasConversation}
-        showChatsTitle={currentView === "chats-list"}
-      />
-
-      {/* Main content area */}
-      <div className="flex-1 overflow-hidden">
-        {currentView === "chats-list" ? (
-          <ChatsListView
-            onSelectConversation={handleSelectConversation}
-            currentConversationId={conversationId}
+    <AnimatePresence mode="wait">
+      {isVisible && (
+        <motion.div
+          key="agent-panel"
+          initial={currentAnimation.initial}
+          animate={currentAnimation.animate}
+          exit={currentAnimation.exit}
+          transition={currentAnimation.transition}
+          className="flex flex-col h-screen bg-black/20 text-white border-l border-white/10"
+        >
+          {/* Header */}
+          <Header
+            onNewChat={handleNewChat}
+            onOpenChats={handleOpenChats}
+            onOpenInConsole={handleOpenInConsole}
+            onClose={handleClose}
+            hasConversation={hasConversation}
+            showChatsTitle={currentView === "chats-list"}
           />
-        ) : hasConversation ? (
-          <ChatView
-            messages={messages}
-            isStreaming={isStreaming}
-            streamingContent={streamingContent}
-            onWorkflowOptionSelect={handleWorkflowOptionSelect}
-          />
-        ) : (
-          <EmptyState userName={userName} />
-        )}
-      </div>
 
-      {/* Input bar - hidden when viewing chats list */}
-      {currentView !== "chats-list" && (
-        <InputBar
-          inputMode={inputMode}
-          onInputModeChange={setInputMode}
-          isRecording={isRecording}
-          onRecordingChange={setIsRecording}
-          watchingScreen={watchingScreen}
-          onToggleWatch={handleToggleWatchMode}
-          selectedWindowCount={selectedWindows.length}
-          onSendMessage={handleSendMessage}
-          disabled={isStreaming}
-        />
+          {/* Main content area */}
+          <div className="flex-1 overflow-hidden">
+            {currentView === "chats-list" ? (
+              <ChatsListView
+                onSelectConversation={handleSelectConversation}
+                currentConversationId={conversationId}
+              />
+            ) : hasConversation ? (
+              <ChatView
+                messages={messages}
+                isStreaming={isStreaming}
+                streamingContent={streamingContent}
+                onWorkflowOptionSelect={handleWorkflowOptionSelect}
+              />
+            ) : (
+              <EmptyState userName={userName} />
+            )}
+          </div>
+
+          {/* Input bar - hidden when viewing chats list */}
+          {currentView !== "chats-list" && (
+            <InputBar
+              inputMode={inputMode}
+              onInputModeChange={setInputMode}
+              isRecording={isRecording}
+              onRecordingChange={setIsRecording}
+              watchingScreen={watchingScreen}
+              onToggleWatch={handleToggleWatchMode}
+              selectedWindowCount={selectedWindows.length}
+              onSendMessage={handleSendMessage}
+              disabled={isStreaming}
+            />
+          )}
+        </motion.div>
       )}
-    </div>
+    </AnimatePresence>
   );
 }
 
