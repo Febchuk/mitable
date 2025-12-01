@@ -199,11 +199,8 @@ function createAgentPanelWindow() {
     resizable: true,
     skipTaskbar: true,
     show: false, // Hidden by default
-    // Native frosted glass - platform specific
-    ...(process.platform === "darwin" && {
-      vibrancy: "under-window" as const,
-      visualEffectState: "active" as const,
-    }),
+    // Vibrancy is controlled dynamically for animation coordination
+    // Window starts transparent, vibrancy fades in after content animation
     ...(process.platform === "win32" && {
       backgroundMaterial: "acrylic" as const,
     }),
@@ -480,6 +477,8 @@ function setupIPC() {
         agentPanelWindow.hide();
       } else {
         agentPanelWindow.show();
+        // Notify renderer for entrance animation
+        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
       }
     }
   });
@@ -488,6 +487,8 @@ function setupIPC() {
   ipcMain.on(IPC_CHANNELS.AGENTPANEL_SHOW, () => {
     if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
       agentPanelWindow.show();
+      // Notify renderer for entrance animation
+      agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
     }
   });
 
@@ -495,6 +496,29 @@ function setupIPC() {
   ipcMain.on(IPC_CHANNELS.AGENTPANEL_HIDE, () => {
     if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
       agentPanelWindow.hide();
+    }
+  });
+
+  // Vibrancy control for animation coordination (macOS only)
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_VIBRANCY_ON, () => {
+    if (
+      process.platform === "darwin" &&
+      agentPanelWindow &&
+      !agentPanelWindow.isDestroyed()
+    ) {
+      // Fade in vibrancy after content animation completes
+      agentPanelWindow.setVibrancy("under-window");
+    }
+  });
+
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_VIBRANCY_OFF, () => {
+    if (
+      process.platform === "darwin" &&
+      agentPanelWindow &&
+      !agentPanelWindow.isDestroyed()
+    ) {
+      // Fade out vibrancy before/during exit animation
+      agentPanelWindow.setVibrancy(null);
     }
   });
 
@@ -525,6 +549,8 @@ function setupIPC() {
       // Show panel if hidden
       if (!agentPanelWindow.isVisible()) {
         agentPanelWindow.show();
+        // Notify renderer for entrance animation
+        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
       }
 
       // Forward to renderer
@@ -1222,6 +1248,8 @@ function registerGlobalShortcuts() {
       } else {
         agentPanelWindow.show();
         agentPanelWindow.focus();
+        // Notify renderer for entrance animation
+        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
       }
     }
   });
