@@ -7,6 +7,7 @@ import { workRetriever } from "../retrievers/work.retriever.js";
 import { slackRetriever } from "../retrievers/slack.retriever";
 import { notionRetriever } from "../retrievers/notion.retriever.js";
 import { TemporalQueryParser } from "../utils/temporal-parser";
+import { memoryService } from "../services/memory.service.js";
 // import { orgContextService } from "../services/org-context.service";
 
 /**
@@ -277,7 +278,14 @@ export class KnowledgeAgent extends BaseAgent {
         },
       ];
 
-      // Build messages array from conversation history
+      // Get conversation memory (summary + recent turns)
+      console.log(`[KnowledgeAgent] Loading conversation memory...`);
+      const memory = await memoryService.getConversationMemory(context.conversationId);
+      console.log(
+        `[KnowledgeAgent] Memory loaded: ${memory.conversationSummary ? `${memory.estimatedTokens} tokens (summary + ${memory.recentTurns.length} recent turns)` : `${memory.recentTurns.length} recent turns (no summary yet)`}`
+      );
+
+      // Build messages array from memory (not full history)
       const messages: Groq.Chat.ChatCompletionMessageParam[] = [];
       const ephemeralMessageIds = new Set<string>(); // Track ephemeral tool results
 
@@ -369,7 +377,19 @@ export class KnowledgeAgent extends BaseAgent {
           "→ Now you have the actual code",
       });
 
-      for (const msg of context.conversationHistory) {
+      // Add conversation summary if exists
+      if (memory.conversationSummary) {
+        messages.push({
+          role: "system",
+          content: `Previous conversation summary:\n${memory.conversationSummary}`,
+        });
+        console.log(
+          `[KnowledgeAgent] Added conversation summary (${memory.summaryUpToTurn} turns summarized)`
+        );
+      }
+
+      // Add recent turns from memory (already filtered to last N exchanges)
+      for (const msg of memory.recentTurns) {
         const msgAny = msg as any;
 
         // Handle tool messages
@@ -564,6 +584,11 @@ export class KnowledgeAgent extends BaseAgent {
           content: cleanContent,
           sources: sources.length > 0 ? sources : undefined,
         };
+
+        // Update conversation memory with new Q&A pair
+        console.log(`[KnowledgeAgent] Updating conversation memory...`);
+        await memoryService.updateConversationMemory(context.conversationId);
+        console.log(`[KnowledgeAgent] Memory updated successfully`);
 
         return;
       }
