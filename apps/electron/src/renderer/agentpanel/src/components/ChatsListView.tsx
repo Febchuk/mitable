@@ -25,10 +25,7 @@ function formatRelativeTime(date: Date): string {
   return date.toLocaleDateString();
 }
 
-function ChatsListView({
-  onSelectConversation,
-  currentConversationId,
-}: ChatsListViewProps) {
+function ChatsListView({ onSelectConversation, currentConversationId }: ChatsListViewProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -110,9 +107,7 @@ function ChatsListView({
           <MessageSquare className="h-6 w-6 text-white/40" />
         </div>
         <p className="text-white/60 text-sm text-center">No conversations yet</p>
-        <p className="text-white/40 text-xs text-center">
-          Start a new chat to get help
-        </p>
+        <p className="text-white/40 text-xs text-center">Start a new chat to get help</p>
       </div>
     );
   }
@@ -120,10 +115,7 @@ function ChatsListView({
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Conversations list */}
-      <div
-        className="flex-1 overflow-y-auto min-h-0 scrollbar-hidden"
-        onScroll={handleScroll}
-      >
+      <div className="flex-1 overflow-y-auto min-h-0 scrollbar-hidden" onScroll={handleScroll}>
         {conversations.map((conv) => {
           const isCurrent = conv.id === currentConversationId;
           return (
@@ -156,9 +148,7 @@ function ChatsListView({
                     </span>
                   </div>
                   {conv.lastMessage && (
-                    <p className="text-white/50 text-xs mt-1 line-clamp-2">
-                      {conv.lastMessage}
-                    </p>
+                    <p className="text-white/50 text-xs mt-1 line-clamp-2">{conv.lastMessage}</p>
                   )}
                 </div>
               </div>

@@ -72,9 +72,7 @@ function Header({
 
       {/* Center: Title (when showing chats) */}
       {showChatsTitle && (
-        <span className="absolute left-1/2 -translate-x-1/2 text-white font-medium">
-          Chats
-        </span>
+        <span className="absolute left-1/2 -translate-x-1/2 text-white font-medium">Chats</span>
       )}
 
       {/* Right: Close button */}
