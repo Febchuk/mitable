@@ -15,13 +15,15 @@ Separate subsystem that manages conversation memory independently from agent log
 - `getConversationMemory(conversationId)` - Returns summary + recent turns
 - `updateConversationMemory(conversationId)` - Incrementally summarizes as needed
 
-### 2. **Database Schema** (Migration 0011)
+### 2. **Database Migration (0014):**
 
 ```sql
-ALTER TABLE conversations
+ALTER TABLE conversations 
 ADD COLUMN conversation_summary TEXT,
 ADD COLUMN summary_up_to_turn INTEGER DEFAULT 0;
 ```
+
+Run with: `npm run migrate:0014`
 
 - `conversation_summary`: Incrementally-built summary of older turns
 - `summary_up_to_turn`: Tracks which messages were last summarized
