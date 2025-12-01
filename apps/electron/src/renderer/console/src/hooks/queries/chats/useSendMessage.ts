@@ -38,8 +38,6 @@ export function useSendMessage(options?: SendMessageOptions) {
       content,
       metadata,
       multiWindowCapture: providedCapture,
-      workflowSessionId,
-      relatedStepIndex,
     }: {
       chatId: string;
       content: string;
