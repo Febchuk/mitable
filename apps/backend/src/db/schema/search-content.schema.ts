@@ -109,6 +109,14 @@ export const searchContent = pgTable(
     isThreadRoot: boolean("is_thread_root").default(false),
     messageIds: text("message_ids").array(), // Array of message timestamps
 
+    // 🆕 NOTION STRUCTURE-AWARE METADATA (Migration 0010)
+    sectionPath: text("section_path"), // JSON array: ["Parent Section", "Child Section"]
+    sectionTitle: text("section_title"), // Title of the section this chunk belongs to
+    sectionId: text("section_id"), // Unique identifier for the section
+    headingLevel: integer("heading_level"), // 1, 2, or 3 for heading levels
+    hasTable: boolean("has_table").default(false), // Whether chunk contains tables
+    hasList: boolean("has_list").default(false), // Whether chunk contains lists
+
     // Temporal metadata for filtering
     timestamp: bigint("timestamp", { mode: "number" }), // Unix timestamp (milliseconds)
     date: date("date"), // Date only for easier date range queries

@@ -1000,6 +1000,142 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
 });
 
 /**
+ * POST /admin/integrations/:id/sync
+ * Trigger manual sync for an integration
+ */
+router.post(
+  "/integrations/:id/sync",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const integrationId = req.params.id;
+
+      // Get user's organization
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!currentUser) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "User not found",
+        });
+        return;
+      }
+
+      // Verify user is admin
+      if (currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
+
+      // Get integration details
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.id, integrationId),
+            eq(schema.integrations.organizationId, currentUser.organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!integration) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Integration not found",
+        });
+        return;
+      }
+
+      if (integration.status !== "connected") {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "Integration must be connected before syncing",
+        });
+        return;
+      }
+
+      console.log(
+        `[Admin] Starting ${integration.provider} sync for org ${currentUser.organizationId}`
+      );
+
+      // Route to appropriate sync service based on provider
+      let syncResult: any;
+
+      switch (integration.provider) {
+        case "slack": {
+          const { slackIngestionService } = await import("../services/slack-ingestion.service.js");
+          syncResult = await slackIngestionService.syncMessages(currentUser.organizationId);
+          break;
+        }
+
+        case "notion": {
+          const { notionIngestionService } = await import(
+            "../services/notion-ingestion.service.js"
+          );
+          syncResult = await notionIngestionService.syncPages(currentUser.organizationId);
+          break;
+        }
+
+        case "github": {
+          const { syncIntegration } = await import("../scripts/sync-github.js");
+          const result = await syncIntegration(integration);
+          syncResult = {
+            success: true,
+            channelsProcessed: result.reposProcessed,
+            messagesEmbedded: result.chunksCreated,
+            totalMessages: result.filesProcessed,
+            errors: [],
+            duration: 0,
+          };
+          break;
+        }
+
+        default:
+          res.status(400).json({
+            error: "Bad Request",
+            message: `Sync not supported for provider: ${integration.provider}`,
+          });
+          return;
+      }
+
+      // Return sync results
+      if (syncResult.success) {
+        res.json({
+          success: true,
+          provider: integration.provider,
+          itemsProcessed: syncResult.channelsProcessed || syncResult.filesProcessed || 0,
+          itemsEmbedded: syncResult.messagesEmbedded || syncResult.chunksEmbedded || 0,
+          duration: syncResult.duration,
+          errors: syncResult.errors,
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: "Sync Failed",
+          provider: integration.provider,
+          errors: syncResult.errors,
+        });
+      }
+    } catch (error) {
+      console.error("Error syncing integration:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to sync integration",
+      });
+    }
+  }
+);
+
+/**
  * @openapi
  * /admin/users:
  *   post:
@@ -1996,19 +2132,21 @@ router.post(
 
       try {
         if (integration.provider === "slack") {
-          const { ingestionService } = await import("../services/ingestion.service.js");
-          const result = await ingestionService.syncSlackMessages(currentUser.organizationId);
+          const { slackIngestionService } = await import("../services/slack-ingestion.service.js");
+          const result = await slackIngestionService.syncMessages(currentUser.organizationId);
           itemsSynced = result.messagesEmbedded || 0;
           syncResult = result;
         } else if (integration.provider === "notion") {
-          const { ingestionService } = await import("../services/ingestion.service.js");
-          const result = await ingestionService.syncNotionPages(currentUser.organizationId);
-          itemsSynced = result.messagesEmbedded || 0; // Notion uses same interface
+          const { notionIngestionService } = await import(
+            "../services/notion-ingestion.service.js"
+          );
+          const result = await notionIngestionService.syncPages(currentUser.organizationId);
+          itemsSynced = result.messagesEmbedded || 0;
           syncResult = result;
         } else if (integration.provider === "github") {
-          const { githubSyncService } = await import("../services/github-sync.service.js");
-          const result = await githubSyncService.syncIntegration(integration);
-          itemsSynced = result.commitsProcessed || 0;
+          const { syncIntegration } = await import("../scripts/sync-github.js");
+          const result = await syncIntegration(integration);
+          itemsSynced = result.chunksCreated || 0;
           syncResult = result;
         }
 
