@@ -17,7 +17,7 @@ import Groq from "groq-sdk";
 import { encoding_for_model } from "tiktoken";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { config } from "../config.js";
 
 // Memory configuration
@@ -371,6 +371,99 @@ Return ONLY the compressed summary, nothing else.`;
     console.log(
       `[MemoryService] Summary updated (${this.countTokens(updatedSummary)} tokens, up to turn ${allMessages.length - verbatimCount})`
     );
+  }
+
+  /**
+   * Backfill summaries for existing conversations without summaries
+   * Use this to pre-summarize long conversations after deploying the memory system
+   */
+  async backfillSummaries(options?: {
+    minMessages?: number; // Only summarize conversations with at least this many messages
+    batchSize?: number; // Process this many conversations at a time
+    dryRun?: boolean; // If true, only logs what would be done without actually summarizing
+  }): Promise<{
+    processed: number;
+    summarized: number;
+    skipped: number;
+    errors: string[];
+  }> {
+    const minMessages = options?.minMessages || MEMORY_CONFIG.SUMMARY_TRIGGER_TURNS;
+    const batchSize = options?.batchSize || 10;
+    const dryRun = options?.dryRun || false;
+
+    console.log(`[MemoryService] Starting backfill...`);
+    console.log(
+      `[MemoryService] Config: minMessages=${minMessages}, batchSize=${batchSize}, dryRun=${dryRun}`
+    );
+
+    const result = {
+      processed: 0,
+      summarized: 0,
+      skipped: 0,
+      errors: [] as string[],
+    };
+
+    try {
+      // Find conversations without summaries
+      const conversationsToProcess = await db
+        .select()
+        .from(schema.conversations)
+        .where(isNull(schema.conversations.conversationSummary))
+        .limit(batchSize);
+
+      console.log(`[MemoryService] Found ${conversationsToProcess.length} conversations to check`);
+
+      for (const conversation of conversationsToProcess) {
+        result.processed++;
+
+        try {
+          // Check message count
+          const messages = await db
+            .select()
+            .from(schema.messages)
+            .where(eq(schema.messages.conversationId, conversation.id))
+            .orderBy(schema.messages.createdAt);
+
+          const messageCount = messages.filter((m) => m.role !== "tool").length;
+
+          if (messageCount < minMessages) {
+            console.log(
+              `[MemoryService] Skipping conversation ${conversation.id} (${messageCount} messages < ${minMessages})`
+            );
+            result.skipped++;
+            continue;
+          }
+
+          console.log(
+            `[MemoryService] Processing conversation ${conversation.id} (${messageCount} messages)`
+          );
+
+          if (dryRun) {
+            console.log(
+              `[MemoryService] [DRY RUN] Would summarize conversation ${conversation.id}`
+            );
+            result.summarized++;
+            continue;
+          }
+
+          // Actually update the conversation memory
+          await this.updateConversationMemory(conversation.id);
+          result.summarized++;
+
+          console.log(`[MemoryService] ✅ Summarized conversation ${conversation.id}`);
+        } catch (error) {
+          const errorMsg = `Failed to process conversation ${conversation.id}: ${error instanceof Error ? error.message : "Unknown error"}`;
+          console.error(`[MemoryService] ${errorMsg}`);
+          result.errors.push(errorMsg);
+        }
+      }
+
+      console.log(`[MemoryService] Backfill complete:`, result);
+      return result;
+    } catch (error) {
+      console.error(`[MemoryService] Backfill failed:`, error);
+      throw error;
+    }
   }
 }
 
