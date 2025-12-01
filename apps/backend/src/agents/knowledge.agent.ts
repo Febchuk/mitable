@@ -200,35 +200,50 @@ export class KnowledgeAgent extends BaseAgent {
           function: {
             name: "view_code",
             description:
-              "Fetch the actual code for a specific function/class from GitHub. " +
-              "Use this when search_code metadata isn't sufficient and you need to see implementation details. " +
-              "Returns the raw code for that function/class. This is NOT persisted.",
+              "Fetch actual code from GitHub. Use after search_code when you need implementation details. " +
+              "Can fetch: (1) specific function/class lines, (2) entire file, or (3) multiple related files (up to 4). " +
+              "IMPORTANT: Use repoFullName from search_code results. Code is NOT persisted (ephemeral).",
             parameters: {
               type: "object",
               properties: {
-                repo_full_name: {
-                  type: "string",
-                  description: "Repository full name (e.g., 'Npounengnong/mitableai')",
-                },
-                file_path: {
+                repoFullName: {
                   type: "string",
                   description:
-                    "File path in repo (e.g., 'apps/backend/src/services/auth.service.ts')",
+                    "Repository name from search_code results (e.g., 'owner/repo'). Optional if org has only 1 repo.",
                 },
-                start_line: {
-                  type: "number",
-                  description: "Start line number of function/class",
-                },
-                end_line: {
-                  type: "number",
-                  description: "End line number of function/class",
-                },
-                function_name: {
+                filePath: {
                   type: "string",
-                  description: "Name of function/class (for context)",
+                  description:
+                    "Single file path (Mode 1). Omit startLine/endLine to fetch entire file.",
+                },
+                startLine: {
+                  type: "number",
+                  description: "Optional: Start line for specific function/class",
+                },
+                endLine: {
+                  type: "number",
+                  description: "Optional: End line for specific function/class",
+                },
+                functionName: {
+                  type: "string",
+                  description: "Optional: Function/class name for context",
+                },
+                files: {
+                  type: "array",
+                  description:
+                    "Multiple files (Mode 2, max 4). Use this to understand a feature across files.",
+                  items: {
+                    type: "object",
+                    properties: {
+                      filePath: { type: "string" },
+                      startLine: { type: "number", description: "Optional" },
+                      endLine: { type: "number", description: "Optional" },
+                    },
+                    required: ["filePath"],
+                  },
                 },
               },
-              required: ["repo_full_name", "file_path", "start_line", "end_line"],
+              required: [],
             },
           },
         },
@@ -285,11 +300,12 @@ export class KnowledgeAgent extends BaseAgent {
           "- **Service Layer**: Core business logic\n" +
           "  - Implementation: `guideGeneration.service.ts`\n\n" +
           "Use headers (##, ###), bullet points (-), and numbered lists (1., 2., 3.) ONLY.\n\n" +
-          "BREVITY GUIDELINES:\n" +
-          "- For timeline/status questions (what happened this week, what did we discuss, current status): " +
-          "provide a 2-8 sentence executive summary unless user explicitly asks for details.\n" +
-          "- For technical/architectural questions: provide complete answers with all necessary context.\n" +
-          "- Always prioritize clarity and usefulness over verbosity.\n\n" +
+          "BREVITY GUIDELINES - Match detail level to question specificity:\n" +
+          '- **Vague/broad questions** ("What is X?", "How does Y work?"): Provide concise 2-4 paragraph overview with key points. Don\'t deep-dive unless asked.\n' +
+          '- **Specific questions** ("What parameters does X function take?", "How do I configure Y?"): Provide focused, detailed answer to exact question.\n' +
+          "- **Timeline/status questions**: 2-8 sentence executive summary unless user asks for details.\n" +
+          "- **Rule of thumb**: Simple question = Simple answer. Complex question = Detailed answer.\n" +
+          "- Avoid making 5+ tool calls for vague questions - get core answer first, user can ask follow-ups.\n\n" +
           "For complex questions (especially about integrations, architecture, or 'how does X work'), DECOMPOSE them into sub-questions:\n" +
           "- What is the data model? (database schemas, tables, fields)\n" +
           "- What is the authentication/OAuth flow?\n" +
@@ -405,10 +421,10 @@ export class KnowledgeAgent extends BaseAgent {
                 `- search_slack: Search Slack messages\n` +
                 `- search_work: Search GitHub PRs, commits, issues\n\n` +
                 `If you need to view a specific file, use view_code with parameters:\n` +
-                `- repo_full_name: "Npounengnong/mitableai"\n` +
-                `- file_path: "apps/backend/src/..."\n` +
-                `- start_line: number\n` +
-                `- end_line: number\n\n` +
+                `- repoFullName: string (e.g., "owner/repo") - from search results\n` +
+                `- filePath: string (e.g., "apps/backend/src/...")\n` +
+                `- startLine: number (optional)\n` +
+                `- endLine: number (optional)\n\n` +
                 `Please retry with the correct tool.`,
             });
 
@@ -425,6 +441,21 @@ export class KnowledgeAgent extends BaseAgent {
         // Check if LLM wants to call tools
         if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
           console.log(`[KnowledgeAgent] LLM called ${responseMessage.tool_calls.length} tool(s)`);
+
+          // Check if we're on last iteration - if so, we won't be able to process results
+          if (iteration === MAX_ITERATIONS) {
+            console.warn(
+              `[KnowledgeAgent] Tools called on final iteration - cannot process results`
+            );
+            yield {
+              type: "complete",
+              messageType: "text",
+              content:
+                "I found relevant information but ran out of processing time. Please try asking your question in a more specific way, or break it into smaller questions.",
+              sources: undefined,
+            };
+            return;
+          }
 
           // Add assistant message to history
           messages.push({

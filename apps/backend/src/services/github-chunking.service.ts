@@ -179,8 +179,8 @@ export interface CodeSymbol {
  */
 export interface GitHubCodeChunk {
   // ===== CONTENT =====
-  text: string; // What gets stored (empty for security - no raw code)
-  _embeddingText?: string; // INTERNAL: Full text for embedding generation (not persisted)
+  text: string; // METADATA ONLY: File path, function name, lines (NO raw code stored)
+  _embeddingText?: string; // INTERNAL ONLY: Full code for embedding generation (discarded after embedding)
 
   // ===== REPO CONTEXT =====
   repo_id: string;
@@ -827,13 +827,13 @@ class GitHubChunkingService {
     // If symbol fits in one chunk, create single chunk
     if (tokenCount <= CHUNK_CONFIG.MAX_TOKENS) {
       const header = `[${file.repoFullName} / ${file.path} • ${symbol.type} ${symbol.name}]\nLines ${symbol.startLine}-${symbol.endLine}\n\n`;
-      const fullText = header + symbol.code; // For embedding only
-      const storedText = header; // Metadata only (no code)
+      const fullText = header + symbol.code; // Full code: used for embedding generation, then discarded
+      const storedText = header; // Metadata header: stored in DB/Pinecone for search (NO code)
 
       return [
         {
-          text: storedText, // ← Only metadata stored
-          _embeddingText: fullText, // ← Full code for embedding (not persisted)
+          text: storedText, // ← Searchable metadata (file path + line numbers)
+          _embeddingText: fullText, // ← Full code for embedding (discarded after use)
           repo_id: file.repoId,
           repo_full_name: file.repoFullName,
           org_id: orgId,
@@ -906,12 +906,12 @@ class GitHubChunkingService {
         const totalSegments = Math.ceil(lines.length / targetLinesPerSegment);
 
         const header = `[${file.repoFullName} / ${file.path} • ${symbol.type} ${symbol.name} (segment ${segmentIndex + 1}/${totalSegments})]\nLines ${segmentStartLine}-${segmentEndLine}\n\n`;
-        const fullText = header + segmentCode; // For embedding only
-        const storedText = header; // Metadata only (no code)
+        const fullText = header + segmentCode; // Full code: used for embedding generation, then discarded
+        const storedText = header; // Metadata header: stored in DB/Pinecone for search (NO code)
 
         chunks.push({
-          text: storedText, // ← Only metadata stored
-          _embeddingText: fullText, // ← Full code for embedding (not persisted)
+          text: storedText, // ← Searchable metadata (file path + line numbers)
+          _embeddingText: fullText, // ← Full code for embedding (discarded after use)
           repo_id: file.repoId,
           repo_full_name: file.repoFullName,
           org_id: orgId,
