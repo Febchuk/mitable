@@ -22,7 +22,7 @@
 import { db } from "../db/client.js";
 import { integrations } from "../db/schema/integrations.schema.js";
 import { eq } from "drizzle-orm";
-import { ingestionService } from "../services/ingestion.service.js";
+import { notionIngestionService } from "../services/notion-ingestion.service.js";
 import { validateConfig } from "../config.js";
 import { vectorService } from "../services/vector.service.js";
 
@@ -73,7 +73,7 @@ async function main() {
       console.log(`${"=".repeat(60)}\n`);
 
       try {
-        const result = await ingestionService.syncNotionPages(orgId, (progress) => {
+        const result = await notionIngestionService.syncPages(orgId, (progress) => {
           // Progress callback
           if (progress.currentChannel) {
             console.log(

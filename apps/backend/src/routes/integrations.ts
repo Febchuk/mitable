@@ -735,13 +735,13 @@ router.post("/slack/sync", requireAuth, async (req: Request, res: Response): Pro
 
     console.log(`🔄 Starting Slack sync for organization: ${org?.name || user.organizationId}`);
 
-    // Import ingestion service dynamically
-    const { ingestionService } = await import("../services/ingestion.service.js");
+    // Import Slack-specific ingestion service dynamically
+    const { slackIngestionService } = await import("../services/slack-ingestion.service.js");
 
     // Start sync (runs in background)
     // For now, we'll run it synchronously and return results
     // In production, you might want to use a job queue
-    const result = await ingestionService.syncSlackMessages(user.organizationId);
+    const result = await slackIngestionService.syncMessages(user.organizationId);
 
     if (result.success) {
       res.json({
@@ -1174,11 +1174,11 @@ router.post("/notion/sync", requireAuth, async (req: Request, res: Response): Pr
 
     console.log(`🔄 Starting Notion sync for organization: ${org?.name || user.organizationId}`);
 
-    // Import ingestion service dynamically
-    const { ingestionService } = await import("../services/ingestion.service.js");
+    // Import Notion-specific ingestion service
+    const { notionIngestionService } = await import("../services/notion-ingestion.service.js");
 
     // Start sync (runs in background)
-    const result = await ingestionService.syncNotionPages(user.organizationId);
+    const result = await notionIngestionService.syncPages(user.organizationId);
 
     if (result.success) {
       res.json({
@@ -1511,8 +1511,8 @@ router.post("/github/sync", requireAuth, async (req: Request, res: Response): Pr
 
     console.log(`🔄 Starting GitHub sync for org: ${user.organizationId}`);
 
-    const { githubSyncService } = await import("../services/github-sync.service.js");
-    const result = await githubSyncService.syncIntegration(integration);
+    const { syncIntegration } = await import("../scripts/sync-github.js");
+    const result = await syncIntegration(integration);
 
     res.json({
       success: true,

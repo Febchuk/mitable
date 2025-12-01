@@ -5,8 +5,8 @@ import type { StreamChunk, ToolContext, Source } from "../tools/base.tool";
 import { codeRetriever } from "../retrievers/code.retriever.js";
 import { workRetriever } from "../retrievers/work.retriever.js";
 import { slackRetriever } from "../retrievers/slack.retriever";
+import { notionRetriever } from "../retrievers/notion.retriever.js";
 import { TemporalQueryParser } from "../utils/temporal-parser";
-// import { notionRetriever } from "../retrievers/notion.retriever";
 // import { orgContextService } from "../services/org-context.service";
 
 /**
@@ -120,30 +120,32 @@ export class KnowledgeAgent extends BaseAgent {
         //     },
         //   },
         // },
-        // {
-        //   type: "function",
-        //   function: {
-        //     name: "search_notion",
-        //     description:
-        //       "Search Notion workspace for documentation, guides, policies, processes, specs, and formal knowledge. " +
-        //       "Returns page blocks with metadata including last_edited_time.",
-        //     parameters: {
-        //       type: "object",
-        //       properties: {
-        //         query: {
-        //           type: "string",
-        //           description: "Search query for Notion docs",
-        //         },
-        //         topK: {
-        //           type: "number",
-        //           description: "Number of results (default: 10)",
-        //           default: 10,
-        //         },
-        //       },
-        //       required: ["query"],
-        //     },
-        //   },
-        // },
+        {
+          type: "function",
+          function: {
+            name: "search_notion",
+            description:
+              "Search Notion workspace for documentation, guides, policies, processes, database schemas, and formal knowledge. " +
+              "Use this for 'what is documented about X', 'policies/procedures for Y', or 'database schema' questions. " +
+              "Returns page blocks with section hierarchy and metadata. " +
+              "NOTE: Prefer search_code over search_notion when actual implementation details exist in code - code is more authoritative.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "Search query for Notion docs",
+                },
+                topK: {
+                  type: "number",
+                  description: "Number of results (default: 10)",
+                  default: 10,
+                },
+              },
+              required: ["query"],
+            },
+          },
+        },
         {
           type: "function",
           function: {
@@ -338,9 +340,22 @@ export class KnowledgeAgent extends BaseAgent {
           "AVAILABLE TOOLS (use ONLY these):\n" +
           "1. search_code - Search code files (returns metadata only: file paths, function names, line numbers)\n" +
           "2. view_code - Fetch actual code from a specific file (use after search_code)\n" +
-          "3. search_slack - Search Slack messages\n" +
-          "4. search_work - Search GitHub PRs, commits, issues\n\n" +
-          "DO NOT invent or hallucinate other tool names like 'repo_browser', 'open_file', 'get_org_info', 'search_notion', etc. They don't exist.\n\n" +
+          "3. search_notion - Search Notion documentation and specs\n" +
+          "4. search_slack - Search Slack messages\n" +
+          "5. search_work - Search GitHub PRs, commits, issues\n\n" +
+          "DO NOT invent or hallucinate other tool names like 'repo_browser', 'open_file', 'get_org_info', etc. They don't exist.\n\n" +
+          "DOMAIN PRIORITY & WEIGHTING:\n" +
+          "Each search result includes a _domain_weight field indicating authority:\n" +
+          "- CODE: weight=2.0 (HIGHEST authority - current source of truth)\n" +
+          "- NOTION: weight=1.0 (Documentation - may be outdated)\n" +
+          "- SLACK: weight=0.8 (Discussions - context and decisions)\n" +
+          "- WORK: weight=0.6 (Timeline - historical context)\n\n" +
+          "When synthesizing answers with conflicting information:\n" +
+          "1. ALWAYS prioritize CODE (2x weight) - it's the current state\n" +
+          "2. If Slack discusses new feature but code hasn't implemented it, say:\n" +
+          "   'Slack discussed X, but codebase currently has Y. Notion docs may be outdated.'\n" +
+          "3. Suggest updating docs when you detect staleness\n" +
+          "4. Use weighted synthesis: (code_confidence * 2.0 + notion_confidence * 1.0 + slack_confidence * 0.8)\n\n" +
           "CODE SEARCH WORKFLOW:\n" +
           "1. Start with search_code to find relevant files and functions (metadata only)\n" +
           "2. If metadata isn't enough, call view_code on specific functions you identified\n" +
@@ -606,24 +621,33 @@ export class KnowledgeAgent extends BaseAgent {
       //   return JSON.stringify(orgContext);
       // }
 
-      // case "search_notion": {
-      //   const results = await notionRetriever.retrieve(
-      //     args.query,
-      //     { organizationId: context.organizationId },
-      //     { topK }
-      //   );
+      case "search_notion": {
+        const results = await notionRetriever.retrieve(
+          args.query,
+          { organizationId: context.organizationId },
+          { topK }
+        );
 
-      //   const formatted = results.pages.flatMap((page: any) =>
-      //     page.blocks.map((block: any) => ({
-      //       title: page.pageTitle,
-      //       url: page.pageUrl,
-      //       content: block.text, // Full content, not snippet
-      //       last_edited: page.lastEditedTime,
-      //     }))
-      //   );
+        const formatted = results.pages.flatMap((page: any) =>
+          page.blocks.map((block: any) => ({
+            page_title: page.pageTitle,
+            page_url: page.pageUrl,
+            content: block.text, // Full content
+            section_path: block.sectionPath ? block.sectionPath.join(" → ") : undefined,
+            chunk_type: block.chunkType,
+            has_code: block.hasCode,
+            code_language: block.codeLanguage,
+            last_edited: page.lastEditedTime,
+          }))
+        );
 
-      //   return JSON.stringify(formatted);
-      // }
+        return JSON.stringify({
+          docs: formatted,
+          _domain: "notion",
+          _domain_weight: 1.0,
+          _note: "Documentation source - may be outdated. Verify against code.",
+        });
+      }
 
       case "search_slack": {
         // Parse temporal expressions from query
@@ -663,6 +687,9 @@ export class KnowledgeAgent extends BaseAgent {
             note: "Results were truncated to fit token budget. You can request more specific searches or filter by time/channel if needed.",
           };
         }
+        response._domain = "slack";
+        response._domain_weight = 0.8;
+        response._note = "Discussion context - check if implemented in code.";
 
         return JSON.stringify(response);
       }
@@ -697,6 +724,9 @@ export class KnowledgeAgent extends BaseAgent {
             note: "Results were truncated to fit token budget. Use more specific queries if needed.",
           };
         }
+        response._domain = "code";
+        response._domain_weight = 2.0;
+        response._note = "Current implementation - most authoritative source.";
 
         return JSON.stringify(response);
       }
@@ -729,6 +759,9 @@ export class KnowledgeAgent extends BaseAgent {
             note: "Results were truncated to fit token budget. Use more specific queries or date filters if needed.",
           };
         }
+        response._domain = "work";
+        response._domain_weight = 0.6;
+        response._note = "Historical context - PRs, commits, issues.";
 
         return JSON.stringify(response);
       }
