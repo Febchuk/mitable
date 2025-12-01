@@ -18,7 +18,7 @@ Separate subsystem that manages conversation memory independently from agent log
 ### 2. **Database Migration (0014):**
 
 ```sql
-ALTER TABLE conversations 
+ALTER TABLE conversations
 ADD COLUMN conversation_summary TEXT,
 ADD COLUMN summary_up_to_turn INTEGER DEFAULT 0;
 ```

@@ -33,7 +33,9 @@ async function runMigration() {
     console.log("  - conversation_summary (TEXT) - Incremental summary of older turns");
     console.log("  - summary_up_to_turn (INTEGER) - Tracks which turn was last summarized");
     console.log("\nIndex created:");
-    console.log("  - idx_conversations_summary on conversations(id) WHERE conversation_summary IS NOT NULL");
+    console.log(
+      "  - idx_conversations_summary on conversations(id) WHERE conversation_summary IS NOT NULL"
+    );
 
     process.exit(0);
   } catch (error) {
