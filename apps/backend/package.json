@@ -26,7 +26,8 @@
     "sync-slack": "tsx src/scripts/sync-slack.ts",
     "sync-notion": "tsx src/scripts/sync-notion.ts",
     "sync-integrations": "tsx src/scripts/sync-integrations.ts",
-    "backfill-tokens": "tsx src/scripts/backfill-encrypted-tokens.ts"
+    "backfill-tokens": "tsx src/scripts/backfill-encrypted-tokens.ts",
+    "backfill-summaries": "tsx src/scripts/backfill-conversation-summaries.ts"
   },
   "dependencies": {
     "@babel/parser": "^7.28.5",
