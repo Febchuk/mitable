@@ -241,26 +241,7 @@ export function WorkflowAccordion({
                         </div>
                       ))}
 
-                      {/* Streaming indicator */}
-                      {isCurrentStep && isStreaming && (
-                        <div className="streaming-indicator flex items-center gap-2 text-sm text-gray-400 mt-2">
-                          <div className="loading-dots flex gap-1">
-                            <span
-                              className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce"
-                              style={{ animationDelay: "0ms" }}
-                            ></span>
-                            <span
-                              className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce"
-                              style={{ animationDelay: "150ms" }}
-                            ></span>
-                            <span
-                              className="w-2 h-2 bg-[#8B5CF6] rounded-full animate-bounce"
-                              style={{ animationDelay: "300ms" }}
-                            ></span>
-                          </div>
-                          AI is thinking...
-                        </div>
-                      )}
+                      {/* Streaming indicator intentionally removed to keep a single consistent loading UI via LoadingMessage */}
 
                       {/* Loading message - show when workflow operation is in progress */}
                       {isCurrentStep && workflowLoadingMessage && (
@@ -291,12 +272,18 @@ export function WorkflowAccordion({
           {(isPreFlight || workflow.status === "paused" || workflow.status === "completed") && (
             <div className="px-6 py-4 border-t border-[#3A3A45]">
               {isPreFlight ? (
-                <WorkflowOptions
-                  phase={"initial_proposal" as WorkflowPhase}
-                  onOptionSelect={onOptionSelect}
-                  disabled={isStreaming}
-                  hidden={awaitingCustomQuestion}
-                />
+                <>
+                  {workflowLoadingMessage ? (
+                    <LoadingMessage message={workflowLoadingMessage} />
+                  ) : (
+                    <WorkflowOptions
+                      phase={"initial_proposal" as WorkflowPhase}
+                      onOptionSelect={onOptionSelect}
+                      disabled={isStreaming}
+                      hidden={awaitingCustomQuestion}
+                    />
+                  )}
+                </>
               ) : workflow.status === "paused" ? (
                 <button
                   className="resume-workflow-btn w-full flex items-center justify-center gap-2 bg-[#8B5CF6] text-white px-5 py-2.5 rounded-[18px] hover:bg-[#8B5CF6]/90 transition-all hover:scale-105 font-medium text-sm"

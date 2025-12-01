@@ -164,8 +164,10 @@ ${visualGuidance.confidence === "low" ? "\n\n*Note: I'm having some difficulty a
         content: troubleshootingMessage,
         cardData: {
           ...currentSolution,
+          workflowSessionId: currentSolution.workflowSessionId,
           workflowActive: true,
-          workflowPhase: "custom_question", // Triggers Q&A UI mode (hides step list, shows Q&A options)
+          workflowPhase: "custom_question",
+          status: "active" as const,
         },
         streamable: true,
       };

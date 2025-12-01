@@ -403,9 +403,10 @@ REMEMBER: You're creating the initial logical sequence. GeminiVision will adapt 
       content: previewMessage,
       cardData: {
         ...solutionObject,
-        workflowSessionId: workflowSession.id, // Add session ID to cardData
+        workflowSessionId: workflowSession.id,
         workflowActive: true,
         workflowPhase: "initial_proposal",
+        status: "active" as const,
       },
       streamable: true,
     };

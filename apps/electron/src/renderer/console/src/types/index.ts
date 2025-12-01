@@ -50,6 +50,8 @@ export interface Message {
   content: string;
   timestamp: Date;
   type?: "text" | "workflow" | "experts";
+  workflowSessionId?: string | null; // Links to workflow session
+  relatedStepIndex?: number | null; // Which step this message relates to
   cardData?: {
     title: string;
     subtitle: string;

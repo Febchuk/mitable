@@ -151,33 +151,6 @@ export class OrchestratorService {
   }
 
   /**
-   * Heuristic shortcut for obvious knowledge queries
-   * Catches common RAG patterns before calling LLM
-   */
-  private heuristicRAG(msg: string): { type?: Intent["type"]; confidence?: number } {
-    const KNOWLEDGE_HINT =
-      /\b(what|where|when|how|why|policy|policies|doc|docs|documentation|handbook|guide|SOP|PRD|spec|requirement|requirements|meeting|notes|recap|decision|roadmap|update|discuss|discussed|conversation|thread|channel|slack|notion|wiki|announcement|setup|set up|configure|config|environment|install|deploy)\b/i;
-
-    if (KNOWLEDGE_HINT.test(msg)) {
-      return { type: "knowledge_search", confidence: 0.9 };
-    }
-    return {};
-  }
-
-  /**
-   * Check if prior assistant message was from KnowledgeAgent (has sources)
-   */
-  private priorWasRAG(ctx: ToolContext): boolean {
-    const lastAssistant = ctx.conversationHistory
-      .slice()
-      .reverse()
-      .find((m) => m.role === "assistant");
-
-    // KnowledgeAgent always includes Sources section
-    return lastAssistant?.content.includes("Sources:") || false;
-  }
-
-  /**
    * Parse intent from JSON response with safe fallback to RAG
    */
   private parseIntentJSON(text: string): Intent {
@@ -212,7 +185,6 @@ export class OrchestratorService {
 
   /**
    * Classify user intent using Gemini Flash (cheap, fast)
-   * Enhanced with RAG-biased heuristics and safer parsing
    */
   private async classifyIntent(context: ToolContext): Promise<Intent> {
     try {
@@ -227,40 +199,6 @@ export class OrchestratorService {
 
       const userMessage = lastUserMessage.content;
 
-      // (0) Short greeting check - handle simple greetings with text agent
-      const isGreeting =
-        /^(hi|hello|hey|good morning|good afternoon|good evening|greetings|yo|sup|what's up|whats up)[\s!.?]*$/i.test(
-          userMessage.trim()
-        );
-      if (isGreeting) {
-        console.log("[Orchestrator] Simple greeting → general_chat");
-        return { type: "general_chat", confidence: 1.0 };
-      }
-
-      // Has org hints → route to knowledge search
-      const ORG_HINT =
-        /\b(slack|notion|policy|policies|handbook|doc|docs|documentation|meeting|notes|recap|decision|roadmap|update|channel|thread|conversation|discuss|discussed|talk|talked|mention|mentioned|said|internal|wiki|sop|prd|spec|org|organization|company|team|we|our|us|locally|setup|set up|environment|configure|config|install|deploy|january|february|march|april|may|june|july|august|september|october|november|december|today|yesterday|week|month|year|ago|recent|latest)\b/i;
-
-      if (ORG_HINT.test(userMessage)) {
-        console.log("[Orchestrator] Has org hints → knowledge_search");
-        return { type: "knowledge_search", confidence: 0.9 };
-      }
-
-      // (1) RAG heuristic shortcut - catch obvious knowledge queries
-      const heuristic = this.heuristicRAG(userMessage);
-      if (heuristic.type && (heuristic.confidence ?? 0) >= 0.85) {
-        console.log("[Orchestrator] Heuristic match → knowledge_search");
-        return heuristic as Intent;
-      }
-
-      // (3) RAG carry-over - keep short follow-ups on RAG path
-      const wordCount = userMessage.trim().split(/\s+/).length;
-      if (wordCount <= 6 && this.priorWasRAG(context)) {
-        console.log("[Orchestrator] Short follow-up after RAG → knowledge_search");
-        return { type: "knowledge_search", confidence: 0.8 };
-      }
-
-      // (2) Model with strict JSON and RAG-biased prompt
       const model = this.gemini.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
       const prompt = `Classify into ONE intent:
@@ -286,7 +224,7 @@ Return STRICT JSON only:
 
       console.log("[Orchestrator] Gemini classified:", intent);
 
-      // (4) Safety: prefer RAG if "workflow_start" without screenshot and low confidence
+      // Safety: prefer RAG if "workflow_start" without screenshot and low confidence
       if (
         intent.type === "workflow_start" &&
         (!context.screenshots || context.screenshots.length === 0) &&
@@ -296,15 +234,6 @@ Return STRICT JSON only:
           "[Orchestrator] Downgrading workflow_start → knowledge_search (no screenshot + low confidence)"
         );
         intent = { type: "knowledge_search", confidence: 0.6 };
-      }
-
-      // (4b) Post-classification guard: if model chose knowledge_search but message has no org hints, use open_domain_qa
-      if (intent.type === "knowledge_search" && !ORG_HINT.test(userMessage)) {
-        console.log("[Orchestrator] No org hints detected → downgrade to open_domain_qa");
-        intent = {
-          type: "open_domain_qa",
-          confidence: Math.min(0.9, Math.max(0.6, intent.confidence)),
-        } as Intent;
       }
 
       return intent;

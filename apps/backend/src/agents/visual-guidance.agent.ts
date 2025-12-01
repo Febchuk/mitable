@@ -130,10 +130,18 @@ export class VisualGuidanceAgent extends BaseAgent {
         return;
       }
 
-      // Check if user message is vague ("How do I do this?", "Help me with this")
-      const isVaguePrompt = await this.isVaguePrompt(lastUserMessage.content);
+      // Detect step-level custom questions during an active workflow
+      const isWorkflowCustomQuestion =
+        !!context.workflowState &&
+        context.workflowState.currentStepIndex >= 0 &&
+        context.metadata?.workflowAction === "custom_question";
 
-      if (isVaguePrompt) {
+      // Only run vague-prompt → clarify_intent for non-workflow or pre-flight cases
+      const isVaguePrompt = isWorkflowCustomQuestion
+        ? false
+        : await this.isVaguePrompt(lastUserMessage.content);
+
+      if (!isWorkflowCustomQuestion && isVaguePrompt) {
         // Use clarify_intent to analyze screen and offer interpretations
         const result = await this.clarifyIntentTool.execute(
           {

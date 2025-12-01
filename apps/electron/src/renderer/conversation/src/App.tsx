@@ -211,12 +211,16 @@ function App() {
           role: "assistant",
           content: "",
           type: "text",
+          // Route into the correct workflow accordion/step immediately for custom questions
+          workflowSessionId: awaitingCustomQuestion?.workflowSessionId || undefined,
+          relatedStepIndex: awaitingCustomQuestion?.relatedStepIndex ?? undefined,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
 
         // Prepare metadata if this is a custom question during workflow
-        const metadata = awaitingCustomQuestion
+        const isCustomWorkflowQuestion = !!awaitingCustomQuestion;
+        const metadata = isCustomWorkflowQuestion
           ? {
               workflowAction: "custom_question",
               selectedOption: 2,
@@ -228,7 +232,11 @@ function App() {
         console.log("[Conversation] Sending message with metadata:", metadata);
 
         // Set initial loading state
-        setLoadingMessage("Thinking...");
+        if (isCustomWorkflowQuestion) {
+          setWorkflowLoadingMessage("Thinking...");
+        } else {
+          setLoadingMessage("Thinking...");
+        }
 
         // Stream the response with multi-window captures
         try {
@@ -239,7 +247,11 @@ function App() {
             {
               onChunk: (chunk, workflowSessionId, relatedStepIndex) => {
                 // Clear loading message on first chunk
-                setLoadingMessage(null);
+                if (isCustomWorkflowQuestion) {
+                  setWorkflowLoadingMessage(null);
+                } else {
+                  setLoadingMessage(null);
+                }
                 setMessages((prev) =>
                   prev.map(
                     (msg): Message =>
@@ -272,7 +284,11 @@ function App() {
                 });
 
                 // Clear loading message on complete (in case onChunk never fired)
-                setLoadingMessage(null);
+                if (isCustomWorkflowQuestion) {
+                  setWorkflowLoadingMessage(null);
+                } else {
+                  setLoadingMessage(null);
+                }
 
                 setMessages((prev) =>
                   prev.map(
@@ -281,12 +297,17 @@ function App() {
                         ? {
                             ...msg,
                             id: messageId,
-                            content: fullContent,
+                            // Preserve any previously set error or partial content if fullContent is empty
+                            content:
+                              fullContent && fullContent.trim().length > 0
+                                ? fullContent
+                                : msg.content,
                             type: cardData ? "card" : "text",
                             messageType: messageType as "workflow" | "experts" | "text",
                             cardData,
-                            workflowSessionId,
-                            relatedStepIndex,
+                            // Preserve existing routing if backend omits these fields
+                            workflowSessionId: workflowSessionId ?? msg.workflowSessionId,
+                            relatedStepIndex: relatedStepIndex ?? msg.relatedStepIndex,
                           }
                         : msg
                   )
@@ -301,7 +322,11 @@ function App() {
                 console.error("Streaming error:", error);
 
                 // Clear loading message on error
-                setLoadingMessage(null);
+                if (isCustomWorkflowQuestion) {
+                  setWorkflowLoadingMessage(null);
+                } else {
+                  setLoadingMessage(null);
+                }
 
                 setMessages((prev) =>
                   prev.map(
@@ -318,7 +343,11 @@ function App() {
               },
               onProgress: (phase, message) => {
                 console.log(`[Conversation] Progress update: ${phase} - ${message}`);
-                setLoadingMessage(message);
+                if (isCustomWorkflowQuestion) {
+                  setWorkflowLoadingMessage(message);
+                } else {
+                  setLoadingMessage(message);
+                }
               },
             },
             metadata // Workflow metadata only
@@ -413,6 +442,8 @@ function App() {
     }
 
     try {
+      // Show cancelling/loading state while pausing workflow
+      setWorkflowLoadingMessage("cancelling workflow");
       console.log("[Conversation] Exiting workflow for conversation:", conversationId);
 
       // Call backend to pause workflow and get updated state
@@ -440,6 +471,9 @@ function App() {
       console.log("[Conversation] Workflow status updated to paused");
     } catch (error) {
       console.error("[Conversation] Error pausing workflow:", error);
+    } finally {
+      // Clear cancelling/loading state after operation completes or fails
+      setWorkflowLoadingMessage(null);
     }
   };
 
@@ -477,6 +511,13 @@ function App() {
         // Handle exit workflow separately - pause workflow without sending message
         await handleExitWorkflow();
         return; // Don't continue with sending message
+      case "resume_workflow":
+        metadata = {
+          workflowAction: "resume_workflow",
+          selectedOption: 1,
+        };
+        message = "Resume workflow";
+        break;
 
       case "confirm_start":
         metadata = {
@@ -518,9 +559,9 @@ function App() {
       return;
     }
 
-    // Only create user message for actions where user intent should be visible
-    // Control actions (progress_step, exit_workflow) should NOT create visible bubbles
-    const shouldCreateUserMessage = action === "confirm_start";
+    // Do not create visible user messages for workflow control actions, including pre-flight confirm
+    // All workflow option clicks should operate silently without adding user bubbles
+    const shouldCreateUserMessage = false;
 
     if (shouldCreateUserMessage) {
       // Add user message to UI with workflow fields so it appears inside WorkflowAccordion
@@ -549,7 +590,15 @@ function App() {
     setMessages((prev) => [...prev, assistantMessage]);
 
     // Set workflow-specific loading state
-    setWorkflowLoadingMessage("Thinking...");
+    if (action === "confirm_start") {
+      setWorkflowLoadingMessage("starting workflow");
+    } else if (action === "progress_step") {
+      setWorkflowLoadingMessage("progressing to next step");
+    } else if (action === "resume_workflow") {
+      setWorkflowLoadingMessage("resuming workflow");
+    } else {
+      setWorkflowLoadingMessage("Thinking...");
+    }
 
     // Capture screenshot for workflow actions (progress_step and custom_question)
     let multiWindowCapture: any = null;
@@ -615,12 +664,15 @@ function App() {
                     ? {
                         ...msg,
                         id: messageId,
-                        content: fullContent,
+                        // Preserve any previously set error or partial content if fullContent is empty
+                        content:
+                          fullContent && fullContent.trim().length > 0 ? fullContent : msg.content,
                         type: cardData ? "card" : "text",
                         messageType: messageType as "workflow" | "experts" | "text",
                         cardData,
-                        workflowSessionId,
-                        relatedStepIndex,
+                        // Preserve existing routing if backend omits these fields
+                        workflowSessionId: workflowSessionId ?? msg.workflowSessionId,
+                        relatedStepIndex: relatedStepIndex ?? msg.relatedStepIndex,
                       }
                     : msg
               )
@@ -713,13 +765,22 @@ function App() {
                 const renderedWorkflowSessions = new Set<string>();
 
                 return messages.map((message) => {
-                  // Skip user messages that belong to a workflow (they'll be shown inside WorkflowAccordion)
+                  // User messages: decide whether to show in main flow vs inside WorkflowAccordion
                   if (message.role === "user") {
-                    // Only render user message in main flow if it's NOT part of a workflow
-                    if (!message.workflowSessionId) {
+                    const isInWorkflow = !!message.workflowSessionId;
+                    const hasValidStepIndex =
+                      message.relatedStepIndex !== undefined &&
+                      message.relatedStepIndex !== null &&
+                      message.relatedStepIndex >= 0;
+
+                    // Show in main flow if not part of a workflow OR if it's a pre-flight/custom question
+                    // (relatedStepIndex < 0) that doesn't belong to any concrete step
+                    if (!isInWorkflow || !hasValidStepIndex) {
                       return <UserMessage key={message.id} content={message.content} />;
                     }
-                    // User messages with workflowSessionId are rendered inside WorkflowAccordion
+
+                    // True step-level workflow user messages (relatedStepIndex >= 0)
+                    // are rendered inside WorkflowAccordion only
                     return null;
                   }
 
@@ -790,7 +851,9 @@ function App() {
                   return (
                     <div key={message.id} className="space-y-3">
                       {/* Show AI message for non-workflow messages */}
-                      {!isWorkflowMessage && message.content && (
+                      {/* Do NOT render here if this assistant message belongs to a workflow;
+                          it will be shown inside the corresponding WorkflowAccordion step */}
+                      {!isWorkflowMessage && message.content && !message.workflowSessionId && (
                         <AIMessage content={message.content} />
                       )}
 
