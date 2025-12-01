@@ -50,7 +50,12 @@ describe("VisualGuidanceAgent routing", () => {
           windowTitle: "Test",
           appName: "TestApp",
           dataUrl: "data:image/png;base64,xxx",
-          metadata: { width: 100, height: 100, scaleFactor: 1, bounds: { x: 0, y: 0, width: 100, height: 100 } },
+          metadata: {
+            width: 100,
+            height: 100,
+            scaleFactor: 1,
+            bounds: { x: 0, y: 0, width: 100, height: 100 },
+          },
         },
       ],
       metadata: undefined,
@@ -94,7 +99,9 @@ describe("VisualGuidanceAgent routing", () => {
     (agent as any).clarifyIntentTool = { execute: clarifyExecuteMock };
 
     (agent as any).isVaguePrompt = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
-    (agent as any).classifyWorkflowQuestion = jest.fn<() => Promise<string>>().mockResolvedValue("directly_answerable");
+    (agent as any).classifyWorkflowQuestion = jest
+      .fn<() => Promise<string>>()
+      .mockResolvedValue("directly_answerable");
 
     const context: ToolContext = {
       conversationId: "conv-2",
@@ -106,7 +113,12 @@ describe("VisualGuidanceAgent routing", () => {
           windowTitle: "Test",
           appName: "TestApp",
           dataUrl: "data:image/png;base64,xxx",
-          metadata: { width: 100, height: 100, scaleFactor: 1, bounds: { x: 0, y: 0, width: 100, height: 100 } },
+          metadata: {
+            width: 100,
+            height: 100,
+            scaleFactor: 1,
+            bounds: { x: 0, y: 0, width: 100, height: 100 },
+          },
         },
       ],
       metadata: {
