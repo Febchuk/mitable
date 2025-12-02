@@ -4,7 +4,7 @@
  * Responsibilities:
  * - Orchestrate code snapshot ingestion via Tree API
  * - Use GitHubCodeSnapshotService for code domain (current repo state)
- * - Work domain (commits/PRs/issues) handled by github-sync.service
+ * - Work domain (commits/PRs/issues) handled by sync-github.ts script
  * - Update sync logs
  *
  * Pattern: Dual-domain strategy
