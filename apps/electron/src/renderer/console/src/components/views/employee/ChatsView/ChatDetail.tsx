@@ -18,6 +18,7 @@ export default function ChatDetail() {
   const { data: messagesData, isLoading: messagesLoading } = useConversationMessages(chatId);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Ref to track which message is currently streaming (for WorkflowAccordion)
   const streamingMessageIdRef = useRef<string | null>(null);
@@ -181,9 +182,19 @@ export default function ChatDetail() {
     hasCaptureMethod: typeof window !== "undefined" && !!window.consoleAPI?.captureScreenshot,
   });
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages change (only if user is near bottom)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    // Check if user is already near the bottom (within 100px)
+    const isNearBottom = 
+      container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+
+    // Only auto-scroll if user hasn't scrolled up
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   if (messagesLoading) {
@@ -502,7 +513,7 @@ export default function ChatDetail() {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto app-no-drag custom-scrollbar">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto app-no-drag custom-scrollbar">
         <div className="max-w-4xl mx-auto px-8 py-4">
           {(() => {
             // Track which workflow sessions have been rendered to avoid duplicates
