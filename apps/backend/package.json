@@ -18,17 +18,14 @@
     "seed:production": "tsx src/db/seed-production.ts",
     "db:migrate-fts": "tsx src/scripts/run-fts-migration.ts",
     "migrate:0008": "tsx src/scripts/run-migration-0008.ts",
-    "migrate:0009": "tsx src/scripts/run-migration-0009.ts",
     "migrate:0011": "tsx src/scripts/run-migration-0011.ts",
     "migrate:0012": "tsx src/scripts/run-migration-0012.ts",
     "migrate:0013": "tsx src/scripts/run-migration-0013.ts",
-    "migrate:0014": "tsx src/scripts/run-migration-0014.ts",
     "test-search": "tsx src/scripts/test-search.ts",
     "sync-slack": "tsx src/scripts/sync-slack.ts",
     "sync-notion": "tsx src/scripts/sync-notion.ts",
     "sync-integrations": "tsx src/scripts/sync-integrations.ts",
-    "backfill-tokens": "tsx src/scripts/backfill-encrypted-tokens.ts",
-    "inspect-security": "tsx src/scripts/inspect-data-security.ts"
+    "backfill-tokens": "tsx src/scripts/backfill-encrypted-tokens.ts"
   },
   "dependencies": {
     "@babel/parser": "^7.28.5",

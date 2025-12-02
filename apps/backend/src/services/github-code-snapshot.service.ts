@@ -17,7 +17,7 @@ import { embeddingService } from "./embedding.service.js";
 import { vectorService } from "./vector.service.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, sql, inArray } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { VectorRecord } from "./vector.service.js";
 import type { NewSearchContent } from "../db/schema/search-content.schema.js";
 
@@ -660,57 +660,26 @@ class GitHubCodeSnapshotService {
         return result;
       }
 
-      // Get last indexed commit to find starting point for incremental update
-      const lastIndexedCommit = repo.lastIndexedCommitSha
-        ? await db
-            .select()
-            .from(schema.githubCommits)
-            .where(
-              sql`${schema.githubCommits.repoId} = ${repo.id} AND ${schema.githubCommits.sha} = ${repo.lastIndexedCommitSha}`
-            )
-            .limit(1)
-        : [];
+      // Get commits since last indexed
+      const commits = await db
+        .select()
+        .from(schema.githubCommits)
+        .where(eq(schema.githubCommits.repoId, repo.id))
+        .orderBy(schema.githubCommits.committedAt);
 
-      if (lastIndexedCommit.length === 0 && repo.lastIndexedCommitSha) {
-        console.log(
-          `      ⚠️  Last indexed commit ${repo.lastIndexedCommitSha.substring(0, 7)} not found in DB, falling back to full snapshot`
-        );
+      if (commits.length === 0) {
+        console.log(`      ⚠️  No commits found, falling back to full snapshot`);
         return this.ingestRepositorySnapshot(octokit, repo, organizationId);
       }
 
-      // Get commits since last indexed (or all if first sync)
-      const lastIndexedDate = lastIndexedCommit[0]?.committedAt;
-      const newCommits = lastIndexedDate
-        ? await db
-            .select()
-            .from(schema.githubCommits)
-            .where(
-              sql`${schema.githubCommits.repoId} = ${repo.id} AND ${schema.githubCommits.committedAt} > ${lastIndexedDate}`
-            )
-            .orderBy(schema.githubCommits.committedAt)
-        : await db
-            .select()
-            .from(schema.githubCommits)
-            .where(eq(schema.githubCommits.repoId, repo.id))
-            .orderBy(schema.githubCommits.committedAt);
-
-      if (newCommits.length === 0) {
-        console.log(`      ✅ No new commits to process`);
-        return result;
-      }
-
-      console.log(`      📦 Processing ${newCommits.length} new commits`);
-
-      const newCommitIds = newCommits.map((c) => c.id);
-
-      // Get unique changed file paths from ONLY the new commits
+      // Get unique changed file paths from recent commits
       const changedFiles = await db
         .selectDistinctOn([schema.githubCommitFiles.path])
         .from(schema.githubCommitFiles)
-        .where(inArray(schema.githubCommitFiles.commitId, newCommitIds))
+        .where(eq(schema.githubCommitFiles.repoId, repo.id))
         .orderBy(schema.githubCommitFiles.path);
 
-      console.log(`      📝 Found ${changedFiles.length} unique changed files in new commits`);
+      console.log(`      📝 Found ${changedFiles.length} unique changed files`);
 
       // Get current tree to fetch latest versions
       const tree = await this.getRepositoryTree(octokit, repo.owner, repo.name, treeSha);

@@ -7,7 +7,6 @@ import { workRetriever } from "../retrievers/work.retriever.js";
 import { slackRetriever } from "../retrievers/slack.retriever";
 import { notionRetriever } from "../retrievers/notion.retriever.js";
 import { TemporalQueryParser } from "../utils/temporal-parser";
-import { memoryService } from "../services/memory.service.js";
 // import { orgContextService } from "../services/org-context.service";
 
 /**
@@ -278,14 +277,7 @@ export class KnowledgeAgent extends BaseAgent {
         },
       ];
 
-      // Get conversation memory (summary + recent turns)
-      console.log(`[KnowledgeAgent] Loading conversation memory...`);
-      const memory = await memoryService.getConversationMemory(context.conversationId);
-      console.log(
-        `[KnowledgeAgent] Memory loaded: ${memory.conversationSummary ? `${memory.estimatedTokens} tokens (summary + ${memory.recentTurns.length} recent turns)` : `${memory.recentTurns.length} recent turns (no summary yet)`}`
-      );
-
-      // Build messages array from memory (not full history)
+      // Build messages array from conversation history
       const messages: Groq.Chat.ChatCompletionMessageParam[] = [];
       const ephemeralMessageIds = new Set<string>(); // Track ephemeral tool results
 
@@ -367,38 +359,17 @@ export class KnowledgeAgent extends BaseAgent {
           "CODE SEARCH WORKFLOW:\n" +
           "1. Start with search_code to find relevant files and functions (metadata only)\n" +
           "2. If metadata isn't enough, call view_code on specific functions you identified\n" +
-          "3. view_code supports TWO MODES:\n" +
-          "   - Single file: {repo_full_name, file_path, start_line, end_line}\n" +
-          "   - Multi-file (PREFERRED for features): {files: [{filePath, startLine, endLine}, ...]} - UP TO 4 FILES\n" +
-          "4. USE MULTI-FILE MODE when a feature spans multiple files (routes + services + schemas)\n" +
-          "5. DO NOT call view_code multiple times for related files - batch them!\n" +
-          "6. DO NOT try to call search_code without a 'query' parameter - it's required\n" +
-          "7. DO NOT hallucinate implementation details - use view_code if you need them\n\n" +
-          "Example (Single file):\n" +
+          "3. view_code requires: repo_full_name, file_path, start_line, end_line\n" +
+          "4. DO NOT try to call search_code without a 'query' parameter - it's required\n" +
+          "5. DO NOT hallucinate implementation details - use view_code if you need them\n\n" +
+          "Example:\n" +
           'search_code({"query": "authentication"})\n' +
           "→ Found: AuthService.authenticateUser (lines 45-89)\n" +
-          'view_code({"repoFullName": "Npounengnong/mitableai", "filePath": "apps/backend/src/services/auth.service.ts", "startLine": 45, "endLine": 89})\n' +
-          "→ Now you have the actual code\n\n" +
-          "Example (Multi-file - BETTER):\n" +
-          'search_code({"query": "slack integration"})\n' +
-          "→ Found: integrations.ts (routes), slack.service.ts, slack-sync.ts\n" +
-          'view_code({"files": [{"filePath": "apps/backend/src/routes/integrations.ts", "startLine": 80, "endLine": 120}, {"filePath": "apps/backend/src/services/slack.service.ts"}, {"filePath": "apps/backend/src/scripts/sync-slack.ts", "startLine": 1, "endLine": 100}]})\n' +
-          "→ Now you see the complete integration flow",
+          'view_code({"repo_full_name": "Npounengnong/mitableai", "file_path": "apps/backend/src/services/auth.service.ts", "start_line": 45, "end_line": 89})\n' +
+          "→ Now you have the actual code",
       });
 
-      // Add conversation summary if exists
-      if (memory.conversationSummary) {
-        messages.push({
-          role: "system",
-          content: `Previous conversation summary:\n${memory.conversationSummary}`,
-        });
-        console.log(
-          `[KnowledgeAgent] Added conversation summary (${memory.summaryUpToTurn} turns summarized)`
-        );
-      }
-
-      // Add recent turns from memory (already filtered to last N exchanges)
-      for (const msg of memory.recentTurns) {
+      for (const msg of context.conversationHistory) {
         const msgAny = msg as any;
 
         // Handle tool messages
@@ -427,7 +398,7 @@ export class KnowledgeAgent extends BaseAgent {
       }
 
       // Agentic loop from Groq docs - simple and clean
-      const MAX_ITERATIONS = 15;
+      const MAX_ITERATIONS = 10;
       let iteration = 0;
 
       while (iteration < MAX_ITERATIONS) {
@@ -593,11 +564,6 @@ export class KnowledgeAgent extends BaseAgent {
           content: cleanContent,
           sources: sources.length > 0 ? sources : undefined,
         };
-
-        // Update conversation memory with new Q&A pair
-        console.log(`[KnowledgeAgent] Updating conversation memory...`);
-        await memoryService.updateConversationMemory(context.conversationId);
-        console.log(`[KnowledgeAgent] Memory updated successfully`);
 
         return;
       }

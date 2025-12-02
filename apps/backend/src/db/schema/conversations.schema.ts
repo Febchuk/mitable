@@ -11,11 +11,6 @@ export const conversations = pgTable("conversations", {
     .references(() => users.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 255 }), // Auto-generated from first message
   contextType: varchar("context_type", { length: 50 }), // 'general' | 'help_request' | 'workflow'
-
-  // Memory management fields
-  conversationSummary: text("conversation_summary"), // Incremental summary of older turns
-  summaryUpToTurn: integer("summary_up_to_turn").default(0), // Which turn was last summarized
-
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

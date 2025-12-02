@@ -391,9 +391,9 @@ Detected from path patterns:
 ### Sync Flow Diagram
 
 ```
-User clicks "Sync Now" (or cron triggers)
+User clicks "Sync Now"
        ↓
-Orchestration Script (sync-github.ts)
+Metadata Sync (github-sync.service.ts)
        ↓
 1. Fetch commits (50 first, incremental after)
        ↓
@@ -407,21 +407,19 @@ Orchestration Script (sync-github.ts)
        ↓
 6. Save to github_issues
        ↓
-7. Call GitHubIngestionService.syncCode()
-       ↓
 Code Ingestion (github-ingestion.service.ts)
        ↓
-8. Get Tree API snapshot (recursive)
+7. Get Tree API snapshot (recursive)
        ↓
-9. Filter code files (extensions + skip patterns)
+8. Filter code files (extensions + skip patterns)
        ↓
-10. Chunk files (github-chunking.service.ts)
+9. Chunk files (github-chunking.service.ts)
        ↓
-11. Embed chunks (OpenAI text-embedding-3-small)
+10. Embed chunks (OpenAI text-embedding-3-small)
        ↓
-12. Dual-write to Pinecone + PostgreSQL
+11. Dual-write to Pinecone + PostgreSQL
        ↓
-13. Update lastSyncedAt + lastIndexedCommitSha
+12. Update lastSyncedAt + lastIndexedCommitSha
 ```
 
 ---
@@ -568,28 +566,17 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 - Octokit instance management
 - Installation token generation
 
-### `sync-github.ts` (Script)
+### `github-sync.service.ts`
 
-- **Main orchestration script**
-- Fetches commits, PRs, issues from GitHub API
-- Handles incremental sync (first vs. subsequent)
-- Respects 50-commit initial limit
+- Orchestrates work domain sync
+- Fetches commits, PRs, issues
 - Saves metadata to PostgreSQL
-- Calls `githubIngestionService.syncCode()` for code ingestion
-- Run with: `npm run sync-github` (or via cron)
-
-### `github-ingestion.service.ts`
-
-- Orchestrates code domain sync only
-- Coordinates snapshot + chunking
-- Dual-write to Pinecone + PostgreSQL
-- Updates sync logs
-- Called by `sync-github.ts` script
+- Respects 50-commit initial limit
 
 ### `github-code-snapshot.service.ts`
 
-- Fetches Tree API snapshot (recursive)
-- Filters code files by extension + skip patterns
+- Fetches Tree API snapshot
+- Filters code files
 - Fetches blob contents
 - Coordinates chunking + embedding
 
@@ -600,6 +587,13 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 - Function/class extraction
 - File role + area detection
 - Smart skip patterns
+
+### `github-ingestion.service.ts`
+
+- Orchestrates code domain sync
+- Coordinates snapshot + chunking
+- Dual-write to Pinecone + PostgreSQL
+- Updates sync logs
 
 ### `code.retriever.ts`
 
