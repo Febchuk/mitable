@@ -64,8 +64,8 @@ function InputBar({
   };
 
   return (
-    <div className="px-4 py-3 space-y-3">
-      {/* TOP: Watch Mode Bar */}
+    <div className="px-4 py-3 space-y-2">
+      {/* TOP: Watch Mode Bar - compact, outside container */}
       <WatchModeBar
         isExpanded={watchExpanded}
         windows={selectedWindows}
@@ -73,77 +73,80 @@ function InputBar({
         onRemoveWindow={onRemoveWindow}
       />
 
-      {/* MIDDLE: Textarea */}
-      <Textarea
-        ref={textareaRef}
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="How can I help?"
-        disabled={disabled || inputMode === "voice"}
-        className="min-h-[60px] max-h-[120px] resize-none bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-1 focus-visible:ring-white/30"
-        rows={2}
-      />
+      {/* Single rounded container for textarea + controls */}
+      <div className="bg-white/10 rounded-2xl p-3">
+        {/* Borderless textarea - matches container bg */}
+        <Textarea
+          ref={textareaRef}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="How can I help?"
+          disabled={disabled || inputMode === "voice"}
+          className="min-h-[60px] max-h-[120px] resize-none bg-transparent border-0 text-white placeholder:text-white/50 focus-visible:ring-0 focus-visible:ring-offset-0"
+          rows={2}
+        />
 
-      {/* BOTTOM: Mode toggle (left) + Send button (right) */}
-      <div className="flex items-center justify-between">
-        {/* Left: Mode toggle */}
-        <TooltipProvider delayDuration={300}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center bg-white/10 rounded-full p-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onInputModeChange("text")}
-                  className={`h-8 w-8 rounded-full ${
-                    inputMode === "text"
-                      ? "bg-white/20 text-white"
-                      : "text-white/50 hover:text-white hover:bg-transparent"
-                  }`}
-                  aria-label="Text mode"
-                >
-                  <Type className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    onInputModeChange("voice");
-                    if (isRecording) onRecordingChange(false);
-                  }}
-                  className={`h-8 w-8 rounded-full ${
-                    inputMode === "voice"
-                      ? "bg-white/20 text-white"
-                      : "text-white/50 hover:text-white hover:bg-transparent"
-                  }`}
-                  aria-label="Voice mode"
-                >
-                  <Mic className="h-4 w-4" />
-                </Button>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              {inputMode === "text" ? "Currently in text mode" : "Currently in voice mode"}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        {/* Controls row inside container */}
+        <div className="flex items-center justify-between mt-2">
+          {/* Left: Mode toggle - smaller */}
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center bg-white/20 rounded-full p-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onInputModeChange("text")}
+                    className={`h-6 w-6 rounded-full ${
+                      inputMode === "text"
+                        ? "bg-white/30 text-white"
+                        : "text-white/50 hover:text-white hover:bg-transparent"
+                    }`}
+                    aria-label="Text mode"
+                  >
+                    <Type className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      onInputModeChange("voice");
+                      if (isRecording) onRecordingChange(false);
+                    }}
+                    className={`h-6 w-6 rounded-full ${
+                      inputMode === "voice"
+                        ? "bg-white/30 text-white"
+                        : "text-white/50 hover:text-white hover:bg-transparent"
+                    }`}
+                    aria-label="Voice mode"
+                  >
+                    <Mic className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                {inputMode === "text" ? "Currently in text mode" : "Currently in voice mode"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
-        {/* Right: Send button */}
-        <Button
-          size="icon"
-          onClick={handleSubmit}
-          disabled={disabled || (inputMode === "text" && !inputValue.trim())}
-          className="h-10 w-10 rounded-full"
-        >
-          {inputMode === "text" ? (
-            <ArrowUp className="h-5 w-5" />
-          ) : isRecording ? (
-            <Square className="h-5 w-5" />
-          ) : (
-            <Mic className="h-5 w-5" />
-          )}
-        </Button>
+          {/* Right: Send button - smaller */}
+          <Button
+            size="icon"
+            onClick={handleSubmit}
+            disabled={disabled || (inputMode === "text" && !inputValue.trim())}
+            className="h-8 w-8 rounded-full"
+          >
+            {inputMode === "text" ? (
+              <ArrowUp className="h-4 w-4" />
+            ) : isRecording ? (
+              <Square className="h-4 w-4" />
+            ) : (
+              <Mic className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
