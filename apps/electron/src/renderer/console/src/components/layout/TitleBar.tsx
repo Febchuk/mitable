@@ -27,7 +27,7 @@ export default function TitleBar() {
       if (role === "admin") {
         navigate("/dashboard");
       } else {
-        navigate("/home");
+        navigate("/roadmap");
       }
     }
   };
