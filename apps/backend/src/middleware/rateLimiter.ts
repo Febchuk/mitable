@@ -14,14 +14,14 @@ import rateLimit from "express-rate-limit";
  * General API Rate Limiter
  * Applied to all API routes by default
  *
- * Limit: 100 requests per 15 minutes per IP
+ * Limit: 1000 requests per 1 minute per IP (ultra relaxed)
  */
 export const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 60 * 1000, // 1 minute
+  max: 1000, // Limit each IP to 1000 requests per windowMs
   message: {
     error: "Too many requests from this IP, please try again later.",
-    retryAfter: "15 minutes",
+    retryAfter: "1 minute",
   },
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
@@ -33,12 +33,11 @@ export const generalLimiter = rateLimit({
  * Auth Rate Limiter
  * Applied to authentication endpoints (login, signup, password reset)
  *
- * Limit: 5 requests per 15 minutes per IP
- * Stricter limit to prevent brute-force attacks
+ * Limit: 100 requests per 15 minutes per IP (relaxed)
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  max: 100, // Limit each IP to 100 requests per windowMs
   message: {
     error: "Too many authentication attempts from this IP, please try again later.",
     retryAfter: "15 minutes",
@@ -53,15 +52,14 @@ export const authLimiter = rateLimit({
  * Screenshot Analysis Rate Limiter
  * Applied to AI-powered screenshot analysis endpoints
  *
- * Limit: 20 requests per 15 minutes per IP
- * Moderate limit to prevent excessive AI compute usage while allowing normal workflow
+ * Limit: 500 requests per 1 minute per IP (ultra relaxed)
  */
 export const screenshotLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // Limit each IP to 20 requests per windowMs
+  windowMs: 60 * 1000, // 1 minute
+  max: 500, // Limit each IP to 500 requests per windowMs
   message: {
     error: "Too many screenshot analysis requests from this IP, please try again later.",
-    retryAfter: "15 minutes",
+    retryAfter: "1 minute",
   },
   standardHeaders: true,
   legacyHeaders: false,
