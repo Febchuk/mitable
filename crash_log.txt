@@ -1,101 +1,106 @@
-Slack OAuth callback error: DrizzleQueryError: Failed query: insert into "integrations" ("id", "organization_id", "provider", "status", "access_token", "refresh_token", "token_expires_at", "metadata", "last_synced_at", "sync_frequency", "created_at", "updated_at") values (default, $1, $2, $3, $4, default, default, $5, $6, default, $7, $8) on conflict ("organization_id","provider") do update set "status" = $9, "access_token" = $10, "metadata" = $11, "updated_at" = $12
-params: 9647bdeb-418e-48ba-9da9-17b5f01e2d23,slack,connected,xoxb-9402929710246-9698612333271-hUCDZQ77TpWpxGKQBVjn85Hk,{"team_id":"T09BUTBLW78","team_name":"Mitable","bot_user_id":"U09LJJ09T7Z","scope":"channels:history,channels:read,groups:history,groups:read,users:read,chat:write","app_id":"A09LW46FWHK","authed_user":{"id":"U09CE8YD4EM"}},,2025-11-14T06:15:20.764Z,2025-11-14T06:15:20.764Z,connected,xoxb-9402929710246-9698612333271-hUCDZQ77TpWpxGKQBVjn85Hk,{"team_id":"T09BUTBLW78","team_name":"Mitable","bot_user_id":"U09LJJ09T7Z","scope":"channels:history,channels:read,groups:history,groups:read,users:read,chat:write","app_id":"A09LW46FWHK","authed_user":{"id":"U09CE8YD4EM"}},2025-11-14T06:15:20.764Z
-    at NodePgPreparedQuery.queryWithCache (file:///app/node_modules/drizzle-orm/pg-core/session.js:41:15)
-    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at async file:///app/apps/backend/dist/index.js:10727:5 {
-  query: 'insert into "integrations" ("id", "organization_id", "provider", "status", "access_token", "refresh_token", "token_expires_at", "metadata", "last_synced_at", "sync_frequency", "created_at", "updated_at") values (default, $1, $2, $3, $4, default, default, $5, $6, default, $7, $8) on conflict ("organization_id","provider") do update set "status" = $9, "access_token" = $10, "metadata" = $11, "updated_at" = $12',
-  params: [
-    '9647bdeb-418e-48ba-9da9-17b5f01e2d23',
-    'slack',
-    'connected',
-    'xoxb-9402929710246-9698612333271-hUCDZQ77TpWpxGKQBVjn85Hk',
-    '{"team_id":"T09BUTBLW78","team_name":"Mitable","bot_user_id":"U09LJJ09T7Z","scope":"channels:history,channels:read,groups:history,groups:read,users:read,chat:write","app_id":"A09LW46FWHK","authed_user":{"id":"U09CE8YD4EM"}}',
-    null,
-    '2025-11-14T06:15:20.764Z',
-    '2025-11-14T06:15:20.764Z',
-    'connected',
-    'xoxb-9402929710246-9698612333271-hUCDZQ77TpWpxGKQBVjn85Hk',
-    '{"team_id":"T09BUTBLW78","team_name":"Mitable","bot_user_id":"U09LJJ09T7Z","scope":"channels:history,channels:read,groups:history,groups:read,users:read,chat:write","app_id":"A09LW46FWHK","authed_user":{"id":"U09CE8YD4EM"}}',
-    '2025-11-14T06:15:20.764Z'
-  ],
-  cause: error: insert or update on table "integrations" violates foreign key constraint "integrations_organization_id_organizations_id_fk"
-      at /app/node_modules/pg-pool/index.js:45:11
-      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:113:20
-      at async NodePgPreparedQuery.queryWithCache (file:///app/node_modules/drizzle-orm/pg-core/session.js:39:16)
-      at async file:///app/apps/backend/dist/index.js:10727:5 {
-    length: 367,
-    severity: 'ERROR',
-    code: '23503',
-    detail: 'Key (organization_id)=(9647bdeb-418e-48ba-9da9-17b5f01e2d23) is not present in table "organizations".',
-    hint: undefined,
-    position: undefined,
-    internalPosition: undefined,
-    internalQuery: undefined,
-    where: undefined,
-    schema: 'public',
-    table: 'integrations',
-    column: undefined,
-    dataType: undefined,
-    constraint: 'integrations_organization_id_organizations_id_fk',
-    file: 'ri_triggers.c',
-    line: '2599',
-    routine: 'ri_ReportViolation'
-  }
-}
-Slack OAuth callback error: DrizzleQueryError: Failed query: insert into "integrations" ("id", "organization_id", "provider", "status", "access_token", "refresh_token", "token_expires_at", "metadata", "last_synced_at", "sync_frequency", "created_at", "updated_at") values (default, $1, $2, $3, $4, default, default, $5, $6, default, $7, $8) on conflict ("organization_id","provider") do update set "status" = $9, "access_token" = $10, "metadata" = $11, "updated_at" = $12
-params: 9647bdeb-418e-48ba-9da9-17b5f01e2d23,slack,connected,xoxb-9402929710246-9698612333271-hUCDZQ77TpWpxGKQBVjn85Hk,{"team_id":"T09BUTBLW78","team_name":"Mitable","bot_user_id":"U09LJJ09T7Z","scope":"channels:history,channels:read,groups:history,groups:read,users:read,chat:write","app_id":"A09LW46FWHK","authed_user":{"id":"U09CE8YD4EM"}},,2025-11-14T06:47:54.039Z,2025-11-14T06:47:54.039Z,connected,xoxb-9402929710246-9698612333271-hUCDZQ77TpWpxGKQBVjn85Hk,{"team_id":"T09BUTBLW78","team_name":"Mitable","bot_user_id":"U09LJJ09T7Z","scope":"channels:history,channels:read,groups:history,groups:read,users:read,chat:write","app_id":"A09LW46FWHK","authed_user":{"id":"U09CE8YD4EM"}},2025-11-14T06:47:54.039Z
-    at NodePgPreparedQuery.queryWithCache (file:///app/node_modules/drizzle-orm/pg-core/session.js:41:15)
-    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at async file:///app/apps/backend/dist/index.js:10727:5 {
-  query: 'insert into "integrations" ("id", "organization_id", "provider", "status", "access_token", "refresh_token", "token_expires_at", "metadata", "last_synced_at", "sync_frequency", "created_at", "updated_at") values (default, $1, $2, $3, $4, default, default, $5, $6, default, $7, $8) on conflict ("organization_id","provider") do update set "status" = $9, "access_token" = $10, "metadata" = $11, "updated_at" = $12',
-  params: [
-    '9647bdeb-418e-48ba-9da9-17b5f01e2d23',
-    'slack',
-    'connected',
-    'xoxb-9402929710246-9698612333271-hUCDZQ77TpWpxGKQBVjn85Hk',
-    '{"team_id":"T09BUTBLW78","team_name":"Mitable","bot_user_id":"U09LJJ09T7Z","scope":"channels:history,channels:read,groups:history,groups:read,users:read,chat:write","app_id":"A09LW46FWHK","authed_user":{"id":"U09CE8YD4EM"}}',
-    null,
-    '2025-11-14T06:47:54.039Z',
-    '2025-11-14T06:47:54.039Z',
-    'connected',
-    'xoxb-9402929710246-9698612333271-hUCDZQ77TpWpxGKQBVjn85Hk',
-    '{"team_id":"T09BUTBLW78","team_name":"Mitable","bot_user_id":"U09LJJ09T7Z","scope":"channels:history,channels:read,groups:history,groups:read,users:read,chat:write","app_id":"A09LW46FWHK","authed_user":{"id":"U09CE8YD4EM"}}',
-    '2025-11-14T06:47:54.039Z'
-  ],
-  cause: error: insert or update on table "integrations" violates foreign key constraint "integrations_organization_id_organizations_id_fk"
-      at /app/node_modules/pg-pool/index.js:45:11
-      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:113:20
-      at async NodePgPreparedQuery.queryWithCache (file:///app/node_modules/drizzle-orm/pg-core/session.js:39:16)
-      at async file:///app/apps/backend/dist/index.js:10727:5 {
-    length: 367,
-    severity: 'ERROR',
-    dataType: undefined,
-    code: '23503',
-    detail: 'Key (organization_id)=(9647bdeb-418e-48ba-9da9-17b5f01e2d23) is not present in table "organizations".',
-    constraint: 'integrations_organization_id_organizations_id_fk',
-    hint: undefined,
-    position: undefined,
-    file: 'ri_triggers.c',
-    internalPosition: undefined,
-    internalQuery: undefined,
-    where: undefined,
-    schema: 'public',
-    table: 'integrations',
-    line: '2599',
-    routine: 'ri_ReportViolation'
-  }
-}
-    column: undefined,
-  code: 'invalid_credentials'
-}
-Login error: AuthApiError: Invalid login credentials
-    at handleError (/app/node_modules/@supabase/auth-js/dist/main/lib/fetch.js:76:11)
-    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at async _handleRequest (/app/node_modules/@supabase/auth-js/dist/main/lib/fetch.js:119:9)
-    at async _request (/app/node_modules/@supabase/auth-js/dist/main/lib/fetch.js:101:18)
-    at async SupabaseAuthClient.signInWithPassword (/app/node_modules/@supabase/auth-js/dist/main/GoTrueClient.js:386:23)
-    at async file:///app/apps/backend/dist/index.js:2667:29 {
-  __isAuthError: true,
-  status: 400,
+chunk-IFMQGFG6.js?v=6bbd7ba7:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+VM4 sandbox_bundle:2 Electron Security Warning (Insecure Content-Security-Policy) This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+warnAboutInsecureCSP @ VM4 sandbox_bundle:2
+App.tsx:110 [AgentPanel] Auth token updated
+App.tsx:110 [AgentPanel] Auth token updated
+App.tsx:110 [AgentPanel] Auth token updated
+App.tsx:110 [AgentPanel] Auth token updated
+App.tsx:204 [AgentPanel] Creating new conversation...
+conversations.ts:72 [API] Creating conversation: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(1)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(1)
+conversations.ts:75 [API] Auth headers obtained
+conversations.ts:87 [API] Conversation creation response: Object
+conversations.ts:103 [API] ✅ Conversation created: Object
+App.tsx:208 [AgentPanel] Conversation created: 6b4a9e87-7633-4032-b992-791d064c2fb3
+conversations.ts:243 [API] Sending message without screenshots
+conversations.ts:246 [API] 📨 Starting message stream: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(2)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(2)
+conversations.ts:253 [API] Auth headers obtained for streaming
+App.tsx:270 [AgentPanel] Stream complete: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(2)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(2)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(2)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(2)
+App.tsx:193 [AgentPanel] Capturing screenshots...
+VM5:42 [AgentPanel Preload] captureScreenshot() called
+ChatView.tsx:75 [ChatView] Rendering messages: Array(3)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(3)
+App.tsx:195 [AgentPanel] Screenshot capture result: Object
+conversations.ts:236 [API] Sending multi-window capture payload: Object
+conversations.ts:246 [API] 📨 Starting message stream: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(4)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(4)
+conversations.ts:253 [API] Auth headers obtained for streaming
+App.tsx:270 [AgentPanel] Stream complete: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(4)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(4)
+App.tsx:193 [AgentPanel] Capturing screenshots...
+VM5:42 [AgentPanel Preload] captureScreenshot() called
+ChatView.tsx:75 [ChatView] Rendering messages: Array(5)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(5)
+App.tsx:195 [AgentPanel] Screenshot capture result: Object
+conversations.ts:236 [API] Sending multi-window capture payload: Object
+conversations.ts:246 [API] 📨 Starting message stream: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+conversations.ts:253 [API] Auth headers obtained for streaming
+App.tsx:332 [AgentPanel] Progress: searching Searching knowledge base...
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+App.tsx:332 [AgentPanel] Progress: generating Generating step-by-step guide...
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+App.tsx:270 [AgentPanel] Stream complete: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(6)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+App.tsx:529 [AgentPanel] Workflow option selected: Object
+App.tsx:585 [AgentPanel] Capturing screenshot for workflow action...
+VM5:42 [AgentPanel Preload] captureScreenshot() called
+ChatView.tsx:75 [ChatView] Rendering messages: Array(7)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(7)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+App.tsx:589 [AgentPanel] Multi-window capture successful Object
+conversations.ts:236 [API] Sending multi-window capture payload: Object
+conversations.ts:246 [API] 📨 Starting message stream: Object
+conversations.ts:253 [API] Auth headers obtained for streaming
+conversations.ts:268 [API] Sending message with metadata: Object
+App.tsx:621 [AgentPanel] Workflow stream complete: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(7)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(7)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(7)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(7)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+App.tsx:484 [AgentPanel] Enabling custom question mode
+ChatView.tsx:75 [ChatView] Rendering messages: Array(7)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:75 [ChatView] Rendering messages: Array(7)
+ChatView.tsx:93 [ChatView] Potential workflow message: Object
+ChatView.tsx:93 [ChatView] Potential workflow message: Object

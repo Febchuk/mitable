@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "./components/Header";
 import EmptyState from "./components/EmptyState";
@@ -9,6 +9,7 @@ import {
   createConversation,
   sendMessageStream,
   getConversationMessages,
+  pauseWorkflow,
 } from "../../lib/api/conversations";
 import type { SelectedWindowInfo } from "./global";
 import type { MultiWindowCaptureResult } from "@mitable/shared";
@@ -63,14 +64,18 @@ export interface Message {
   messageType?: "text" | "workflow" | "experts";
   isStreaming?: boolean;
   cardData?: unknown;
+  workflowSessionId?: string | null;
+  relatedStepIndex?: number | null;
 }
 
 function App() {
   // Conversation state
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingContent, setStreamingContent] = useState("");
+  const streamingMessageIdRef = useRef<string | null>(null);
+
+  // Loading state for progress messages
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
 
   // User state
   const [userName] = useState("there");
@@ -88,6 +93,14 @@ function App() {
 
   // Animation visibility state
   const [isVisible, setIsVisible] = useState(true);
+
+  // Workflow state
+  const [workflowLoadingMessage, setWorkflowLoadingMessage] = useState<string | null>(null);
+  const [awaitingCustomQuestion, setAwaitingCustomQuestion] = useState<{
+    conversationId: string;
+    workflowSessionId: string | null;
+    relatedStepIndex: number | null;
+  } | null>(null);
 
   // Initialize auth token listener
   useEffect(() => {
@@ -129,6 +142,8 @@ function App() {
             timestamp: new Date(),
             messageType: msg.messageType as "text" | "workflow" | "experts",
             cardData: msg.cardData,
+            workflowSessionId: msg.workflowSessionId,
+            relatedStepIndex: msg.relatedStepIndex,
           }))
         );
       } catch (error) {
@@ -156,7 +171,7 @@ function App() {
 
   const handleSendMessage = useCallback(
     async (content: string) => {
-      if (!content.trim() || isStreaming) return;
+      if (!content.trim() || streamingMessageIdRef.current) return;
 
       // Create user message
       const userMessage: Message = {
@@ -164,11 +179,12 @@ function App() {
         role: "user",
         content: content.trim(),
         timestamp: new Date(),
+        // If awaiting custom question, attach workflow fields so message appears in accordion
+        workflowSessionId: awaitingCustomQuestion?.workflowSessionId || null,
+        relatedStepIndex: awaitingCustomQuestion?.relatedStepIndex ?? null,
       };
 
       setMessages((prev) => [...prev, userMessage]);
-      setIsStreaming(true);
-      setStreamingContent("");
 
       try {
         // Capture screenshot if in watch mode
@@ -192,66 +208,147 @@ function App() {
           console.log("[AgentPanel] Conversation created:", activeConversationId);
         }
 
+        // Create placeholder for streaming assistant message (like conversation window)
+        const streamingMessageId = `streaming-${Date.now()}`;
+        streamingMessageIdRef.current = streamingMessageId;
+
+        const assistantMessage: Message = {
+          id: streamingMessageId,
+          role: "assistant",
+          content: "",
+          timestamp: new Date(),
+          // Route into the correct workflow accordion/step immediately for custom questions
+          workflowSessionId: awaitingCustomQuestion?.workflowSessionId || null,
+          relatedStepIndex: awaitingCustomQuestion?.relatedStepIndex ?? null,
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+
+        // Prepare metadata if this is a custom question during workflow
+        const isCustomWorkflowQuestion = !!awaitingCustomQuestion;
+        const metadata = isCustomWorkflowQuestion
+          ? {
+              workflowAction: "custom_question",
+              selectedOption: 2,
+              workflowSessionId: awaitingCustomQuestion.workflowSessionId,
+              currentStepIndex: awaitingCustomQuestion.relatedStepIndex,
+            }
+          : undefined;
+
+        // Set initial loading state
+        if (isCustomWorkflowQuestion) {
+          setWorkflowLoadingMessage("Thinking...");
+        } else {
+          setLoadingMessage("Thinking...");
+        }
+
         // Send message with streaming
         await sendMessageStream(activeConversationId, content.trim(), captureResult, {
-          onChunk: (chunk) => {
-            setStreamingContent((prev) => prev + chunk);
+          onChunk: (chunk, workflowSessionId, relatedStepIndex) => {
+            // Clear loading message on first chunk
+            if (isCustomWorkflowQuestion) {
+              setWorkflowLoadingMessage(null);
+            } else {
+              setLoadingMessage(null);
+            }
+            // Update message in-place (like conversation window)
+            setMessages((prev) =>
+              prev.map((msg): Message =>
+                msg.id === streamingMessageId
+                  ? {
+                      ...msg,
+                      content: msg.content + chunk,
+                      // Add workflow routing metadata from first chunk
+                      workflowSessionId: msg.workflowSessionId ?? workflowSessionId ?? null,
+                      relatedStepIndex: msg.relatedStepIndex ?? relatedStepIndex ?? null,
+                    }
+                  : msg
+              )
+            );
           },
-          onComplete: (fullContent, messageId, messageType, cardData) => {
-            console.log("[AgentPanel] Stream complete:", {
-              messageId,
-              messageType,
-              hasCardData: !!cardData,
-            });
+          onComplete: (fullContent, messageId, messageType, cardData, workflowSessionId, relatedStepIndex) => {
+            // Clear loading message on complete (in case onChunk never fired)
+            if (isCustomWorkflowQuestion) {
+              setWorkflowLoadingMessage(null);
+            } else {
+              setLoadingMessage(null);
+            }
 
-            // Add assistant message
-            const assistantMessage: Message = {
-              id: messageId || `msg-${Date.now()}`,
-              role: "assistant",
-              content: fullContent,
-              timestamp: new Date(),
-              messageType: messageType as "text" | "workflow" | "experts",
-              cardData,
-            };
-
-            setMessages((prev) => [...prev, assistantMessage]);
-            setStreamingContent("");
-            setIsStreaming(false);
+            // Update message in-place (not create new one)
+            setMessages((prev) =>
+              prev.map((msg): Message =>
+                msg.id === streamingMessageId
+                  ? {
+                      ...msg,
+                      id: messageId || msg.id,
+                      content: fullContent && fullContent.trim().length > 0 ? fullContent : msg.content,
+                      messageType: messageType as "text" | "workflow" | "experts",
+                      cardData,
+                      // Preserve existing routing if backend omits these fields
+                      workflowSessionId: workflowSessionId ?? msg.workflowSessionId,
+                      relatedStepIndex: relatedStepIndex ?? msg.relatedStepIndex,
+                    }
+                  : msg
+              )
+            );
+            streamingMessageIdRef.current = null;
+            // Clear awaiting custom question state after successful completion
+            if (awaitingCustomQuestion) {
+              setAwaitingCustomQuestion(null);
+            }
           },
           onError: (error) => {
             console.error("[AgentPanel] Stream error:", error);
-            setStreamingContent("");
-            setIsStreaming(false);
-
-            // Add error message
-            const errorMessage: Message = {
-              id: `msg-error-${Date.now()}`,
-              role: "assistant",
-              content: `Sorry, I encountered an error: ${error}`,
-              timestamp: new Date(),
-            };
-            setMessages((prev) => [...prev, errorMessage]);
+            // Clear loading message on error
+            if (isCustomWorkflowQuestion) {
+              setWorkflowLoadingMessage(null);
+            } else {
+              setLoadingMessage(null);
+            }
+            // Update message in-place with error
+            setMessages((prev) =>
+              prev.map((msg): Message =>
+                msg.id === streamingMessageId
+                  ? {
+                      ...msg,
+                      content: `Sorry, I encountered an error: ${error}`,
+                    }
+                  : msg
+              )
+            );
+            streamingMessageIdRef.current = null;
           },
-          onProgress: (phase, message) => {
-            console.log("[AgentPanel] Progress:", phase, message);
+          onProgress: (phase, progressMessage) => {
+            console.log("[AgentPanel] Progress:", phase, progressMessage);
+            if (isCustomWorkflowQuestion) {
+              setWorkflowLoadingMessage(progressMessage);
+            } else {
+              setLoadingMessage(progressMessage);
+            }
           },
-        });
+        }, metadata);
       } catch (error) {
         console.error("[AgentPanel] Error sending message:", error);
-        setIsStreaming(false);
-        setStreamingContent("");
-
-        // Add error message
-        const errorMessage: Message = {
-          id: `msg-error-${Date.now()}`,
-          role: "assistant",
-          content: `Sorry, I couldn't process your request. Please try again.`,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, errorMessage]);
+        // Update message in-place with error
+        const currentStreamingId = streamingMessageIdRef.current;
+        if (currentStreamingId) {
+          setMessages((prev) =>
+            prev.map((msg): Message =>
+              msg.id === currentStreamingId
+                ? {
+                    ...msg,
+                    content: `Sorry, I couldn't process your request. Please try again.`,
+                  }
+                : msg
+            )
+          );
+        }
+        streamingMessageIdRef.current = null;
+        setLoadingMessage(null);
+        setWorkflowLoadingMessage(null);
       }
     },
-    [conversationId, isStreaming, selectedWindows.length]
+    [conversationId, selectedWindows.length, awaitingCustomQuestion]
   );
 
   const handleToggleWatchMode = async () => {
@@ -267,8 +364,10 @@ function App() {
   const handleNewChat = () => {
     setConversationId(null);
     setMessages([]);
-    setStreamingContent("");
-    setIsStreaming(false);
+    streamingMessageIdRef.current = null;
+    setLoadingMessage(null);
+    setWorkflowLoadingMessage(null);
+    setAwaitingCustomQuestion(null);
     setCurrentView("chat"); // Return to chat view
   };
 
@@ -292,6 +391,8 @@ function App() {
           timestamp: new Date(),
           messageType: msg.messageType as "text" | "workflow" | "experts",
           cardData: msg.cardData,
+          workflowSessionId: msg.workflowSessionId,
+          relatedStepIndex: msg.relatedStepIndex,
         }))
       );
     } catch (error) {
@@ -315,58 +416,181 @@ function App() {
     }, ANIMATION_DURATION_MS);
   };
 
-  // Workflow option handler
+  // Exit workflow handler - pauses the workflow without creating user messages
+  const handleExitWorkflow = useCallback(async () => {
+    if (!conversationId) return;
+
+    setWorkflowLoadingMessage("cancelling workflow");
+
+    try {
+      const updatedWorkflow = await pauseWorkflow(conversationId);
+
+      // Update all messages in workflow session to status: "paused"
+      if (updatedWorkflow?.workflowSessionId) {
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.workflowSessionId === updatedWorkflow.workflowSessionId && msg.cardData) {
+              return {
+                ...msg,
+                cardData: {
+                  ...(msg.cardData as object),
+                  status: "paused",
+                },
+              };
+            }
+            return msg;
+          })
+        );
+      }
+    } catch (error) {
+      console.error("[AgentPanel] Error pausing workflow:", error);
+    } finally {
+      setWorkflowLoadingMessage(null);
+    }
+  }, [conversationId]);
+
+  // Workflow option handler (matches conversation window pattern)
   const handleWorkflowOptionSelect = useCallback(
     async (option: { id: number; label: string; action: string }) => {
-      if (!conversationId || isStreaming) return;
+      if (!conversationId || streamingMessageIdRef.current) return;
 
       const { action, label } = option;
+
+      // Handle exit workflow separately (doesn't create user message)
+      if (action === "exit_workflow") {
+        await handleExitWorkflow();
+        return;
+      }
+
+      // Find the LATEST workflow message to get current workflowSessionId and currentStepIndex
+      const activeWorkflowMessage = [...messages]
+        .reverse()
+        .find((m) => m.messageType === "workflow" && (m.cardData as { workflowSessionId?: string })?.workflowSessionId);
+      const workflowSessionId = (activeWorkflowMessage?.cardData as { workflowSessionId?: string })?.workflowSessionId || null;
+      const currentStepIndex = (activeWorkflowMessage?.cardData as { currentStepIndex?: number })?.currentStepIndex ?? null;
+
+      // Handle custom question - enable awaiting mode without sending message
+      if (action === "custom_question" || action === "ask_questions") {
+        console.log("[AgentPanel] Enabling custom question mode");
+        setAwaitingCustomQuestion({
+          conversationId,
+          workflowSessionId,
+          relatedStepIndex: currentStepIndex,
+        });
+        // Don't send message yet - wait for user to type their actual question
+        return;
+      }
+
       let metadata: Record<string, unknown> = {};
       let message = "";
 
       // Map workflow actions
       switch (action) {
         case "progress_step":
-          metadata = { workflowAction: "progress_step", selectedOption: 1 };
+          metadata = {
+            workflowAction: "progress_step",
+            selectedOption: 1,
+            workflowSessionId,
+            currentStepIndex,
+          };
           message = "Move on to next step";
           break;
-        case "custom_question":
-        case "ask_questions":
-          metadata = { workflowAction: "custom_question", selectedOption: 2 };
-          message = label || "I have a question";
-          break;
-        case "exit_workflow":
-          metadata = { workflowAction: "exit_workflow", selectedOption: 3 };
-          message = "Exit workflow";
-          break;
         case "confirm_start":
-          metadata = { workflowAction: "progress_step", selectedOption: 1 };
+          metadata = {
+            workflowAction: "progress_step",
+            selectedOption: 1,
+            workflowSessionId,
+          };
           message = "Yes, let's get started!";
+          break;
+        case "resume_workflow":
+          metadata = {
+            workflowAction: "resume_workflow",
+            selectedOption: 1,
+            workflowSessionId,
+            currentStepIndex,
+          };
+          message = "Resume workflow";
           break;
         default:
           message = label || action;
+      }
+
+      console.log("[AgentPanel] Workflow option selected:", {
+        action,
+        message,
+        metadata,
+        workflowSessionId,
+        currentStepIndex,
+      });
+
+      // Do not create visible user messages for workflow control actions
+      // All workflow option clicks should operate silently without adding user bubbles
+      // (This matches the conversation window behavior)
+      const shouldCreateUserMessage = false;
+
+      if (shouldCreateUserMessage) {
+        // Add user message to UI with workflow fields so it appears inside WorkflowAccordion
+        const userMsg: Message = {
+          id: `msg-${Date.now()}`,
+          role: "user",
+          content: message,
+          timestamp: new Date(),
+          workflowSessionId,
+          relatedStepIndex: currentStepIndex,
+        };
+        setMessages((prev) => [...prev, userMsg]);
+      }
+
+      // Create placeholder for streaming assistant message
+      const streamingMessageId = `streaming-${Date.now()}`;
+      streamingMessageIdRef.current = streamingMessageId;
+
+      const assistantMessage: Message = {
+        id: streamingMessageId,
+        role: "assistant",
+        content: "",
+        timestamp: new Date(),
+        // Include workflow routing so the message can be properly grouped/rendered
+        workflowSessionId,
+        relatedStepIndex: currentStepIndex,
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+
+      // Set workflow-specific loading state
+      if (action === "confirm_start") {
+        setWorkflowLoadingMessage("starting workflow");
+      } else if (action === "progress_step") {
+        setWorkflowLoadingMessage("progressing to next step");
+      } else if (action === "resume_workflow") {
+        setWorkflowLoadingMessage("resuming workflow");
+      } else {
+        setWorkflowLoadingMessage("Thinking...");
       }
 
       // Capture screenshot if in watch mode
       let captureResult: MultiWindowCaptureResult | null = null;
       if (
         selectedWindows.length > 0 &&
-        ["progress_step", "custom_question", "confirm_start"].includes(action)
+        ["progress_step", "confirm_start", "resume_workflow"].includes(action)
       ) {
         console.log("[AgentPanel] Capturing screenshot for workflow action...");
-        captureResult = (await window.agentPanelAPI?.captureScreenshot()) || null;
+        try {
+          const result = await window.agentPanelAPI?.captureScreenshot();
+          if (result && result.success) {
+            console.log("[AgentPanel] Multi-window capture successful", {
+              windowCount: result.screenshots.length,
+              blockedCount: result.blockedWindows.length,
+              totalDetected: result.totalWindowsDetected,
+            });
+            captureResult = result;
+          }
+        } catch (error) {
+          console.error("[AgentPanel] Screenshot capture failed:", error);
+          // Continue without screenshot - backend will handle gracefully
+        }
       }
-
-      // Add user message
-      const userMessage: Message = {
-        id: `msg-${Date.now()}`,
-        role: "user",
-        content: message,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, userMessage]);
-      setIsStreaming(true);
-      setStreamingContent("");
 
       try {
         // Send with metadata as 5th argument
@@ -376,62 +600,86 @@ function App() {
           captureResult,
           {
             onChunk: (chunk) => {
-              setStreamingContent((prev) => prev + chunk);
+              // Clear workflow loading state on first chunk
+              setWorkflowLoadingMessage(null);
+
+              // Update message in-place
+              setMessages((prev) =>
+                prev.map((msg): Message =>
+                  msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
+                )
+              );
             },
-            onComplete: (fullContent, messageId, messageType, cardData) => {
+            onComplete: (fullContent, messageId, messageType, cardData, wfSessionId, relatedStepIndex) => {
               console.log("[AgentPanel] Workflow stream complete:", {
                 messageId,
                 messageType,
                 hasCardData: !!cardData,
+                workflowSessionId: wfSessionId,
+                relatedStepIndex,
               });
 
-              const assistantMessage: Message = {
-                id: messageId || `msg-${Date.now()}`,
-                role: "assistant",
-                content: fullContent,
-                timestamp: new Date(),
-                messageType: messageType as "text" | "workflow" | "experts",
-                cardData,
-              };
+              // Clear workflow loading state on complete (in case onChunk never fired)
+              setWorkflowLoadingMessage(null);
 
-              setMessages((prev) => [...prev, assistantMessage]);
-              setStreamingContent("");
-              setIsStreaming(false);
+              // Update message in-place
+              setMessages((prev) =>
+                prev.map((msg): Message =>
+                  msg.id === streamingMessageId
+                    ? {
+                        ...msg,
+                        id: messageId || msg.id,
+                        content: fullContent && fullContent.trim().length > 0 ? fullContent : msg.content,
+                        messageType: messageType as "text" | "workflow" | "experts",
+                        cardData,
+                        // Preserve existing routing if backend omits these fields
+                        workflowSessionId: wfSessionId ?? msg.workflowSessionId,
+                        relatedStepIndex: relatedStepIndex ?? msg.relatedStepIndex,
+                      }
+                    : msg
+                )
+              );
+              streamingMessageIdRef.current = null;
             },
             onError: (error) => {
               console.error("[AgentPanel] Workflow stream error:", error);
-              setStreamingContent("");
-              setIsStreaming(false);
 
-              const errorMessage: Message = {
-                id: `msg-error-${Date.now()}`,
-                role: "assistant",
-                content: `Sorry, I encountered an error: ${error}`,
-                timestamp: new Date(),
-              };
-              setMessages((prev) => [...prev, errorMessage]);
+              // Clear workflow loading state on error
+              setWorkflowLoadingMessage(null);
+
+              // Update message in-place with error
+              setMessages((prev) =>
+                prev.map((msg): Message =>
+                  msg.id === streamingMessageId
+                    ? { ...msg, content: `Error: ${error}. Please try again.` }
+                    : msg
+                )
+              );
+              streamingMessageIdRef.current = null;
             },
             onProgress: (phase, progressMessage) => {
               console.log("[AgentPanel] Workflow progress:", phase, progressMessage);
+              setWorkflowLoadingMessage(progressMessage);
             },
           },
           metadata
         );
       } catch (error) {
         console.error("[AgentPanel] Error in workflow action:", error);
-        setIsStreaming(false);
-        setStreamingContent("");
+        setWorkflowLoadingMessage(null);
 
-        const errorMessage: Message = {
-          id: `msg-error-${Date.now()}`,
-          role: "assistant",
-          content: `Sorry, I couldn't process that action. Please try again.`,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, errorMessage]);
+        // Update message in-place with error
+        setMessages((prev) =>
+          prev.map((msg): Message =>
+            msg.id === streamingMessageId
+              ? { ...msg, content: `Sorry, I couldn't process that action. Please try again.` }
+              : msg
+          )
+        );
+        streamingMessageIdRef.current = null;
       }
     },
-    [conversationId, isStreaming, selectedWindows.length]
+    [conversationId, selectedWindows.length, messages, handleExitWorkflow]
   );
 
   const hasConversation = messages.length > 0;
@@ -467,9 +715,12 @@ function App() {
             ) : hasConversation ? (
               <ChatView
                 messages={messages}
-                isStreaming={isStreaming}
-                streamingContent={streamingContent}
+                isStreaming={!!streamingMessageIdRef.current}
+                streamingMessageIdRef={streamingMessageIdRef}
                 onWorkflowOptionSelect={handleWorkflowOptionSelect}
+                workflowLoadingMessage={workflowLoadingMessage}
+                loadingMessage={loadingMessage}
+                awaitingCustomQuestion={!!awaitingCustomQuestion}
               />
             ) : (
               <EmptyState userName={userName} />
@@ -487,7 +738,7 @@ function App() {
               onToggleWatch={handleToggleWatchMode}
               selectedWindowCount={selectedWindows.length}
               onSendMessage={handleSendMessage}
-              disabled={isStreaming}
+              disabled={!!streamingMessageIdRef.current}
             />
           )}
         </motion.div>
