@@ -201,21 +201,6 @@ export default function ChatDetail() {
     );
   }
 
-  if (!messages || messages.length === 0) {
-    return (
-      <div className="p-8">
-        <button
-          onClick={() => navigate("/chats")}
-          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-4"
-        >
-          <ArrowLeft size={16} />
-          <span className="text-sm">Back to Chats</span>
-        </button>
-        <p className="text-text-primary">No messages found</p>
-      </div>
-    );
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || !chatId) return;

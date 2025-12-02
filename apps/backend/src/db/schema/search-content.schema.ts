@@ -70,6 +70,26 @@ export const searchContent = pgTable(
     blockId: text("block_id"),
     blockType: text("block_type"),
 
+    // GitHub-specific metadata (Code Domain - Phase 1)
+    repoId: text("repo_id"), // FK to github_repos (not enforced to allow flexibility)
+    repoFullName: text("repo_full_name"), // "Febchuk/mitable"
+    filePath: text("file_path"), // "apps/backend/src/services/notion.service.ts"
+    fileName: text("file_name"), // "notion.service.ts"
+    language: text("language"), // "typescript" | "javascript" | etc.
+    fileRole: text("file_role"), // "service" | "controller" | "component" | etc.
+    area: text("area"), // "backend-services" | "electron-main" | etc.
+    commitSha: text("commit_sha"), // Git commit SHA
+    gitAuthor: text("git_author"), // Git author name
+    committedAt: timestamp("committed_at"), // When committed
+    startLine: integer("start_line"), // Symbol start line
+    endLine: integer("end_line"), // Symbol end line
+    functionName: text("function_name"), // For function chunks
+    className: text("class_name"), // For class chunks
+    exports: text("exports").array(), // Exported symbols (for file_overview)
+    isExported: boolean("is_exported").default(false), // Is this symbol exported?
+    isTestFile: boolean("is_test_file").default(false), // Test vs production code
+    isGenerated: boolean("is_generated").default(false), // Generated code (e.g., Prisma client)
+
     // Chunk metadata (from chunking service)
     chunkIndex: integer("chunk_index").default(0),
     totalChunks: integer("total_chunks").default(1),
@@ -116,6 +136,12 @@ export const searchContent = pgTable(
 
     // Notion-specific indexes
     index("search_content_page_idx").on(table.pageId),
+
+    // GitHub-specific indexes
+    index("search_content_repo_idx").on(table.repoFullName),
+    index("search_content_file_role_idx").on(table.fileRole),
+    index("search_content_area_idx").on(table.area),
+    index("search_content_language_idx").on(table.language),
   ]
 );
 

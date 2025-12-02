@@ -1,11 +1,12 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { config } from "../config.js";
 import { NOTION_CONFIG } from "../services/notion.service.js";
 import { encryptionService } from "../services/encryption.service.js";
+import { githubService } from "../services/github.service.js";
 
 const router = Router();
 
@@ -1205,6 +1206,323 @@ router.post("/notion/sync", requireAuth, async (req: Request, res: Response): Pr
       error: "Internal Server Error",
       message: error instanceof Error ? error.message : "Failed to trigger sync",
     });
+  }
+});
+
+// ============================================================================
+// GITHUB INTEGRATION ROUTES
+// ============================================================================
+
+/**
+ * POST /api/integrations/github/install/start
+ * Generate GitHub App installation URL
+ */
+router.post(
+  "/github/install/start",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req as any).userId;
+
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!user) {
+        sendError(res, 404, "USER_NOT_FOUND", "User not found");
+        return;
+      }
+
+      if (!config.github?.appSlug) {
+        sendError(res, 500, "GITHUB_NOT_CONFIGURED", "GitHub App not configured");
+        return;
+      }
+
+      const installUrl =
+        `https://github.com/apps/${encodeURIComponent(config.github.appSlug)}/installations/new` +
+        `?state=${user.organizationId}` +
+        `&redirect_uri=${encodeURIComponent(config.github.installationRedirectUri || "")}`;
+
+      res.json({ installUrl });
+    } catch (error) {
+      console.error("Error starting GitHub install:", error);
+      sendError(res, 500, "GITHUB_INSTALL_FAILED", "Failed to start GitHub installation");
+    }
+  }
+);
+
+/**
+ * GET /api/integrations/github/callback
+ * GitHub App installation callback
+ */
+router.get("/github/callback", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { installation_id, state } = req.query;
+
+    if (!installation_id || !state) {
+      sendError(res, 400, "GITHUB_CALLBACK_INVALID", "Missing installation_id or state");
+      return;
+    }
+
+    const organizationId = state as string;
+    const installationId = parseInt(installation_id as string, 10);
+
+    if (Number.isNaN(installationId)) {
+      sendError(res, 400, "GITHUB_INSTALLATION_INVALID", "Invalid installation_id");
+      return;
+    }
+
+    const placeholderToken = encryptionService.encrypt("github-app-installation");
+
+    const [integration] = await db
+      .insert(schema.integrations)
+      .values({
+        organizationId,
+        provider: "github",
+        status: "connected",
+        accessTokenEncrypted: placeholderToken,
+        encryptionVersion: 1,
+        metadata: { installationId },
+      })
+      .onConflictDoUpdate({
+        target: [schema.integrations.organizationId, schema.integrations.provider],
+        set: {
+          status: "connected",
+          accessTokenEncrypted: placeholderToken,
+          metadata: { installationId },
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    // Fetch and save repos
+    try {
+      const repos = await githubService.listInstallationRepos(installationId);
+
+      if (repos.length > 0) {
+        await db
+          .insert(schema.githubRepos)
+          .values(
+            repos.map((repo) => ({
+              integrationId: integration.id,
+              githubRepoId: repo.id,
+              owner: repo.owner.login,
+              name: repo.name,
+              fullName: repo.full_name,
+              defaultBranch: repo.default_branch,
+              visibility: repo.visibility || (repo.private ? "private" : "public"),
+              isPrivate: repo.private,
+              isSelected: true,
+            }))
+          )
+          .onConflictDoUpdate({
+            target: [schema.githubRepos.integrationId, schema.githubRepos.githubRepoId],
+            set: {
+              owner: sql`excluded.owner`,
+              name: sql`excluded.name`,
+              fullName: sql`excluded.full_name`,
+              defaultBranch: sql`excluded.default_branch`,
+              visibility: sql`excluded.visibility`,
+              isPrivate: sql`excluded.is_private`,
+            },
+          });
+
+        console.log(`✅ GitHub repos saved: ${repos.length} for installation ${installationId}`);
+      }
+    } catch (repoError) {
+      console.error("Failed to fetch repos:", repoError);
+    }
+
+    res.send(`
+      <html>
+        <head>
+          <title>GitHub Connected</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; text-align: center; }
+            h1 { color: #24292e; }
+          </style>
+        </head>
+        <body>
+          <h1>✅ GitHub Connected</h1>
+          <p>Your GitHub App is linked to Mitable.</p>
+          <p>You can close this window and return to the app.</p>
+          <button onclick="window.close()">Close Window</button>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("GitHub callback error:", error);
+    sendError(res, 500, "GITHUB_CALLBACK_FAILED", "Failed to complete GitHub installation");
+  }
+});
+
+/**
+ * GET /api/integrations/github/repos
+ * List GitHub repositories
+ */
+router.get("/github/repos", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).userId;
+
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+
+    if (!user) {
+      sendError(res, 404, "USER_NOT_FOUND", "User not found");
+      return;
+    }
+
+    const [integration] = await db
+      .select()
+      .from(schema.integrations)
+      .where(
+        and(
+          eq(schema.integrations.organizationId, user.organizationId),
+          eq(schema.integrations.provider, "github")
+        )
+      )
+      .limit(1);
+
+    if (!integration) {
+      sendError(res, 404, "GITHUB_NOT_CONNECTED", "GitHub not connected");
+      return;
+    }
+
+    const metadata = (integration.metadata || {}) as { installationId?: number };
+
+    if (!metadata.installationId) {
+      sendError(res, 400, "GITHUB_INSTALLATION_MISSING", "Installation ID not found");
+      return;
+    }
+
+    const repoRecords = await db
+      .select()
+      .from(schema.githubRepos)
+      .where(eq(schema.githubRepos.integrationId, integration.id));
+
+    res.json({
+      repositories: repoRecords.map((repo) => ({
+        id: repo.githubRepoId,
+        name: repo.name,
+        fullName: repo.fullName,
+        owner: repo.owner,
+        defaultBranch: repo.defaultBranch,
+        isSelected: repo.isSelected,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching GitHub repos:", error);
+    sendError(res, 500, "GITHUB_REPO_LIST_FAILED", "Failed to fetch repositories");
+  }
+});
+
+/**
+ * POST /api/integrations/github/repos
+ * Update selected repositories
+ */
+router.post("/github/repos", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).userId;
+    const { selectedRepoIds } = req.body as { selectedRepoIds?: number[] };
+
+    if (!Array.isArray(selectedRepoIds)) {
+      sendError(res, 400, "INVALID_BODY", "selectedRepoIds must be an array");
+      return;
+    }
+
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+
+    if (!user) {
+      sendError(res, 404, "USER_NOT_FOUND", "User not found");
+      return;
+    }
+
+    const [integration] = await db
+      .select()
+      .from(schema.integrations)
+      .where(
+        and(
+          eq(schema.integrations.organizationId, user.organizationId),
+          eq(schema.integrations.provider, "github")
+        )
+      )
+      .limit(1);
+
+    if (!integration) {
+      sendError(res, 404, "GITHUB_NOT_CONNECTED", "GitHub not connected");
+      return;
+    }
+
+    await db
+      .update(schema.githubRepos)
+      .set({ isSelected: false })
+      .where(eq(schema.githubRepos.integrationId, integration.id));
+
+    if (selectedRepoIds.length > 0) {
+      await db
+        .update(schema.githubRepos)
+        .set({ isSelected: true })
+        .where(
+          and(
+            eq(schema.githubRepos.integrationId, integration.id),
+            inArray(schema.githubRepos.githubRepoId, selectedRepoIds)
+          )
+        );
+    }
+
+    res.json({ success: true, selectedRepoIds });
+  } catch (error) {
+    console.error("Error saving GitHub repo selections:", error);
+    sendError(res, 500, "GITHUB_REPO_SAVE_FAILED", "Failed to save selections");
+  }
+});
+
+/**
+ * POST /api/integrations/github/sync
+ * Trigger GitHub sync
+ */
+router.post("/github/sync", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).userId;
+
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+
+    if (!user) {
+      sendError(res, 404, "USER_NOT_FOUND", "User not found");
+      return;
+    }
+
+    const [integration] = await db
+      .select()
+      .from(schema.integrations)
+      .where(
+        and(
+          eq(schema.integrations.organizationId, user.organizationId),
+          eq(schema.integrations.provider, "github")
+        )
+      )
+      .limit(1);
+
+    if (!integration) {
+      sendError(res, 404, "GITHUB_NOT_CONNECTED", "GitHub not connected");
+      return;
+    }
+
+    console.log(`🔄 Starting GitHub sync for org: ${user.organizationId}`);
+
+    const { githubSyncService } = await import("../services/github-sync.service.js");
+    const result = await githubSyncService.syncIntegration(integration);
+
+    res.json({
+      success: true,
+      message: "GitHub sync completed",
+      reposProcessed: result.reposProcessed,
+      commitsProcessed: result.commitsProcessed,
+    });
+  } catch (error) {
+    console.error("Error triggering GitHub sync:", error);
+    sendError(res, 500, "GITHUB_SYNC_FAILED", "Failed to sync GitHub");
   }
 });
 

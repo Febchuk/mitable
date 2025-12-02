@@ -2,8 +2,8 @@ import Groq from "groq-sdk";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
 import type { StreamChunk, ToolContext, Source } from "../tools/base.tool";
-// import { codeRetriever } from "../retrievers/code.retriever";
-// import { workRetriever } from "../retrievers/work.retriever";
+import { codeRetriever } from "../retrievers/code.retriever.js";
+import { workRetriever } from "../retrievers/work.retriever.js";
 import { slackRetriever } from "../retrievers/slack.retriever";
 import { TemporalQueryParser } from "../utils/temporal-parser";
 // import { notionRetriever } from "../retrievers/notion.retriever";
@@ -168,59 +168,116 @@ export class KnowledgeAgent extends BaseAgent {
             },
           },
         },
-        // TODO: Re-enable after Slack chunking is complete
-        // {
-        //   type: "function",
-        //   function: {
-        //     name: "search_code",
-        //     description:
-        //       "Search GitHub codebase for implementations, functions, classes, and files. " +
-        //       "Returns code chunks with file paths and line numbers.",
-        //     parameters: {
-        //       type: "object",
-        //       properties: {
-        //         query: {
-        //           type: "string",
-        //           description: "Search query for code",
-        //         },
-        //         topK: {
-        //           type: "number",
-        //           description: "Number of results (default: 10)",
-        //           default: 10,
-        //         },
-        //       },
-        //       required: ["query"],
-        //     },
-        //   },
-        // },
-        // {
-        //   type: "function",
-        //   function: {
-        //     name: "search_work",
-        //     description:
-        //       "Search GitHub work items: commits, pull requests, and issues. " +
-        //       "Returns PRs, commits, and issues with metadata.",
-        //     parameters: {
-        //       type: "object",
-        //       properties: {
-        //         query: {
-        //           type: "string",
-        //           description: "Search query for PRs/commits/issues",
-        //         },
-        //         topK: {
-        //           type: "number",
-        //           description: "Number of results (default: 10)",
-        //           default: 10,
-        //         },
-        //       },
-        //       required: ["query"],
-        //     },
-        //   },
-        // },
+        {
+          type: "function",
+          function: {
+            name: "search_code",
+            description:
+              "Search GitHub codebase for implementations, functions, classes, types, and files. " +
+              "Use this for 'where/what/how is X implemented' questions. " +
+              "Returns code chunks with file paths, line numbers, and function/class names.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description:
+                    "Search query for code (e.g., 'Notion sync implementation', 'authentication functions')",
+                },
+                topK: {
+                  type: "number",
+                  description: "Number of results (default: 10)",
+                  default: 10,
+                },
+              },
+              required: ["query"],
+            },
+          },
+        },
+        // view_code tool - Fetch actual code from GitHub (ephemeral)
+        {
+          type: "function",
+          function: {
+            name: "view_code",
+            description:
+              "Fetch actual code from GitHub. Use after search_code when you need implementation details. " +
+              "Can fetch: (1) specific function/class lines, (2) entire file, or (3) multiple related files (up to 4). " +
+              "IMPORTANT: Use repoFullName from search_code results. Code is NOT persisted (ephemeral).",
+            parameters: {
+              type: "object",
+              properties: {
+                repoFullName: {
+                  type: "string",
+                  description:
+                    "Repository name from search_code results (e.g., 'owner/repo'). Optional if org has only 1 repo.",
+                },
+                filePath: {
+                  type: "string",
+                  description:
+                    "Single file path (Mode 1). Omit startLine/endLine to fetch entire file.",
+                },
+                startLine: {
+                  type: "number",
+                  description: "Optional: Start line for specific function/class",
+                },
+                endLine: {
+                  type: "number",
+                  description: "Optional: End line for specific function/class",
+                },
+                functionName: {
+                  type: "string",
+                  description: "Optional: Function/class name for context",
+                },
+                files: {
+                  type: "array",
+                  description:
+                    "Multiple files (Mode 2, max 4). Use this to understand a feature across files.",
+                  items: {
+                    type: "object",
+                    properties: {
+                      filePath: { type: "string" },
+                      startLine: { type: "number", description: "Optional" },
+                      endLine: { type: "number", description: "Optional" },
+                    },
+                    required: ["filePath"],
+                  },
+                },
+              },
+              required: [],
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "search_work",
+            description:
+              "Search GitHub work items: commits, pull requests, and issues. " +
+              "Use this for 'when/why/who decided' questions about changes, features, or discussions. " +
+              "Returns PRs, commits, and issues with metadata, labels, and timestamps.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description:
+                    "Search query for PRs/commits/issues (e.g., 'recent PR about Slack', 'bug fixes last week')",
+                },
+                topK: {
+                  type: "number",
+                  description: "Number of results (default: 10)",
+                  default: 10,
+                },
+              },
+              required: ["query"],
+            },
+          },
+        },
       ];
 
       // Build messages array from conversation history
       const messages: Groq.Chat.ChatCompletionMessageParam[] = [];
+      const ephemeralMessageIds = new Set<string>(); // Track ephemeral tool results
 
       // Add system prompt to guide multi-query decomposition and thorough research
       messages.push({
@@ -228,19 +285,34 @@ export class KnowledgeAgent extends BaseAgent {
         content:
           "You are a helpful AI assistant with access to search tools. " +
           "Your goal is to provide COMPREHENSIVE, DETAILED answers by gathering all relevant information.\n\n" +
-          "BREVITY GUIDELINES:\n" +
-          "- For timeline/status questions (what happened this week, what did we discuss, current status): " +
-          "provide a 2-8 sentence executive summary unless user explicitly asks for details.\n" +
-          "- For technical/architectural questions: provide complete answers with all necessary context.\n" +
-          "- Always prioritize clarity and usefulness over verbosity.\n\n" +
+          "🚫 CRITICAL FORMATTING RULE - NEVER USE TABLES:\n" +
+          "- NEVER EVER use markdown tables (anything with pipes | )\n" +
+          "- NEVER format data in rows and columns with | symbols\n" +
+          "- If you need to show structured data, use bullet points or numbered lists instead\n\n" +
+          "Example - DO NOT do this:\n" +
+          "| Layer | Responsibility | Implementation |\n" +
+          "|-------|----------------|----------------|\n" +
+          "| Agent | Routing | agent.service.ts |\n\n" +
+          "Instead, DO this:\n" +
+          "## Architecture Layers\n" +
+          "- **Agent Layer**: Handles routing decisions\n" +
+          "  - Implementation: `agent.service.ts`\n" +
+          "- **Service Layer**: Core business logic\n" +
+          "  - Implementation: `guideGeneration.service.ts`\n\n" +
+          "Use headers (##, ###), bullet points (-), and numbered lists (1., 2., 3.) ONLY.\n\n" +
+          "BREVITY GUIDELINES - Match detail level to question specificity:\n" +
+          '- **Vague/broad questions** ("What is X?", "How does Y work?"): Provide concise 2-4 paragraph overview with key points. Don\'t deep-dive unless asked.\n' +
+          '- **Specific questions** ("What parameters does X function take?", "How do I configure Y?"): Provide focused, detailed answer to exact question.\n' +
+          "- **Timeline/status questions**: 2-8 sentence executive summary unless user asks for details.\n" +
+          "- **Rule of thumb**: Simple question = Simple answer. Complex question = Detailed answer.\n" +
+          "- Avoid making 5+ tool calls for vague questions - get core answer first, user can ask follow-ups.\n\n" +
           "For complex questions (especially about integrations, architecture, or 'how does X work'), DECOMPOSE them into sub-questions:\n" +
           "- What is the data model? (database schemas, tables, fields)\n" +
           "- What is the authentication/OAuth flow?\n" +
           "- What are the implementation details? (sync pipeline, API calls, code)\n" +
           "- What are edge cases or limitations?\n\n" +
           "Use MULTIPLE targeted searches to gather complete information:\n" +
-          "- First, call get_org_info to see what data sources are available\n" +
-          "- Then search each relevant domain with SPECIFIC queries\n" +
+          "- Search each relevant domain with SPECIFIC queries\n" +
           "- Example: For 'How does Notion integration work?', search for:\n" +
           "  1. 'Notion integration database schema tables'\n" +
           "  2. 'Notion OAuth flow authorization'\n" +
@@ -262,7 +334,24 @@ export class KnowledgeAgent extends BaseAgent {
           "  ❌ WRONG: 'According to the Slack discussion...' - no inline citations\n" +
           "  ❌ WRONG: Sources without **Sources:** heading - MUST include heading\n" +
           "  ❌ WRONG: No sources section at end - MANDATORY\n\n" +
-          "REMEMBER: You MUST include the **Sources:** heading before the list!",
+          "REMEMBER: You MUST include the **Sources:** heading before the list!\n\n" +
+          "AVAILABLE TOOLS (use ONLY these):\n" +
+          "1. search_code - Search code files (returns metadata only: file paths, function names, line numbers)\n" +
+          "2. view_code - Fetch actual code from a specific file (use after search_code)\n" +
+          "3. search_slack - Search Slack messages\n" +
+          "4. search_work - Search GitHub PRs, commits, issues\n\n" +
+          "DO NOT invent or hallucinate other tool names like 'repo_browser', 'open_file', 'get_org_info', 'search_notion', etc. They don't exist.\n\n" +
+          "CODE SEARCH WORKFLOW:\n" +
+          "1. Start with search_code to find relevant files and functions (metadata only)\n" +
+          "2. If metadata isn't enough, call view_code on specific functions you identified\n" +
+          "3. view_code requires: repo_full_name, file_path, start_line, end_line\n" +
+          "4. DO NOT try to call search_code without a 'query' parameter - it's required\n" +
+          "5. DO NOT hallucinate implementation details - use view_code if you need them\n\n" +
+          "Example:\n" +
+          'search_code({"query": "authentication"})\n' +
+          "→ Found: AuthService.authenticateUser (lines 45-89)\n" +
+          'view_code({"repo_full_name": "Npounengnong/mitableai", "file_path": "apps/backend/src/services/auth.service.ts", "start_line": 45, "end_line": 89})\n' +
+          "→ Now you have the actual code",
       });
 
       for (const msg of context.conversationHistory) {
@@ -301,19 +390,72 @@ export class KnowledgeAgent extends BaseAgent {
         iteration++;
         console.log(`[KnowledgeAgent] Iteration ${iteration}/${MAX_ITERATIONS}`);
 
-        const response = await this.groq.chat.completions.create({
-          model: config.groq.chatModel,
-          messages: messages,
-          tools: tools,
-          tool_choice: "auto",
-          temperature: config.groq.temperature,
-        });
+        let response;
+        try {
+          response = await this.groq.chat.completions.create({
+            model: config.groq.chatModel,
+            messages: messages,
+            tools: tools,
+            tool_choice: "auto",
+            temperature: config.groq.temperature,
+          });
+        } catch (error: any) {
+          // Handle tool hallucination errors (e.g., LLM tries to call non-existent tools)
+          if (error?.status === 400 && error?.error?.code === "tool_use_failed") {
+            console.warn(
+              `[KnowledgeAgent] Tool hallucination detected:`,
+              error.error.failed_generation
+            );
+
+            // Extract what the LLM tried to call
+            const failedTool = error.error.failed_generation;
+
+            // Add error message to guide LLM to correct tools
+            messages.push({
+              role: "system",
+              content:
+                `ERROR: You tried to call a tool that doesn't exist: ${failedTool}\n\n` +
+                `Available tools are:\n` +
+                `- search_code: Search code files (metadata only)\n` +
+                `- view_code: Fetch actual code from a specific file\n` +
+                `- search_slack: Search Slack messages\n` +
+                `- search_work: Search GitHub PRs, commits, issues\n\n` +
+                `If you need to view a specific file, use view_code with parameters:\n` +
+                `- repoFullName: string (e.g., "owner/repo") - from search results\n` +
+                `- filePath: string (e.g., "apps/backend/src/...")\n` +
+                `- startLine: number (optional)\n` +
+                `- endLine: number (optional)\n\n` +
+                `Please retry with the correct tool.`,
+            });
+
+            // Continue to next iteration to let LLM retry
+            continue;
+          }
+
+          // Re-throw other errors
+          throw error;
+        }
 
         const responseMessage = response.choices[0]?.message;
 
         // Check if LLM wants to call tools
         if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
           console.log(`[KnowledgeAgent] LLM called ${responseMessage.tool_calls.length} tool(s)`);
+
+          // Check if we're on last iteration - if so, we won't be able to process results
+          if (iteration === MAX_ITERATIONS) {
+            console.warn(
+              `[KnowledgeAgent] Tools called on final iteration - cannot process results`
+            );
+            yield {
+              type: "complete",
+              messageType: "text",
+              content:
+                "I found relevant information but ran out of processing time. Please try asking your question in a more specific way, or break it into smaller questions.",
+              sources: undefined,
+            };
+            return;
+          }
 
           // Add assistant message to history
           messages.push({
@@ -334,10 +476,26 @@ export class KnowledgeAgent extends BaseAgent {
 
               console.log(`[KnowledgeAgent] Tool result: ${result.substring(0, 200)}...`);
 
+              // Check if result is ephemeral (shouldn't be persisted)
+              let isEphemeral = false;
+              try {
+                const parsed = JSON.parse(result);
+                isEphemeral = parsed._ephemeral === true;
+                if (isEphemeral) {
+                  console.log(
+                    `[KnowledgeAgent] Tool ${toolName} marked as ephemeral (not persisted)`
+                  );
+                  ephemeralMessageIds.add(toolCall.id); // Track separately
+                }
+              } catch {
+                // Not JSON or no _ephemeral flag - treat as normal
+              }
+
               return {
                 role: "tool" as const,
                 tool_call_id: toolCall.id,
                 content: result,
+                // NO custom properties - Groq doesn't support them!
               };
             } catch (error) {
               console.error(`[KnowledgeAgent] Tool ${toolName} failed:`, error);
@@ -352,7 +510,8 @@ export class KnowledgeAgent extends BaseAgent {
           // Wait for all tool calls to complete in parallel
           const toolResults = await Promise.all(toolCallPromises);
 
-          // Add all results to message history
+          // Add all results to message history (including ephemeral for THIS iteration)
+          // Note: Ephemeral results will be filtered out before saving to DB
           toolResults.forEach((result) => messages.push(result));
 
           // Loop continues - call LLM again with tool results
@@ -508,43 +667,80 @@ export class KnowledgeAgent extends BaseAgent {
         return JSON.stringify(response);
       }
 
-      // TODO: Re-enable after Slack chunking is complete
-      // case "search_code": {
-      //   const results = await codeRetriever.retrieve(
-      //     args.query,
-      //     { organizationId: context.organizationId },
-      //     { topK, includeTypes: ["code"] }
-      //   );
+      case "search_code": {
+        const results = await codeRetriever.retrieve(
+          args.query,
+          { organizationId: context.organizationId },
+          { topK }
+        );
 
-      //   const formatted = results.files.flatMap((file: any) =>
-      //     file.chunks.map((chunk: any) => ({
-      //       file: file.path,
-      //       lines: `${chunk.startLine}-${chunk.endLine}`,
-      //       code: chunk.text, // Full code chunk
-      //       repo: file.repoFullName,
-      //     }))
-      //   );
+        const formatted = results.chunks.map((chunk: any) => ({
+          file: chunk.path,
+          fileName: chunk.fileName,
+          repo: chunk.repoFullName,
+          lines: `${chunk.startLine}-${chunk.endLine}`,
+          code: chunk.text, // Full code chunk
+          language: chunk.language,
+          role: chunk.fileRole,
+          area: chunk.area,
+          functionName: chunk.functionName,
+          className: chunk.className,
+          isExported: chunk.isExported,
+        }));
 
-      //   return JSON.stringify(formatted);
-      // }
+        // Add metadata about truncation
+        const response: any = { code: formatted };
+        if (results.truncated) {
+          response._meta = {
+            truncated: true,
+            estimatedTokens: results.estimatedTokens,
+            note: "Results were truncated to fit token budget. Use more specific queries if needed.",
+          };
+        }
 
-      // case "search_work": {
-      //   const results = await workRetriever.retrieve(
-      //     args.query,
-      //     { organizationId: context.organizationId },
-      //     { topK }
-      //   );
+        return JSON.stringify(response);
+      }
 
-      //   const formatted = results.items.map((item: any) => ({
-      //     type: item.type,
-      //     title: item.title,
-      //     description: item.description, // Full description
-      //     author: item.author,
-      //     created: item.createdAt,
-      //   }));
+      case "search_work": {
+        const results = await workRetriever.retrieve(
+          args.query,
+          { organizationId: context.organizationId },
+          { topK }
+        );
 
-      //   return JSON.stringify(formatted);
-      // }
+        const formatted = results.chunks.map((chunk: any) => ({
+          type: chunk.chunkType, // commit_summary | pr_summary | issue_summary | pr_comments | issue_comments
+          repo: chunk.repoFullName,
+          content: chunk.text, // Full description/summary
+          author: chunk.author,
+          date: chunk.committedAt,
+          area: chunk.area,
+          labels: chunk.labels,
+          state: chunk.state,
+          isMerged: chunk.isMerged,
+        }));
+
+        // Add metadata about truncation
+        const response: any = { work: formatted };
+        if (results.truncated) {
+          response._meta = {
+            truncated: true,
+            estimatedTokens: results.estimatedTokens,
+            note: "Results were truncated to fit token budget. Use more specific queries or date filters if needed.",
+          };
+        }
+
+        return JSON.stringify(response);
+      }
+
+      case "view_code": {
+        const { ViewCodeTool } = await import("../tools/view-code.tool.js");
+        const viewCodeTool = new ViewCodeTool();
+        const result = await viewCodeTool.execute(args, {
+          organizationId: context.organizationId,
+        });
+        return JSON.stringify(result); // Includes _ephemeral flag
+      }
 
       default:
         throw new Error(`Unknown tool: ${toolName}`);

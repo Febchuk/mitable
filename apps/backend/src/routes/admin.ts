@@ -1990,25 +1990,68 @@ router.post(
         })
         .where(eq(schema.integrations.id, integrationId));
 
-      // TODO: Trigger actual sync job here (e.g., queue worker, background job)
-      // For now, immediately mark as success
-      await db
-        .update(schema.syncLogs)
-        .set({
-          status: "success",
-          itemsSynced: 0,
-          completedAt: new Date(),
-        })
-        .where(eq(schema.syncLogs.id, syncLog.id));
+      // Trigger actual sync based on provider
+      let itemsSynced = 0;
+      let syncResult: any = {};
 
-      res.json({
-        success: true,
-        syncLog: {
-          ...syncLog,
-          status: "success",
-          completedAt: new Date(),
-        },
-      });
+      try {
+        if (integration.provider === "slack") {
+          const { ingestionService } = await import("../services/ingestion.service.js");
+          const result = await ingestionService.syncSlackMessages(currentUser.organizationId);
+          itemsSynced = result.messagesEmbedded || 0;
+          syncResult = result;
+        } else if (integration.provider === "notion") {
+          const { ingestionService } = await import("../services/ingestion.service.js");
+          const result = await ingestionService.syncNotionPages(currentUser.organizationId);
+          itemsSynced = result.messagesEmbedded || 0; // Notion uses same interface
+          syncResult = result;
+        } else if (integration.provider === "github") {
+          const { githubSyncService } = await import("../services/github-sync.service.js");
+          const result = await githubSyncService.syncIntegration(integration);
+          itemsSynced = result.commitsProcessed || 0;
+          syncResult = result;
+        }
+
+        // Mark sync as success
+        await db
+          .update(schema.syncLogs)
+          .set({
+            status: "success",
+            itemsSynced,
+            completedAt: new Date(),
+          })
+          .where(eq(schema.syncLogs.id, syncLog.id));
+
+        res.json({
+          success: true,
+          provider: integration.provider,
+          result: syncResult,
+          syncLog: {
+            ...syncLog,
+            status: "success",
+            itemsSynced,
+            completedAt: new Date(),
+          },
+        });
+      } catch (syncError) {
+        console.error(`Error syncing ${integration.provider}:`, syncError);
+
+        // Mark sync as failed
+        await db
+          .update(schema.syncLogs)
+          .set({
+            status: "failed",
+            errorMessage: syncError instanceof Error ? syncError.message : "Unknown error",
+            completedAt: new Date(),
+          })
+          .where(eq(schema.syncLogs.id, syncLog.id));
+
+        res.status(500).json({
+          success: false,
+          error: "Sync Failed",
+          message: syncError instanceof Error ? syncError.message : "Failed to sync integration",
+        });
+      }
     } catch (error) {
       console.error("Error syncing integration:", error);
       res.status(500).json({

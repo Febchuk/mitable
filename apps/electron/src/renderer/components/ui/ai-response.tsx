@@ -191,9 +191,9 @@ export const Response = memo(
 
             // Tables
             table: ({ ...props }) => (
-              <div className="overflow-x-auto mb-4">
+              <div className="mb-4 w-full">
                 <table
-                  className="min-w-full divide-y divide-gray-700 border border-gray-700"
+                  className="w-full divide-y divide-gray-700 border border-gray-700"
                   {...props}
                 />
               </div>
@@ -205,11 +205,13 @@ export const Response = memo(
             tr: ({ ...props }) => <tr {...props} />,
             th: ({ ...props }) => (
               <th
-                className="px-4 py-2 text-left font-semibold text-text-primary uppercase tracking-wider"
+                className="px-4 py-2 text-left text-xs font-semibold text-text-primary uppercase tracking-wider break-words"
                 {...props}
               />
             ),
-            td: ({ ...props }) => <td className="px-4 py-2 text-text-primary" {...props} />,
+            td: ({ ...props }) => (
+              <td className="px-4 py-2 text-sm text-text-primary break-words" {...props} />
+            ),
 
             // Code
             code: ({ className, ...props }: ComponentProps<"code">) => {

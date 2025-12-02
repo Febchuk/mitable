@@ -6,6 +6,8 @@ export default {
   extensionsToTreatAsEsm: [".ts"],
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
+    "@octokit/app": "<rootDir>/__mocks__/@octokit/app.js",
+    "@octokit/core": "<rootDir>/__mocks__/@octokit/core.js",
   },
   transform: {
     "^.+\\.tsx?$": [
@@ -15,6 +17,7 @@ export default {
       },
     ],
   },
+  transformIgnorePatterns: ["node_modules/(?!(@octokit)/)"],
   testMatch: ["**/?(*.)+(spec|test).[tj]s?(x)"],
   collectCoverageFrom: ["src/**/*.{ts,tsx}", "!src/**/*.d.ts"],
 };
