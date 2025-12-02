@@ -21,7 +21,7 @@ export default function Nav() {
   // Employee navigation
   return (
     <nav className="space-y-1 px-2">
-      <NavItem to="/home" icon={Home} label="Home" />
+      {/* <NavItem to="/home" icon={Home} label="Home" /> */}
       <NavItem to="/roadmap" icon={Layers} label="Roadmap" />
       <NavItem to="/nudges" icon={Users} label="Nudges" />
       <NavItem to="/chats" icon={MessageSquare} label="Chats" />
