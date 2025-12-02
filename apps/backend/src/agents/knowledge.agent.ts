@@ -428,19 +428,42 @@ export class KnowledgeAgent extends BaseAgent {
 
       // Agentic loop from Groq docs - simple and clean
       const MAX_ITERATIONS = 15;
+      const SYNTHESIS_RESERVE = 3; // Reserve last 3 iterations for synthesis only
+      const TOOL_CUTOFF = MAX_ITERATIONS - SYNTHESIS_RESERVE; // Iteration 12
       let iteration = 0;
 
       while (iteration < MAX_ITERATIONS) {
         iteration++;
         console.log(`[KnowledgeAgent] Iteration ${iteration}/${MAX_ITERATIONS}`);
 
+        // Check if we're in synthesis-only mode (no more tools allowed)
+        const inSynthesisMode = iteration > TOOL_CUTOFF;
+
+        // Inject synthesis mode instruction
+        if (iteration === TOOL_CUTOFF + 1) {
+          messages.push({
+            role: "system",
+            content: `You are now in SYNTHESIS MODE (iteration ${iteration}/${MAX_ITERATIONS}).
+
+You may NO LONGER call any tools. You must now produce your final answer using ONLY the information already retrieved.
+
+If information is missing:
+- Explicitly state which data sources are unavailable
+- Mention which integrations are not connected (e.g., "GitHub integration not found")
+- Provide the best partial answer you can with available data
+
+Do NOT say you'll search again. Synthesize your answer NOW.`,
+          });
+          console.log(`[KnowledgeAgent] Entered SYNTHESIS MODE - no more tool calls allowed`);
+        }
+
         let response;
         try {
           response = await this.groq.chat.completions.create({
             model: config.groq.chatModel,
             messages: messages,
-            tools: tools,
-            tool_choice: "auto",
+            tools: inSynthesisMode ? [] : tools, // Empty tools array in synthesis mode
+            tool_choice: inSynthesisMode ? "none" : "auto",
             temperature: config.groq.temperature,
           });
         } catch (error: any) {
@@ -486,10 +509,10 @@ export class KnowledgeAgent extends BaseAgent {
         if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
           console.log(`[KnowledgeAgent] LLM called ${responseMessage.tool_calls.length} tool(s)`);
 
-          // Check if we're on last iteration - if so, we won't be able to process results
-          if (iteration === MAX_ITERATIONS) {
+          // Check if we're in synthesis mode or on last iteration - cannot process tools
+          if (inSynthesisMode || iteration === MAX_ITERATIONS) {
             console.warn(
-              `[KnowledgeAgent] Tools called on final iteration - cannot process results`
+              `[KnowledgeAgent] Tools called during synthesis mode (iteration ${iteration}/${MAX_ITERATIONS}) - cannot process`
             );
             yield {
               type: "complete",

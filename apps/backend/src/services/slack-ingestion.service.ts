@@ -175,6 +175,7 @@ class SlackIngestionService {
       const workspaceName = metadata?.team_name || "Slack Workspace";
 
       // Determine sync mode (incremental vs full)
+      // Check PostgreSQL for latest message
       const [latestMessage] = await db
         .select({ timestamp: schema.searchContent.timestamp })
         .from(schema.searchContent)
@@ -187,11 +188,45 @@ class SlackIngestionService {
         .orderBy(desc(schema.searchContent.timestamp))
         .limit(1);
 
+      // Count PostgreSQL records
+      const [pgCount] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.searchContent)
+        .where(
+          and(
+            eq(schema.searchContent.organizationId, organizationId),
+            eq(schema.searchContent.source, "slack")
+          )
+        );
+
+      const postgresCount = pgCount?.count || 0;
+
+      // Check Pinecone for existing vectors (to detect desync)
+      const namespace = `org-${organizationId}`;
+      let pineconeCount = 0;
+      
+      try {
+        const stats = await vectorService.getStats();
+        pineconeCount = stats.namespaces?.[namespace]?.vectorCount || 0;
+        console.log(`📊 Data status - PostgreSQL: ${postgresCount} chunks, Pinecone: ${pineconeCount} vectors`);
+      } catch (error) {
+        console.log(`⚠️  Could not check Pinecone stats, assuming full sync needed`);
+      }
+
       let oldestTimestamp: string | undefined;
       let syncMode = "full";
 
-      if (latestMessage?.timestamp) {
-        // Convert to Unix timestamp string (seconds)
+      // Smart sync mode detection
+      // If PostgreSQL has data but Pinecone is missing/low, force full sync (data reconciliation)
+      const needsReconciliation = postgresCount > 0 && pineconeCount < postgresCount * 0.9;
+
+      if (needsReconciliation) {
+        syncMode = "full";
+        console.log(`🔄 Sync Mode: ${syncMode} (reconciliation - Pinecone missing data)`);
+        console.log(`   PostgreSQL has ${postgresCount} chunks but Pinecone only has ${pineconeCount} vectors`);
+        console.log(`   Performing full re-sync to backfill Pinecone...`);
+      } else if (latestMessage?.timestamp) {
+        // Both have data and counts match - do incremental
         oldestTimestamp = Math.floor(latestMessage.timestamp / 1000).toString();
         syncMode = "incremental";
         console.log(`🔄 Sync Mode: ${syncMode}`);

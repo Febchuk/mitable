@@ -1067,6 +1067,11 @@ router.post(
         `[Admin] Starting ${integration.provider} sync for org ${currentUser.organizationId}`
       );
 
+      // Initialize vector service (required for Pinecone upserts)
+      const { vectorService } = await import("../services/vector.service.js");
+      vectorService.initialize();
+      console.log("[Admin] Vector service initialized");
+
       // Route to appropriate sync service based on provider
       let syncResult: any;
 

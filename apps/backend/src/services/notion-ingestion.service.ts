@@ -159,18 +159,56 @@ class NotionIngestionService {
 
       syncLogId = syncLog.id;
 
-      // Get last sync timestamp for incremental sync
-      const lastSyncedAt = integration.lastSyncedAt ? new Date(integration.lastSyncedAt) : null;
+      // Check for data reconciliation needs
+      const [pgCount] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.searchContent)
+        .where(
+          and(
+            eq(schema.searchContent.organizationId, organizationId),
+            eq(schema.searchContent.source, "notion")
+          )
+        );
 
-      const syncMode = lastSyncedAt ? "incremental" : "full";
-      console.log(`[NOTION SYNC] Starting ${syncMode} sync for org ${organizationId}`);
-      if (lastSyncedAt) {
-        console.log(`[NOTION SYNC] Fetching pages modified since ${lastSyncedAt.toISOString()}`);
+      const postgresCount = pgCount?.count || 0;
+
+      // Check Pinecone for existing vectors
+      const namespace = `org-${organizationId}`;
+      let pineconeCount = 0;
+
+      try {
+        const stats = await vectorService.getStats();
+        pineconeCount = stats.namespaces?.[namespace]?.vectorCount || 0;
+        console.log(
+          `[NOTION SYNC] Data status - PostgreSQL: ${postgresCount} chunks, Pinecone: ${pineconeCount} vectors`
+        );
+      } catch (error) {
+        console.log(`[NOTION SYNC] Could not check Pinecone stats`);
       }
 
-      // Search pages (with incremental filtering if lastSyncedAt exists)
+      // Determine sync mode
+      const needsReconciliation = postgresCount > 0 && pineconeCount < postgresCount * 0.9;
+      const lastSyncedAt = integration.lastSyncedAt ? new Date(integration.lastSyncedAt) : null;
+
+      let syncMode = lastSyncedAt ? "incremental" : "full";
+
+      if (needsReconciliation) {
+        syncMode = "full";
+        console.log(`[NOTION SYNC] Starting ${syncMode} sync (reconciliation - Pinecone missing data)`);
+        console.log(
+          `[NOTION SYNC] PostgreSQL has ${postgresCount} chunks but Pinecone only has ${pineconeCount} vectors`
+        );
+        console.log(`[NOTION SYNC] Performing full re-sync to backfill Pinecone...`);
+      } else {
+        console.log(`[NOTION SYNC] Starting ${syncMode} sync for org ${organizationId}`);
+        if (lastSyncedAt) {
+          console.log(`[NOTION SYNC] Fetching pages modified since ${lastSyncedAt.toISOString()}`);
+        }
+      }
+
+      // Search pages (with incremental filtering if no reconciliation needed)
       const pages = await notionService.searchPages(organizationId, {
-        modifiedSince: lastSyncedAt || undefined,
+        modifiedSince: needsReconciliation ? undefined : lastSyncedAt || undefined,
       });
 
       console.log(`[NOTION SYNC] Found ${pages.length} updated pages`);
