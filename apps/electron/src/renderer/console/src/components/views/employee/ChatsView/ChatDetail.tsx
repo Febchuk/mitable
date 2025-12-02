@@ -170,13 +170,13 @@ export default function ChatDetail() {
         setLoadingMessage(message);
       }
     },
-    // Enable screenshot capture for workflow mode
-    captureScreenshot: true,
+    // Screenshot capture is disabled in Console - use Agent Panel for watch mode
+    captureScreenshot: false,
   });
 
   console.log("[ChatDetail] Component loaded", {
     hasSendMutation: !!sendMessageMutation,
-    captureScreenshotEnabled: true,
+    captureScreenshotEnabled: false,
     hasConsoleAPI: typeof window !== "undefined" && !!window.consoleAPI,
     hasCaptureMethod: typeof window !== "undefined" && !!window.consoleAPI?.captureScreenshot,
   });

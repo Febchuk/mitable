@@ -916,10 +916,21 @@ function setupIPC() {
               .join(", ") || "none",
         });
 
-        // Capture with optional filtering
+        // Return early if no windows selected (watch mode OFF)
+        // This prevents capturing ALL windows when user hasn't selected any
+        if (!hasSelectedWindows) {
+          console.log("[Screenshot] No windows selected, skipping capture");
+          return {
+            success: false,
+            error: "No windows selected for capture",
+            reason: "no_selection",
+          };
+        }
+
+        // Capture only the selected windows
         const result = await captureService.captureVisibleWindows(
           false, // saveToFile
-          hasSelectedWindows ? selectedWindowIds : undefined // Only filter if windows are selected
+          selectedWindowIds // Always filter by selected windows
         );
 
         console.log("[Screenshot] Multi-window capture result:", {
