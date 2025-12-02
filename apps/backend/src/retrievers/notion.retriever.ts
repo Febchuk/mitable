@@ -296,6 +296,7 @@ export class NotionRetriever {
    */
   private applyLightRecencyBoost(blocks: NotionBlock[]): NotionBlock[] {
     const now = Date.now();
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     const NINETY_DAYS = 90 * 24 * 60 * 60 * 1000;
 
@@ -306,10 +307,14 @@ export class NotionRetriever {
       const age = now - lastEdited;
       let boost = 1.0;
 
-      if (age < THIRTY_DAYS) {
-        boost = 1.1; // 10% boost for last 30 days (much lighter than Slack)
+      if (age < SEVEN_DAYS) {
+        boost = 1.3; // 30% boost for very recent docs (last week)
+      } else if (age < THIRTY_DAYS) {
+        boost = 1.1; // 10% boost for recent docs (last month)
       } else if (age < NINETY_DAYS) {
-        boost = 1.05; // 5% boost for last 90 days
+        boost = 0.8; // 20% PENALTY for stale docs (1-3 months old)
+      } else {
+        boost = 0.5; // 50% PENALTY for very stale docs (3+ months old)
       }
 
       return {

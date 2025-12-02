@@ -367,14 +367,23 @@ export class KnowledgeAgent extends BaseAgent {
           "CODE SEARCH WORKFLOW:\n" +
           "1. Start with search_code to find relevant files and functions (metadata only)\n" +
           "2. If metadata isn't enough, call view_code on specific functions you identified\n" +
-          "3. view_code requires: repo_full_name, file_path, start_line, end_line\n" +
-          "4. DO NOT try to call search_code without a 'query' parameter - it's required\n" +
-          "5. DO NOT hallucinate implementation details - use view_code if you need them\n\n" +
-          "Example:\n" +
+          "3. view_code supports TWO MODES:\n" +
+          "   - Single file: {repo_full_name, file_path, start_line, end_line}\n" +
+          "   - Multi-file (PREFERRED for features): {files: [{filePath, startLine, endLine}, ...]} - UP TO 4 FILES\n" +
+          "4. USE MULTI-FILE MODE when a feature spans multiple files (routes + services + schemas)\n" +
+          "5. DO NOT call view_code multiple times for related files - batch them!\n" +
+          "6. DO NOT try to call search_code without a 'query' parameter - it's required\n" +
+          "7. DO NOT hallucinate implementation details - use view_code if you need them\n\n" +
+          "Example (Single file):\n" +
           'search_code({"query": "authentication"})\n' +
           "→ Found: AuthService.authenticateUser (lines 45-89)\n" +
-          'view_code({"repo_full_name": "Npounengnong/mitableai", "file_path": "apps/backend/src/services/auth.service.ts", "start_line": 45, "end_line": 89})\n' +
-          "→ Now you have the actual code",
+          'view_code({"repoFullName": "Npounengnong/mitableai", "filePath": "apps/backend/src/services/auth.service.ts", "startLine": 45, "endLine": 89})\n' +
+          "→ Now you have the actual code\n\n" +
+          "Example (Multi-file - BETTER):\n" +
+          'search_code({"query": "slack integration"})\n' +
+          "→ Found: integrations.ts (routes), slack.service.ts, slack-sync.ts\n" +
+          'view_code({"files": [{"filePath": "apps/backend/src/routes/integrations.ts", "startLine": 80, "endLine": 120}, {"filePath": "apps/backend/src/services/slack.service.ts"}, {"filePath": "apps/backend/src/scripts/sync-slack.ts", "startLine": 1, "endLine": 100}]})\n' +
+          "→ Now you see the complete integration flow",
       });
 
       // Add conversation summary if exists
@@ -418,7 +427,7 @@ export class KnowledgeAgent extends BaseAgent {
       }
 
       // Agentic loop from Groq docs - simple and clean
-      const MAX_ITERATIONS = 10;
+      const MAX_ITERATIONS = 15;
       let iteration = 0;
 
       while (iteration < MAX_ITERATIONS) {
