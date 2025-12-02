@@ -16,6 +16,12 @@ import { slackService } from "./slack.service.js";
 import { slackChunkingService } from "./slack-chunking.service.js";
 import { embeddingService } from "./embedding.service.js";
 import { vectorService } from "./vector.service.js";
+<<<<<<<< HEAD:apps/backend/src/services/slack-ingestion.service.ts
+========
+import { chunkingService } from "./chunking.service.js";
+import { slackChunkingService } from "./slack-chunking.service.js";
+import { githubChunkingService } from "./github-chunking.service.js";
+>>>>>>>> ebfc26d (feat(github): complete GitHub integration with structure-aware chunking):apps/backend/src/services/ingestion.service.ts
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -98,6 +104,26 @@ class SlackIngestionService {
       threadId: metadata.thread_id,
       isThreadRoot: metadata.is_thread_root,
       messageIds: metadata.message_ids,
+
+      // GitHub-specific fields
+      repoId: metadata.repo_id,
+      repoFullName: metadata.repo_full_name,
+      filePath: metadata.path,
+      fileName: metadata.file_name,
+      language: metadata.language,
+      fileRole: metadata.file_role,
+      area: metadata.area,
+      commitSha: metadata.commit_sha,
+      gitAuthor: metadata.git_author,
+      committedAt: metadata.committed_at ? new Date(metadata.committed_at) : null,
+      startLine: metadata.start_line,
+      endLine: metadata.end_line,
+      functionName: metadata.function_name,
+      className: metadata.class_name,
+      exports: metadata.exports,
+      isExported: metadata.is_exported || false,
+      isTestFile: metadata.is_test_file || false,
+      isGenerated: metadata.is_generated || false,
 
       // Chunk metadata
       chunkIndex: metadata.chunk_index || 0,
@@ -491,6 +517,631 @@ class SlackIngestionService {
       throw error; // Re-throw original error, don't wrap it
     }
   }
+<<<<<<<< HEAD:apps/backend/src/services/slack-ingestion.service.ts
+========
+
+  /**
+   * Sync Notion pages for an organization
+   * Fetches all shared pages, embeds blocks, and stores in BOTH Pinecone AND PostgreSQL
+   */
+  async syncNotionPages(
+    organizationId: string,
+    onProgress?: (progress: IngestionProgress) => void
+  ): Promise<IngestionResult> {
+    const startTime = Date.now();
+    const result: IngestionResult = {
+      success: false,
+      channelsProcessed: 0, // Using "channels" field for "pages" count
+      messagesEmbedded: 0, // Using "messages" field for "blocks" count
+      totalMessages: 0,
+      errors: [],
+      duration: 0,
+    };
+
+    let syncLogId: string | null = null;
+
+    try {
+      // Get integration
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.organizationId, organizationId),
+            eq(schema.integrations.provider, "notion")
+          )
+        )
+        .limit(1);
+
+      if (!integration) {
+        throw new Error("Notion integration not found");
+      }
+
+      // Get workspace info from metadata
+      const metadata = integration.metadata as NotionIntegrationMetadata;
+      const workspaceId = metadata?.workspace_id || "unknown";
+      const workspaceName = metadata?.workspace_name || "Notion Workspace";
+      const botId = metadata?.bot_id || "unknown";
+
+      // Create sync log
+      const [syncLog] = await db
+        .insert(schema.syncLogs)
+        .values({
+          integrationId: integration.id,
+          status: "in_progress",
+          itemsSynced: 0,
+          startedAt: new Date(),
+        })
+        .returning();
+
+      syncLogId = syncLog.id;
+
+      // Get last sync timestamp for incremental sync
+      const lastSyncedAt = integration.lastSyncedAt ? new Date(integration.lastSyncedAt) : null;
+
+      const syncMode = lastSyncedAt ? "incremental" : "full";
+      console.log(`[NOTION SYNC] Starting ${syncMode} sync for org ${organizationId}`);
+      if (lastSyncedAt) {
+        console.log(`[NOTION SYNC] Fetching pages modified since ${lastSyncedAt.toISOString()}`);
+      }
+
+      // Search pages (with incremental filtering if lastSyncedAt exists)
+      const pages = await notionService.searchPages(organizationId, {
+        modifiedSince: lastSyncedAt || undefined,
+      });
+
+      console.log(`[NOTION SYNC] Found ${pages.length} updated pages`);
+
+      if (pages.length === 0 && !lastSyncedAt) {
+        throw new Error(
+          "No pages shared with integration. Please share pages in Notion or reconnect."
+        );
+      }
+
+      // If no updated pages in incremental sync, that's OK
+      if (pages.length === 0 && lastSyncedAt) {
+        console.log("[NOTION SYNC] No pages modified since last sync - skipping");
+        result.success = true;
+        result.duration = Date.now() - startTime;
+
+        await db
+          .update(schema.syncLogs)
+          .set({
+            status: "success",
+            itemsSynced: 0,
+            completedAt: new Date(),
+          })
+          .where(eq(schema.syncLogs.id, syncLogId));
+
+        return result;
+      }
+
+      // Process each page
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+
+        try {
+          // Update progress
+          onProgress?.({
+            channelsProcessed: i,
+            totalChannels: pages.length,
+            messagesProcessed: result.totalMessages,
+            messagesEmbedded: result.messagesEmbedded,
+            errors: result.errors,
+            currentChannel: page.title,
+          });
+
+          // Fetch all blocks from page (recursive)
+          const blocks = await notionService.getPageBlocks(organizationId, page.id);
+
+          // Filter out empty blocks
+          const validBlocks = blocks.filter((block) => block.text && block.text.trim().length > 0);
+
+          if (validBlocks.length > 0) {
+            // Process blocks in batches
+            for (let j = 0; j < validBlocks.length; j += SYNC_CONFIG.BATCH_SIZE) {
+              const batch = validBlocks.slice(j, j + SYNC_CONFIG.BATCH_SIZE);
+              await this.processNotionBatch(
+                batch,
+                page,
+                organizationId,
+                workspaceId,
+                workspaceName,
+                botId
+              );
+
+              result.messagesEmbedded += batch.length;
+              result.totalMessages += batch.length;
+
+              // Update progress
+              onProgress?.({
+                channelsProcessed: i,
+                totalChannels: pages.length,
+                messagesProcessed: result.totalMessages,
+                messagesEmbedded: result.messagesEmbedded,
+                errors: result.errors,
+                currentChannel: page.title,
+              });
+            }
+          }
+
+          result.channelsProcessed++;
+        } catch (error) {
+          const errorMsg = `Failed to process page ${page.title}: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`;
+          result.errors.push(errorMsg);
+        }
+      }
+
+      // Update sync log
+      await db
+        .update(schema.syncLogs)
+        .set({
+          status: "success",
+          itemsSynced: result.messagesEmbedded,
+          completedAt: new Date(),
+        })
+        .where(eq(schema.syncLogs.id, syncLogId));
+
+      // Update integration lastSyncedAt (only on successful sync)
+      await db
+        .update(schema.integrations)
+        .set({
+          lastSyncedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integration.id));
+
+      result.success = true;
+      result.duration = Date.now() - startTime;
+
+      // Log completion summary
+      console.log(`[NOTION SYNC] ✅ Sync complete for org ${organizationId}`);
+      console.log(`[NOTION SYNC]    Mode: ${syncMode}`);
+      console.log(`[NOTION SYNC]    Pages synced: ${result.channelsProcessed}`);
+      console.log(`[NOTION SYNC]    Blocks embedded: ${result.messagesEmbedded}`);
+      console.log(`[NOTION SYNC]    Duration: ${Math.round(result.duration / 1000)}s`);
+      if (result.errors.length > 0) {
+        console.log(`[NOTION SYNC]    Errors: ${result.errors.length}`);
+      }
+
+      return result;
+    } catch (error) {
+      // Update sync log as failed
+      if (syncLogId) {
+        await db
+          .update(schema.syncLogs)
+          .set({
+            status: "failed",
+            errorMessage: error instanceof Error ? error.message : "Unknown error",
+            completedAt: new Date(),
+          })
+          .where(eq(schema.syncLogs.id, syncLogId));
+      }
+
+      result.errors.push(error instanceof Error ? error.message : "Unknown error");
+      result.duration = Date.now() - startTime;
+      return result;
+    }
+  }
+
+  /**
+   * Process a batch of Notion blocks: chunk, embed, and dual-write to Pinecone + PostgreSQL
+   */
+  private async processNotionBatch(
+    blocks: any[],
+    page: any,
+    organizationId: string,
+    workspaceId: string,
+    workspaceName: string,
+    botId: string
+  ): Promise<void> {
+    try {
+      const allChunks: Array<{
+        chunkText: string;
+        chunkIndex: number;
+        totalChunks: number;
+        parentBlock: any;
+      }> = [];
+
+      for (const block of blocks) {
+        const chunks = chunkingService.chunkText(block.text);
+        for (const chunk of chunks) {
+          allChunks.push({
+            chunkText: chunk.text,
+            chunkIndex: chunk.chunkIndex,
+            totalChunks: chunk.totalChunks,
+            parentBlock: block,
+          });
+        }
+      }
+
+      const texts = allChunks.map((c) => c.chunkText);
+      const embeddings = await embeddingService.embedTexts(texts);
+
+      const vectors = allChunks.map((chunkData, idx) => {
+        const block = chunkData.parentBlock;
+        const editedDate = new Date(block.last_edited_time);
+
+        return {
+          id: `notion-${page.id}-${block.id}-chunk-${chunkData.chunkIndex}`,
+          values: embeddings[idx],
+          metadata: {
+            text: chunkData.chunkText,
+            source: "notion",
+            source_type: "block",
+
+            page_id: page.id,
+            page_title: page.title,
+            page_url: page.url,
+
+            block_id: block.id,
+            block_type: block.type,
+
+            chunk_index: chunkData.chunkIndex,
+            total_chunks: chunkData.totalChunks,
+            is_chunked: chunkData.totalChunks > 1,
+
+            created_by_id: page.created_by_id,
+            last_edited_by_id: page.last_edited_by_id,
+
+            created_time: block.created_time,
+            last_edited_time: block.last_edited_time,
+            timestamp: Math.floor(editedDate.getTime() / 1000),
+
+            date: editedDate.toISOString().split("T")[0],
+            year: editedDate.getFullYear(),
+            month: editedDate.getMonth() + 1,
+
+            organization_id: organizationId,
+            workspace_id: workspaceId,
+            workspace_name: workspaceName,
+            bot_id: botId,
+
+            ...(page.parent_page_id && { parent_page_id: page.parent_page_id }),
+            ...(page.parent_database_id && { parent_database_id: page.parent_database_id }),
+          },
+        };
+      });
+
+      const namespace = `org-${organizationId}`;
+
+      // DUAL-WRITE: Store in both Pinecone (semantic) and PostgreSQL (keyword)
+      await vectorService.upsertVectors(vectors, namespace);
+
+      // Transform vectors to PostgreSQL format and upsert (handles duplicates)
+      const searchContentRecords = vectors.map((v) =>
+        this.transformVectorToSearchContent(v, organizationId)
+      );
+
+      // Use onConflictDoUpdate to handle re-syncing of updated pages/blocks
+      await db
+        .insert(schema.searchContent)
+        .values(searchContentRecords)
+        .onConflictDoUpdate({
+          target: schema.searchContent.id,
+          set: {
+            text: sql`EXCLUDED.text`,
+            pageTitle: sql`EXCLUDED.page_title`,
+            timestamp: sql`EXCLUDED.timestamp`,
+            date: sql`EXCLUDED.date`,
+            updatedAt: new Date(),
+          },
+        });
+    } catch (error) {
+      throw new Error("Failed to process Notion block batch", { cause: error });
+    }
+  }
+
+  /**
+   * Sync GitHub code files for an organization
+   * Follows the Slack v2.0 pattern: fetch → smart chunk → embed → dual-write
+   */
+  async syncGitHubCode(organizationId: string): Promise<IngestionResult> {
+    const startTime = Date.now();
+    const result: IngestionResult = {
+      success: false,
+      channelsProcessed: 0, // Repurpose as reposProcessed
+      messagesEmbedded: 0, // Repurpose as chunksCreated
+      totalMessages: 0, // Repurpose as filesProcessed
+      errors: [],
+      duration: 0,
+    };
+
+    let syncLogId: string | null = null;
+
+    try {
+      // Get GitHub integration
+      const [integration] = await db
+        .select()
+        .from(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.organizationId, organizationId),
+            eq(schema.integrations.provider, "github")
+          )
+        )
+        .limit(1);
+
+      if (!integration) {
+        throw new Error("GitHub integration not found");
+      }
+
+      console.log(`\n🚀 Starting GitHub code sync for org: ${organizationId}`);
+
+      // Create sync log
+      const [syncLog] = await db
+        .insert(schema.syncLogs)
+        .values({
+          integrationId: integration.id,
+          status: "in_progress",
+          itemsSynced: 0,
+          startedAt: new Date(),
+        })
+        .returning();
+
+      syncLogId = syncLog.id;
+
+      // Get selected repos
+      const repos = await db
+        .select()
+        .from(schema.githubRepos)
+        .where(
+          and(
+            eq(schema.githubRepos.integrationId, integration.id),
+            eq(schema.githubRepos.isSelected, true)
+          )
+        );
+
+      if (repos.length === 0) {
+        console.log(`⚠️  No repos selected for syncing`);
+        result.success = true;
+        result.duration = Date.now() - startTime;
+        return result;
+      }
+
+      console.log(`📚 Processing ${repos.length} selected repos`);
+
+      // Process each repo
+      for (const repo of repos) {
+        try {
+          console.log(`\n📂 Repo: ${repo.fullName}`);
+
+          // Get latest commit for this repo (default branch HEAD)
+          const [latestCommit] = await db
+            .select()
+            .from(schema.githubCommits)
+            .where(eq(schema.githubCommits.repoId, repo.id))
+            .orderBy(desc(schema.githubCommits.committedAt))
+            .limit(1);
+
+          if (!latestCommit) {
+            console.log(`   ⚠️  No commits found, skipping`);
+            continue;
+          }
+
+          // Get files from the latest commit
+          const files = await db
+            .select()
+            .from(schema.githubCommitFiles)
+            .where(
+              and(
+                eq(schema.githubCommitFiles.commitId, latestCommit.id),
+                eq(schema.githubCommitFiles.repoId, repo.id)
+              )
+            );
+
+          console.log(`   📄 Found ${files.length} files in latest commit`);
+
+          // Process files in batches
+          for (let i = 0; i < files.length; i += SYNC_CONFIG.BATCH_SIZE) {
+            const batch = files.slice(i, i + SYNC_CONFIG.BATCH_SIZE);
+            const chunksCreated = await this.processCodeBatch(
+              batch,
+              organizationId,
+              repo,
+              latestCommit
+            );
+
+            result.messagesEmbedded += chunksCreated;
+            result.totalMessages += batch.length;
+
+            console.log(
+              `   📊 Batch complete: +${chunksCreated} chunks (${i + batch.length}/${files.length} files)`
+            );
+          }
+
+          result.channelsProcessed++; // reposProcessed
+        } catch (error) {
+          const errorMsg = `Failed to process repo ${repo.fullName}: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`;
+          console.error(`❌ Repo error:`, errorMsg);
+          result.errors.push(errorMsg);
+        }
+      }
+
+      // Update sync log
+      await db
+        .update(schema.syncLogs)
+        .set({
+          status: "success",
+          itemsSynced: result.messagesEmbedded,
+          completedAt: new Date(),
+        })
+        .where(eq(schema.syncLogs.id, syncLogId));
+
+      // Update integration lastSyncedAt
+      await db
+        .update(schema.integrations)
+        .set({
+          lastSyncedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.integrations.id, integration.id));
+
+      result.success = true;
+      result.duration = Date.now() - startTime;
+
+      console.log(`\n✅ GitHub sync complete:`, {
+        repos: result.channelsProcessed,
+        files: result.totalMessages,
+        chunks: result.messagesEmbedded,
+        duration: `${result.duration}ms`,
+      });
+
+      return result;
+    } catch (error) {
+      // Update sync log as failed
+      if (syncLogId) {
+        await db
+          .update(schema.syncLogs)
+          .set({
+            status: "failed",
+            errorMessage: error instanceof Error ? error.message : "Unknown error",
+            completedAt: new Date(),
+          })
+          .where(eq(schema.syncLogs.id, syncLogId));
+      }
+
+      result.errors.push(error instanceof Error ? error.message : "Unknown error");
+      result.duration = Date.now() - startTime;
+      return result;
+    }
+  }
+
+  /**
+   * Process a batch of GitHub code files: chunk, embed, and dual-write
+   * Follows Slack v2.0 pattern with smart chunking
+   */
+  private async processCodeBatch(
+    files: any[],
+    organizationId: string,
+    repo: any,
+    commit: any
+  ): Promise<number> {
+    const validFiles = files.filter((f) => f.content && f.content.trim().length > 0);
+
+    if (validFiles.length === 0) return 0;
+
+    try {
+      let totalChunks = 0;
+
+      // Process each file
+      for (const file of validFiles) {
+        // Use smart chunking service (like Slack v2.0)
+        const chunks = githubChunkingService.chunkFile(
+          {
+            repoId: repo.id,
+            repoFullName: repo.fullName,
+            path: file.path,
+            fileName: file.path.split("/").pop() || file.path,
+            content: file.content,
+            commitSha: commit.sha,
+            author: commit.authorName,
+            committedAt: commit.committedAt.toISOString(),
+            defaultBranch: repo.defaultBranch,
+          },
+          organizationId
+        );
+
+        if (chunks.length === 0) continue;
+
+        const texts = chunks.map((c) => c.text);
+        const embeddings = await embeddingService.embedTexts(texts);
+
+        // Build vectors with rich metadata
+        const vectors = chunks.map((chunk, idx) => {
+          const committedDate = new Date(chunk.committed_at);
+
+          return {
+            id: `github-${chunk.repo_id}-${chunk.commit_sha.slice(0, 7)}-${chunk.path}-chunk-${chunk.chunk_index}`,
+            values: embeddings[idx],
+            metadata: {
+              text: chunk.text,
+              source: "github",
+              source_type: chunk.chunk_type,
+
+              // Repo context
+              repo_id: chunk.repo_id,
+              repo_full_name: chunk.repo_full_name,
+              org_id: chunk.org_id,
+
+              // File context
+              path: chunk.path,
+              file_name: chunk.file_name,
+              language: chunk.language,
+              file_role: chunk.file_role,
+              area: chunk.area,
+
+              // Git context
+              commit_sha: chunk.commit_sha,
+              git_author: chunk.author,
+              committed_at: chunk.committed_at,
+              default_branch: chunk.default_branch,
+
+              // Symbol metadata
+              start_line: chunk.start_line,
+              end_line: chunk.end_line,
+              function_name: chunk.function_name,
+              className: chunk.class_name,
+              exports: chunk.exports,
+              is_exported: chunk.is_exported,
+              is_test_file: chunk.is_test_file,
+              is_generated: chunk.is_generated,
+
+              // Chunk metadata
+              chunk_index: chunk.chunk_index,
+              total_chunks: chunk.total_chunks,
+              is_chunked: chunk.total_chunks > 1,
+              token_count: chunk.token_count,
+
+              // Timestamps
+              timestamp: Math.floor(committedDate.getTime() / 1000),
+              date: committedDate.toISOString().split("T")[0],
+              year: committedDate.getFullYear(),
+              month: committedDate.getMonth() + 1,
+
+              // Organization context
+              organization_id: organizationId,
+            },
+          };
+        });
+
+        const namespace = `org-${organizationId}`;
+
+        // DUAL-WRITE: Store in both Pinecone (semantic) and PostgreSQL (keyword)
+        await vectorService.upsertVectors(vectors, namespace);
+
+        // Transform vectors to PostgreSQL format and upsert
+        const searchContentRecords = vectors.map((v) =>
+          this.transformVectorToSearchContent(v, organizationId)
+        );
+
+        await db
+          .insert(schema.searchContent)
+          .values(searchContentRecords)
+          .onConflictDoUpdate({
+            target: schema.searchContent.id,
+            set: {
+              text: sql`EXCLUDED.text`,
+              timestamp: sql`EXCLUDED.timestamp`,
+              date: sql`EXCLUDED.date`,
+              updatedAt: new Date(),
+            },
+          });
+
+        totalChunks += chunks.length;
+      }
+
+      return totalChunks;
+    } catch (error) {
+      console.error("❌ processCodeBatch error:", error);
+      throw error;
+    }
+  }
+>>>>>>>> ebfc26d (feat(github): complete GitHub integration with structure-aware chunking):apps/backend/src/services/ingestion.service.ts
 }
 
 export const slackIngestionService = new SlackIngestionService();

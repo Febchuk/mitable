@@ -391,9 +391,9 @@ Detected from path patterns:
 ### Sync Flow Diagram
 
 ```
-User clicks "Sync Now"
+User clicks "Sync Now" (or cron triggers)
        ↓
-Metadata Sync (github-sync.service.ts)
+Orchestration Script (sync-github.ts)
        ↓
 1. Fetch commits (50 first, incremental after)
        ↓
@@ -407,19 +407,21 @@ Metadata Sync (github-sync.service.ts)
        ↓
 6. Save to github_issues
        ↓
+7. Call GitHubIngestionService.syncCode()
+       ↓
 Code Ingestion (github-ingestion.service.ts)
        ↓
-7. Get Tree API snapshot (recursive)
+8. Get Tree API snapshot (recursive)
        ↓
-8. Filter code files (extensions + skip patterns)
+9. Filter code files (extensions + skip patterns)
        ↓
-9. Chunk files (github-chunking.service.ts)
+10. Chunk files (github-chunking.service.ts)
        ↓
-10. Embed chunks (OpenAI text-embedding-3-small)
+11. Embed chunks (OpenAI text-embedding-3-small)
        ↓
-11. Dual-write to Pinecone + PostgreSQL
+12. Dual-write to Pinecone + PostgreSQL
        ↓
-12. Update lastSyncedAt + lastIndexedCommitSha
+13. Update lastSyncedAt + lastIndexedCommitSha
 ```
 
 ---
@@ -566,17 +568,28 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 - Octokit instance management
 - Installation token generation
 
-### `github-sync.service.ts`
+### `sync-github.ts` (Script)
 
-- Orchestrates work domain sync
-- Fetches commits, PRs, issues
-- Saves metadata to PostgreSQL
+- **Main orchestration script**
+- Fetches commits, PRs, issues from GitHub API
+- Handles incremental sync (first vs. subsequent)
 - Respects 50-commit initial limit
+- Saves metadata to PostgreSQL
+- Calls `githubIngestionService.syncCode()` for code ingestion
+- Run with: `npm run sync-github` (or via cron)
+
+### `github-ingestion.service.ts`
+
+- Orchestrates code domain sync only
+- Coordinates snapshot + chunking
+- Dual-write to Pinecone + PostgreSQL
+- Updates sync logs
+- Called by `sync-github.ts` script
 
 ### `github-code-snapshot.service.ts`
 
-- Fetches Tree API snapshot
-- Filters code files
+- Fetches Tree API snapshot (recursive)
+- Filters code files by extension + skip patterns
 - Fetches blob contents
 - Coordinates chunking + embedding
 
@@ -587,13 +600,6 @@ GITHUB_APP_REDIRECT_URI=https://your-domain.com/api/integrations/github/callback
 - Function/class extraction
 - File role + area detection
 - Smart skip patterns
-
-### `github-ingestion.service.ts`
-
-- Orchestrates code domain sync
-- Coordinates snapshot + chunking
-- Dual-write to Pinecone + PostgreSQL
-- Updates sync logs
 
 ### `code.retriever.ts`
 
