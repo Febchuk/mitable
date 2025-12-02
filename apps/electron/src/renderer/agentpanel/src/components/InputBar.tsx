@@ -2,16 +2,19 @@ import { useState, useRef, useEffect, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowUp, Mic, Eye, MessageSquare, Square } from "lucide-react";
+import { ArrowUp, Mic, Type, Square } from "lucide-react";
+import WatchModeBar from "./WatchModeBar";
+import type { SelectedWindowInfo } from "../global";
 
 interface InputBarProps {
   inputMode: "text" | "voice";
   onInputModeChange: (mode: "text" | "voice") => void;
   isRecording: boolean;
   onRecordingChange: (recording: boolean) => void;
-  watchingScreen: boolean;
-  onToggleWatch: () => void;
-  selectedWindowCount: number;
+  selectedWindows: SelectedWindowInfo[];
+  onToggleWatchExpanded: (expanded: boolean) => void;
+  onRemoveWindow: (windowId: string) => void;
+  watchExpanded: boolean;
   onSendMessage: (content: string) => void;
   disabled?: boolean;
 }
@@ -21,9 +24,10 @@ function InputBar({
   onInputModeChange,
   isRecording,
   onRecordingChange,
-  watchingScreen,
-  onToggleWatch,
-  selectedWindowCount,
+  selectedWindows,
+  onToggleWatchExpanded,
+  onRemoveWindow,
+  watchExpanded,
   onSendMessage,
   disabled = false,
 }: InputBarProps) {
@@ -55,97 +59,91 @@ function InputBar({
     }
   };
 
-  const toggleMode = () => {
-    onInputModeChange(inputMode === "text" ? "voice" : "text");
-    if (isRecording) {
-      onRecordingChange(false);
-    }
+  const handleEyeClick = () => {
+    onToggleWatchExpanded(!watchExpanded);
   };
 
   return (
     <div className="px-4 py-3 space-y-3">
-      {/* Input row */}
-      <div className="relative flex items-end gap-2">
-        <Textarea
-          ref={textareaRef}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="How can I help?"
-          disabled={disabled || inputMode === "voice"}
-          className="min-h-[40px] max-h-[120px] resize-none pr-12 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-1 focus-visible:ring-white/30"
-          rows={1}
-        />
+      {/* TOP: Watch Mode Bar */}
+      <WatchModeBar
+        isExpanded={watchExpanded}
+        windows={selectedWindows}
+        onEyeClick={handleEyeClick}
+        onRemoveWindow={onRemoveWindow}
+      />
 
-        {/* Submit button (inside input) */}
+      {/* MIDDLE: Textarea */}
+      <Textarea
+        ref={textareaRef}
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="How can I help?"
+        disabled={disabled || inputMode === "voice"}
+        className="min-h-[60px] max-h-[120px] resize-none bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-1 focus-visible:ring-white/30"
+        rows={2}
+      />
+
+      {/* BOTTOM: Mode toggle (left) + Send button (right) */}
+      <div className="flex items-center justify-between">
+        {/* Left: Mode toggle */}
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center bg-white/10 rounded-full p-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onInputModeChange("text")}
+                  className={`h-8 w-8 rounded-full ${
+                    inputMode === "text"
+                      ? "bg-white/20 text-white"
+                      : "text-white/50 hover:text-white hover:bg-transparent"
+                  }`}
+                  aria-label="Text mode"
+                >
+                  <Type className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    onInputModeChange("voice");
+                    if (isRecording) onRecordingChange(false);
+                  }}
+                  className={`h-8 w-8 rounded-full ${
+                    inputMode === "voice"
+                      ? "bg-white/20 text-white"
+                      : "text-white/50 hover:text-white hover:bg-transparent"
+                  }`}
+                  aria-label="Voice mode"
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              {inputMode === "text" ? "Currently in text mode" : "Currently in voice mode"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        {/* Right: Send button */}
         <Button
           size="icon"
           onClick={handleSubmit}
           disabled={disabled || (inputMode === "text" && !inputValue.trim())}
-          className="absolute right-2 bottom-2 h-8 w-8"
+          className="h-10 w-10 rounded-full"
         >
           {inputMode === "text" ? (
-            <ArrowUp className="h-4 w-4" />
+            <ArrowUp className="h-5 w-5" />
           ) : isRecording ? (
-            <Square className="h-4 w-4" />
+            <Square className="h-5 w-5" />
           ) : (
-            <Mic className="h-4 w-4" />
+            <Mic className="h-5 w-5" />
           )}
         </Button>
-      </div>
-
-      {/* Actions row */}
-      <div className="flex items-center justify-between">
-        {/* Left: Voice mode toggle */}
-        <TooltipProvider delayDuration={300}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={inputMode === "voice" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={toggleMode}
-                className="flex items-center gap-1.5 text-white/70 hover:text-white hover:bg-white/10"
-              >
-                {inputMode === "voice" ? (
-                  <MessageSquare className="h-4 w-4" />
-                ) : (
-                  <Mic className="h-4 w-4" />
-                )}
-                <span className="text-xs">
-                  {inputMode === "voice" ? "Text mode" : "Voice mode"}
-                </span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Switch to {inputMode === "voice" ? "text" : "voice"} input
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-
-        {/* Right: Watch button */}
-        <TooltipProvider delayDuration={300}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={watchingScreen ? "secondary" : "ghost"}
-                size="sm"
-                onClick={onToggleWatch}
-                className="flex items-center gap-1.5 text-white/70 hover:text-white hover:bg-white/10"
-              >
-                <Eye className="h-4 w-4" />
-                {selectedWindowCount > 0 && (
-                  <span className="text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
-                    {selectedWindowCount}
-                  </span>
-                )}
-                {selectedWindowCount === 0 && <span className="text-xs">Watch</span>}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {watchingScreen ? "Stop watching screen" : "Watch screen for context"}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
       </div>
     </div>
   );

@@ -85,8 +85,8 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
 
   // Watch mode state
-  const [watchingScreen, setWatchingScreen] = useState(false);
   const [selectedWindows, setSelectedWindows] = useState<SelectedWindowInfo[]>([]);
+  const [watchExpanded, setWatchExpanded] = useState(false);
 
   // View state (chat view or chats list)
   const [currentView, setCurrentView] = useState<PanelView>("chat");
@@ -351,13 +351,22 @@ function App() {
     [conversationId, selectedWindows.length, awaitingCustomQuestion]
   );
 
-  const handleToggleWatchMode = async () => {
+  const handleToggleWatchExpanded = async (expanded: boolean) => {
+    setWatchExpanded(expanded);
+    // Toggle watch mode overlay when expanding/collapsing
     try {
-      const newState = !watchingScreen;
-      await window.agentPanelAPI?.toggleWatchMode(newState);
-      setWatchingScreen(newState);
+      await window.agentPanelAPI?.toggleWatchMode(expanded);
     } catch (error) {
       console.error("Failed to toggle watch mode:", error);
+    }
+  };
+
+  const handleRemoveWindow = async (windowId: string) => {
+    try {
+      await window.agentPanelAPI?.unselectWindow(windowId);
+      // State will be updated via onWatchWindowsUpdated event
+    } catch (error) {
+      console.error("Failed to remove window:", error);
     }
   };
 
@@ -734,9 +743,10 @@ function App() {
               onInputModeChange={setInputMode}
               isRecording={isRecording}
               onRecordingChange={setIsRecording}
-              watchingScreen={watchingScreen}
-              onToggleWatch={handleToggleWatchMode}
-              selectedWindowCount={selectedWindows.length}
+              selectedWindows={selectedWindows}
+              watchExpanded={watchExpanded}
+              onToggleWatchExpanded={handleToggleWatchExpanded}
+              onRemoveWindow={handleRemoveWindow}
               onSendMessage={handleSendMessage}
               disabled={!!streamingMessageIdRef.current}
             />
