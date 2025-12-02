@@ -204,11 +204,13 @@ class SlackIngestionService {
       // Check Pinecone for existing vectors (to detect desync)
       const namespace = `org-${organizationId}`;
       let pineconeCount = 0;
-      
+
       try {
         const stats = await vectorService.getStats();
         pineconeCount = stats.namespaces?.[namespace]?.vectorCount || 0;
-        console.log(`📊 Data status - PostgreSQL: ${postgresCount} chunks, Pinecone: ${pineconeCount} vectors`);
+        console.log(
+          `📊 Data status - PostgreSQL: ${postgresCount} chunks, Pinecone: ${pineconeCount} vectors`
+        );
       } catch (error) {
         console.log(`⚠️  Could not check Pinecone stats, assuming full sync needed`);
       }
@@ -223,7 +225,9 @@ class SlackIngestionService {
       if (needsReconciliation) {
         syncMode = "full";
         console.log(`🔄 Sync Mode: ${syncMode} (reconciliation - Pinecone missing data)`);
-        console.log(`   PostgreSQL has ${postgresCount} chunks but Pinecone only has ${pineconeCount} vectors`);
+        console.log(
+          `   PostgreSQL has ${postgresCount} chunks but Pinecone only has ${pineconeCount} vectors`
+        );
         console.log(`   Performing full re-sync to backfill Pinecone...`);
       } else if (latestMessage?.timestamp) {
         // Both have data and counts match - do incremental

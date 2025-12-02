@@ -591,7 +591,12 @@ async function main() {
       const [pgCount] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(schema.searchContent)
-        .where(and(eq(schema.searchContent.organizationId, orgId), eq(schema.searchContent.source, "github")));
+        .where(
+          and(
+            eq(schema.searchContent.organizationId, orgId),
+            eq(schema.searchContent.source, "github")
+          )
+        );
 
       const postgresCount = pgCount?.count || 0;
 
@@ -609,22 +614,24 @@ async function main() {
       const needsReconciliation = postgresCount > 0 && pineconeCount < postgresCount * 0.9;
       const lastSyncedAt = integration.lastSyncedAt ? new Date(integration.lastSyncedAt) : null;
 
-      let syncMode = lastSyncedAt && !needsReconciliation ? "incremental" : "full";
+      const syncMode = lastSyncedAt && !needsReconciliation ? "incremental" : "full";
 
       console.log(`\n${"=".repeat(60)}`);
       console.log(`📦 Organization: ${orgId}`);
-      console.log(`📊 Data status - PostgreSQL: ${postgresCount} chunks, Pinecone: ${pineconeCount} vectors`);
+      console.log(
+        `📊 Data status - PostgreSQL: ${postgresCount} chunks, Pinecone: ${pineconeCount} vectors`
+      );
       console.log(`🔄 Sync Mode: ${syncMode}`);
       if (needsReconciliation) {
         console.log(`⚠️  Reconciliation needed - Pinecone missing data`);
         console.log(`   Clearing lastIndexedCommitSha for all repos to force re-ingestion...`);
-        
+
         // Clear lastIndexedCommitSha to force full re-ingestion of code
         await db
           .update(schema.githubRepos)
           .set({ lastIndexedCommitSha: null })
           .where(eq(schema.githubRepos.integrationId, integration.id));
-        
+
         console.log(`   Full re-sync to backfill Pinecone will begin...`);
       } else if (lastSyncedAt) {
         console.log(`📅 Last synced: ${lastSyncedAt.toLocaleString()}`);

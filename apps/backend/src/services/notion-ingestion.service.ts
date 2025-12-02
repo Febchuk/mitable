@@ -194,7 +194,9 @@ class NotionIngestionService {
 
       if (needsReconciliation) {
         syncMode = "full";
-        console.log(`[NOTION SYNC] Starting ${syncMode} sync (reconciliation - Pinecone missing data)`);
+        console.log(
+          `[NOTION SYNC] Starting ${syncMode} sync (reconciliation - Pinecone missing data)`
+        );
         console.log(
           `[NOTION SYNC] PostgreSQL has ${postgresCount} chunks but Pinecone only has ${pineconeCount} vectors`
         );

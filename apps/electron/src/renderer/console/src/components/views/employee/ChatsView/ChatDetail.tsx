@@ -188,7 +188,7 @@ export default function ChatDetail() {
     if (!container) return;
 
     // Check if user is already near the bottom (within 100px)
-    const isNearBottom = 
+    const isNearBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight < 100;
 
     // Only auto-scroll if user hasn't scrolled up
@@ -513,7 +513,10 @@ export default function ChatDetail() {
       </div>
 
       {/* Messages Area */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto app-no-drag custom-scrollbar">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto app-no-drag custom-scrollbar"
+      >
         <div className="max-w-4xl mx-auto px-8 py-4">
           {(() => {
             // Track which workflow sessions have been rendered to avoid duplicates
