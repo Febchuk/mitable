@@ -151,7 +151,7 @@ function getDemoStep1WorkflowMessage(): Message {
       supportingData: [],
       supportingDataExplanation: "",
       stepList: [
-        { stepNumber: 1, description: "Redownload the app", status: "current", guidance: "First you need to go back to this link to redownload the prod app." },
+        { stepNumber: 1, description: "Redownload the app", status: "current", guidance: "First you need to redownload the app at this link: https://github.com/Febchuk/mitable/releases/tag/v0.1.0" },
         { stepNumber: 2, description: "Run the following terminal command", status: "pending" },
       ],
       currentStepIndex: 0,
@@ -182,7 +182,7 @@ function getDemoStep2WorkflowMessage(): Message {
       supportingDataExplanation: "",
       stepList: [
         { stepNumber: 1, description: "Redownload the app", status: "completed" },
-        { stepNumber: 2, description: "Run the following terminal command", status: "current", guidance: "Now open your terminal and run this command in it before opening the dmg file" },
+        { stepNumber: 2, description: "Run the following terminal command", status: "current", guidance: "Now open your terminal and run this command:\n\n```bash\nxattr -cr /Applications/Mitable.app\n```" },
       ],
       currentStepIndex: 1,
       searchQuery: "file contamination error",
@@ -386,7 +386,7 @@ function App() {
             const assistantMessage: Message = {
               id: `msg-${Date.now()}`,
               role: "assistant",
-              content: "Yes I can see the dmg file in your Finder. We're good to move on to the next step!",
+              content: "Yes I can see the dmg file in your Finder. Once you've run the command, click 'Move on to next step' when you're ready.",
               timestamp: new Date(),
               workflowSessionId: DEMO_WORKFLOW_SESSION_ID,
               relatedStepIndex: 0,
