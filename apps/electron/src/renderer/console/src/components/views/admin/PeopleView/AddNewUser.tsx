@@ -332,9 +332,7 @@ export default function AddNewUser() {
       {/* Onboarding Roadmap Section */}
       <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
         <div>
-          <h2 className="text-xl font-semibold text-text-primary mb-1">
-            Onboarding Roadmap
-          </h2>
+          <h2 className="text-xl font-semibold text-text-primary mb-1">Onboarding Roadmap</h2>
           <p className="text-sm text-text-secondary">
             Optionally select one or more templates. They'll be combined into this person's complete
             onboarding plan.
@@ -430,10 +428,7 @@ export default function AddNewUser() {
               onCheckedChange={(checked) => setMakeAdmin(checked as boolean)}
             />
             <div className="flex-1">
-              <Label
-                htmlFor="makeAdmin"
-                className="text-text-primary font-medium cursor-pointer"
-              >
+              <Label htmlFor="makeAdmin" className="text-text-primary font-medium cursor-pointer">
                 Make user an admin
               </Label>
               <p className="text-sm text-text-secondary mt-1">
