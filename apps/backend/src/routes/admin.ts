@@ -1243,16 +1243,16 @@ router.post(
 router.post("/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-  const {
-    firstName,
-    lastName,
-    email,
-    role,
-    startDate,
-    templateIds,
-    sendWelcomeEmail,
-    makeAdmin,
-  } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      role,
+      startDate,
+      templateIds,
+      sendWelcomeEmail,
+      makeAdmin,
+    } = req.body;
 
     // Verify requester is admin
     const [currentUser] = await db
