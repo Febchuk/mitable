@@ -1,0 +1,642 @@
+
+> mitable@0.1.0 dev
+> turbo run dev
+
+╭──────────────────────────────────────────────────────────────────────╮
+│                                                                      │
+│                  Update available v1.13.4 ≫ v2.6.1                   │
+│    Changelog: https://github.com/vercel/turbo/releases/tag/v2.6.1    │
+│           Run "npx @turbo/codemod@latest update" to update           │
+│                                                                      │
+│        Follow @turborepo for updates: https://x.com/turborepo        │
+╰──────────────────────────────────────────────────────────────────────╯
+• Packages in scope: @mitable/backend, @mitable/electron, @mitable/shared
+• Running dev in 3 packages
+• Remote caching disabled
+@mitable/electron:dev: cache bypass, force executing 8e0f83b45e3aaee2
+@mitable/shared:dev: cache bypass, force executing 0bfb7e4a8f78e7c7
+@mitable/backend:dev: cache bypass, force executing 6f74aa7f389d0466
+@mitable/electron:dev: 
+@mitable/electron:dev: > @mitable/electron@0.1.0 dev
+@mitable/electron:dev: > cross-env VITE_USER_ROLE=employee electron-vite dev --mode development
+@mitable/electron:dev: 
+@mitable/shared:dev: 
+@mitable/shared:dev: > @mitable/shared@0.1.0 dev
+@mitable/shared:dev: > tsup --watch
+@mitable/shared:dev: 
+@mitable/backend:dev: 
+@mitable/backend:dev: > @mitable/backend@0.1.0 dev
+@mitable/backend:dev: > tsx watch src/index.ts
+@mitable/backend:dev: 
+CLI Building entry: src/index.ts
+@mitable/shared:dev: CLI Using tsconfig: tsconfig.json
+@mitable/shared:dev: CLI tsup v8.5.0
+@mitable/shared:dev: CLI Using tsup config: /Users/febechukwuma/Documents/mitable/packages/shared/tsup.config.ts
+@mitable/shared:dev: CLI Running in watch mode
+@mitable/shared:dev: CLI Target: es2022
+@mitable/shared:dev: CLI Cleaning output folder
+@mitable/shared:dev: ESM Build start
+@mitable/shared:dev: CJS Build start
+@mitable/shared:dev: CJS dist/index.cjs     16.54 KB
+@mitable/shared:dev: CJS dist/index.cjs.map 25.62 KB
+@mitable/shared:dev: CJS ⚡️ Build success in 9ms
+@mitable/shared:dev: ESM dist/index.js     12.50 KB
+@mitable/shared:dev: ESM dist/index.js.map 25.35 KB
+@mitable/shared:dev: ESM ⚡️ Build success in 10ms
+@mitable/shared:dev: CLI Watching for changes in "."
+@mitable/shared:dev: CLI Ignoring changes in "**/{.git,node_modules}/**" | "dist"
+vite v5.4.20 building SSR bundle for development...
+@mitable/shared:dev: DTS Build start
+✓ 6 modules transformed.
+out/main/index.cjs  55.54 kB
+@mitable/electron:dev: ✓ built in 166ms
+@mitable/electron:dev: 
+@mitable/electron:dev: build the electron main process successfully
+@mitable/electron:dev: 
+@mitable/electron:dev: -----
+@mitable/electron:dev: 
+@mitable/electron:dev: vite v5.4.20 building SSR bundle for development...
+✓ 5 modules transformed.
+out/preload/watchButton.cjs   0.38 kB
+@mitable/electron:dev: out/preload/console.cjs       3.29 kB
+@mitable/electron:dev: out/preload/agentpanel.cjs    3.66 kB
+@mitable/electron:dev: out/preload/agent.cjs         3.67 kB
+@mitable/electron:dev: out/preload/conversation.cjs  5.66 kB
+@mitable/electron:dev: ✓ built in 16ms
+@mitable/electron:dev: 
+@mitable/electron:dev: build the electron preload files successfully
+@mitable/electron:dev: 
+@mitable/electron:dev: -----
+@mitable/electron:dev: 
+dev server running for the electron renderer process at:
+@mitable/electron:dev: 
+@mitable/electron:dev:   ➜  Local:   http://localhost:5173/
+@mitable/electron:dev:   ➜  Network: use --host to expose
+@mitable/electron:dev: 
+@mitable/electron:dev: start electron app...
+@mitable/electron:dev: 
+@mitable/electron:dev: [CaptureService] Started cleanup interval
+@mitable/electron:dev: [CaptureService] Initialized
+@mitable/electron:dev: [WindowDetectionService] Initialized
+@mitable/electron:dev: [ActiveWindowBridge] IPC handler registered on channel: mitable:get-active-window
+@mitable/electron:dev: [Console] Creating console window...
+@mitable/electron:dev: [Console] Preload script path: /Users/febechukwuma/Documents/mitable/apps/electron/out/preload/console.cjs
+@mitable/electron:dev: [Console] Loading dev URL: http://localhost:5173/console/index.html
+@mitable/electron:dev: [IPC] Setting up IPC handlers...
+@mitable/electron:dev: [IPC] Screenshot capture and display metadata handlers registered successfully
+@mitable/electron:dev: [IPC] Watch mode handlers registered successfully
+@mitable/shared:dev: DTS ⚡️ Build success in 581ms
+@mitable/electron:dev: [82616:1202/121825.873035:ERROR:CONSOLE:1] "Request Autofill.enable failed. {"code":-32601,"message":"'Autofill.enable' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
+@mitable/electron:dev: [82616:1202/121825.873412:ERROR:CONSOLE:1] "Request Autofill.setAddresses failed. {"code":-32601,"message":"'Autofill.setAddresses' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
+🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "interpretations": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "task": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "confidence": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "high",
+@mitable/backend:dev:               "medium",
+@mitable/backend:dev:               "low"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "reasoning": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "task",
+@mitable/backend:dev:           "confidence",
+@mitable/backend:dev:           "reasoning"
+@mitable/backend:dev:         ],
+@mitable/backend:dev:         "additionalProperties": false
+@mitable/backend:dev:       }
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "interpretations"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "interpretations": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "task": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "confidence": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "high",
+@mitable/backend:dev:               "medium",
+@mitable/backend:dev:               "low"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "reasoning": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "task",
+@mitable/backend:dev:           "confidence",
+@mitable/backend:dev:           "reasoning"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       }
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "interpretations"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "elementDescription": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "visualContext": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "confidence": {
+@mitable/backend:dev:       "type": "string",
+@mitable/backend:dev:       "enum": [
+@mitable/backend:dev:         "high",
+@mitable/backend:dev:         "medium",
+@mitable/backend:dev:         "low"
+@mitable/backend:dev:       ]
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "alternativeElements": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "conversationalMessage": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "elementDescription",
+@mitable/backend:dev:     "visualContext",
+@mitable/backend:dev:     "confidence",
+@mitable/backend:dev:     "conversationalMessage"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "elementDescription": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "visualContext": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "confidence": {
+@mitable/backend:dev:       "type": "string",
+@mitable/backend:dev:       "enum": [
+@mitable/backend:dev:         "high",
+@mitable/backend:dev:         "medium",
+@mitable/backend:dev:         "low"
+@mitable/backend:dev:       ]
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "alternativeElements": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "conversationalMessage": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "elementDescription",
+@mitable/backend:dev:     "visualContext",
+@mitable/backend:dev:     "confidence",
+@mitable/backend:dev:     "conversationalMessage"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "needsAdjustment": {
+@mitable/backend:dev:       "type": "boolean"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustedStepList": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "stepNumber": {
+@mitable/backend:dev:             "type": "integer",
+@mitable/backend:dev:             "exclusiveMinimum": 0
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "description": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "status": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "pending",
+@mitable/backend:dev:               "current",
+@mitable/backend:dev:               "completed"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "stepNumber",
+@mitable/backend:dev:           "description",
+@mitable/backend:dev:           "status"
+@mitable/backend:dev:         ],
+@mitable/backend:dev:         "additionalProperties": false
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustmentReason": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "needsAdjustment"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "needsAdjustment": {
+@mitable/backend:dev:       "type": "boolean"
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustedStepList": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "stepNumber": {
+@mitable/backend:dev:             "type": "integer"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "description": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "status": {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "enum": [
+@mitable/backend:dev:               "pending",
+@mitable/backend:dev:               "current",
+@mitable/backend:dev:               "completed"
+@mitable/backend:dev:             ]
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "stepNumber",
+@mitable/backend:dev:           "description",
+@mitable/backend:dev:           "status"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "adjustmentReason": {
+@mitable/backend:dev:       "type": "string"
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "needsAdjustment"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "relevantScreenshots": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "imageName": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "inclusionReason": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "imageName",
+@mitable/backend:dev:           "inclusionReason"
+@mitable/backend:dev:         ],
+@mitable/backend:dev:         "additionalProperties": false
+@mitable/backend:dev:       }
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "relevantScreenshots"
+@mitable/backend:dev:   ],
+@mitable/backend:dev:   "additionalProperties": false,
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "object",
+@mitable/backend:dev:   "properties": {
+@mitable/backend:dev:     "relevantScreenshots": {
+@mitable/backend:dev:       "type": "array",
+@mitable/backend:dev:       "items": {
+@mitable/backend:dev:         "type": "object",
+@mitable/backend:dev:         "properties": {
+@mitable/backend:dev:           "imageName": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           },
+@mitable/backend:dev:           "inclusionReason": {
+@mitable/backend:dev:             "type": "string"
+@mitable/backend:dev:           }
+@mitable/backend:dev:         },
+@mitable/backend:dev:         "required": [
+@mitable/backend:dev:           "imageName",
+@mitable/backend:dev:           "inclusionReason"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       }
+@mitable/backend:dev:     }
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "required": [
+@mitable/backend:dev:     "relevantScreenshots"
+@mitable/backend:dev:   ]
+@mitable/backend:dev: }
+@mitable/backend:dev: [GuideGenerationService] Initialized 3 pre-defined guides
+@mitable/backend:dev: 🔍 Full JSON Schema: {
+@mitable/backend:dev:   "type": "array",
+@mitable/backend:dev:   "items": {
+@mitable/backend:dev:     "type": "object",
+@mitable/backend:dev:     "properties": {
+@mitable/backend:dev:       "weekNumber": {
+@mitable/backend:dev:         "type": "integer",
+@mitable/backend:dev:         "minimum": 1
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "title": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "minLength": 1,
+@mitable/backend:dev:         "maxLength": 255
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "description": {
+@mitable/backend:dev:         "type": [
+@mitable/backend:dev:           "string",
+@mitable/backend:dev:           "null"
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "timeEstimate": {
+@mitable/backend:dev:         "anyOf": [
+@mitable/backend:dev:           {
+@mitable/backend:dev:             "type": "string",
+@mitable/backend:dev:             "maxLength": 50
+@mitable/backend:dev:           },
+@mitable/backend:dev:           {
+@mitable/backend:dev:             "type": "null"
+@mitable/backend:dev:           }
+@mitable/backend:dev:         ]
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "orderIndex": {
+@mitable/backend:dev:         "type": "integer",
+@mitable/backend:dev:         "minimum": 0
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "required": [
+@mitable/backend:dev:       "weekNumber",
+@mitable/backend:dev:       "title",
+@mitable/backend:dev:       "description",
+@mitable/backend:dev:       "timeEstimate",
+@mitable/backend:dev:       "orderIndex"
+@mitable/backend:dev:     ],
+@mitable/backend:dev:     "additionalProperties": false
+@mitable/backend:dev:   },
+@mitable/backend:dev:   "$schema": "http://json-schema.org/draft-07/schema#"
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔄 Converting type array: ["string","null"]
+@mitable/backend:dev:   ✓ Converted to: type="string", nullable=true
+@mitable/backend:dev: 🔄 Converting anyOf nullable: [{"type":"string","maxLength":50},{"type":"null"}]
+@mitable/backend:dev:   ✓ Converted to: {"type":"string","nullable":true}
+@mitable/backend:dev: ✨ Simplified Gemini Schema: {
+@mitable/backend:dev:   "type": "array",
+@mitable/backend:dev:   "items": {
+@mitable/backend:dev:     "type": "object",
+@mitable/backend:dev:     "properties": {
+@mitable/backend:dev:       "weekNumber": {
+@mitable/backend:dev:         "type": "integer"
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "title": {
+@mitable/backend:dev:         "type": "string"
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "description": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "nullable": true
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "timeEstimate": {
+@mitable/backend:dev:         "type": "string",
+@mitable/backend:dev:         "nullable": true
+@mitable/backend:dev:       },
+@mitable/backend:dev:       "orderIndex": {
+@mitable/backend:dev:         "type": "integer"
+@mitable/backend:dev:       }
+@mitable/backend:dev:     },
+@mitable/backend:dev:     "required": [
+@mitable/backend:dev:       "weekNumber",
+@mitable/backend:dev:       "title",
+@mitable/backend:dev:       "description",
+@mitable/backend:dev:       "timeEstimate",
+@mitable/backend:dev:       "orderIndex"
+@mitable/backend:dev:     ]
+@mitable/backend:dev:   }
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔍 Validating configuration...
+@mitable/backend:dev: 🔍 Checking port 3000 availability...
+@mitable/backend:dev: 🔌 Testing database connection...
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/backend:dev: ✅ Database connected: 2025-12-02T18:18:26.531Z
+@mitable/backend:dev: 📊 Initial pool stats: { total: 1, idle: 0, waiting: 0 }
+@mitable/backend:dev: 🔧 Initializing vector service...
+@mitable/backend:dev: ✅ Vector service initialized
+@mitable/backend:dev: 🔧 Initializing PII redaction service...
+@mitable/backend:dev: [PIIRedactionService] Initializing 5 Tesseract.js workers for parallel OCR...
+@mitable/backend:dev: [PIIRedactionService] 5 parallel OCR workers initialized and ready
+@mitable/backend:dev: ✅ PII redaction service hot and ready (5 workers)
+@mitable/backend:dev: 🚀 Mitable Backend API running on http://localhost:3000
+@mitable/backend:dev: 📊 Environment: development
+@mitable/electron:dev: [Conversation] DOM ready
+@mitable/electron:dev: [Conversation] Renderer loaded and ready for IPC
+@mitable/electron:dev: [AgentPanel] Window finished loading
+@mitable/electron:dev: [Console] DOM ready - window.consoleAPI should be available now
+@mitable/electron:dev: [Console] Window finished loading - preload script should be ready
+@mitable/electron:dev: [Auth] Tokens set from Console window
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/electron:dev: [Auth] Tokens set from Console window
+@mitable/electron:dev: [Watch Mode] Toggling watch mode: true
+@mitable/electron:dev: [WindowDetectionService] Watch mode set to: true
+@mitable/electron:dev: [WindowDetectionService] Detected 6 total windows
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'Electron',
+@mitable/electron:dev:   title: 'Mitable Agent Panel',
+@mitable/electron:dev:   blocked: false,
+@mitable/electron:dev:   reason: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'Cursor',
+@mitable/electron:dev:   title: 'run_log.txt — mitable',
+@mitable/electron:dev:   blocked: false,
+@mitable/electron:dev:   reason: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [WindowDetectionService] Returning 2 watchable windows
+@mitable/electron:dev: [Watch Mode] Found 2 watchable windows
+@mitable/electron:dev: [Watch Mode] Created button for Electron at (1072, 48)
+@mitable/electron:dev: [Watch Mode] Created button for Cursor at (10, 47)
+@mitable/electron:dev: [Watch Mode] Selecting window: Cursor (run_log.txt — mitable) [99443]
+@mitable/electron:dev: [WindowDetectionService] Added window to watch list: Cursor (run_log.txt — mitable) [99443]
+@mitable/electron:dev: [WindowDetectionService] Now watching 1 windows
+@mitable/electron:dev: [Watch Mode] Closing button for selected window: Cursor (windowId: 99443)
+@mitable/electron:dev: [Watch Mode] Broadcasted update to windows. Selected windows: Cursor - run_log.txt — mitable
+@mitable/electron:dev: [Watch Mode] Button window closed for: Cursor
+@mitable/electron:dev: [Screenshot] Multi-window capture requested { hasMessage: false }
+@mitable/electron:dev: [Screenshot] Capture with filters: {
+@mitable/electron:dev:   hasSelectedWindows: true,
+@mitable/electron:dev:   selectedWindows: 'Cursor - run_log.txt — mitable'
+@mitable/electron:dev: }
+@mitable/electron:dev: [CaptureService] Detected 1 visible windows
+@mitable/electron:dev: [CaptureService] ✅ Allowed: run_log.txt — mitable
+@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 99443
+@mitable/electron:dev: [CaptureService] Capturing 1 windows
+@mitable/electron:dev: [CaptureService] Resizing image: {
+@mitable/electron:dev:   original: { width: 3456, height: 2160 },
+@mitable/electron:dev:   resized: { width: 1728, height: 1080 }
+@mitable/electron:dev: }
+@mitable/electron:dev: [Screenshot] Multi-window capture result: {
+@mitable/electron:dev:   success: true,
+@mitable/electron:dev:   screenshotCount: 1,
+@mitable/electron:dev:   blockedCount: 0,
+@mitable/electron:dev:   totalDetected: 1
+@mitable/electron:dev: }
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/electron:dev: [Auth] Token requested, returning: present
+@mitable/backend:dev: [Conversations] Request received: {
+@mitable/backend:dev:   conversationId: 'd0a76664-2bc5-4d56-809a-d4a4192b3d70',
+@mitable/backend:dev:   userId: '0a484b0b-59c7-467e-a492-4a8c72ff7bc6',
+@mitable/backend:dev:   contentLength: 33,
+@mitable/backend:dev:   screenshotCount: 1,
+@mitable/backend:dev:   metadata: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: [Stream] User message saved: 53117f26-53f4-429d-8ded-639a854129a2
+@mitable/backend:dev: [Conversations] User profile (from cache): {
+@mitable/backend:dev:   organizationId: 'f4f35c6f-efb0-47ae-b200-6b8bf0a0990a',
+@mitable/backend:dev:   name: 'Emily Rodriguez',
+@mitable/backend:dev:   email: 'emily@lorikeet.ai'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] ToolContext created: {
+@mitable/backend:dev:   conversationId: 'd0a76664-2bc5-4d56-809a-d4a4192b3d70',
+@mitable/backend:dev:   userId: '0a484b0b-59c7-467e-a492-4a8c72ff7bc6',
+@mitable/backend:dev:   historyLength: 1,
+@mitable/backend:dev:   hasUserProfile: true,
+@mitable/backend:dev:   userProfileOrg: 'f4f35c6f-efb0-47ae-b200-6b8bf0a0990a'
+@mitable/backend:dev: }
+@mitable/backend:dev: [Conversations] Starting OrchestratorService.processMessage
+@mitable/backend:dev: [Orchestrator] Processing message: {
+@mitable/backend:dev:   conversationId: 'd0a76664-2bc5-4d56-809a-d4a4192b3d70',
+@mitable/backend:dev:   screenshotCount: 1,
+@mitable/backend:dev:   hasWorkflowState: false,
+@mitable/backend:dev:   workflowAction: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [Orchestrator] Gemini classified: { type: 'workflow_start', confidence: 0.95 }
+@mitable/backend:dev: [Orchestrator] Intent classified: { type: 'workflow_start', confidence: 0.95 }
+@mitable/backend:dev: [Orchestrator] Routing: intent � Agent: visual-guidance
+@mitable/backend:dev: [VisualGuidanceAgent] Vague prompt inference: "How do I run the dev environement" → specific
+@mitable/backend:dev: [VisualGuidanceAgent] Starting knowledge-grounded workflow
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'progress',
+@mitable/backend:dev:   hasContent: false,
+@mitable/backend:dev:   hasWindowTrigger: false,
+@mitable/backend:dev:   windowType: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [SlackRetriever] Searching for: "How do I run the dev environement" {
+@mitable/backend:dev:   organizationId: 'f4f35c6f-efb0-47ae-b200-6b8bf0a0990a',
+@mitable/backend:dev:   channels: undefined,
+@mitable/backend:dev:   topK: 20
+@mitable/backend:dev: }
+@mitable/backend:dev:          📦 Embedding batch 1: 1 chunks (~9 tokens)
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [SlackRetriever] Keyword: 0 results
+@mitable/backend:dev: [SlackRetriever] Pinecone filter: {"source":"slack"}
+@mitable/backend:dev: [SlackRetriever] Semantic search: 0 messages (filtered at query time)
+@mitable/backend:dev: [SlackRetriever] Found 0 threads (0 messages) in 3423ms
+@mitable/backend:dev: [SlackRetriever] Estimated tokens: 0 / 90000 (truncated: false)
+@mitable/backend:dev: [VisualGuidanceAgent] Search complete: { query: 'How do I run the dev environement', sourcesFound: 0 }
+@mitable/backend:dev: [VisualGuidanceAgent] Analyzing visible application on screen...
+@mitable/backend:dev: [VisualGuidanceAgent] ✅ Visible app detected: Cursor
+@mitable/backend:dev: [VisualGuidanceAgent] Calling GPT-4 for workflow synthesis
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'progress',
+@mitable/backend:dev:   hasContent: false,
+@mitable/backend:dev:   hasWindowTrigger: false,
+@mitable/backend:dev:   windowType: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] GPT-4 synthesis received: {
+@mitable/backend:dev:   hasSolution: true,
+@mitable/backend:dev:   hasExplanation: true,
+@mitable/backend:dev:   hasSupportingDataExplanation: true,
+@mitable/backend:dev:   stepCount: 5
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] 📊 Synthesis context used: {
+@mitable/backend:dev:   userQuestion: 'How do I run the dev environement',
+@mitable/backend:dev:   visibleApp: 'Cursor',
+@mitable/backend:dev:   searchResultCount: 0,
+@mitable/backend:dev:   firstStepUsesVisibleApp: false
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Validation passed, preparing tool parameters: {
+@mitable/backend:dev:   solution: 'Start the development environment for your project...',
+@mitable/backend:dev:   stepCount: 5,
+@mitable/backend:dev:   supportingDataFromSearch: 0
+@mitable/backend:dev: }
+@mitable/backend:dev: [VisualGuidanceAgent] Executing workflow tool with combined parameters
+@mitable/backend:dev: [StartUIGuidanceWorkflowTool] Missing required fields: [ 'supportingData' ]
+@mitable/backend:dev: [Conversations] Streaming chunk sent: {
+@mitable/backend:dev:   type: 'complete',
+@mitable/backend:dev:   hasContent: true,
+@mitable/backend:dev:   hasWindowTrigger: false,
+@mitable/backend:dev:   windowType: undefined
+@mitable/backend:dev: }
+@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
+@mitable/backend:dev: [Stream] Assistant message saved: 176a4048-581a-499c-8b9d-40be79481997
+@mitable/backend:dev: [DEBUG PII] Saving PII test screenshots... {
+@mitable/backend:dev:   screenshotPreview: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABsAA',
+@mitable/backend:dev:   hasMetadata: true
+@mitable/backend:dev: }
+@mitable/backend:dev: [DEBUG PII] Path resolution: {
+@mitable/backend:dev:   processCwd: '/Users/febechukwuma/Documents/mitable/apps/backend',
+@mitable/backend:dev:   monorepoRoot: '/Users/febechukwuma/Documents/mitable',
+@mitable/backend:dev:   defaultDir: '/Users/febechukwuma/Documents/mitable/temp/pii-debug-screenshots',
+@mitable/backend:dev:   sessionDir: '/Users/febechukwuma/Documents/mitable/temp/2025-12-02T18-19-16-852Z'
+@mitable/backend:dev: }
+@mitable/backend:dev: [DEBUG PII] Screenshots saved: {
+@mitable/backend:dev:   sessionDir: '/Users/febechukwuma/Documents/mitable/temp/2025-12-02T18-19-16-852Z',
+@mitable/backend:dev:   redactedPath: '/Users/febechukwuma/Documents/mitable/temp/2025-12-02T18-19-16-852Z/redacted.png',
+@mitable/backend:dev:   metadataPath: '/Users/febechukwuma/Documents/mitable/temp/2025-12-02T18-19-16-852Z/metadata.json'
+@mitable/backend:dev: }
+@mitable/backend:dev: [DEBUG SCREENSHOT] Annotated screenshot saving is disabled for conversational-only guidance output (no bounding boxes available).
+@mitable/backend:dev: [Stream] First exchange detected - generating conversation title
+@mitable/backend:dev: [TitleGenerationService] Generating title for conversation
+@mitable/backend:dev: [TitleGenerationService] Title generated: Running the dev environment: Tool call error
+@mitable/backend:dev: [Stream] Generated title: Running the dev environment: Tool call error
+@mitable/backend:dev: [Stream] Conversation title updated successfully
+@mitable/backend:dev: [Conversations] Streaming completed successfully: {
+@mitable/backend:dev:   messageId: '176a4048-581a-499c-8b9d-40be79481997',
+@mitable/backend:dev:   contentLength: 166
+@mitable/backend:dev: }
+@mitable/backend:dev: 🔌 Database connection removed from pool

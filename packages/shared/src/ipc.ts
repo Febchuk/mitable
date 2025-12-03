@@ -57,6 +57,17 @@ export const IPC_CHANNELS = {
   AGENT_GUIDE_NEXT_STEP: "agent-guide-next-step", // Triggered when Guide "Done" button clicked
   AGENT_OPEN_CONVERSATION: "agent-open-conversation", // Console → Main (open specific conversation in agent)
   CONSOLE_OPEN_CHAT: "console-open-chat", // Agent/Conversation → Main (open conversation in console)
+  CONSOLE_OPEN_CHATS: "console-open-chats", // AgentPanel → Main (open chats tab in console)
+
+  // Agent Panel window (right-docked chat panel)
+  AGENTPANEL_TOGGLE: "agentpanel-toggle", // Toggle visibility
+  AGENTPANEL_SHOW: "agentpanel-show", // Show panel
+  AGENTPANEL_HIDE: "agentpanel-hide", // Hide panel
+  AGENTPANEL_SHOWN: "agentpanel-shown", // Notify renderer after panel shown (for entrance animation)
+  AGENTPANEL_RESIZE: "agentpanel-resize", // Resize panel width
+  AGENTPANEL_VIBRANCY_ON: "agentpanel-vibrancy-on", // Renderer → Main: fade in vibrancy after animation
+  AGENTPANEL_VIBRANCY_OFF: "agentpanel-vibrancy-off", // Renderer → Main: fade out vibrancy before animation
+  AGENTPANEL_LOAD_CONVERSATION: "agentpanel-load-conversation", // Console → AgentPanel (load conversation)
 
   // Conversation window (parent-child with agent)
   CONVERSATION_SHOW: "conversation-show", // Agent → Main (show conversation window)

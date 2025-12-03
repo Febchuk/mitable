@@ -78,6 +78,7 @@ export interface User {
   avatarUrl?: string;
   currentWeek: number;
   role: UserRole;
+  originalRole?: UserRole;
 }
 
 // ============================================

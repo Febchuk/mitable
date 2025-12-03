@@ -42,13 +42,15 @@ export interface StreamChunk {
 
 /**
  * Get auth token from main process
- * Works with both agentAPI and conversationAPI
+ * Works with agentAPI, agentPanelAPI, and conversationAPI
  */
 async function getAuthHeaders(): Promise<HeadersInit> {
   let token: string | null = null;
 
   // Check which window API is available
-  if ("agentAPI" in window && window.agentAPI?.getAuthToken) {
+  if ("agentPanelAPI" in window && window.agentPanelAPI?.getAuthToken) {
+    token = await window.agentPanelAPI.getAuthToken();
+  } else if ("agentAPI" in window && window.agentAPI?.getAuthToken) {
     token = await window.agentAPI.getAuthToken();
   } else if ("conversationAPI" in window && window.conversationAPI?.getAuthToken) {
     token = await window.conversationAPI.getAuthToken();
@@ -100,6 +102,47 @@ export async function createConversation(
   const data = await response.json();
   console.log("[API] ✅ Conversation created:", data.conversation);
   return data.conversation;
+}
+
+/**
+ * Get list of conversations (paginated)
+ */
+export async function getConversations(
+  page: number = 1,
+  limit: number = 20
+): Promise<{
+  conversations: Conversation[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}> {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_BASE_URL}/api/conversations?page=${page}&limit=${limit}`, {
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get conversations: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+
+  // Parse timestamps to Date objects
+  const conversations = data.conversations.map((conv: any) => ({
+    ...conv,
+    timestamp: new Date(conv.timestamp),
+  }));
+
+  return {
+    conversations,
+    pagination: data.pagination,
+  };
 }
 
 /**

@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import type { User } from "../types";
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { authService } from "../services/authService";
+import type { User } from "../types";
 
 interface UserContextType {
   user: User | null;
@@ -38,6 +38,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
           avatarUrl: response.profile.avatarUrl || undefined,
           currentWeek: response.profile.currentWeek || 1,
           role: response.profile.role,
+          originalRole: response.profile.role,
         });
         setIsAuthenticated(true);
 
@@ -66,6 +67,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
               avatarUrl: response.profile.avatarUrl || undefined,
               currentWeek: response.profile.currentWeek || 1,
               role: response.profile.role,
+              originalRole: response.profile.role,
             });
             setIsAuthenticated(true);
           } catch (refreshError) {

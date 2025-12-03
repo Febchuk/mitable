@@ -1,5 +1,5 @@
-import { NavLink } from "react-router-dom";
 import { LucideIcon } from "lucide-react";
+import { NavLink } from "react-router-dom";
 import { useSidebar } from "../../context/SidebarContext";
 
 interface NavItemProps {
@@ -8,21 +8,8 @@ interface NavItemProps {
   label: string;
 }
 
-// Map route paths to colors
-const iconColors: Record<string, string> = {
-  "/home": "text-blue-400",
-  "/roadmap": "text-purple-400",
-  "/nudges": "text-green-400",
-  "/chats": "text-pink-400",
-  "/dashboard": "text-blue-400",
-  "/people": "text-green-400",
-  "/templates": "text-purple-400",
-  "/integrations": "text-amber-400",
-};
-
 export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
   const { open } = useSidebar();
-  const iconColor = iconColors[to] || "text-text-secondary";
 
   return (
     <NavLink
@@ -40,7 +27,7 @@ export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
         <>
           <Icon
             className={`w-5 h-5 flex-shrink-0 transition-all duration-200 ${
-              isActive ? "" : `${iconColor} group-hover:text-white group-hover:scale-110`
+              isActive ? "" : `text-text-secondary group-hover:text-white group-hover:scale-110`
             }`}
           />
           {open && (

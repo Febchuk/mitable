@@ -84,7 +84,7 @@ export type MultiWindowCaptureSuccess = z.infer<typeof MultiWindowCaptureSuccess
 export const MultiWindowCaptureErrorSchema = z.object({
   success: z.literal(false),
   error: z.string(),
-  reason: z.enum(["policy_blocked", "technical_error", "no_window"]),
+  reason: z.enum(["policy_blocked", "technical_error", "no_window", "no_selection"]),
   blockedApp: z.string().optional(),
   blockedWindow: z.string().optional(),
 });

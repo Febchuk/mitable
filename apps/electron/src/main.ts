@@ -1,15 +1,16 @@
+import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
+import { IPC_CHANNELS } from "@mitable/shared";
 import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from "electron";
 import { join } from "path";
-import { IPC_CHANNELS } from "@mitable/shared";
-import { captureService } from "./services/captureService";
-import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
-import { windowDetectionService } from "./services/windowDetectionService";
-import { isBlockedByPolicy } from "./services/capturePolicy";
-import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
+import { isBlockedByPolicy } from "./services/capturePolicy";
+import { captureService } from "./services/captureService";
+import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
+import { windowDetectionService } from "./services/windowDetectionService";
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
+let agentPanelWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 
@@ -181,6 +182,67 @@ function createConversationWindow() {
   });
 }
 
+function createAgentPanelWindow() {
+  // Get screen dimensions for right-docked positioning
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+  const panelWidth = 450;
+
+  agentPanelWindow = new BrowserWindow({
+    width: panelWidth,
+    height: screenHeight,
+    x: screenWidth - panelWidth, // Right edge of screen
+    y: 0,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: true,
+    skipTaskbar: true,
+    show: false, // Hidden by default
+    // Vibrancy is controlled dynamically for animation coordination
+    // Window starts transparent, vibrancy fades in after content animation
+    ...(process.platform === "win32" && {
+      backgroundMaterial: "acrylic" as const,
+    }),
+    webPreferences: {
+      preload: join(__dirname, "../preload/agentpanel.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top behavior
+  if (process.platform === "darwin") {
+    agentPanelWindow.setAlwaysOnTop(true, "modal-panel");
+    agentPanelWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    agentPanelWindow.setAlwaysOnTop(true, "normal", 1);
+  }
+
+  // Handle external links
+  agentPanelWindow.webContents.setWindowOpenHandler(({ url }) => {
+    console.log("[AgentPanel] External link clicked:", url);
+    shell.openExternal(url).catch((err) => {
+      console.error("[AgentPanel] Failed to open external link:", err);
+    });
+    return { action: "deny" };
+  });
+
+  if (!app.isPackaged) {
+    agentPanelWindow.loadURL("http://localhost:5173/agentpanel/index.html");
+  } else {
+    agentPanelWindow.loadFile(join(__dirname, "../renderer/agentpanel.html"));
+  }
+
+  agentPanelWindow.webContents.on("did-finish-load", () => {
+    console.log("[AgentPanel] Window finished loading");
+  });
+
+  agentPanelWindow.on("closed", () => {
+    agentPanelWindow = null;
+  });
+}
+
 function createConsoleWindow() {
   console.log("[Console] Creating console window...");
   console.log("[Console] Preload script path:", join(__dirname, "../preload/console.cjs"));
@@ -188,12 +250,17 @@ function createConsoleWindow() {
   consoleWindow = new BrowserWindow({
     width: 1264,
     height: 888,
-    transparent: process.platform === "darwin", // Only transparent on macOS
+    transparent: true,
+    backgroundColor: "#00000000", // Fully transparent hex for vibrancy support
     // Hidden title bar on macOS for native traffic lights with custom positioning
     titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
-    trafficLightPosition: process.platform === "darwin" ? { x: 6, y: 10 } : undefined,
-    frame: process.platform !== "darwin", // Native frame on Windows/Linux
-    maximizable: true, // Allow maximize on Windows
+    frame: process.platform !== "darwin",
+    maximizable: false,
+    // Native frosted glass - platform specific
+    ...(process.platform === "darwin" && {
+      vibrancy: "under-window" as const,
+      visualEffectState: "active" as const,
+    }),
     webPreferences: {
       preload: join(__dirname, "../preload/console.cjs"),
       contextIsolation: true,
@@ -386,6 +453,100 @@ function setupIPC() {
     }
     if (conversationWindow && !conversationWindow.isDestroyed()) {
       conversationWindow.hide();
+    }
+  });
+
+  // NEW: Open Chats tab in Console (from Agent Panel)
+  ipcMain.on(IPC_CHANNELS.CONSOLE_OPEN_CHATS, () => {
+    if (!consoleWindow || consoleWindow.isDestroyed()) return;
+
+    // Show and focus console window
+    consoleWindow.show();
+    consoleWindow.focus();
+
+    // Send navigation message to console to open chats tab
+    consoleWindow.webContents.send("navigate-to-chats");
+  });
+
+  // ==================== Agent Panel IPC Handlers ====================
+
+  // Toggle Agent Panel visibility
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_TOGGLE, () => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      if (agentPanelWindow.isVisible()) {
+        agentPanelWindow.hide();
+      } else {
+        agentPanelWindow.show();
+        // Notify renderer for entrance animation
+        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
+      }
+    }
+  });
+
+  // Show Agent Panel
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_SHOW, () => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      agentPanelWindow.show();
+      // Notify renderer for entrance animation
+      agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
+    }
+  });
+
+  // Hide Agent Panel
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_HIDE, () => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      agentPanelWindow.hide();
+    }
+  });
+
+  // Vibrancy control for animation coordination (macOS only)
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_VIBRANCY_ON, () => {
+    if (process.platform === "darwin" && agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      // Fade in vibrancy after content animation completes
+      agentPanelWindow.setVibrancy("under-window");
+    }
+  });
+
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_VIBRANCY_OFF, () => {
+    if (process.platform === "darwin" && agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      // Fade out vibrancy before/during exit animation
+      agentPanelWindow.setVibrancy(null);
+    }
+  });
+
+  // Resize Agent Panel width
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_RESIZE, (_event, width: number) => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+
+      // Clamp width between 350 and 600
+      const clampedWidth = Math.max(350, Math.min(600, width));
+
+      agentPanelWindow.setBounds(
+        {
+          x: screenWidth - clampedWidth,
+          y: 0,
+          width: clampedWidth,
+          height: screenHeight,
+        },
+        true // animate
+      );
+    }
+  });
+
+  // Load conversation in Agent Panel (from Console)
+  ipcMain.on(IPC_CHANNELS.AGENTPANEL_LOAD_CONVERSATION, (_event, conversationId: string) => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      // Show panel if hidden
+      if (!agentPanelWindow.isVisible()) {
+        agentPanelWindow.show();
+        // Notify renderer for entrance animation
+        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
+      }
+
+      // Forward to renderer
+      agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_LOAD_CONVERSATION, conversationId);
     }
   });
 
@@ -699,7 +860,7 @@ function setupIPC() {
     authTokens.refreshToken = refreshToken;
 
     // Broadcast token update to all windows
-    const allWindows = [agentWindow, conversationWindow, consoleWindow];
+    const allWindows = [agentWindow, agentPanelWindow, conversationWindow, consoleWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, accessToken);
@@ -720,7 +881,7 @@ function setupIPC() {
     authTokens.refreshToken = null;
 
     // Broadcast token clear to all windows
-    const allWindows = [agentWindow, conversationWindow, consoleWindow];
+    const allWindows = [agentWindow, agentPanelWindow, conversationWindow, consoleWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, null);
@@ -755,10 +916,21 @@ function setupIPC() {
               .join(", ") || "none",
         });
 
-        // Capture with optional filtering
+        // Return early if no windows selected (watch mode OFF)
+        // This prevents capturing ALL windows when user hasn't selected any
+        if (!hasSelectedWindows) {
+          console.log("[Screenshot] No windows selected, skipping capture");
+          return {
+            success: false,
+            error: "No windows selected for capture",
+            reason: "no_selection",
+          };
+        }
+
+        // Capture only the selected windows
         const result = await captureService.captureVisibleWindows(
           false, // saveToFile
-          hasSelectedWindows ? selectedWindowIds : undefined // Only filter if windows are selected
+          selectedWindowIds // Always filter by selected windows
         );
 
         console.log("[Screenshot] Multi-window capture result:", {
@@ -930,7 +1102,7 @@ function setupWatchModeHandlers() {
   // Broadcast updated window list to all windows
   function broadcastWatchWindowsUpdate() {
     const selectedWindows = windowDetectionService.getSelectedWindows();
-    const windows = [agentWindow, conversationWindow];
+    const windows = [agentWindow, agentPanelWindow, conversationWindow];
 
     for (const window of windows) {
       if (window && !window.isDestroyed()) {
@@ -1055,6 +1227,7 @@ function closeAllWatchButtonWindows(watchButtonWindows: Map<string, BrowserWindo
 
 // Global shortcut for help (Cmd+H / Ctrl+H)
 function registerGlobalShortcuts() {
+  // Old Agent pill (Cmd+H)
   globalShortcut.register("CommandOrControl+H", () => {
     if (!agentWindow || agentWindow.isDestroyed()) {
       // Recreate window if it was closed
@@ -1069,6 +1242,20 @@ function registerGlobalShortcuts() {
       }
     }
   });
+
+  // Agent Panel (Cmd+Shift+A)
+  globalShortcut.register("CommandOrControl+Shift+A", () => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      if (agentPanelWindow.isVisible()) {
+        agentPanelWindow.hide();
+      } else {
+        agentPanelWindow.show();
+        agentPanelWindow.focus();
+        // Notify renderer for entrance animation
+        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
+      }
+    }
+  });
 }
 
 app.whenReady().then(() => {
@@ -1077,6 +1264,7 @@ app.whenReady().then(() => {
 
   createAgentWindow();
   createConversationWindow(); // Create conversation window as child of agent
+  createAgentPanelWindow(); // Create Agent Panel (right-docked chat panel)
   createConsoleWindow();
 
   setupIPC();
