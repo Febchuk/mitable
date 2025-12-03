@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import * as schema from "./schema/index";
+import crypto from "crypto";
 
 dotenv.config();
 
