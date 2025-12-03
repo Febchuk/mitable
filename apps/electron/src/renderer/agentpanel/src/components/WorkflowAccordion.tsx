@@ -1,8 +1,6 @@
 import { useState, useMemo } from "react";
 import { ChevronDown, ChevronRight, PlayCircle, CheckCircle, Check, Circle } from "lucide-react";
-import WorkflowOptions, {
-  WorkflowPhase,
-} from "@/components/domain/workflow/WorkflowOptions";
+import WorkflowOptions, { WorkflowPhase } from "@/components/domain/workflow/WorkflowOptions";
 import { Response } from "@/components/ui/ai-response";
 import LoadingMessage from "./LoadingMessage";
 import { cn } from "@/lib/utils";
@@ -120,9 +118,7 @@ export function WorkflowAccordion({
           {/* Persistent explanation message */}
           <div className="px-4 py-3">
             <div className="text-sm leading-relaxed text-gray-200">
-              <Response parseIncompleteMarkdown={false}>
-                {workflow.solutionExplanation}
-              </Response>
+              <Response parseIncompleteMarkdown={false}>{workflow.solutionExplanation}</Response>
             </div>
           </div>
 
@@ -227,9 +223,7 @@ export function WorkflowAccordion({
                       {isCurrentStep && step.guidance && (
                         <div className="current-step-guidance mb-2">
                           <div className="text-sm leading-relaxed text-gray-200">
-                            <Response parseIncompleteMarkdown={false}>
-                              {step.guidance}
-                            </Response>
+                            <Response parseIncompleteMarkdown={false}>{step.guidance}</Response>
                           </div>
                         </div>
                       )}

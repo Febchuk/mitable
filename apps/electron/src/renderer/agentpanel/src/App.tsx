@@ -243,103 +243,123 @@ function App() {
         }
 
         // Send message with streaming
-        await sendMessageStream(activeConversationId, content.trim(), captureResult, {
-          onChunk: (chunk, workflowSessionId, relatedStepIndex) => {
-            // Clear loading message on first chunk
-            if (isCustomWorkflowQuestion) {
-              setWorkflowLoadingMessage(null);
-            } else {
-              setLoadingMessage(null);
-            }
-            // Update message in-place (like conversation window)
-            setMessages((prev) =>
-              prev.map((msg): Message =>
-                msg.id === streamingMessageId
-                  ? {
-                      ...msg,
-                      content: msg.content + chunk,
-                      // Add workflow routing metadata from first chunk
-                      workflowSessionId: msg.workflowSessionId ?? workflowSessionId ?? null,
-                      relatedStepIndex: msg.relatedStepIndex ?? relatedStepIndex ?? null,
-                    }
-                  : msg
-              )
-            );
-          },
-          onComplete: (fullContent, messageId, messageType, cardData, workflowSessionId, relatedStepIndex) => {
-            // Clear loading message on complete (in case onChunk never fired)
-            if (isCustomWorkflowQuestion) {
-              setWorkflowLoadingMessage(null);
-            } else {
-              setLoadingMessage(null);
-            }
+        await sendMessageStream(
+          activeConversationId,
+          content.trim(),
+          captureResult,
+          {
+            onChunk: (chunk, workflowSessionId, relatedStepIndex) => {
+              // Clear loading message on first chunk
+              if (isCustomWorkflowQuestion) {
+                setWorkflowLoadingMessage(null);
+              } else {
+                setLoadingMessage(null);
+              }
+              // Update message in-place (like conversation window)
+              setMessages((prev) =>
+                prev.map(
+                  (msg): Message =>
+                    msg.id === streamingMessageId
+                      ? {
+                          ...msg,
+                          content: msg.content + chunk,
+                          // Add workflow routing metadata from first chunk
+                          workflowSessionId: msg.workflowSessionId ?? workflowSessionId ?? null,
+                          relatedStepIndex: msg.relatedStepIndex ?? relatedStepIndex ?? null,
+                        }
+                      : msg
+                )
+              );
+            },
+            onComplete: (
+              fullContent,
+              messageId,
+              messageType,
+              cardData,
+              workflowSessionId,
+              relatedStepIndex
+            ) => {
+              // Clear loading message on complete (in case onChunk never fired)
+              if (isCustomWorkflowQuestion) {
+                setWorkflowLoadingMessage(null);
+              } else {
+                setLoadingMessage(null);
+              }
 
-            // Update message in-place (not create new one)
-            setMessages((prev) =>
-              prev.map((msg): Message =>
-                msg.id === streamingMessageId
-                  ? {
-                      ...msg,
-                      id: messageId || msg.id,
-                      content: fullContent && fullContent.trim().length > 0 ? fullContent : msg.content,
-                      messageType: messageType as "text" | "workflow" | "experts",
-                      cardData,
-                      // Preserve existing routing if backend omits these fields
-                      workflowSessionId: workflowSessionId ?? msg.workflowSessionId,
-                      relatedStepIndex: relatedStepIndex ?? msg.relatedStepIndex,
-                    }
-                  : msg
-              )
-            );
-            streamingMessageIdRef.current = null;
-            // Clear awaiting custom question state after successful completion
-            if (awaitingCustomQuestion) {
-              setAwaitingCustomQuestion(null);
-            }
+              // Update message in-place (not create new one)
+              setMessages((prev) =>
+                prev.map(
+                  (msg): Message =>
+                    msg.id === streamingMessageId
+                      ? {
+                          ...msg,
+                          id: messageId || msg.id,
+                          content:
+                            fullContent && fullContent.trim().length > 0
+                              ? fullContent
+                              : msg.content,
+                          messageType: messageType as "text" | "workflow" | "experts",
+                          cardData,
+                          // Preserve existing routing if backend omits these fields
+                          workflowSessionId: workflowSessionId ?? msg.workflowSessionId,
+                          relatedStepIndex: relatedStepIndex ?? msg.relatedStepIndex,
+                        }
+                      : msg
+                )
+              );
+              streamingMessageIdRef.current = null;
+              // Clear awaiting custom question state after successful completion
+              if (awaitingCustomQuestion) {
+                setAwaitingCustomQuestion(null);
+              }
+            },
+            onError: (error) => {
+              console.error("[AgentPanel] Stream error:", error);
+              // Clear loading message on error
+              if (isCustomWorkflowQuestion) {
+                setWorkflowLoadingMessage(null);
+              } else {
+                setLoadingMessage(null);
+              }
+              // Update message in-place with error
+              setMessages((prev) =>
+                prev.map(
+                  (msg): Message =>
+                    msg.id === streamingMessageId
+                      ? {
+                          ...msg,
+                          content: `Sorry, I encountered an error: ${error}`,
+                        }
+                      : msg
+                )
+              );
+              streamingMessageIdRef.current = null;
+            },
+            onProgress: (phase, progressMessage) => {
+              console.log("[AgentPanel] Progress:", phase, progressMessage);
+              if (isCustomWorkflowQuestion) {
+                setWorkflowLoadingMessage(progressMessage);
+              } else {
+                setLoadingMessage(progressMessage);
+              }
+            },
           },
-          onError: (error) => {
-            console.error("[AgentPanel] Stream error:", error);
-            // Clear loading message on error
-            if (isCustomWorkflowQuestion) {
-              setWorkflowLoadingMessage(null);
-            } else {
-              setLoadingMessage(null);
-            }
-            // Update message in-place with error
-            setMessages((prev) =>
-              prev.map((msg): Message =>
-                msg.id === streamingMessageId
-                  ? {
-                      ...msg,
-                      content: `Sorry, I encountered an error: ${error}`,
-                    }
-                  : msg
-              )
-            );
-            streamingMessageIdRef.current = null;
-          },
-          onProgress: (phase, progressMessage) => {
-            console.log("[AgentPanel] Progress:", phase, progressMessage);
-            if (isCustomWorkflowQuestion) {
-              setWorkflowLoadingMessage(progressMessage);
-            } else {
-              setLoadingMessage(progressMessage);
-            }
-          },
-        }, metadata);
+          metadata
+        );
       } catch (error) {
         console.error("[AgentPanel] Error sending message:", error);
         // Update message in-place with error
         const currentStreamingId = streamingMessageIdRef.current;
         if (currentStreamingId) {
           setMessages((prev) =>
-            prev.map((msg): Message =>
-              msg.id === currentStreamingId
-                ? {
-                    ...msg,
-                    content: `Sorry, I couldn't process your request. Please try again.`,
-                  }
-                : msg
+            prev.map(
+              (msg): Message =>
+                msg.id === currentStreamingId
+                  ? {
+                      ...msg,
+                      content: `Sorry, I couldn't process your request. Please try again.`,
+                    }
+                  : msg
             )
           );
         }
@@ -474,9 +494,17 @@ function App() {
       // Find the LATEST workflow message to get current workflowSessionId and currentStepIndex
       const activeWorkflowMessage = [...messages]
         .reverse()
-        .find((m) => m.messageType === "workflow" && (m.cardData as { workflowSessionId?: string })?.workflowSessionId);
-      const workflowSessionId = (activeWorkflowMessage?.cardData as { workflowSessionId?: string })?.workflowSessionId || null;
-      const currentStepIndex = (activeWorkflowMessage?.cardData as { currentStepIndex?: number })?.currentStepIndex ?? null;
+        .find(
+          (m) =>
+            m.messageType === "workflow" &&
+            (m.cardData as { workflowSessionId?: string })?.workflowSessionId
+        );
+      const workflowSessionId =
+        (activeWorkflowMessage?.cardData as { workflowSessionId?: string })?.workflowSessionId ||
+        null;
+      const currentStepIndex =
+        (activeWorkflowMessage?.cardData as { currentStepIndex?: number })?.currentStepIndex ??
+        null;
 
       // Handle custom question - enable awaiting mode without sending message
       if (action === "custom_question" || action === "ask_questions") {
@@ -614,12 +642,20 @@ function App() {
 
               // Update message in-place
               setMessages((prev) =>
-                prev.map((msg): Message =>
-                  msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
+                prev.map(
+                  (msg): Message =>
+                    msg.id === streamingMessageId ? { ...msg, content: msg.content + chunk } : msg
                 )
               );
             },
-            onComplete: (fullContent, messageId, messageType, cardData, wfSessionId, relatedStepIndex) => {
+            onComplete: (
+              fullContent,
+              messageId,
+              messageType,
+              cardData,
+              wfSessionId,
+              relatedStepIndex
+            ) => {
               console.log("[AgentPanel] Workflow stream complete:", {
                 messageId,
                 messageType,
@@ -633,19 +669,23 @@ function App() {
 
               // Update message in-place
               setMessages((prev) =>
-                prev.map((msg): Message =>
-                  msg.id === streamingMessageId
-                    ? {
-                        ...msg,
-                        id: messageId || msg.id,
-                        content: fullContent && fullContent.trim().length > 0 ? fullContent : msg.content,
-                        messageType: messageType as "text" | "workflow" | "experts",
-                        cardData,
-                        // Preserve existing routing if backend omits these fields
-                        workflowSessionId: wfSessionId ?? msg.workflowSessionId,
-                        relatedStepIndex: relatedStepIndex ?? msg.relatedStepIndex,
-                      }
-                    : msg
+                prev.map(
+                  (msg): Message =>
+                    msg.id === streamingMessageId
+                      ? {
+                          ...msg,
+                          id: messageId || msg.id,
+                          content:
+                            fullContent && fullContent.trim().length > 0
+                              ? fullContent
+                              : msg.content,
+                          messageType: messageType as "text" | "workflow" | "experts",
+                          cardData,
+                          // Preserve existing routing if backend omits these fields
+                          workflowSessionId: wfSessionId ?? msg.workflowSessionId,
+                          relatedStepIndex: relatedStepIndex ?? msg.relatedStepIndex,
+                        }
+                      : msg
                 )
               );
               streamingMessageIdRef.current = null;
@@ -658,10 +698,11 @@ function App() {
 
               // Update message in-place with error
               setMessages((prev) =>
-                prev.map((msg): Message =>
-                  msg.id === streamingMessageId
-                    ? { ...msg, content: `Error: ${error}. Please try again.` }
-                    : msg
+                prev.map(
+                  (msg): Message =>
+                    msg.id === streamingMessageId
+                      ? { ...msg, content: `Error: ${error}. Please try again.` }
+                      : msg
                 )
               );
               streamingMessageIdRef.current = null;
@@ -679,10 +720,11 @@ function App() {
 
         // Update message in-place with error
         setMessages((prev) =>
-          prev.map((msg): Message =>
-            msg.id === streamingMessageId
-              ? { ...msg, content: `Sorry, I couldn't process that action. Please try again.` }
-              : msg
+          prev.map(
+            (msg): Message =>
+              msg.id === streamingMessageId
+                ? { ...msg, content: `Sorry, I couldn't process that action. Please try again.` }
+                : msg
           )
         );
         streamingMessageIdRef.current = null;

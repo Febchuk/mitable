@@ -10,12 +10,7 @@ interface WatchModeBarProps {
   onRemoveWindow: (windowId: string) => void;
 }
 
-function WatchModeBar({
-  isExpanded,
-  windows,
-  onEyeClick,
-  onRemoveWindow,
-}: WatchModeBarProps) {
+function WatchModeBar({ isExpanded, windows, onEyeClick, onRemoveWindow }: WatchModeBarProps) {
   const hasWindows = windows.length > 0;
   const isWatching = hasWindows; // Watch mode = has windows
 
@@ -28,18 +23,10 @@ function WatchModeBar({
         onClick={onEyeClick}
         className="relative h-7 w-7 shrink-0 rounded-full text-white/70 hover:text-white hover:bg-white/10"
         aria-label={
-          isExpanded
-            ? "Collapse watch list"
-            : isWatching
-              ? "Expand watch list"
-              : "Start watching"
+          isExpanded ? "Collapse watch list" : isWatching ? "Expand watch list" : "Start watching"
         }
       >
-        {hasWindows || isExpanded ? (
-          <Eye className="h-4 w-4" />
-        ) : (
-          <EyeOff className="h-4 w-4" />
-        )}
+        {hasWindows || isExpanded ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
 
         {/* Count badge - smaller */}
         {!isExpanded && hasWindows && (
@@ -62,9 +49,7 @@ function WatchModeBar({
               />
             ))}
             {windows.length === 0 && (
-              <span className="text-xs text-white/50 italic">
-                Click windows to add
-              </span>
+              <span className="text-xs text-white/50 italic">Click windows to add</span>
             )}
           </div>
         </div>

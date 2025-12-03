@@ -79,8 +79,7 @@ function ChatView({
               workflowSessionId?: string;
               status?: "active" | "paused" | "completed";
             };
-            const workflowSessionId =
-              cardData.workflowSessionId || message.workflowSessionId || "";
+            const workflowSessionId = cardData.workflowSessionId || message.workflowSessionId || "";
 
             // Skip if we've already rendered this workflow session
             if (workflowSessionId && renderedWorkflowSessions.has(workflowSessionId)) {
