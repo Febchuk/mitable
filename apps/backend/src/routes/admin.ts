@@ -1455,6 +1455,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
       },
       templatesAssigned: Array.isArray(templateIds) ? templateIds.length : 0,
       tasksCreated: totalTasksCreated,
+      initialPassword: tempPassword,
     });
   } catch (error) {
     console.error("Error creating user:", error);

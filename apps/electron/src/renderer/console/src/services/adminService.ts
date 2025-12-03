@@ -208,6 +208,7 @@ export interface CreateUserResponse {
   };
   templatesAssigned: number;
   tasksCreated: number;
+  initialPassword: string;
 }
 
 /**
