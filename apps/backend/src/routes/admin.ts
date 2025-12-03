@@ -1183,16 +1183,18 @@ router.post(
  *                 example: 2025-01-15
  *               templateIds:
  *                 type: array
- *                 description: Array of roadmap template IDs to assign
+ *                 description: Optional array of roadmap template IDs to assign
  *                 items:
  *                   type: string
  *                   format: uuid
- *                 minItems: 1
  *                 example: ["123e4567-e89b-12d3-a456-426614174000"]
  *               sendWelcomeEmail:
  *                 type: boolean
  *                 description: Whether to send welcome email with credentials
  *                 default: true
+ *               makeAdmin:
+ *                 type: boolean
+ *                 description: If true, create this user as an org admin
  *     responses:
  *       201:
  *         description: Employee created successfully
@@ -1241,7 +1243,16 @@ router.post(
 router.post("/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const { firstName, lastName, email, role, startDate, templateIds, sendWelcomeEmail } = req.body;
+  const {
+    firstName,
+    lastName,
+    email,
+    role,
+    startDate,
+    templateIds,
+    sendWelcomeEmail,
+    makeAdmin,
+  } = req.body;
 
     // Verify requester is admin
     const [currentUser] = await db
@@ -1306,17 +1317,6 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
       return;
     }
 
-    if (!templateIds || templateIds.length === 0) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "At least one template must be selected",
-        },
-      });
-      return;
-    }
-
     // Check if email already exists in database
     const [existingUser] = await db
       .select()
@@ -1368,7 +1368,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
       await db
         .update(schema.users)
         .set({
-          role: role,
+          role: makeAdmin ? "admin" : role,
           startDate: startDate,
           currentWeek: 1,
         })
@@ -1388,39 +1388,41 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Assign templates and copy tasks
+    // Assign templates and copy tasks (optional)
     let totalTasksCreated = 0;
 
-    for (const templateId of templateIds) {
-      // Create template assignment
-      await db.insert(schema.userTemplateAssignments).values({
-        userId: authData.user.id,
-        templateId,
-        status: "active",
-        assignedAt: new Date(),
-      });
-
-      // Get all tasks from this template
-      const templateTasks = await db
-        .select()
-        .from(schema.roadmapTemplateTasks)
-        .where(eq(schema.roadmapTemplateTasks.templateId, templateId))
-        .orderBy(schema.roadmapTemplateTasks.weekNumber, schema.roadmapTemplateTasks.orderIndex);
-
-      // Copy tasks to user's roadmap
-      for (const task of templateTasks) {
-        await db.insert(schema.userRoadmapTasks).values({
+    if (Array.isArray(templateIds) && templateIds.length > 0) {
+      for (const templateId of templateIds) {
+        // Create template assignment
+        await db.insert(schema.userTemplateAssignments).values({
           userId: authData.user.id,
-          templateId: templateId,
-          templateTaskId: task.id,
-          weekNumber: task.weekNumber,
-          title: task.title,
-          description: task.description,
-          timeEstimate: task.timeEstimate,
-          orderIndex: task.orderIndex,
-          completed: false,
+          templateId,
+          status: "active",
+          assignedAt: new Date(),
         });
-        totalTasksCreated++;
+
+        // Get all tasks from this template
+        const templateTasks = await db
+          .select()
+          .from(schema.roadmapTemplateTasks)
+          .where(eq(schema.roadmapTemplateTasks.templateId, templateId))
+          .orderBy(schema.roadmapTemplateTasks.weekNumber, schema.roadmapTemplateTasks.orderIndex);
+
+        // Copy tasks to user's roadmap
+        for (const task of templateTasks) {
+          await db.insert(schema.userRoadmapTasks).values({
+            userId: authData.user.id,
+            templateId: templateId,
+            templateTaskId: task.id,
+            weekNumber: task.weekNumber,
+            title: task.title,
+            description: task.description,
+            timeEstimate: task.timeEstimate,
+            orderIndex: task.orderIndex,
+            completed: false,
+          });
+          totalTasksCreated++;
+        }
       }
     }
 
@@ -1451,7 +1453,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
         lastName,
         role,
       },
-      templatesAssigned: templateIds.length,
+      templatesAssigned: Array.isArray(templateIds) ? templateIds.length : 0,
       tasksCreated: totalTasksCreated,
     });
   } catch (error) {
