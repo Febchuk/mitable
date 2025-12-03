@@ -194,6 +194,7 @@ export interface CreateUserPayload {
   startDate: string;
   templateIds: string[];
   sendWelcomeEmail: boolean;
+  makeAdmin?: boolean;
 }
 
 export interface CreateUserResponse {

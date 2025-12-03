@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const roles = [
   { value: "engineer", label: "Software Engineer" },
+  { value: "fde", label: "Forward Deployed Engineer" },
   { value: "designer", label: "Product Designer" },
   { value: "manager", label: "Marketing Manager" },
   { value: "pm", label: "Product Manager" },
@@ -45,6 +46,7 @@ export default function AddNewUser() {
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const [welcomeEmail, setWelcomeEmail] = useState(true);
   const [notifyManager, setNotifyManager] = useState(false);
+  const [makeAdmin, setMakeAdmin] = useState(false);
   const [date, setDate] = useState<Date>();
   const [roleOpen, setRoleOpen] = useState(false);
   const [role, setRole] = useState("");
@@ -104,15 +106,6 @@ export default function AddNewUser() {
       return;
     }
 
-    if (selectedTemplates.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please select at least one onboarding template",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       // Get the full role label (e.g., "Software Engineer") from the selected role value
       const selectedRole = roles.find((r) => r.value === role);
@@ -125,6 +118,7 @@ export default function AddNewUser() {
         startDate: format(date, "yyyy-MM-dd"),
         templateIds: selectedTemplates,
         sendWelcomeEmail: welcomeEmail,
+        makeAdmin,
       });
 
       toast({
@@ -339,11 +333,11 @@ export default function AddNewUser() {
       <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
         <div>
           <h2 className="text-xl font-semibold text-text-primary mb-1">
-            Onboarding Roadmap <span className="text-red-500">*</span>
+            Onboarding Roadmap
           </h2>
           <p className="text-sm text-text-secondary">
-            Select one or more templates. They'll be combined into this person's complete onboarding
-            plan.
+            Optionally select one or more templates. They'll be combined into this person's complete
+            onboarding plan.
           </p>
         </div>
 
@@ -424,6 +418,26 @@ export default function AddNewUser() {
               </Label>
               <p className="text-sm text-text-secondary mt-1">
                 Manager receives progress updates and milestone notifications
+              </p>
+            </div>
+          </div>
+
+          {/* Make User an Admin */}
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="makeAdmin"
+              checked={makeAdmin}
+              onCheckedChange={(checked) => setMakeAdmin(checked as boolean)}
+            />
+            <div className="flex-1">
+              <Label
+                htmlFor="makeAdmin"
+                className="text-text-primary font-medium cursor-pointer"
+              >
+                Make user an admin
+              </Label>
+              <p className="text-sm text-text-secondary mt-1">
+                Admins can manage onboarding, integrations, and other employees.
               </p>
             </div>
           </div>
