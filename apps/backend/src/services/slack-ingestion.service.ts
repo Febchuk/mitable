@@ -23,9 +23,9 @@ import type { VectorRecord } from "./vector.service.js";
 import type { NewSearchContent } from "../db/schema/search-content.schema.js";
 
 const SYNC_CONFIG = {
-  MESSAGES_PER_PAGE: 100,
+  MESSAGES_PER_PAGE: 15, // Tier 1 limit for distributed apps (non-Marketplace) - reduced from 1000 to 15!
   BATCH_SIZE: 100,
-  SLACK_API_DELAY_MS: 1200, // 1.2s delay between Slack API calls (Tier 1 = ~1 req/min, be conservative)
+  SLACK_API_DELAY_MS: 65000, // 65s delay between Slack API calls (Tier 1 = 1 req/min for distributed apps)
   INITIAL_SYNC_DAYS: 30, // Only fetch last 30 days on first sync (prevent massive data ingestion)
 } as const;
 
@@ -342,10 +342,11 @@ class SlackIngestionService {
             // Continue fetching until all messages are retrieved
             if (!hasMore) break;
 
-            // CRITICAL: Add delay between Slack API calls to respect Tier 1 rate limits
+            // CRITICAL: Add delay between EVERY page to respect Tier 1 rate limits
+            // No bursting - Slack detects patterns and rate limits harder
             if (cursor) {
               console.log(
-                `   ⏳ Waiting ${SYNC_CONFIG.SLACK_API_DELAY_MS}ms before next page (Slack rate limit)...`
+                `   ⏳ Waiting ${SYNC_CONFIG.SLACK_API_DELAY_MS / 1000}s before next page (Slack rate limit)...`
               );
               await new Promise((resolve) => setTimeout(resolve, SYNC_CONFIG.SLACK_API_DELAY_MS));
             }
