@@ -239,9 +239,11 @@ class SlackIngestionService {
         console.log(`📅 Last sync: ${new Date(latestMessage.timestamp).toLocaleString()}`);
       } else {
         // First sync - limit to recent messages to avoid rate limit hell
-        const daysAgo = Date.now() - (SYNC_CONFIG.INITIAL_SYNC_DAYS * 24 * 60 * 60 * 1000);
+        const daysAgo = Date.now() - SYNC_CONFIG.INITIAL_SYNC_DAYS * 24 * 60 * 60 * 1000;
         oldestTimestamp = Math.floor(daysAgo / 1000).toString();
-        console.log(`🔄 Sync Mode: ${syncMode} (first sync - last ${SYNC_CONFIG.INITIAL_SYNC_DAYS} days)`);
+        console.log(
+          `🔄 Sync Mode: ${syncMode} (first sync - last ${SYNC_CONFIG.INITIAL_SYNC_DAYS} days)`
+        );
         console.log(`📅 Fetching messages since: ${new Date(daysAgo).toLocaleString()}`);
       }
 
@@ -342,8 +344,10 @@ class SlackIngestionService {
 
             // CRITICAL: Add delay between Slack API calls to respect Tier 1 rate limits
             if (cursor) {
-              console.log(`   ⏳ Waiting ${SYNC_CONFIG.SLACK_API_DELAY_MS}ms before next page (Slack rate limit)...`);
-              await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.SLACK_API_DELAY_MS));
+              console.log(
+                `   ⏳ Waiting ${SYNC_CONFIG.SLACK_API_DELAY_MS}ms before next page (Slack rate limit)...`
+              );
+              await new Promise((resolve) => setTimeout(resolve, SYNC_CONFIG.SLACK_API_DELAY_MS));
             }
           } while (cursor);
 
