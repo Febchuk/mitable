@@ -75,6 +75,21 @@ export interface MemoryStats {
   memoryUsageMB: number;
 }
 
+/**
+ * Cached screenshot for watch mode fallback
+ */
+export interface CachedScreenshot {
+  appName: string;
+  windowTitle: string;
+  dataUrl: string;
+  capturedAt: number;
+  metadata: {
+    width: number;
+    height: number;
+    scaleFactor: number;
+  };
+}
+
 // ===========================
 // CaptureService Class
 // ===========================
@@ -87,6 +102,9 @@ class CaptureService {
   private readonly MAX_WIDTH = 1920;
   private readonly MAX_HEIGHT = 1080;
   private cleanupInterval: NodeJS.Timeout | null = null;
+
+  // Screenshot cache for watch mode fallback (keyed by appName lowercase)
+  private screenshotCache: Map<string, CachedScreenshot> = new Map();
 
   constructor() {
     this.startCleanupInterval();
@@ -510,6 +528,203 @@ class CaptureService {
       totalTempFileSize: totalSize,
       memoryUsageMB: Math.round((memoryUsage.heapUsed / 1024 / 1024) * 100) / 100,
     };
+  }
+
+  // ===========================
+  // Screenshot Cache Methods
+  // ===========================
+
+  /**
+   * Cache a screenshot for an app (used for fallback when window not visible)
+   *
+   * @param appName - App name to use as cache key
+   * @param screenshot - Screenshot data to cache
+   */
+  cacheScreenshot(appName: string, screenshot: CachedScreenshot): void {
+    this.screenshotCache.set(appName.toLowerCase(), screenshot);
+    console.log(`[CaptureService] Cached screenshot for ${appName}`);
+  }
+
+  /**
+   * Get cached screenshot for an app
+   *
+   * @param appName - App name to look up
+   * @returns Cached screenshot or undefined if not found
+   */
+  getCachedScreenshot(appName: string): CachedScreenshot | undefined {
+    return this.screenshotCache.get(appName.toLowerCase());
+  }
+
+  /**
+   * Clear cached screenshot for an app
+   *
+   * @param appName - App name to clear from cache
+   */
+  clearCachedScreenshot(appName: string): void {
+    const deleted = this.screenshotCache.delete(appName.toLowerCase());
+    if (deleted) {
+      console.log(`[CaptureService] Cleared cached screenshot for ${appName}`);
+    }
+  }
+
+  /**
+   * Clear all cached screenshots
+   */
+  clearAllCachedScreenshots(): void {
+    const count = this.screenshotCache.size;
+    this.screenshotCache.clear();
+    console.log(`[CaptureService] Cleared all ${count} cached screenshots`);
+  }
+
+  /**
+   * Capture visible windows with cache fallback for selected apps
+   *
+   * This method:
+   * 1. Attempts fresh capture of all visible windows
+   * 2. Matches captured windows against selected apps by appName
+   * 3. Falls back to cached screenshots for apps not currently visible
+   * 4. Updates cache with fresh screenshots when available
+   *
+   * @param selectedApps - Array of apps to capture (by appName and windowTitle)
+   * @returns Multi-window capture result with screenshots
+   */
+  async captureWithCacheFallback(
+    selectedApps: Array<{ appName: string; windowTitle: string }>
+  ): Promise<MultiWindowCaptureResult> {
+    // Step 1: Fresh capture of all visible windows (no ID filtering)
+    const freshResult = await this.captureVisibleWindows(false);
+
+    // If complete failure, try returning cached screenshots only
+    if (!freshResult.success || !freshResult.screenshots) {
+      return this.returnCachedOnly(selectedApps, freshResult);
+    }
+
+    // Step 2: Match fresh screenshots by windowTitle (not appName!)
+    // desktopCapturer returns window titles, not app names
+    const selectedTitles = new Set(selectedApps.map((a) => a.windowTitle.toLowerCase()));
+    const matchedScreenshots: WindowScreenshot[] = [];
+    const matchedTitles = new Set<string>();
+
+    for (const screenshot of freshResult.screenshots) {
+      const titleLower = screenshot.windowTitle.toLowerCase();
+      if (selectedTitles.has(titleLower)) {
+        matchedScreenshots.push(screenshot);
+        matchedTitles.add(titleLower);
+
+        // Update cache with fresh screenshot (keyed by windowTitle)
+        this.cacheScreenshot(screenshot.windowTitle, {
+          appName: screenshot.appName,
+          windowTitle: screenshot.windowTitle,
+          dataUrl: screenshot.dataUrl,
+          capturedAt: Date.now(),
+          metadata: {
+            width: screenshot.metadata.width,
+            height: screenshot.metadata.height,
+            scaleFactor: screenshot.metadata.scaleFactor,
+          },
+        });
+
+        console.log(`[CaptureService] Fresh screenshot for ${screenshot.windowTitle}`);
+      }
+    }
+
+    // Step 3: Fallback to cache for missing windows
+    for (const app of selectedApps) {
+      if (!matchedTitles.has(app.windowTitle.toLowerCase())) {
+        const cached = this.getCachedScreenshot(app.windowTitle);
+        if (cached) {
+          matchedScreenshots.push({
+            windowId: "cached",
+            windowTitle: cached.windowTitle,
+            appName: cached.appName,
+            dataUrl: cached.dataUrl,
+            metadata: {
+              width: cached.metadata.width,
+              height: cached.metadata.height,
+              scaleFactor: cached.metadata.scaleFactor,
+              bounds: {
+                x: 0,
+                y: 0,
+                width: cached.metadata.width,
+                height: cached.metadata.height,
+              },
+            },
+          });
+          console.log(`[CaptureService] Using cached screenshot for ${app.windowTitle}`);
+        } else {
+          console.log(`[CaptureService] No fresh or cached screenshot for ${app.windowTitle}`);
+        }
+      }
+    }
+
+    if (matchedScreenshots.length > 0) {
+      return {
+        success: true,
+        screenshots: matchedScreenshots,
+        blockedWindows: freshResult.blockedWindows,
+        totalWindowsDetected: freshResult.totalWindowsDetected,
+        captureTimestamp: Date.now(),
+      };
+    }
+
+    return {
+      success: false,
+      error: "No screenshots captured - selected windows may not be visible",
+      reason: "no_window",
+    };
+  }
+
+  /**
+   * Return cached screenshots only (when fresh capture fails)
+   *
+   * @param selectedApps - Apps to retrieve from cache
+   * @param originalResult - Original failed result for error context
+   * @returns Multi-window capture result with cached screenshots
+   */
+  private returnCachedOnly(
+    selectedApps: Array<{ appName: string; windowTitle: string }>,
+    originalResult: MultiWindowCaptureResult
+  ): MultiWindowCaptureResult {
+    const cachedScreenshots: WindowScreenshot[] = [];
+
+    for (const app of selectedApps) {
+      const cached = this.getCachedScreenshot(app.windowTitle);
+      if (cached) {
+        cachedScreenshots.push({
+          windowId: "cached",
+          windowTitle: cached.windowTitle,
+          appName: cached.appName,
+          dataUrl: cached.dataUrl,
+          metadata: {
+            width: cached.metadata.width,
+            height: cached.metadata.height,
+            scaleFactor: cached.metadata.scaleFactor,
+            bounds: {
+              x: 0,
+              y: 0,
+              width: cached.metadata.width,
+              height: cached.metadata.height,
+            },
+          },
+        });
+        console.log(
+          `[CaptureService] Using cached screenshot for ${app.windowTitle} (fresh failed)`
+        );
+      }
+    }
+
+    if (cachedScreenshots.length > 0) {
+      return {
+        success: true,
+        screenshots: cachedScreenshots,
+        blockedWindows: [],
+        totalWindowsDetected: 0,
+        captureTimestamp: Date.now(),
+      };
+    }
+
+    // No cached screenshots available, return original error
+    return originalResult;
   }
 }
 

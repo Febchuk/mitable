@@ -11,6 +11,7 @@ const IPC_CHANNELS = {
   AGENTPANEL_RESIZE: "agentpanel-resize",
   AGENTPANEL_VIBRANCY_ON: "agentpanel-vibrancy-on", // Fade in vibrancy after animation
   AGENTPANEL_VIBRANCY_OFF: "agentpanel-vibrancy-off", // Fade out vibrancy before animation
+  AGENTPANEL_REQUEST_CLOSE: "agentpanel-request-close", // Main → Renderer: request animated close
 
   // Screenshot capture
   CAPTURE_SCREENSHOT: "capture-screenshot",
@@ -81,6 +82,13 @@ contextBridge.exposeInMainWorld("agentPanelAPI", {
   // Panel show event (for entrance animation)
   onPanelShow: (callback: () => void) => {
     ipcRenderer.on(IPC_CHANNELS.AGENTPANEL_SHOWN, () => callback());
+  },
+
+  // Panel close request (from hotkey - triggers animated close)
+  onRequestClose: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on(IPC_CHANNELS.AGENTPANEL_REQUEST_CLOSE, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENTPANEL_REQUEST_CLOSE, listener);
   },
 
   // Listen for conversation load requests from Console

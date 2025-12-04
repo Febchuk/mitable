@@ -40,7 +40,7 @@ interface GetWindowsResult {
 class WindowDetectionService {
   // Track which windows user has selected to watch
   private selectedWindows: Map<string, SelectedWindowInfo> = new Map();
-  private isWatching: boolean = false;
+  // Note: isWatching is derived from selectedWindows.size > 0 (no separate flag)
 
   // Last detected OS windows keyed by windowId (stringified)
   private lastDetectedWindows: Map<string, GetWindowsResult> = new Map();
@@ -239,24 +239,24 @@ class WindowDetectionService {
    */
   getWatchState(): WatchState {
     return {
-      isWatching: this.isWatching,
+      isWatching: this.selectedWindows.size > 0, // Derived from list
       selectedWindows: this.getSelectedWindows(),
     };
   }
 
   /**
    * Set watch mode on/off
+   * Note: isWatching is now derived from selectedWindows.size > 0
+   * This method is kept for API compatibility but is effectively a no-op
    *
-   * @param watching - Whether watch mode is active
+   * @param watching - Whether watch mode is active (ignored)
    */
   setWatchingMode(watching: boolean): void {
-    this.isWatching = watching;
-    console.log(`[WindowDetectionService] Watch mode set to: ${watching}`);
-
-    // Clear selections when turning off watch mode
-    if (!watching) {
-      this.clearAll();
-    }
+    // isWatching is derived from selectedWindows.size > 0
+    // No separate flag to set
+    console.log(
+      `[WindowDetectionService] Watch mode toggle: ${watching} (actual: ${this.selectedWindows.size > 0})`
+    );
   }
 
   /**
@@ -268,7 +268,7 @@ class WindowDetectionService {
     selectedWindows: SelectedWindowInfo[];
   } {
     return {
-      isWatching: this.isWatching,
+      isWatching: this.selectedWindows.size > 0, // Derived from list
       selectedCount: this.selectedWindows.size,
       selectedWindows: this.getSelectedWindows(),
     };

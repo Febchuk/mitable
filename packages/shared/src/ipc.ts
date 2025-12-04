@@ -67,6 +67,7 @@ export const IPC_CHANNELS = {
   AGENTPANEL_RESIZE: "agentpanel-resize", // Resize panel width
   AGENTPANEL_VIBRANCY_ON: "agentpanel-vibrancy-on", // Renderer → Main: fade in vibrancy after animation
   AGENTPANEL_VIBRANCY_OFF: "agentpanel-vibrancy-off", // Renderer → Main: fade out vibrancy before animation
+  AGENTPANEL_REQUEST_CLOSE: "agentpanel-request-close", // Main → Renderer: request animated close (from hotkey)
   AGENTPANEL_LOAD_CONVERSATION: "agentpanel-load-conversation", // Console → AgentPanel (load conversation)
 
   // Conversation window (parent-child with agent)
