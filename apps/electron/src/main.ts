@@ -200,6 +200,8 @@ function createAgentPanelWindow() {
     skipTaskbar: true,
     show: false, // Hidden by default
     // Vibrancy is controlled dynamically for animation coordination
+    // but keep active so vibrancy is available for animation
+    visualEffectState: "active" as const,
     // Window starts transparent, vibrancy fades in after content animation
     ...(process.platform === "win32" && {
       backgroundMaterial: "acrylic" as const,
@@ -231,7 +233,7 @@ function createAgentPanelWindow() {
   if (!app.isPackaged) {
     agentPanelWindow.loadURL("http://localhost:5173/agentpanel/index.html");
   } else {
-    agentPanelWindow.loadFile(join(__dirname, "../renderer/agentpanel.html"));
+    agentPanelWindow.loadFile(join(__dirname, "../renderer/agentpanel/index.html"));
   }
 
   agentPanelWindow.webContents.on("did-finish-load", () => {
@@ -476,6 +478,10 @@ function setupIPC() {
       if (agentPanelWindow.isVisible()) {
         agentPanelWindow.hide();
       } else {
+        // Apply vibrancy FIRST (synchronously) before showing - fixes production transparency issue
+        if (process.platform === "darwin") {
+          agentPanelWindow.setVibrancy("under-window");
+        }
         agentPanelWindow.show();
         // Notify renderer for entrance animation
         agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
@@ -486,6 +492,10 @@ function setupIPC() {
   // Show Agent Panel
   ipcMain.on(IPC_CHANNELS.AGENTPANEL_SHOW, () => {
     if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      // Apply vibrancy FIRST (synchronously) before showing - fixes production transparency issue
+      if (process.platform === "darwin") {
+        agentPanelWindow.setVibrancy("under-window");
+      }
       agentPanelWindow.show();
       // Notify renderer for entrance animation
       agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
@@ -540,6 +550,10 @@ function setupIPC() {
     if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
       // Show panel if hidden
       if (!agentPanelWindow.isVisible()) {
+        // Apply vibrancy FIRST (synchronously) before showing - fixes production transparency issue
+        if (process.platform === "darwin") {
+          agentPanelWindow.setVibrancy("under-window");
+        }
         agentPanelWindow.show();
         // Notify renderer for entrance animation
         agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
@@ -889,7 +903,7 @@ function setupIPC() {
     });
   });
 
-  // Screenshot Capture - Multi-window capture only
+  // Screenshot Capture - Multi-window capture with smart caching
   ipcMain.handle(
     IPC_CHANNELS.CAPTURE_SCREENSHOT,
     async (
@@ -903,10 +917,9 @@ function setupIPC() {
       });
 
       try {
-        // Get currently selected windows for filtering
+        // Get currently selected windows
         const selectedWindows = windowDetectionService.getSelectedWindows();
-        const selectedWindowIds = selectedWindows.map((window) => window.windowId);
-        const hasSelectedWindows = selectedWindowIds.length > 0;
+        const hasSelectedWindows = selectedWindows.length > 0;
 
         console.log("[Screenshot] Capture with filters:", {
           hasSelectedWindows,
@@ -917,7 +930,6 @@ function setupIPC() {
         });
 
         // Return early if no windows selected (watch mode OFF)
-        // This prevents capturing ALL windows when user hasn't selected any
         if (!hasSelectedWindows) {
           console.log("[Screenshot] No windows selected, skipping capture");
           return {
@@ -927,11 +939,14 @@ function setupIPC() {
           };
         }
 
-        // Capture only the selected windows
-        const result = await captureService.captureVisibleWindows(
-          false, // saveToFile
-          selectedWindowIds // Always filter by selected windows
-        );
+        // Convert selected windows to the format expected by captureWithCacheFallback
+        const selectedApps = selectedWindows.map((w) => ({
+          appName: w.appName,
+          windowTitle: w.windowTitle,
+        }));
+
+        // Use smart capture with cache fallback (matches by appName, not windowId)
+        const result = await captureService.captureWithCacheFallback(selectedApps);
 
         console.log("[Screenshot] Multi-window capture result:", {
           success: result.success,
@@ -985,7 +1000,7 @@ function setupWatchModeHandlers() {
         createWatchButtonWindow(window, watchButtonWindows);
       }
     } else {
-      // Close all watch button windows
+      // Close all watch button windows (but preserve selected windows state)
       console.log("[Watch Mode] Closing all watch button windows");
       for (const [windowId, buttonWindow] of watchButtonWindows.entries()) {
         if (!buttonWindow.isDestroyed()) {
@@ -993,7 +1008,7 @@ function setupWatchModeHandlers() {
         }
         watchButtonWindows.delete(windowId);
       }
-      windowDetectionService.clearAll();
+      // Don't clear selected windows - preserve state for re-expansion
     }
   });
 
@@ -1085,9 +1100,19 @@ function setupWatchModeHandlers() {
   // Unselect a window
   ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, async (_event, windowId: string) => {
     console.log(`[Watch Mode] Unselecting window: ${windowId}`);
+
+    // Get the window info before removing to clear the cache
+    const selectedWindows = windowDetectionService.getSelectedWindows();
+    const windowToRemove = selectedWindows.find((w) => w.windowId === windowId);
+
     const removed = windowDetectionService.removeWindow(windowId);
 
     if (removed) {
+      // Clear the cached screenshot for this window (keyed by windowTitle)
+      if (windowToRemove) {
+        captureService.clearCachedScreenshot(windowToRemove.windowTitle);
+        console.log(`[Watch Mode] Cleared cache for ${windowToRemove.windowTitle}`);
+      }
       broadcastWatchWindowsUpdate();
     }
   });
@@ -1118,7 +1143,9 @@ function setupWatchModeHandlers() {
     );
   }
 
-  function selectWindowForWatch(windowInfo: SelectedWindowInfo): { allowed: boolean } {
+  async function selectWindowForWatch(
+    windowInfo: SelectedWindowInfo
+  ): Promise<{ allowed: boolean }> {
     const added = windowDetectionService.addWindow(windowInfo);
 
     if (added) {
@@ -1133,6 +1160,31 @@ function setupWatchModeHandlers() {
 
       watchButtonWindows.delete(windowInfo.windowId);
       broadcastWatchWindowsUpdate();
+
+      // Capture and cache screenshot immediately (window is visible now)
+      // Match by windowTitle since desktopCapturer returns titles, not app names
+      try {
+        const captureResult = await captureService.captureVisibleWindows(false);
+        if (captureResult.success && captureResult.screenshots) {
+          const screenshot = captureResult.screenshots.find(
+            (s) => s.windowTitle.toLowerCase() === windowInfo.windowTitle.toLowerCase()
+          );
+          if (screenshot) {
+            captureService.cacheScreenshot(windowInfo.windowTitle, {
+              appName: windowInfo.appName,
+              windowTitle: windowInfo.windowTitle,
+              dataUrl: screenshot.dataUrl,
+              capturedAt: Date.now(),
+              metadata: screenshot.metadata,
+            });
+            console.log(
+              `[Watch Mode] Cached screenshot for ${windowInfo.windowTitle} at selection time`
+            );
+          }
+        }
+      } catch (error) {
+        console.warn("[Watch Mode] Failed to cache screenshot at selection time:", error);
+      }
     }
 
     return { allowed: true };
@@ -1247,8 +1299,13 @@ function registerGlobalShortcuts() {
   globalShortcut.register("CommandOrControl+Shift+A", () => {
     if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
       if (agentPanelWindow.isVisible()) {
-        agentPanelWindow.hide();
+        // Request animated close via renderer (don't hide directly)
+        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_REQUEST_CLOSE);
       } else {
+        // Apply vibrancy FIRST (synchronously) before showing - fixes production transparency issue
+        if (process.platform === "darwin") {
+          agentPanelWindow.setVibrancy("under-window");
+        }
         agentPanelWindow.show();
         agentPanelWindow.focus();
         // Notify renderer for entrance animation

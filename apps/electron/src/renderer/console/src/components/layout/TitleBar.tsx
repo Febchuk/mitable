@@ -21,7 +21,12 @@ export default function TitleBar() {
 
   const handleRoleChange = (role: "admin" | "employee") => {
     if (user) {
-      updateUser({ ...user, role });
+      updateUser({
+        ...user,
+        role,
+        // Preserve originalRole so admins can always switch back
+        originalRole: user.originalRole ?? user.role,
+      });
 
       // Auto-navigate to appropriate default view
       if (role === "admin") {

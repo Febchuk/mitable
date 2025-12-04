@@ -35,6 +35,9 @@ export interface AgentPanelAPI {
 
   // Panel show event (for entrance animation)
   onPanelShow(callback: () => void): void;
+
+  // Panel close request (from hotkey - triggers animated close)
+  onRequestClose(callback: () => void): () => void;
 }
 
 declare global {

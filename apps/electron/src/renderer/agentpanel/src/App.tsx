@@ -169,6 +169,20 @@ function App() {
     };
   }, []);
 
+  // Listen for close request from hotkey (triggers animated close)
+  useEffect(() => {
+    const cleanup = window.agentPanelAPI?.onRequestClose?.(() => {
+      // Start exit animation and fade out vibrancy simultaneously
+      setIsVisible(false);
+      window.agentPanelAPI?.vibrancyOff();
+      // Wait for animation to complete before hiding window
+      setTimeout(() => {
+        window.agentPanelAPI?.hide();
+      }, ANIMATION_DURATION_MS);
+    });
+    return cleanup;
+  }, []);
+
   const handleSendMessage = useCallback(
     async (content: string) => {
       if (!content.trim() || streamingMessageIdRef.current) return;
