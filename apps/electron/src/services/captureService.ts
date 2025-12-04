@@ -707,7 +707,9 @@ class CaptureService {
             },
           },
         });
-        console.log(`[CaptureService] Using cached screenshot for ${app.windowTitle} (fresh failed)`);
+        console.log(
+          `[CaptureService] Using cached screenshot for ${app.windowTitle} (fresh failed)`
+        );
       }
     }
 
