@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config";
 import { BaseAgent } from "./base.agent";
@@ -9,12 +8,14 @@ import { ClarifyIntentTool } from "../tools/clarify-intent.tool";
 import { StartUIGuidanceWorkflowTool } from "../tools/start-ui-guidance-workflow.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
 import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool";
+import { toGeminiSchema } from "../utils/gemini-schema.js";
+import { WorkflowSynthesisResponseSchema } from "@mitable/shared";
 
 /**
  * Visual Guidance Agent
  *
  * Multi-step UI guidance with screenshot analysis.
- * Uses GPT-4 Turbo for workflow synthesis + Gemini Vision 2.0 Flash for visual understanding.
+ * Uses Gemini 2.5 Pro for workflow synthesis + Gemini Vision 2.0 Flash for visual understanding.
  *
  * Responsibilities:
  * - "How do I..." questions with screenshots
@@ -30,9 +31,11 @@ import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool
  * - analyze_workflow_screen: Troubleshoot visual issues during workflow
  *
  * Services Used:
- * - OpenAI GPT-4 Turbo: Synthesize search results into structured workflows
+ * - Gemini 2.5 Pro (Omniscient Expert Collaborator): Synthesize search results into structured workflows
+ *   - Acts as a senior-level expert colleague providing contextual reasoning
  *   - Generates solution, explanation, and adaptive step-by-step guidance
  *   - Determines complexity and adjusts step count (3-5 for simple, 8-12+ for complex)
+ *   - Uses structured output (WorkflowSynthesisResponseSchema) for type safety
  * - KnowledgeAgent: Search company documentation (Slack + Notion)
  * - geminiVisionService: Screenshot analysis (called by tools, not directly)
  *   - analyzeScreenshot(): UI element detection
@@ -43,7 +46,7 @@ import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool
  *
  * Workflow Creation Flow:
  * 1. Call KnowledgeAgent.search() for company documentation
- * 2. Use GPT-4 to synthesize search results into SolutionObject with JSON mode
+ * 2. Use Gemini 2.5 Pro to synthesize search results into SolutionObject with structured output
  * 3. Validate all required fields (solution, explanation, stepList, etc.)
  * 4. Execute StartUIGuidanceWorkflowTool with validated parameters
  *
@@ -60,8 +63,8 @@ import { AnalyzeWorkflowScreenTool } from "../tools/analyze-workflow-screen.tool
  */
 export class VisualGuidanceAgent extends BaseAgent {
   readonly name = "visual-guidance";
-  private openai: OpenAI;
   private gemini: GoogleGenerativeAI;
+  private synthesisModel: any; // Gemini 2.5 Pro for workflow synthesis
   private knowledgeAgent: KnowledgeAgent;
   private textAgent: TextResponseAgent;
   private clarifyIntentTool: ClarifyIntentTool;
@@ -71,8 +74,18 @@ export class VisualGuidanceAgent extends BaseAgent {
 
   constructor(knowledgeAgent: KnowledgeAgent, textAgent: TextResponseAgent) {
     super();
-    this.openai = new OpenAI({ apiKey: config.openai.apiKey });
     this.gemini = new GoogleGenerativeAI(config.gemini.apiKey);
+    
+    // Initialize Gemini 2.5 Pro for workflow synthesis with structured output
+    // This model provides the highest reasoning capabilities ideal for the "Omniscient Expert Collaborator" role
+    this.synthesisModel = this.gemini.getGenerativeModel({
+      model: "gemini-2.5-pro", // Highest capability model for deep contextual reasoning and synthesis
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: toGeminiSchema(WorkflowSynthesisResponseSchema) as any,
+      },
+    });
+    
     this.knowledgeAgent = knowledgeAgent;
     this.textAgent = textAgent;
     this.clarifyIntentTool = new ClarifyIntentTool();
@@ -271,10 +284,24 @@ Return ONLY the app name (e.g., "Spotify", "Slack", "Chrome", "Desktop", "Finder
         visibleApp = "Unknown";
       }
 
-      // STEP 2: Use GPT-4 to synthesize search results into structured workflow
-      // Note: We only ask GPT-4 to generate fields requiring synthesis
-      // (solution, explanations, steps). We'll pass supportingData and searchQuery directly.
-      const synthesisPrompt = `You are creating step-by-step UI guidance for an employee based on company documentation.
+      // STEP 2: Use Gemini 2.5 Pro to synthesize search results into structured workflow
+      // Note: We use the "Omniscient Expert Collaborator" prompt to provide senior-level guidance
+      const synthesisPrompt = `Role & Identity
+You are the Omniscient Expert Collaborator. You are not a standard AI assistant; you are a senior-level expert colleague "sitting" virtually beside the user.
+
+Your goal is to unblock the user, teach them, and help them solve complex, nuanced problems by leveraging a complete understanding of their digital environment. You possess the combined context of the user's active screen, their entire codebase, communication history (Slack, Email), documentation (Notion), and meeting transcripts.
+
+Core Competency: Contextual Reasoning & Synthesis
+Your primary differentiator is your ability to "connect the dots" across disparate data sources where a human might struggle. You must perform expert-level reasoning:
+
+Ingest & Correlate: Continuously analyze the user's current screen state and cross-reference it with:
+- Codebase: The underlying logic causing the visual state.
+- Historical Context: Past Slack threads, PR comments, or meeting notes that explain why a feature was built a certain way.
+- External Knowledge: Web search and general training data for libraries and frameworks.
+
+Simulate the Original Architect: When diagnosing a bug or explaining a concept, assume the persona of the expert who originally built the system. Don't just look for syntax errors; look for logical inconsistencies or edge cases that only someone with deep context would spot.
+
+Proactive Synthesis: Do not wait for the user to paste code. You "see" what they are working on. Anticipate their needs based on the file they have open or the error message on their screen.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 CRITICAL CONTEXT - CURRENT SCREEN STATE
@@ -316,34 +343,58 @@ VISIBLE APPLICATION: ${visibleApp}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Generate a JSON object with the following structure:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 YOUR TASK: WORKFLOW SYNTHESIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You will return a structured JSON response with EXACTLY these fields:
 
 {
   "solution": "string - High-level goal in natural language",
-  "solutionExplanation": "string - WHY this approach makes sense",
-  "supportingDataExplanation": "string - HOW results support solution",
+  "solutionExplanation": "string - WHY this approach makes sense based on search results and your reasoning chain",
+  "supportingDataExplanation": "string - HOW the specific search results support your solution (prove you used them)",
   "stepList": [
     {
       "stepNumber": number,
-      "description": "string - Actionable instruction",
+      "description": "string - Clear, actionable instruction",
       "status": "pending"
     }
   ]
 }
 
-USER'S REQUEST:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 USER'S REQUEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 "${lastUserMessage.content}"
 
-SEARCH RESULTS FROM COMPANY KNOWLEDGE BASE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 SEARCH RESULTS FROM COMPANY KNOWLEDGE BASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ${JSON.stringify(searchResult.sources || [], null, 2)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DETAILED INSTRUCTIONS FOR EACH FIELD
+🎓 INTERACTION GUIDELINES: THE "ZOOM CALL" EXPERIENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your interaction style must mimic a collaborative screen-sharing session with a patient mentor.
+
+Step-by-Step Pedagogy: Break the solution into atomic, digestible chunks. Never dump a massive block of steps all at once.
+
+Visual Guidance: Give instructions relative to the user's screen. (e.g., "Click on the utils folder on the left sidebar," or "Scroll down to line 45 where the fetchData function starts.")
+
+Check for Understanding: Your explanations should sound like you're talking to a colleague, not writing documentation.
+
+Dynamic Adaptation: Consider what the user can see RIGHT NOW on their screen (the ${visibleApp} application).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 DETAILED INSTRUCTIONS FOR EACH FIELD
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. **solution** (string)
-   High-level goal that directly addresses the user's question in natural, user-friendly language.
-   This should reflect your REASONING about what the user needs to accomplish.
+   High-level goal that directly addresses the user's question in natural, colleague-to-colleague language.
+   Think: "What would I tell my teammate if they asked me this on a Zoom call?"
 
    Examples:
    ✅ GOOD: "Debug why user profiles aren't loading by tracing the data flow from frontend to backend logs"
@@ -352,30 +403,27 @@ DETAILED INSTRUCTIONS FOR EACH FIELD
    ❌ BAD: "Modify task descriptions in database" (too technical, not user-centric)
 
 2. **solutionExplanation** (string)
-   Explain WHY this approach makes sense based on search results and your reasoning chain.
-   This demonstrates your synthesis process.
+   Explain WHY this approach makes sense. Act as if you're the original architect explaining your design.
+   Connect the dots between what you see on their screen, what's in the codebase, and what the search results tell you.
 
    For simple problems: Reference key search results that guided the approach.
    For complex problems: Show your reasoning chain that connected fragmented information.
 
    Examples:
+   ✅ GOOD: "I see from the Slack thread last week that the backend team updated the API response structure. Looking at your screen, the data isn't flowing through because the UserList component hasn't been updated to handle the new JSON format. We need to adjust the parsing logic."
    ✅ GOOD: "Based on messages in #product-team, the roadmap is maintained as a Slack canvas where the team collaborates openly. This follows the company's transparency culture from the Notion wiki."
-   ✅ GOOD: "The search results show this is an Electron app with IPC-based communication. To debug profile loading, we need to trace: UserProfile.tsx → IPC channel → backend API → CloudWatch logs. AWS credentials are in 1Password per the team wiki."
    ❌ BAD: "The documentation says to do it this way."
    ❌ BAD: "This is how you fix bugs."
 
 3. **supportingDataExplanation** (string)
-   Explain HOW the specific search results in supportingData support your solution.
-   This proves you actually used the search results to synthesize your steps, not just hallucinated them.
-   Connect the dots: Show which search results informed which parts of your stepList.
+   Prove your intelligent synthesis. Show exactly which search results informed which parts of your solution.
+   Think: "How do I demonstrate I actually read these docs and didn't just make up steps?"
 
    Examples:
    ✅ GOOD: "The Slack message from #product-team reveals the canvas location (step 1-2), while the Notion transparency doc explains why we notify the team after changes (step 4)."
    ✅ GOOD: "The GitHub README identifies the Electron architecture (informs steps 1-3), the #engineering Slack shows the API endpoint (step 4), Confluence provides the CloudWatch location (steps 6-8), and the email mentions 1Password credentials (step 5)."
    ❌ BAD: "These docs are relevant to the task."
    ❌ BAD: "The search results contain information about the solution."
-
-   This field is your proof of intelligent synthesis - show your work.
 
 4. **stepList** (array of step objects)
    Ordered list of actionable steps synthesized through intelligent reasoning.
@@ -510,7 +558,7 @@ DETAILED INSTRUCTIONS FOR EACH FIELD
 
 Generate the complete JSON object now with ALL required fields.`;
 
-      console.log("[VisualGuidanceAgent] Calling GPT-4 for workflow synthesis");
+      console.log("[VisualGuidanceAgent] Calling Gemini 2.5 Pro for workflow synthesis");
 
       // Emit progress event: Generating workflow
       yield {
@@ -521,34 +569,23 @@ Generate the complete JSON object now with ALL required fields.`;
         },
       };
 
-      // Call GPT-4 with JSON mode (no function calling)
-      const response = await this.openai.chat.completions.create({
-        model: config.openai.chatModel, // gpt-4-turbo-preview
-        messages: [
-          {
-            role: "system",
-            content: synthesisPrompt,
-          },
-          {
-            role: "user",
-            content: "Generate the complete JSON object with all required fields now.",
-          },
-        ],
-        response_format: { type: "json_object" }, // Force JSON output
-        temperature: 0.7,
-        max_tokens: 2000,
-      });
+      // Call Gemini 2.5 Pro with structured output (configured in constructor)
+      const result = await this.synthesisModel.generateContent(synthesisPrompt);
 
-      // Parse GPT-4's response
+      // Parse Gemini's structured response
       let aiGeneratedParams;
       try {
-        aiGeneratedParams = JSON.parse(response.choices[0].message.content || "{}");
+        const responseText = result.response.text();
+        aiGeneratedParams = WorkflowSynthesisResponseSchema.parse(JSON.parse(responseText));
+        
+        console.log("[VisualGuidanceAgent] ✅ Gemini structured output validated successfully");
       } catch (parseError) {
-        console.error("[VisualGuidanceAgent] Failed to parse GPT-4 response:", parseError);
-        throw new Error("Failed to parse workflow JSON from GPT-4");
+        console.error("[VisualGuidanceAgent] Failed to parse or validate Gemini response:", parseError);
+        console.error("[VisualGuidanceAgent] Raw response:", result.response.text().substring(0, 500));
+        throw new Error("Failed to parse workflow JSON from Gemini 2.5 Pro");
       }
 
-      console.log("[VisualGuidanceAgent] GPT-4 synthesis received:", {
+      console.log("[VisualGuidanceAgent] Gemini 2.5 Pro synthesis received:", {
         hasSolution: !!aiGeneratedParams.solution,
         hasExplanation: !!aiGeneratedParams.solutionExplanation,
         hasSupportingDataExplanation: !!aiGeneratedParams.supportingDataExplanation,
@@ -565,51 +602,38 @@ Generate the complete JSON object now with ALL required fields.`;
             .includes(visibleApp.toLowerCase()) || false,
       });
 
-      // STEP 3: Validate required fields (only those GPT-4 should generate)
+      // STEP 3: Additional validation (Zod schema already validated, but double-check critical fields)
+      // Note: WorkflowSynthesisResponseSchema.parse() already validated the structure,
+      // but we add extra checks for completeness and clear error messages
       const missingFields: string[] = [];
-      if (!aiGeneratedParams.solution || typeof aiGeneratedParams.solution !== "string") {
-        missingFields.push("solution");
+      if (!aiGeneratedParams.solution || aiGeneratedParams.solution.trim().length === 0) {
+        missingFields.push("solution (empty)");
       }
-      if (
-        !aiGeneratedParams.solutionExplanation ||
-        typeof aiGeneratedParams.solutionExplanation !== "string"
-      ) {
-        missingFields.push("solutionExplanation");
+      if (!aiGeneratedParams.solutionExplanation || aiGeneratedParams.solutionExplanation.trim().length === 0) {
+        missingFields.push("solutionExplanation (empty)");
       }
-      if (
-        !aiGeneratedParams.supportingDataExplanation ||
-        typeof aiGeneratedParams.supportingDataExplanation !== "string"
-      ) {
-        missingFields.push("supportingDataExplanation");
+      if (!aiGeneratedParams.supportingDataExplanation || aiGeneratedParams.supportingDataExplanation.trim().length === 0) {
+        missingFields.push("supportingDataExplanation (empty)");
       }
-      if (
-        !aiGeneratedParams.stepList ||
-        !Array.isArray(aiGeneratedParams.stepList) ||
-        aiGeneratedParams.stepList.length === 0
-      ) {
-        missingFields.push("stepList");
+      if (!aiGeneratedParams.stepList || aiGeneratedParams.stepList.length === 0) {
+        missingFields.push("stepList (empty)");
       }
 
       if (missingFields.length > 0) {
         console.error(
-          "[VisualGuidanceAgent] GPT-4 response missing critical fields:",
+          "[VisualGuidanceAgent] Gemini response has empty critical fields:",
           missingFields,
           aiGeneratedParams
         );
-        throw new Error(`Failed to generate workflow: Missing fields: ${missingFields.join(", ")}`);
+        throw new Error(`Workflow generation incomplete: ${missingFields.join(", ")}`);
       }
 
-      // Validate stepList structure
+      // Validate each step has required content (schema ensures structure, but check content quality)
       for (const step of aiGeneratedParams.stepList) {
-        if (
-          typeof step.stepNumber !== "number" ||
-          !step.description ||
-          typeof step.description !== "string" ||
-          !step.status
-        ) {
-          console.error("[VisualGuidanceAgent] Invalid step structure:", step);
+        if (step.description.trim().length < 5) {
+          console.error("[VisualGuidanceAgent] Step description too short:", step);
           throw new Error(
-            "Invalid step structure in stepList: each step must have stepNumber (number), description (string), and status"
+            `Step ${step.stepNumber} has insufficient description: "${step.description}"`
           );
         }
       }
