@@ -13,9 +13,14 @@ let agentWindow: BrowserWindow | null = null;
 let agentPanelWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
+let observationModalWindow: BrowserWindow | null = null;
+let eyeIndicatorWindow: BrowserWindow | null = null;
 
 // Watch button windows tracking (module scope for cleanup from multiple handlers)
 const watchButtonWindows: Map<string, BrowserWindow> = new Map();
+
+// Observation session state
+let observationSessionActive = false;
 
 // Auth token storage (shared across all windows)
 const authTokens: {
@@ -309,6 +314,135 @@ function createConsoleWindow() {
   consoleWindow.on("closed", () => {
     app.quit(); // Quit app when main console window is closed
   });
+}
+
+function createObservationModalWindow(type: 'start' | 'end') {
+  // Close existing modal if open
+  if (observationModalWindow && !observationModalWindow.isDestroyed()) {
+    observationModalWindow.close();
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+  const windowWidth = 600;
+  const windowHeight = type === 'start' ? 320 : 240;
+  const bottomMargin = 40;
+
+  observationModalWindow = new BrowserWindow({
+    width: windowWidth,
+    height: windowHeight,
+    x: Math.floor((screenWidth - windowWidth) / 2), // Center horizontally
+    y: screenHeight - windowHeight - bottomMargin, // Position at bottom with margin
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, '../preload/observation.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top behavior
+  if (process.platform === 'darwin') {
+    observationModalWindow.setAlwaysOnTop(true, 'modal-panel');
+    observationModalWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    observationModalWindow.setAlwaysOnTop(true, 'normal', 1);
+  }
+
+  if (!app.isPackaged) {
+    observationModalWindow.loadURL(`http://localhost:5173/observation/index.html?type=${type}`);
+  } else {
+    observationModalWindow.loadFile(join(__dirname, '../renderer/observation/index.html'), {
+      query: { type },
+    });
+  }
+
+  observationModalWindow.once('ready-to-show', () => {
+    observationModalWindow?.show();
+    // Open devtools in development for debugging
+    if (!app.isPackaged) {
+      observationModalWindow.webContents.openDevTools();
+    }
+  });
+
+  observationModalWindow.on('closed', () => {
+    observationModalWindow = null;
+  });
+}
+
+function createEyeIndicatorWindow() {
+  if (eyeIndicatorWindow && !eyeIndicatorWindow.isDestroyed()) {
+    eyeIndicatorWindow.show();
+    return;
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+  const indicatorWidth = 48;
+  const indicatorHeight = 120;
+  const rightMargin = 40; // Increased margin to ensure full oval is visible
+
+  eyeIndicatorWindow = new BrowserWindow({
+    width: indicatorWidth,
+    height: indicatorHeight,
+    x: screenWidth - indicatorWidth - rightMargin, // Positioned to show full oval
+    y: Math.floor((screenHeight - indicatorHeight) / 2), // Centered vertically
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, '../preload/eyeIndicator.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top behavior
+  if (process.platform === 'darwin') {
+    eyeIndicatorWindow.setAlwaysOnTop(true, 'floating');
+    eyeIndicatorWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    eyeIndicatorWindow.setAlwaysOnTop(true, 'normal', 1);
+  }
+
+  if (!app.isPackaged) {
+    eyeIndicatorWindow.loadURL('http://localhost:5173/eyeIndicator/index.html');
+  } else {
+    eyeIndicatorWindow.loadFile(join(__dirname, '../renderer/eyeIndicator/index.html'));
+  }
+
+  eyeIndicatorWindow.once('ready-to-show', () => {
+    eyeIndicatorWindow?.show();
+  });
+
+  eyeIndicatorWindow.on('closed', () => {
+    eyeIndicatorWindow = null;
+  });
+}
+
+function closeEyeIndicatorWindow() {
+  if (eyeIndicatorWindow && !eyeIndicatorWindow.isDestroyed()) {
+    eyeIndicatorWindow.close();
+  }
+  eyeIndicatorWindow = null;
+}
+
+function handleObservationToggle() {
+  if (!observationSessionActive) {
+    // Start session - show initiation modal
+    createObservationModalWindow('start');
+  } else {
+    // End session - show confirmation modal
+    createObservationModalWindow('end');
+  }
 }
 
 // IPC Handlers
@@ -903,6 +1037,48 @@ function setupIPC() {
     });
   });
 
+  // Observation Session - Start accepted
+  ipcMain.on(IPC_CHANNELS.OBSERVATION_START, () => {
+    observationSessionActive = true;
+
+    // Close the modal
+    if (observationModalWindow && !observationModalWindow.isDestroyed()) {
+      observationModalWindow.close();
+    }
+
+    // Show eye indicator
+    createEyeIndicatorWindow();
+  });
+
+  // Observation Session - End confirmed
+  ipcMain.on(IPC_CHANNELS.OBSERVATION_END, () => {
+    observationSessionActive = false;
+
+    // Close the modal
+    if (observationModalWindow && !observationModalWindow.isDestroyed()) {
+      observationModalWindow.close();
+    }
+
+    // Close eye indicator
+    closeEyeIndicatorWindow();
+  });
+
+  // Observation Session - Cancelled (dismiss modal)
+  ipcMain.on(IPC_CHANNELS.OBSERVATION_CANCEL, () => {
+    // Just close the modal, keep current state
+    if (observationModalWindow && !observationModalWindow.isDestroyed()) {
+      observationModalWindow.close();
+    }
+  });
+
+  // Eye Indicator - Position update
+  ipcMain.on(IPC_CHANNELS.EYE_INDICATOR_MOVE, (_event, deltaX: number, deltaY: number) => {
+    if (eyeIndicatorWindow && !eyeIndicatorWindow.isDestroyed()) {
+      const currentPosition = eyeIndicatorWindow.getPosition();
+      eyeIndicatorWindow.setPosition(currentPosition[0] + deltaX, currentPosition[1] + deltaY);
+    }
+  });
+
   // Screenshot Capture - Multi-window capture with smart caching
   ipcMain.handle(
     IPC_CHANNELS.CAPTURE_SCREENSHOT,
@@ -1136,9 +1312,8 @@ function setupWatchModeHandlers() {
     }
 
     console.log(
-      `[Watch Mode] Broadcasted update to windows. Selected windows: ${
-        selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
-        "none"
+      `[Watch Mode] Broadcasted update to windows. Selected windows: ${selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
+      "none"
       }`
     );
   }
@@ -1312,6 +1487,11 @@ function registerGlobalShortcuts() {
         agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
       }
     }
+  });
+
+  // Observation Session Toggle (Cmd+M)
+  globalShortcut.register("CommandOrControl+M", () => {
+    handleObservationToggle();
   });
 }
 

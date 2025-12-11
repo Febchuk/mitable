@@ -41,6 +41,8 @@ export default defineConfig({
           console: resolve(__dirname, "src/preload/console.ts"),
           conversation: resolve(__dirname, "src/preload/conversation.ts"),
           watchButton: resolve(__dirname, "src/preload/watchButton.ts"),
+          observation: resolve(__dirname, "src/preload/observation.ts"),
+          eyeIndicator: resolve(__dirname, "src/preload/eyeIndicator.ts"),
         },
         output: {
           format: "cjs",
@@ -69,6 +71,8 @@ export default defineConfig({
           console: resolve(__dirname, "src/renderer/console/index.html"),
           conversation: resolve(__dirname, "src/renderer/conversation/index.html"),
           watchButton: resolve(__dirname, "src/renderer/watchButton/index.html"),
+          observation: resolve(__dirname, "src/renderer/observation/index.html"),
+          eyeIndicator: resolve(__dirname, "src/renderer/eyeIndicator/index.html"),
         },
       },
     },

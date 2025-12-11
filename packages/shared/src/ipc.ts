@@ -95,6 +95,12 @@ export const IPC_CHANNELS = {
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
+
+  // Observation session (screen watching with double-tap Command)
+  OBSERVATION_START: "observation:start",
+  OBSERVATION_END: "observation:end",
+  OBSERVATION_CANCEL: "observation:cancel",
+  EYE_INDICATOR_MOVE: "eye-indicator:move",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
