@@ -7,7 +7,6 @@ import { isBlockedByPolicy } from "./services/capturePolicy";
 import { captureService } from "./services/captureService";
 import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
 import { windowDetectionService } from "./services/windowDetectionService";
-import { monitoringSessionService } from "./services/monitoringSessionService";
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
@@ -405,8 +404,8 @@ function createWatchingPillWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
 
-  const windowWidth = 280; // Wide enough for w-56 (224px) dropdown + margins
-  const windowHeight = 400; // Tall enough for pill + expanded dropdown lists
+  const windowWidth = 130; // Wide enough for dropdown options
+  const windowHeight = 160; // Tall enough for pill + dropdown
   const rightMargin = 5;
 
   watchingPillWindow = new BrowserWindow({
@@ -1081,8 +1080,30 @@ function setupIPC() {
   });
 
   // ==================== Watching Pill IPC Handlers ====================
-  // Note: Session lifecycle (pause/resume/start/end) is handled by the monitoring session handlers
-  // which broadcast to all windows including the watching pill
+
+  // Pause watching
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_PAUSE, () => {
+    console.log("[WatchingPill] Watching paused");
+    // In a real implementation, this would pause the screen monitoring
+  });
+
+  // Resume watching
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_RESUME, () => {
+    console.log("[WatchingPill] Watching resumed");
+    // In a real implementation, this would resume the screen monitoring
+  });
+
+  // Send update - open Console and navigate to drafts
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_SEND_UPDATE, () => {
+    console.log("[WatchingPill] Send update - opening Console drafts");
+
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+      // Navigate to draft detail
+      consoleWindow.webContents.send(IPC_CHANNELS.DRAFTS_NAVIGATE, "demo-draft-001");
+    }
+  });
 
   // Hide watching pill
   ipcMain.on(IPC_CHANNELS.WATCHING_PILL_HIDE, () => {
@@ -1091,85 +1112,6 @@ function setupIPC() {
       watchingPillWindow.hide();
     }
   });
-
-  // Show watching pill
-  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_SHOW, () => {
-    console.log("[WatchingPill] Show requested");
-    if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
-      createWatchingPillWindow();
-    }
-    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-      watchingPillWindow.show();
-    }
-  });
-
-  // Show console window
-  ipcMain.on(IPC_CHANNELS.SHOW_CONSOLE, () => {
-    console.log("[Console] Show requested");
-    if (consoleWindow && !consoleWindow.isDestroyed()) {
-      consoleWindow.show();
-      consoleWindow.focus();
-    }
-  });
-
-  // ==================== User Context IPC Handlers ====================
-  // Store user context for cross-window access (e.g., WatchingPill needs userId/orgId)
-  let currentUserContext: { userId: string; organizationId: string } | null = null;
-
-  ipcMain.on(IPC_CHANNELS.USER_CONTEXT_SET, (_event, user: { userId: string; organizationId: string }) => {
-    console.log("[UserContext] Set:", user);
-    currentUserContext = user;
-  });
-
-  ipcMain.handle(IPC_CHANNELS.USER_CONTEXT_GET, () => {
-    return currentUserContext;
-  });
-
-  // ==================== Backend Session Creation ====================
-  // Allow windows without direct API access to create backend sessions
-  ipcMain.handle(
-    IPC_CHANNELS.CREATE_BACKEND_SESSION,
-    async (
-      _event,
-      config: {
-        selectedWindows: Array<{ windowId: string; appName: string; windowTitle?: string }>;
-        captureIntervalMs: number;
-        name?: string;
-      }
-    ) => {
-      console.log("[BackendSession] Creating session:", config);
-      try {
-        // Get auth token
-        const token = authTokens.accessToken;
-        if (!token) {
-          return { error: "No auth token available" };
-        }
-
-        const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
-        const response = await fetch(`${API_BASE_URL}/api/monitoring/sessions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(config),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("[BackendSession] Error:", errorText);
-          return { error: `Failed to create session: ${response.status}` };
-        }
-
-        const result = await response.json();
-        console.log("[BackendSession] Created:", result);
-        return result;
-      } catch (error) {
-        console.error("[BackendSession] Error:", error);
-        return { error: String(error) };
-      }
-    }
-  );
 
   // Screenshot Capture - Multi-window capture with smart caching
   ipcMain.handle(
@@ -1248,9 +1190,6 @@ function setupIPC() {
 
   // Watch Mode IPC Handlers
   setupWatchModeHandlers();
-
-  // Monitoring Session IPC Handlers
-  setupMonitoringSessionHandlers();
 }
 
 // Watch mode handlers for selective screenshot capture
@@ -1280,18 +1219,6 @@ function setupWatchModeHandlers() {
         watchButtonWindows.delete(windowId);
       }
       // Don't clear selected windows - preserve state for re-expansion
-    }
-  });
-
-  // Get all visible windows (for monitoring session window selection)
-  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_GET_ALL, async () => {
-    try {
-      const windows = await windowDetectionService.getAllVisibleWindows();
-      console.log(`[Watch Mode] Returning ${windows.length} visible windows`);
-      return { success: true, windows };
-    } catch (error) {
-      console.error("[Watch Mode] Error getting visible windows:", error);
-      return { success: false, windows: [], error: String(error) };
     }
   });
 
@@ -1410,7 +1337,7 @@ function setupWatchModeHandlers() {
   // Broadcast updated window list to all windows
   function broadcastWatchWindowsUpdate() {
     const selectedWindows = windowDetectionService.getSelectedWindows();
-    const windows = [agentWindow, agentPanelWindow, conversationWindow, watchingPillWindow];
+    const windows = [agentWindow, agentPanelWindow, conversationWindow];
 
     for (const window of windows) {
       if (window && !window.isDestroyed()) {
@@ -1474,146 +1401,6 @@ function setupWatchModeHandlers() {
   }
 
   console.log("[IPC] Watch mode handlers registered successfully");
-}
-
-// Monitoring Session handlers for work session tracking
-function setupMonitoringSessionHandlers() {
-  // Start a new monitoring session
-  ipcMain.handle(
-    IPC_CHANNELS.MONITORING_SESSION_START,
-    async (
-      _event,
-      config: {
-        sessionId: string; // Backend's session ID - ensures Electron uses same ID
-        selectedWindows: any[];
-        captureIntervalMs?: number;
-        name?: string;
-        userId: string;
-        organizationId: string;
-      }
-    ) => {
-      console.log("[Monitoring Session] Starting session:", {
-        sessionId: config.sessionId,
-        windowCount: config.selectedWindows.length,
-        intervalMs: config.captureIntervalMs,
-      });
-
-      const result = await monitoringSessionService.startSession({
-        sessionId: config.sessionId,
-        selectedWindows: config.selectedWindows,
-        captureIntervalMs: config.captureIntervalMs || 30000,
-        name: config.name,
-        userId: config.userId,
-        organizationId: config.organizationId,
-      });
-
-      return result;
-    }
-  );
-
-  // Pause the active session
-  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_PAUSE, async () => {
-    console.log("[Monitoring Session] Pausing session");
-    return monitoringSessionService.pauseSession();
-  });
-
-  // Resume the paused session
-  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESUME, async () => {
-    console.log("[Monitoring Session] Resuming session");
-    return monitoringSessionService.resumeSession();
-  });
-
-  // End the active session
-  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_END, async () => {
-    console.log("[Monitoring Session] Ending session");
-    return monitoringSessionService.endSession();
-  });
-
-  // Finalize session: upload captures to backend + trigger summarization
-  ipcMain.handle(
-    IPC_CHANNELS.MONITORING_SESSION_FINALIZE,
-    async (
-      _event,
-      sessionId: string,
-      captures: Array<{
-        sequenceNumber: number;
-        captureTrigger: "periodic" | "focus_change" | "manual";
-        capturedAt: number;
-        windowId?: string;
-        appName?: string;
-        windowTitle?: string;
-        screenshotPath?: string;
-        screenshotHash?: string;
-      }>
-    ) => {
-      console.log("[Monitoring Session] Finalizing session:", sessionId, "captures:", captures.length);
-
-      try {
-        const token = authTokens.accessToken;
-        if (!token) {
-          return { success: false, error: "No auth token available" };
-        }
-
-        const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
-
-        // Step 1: Upload captures to backend
-        if (captures.length > 0) {
-          console.log("[Monitoring Session] Uploading", captures.length, "captures to backend");
-          const uploadResponse = await fetch(`${API_BASE_URL}/api/monitoring/sessions/${sessionId}/captures`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ captures }),
-          });
-
-          if (!uploadResponse.ok) {
-            const errorText = await uploadResponse.text();
-            console.error("[Monitoring Session] Upload captures error:", errorText);
-            return { success: false, error: `Failed to upload captures: ${uploadResponse.status}` };
-          }
-          console.log("[Monitoring Session] Captures uploaded successfully");
-        }
-
-        // Step 2: Call /end endpoint to trigger summarization
-        console.log("[Monitoring Session] Triggering summarization");
-        const endResponse = await fetch(`${API_BASE_URL}/api/monitoring/sessions/${sessionId}/end`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!endResponse.ok) {
-          const errorText = await endResponse.text();
-          console.error("[Monitoring Session] End session error:", errorText);
-          return { success: false, error: `Failed to end session: ${endResponse.status}` };
-        }
-
-        console.log("[Monitoring Session] Session finalized successfully");
-        return { success: true };
-      } catch (error) {
-        console.error("[Monitoring Session] Finalize error:", error);
-        return { success: false, error: String(error) };
-      }
-    }
-  );
-
-  // Reset/clear session state (used when session is deleted externally)
-  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESET, async () => {
-    console.log("[Monitoring Session] Resetting session state");
-    monitoringSessionService.resetSession();
-    return { success: true };
-  });
-
-  // Get current session status
-  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_STATUS, async () => {
-    return monitoringSessionService.getSessionState();
-  });
-
-  console.log("[IPC] Monitoring session handlers registered successfully");
 }
 
 function isBrowserProcess(appName: string, appPath?: string): boolean {

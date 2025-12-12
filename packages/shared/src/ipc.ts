@@ -96,16 +96,6 @@ export const IPC_CHANNELS = {
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
 
-  // User context (cross-window user info sharing)
-  USER_CONTEXT_SET: "user-context-set",
-  USER_CONTEXT_GET: "user-context-get",
-
-  // Backend session creation (for windows without direct API access)
-  CREATE_BACKEND_SESSION: "create-backend-session",
-
-  // Console window
-  SHOW_CONSOLE: "show-console",
-
   // Update Prompt system (proactive status update suggestions)
   UPDATE_PROMPT_SHOW: "update-prompt-show",
   UPDATE_PROMPT_HIDE: "update-prompt-hide",
@@ -122,29 +112,8 @@ export const IPC_CHANNELS = {
   WATCHING_PILL_RESUME: "watching-pill-resume",
   WATCHING_PILL_SEND_UPDATE: "watching-pill-send-update",
 
-  // Monitoring Session system (Work Session Tracking)
-  MONITORING_SESSION_START: "monitoring-session-start", // Start new monitoring session
-  MONITORING_SESSION_PAUSE: "monitoring-session-pause", // Pause active session
-  MONITORING_SESSION_RESUME: "monitoring-session-resume", // Resume paused session
-  MONITORING_SESSION_END: "monitoring-session-end", // End session and trigger summary
-  MONITORING_SESSION_FINALIZE: "monitoring-session-finalize", // Upload captures + trigger backend summarization
-  MONITORING_SESSION_STATUS: "monitoring-session-status", // Get current session status
-  MONITORING_SESSION_UPDATE: "monitoring-session-update", // Broadcast session state changes
-  MONITORING_SESSION_RESET: "monitoring-session-reset", // Reset/clear session state (after external delete)
-  MONITORING_CAPTURE_TAKEN: "monitoring-capture-taken", // Notify when capture is taken
-  MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress", // Capture count update
-
   // Drafts system (Console)
   DRAFTS_NAVIGATE: "drafts-navigate",
-
-  // Session Recovery system (crash recovery)
-  SESSION_GET_INCOMPLETE: "session-get-incomplete", // Get incomplete sessions for recovery dialog
-  SESSION_RECOVER: "session-recover", // Recover a specific session
-  SESSION_DISCARD: "session-discard", // Discard a specific session
-  SESSION_RECOVER_ALL: "session-recover-all", // Recover all incomplete sessions
-  SESSION_DISCARD_ALL: "session-discard-all", // Discard all incomplete sessions
-  SESSION_SHOW_RECOVERY_DIALOG: "session-show-recovery-dialog", // Show recovery dialog in console
-  SESSION_RECOVERY_COMPLETE: "session-recovery-complete", // Recovery process completed
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
