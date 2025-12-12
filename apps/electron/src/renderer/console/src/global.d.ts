@@ -29,6 +29,9 @@ interface ConsoleAPI {
   // Nudge creator
   onNudgeOpenCreator: (callback: (data: unknown) => void) => void;
 
+  // Drafts navigation (Update Buddy)
+  onDraftsNavigate: (callback: (draftId: string) => void) => void;
+
   // Auth management
   setAuthTokens: (accessToken: string, refreshToken: string) => void;
   clearAuthTokens: () => void;

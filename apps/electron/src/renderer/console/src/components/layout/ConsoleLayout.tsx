@@ -29,6 +29,19 @@ export default function ConsoleLayout() {
     }
   }, [navigate]);
 
+  // Listen for drafts navigation requests from IPC (Update Buddy)
+  useEffect(() => {
+    const handleDraftsNavigate = (draftId: string) => {
+      console.log("[ConsoleLayout] Navigating to draft:", draftId);
+      navigate(`/drafts/${draftId}`);
+    };
+
+    // Register IPC listener
+    if (window.consoleAPI?.onDraftsNavigate) {
+      window.consoleAPI.onDraftsNavigate(handleDraftsNavigate);
+    }
+  }, [navigate]);
+
   // macOS: transparent to show vibrancy, Windows: solid background (Mica handles the effect)
   const rootBackground = isMac ? "bg-black/20" : "bg-[#1a1a1a]";
 

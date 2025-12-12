@@ -17,6 +17,7 @@ const IPC_CHANNELS = {
   AUTH_SET_TOKENS: "auth-set-tokens",
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
+  DRAFTS_NAVIGATE: "drafts-navigate", // Update Buddy: Navigate to draft detail
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -69,6 +70,14 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.on(IPC_CHANNELS.NUDGE_OPEN_CREATOR, (_event: IpcRendererEvent, data: unknown) =>
       callback(data)
     );
+  },
+
+  // Drafts navigation (Update Buddy)
+  onDraftsNavigate: (callback: (draftId: string) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.DRAFTS_NAVIGATE, (_event: IpcRendererEvent, draftId: string) => {
+      console.log("[Console Preload] Drafts navigate received:", draftId);
+      callback(draftId);
+    });
   },
 
   // Auth management - Console sends tokens to main process after login
