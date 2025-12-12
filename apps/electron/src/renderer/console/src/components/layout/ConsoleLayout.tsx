@@ -26,6 +26,19 @@ export default function ConsoleLayout() {
     }
   }, [navigate]);
 
+  // Listen for drafts navigation requests from IPC (Update Buddy)
+  useEffect(() => {
+    const handleDraftsNavigate = (draftId: string) => {
+      console.log("[ConsoleLayout] Navigating to draft:", draftId);
+      navigate(`/drafts/${draftId}`);
+    };
+
+    // Register IPC listener
+    if (window.consoleAPI?.onDraftsNavigate) {
+      window.consoleAPI.onDraftsNavigate(handleDraftsNavigate);
+    }
+  }, [navigate]);
+
   return (
     <SidebarProvider>
       {/* Root container with transparent background to let Electron vibrancy show through */}

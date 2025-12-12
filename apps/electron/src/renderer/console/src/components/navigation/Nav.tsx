@@ -1,4 +1,4 @@
-import { Layers, Users, MessageSquare, BarChart3, Plug } from "lucide-react";
+import { Layers, Users, MessageSquare, BarChart3, Plug, FileEdit } from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 
@@ -25,6 +25,7 @@ export default function Nav() {
       <NavItem to="/roadmap" icon={Layers} label="Roadmap" />
       <NavItem to="/nudges" icon={Users} label="Nudges" />
       <NavItem to="/chats" icon={MessageSquare} label="Chats" />
+      <NavItem to="/drafts" icon={FileEdit} label="Drafts" />
     </nav>
   );
 }

@@ -41,6 +41,8 @@ export default defineConfig({
           console: resolve(__dirname, "src/preload/console.ts"),
           conversation: resolve(__dirname, "src/preload/conversation.ts"),
           watchButton: resolve(__dirname, "src/preload/watchButton.ts"),
+          updatePrompt: resolve(__dirname, "src/preload/updatePrompt.ts"),
+          watchingPill: resolve(__dirname, "src/preload/watchingPill.ts"),
         },
         output: {
           format: "cjs",
@@ -69,6 +71,8 @@ export default defineConfig({
           console: resolve(__dirname, "src/renderer/console/index.html"),
           conversation: resolve(__dirname, "src/renderer/conversation/index.html"),
           watchButton: resolve(__dirname, "src/renderer/watchButton/index.html"),
+          updatePrompt: resolve(__dirname, "src/renderer/updatePrompt/index.html"),
+          watchingPill: resolve(__dirname, "src/renderer/watchingPill/index.html"),
         },
       },
     },

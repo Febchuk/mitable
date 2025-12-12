@@ -13,6 +13,8 @@ let agentWindow: BrowserWindow | null = null;
 let agentPanelWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
+let updatePromptWindow: BrowserWindow | null = null;
+let watchingPillWindow: BrowserWindow | null = null;
 
 // Watch button windows tracking (module scope for cleanup from multiple handlers)
 const watchButtonWindows: Map<string, BrowserWindow> = new Map();
@@ -309,6 +311,103 @@ function createConsoleWindow() {
   consoleWindow.on("closed", () => {
     app.quit(); // Quit app when main console window is closed
   });
+}
+
+function createUpdatePromptWindow() {
+  // Get screen dimensions for top-right positioning
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth } = primaryDisplay.bounds;
+
+  const windowWidth = 360;
+  const windowHeight = 140;
+  const topMargin = 20; // Higher up on screen
+  const rightMargin = 5; // Flush to right edge
+
+  updatePromptWindow = new BrowserWindow({
+    width: windowWidth,
+    height: windowHeight,
+    x: screenWidth - windowWidth - rightMargin,
+    y: topMargin,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, "../preload/updatePrompt.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top behavior
+  if (process.platform === "darwin") {
+    updatePromptWindow.setAlwaysOnTop(true, "modal-panel");
+    updatePromptWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    updatePromptWindow.setAlwaysOnTop(true, "normal", 1);
+  }
+
+  if (!app.isPackaged) {
+    updatePromptWindow.loadURL("http://localhost:5173/updatePrompt/index.html");
+  } else {
+    updatePromptWindow.loadFile(join(__dirname, "../renderer/updatePrompt/index.html"));
+  }
+
+  updatePromptWindow.on("closed", () => {
+    updatePromptWindow = null;
+  });
+
+  console.log("[UpdatePrompt] Window created at top-right position");
+}
+
+function createWatchingPillWindow() {
+  // Get screen dimensions for right-edge, vertically centered positioning
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+
+  const windowWidth = 130; // Wide enough for dropdown options
+  const windowHeight = 160; // Tall enough for pill + dropdown
+  const rightMargin = 5;
+
+  watchingPillWindow = new BrowserWindow({
+    width: windowWidth,
+    height: windowHeight,
+    x: screenWidth - windowWidth - rightMargin,
+    y: Math.floor((screenHeight - windowHeight) / 2),
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, "../preload/watchingPill.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top behavior
+  if (process.platform === "darwin") {
+    watchingPillWindow.setAlwaysOnTop(true, "modal-panel");
+    watchingPillWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    watchingPillWindow.setAlwaysOnTop(true, "normal", 1);
+  }
+
+  if (!app.isPackaged) {
+    watchingPillWindow.loadURL("http://localhost:5173/watchingPill/index.html");
+  } else {
+    watchingPillWindow.loadFile(join(__dirname, "../renderer/watchingPill/index.html"));
+  }
+
+  watchingPillWindow.on("closed", () => {
+    watchingPillWindow = null;
+  });
+
+  console.log("[WatchingPill] Window created at right edge, vertically centered");
 }
 
 // IPC Handlers
@@ -903,6 +1002,80 @@ function setupIPC() {
     });
   });
 
+  // ==================== Update Prompt IPC Handlers ====================
+
+  // Edit draft - open console and navigate to drafts view
+  ipcMain.on(IPC_CHANNELS.UPDATE_PROMPT_EDIT, (_event, draftId: string) => {
+    console.log("[UpdatePrompt] Edit requested for draft:", draftId);
+
+    // Hide update prompt window
+    if (updatePromptWindow && !updatePromptWindow.isDestroyed()) {
+      updatePromptWindow.hide();
+    }
+
+    // Show console and navigate to draft
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+      // Send navigation message to console
+      consoleWindow.webContents.send(IPC_CHANNELS.DRAFTS_NAVIGATE, draftId);
+    }
+  });
+
+  // Send now - dismiss after success toast (handled in renderer)
+  ipcMain.on(IPC_CHANNELS.UPDATE_PROMPT_SEND, (_event, draftId: string) => {
+    console.log("[UpdatePrompt] Send now clicked for draft:", draftId);
+    // Success toast is shown in renderer, then this is called
+    // Hide the window after a delay (toast is shown for 1.5s in renderer)
+    setTimeout(() => {
+      if (updatePromptWindow && !updatePromptWindow.isDestroyed()) {
+        updatePromptWindow.hide();
+      }
+    }, 500); // Short delay since renderer already waited 1.5s
+  });
+
+  // Dismiss prompt
+  ipcMain.on(IPC_CHANNELS.UPDATE_PROMPT_DISMISS, () => {
+    console.log("[UpdatePrompt] Dismissed");
+    if (updatePromptWindow && !updatePromptWindow.isDestroyed()) {
+      updatePromptWindow.hide();
+    }
+  });
+
+  // ==================== Watching Pill IPC Handlers ====================
+
+  // Pause watching
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_PAUSE, () => {
+    console.log("[WatchingPill] Watching paused");
+    // In a real implementation, this would pause the screen monitoring
+  });
+
+  // Resume watching
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_RESUME, () => {
+    console.log("[WatchingPill] Watching resumed");
+    // In a real implementation, this would resume the screen monitoring
+  });
+
+  // Send update - open Console and navigate to drafts
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_SEND_UPDATE, () => {
+    console.log("[WatchingPill] Send update - opening Console drafts");
+
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+      // Navigate to draft detail
+      consoleWindow.webContents.send(IPC_CHANNELS.DRAFTS_NAVIGATE, "demo-draft-001");
+    }
+  });
+
+  // Hide watching pill
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_HIDE, () => {
+    console.log("[WatchingPill] Hide requested");
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.hide();
+    }
+  });
+
   // Screenshot Capture - Multi-window capture with smart caching
   ipcMain.handle(
     IPC_CHANNELS.CAPTURE_SCREENSHOT,
@@ -1310,6 +1483,47 @@ function registerGlobalShortcuts() {
         agentPanelWindow.focus();
         // Notify renderer for entrance animation
         agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
+      }
+    }
+  });
+
+  // Update Prompt Demo Trigger (Cmd+Shift+U)
+  globalShortcut.register("CommandOrControl+Shift+U", () => {
+    console.log("[UpdatePrompt] Demo trigger shortcut activated");
+
+    // Create window if it doesn't exist
+    if (!updatePromptWindow || updatePromptWindow.isDestroyed()) {
+      createUpdatePromptWindow();
+    }
+
+    if (updatePromptWindow && !updatePromptWindow.isDestroyed()) {
+      // Send demo draft data to the window
+      updatePromptWindow.webContents.send(IPC_CHANNELS.UPDATE_PROMPT_TRIGGER, {
+        id: "demo-draft-001",
+        topic: "Weekly standup update ready",
+        recipient: "#engineering-standup",
+      });
+      updatePromptWindow.show();
+      console.log("[UpdatePrompt] Window shown with demo data");
+    }
+  });
+
+  // Watching Pill Toggle (Cmd+Shift+W)
+  globalShortcut.register("CommandOrControl+Shift+W", () => {
+    console.log("[WatchingPill] Toggle shortcut activated");
+
+    // Create window if it doesn't exist
+    if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+      createWatchingPillWindow();
+    }
+
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      if (watchingPillWindow.isVisible()) {
+        watchingPillWindow.hide();
+        console.log("[WatchingPill] Window hidden");
+      } else {
+        watchingPillWindow.show();
+        console.log("[WatchingPill] Window shown");
       }
     }
   });

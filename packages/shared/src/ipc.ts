@@ -95,6 +95,25 @@ export const IPC_CHANNELS = {
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
+
+  // Update Prompt system (proactive status update suggestions)
+  UPDATE_PROMPT_SHOW: "update-prompt-show",
+  UPDATE_PROMPT_HIDE: "update-prompt-hide",
+  UPDATE_PROMPT_EDIT: "update-prompt-edit",
+  UPDATE_PROMPT_SEND: "update-prompt-send",
+  UPDATE_PROMPT_DISMISS: "update-prompt-dismiss",
+  UPDATE_PROMPT_TRIGGER: "update-prompt-trigger",
+
+  // Watching Pill system (Update Buddy)
+  WATCHING_PILL_TOGGLE: "watching-pill-toggle",
+  WATCHING_PILL_SHOW: "watching-pill-show",
+  WATCHING_PILL_HIDE: "watching-pill-hide",
+  WATCHING_PILL_PAUSE: "watching-pill-pause",
+  WATCHING_PILL_RESUME: "watching-pill-resume",
+  WATCHING_PILL_SEND_UPDATE: "watching-pill-send-update",
+
+  // Drafts system (Console)
+  DRAFTS_NAVIGATE: "drafts-navigate",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
