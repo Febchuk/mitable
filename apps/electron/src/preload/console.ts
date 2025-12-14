@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
-import type { MultiWindowCaptureResult } from "@mitable/shared";
+import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
 
 console.log("[Preload] Console preload script starting...");
 
@@ -18,6 +18,15 @@ const IPC_CHANNELS = {
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
   DRAFTS_NAVIGATE: "drafts-navigate", // Update Buddy: Navigate to draft detail
+  // Watch mode
+  WATCH_WINDOWS_TOGGLE: "watch-windows-toggle",
+  WATCH_WINDOW_UNSELECT: "watch-window-unselect",
+  WATCH_WINDOWS_GET_SELECTED: "watch-windows-get-selected",
+  WATCH_WINDOWS_UPDATED: "watch-windows-updated",
+  // Watching pill
+  WATCHING_PILL_SHOW: "watching-pill-show",
+  WATCHING_PILL_HIDE: "watching-pill-hide",
+  WATCHING_PILL_TOGGLE: "watching-pill-toggle",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -90,6 +99,24 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       (_event: IpcRendererEvent, token: string | null) => callback(token)
     );
   },
+
+  // Watch mode for selective screenshot capture
+  toggleWatchMode: (enabled: boolean): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_TOGGLE, enabled),
+  unselectWindow: (windowId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, windowId),
+  getSelectedWindows: (): Promise<SelectedWindowInfo[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED),
+  onWatchWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => {
+    const listener = (_event: IpcRendererEvent, windows: SelectedWindowInfo[]) => callback(windows);
+    ipcRenderer.on(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, listener);
+  },
+
+  // Watching pill control
+  showWatchingPill: () => ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_SHOW),
+  hideWatchingPill: () => ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE),
+  toggleWatchingPill: () => ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_TOGGLE),
 });
 
 console.log("[Preload] Console preload script finished - window.consoleAPI exposed");

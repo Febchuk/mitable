@@ -17,6 +17,10 @@ import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
 import DraftsView from "./components/views/employee/DraftsView";
 import DraftDetail from "./components/views/employee/DraftsView/DraftDetail";
+import SessionsView from "./components/views/employee/SessionsView";
+import SessionDetail from "./components/views/employee/SessionsView/SessionDetail";
+import NewSession from "./components/views/employee/SessionsView/NewSession";
+import { SessionsProvider } from "./context/SessionsContext";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
@@ -89,7 +93,8 @@ function App() {
       <HashRouter>
         <NavigationHandler />
         <UserProvider>
-          <Routes>
+          <SessionsProvider>
+            <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup-organization" element={<SignupOrganizationPage />} />
@@ -126,9 +131,14 @@ function App() {
               {/* Drafts Routes (Update Buddy) */}
               <Route path="drafts" element={<DraftsView />} />
               <Route path="drafts/:draftId" element={<DraftDetail />} />
+              {/* Sessions Routes */}
+              <Route path="sessions" element={<SessionsView />} />
+              <Route path="sessions/new" element={<NewSession />} />
+              <Route path="sessions/:sessionId" element={<SessionDetail />} />
             </Route>
           </Routes>
           <Toaster />
+          </SessionsProvider>
         </UserProvider>
       </HashRouter>
       <ReactQueryDevtools initialIsOpen={false} />

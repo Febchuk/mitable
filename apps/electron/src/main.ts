@@ -1044,6 +1044,49 @@ function setupIPC() {
 
   // ==================== Watching Pill IPC Handlers ====================
 
+  // Show watching pill
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_SHOW, () => {
+    console.log("[WatchingPill] Show requested");
+
+    // Create window if it doesn't exist
+    if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+      createWatchingPillWindow();
+    }
+
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.show();
+      console.log("[WatchingPill] Window shown");
+    }
+  });
+
+  // Hide watching pill
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_HIDE, () => {
+    console.log("[WatchingPill] Hide requested");
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.hide();
+    }
+  });
+
+  // Toggle watching pill
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_TOGGLE, () => {
+    console.log("[WatchingPill] Toggle requested");
+
+    // Create window if it doesn't exist
+    if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+      createWatchingPillWindow();
+    }
+
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      if (watchingPillWindow.isVisible()) {
+        watchingPillWindow.hide();
+        console.log("[WatchingPill] Window hidden");
+      } else {
+        watchingPillWindow.show();
+        console.log("[WatchingPill] Window shown");
+      }
+    }
+  });
+
   // Pause watching
   ipcMain.on(IPC_CHANNELS.WATCHING_PILL_PAUSE, () => {
     console.log("[WatchingPill] Watching paused");
@@ -1065,14 +1108,6 @@ function setupIPC() {
       consoleWindow.focus();
       // Navigate to draft detail
       consoleWindow.webContents.send(IPC_CHANNELS.DRAFTS_NAVIGATE, "demo-draft-001");
-    }
-  });
-
-  // Hide watching pill
-  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_HIDE, () => {
-    console.log("[WatchingPill] Hide requested");
-    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-      watchingPillWindow.hide();
     }
   });
 
@@ -1300,7 +1335,7 @@ function setupWatchModeHandlers() {
   // Broadcast updated window list to all windows
   function broadcastWatchWindowsUpdate() {
     const selectedWindows = windowDetectionService.getSelectedWindows();
-    const windows = [agentWindow, agentPanelWindow, conversationWindow];
+    const windows = [agentWindow, agentPanelWindow, conversationWindow, consoleWindow];
 
     for (const window of windows) {
       if (window && !window.isDestroyed()) {

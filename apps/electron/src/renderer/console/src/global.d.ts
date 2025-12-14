@@ -1,6 +1,6 @@
 // Global type declarations for Electron preload API
 
-import type { MultiWindowCaptureResult } from "@mitable/shared";
+import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
 
 interface ConsoleAPI {
   // Help system
@@ -36,6 +36,19 @@ interface ConsoleAPI {
   setAuthTokens: (accessToken: string, refreshToken: string) => void;
   clearAuthTokens: () => void;
   onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
+
+  // Watch mode for selective screenshot capture
+  toggleWatchMode: (enabled: boolean) => Promise<void>;
+  unselectWindow: (windowId: string) => Promise<void>;
+  getSelectedWindows: () => Promise<SelectedWindowInfo[]>;
+  onWatchWindowsUpdated: (
+    callback: (windows: SelectedWindowInfo[]) => void
+  ) => () => void;
+
+  // Watching pill control
+  showWatchingPill: () => void;
+  hideWatchingPill: () => void;
+  toggleWatchingPill: () => void;
 }
 
 declare global {
