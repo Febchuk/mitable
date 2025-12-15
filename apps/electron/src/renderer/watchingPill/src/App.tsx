@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { MoreVertical, Eye, EyeOff, X, ChevronDown, Play } from "lucide-react";
+import { MoreVertical, Eye, EyeOff, Play, Plus, X } from "lucide-react";
 import LogoIcon from "@/assets/logo-icon.svg";
-import type { MonitoringSessionState, SelectedWindowInfo } from "@mitable/shared";
+import type { MonitoringSessionState, SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
 
 export default function App() {
   // Session state
@@ -10,13 +10,13 @@ export default function App() {
 
   // Window management
   const [selectedWindows, setSelectedWindows] = useState<SelectedWindowInfo[]>([]);
-  const [watchModeActive, setWatchModeActive] = useState(false);
-  const [showWindowList, setShowWindowList] = useState(false);
+  const [availableWindows, setAvailableWindows] = useState<WatchableWindow[]>([]);
+  const [showWindowDropdown, setShowWindowDropdown] = useState(false);
 
   // Menu state
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const windowListRef = useRef<HTMLDivElement>(null);
+  const eyeRef = useRef<HTMLDivElement>(null);
 
   // Derived state
   const isActive = sessionState?.status === "active";
@@ -31,19 +31,19 @@ export default function App() {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
       }
-      if (windowListRef.current && !windowListRef.current.contains(event.target as Node)) {
-        setShowWindowList(false);
+      if (eyeRef.current && !eyeRef.current.contains(event.target as Node)) {
+        setShowWindowDropdown(false);
       }
     };
 
-    if (menuOpen || showWindowList) {
+    if (menuOpen || showWindowDropdown) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [menuOpen, showWindowList]);
+  }, [menuOpen, showWindowDropdown]);
 
   // Subscribe to session updates
   useEffect(() => {
@@ -75,21 +75,32 @@ export default function App() {
     };
   }, []);
 
-  // Eye button toggles watch mode overlay
+  // Eye button opens dropdown to select windows
   const handleEyeClick = async () => {
-    const newState = !watchModeActive;
-    setWatchModeActive(newState);
-    await window.watchingPillAPI.toggleWatchMode(newState);
-
-    // If turning off, close window list
-    if (!newState) {
-      setShowWindowList(false);
+    if (showWindowDropdown) {
+      setShowWindowDropdown(false);
+    } else {
+      // Fetch available windows before showing dropdown
+      const result = await window.watchingPillAPI.getVisibleWindows();
+      if (result.success) {
+        setAvailableWindows(result.windows);
+      }
+      setShowWindowDropdown(true);
     }
   };
 
-  // Remove window from watchlist
-  const handleRemoveWindow = async (windowId: string) => {
-    await window.watchingPillAPI.unselectWindow(windowId);
+  // Toggle window selection in dropdown
+  const handleToggleWindow = async (windowInfo: WatchableWindow) => {
+    const isSelected = selectedWindows.some((w) => w.windowId === windowInfo.windowId);
+    if (isSelected) {
+      await window.watchingPillAPI.unselectWindow(windowInfo.windowId);
+    } else {
+      await window.watchingPillAPI.selectWindow({
+        windowId: windowInfo.windowId,
+        appName: windowInfo.appName,
+        windowTitle: windowInfo.windowTitle,
+      });
+    }
   };
 
   // Session controls
@@ -105,12 +116,43 @@ export default function App() {
 
   const handleEndSession = async () => {
     setMenuOpen(false);
-    // End session and get captures
-    const result = await window.watchingPillAPI.endSession();
-    console.log("[WatchingPill] Session ended:", result);
 
-    // Open console to show the session detail
-    window.watchingPillAPI.showConsole();
+    try {
+      // Step 1: End Electron session and get captures
+      const result = await window.watchingPillAPI.endSession();
+      console.log("[WatchingPill] Electron session ended:", result);
+
+      if (!result.success || !result.sessionId) {
+        console.error("[WatchingPill] Failed to end session:", result.error);
+        window.watchingPillAPI.showConsole();
+        return;
+      }
+
+      // Step 2: Upload captures to backend and trigger summarization
+      if (result.captures && result.captures.length > 0) {
+        console.log("[WatchingPill] Finalizing session with", result.captures.length, "captures");
+        const finalizeResult = await window.watchingPillAPI.finalizeSession(
+          result.sessionId,
+          result.captures
+        );
+
+        if (!finalizeResult.success) {
+          console.error("[WatchingPill] Failed to finalize session:", finalizeResult.error);
+        } else {
+          console.log("[WatchingPill] Session finalized successfully - summary generation started");
+        }
+      } else {
+        // No captures, still call finalize to mark session as ended in backend
+        console.log("[WatchingPill] No captures, finalizing empty session");
+        await window.watchingPillAPI.finalizeSession(result.sessionId, []);
+      }
+
+      // Open console to show the session detail
+      window.watchingPillAPI.showConsole();
+    } catch (error) {
+      console.error("[WatchingPill] Error ending session:", error);
+      window.watchingPillAPI.showConsole();
+    }
   };
 
   // Start a new monitoring session
@@ -161,9 +203,6 @@ export default function App() {
         console.error("[WatchingPill] Failed to start session:", result.error);
       } else {
         console.log("[WatchingPill] Session started:", result.sessionId);
-        // Turn off watch mode since session is now active
-        setWatchModeActive(false);
-        await window.watchingPillAPI.toggleWatchMode(false);
       }
     } catch (error) {
       console.error("[WatchingPill] Error starting session:", error);
@@ -198,70 +237,94 @@ export default function App() {
         {/* Divider */}
         <div className="w-5 h-px bg-white/10" />
 
-        {/* Eye Button - toggles watch mode to add windows */}
-        <button
-          onClick={handleEyeClick}
-          className={`w-6 h-6 flex items-center justify-center rounded-full transition-all app-no-drag ${
-            watchModeActive
-              ? "bg-primary text-white"
-              : "hover:bg-white/10 text-white/70"
-          }`}
-          aria-label={watchModeActive ? "Stop selecting windows" : "Select windows to watch"}
-        >
-          {watchModeActive ? <Eye size={12} /> : <EyeOff size={12} />}
-        </button>
-
-        {/* Window count badge - click to expand list */}
-        {selectedWindows.length > 0 && (
-          <div className="relative app-no-drag" ref={windowListRef}>
-            <button
-              onClick={() => setShowWindowList(!showWindowList)}
-              className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-              aria-label="Show watched windows"
-            >
-              <span className="text-[10px] text-white font-medium">
-                {selectedWindows.length}
-              </span>
-              <ChevronDown
-                size={8}
-                className={`text-white/70 ml-0.5 transition-transform ${
-                  showWindowList ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {/* Window list dropdown */}
-            {showWindowList && (
-              <div className="absolute top-full right-0 mt-2 w-56 bg-[#2A2A2A] rounded-lg shadow-xl border border-white/10 py-2 animate-in fade-in slide-in-from-top-2 duration-150 z-50 app-no-drag">
-                <div className="text-[10px] text-white/50 px-3 py-1 mb-1">
-                  Watching {selectedWindows.length} window{selectedWindows.length !== 1 ? "s" : ""}
-                </div>
-                <div className="max-h-48 overflow-y-auto">
-                  {selectedWindows.map((windowInfo) => (
-                    <div
-                      key={windowInfo.windowId}
-                      className="flex items-center justify-between px-3 py-1.5 hover:bg-white/5 transition-colors"
-                    >
-                      <span className="text-xs text-white truncate flex-1 mr-2">
-                        {windowInfo.appName}
-                        {windowInfo.windowTitle && (
-                          <span className="text-white/50"> - {windowInfo.windowTitle}</span>
-                        )}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveWindow(windowInfo.windowId)}
-                        className="p-0.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
-                        aria-label={`Stop watching ${windowInfo.appName}`}
-                      >
-                        <X size={10} className="text-white/50 hover:text-white" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+        {/* Eye Button - opens window selector dropdown */}
+        <div className="relative app-no-drag" ref={eyeRef}>
+          <button
+            onClick={handleEyeClick}
+            className={`relative w-6 h-6 flex items-center justify-center rounded-full transition-all ${
+              showWindowDropdown || selectedWindows.length > 0
+                ? "bg-primary/20 text-white"
+                : "hover:bg-white/10 text-white/70"
+            }`}
+            aria-label="Select windows to watch"
+          >
+            {selectedWindows.length > 0 ? (
+              <>
+                <Eye size={12} />
+                <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-primary rounded-full text-[8px] text-white flex items-center justify-center font-medium px-0.5">
+                  {selectedWindows.length}
+                </span>
+              </>
+            ) : (
+              <EyeOff size={12} />
             )}
-          </div>
-        )}
+          </button>
+
+          {/* Window selector dropdown */}
+          {showWindowDropdown && (
+            <div className="absolute top-full right-0 mt-2 w-56 bg-[#2A2A2A] rounded-lg shadow-xl border border-white/10 py-2 animate-in fade-in slide-in-from-top-2 duration-150 z-50 app-no-drag">
+              {/* Selected windows as chips */}
+              <div className="px-3 pb-2">
+                <div className="text-[10px] text-white/50 mb-1.5">Watching</div>
+                {selectedWindows.length === 0 ? (
+                  <div className="text-xs text-white/30 italic">No windows selected</div>
+                ) : (
+                  <div className="flex flex-wrap gap-1">
+                    {selectedWindows.map((win) => (
+                      <div
+                        key={win.windowId}
+                        className="flex items-center gap-1 bg-primary/20 border border-primary/30 rounded-full pl-2 pr-1 py-0.5"
+                      >
+                        <span className="text-[10px] text-white truncate max-w-[120px]">
+                          {win.appName}
+                        </span>
+                        <button
+                          onClick={() => window.watchingPillAPI.unselectWindow(win.windowId)}
+                          className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+                        >
+                          <X size={10} className="text-white/70" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="h-px bg-white/10 mx-2 my-1" />
+
+              {/* Available windows to add */}
+              <div className="text-[10px] text-white/50 px-3 py-1">Add Window</div>
+              <div className="max-h-32 overflow-y-auto">
+                {availableWindows.filter((w) => !w.isBlocked && !selectedWindows.some((s) => s.windowId === w.windowId)).length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-white/30">
+                    {availableWindows.length === 0 ? "No windows available" : "All windows added"}
+                  </div>
+                ) : (
+                  availableWindows
+                    .filter((w) => !w.isBlocked && !selectedWindows.some((s) => s.windowId === w.windowId))
+                    .map((windowInfo) => (
+                      <button
+                        key={windowInfo.windowId}
+                        onClick={() => handleToggleWindow(windowInfo)}
+                        className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="w-4 h-4 rounded-full border border-white/30 flex items-center justify-center flex-shrink-0 hover:border-primary hover:bg-primary/10">
+                          <Plus size={10} className="text-white/50" />
+                        </div>
+                        <span className="text-xs text-white truncate flex-1">
+                          {windowInfo.appName}
+                          {windowInfo.windowTitle && (
+                            <span className="text-white/50"> - {windowInfo.windowTitle}</span>
+                          )}
+                        </span>
+                      </button>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Divider */}
         <div className="w-5 h-px bg-white/10" />

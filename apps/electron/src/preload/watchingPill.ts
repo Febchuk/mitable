@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
-import type { MonitoringSessionState, SelectedWindowInfo } from "@mitable/shared";
+import type { MonitoringSessionState, SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
 
 // IPC channel constants (inlined to avoid chunking issues - preloads can't resolve npm modules at runtime)
 const IPC_CHANNELS = {
@@ -10,7 +10,10 @@ const IPC_CHANNELS = {
   MONITORING_SESSION_STATUS: "monitoring-session-status",
   MONITORING_SESSION_UPDATE: "monitoring-session-update",
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress",
+  MONITORING_SESSION_FINALIZE: "monitoring-session-finalize",
+  WATCH_WINDOWS_GET_ALL: "watch-windows-get-all",
   WATCH_WINDOWS_GET_SELECTED: "watch-windows-get-selected",
+  WATCH_WINDOW_SELECT: "watch-window-select",
   WATCH_WINDOWS_TOGGLE: "watch-windows-toggle",
   WATCH_WINDOW_UNSELECT: "watch-window-unselect",
   WATCH_WINDOWS_UPDATED: "watch-windows-updated",
@@ -84,8 +87,21 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
   // Window Management
   // ===========================
 
+  getVisibleWindows: (): Promise<{
+    success: boolean;
+    windows: WatchableWindow[];
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_GET_ALL),
+
   getSelectedWindows: (): Promise<SelectedWindowInfo[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED),
+
+  selectWindow: (windowInfo: {
+    windowId: string;
+    appName: string;
+    windowTitle?: string;
+  }): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOW_SELECT, windowInfo),
 
   toggleWatchMode: (enabled: boolean): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_TOGGLE, enabled),
@@ -128,6 +144,25 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
     name?: string;
   }): Promise<{ session?: { id: string }; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.CREATE_BACKEND_SESSION, config),
+
+  // ===========================
+  // Session Finalization (upload captures + trigger summarization)
+  // ===========================
+
+  finalizeSession: (
+    sessionId: string,
+    captures: Array<{
+      sequenceNumber: number;
+      captureTrigger: "periodic" | "focus_change" | "manual";
+      capturedAt: number;
+      windowId?: string;
+      appName?: string;
+      windowTitle?: string;
+      screenshotPath?: string;
+      screenshotHash?: string;
+    }>
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_FINALIZE, sessionId, captures),
 });
 
 // Type declarations for renderer
@@ -161,7 +196,17 @@ declare global {
       onCaptureProgress: (callback: (data: { captureCount: number }) => void) => () => void;
 
       // Window management
+      getVisibleWindows: () => Promise<{
+        success: boolean;
+        windows: WatchableWindow[];
+        error?: string;
+      }>;
       getSelectedWindows: () => Promise<SelectedWindowInfo[]>;
+      selectWindow: (windowInfo: {
+        windowId: string;
+        appName: string;
+        windowTitle?: string;
+      }) => Promise<{ success: boolean; error?: string }>;
       toggleWatchMode: (enabled: boolean) => Promise<void>;
       unselectWindow: (windowId: string) => Promise<void>;
       onWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => () => void;
@@ -179,6 +224,21 @@ declare global {
         captureIntervalMs: number;
         name?: string;
       }) => Promise<{ session?: { id: string }; error?: string }>;
+
+      // Session finalization
+      finalizeSession: (
+        sessionId: string,
+        captures: Array<{
+          sequenceNumber: number;
+          captureTrigger: "periodic" | "focus_change" | "manual";
+          capturedAt: number;
+          windowId?: string;
+          appName?: string;
+          windowTitle?: string;
+          screenshotPath?: string;
+          screenshotHash?: string;
+        }>
+      ) => Promise<{ success: boolean; error?: string }>;
     };
   }
 }
