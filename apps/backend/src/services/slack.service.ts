@@ -21,6 +21,15 @@ export interface SlackMessage {
   permalink: string;
 }
 
+export interface SlackUser {
+  id: string;
+  name: string;
+  real_name: string;
+  display_name: string;
+  avatar: string;
+  is_bot: boolean;
+}
+
 class SlackService {
   /**
    * Get Slack WebClient instance for an organization
@@ -89,6 +98,76 @@ class SlackService {
       return channels.filter((ch) => ch.is_member);
     } catch (error) {
       throw new Error("Failed to fetch Slack channels", { cause: error });
+    }
+  }
+
+  /**
+   * List all workspace users (excluding bots and deleted users)
+   */
+  async listUsers(organizationId: string): Promise<SlackUser[]> {
+    const client = await this.getClient(organizationId);
+    const users: SlackUser[] = [];
+
+    try {
+      let cursor: string | undefined;
+
+      do {
+        const result = await client.users.list({
+          cursor,
+          limit: 200,
+        });
+
+        if (result.members) {
+          users.push(
+            ...result.members
+              .filter((user: any) => !user.deleted && !user.is_bot && user.id !== "USLACKBOT")
+              .map((user: any) => ({
+                id: user.id!,
+                name: user.name || "",
+                real_name: user.real_name || user.name || "",
+                display_name: user.profile?.display_name || user.real_name || user.name || "",
+                avatar: user.profile?.image_48 || user.profile?.image_32 || "",
+                is_bot: false,
+              }))
+          );
+        }
+
+        cursor = result.response_metadata?.next_cursor;
+      } while (cursor);
+
+      return users;
+    } catch (error) {
+      throw new Error("Failed to fetch Slack users", { cause: error });
+    }
+  }
+
+  /**
+   * Open a DM channel with a user
+   */
+  async openDM(organizationId: string, userId: string): Promise<string> {
+    const client = await this.getClient(organizationId);
+
+    console.log(`[SlackService] Opening DM with user: ${userId}`);
+
+    try {
+      const result = await client.conversations.open({
+        users: userId,
+      });
+
+      console.log(`[SlackService] conversations.open result:`, {
+        ok: result.ok,
+        channelId: result.channel?.id,
+        error: result.error,
+      });
+
+      if (!result.ok || !result.channel?.id) {
+        throw new Error(`Failed to open DM channel: ${result.error || "No channel returned"}`);
+      }
+
+      return result.channel.id;
+    } catch (error) {
+      console.error(`[SlackService] Error opening DM:`, error);
+      throw new Error("Failed to open DM channel", { cause: error });
     }
   }
 

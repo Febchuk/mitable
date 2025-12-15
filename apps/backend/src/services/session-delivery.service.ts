@@ -22,6 +22,21 @@ export interface DeliveryTarget {
   channelName?: string;
 }
 
+export interface MultiDeliveryTarget {
+  type: "channel" | "dm";
+  id: string;
+  name?: string;
+}
+
+export interface MultiDeliveryResult {
+  id: string;
+  type: "channel" | "dm";
+  name?: string;
+  status: "delivered" | "failed";
+  messageTs?: string;
+  error?: string;
+}
+
 export interface DeliveryOptions {
   sessionId: string;
   target: DeliveryTarget;
@@ -90,6 +105,132 @@ class SessionDeliveryService {
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
+  }
+
+  /**
+   * Deliver a session summary to multiple targets (channels and/or DMs)
+   */
+  async deliverToMultipleTargets(options: {
+    sessionId: string;
+    targets: MultiDeliveryTarget[];
+  }): Promise<{ results: MultiDeliveryResult[] }> {
+    const { sessionId, targets } = options;
+
+    // Fetch session data once
+    const [session] = await db
+      .select()
+      .from(schema.monitoringSessions)
+      .where(eq(schema.monitoringSessions.id, sessionId))
+      .limit(1);
+
+    if (!session) {
+      // Return failed for all targets
+      return {
+        results: targets.map((t) => ({
+          id: t.id,
+          type: t.type,
+          name: t.name,
+          status: "failed" as const,
+          error: "Session not found",
+        })),
+      };
+    }
+
+    const summary = session.finalSummary || session.rawActivitySummary;
+    if (!summary) {
+      return {
+        results: targets.map((t) => ({
+          id: t.id,
+          type: t.type,
+          name: t.name,
+          status: "failed" as const,
+          error: "No summary available for this session",
+        })),
+      };
+    }
+
+    // Calculate duration and format blocks once
+    const duration = this.calculateDuration(session);
+    const blocks = this.formatSlackBlocks(session, summary, duration);
+    const fallbackText = `Work Session Summary: ${session.name || "Session"} (${duration})`;
+
+    // Deliver to all targets in parallel
+    const deliveryPromises = targets.map(async (target): Promise<MultiDeliveryResult> => {
+      try {
+        let channelId: string;
+
+        // For DMs, we need to open a DM channel first
+        if (target.type === "dm") {
+          console.log(`[SessionDeliveryService] Opening DM with user: ${target.id} (${target.name})`);
+          try {
+            channelId = await slackService.openDM(session.organizationId, target.id);
+            console.log(`[SessionDeliveryService] DM channel opened successfully: ${channelId}`);
+          } catch (error) {
+            console.error(`[SessionDeliveryService] Failed to open DM with ${target.id}:`, error);
+            return {
+              id: target.id,
+              type: target.type,
+              name: target.name,
+              status: "failed",
+              error: `Failed to open DM: ${error instanceof Error ? error.message : "Unknown error"}`,
+            };
+          }
+        } else {
+          // For channels, the id is already the channel ID
+          channelId = target.id;
+          console.log(`[SessionDeliveryService] Sending to channel: ${channelId} (${target.name})`);
+        }
+
+        // Send the message
+        const result = await slackService.sendMessage(session.organizationId, channelId, {
+          text: fallbackText,
+          blocks,
+        });
+
+        console.log(`[SessionDeliveryService] Message send result for ${target.type} ${target.name}:`, {
+          ok: result.ok,
+          ts: result.ts,
+          error: result.error,
+        });
+
+        if (result.ok) {
+          return {
+            id: target.id,
+            type: target.type,
+            name: target.name,
+            status: "delivered",
+            messageTs: result.ts,
+          };
+        }
+
+        return {
+          id: target.id,
+          type: target.type,
+          name: target.name,
+          status: "failed",
+          error: result.error || "Unknown Slack error",
+        };
+      } catch (error) {
+        return {
+          id: target.id,
+          type: target.type,
+          name: target.name,
+          status: "failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    });
+
+    // Wait for all deliveries to complete
+    const results = await Promise.all(deliveryPromises);
+
+    console.log(
+      `[SessionDeliveryService] Multi-target delivery complete: ${
+        results.filter((r) => r.status === "delivered").length
+      }/${results.length} succeeded`
+    );
+
+    return { results };
   }
 
   /**
@@ -249,7 +390,12 @@ class SessionDeliveryService {
 
       const activityList = keyActivities
         .slice(0, 5) // Limit to 5 activities
-        .map((activity: any) => `• ${activity.description || activity}`)
+        .map((activity: any) => {
+          const text = typeof activity === "string"
+            ? activity
+            : activity.activity || activity.description || JSON.stringify(activity);
+          return `• ${text}`;
+        })
         .join("\n");
 
       blocks.push({

@@ -109,6 +109,12 @@
   body.transparent-window #root {
     overflow: hidden;
   }
+
+  /* WatchingPill needs overflow visible for dropdown menus */
+  html.transparent-window.watching-pill #root,
+  body.transparent-window.watching-pill #root {
+    overflow: visible;
+  }
 }
 
 /* Typography system */
