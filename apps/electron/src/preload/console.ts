@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
-import type { MultiWindowCaptureResult } from "@mitable/shared";
+import type { MultiWindowCaptureResult, MonitoringSessionState, SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
 
 console.log("[Preload] Console preload script starting...");
 
@@ -18,6 +18,17 @@ const IPC_CHANNELS = {
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
   DRAFTS_NAVIGATE: "drafts-navigate", // Update Buddy: Navigate to draft detail
+  // Monitoring session channels
+  MONITORING_SESSION_START: "monitoring-session-start",
+  MONITORING_SESSION_PAUSE: "monitoring-session-pause",
+  MONITORING_SESSION_RESUME: "monitoring-session-resume",
+  MONITORING_SESSION_END: "monitoring-session-end",
+  MONITORING_SESSION_RESET: "monitoring-session-reset",
+  MONITORING_SESSION_STATUS: "monitoring-session-status",
+  MONITORING_SESSION_UPDATE: "monitoring-session-update",
+  MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress",
+  // Window detection
+  WATCH_WINDOWS_GET_ALL: "watch-windows-get-all",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -44,6 +55,21 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       console.warn("[Console Preload] Capture blocked or failed:", result.error);
     }
 
+    return result;
+  },
+
+  // Get all visible windows for monitoring session selection
+  getVisibleWindows: async (): Promise<{
+    success: boolean;
+    windows: WatchableWindow[];
+    error?: string;
+  }> => {
+    console.log("[Console Preload] getVisibleWindows() called");
+    const result = await ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_GET_ALL);
+    console.log("[Console Preload] getVisibleWindows result:", {
+      success: result?.success,
+      windowCount: result?.windows?.length ?? 0,
+    });
     return result;
   },
 
@@ -88,6 +114,59 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.on(
       IPC_CHANNELS.AUTH_TOKEN_UPDATED,
       (_event: IpcRendererEvent, token: string | null) => callback(token)
+    );
+  },
+
+  // Monitoring session management
+  startMonitoringSession: (config: {
+    sessionId: string; // Backend's session ID - ensures Electron uses same ID
+    selectedWindows: SelectedWindowInfo[];
+    captureIntervalMs: number;
+    name?: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<{ sessionId: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_START, config),
+
+  pauseMonitoringSession: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_PAUSE),
+
+  resumeMonitoringSession: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_RESUME),
+
+  endMonitoringSession: (): Promise<{
+    success: boolean;
+    sessionId?: string;
+    captureCount?: number;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_END),
+
+  resetMonitoringSession: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_RESET),
+
+  getMonitoringSessionState: (): Promise<MonitoringSessionState | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_STATUS),
+
+  onMonitoringSessionUpdate: (callback: (state: MonitoringSessionState | null) => void) => {
+    ipcRenderer.on(
+      IPC_CHANNELS.MONITORING_SESSION_UPDATE,
+      (_event: IpcRendererEvent, state: MonitoringSessionState | null) => callback(state)
+    );
+  },
+
+  onMonitoringCaptureProgress: (
+    callback: (progress: {
+      sessionId: string;
+      captureCount: number;
+      latestCapture: unknown;
+    }) => void
+  ) => {
+    ipcRenderer.on(
+      IPC_CHANNELS.MONITORING_CAPTURE_PROGRESS,
+      (
+        _event: IpcRendererEvent,
+        progress: { sessionId: string; captureCount: number; latestCapture: unknown }
+      ) => callback(progress)
     );
   },
 });

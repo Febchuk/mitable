@@ -5,7 +5,7 @@
  * Shows summary, allows editing, and provides delivery options.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   useSession,
@@ -15,10 +15,6 @@ import {
   useDeleteSession,
   useEndSession,
   useSlackChannels,
-  useSlackUsers,
-  useReviseSummary,
-  useUpdateSession,
-  useForceEndSession,
 } from "@/console/src/hooks/queries/monitoring";
 import { uploadCaptures } from "@/console/src/services/monitoringService";
 import {
@@ -26,17 +22,17 @@ import {
   Clock,
   Camera,
   Edit2,
+  Save,
   Send,
   Trash2,
   CheckCircle,
   Loader2,
+  X,
   Square,
-  Pause,
-  Play,
-  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -45,9 +41,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import AIEditPanel from "@/console/src/components/shared/AIEditPanel";
-import RecipientSelector from "@/console/src/components/shared/RecipientSelector";
 
 function formatDateTime(dateString: string | null): string {
   if (!dateString) return "N/A";
@@ -76,80 +77,62 @@ export default function SessionDetail() {
     session?.status // Pass status for conditional polling
   );
   const { data: slackChannels = [], isLoading: isLoadingChannels } = useSlackChannels();
-  const { data: slackUsers = [], isLoading: isLoadingUsers } = useSlackUsers();
 
   const updateSummaryMutation = useUpdateSummary();
   const deliverSummaryMutation = useDeliverSummary();
   const deleteSessionMutation = useDeleteSession();
   const endSessionMutation = useEndSession();
-  const reviseSummaryMutation = useReviseSummary();
-  const updateSessionMutation = useUpdateSession();
-  const forceEndMutation = useForceEndSession();
 
-  const [isAIEditMode, setIsAIEditMode] = useState(false);
-  const [isPauseLoading, setIsPauseLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedSummary, setEditedSummary] = useState("");
   const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isForceEndDialogOpen, setIsForceEndDialogOpen] = useState(false);
-  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<string>("");
 
-  const handleSaveSummary = async (content: string) => {
+  // Initialize edited summary when data loads
+  useEffect(() => {
+    if (summaryData) {
+      setEditedSummary(summaryData.finalSummary || summaryData.rawSummary || "");
+    }
+  }, [summaryData]);
+
+  const handleSaveSummary = async () => {
     if (!sessionId) return;
 
-    await updateSummaryMutation.mutateAsync({
-      sessionId,
-      summary: content,
-    });
-    setIsAIEditMode(false);
-    toast({
-      title: "Summary saved",
-      description: "Your changes have been saved successfully.",
-    });
-  };
-
-  const handleRevise = async (instruction: string, currentContent: string) => {
-    if (!sessionId) throw new Error("No session ID");
-
-    const result = await reviseSummaryMutation.mutateAsync({
-      sessionId,
-      instruction,
-      currentSummary: currentContent,
-    });
-    return result;
+    try {
+      await updateSummaryMutation.mutateAsync({
+        sessionId,
+        summary: editedSummary,
+      });
+      setIsEditing(false);
+      toast({
+        title: "Summary saved",
+        description: "Your changes have been saved successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save summary. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeliverSummary = async () => {
-    if (!sessionId || selectedRecipients.length === 0) return;
+    if (!sessionId || !selectedChannel) return;
 
-    // Build targets array from selected recipients
-    const targets = selectedRecipients.map((id) => {
-      const channel = slackChannels.find((c) => c.id === id);
-      const user = slackUsers.find((u) => u.id === id);
-      return {
-        type: channel ? ("channel" as const) : ("dm" as const),
-        id,
-        name: channel?.name || user?.display_name || user?.real_name || user?.name,
-      };
-    });
+    const channel = slackChannels.find((c) => c.id === selectedChannel);
 
     try {
       await deliverSummaryMutation.mutateAsync({
         sessionId,
-        targets,
+        channelId: selectedChannel,
+        channelName: channel?.name,
       });
       setIsDeliveryDialogOpen(false);
-      setSelectedRecipients([]);
-
-      // Build description based on targets
-      const channelCount = targets.filter((t) => t.type === "channel").length;
-      const dmCount = targets.filter((t) => t.type === "dm").length;
-      const parts = [];
-      if (channelCount > 0) parts.push(`${channelCount} channel${channelCount !== 1 ? "s" : ""}`);
-      if (dmCount > 0) parts.push(`${dmCount} person${dmCount !== 1 ? "s" : ""}`);
-
       toast({
         title: "Summary delivered",
-        description: `Summary has been sent to ${parts.join(" and ")}.`,
+        description: `Summary has been sent to #${channel?.name || selectedChannel}`,
       });
     } catch (error) {
       toast({
@@ -195,13 +178,6 @@ export default function SessionDetail() {
       const electronResult = await window.consoleAPI.endMonitoringSession();
 
       if (electronResult.error) {
-        // Check if this is a "No active session" error (crash recovery case)
-        if (electronResult.error.includes("No active session") ||
-            electronResult.error.includes("no active session")) {
-          // Show force-end dialog
-          setIsForceEndDialogOpen(true);
-          return;
-        }
         throw new Error(electronResult.error);
       }
 
@@ -230,78 +206,6 @@ export default function SessionDetail() {
     }
   };
 
-  const handleForceEndSession = async () => {
-    if (!sessionId) return;
-
-    try {
-      await forceEndMutation.mutateAsync({
-        sessionId,
-        reason: "force_ended_after_app_crash",
-      });
-
-      setIsForceEndDialogOpen(false);
-      toast({
-        title: "Session ended",
-        description: "The session has been force-ended. No summary was generated due to the crash.",
-      });
-    } catch (error) {
-      console.error("[SessionDetail] Error force-ending session:", error);
-      toast({
-        title: "Error",
-        description: "Failed to force-end session. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handlePauseSession = async () => {
-    if (!sessionId) return;
-    setIsPauseLoading(true);
-    try {
-      // Pause in Electron (stops capture loop)
-      await window.consoleAPI.pauseMonitoringSession();
-      // Update backend status
-      await updateSessionMutation.mutateAsync({ sessionId, action: "pause" });
-      toast({
-        title: "Session paused",
-        description: "Screenshot capture has been paused.",
-      });
-    } catch (error) {
-      console.error("[SessionDetail] Error pausing session:", error);
-      toast({
-        title: "Error",
-        description: "Failed to pause session.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsPauseLoading(false);
-    }
-  };
-
-  const handleResumeSession = async () => {
-    if (!sessionId) return;
-    setIsPauseLoading(true);
-    try {
-      // Resume in Electron (restarts capture loop)
-      await window.consoleAPI.resumeMonitoringSession();
-      // Update backend status
-      await updateSessionMutation.mutateAsync({ sessionId, action: "resume" });
-      toast({
-        title: "Session resumed",
-        description: "Screenshot capture has resumed.",
-      });
-    } catch (error) {
-      console.error("[SessionDetail] Error resuming session:", error);
-      toast({
-        title: "Error",
-        description: "Failed to resume session.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsPauseLoading(false);
-    }
-  };
-
   if (isLoadingSession || isLoadingSummary) {
     return (
       <div className="p-8 flex items-center justify-center">
@@ -324,22 +228,6 @@ export default function SessionDetail() {
   const summary = summaryData?.finalSummary || summaryData?.rawSummary || "";
   const isDelivered = session.deliveryStatus === "delivered";
 
-  // AI Edit Mode - full screen split-pane editor
-  if (isAIEditMode && summary) {
-    return (
-      <AIEditPanel
-        title="Edit Summary"
-        subtitle={session.name || "Work Session"}
-        initialContent={summary}
-        onSave={handleSaveSummary}
-        onCancel={() => setIsAIEditMode(false)}
-        onRevise={handleRevise}
-        placeholder="Edit your session summary..."
-        contextLabel="session summary"
-      />
-    );
-  }
-
   return (
     <div className="p-8 space-y-6 app-no-drag">
       {/* Header */}
@@ -361,80 +249,33 @@ export default function SessionDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {session.status === "active" && (
-            <>
-              <Button
-                onClick={handlePauseSession}
-                disabled={isPauseLoading}
-                variant="outline"
-                className="gap-2"
-              >
-                {isPauseLoading ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Pause size={16} />
-                )}
-                Pause
-              </Button>
-              <Button
-                onClick={handleEndSession}
-                disabled={endSessionMutation.isPending}
-                className="gap-2 bg-status-error text-white hover:bg-status-error/90"
-              >
-                {endSessionMutation.isPending ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Square size={16} />
-                )}
-                End Session
-              </Button>
-            </>
-          )}
-          {session.status === "paused" && (
-            <>
-              <Button
-                onClick={handleResumeSession}
-                disabled={isPauseLoading}
-                className="gap-2 bg-status-success text-white hover:bg-status-success/90"
-              >
-                {isPauseLoading ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Play size={16} />
-                )}
-                Resume
-              </Button>
-              <Button
-                onClick={handleEndSession}
-                disabled={endSessionMutation.isPending}
-                variant="outline"
-                className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
-              >
-                {endSessionMutation.isPending ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Square size={16} />
-                )}
-                End Session
-              </Button>
-            </>
-          )}
-          {session.status !== "active" && session.status !== "paused" && (
-            isDelivered ? (
-              <Badge className="bg-status-success/20 text-status-success border-transparent">
-                <CheckCircle size={14} className="mr-1" />
-                Delivered
-              </Badge>
-            ) : (
-              <Button
-                onClick={() => setIsDeliveryDialogOpen(true)}
-                disabled={!summary}
-                className="gap-2 bg-primary text-white hover:bg-primary/90"
-              >
-                <Send size={16} />
-                Send to Slack
-              </Button>
-            )
+          {session.status === "active" || session.status === "paused" ? (
+            <Button
+              onClick={handleEndSession}
+              disabled={endSessionMutation.isPending}
+              className="gap-2 bg-status-error text-white hover:bg-status-error/90"
+            >
+              {endSessionMutation.isPending ? (
+                <Loader2 className="animate-spin" size={16} />
+              ) : (
+                <Square size={16} />
+              )}
+              End Session
+            </Button>
+          ) : isDelivered ? (
+            <Badge className="bg-status-success/20 text-status-success border-transparent">
+              <CheckCircle size={14} className="mr-1" />
+              Delivered
+            </Badge>
+          ) : (
+            <Button
+              onClick={() => setIsDeliveryDialogOpen(true)}
+              disabled={!summary}
+              className="gap-2 bg-primary text-white hover:bg-primary/90"
+            >
+              <Send size={16} />
+              Send to Slack
+            </Button>
           )}
           <Button
             variant="ghost"
@@ -487,25 +328,67 @@ export default function SessionDetail() {
           {!isDelivered && summary && (
             <Button
               variant="ghost"
-              onClick={() => setIsAIEditMode(true)}
+              onClick={() => {
+                if (isEditing) {
+                  handleSaveSummary();
+                } else {
+                  setIsEditing(true);
+                }
+              }}
+              disabled={updateSummaryMutation.isPending}
               className="gap-2 text-text-secondary hover:text-text-primary"
             >
-              <Edit2 size={16} />
-              Edit
+              {updateSummaryMutation.isPending ? (
+                <Loader2 className="animate-spin" size={16} />
+              ) : isEditing ? (
+                <>
+                  <Save size={16} />
+                  Save
+                </>
+              ) : (
+                <>
+                  <Edit2 size={16} />
+                  Edit
+                </>
+              )}
             </Button>
           )}
         </div>
 
         {summary ? (
-          <div className="bg-background-elevated rounded-lg border border-border-subtle p-6">
-            <div className="prose prose-invert prose-sm max-w-none">
-              {summary.split("\n").map((paragraph, i) => (
-                <p key={i} className="text-text-primary mb-3 last:mb-0">
-                  {paragraph || <br />}
-                </p>
-              ))}
+          isEditing ? (
+            <div className="space-y-4">
+              <Textarea
+                value={editedSummary}
+                onChange={(e) => setEditedSummary(e.target.value)}
+                className="min-h-[300px] bg-background-elevated border-border-subtle text-text-primary font-mono text-sm"
+                placeholder="Edit your session summary..."
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditedSummary(summary);
+                  }}
+                  className="gap-2"
+                >
+                  <X size={16} />
+                  Cancel
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-background-elevated rounded-lg border border-border-subtle p-6">
+              <div className="prose prose-invert prose-sm max-w-none">
+                {summary.split("\n").map((paragraph, i) => (
+                  <p key={i} className="text-text-primary mb-3 last:mb-0">
+                    {paragraph || <br />}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )
         ) : (
           <div className="bg-background-elevated rounded-lg border border-border-subtle p-8 text-center">
             <p className="text-text-secondary">
@@ -529,7 +412,7 @@ export default function SessionDetail() {
               >
                 <CheckCircle size={18} className="text-status-success mt-0.5 flex-shrink-0" />
                 <span className="text-text-primary">
-                  {typeof activity === "string" ? activity : activity.activity || activity.description || JSON.stringify(activity)}
+                  {typeof activity === "string" ? activity : activity.description || JSON.stringify(activity)}
                 </span>
               </li>
             ))}
@@ -539,23 +422,40 @@ export default function SessionDetail() {
 
       {/* Delivery Dialog */}
       <Dialog open={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen}>
-        <DialogContent className="bg-background-primary border-border-subtle max-w-md">
+        <DialogContent className="bg-background-primary border-border-subtle">
           <DialogHeader>
             <DialogTitle className="text-text-primary">Send to Slack</DialogTitle>
             <DialogDescription className="text-text-secondary">
-              Choose channels and people to share your session summary with.
+              Choose a Slack channel to share your session summary.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-2">
-            <RecipientSelector
-              channels={slackChannels}
-              users={slackUsers}
-              selectedIds={selectedRecipients}
-              onSelectionChange={setSelectedRecipients}
-              isLoading={isLoadingChannels || isLoadingUsers}
-              disabled={deliverSummaryMutation.isPending}
-            />
+          <div className="py-4">
+            <label className="block text-sm font-medium text-text-primary mb-2">Channel</label>
+            {isLoadingChannels ? (
+              <div className="flex items-center gap-2 text-text-secondary">
+                <Loader2 className="animate-spin" size={16} />
+                Loading channels...
+              </div>
+            ) : slackChannels.length === 0 ? (
+              <p className="text-text-secondary text-sm">
+                No Slack channels available. Please configure Slack integration first.
+              </p>
+            ) : (
+              <Select value={selectedChannel} onValueChange={setSelectedChannel}>
+                <SelectTrigger className="bg-background-elevated border-border-subtle text-text-primary">
+                  <SelectValue placeholder="Select a channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {slackChannels.map((channel) => (
+                    <SelectItem key={channel.id} value={channel.id}>
+                      #{channel.name}
+                      {channel.is_private && " (private)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <DialogFooter>
@@ -564,7 +464,7 @@ export default function SessionDetail() {
             </Button>
             <Button
               onClick={handleDeliverSummary}
-              disabled={selectedRecipients.length === 0 || deliverSummaryMutation.isPending}
+              disabled={!selectedChannel || deliverSummaryMutation.isPending}
               className="bg-primary text-white hover:bg-primary/90"
             >
               {deliverSummaryMutation.isPending ? (
@@ -573,7 +473,7 @@ export default function SessionDetail() {
                   Sending...
                 </>
               ) : (
-                `Send${selectedRecipients.length > 0 ? ` (${selectedRecipients.length})` : ""}`
+                "Send"
               )}
             </Button>
           </DialogFooter>
@@ -606,47 +506,6 @@ export default function SessionDetail() {
                 </>
               ) : (
                 "Delete"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Force End Dialog (Crash Recovery) */}
-      <Dialog open={isForceEndDialogOpen} onOpenChange={setIsForceEndDialogOpen}>
-        <DialogContent className="bg-background-primary border-border-subtle">
-          <DialogHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-amber-500/10 rounded-lg">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
-              </div>
-              <DialogTitle className="text-text-primary">Session Recovery Required</DialogTitle>
-            </div>
-            <DialogDescription className="text-text-secondary">
-              The app was closed unexpectedly while this session was running. The session's local
-              capture data may have been lost.
-              <br /><br />
-              You can force-end this session to clear it from the system. No summary will be
-              generated since the capture data is unavailable.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsForceEndDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleForceEndSession}
-              disabled={forceEndMutation.isPending}
-              className="bg-amber-600 text-white hover:bg-amber-700"
-            >
-              {forceEndMutation.isPending ? (
-                <>
-                  <Loader2 className="animate-spin mr-2" size={16} />
-                  Ending...
-                </>
-              ) : (
-                "Force End Session"
               )}
             </Button>
           </DialogFooter>

@@ -555,41 +555,6 @@ Respond with JSON:
     const minutes = Math.round((ms % 3600000) / 60000);
     return `${hours}h ${minutes}m`;
   }
-
-  /**
-   * Revise a summary based on user instructions
-   */
-  async reviseSummary(currentSummary: string, instruction: string): Promise<string> {
-    const prompt = `You are an AI assistant helping to revise a work session summary.
-
-Current summary:
-"""
-${currentSummary}
-"""
-
-User's revision request:
-"${instruction}"
-
-Please revise the summary according to the user's request. Keep the same general structure unless the user asks for a different format.
-
-Important:
-- Maintain a professional tone
-- Keep it concise unless asked to expand
-- Preserve key facts and accomplishments
-- Only output the revised summary text, no explanations
-
-Revised summary:`;
-
-    const completion = await this.groq.chat.completions.create({
-      model: SUMMARIZATION_CONFIG.TEXT_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.4,
-      max_tokens: 800,
-    });
-
-    const response = completion.choices[0]?.message?.content || "";
-    return response.trim();
-  }
 }
 
 // Export singleton

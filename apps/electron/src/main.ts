@@ -7,6 +7,7 @@ import { isBlockedByPolicy } from "./services/capturePolicy";
 import { captureService } from "./services/captureService";
 import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
 import { windowDetectionService } from "./services/windowDetectionService";
+import { monitoringSessionService } from "./services/monitoringSessionService";
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
@@ -1190,6 +1191,9 @@ function setupIPC() {
 
   // Watch Mode IPC Handlers
   setupWatchModeHandlers();
+
+  // Monitoring Session IPC Handlers
+  setupMonitoringSessionHandlers();
 }
 
 // Watch mode handlers for selective screenshot capture
@@ -1219,6 +1223,18 @@ function setupWatchModeHandlers() {
         watchButtonWindows.delete(windowId);
       }
       // Don't clear selected windows - preserve state for re-expansion
+    }
+  });
+
+  // Get all visible windows (for monitoring session window selection)
+  ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_GET_ALL, async () => {
+    try {
+      const windows = await windowDetectionService.getAllVisibleWindows();
+      console.log(`[Watch Mode] Returning ${windows.length} visible windows`);
+      return { success: true, windows };
+    } catch (error) {
+      console.error("[Watch Mode] Error getting visible windows:", error);
+      return { success: false, windows: [], error: String(error) };
     }
   });
 
@@ -1401,6 +1417,74 @@ function setupWatchModeHandlers() {
   }
 
   console.log("[IPC] Watch mode handlers registered successfully");
+}
+
+// Monitoring Session handlers for work session tracking
+function setupMonitoringSessionHandlers() {
+  // Start a new monitoring session
+  ipcMain.handle(
+    IPC_CHANNELS.MONITORING_SESSION_START,
+    async (
+      _event,
+      config: {
+        sessionId: string; // Backend's session ID - ensures Electron uses same ID
+        selectedWindows: any[];
+        captureIntervalMs?: number;
+        name?: string;
+        userId: string;
+        organizationId: string;
+      }
+    ) => {
+      console.log("[Monitoring Session] Starting session:", {
+        sessionId: config.sessionId,
+        windowCount: config.selectedWindows.length,
+        intervalMs: config.captureIntervalMs,
+      });
+
+      const result = await monitoringSessionService.startSession({
+        sessionId: config.sessionId,
+        selectedWindows: config.selectedWindows,
+        captureIntervalMs: config.captureIntervalMs || 30000,
+        name: config.name,
+        userId: config.userId,
+        organizationId: config.organizationId,
+      });
+
+      return result;
+    }
+  );
+
+  // Pause the active session
+  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_PAUSE, async () => {
+    console.log("[Monitoring Session] Pausing session");
+    return monitoringSessionService.pauseSession();
+  });
+
+  // Resume the paused session
+  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESUME, async () => {
+    console.log("[Monitoring Session] Resuming session");
+    return monitoringSessionService.resumeSession();
+  });
+
+  // End the active session
+  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_END, async () => {
+    console.log("[Monitoring Session] Ending session");
+    return monitoringSessionService.endSession();
+  });
+
+  // Reset/clear session state (used when session is deleted externally)
+  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESET, async () => {
+    console.log("[Monitoring Session] Resetting session state");
+    monitoringSessionService.resetSession();
+    return { success: true };
+  });
+
+  // Get current session status
+  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_STATUS, async () => {
+    return monitoringSessionService.getSessionState();
+  });
+
+  console.log("[IPC] Monitoring session handlers registered successfully");
 }
 
 function isBrowserProcess(appName: string, appPath?: string): boolean {

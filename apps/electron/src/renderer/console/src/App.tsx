@@ -17,6 +17,8 @@ import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
 import DraftsView from "./components/views/employee/DraftsView";
 import DraftDetail from "./components/views/employee/DraftsView/DraftDetail";
+import MonitoringView from "./components/views/employee/MonitoringView";
+import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
@@ -46,7 +48,7 @@ function NavigationHandler() {
 // Dynamic default route based on user role
 function DefaultRoute() {
   const { user } = useUser();
-  const defaultPath = user?.role === "admin" ? "/dashboard" : "/roadmap";
+  const defaultPath = user?.role === "admin" ? "/dashboard" : "/monitoring";
   return <Navigate to={defaultPath} replace />;
 }
 
@@ -126,6 +128,9 @@ function App() {
               {/* Drafts Routes (Update Buddy) */}
               <Route path="drafts" element={<DraftsView />} />
               <Route path="drafts/:draftId" element={<DraftDetail />} />
+              {/* Monitoring Routes */}
+              <Route path="monitoring" element={<MonitoringView />} />
+              <Route path="monitoring/:sessionId" element={<SessionDetail />} />
             </Route>
           </Routes>
           <Toaster />

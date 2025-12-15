@@ -16,7 +16,6 @@ export const monitoringKeys = {
   captures: (sessionId: string) => [...monitoringKeys.session(sessionId), "captures"] as const,
   summary: (sessionId: string) => [...monitoringKeys.session(sessionId), "summary"] as const,
   slackChannels: () => [...monitoringKeys.all, "slackChannels"] as const,
-  slackUsers: () => [...monitoringKeys.all, "slackUsers"] as const,
 };
 
 /**
@@ -103,16 +102,6 @@ export function useSlackChannels() {
 }
 
 /**
- * Fetch available Slack users for direct messages
- */
-export function useSlackUsers() {
-  return useQuery({
-    queryKey: monitoringKeys.slackUsers(),
-    queryFn: monitoringService.fetchSlackUsers,
-  });
-}
-
-/**
  * End a session mutation
  */
 export function useEndSession() {
@@ -144,7 +133,7 @@ export function useUpdateSummary() {
 }
 
 /**
- * Deliver summary to multiple Slack channels and/or DMs
+ * Deliver summary to Slack mutation
  */
 export function useDeliverSummary() {
   const queryClient = useQueryClient();
@@ -152,11 +141,13 @@ export function useDeliverSummary() {
   return useMutation({
     mutationFn: ({
       sessionId,
-      targets,
+      channelId,
+      channelName,
     }: {
       sessionId: string;
-      targets: Array<{ type: "channel" | "dm"; id: string; name?: string }>;
-    }) => monitoringService.deliverSummary(sessionId, targets),
+      channelId: string;
+      channelName?: string;
+    }) => monitoringService.deliverSummary(sessionId, { channelId, channelName }),
     onSuccess: (_, { sessionId }) => {
       queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
       queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
@@ -174,74 +165,6 @@ export function useDeleteSession() {
     mutationFn: (sessionId: string) => monitoringService.deleteSession(sessionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-    },
-  });
-}
-
-/**
- * Update session mutation (pause/resume)
- */
-export function useUpdateSession() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ sessionId, action }: { sessionId: string; action: "pause" | "resume" }) =>
-      monitoringService.updateSession(sessionId, { action }),
-    onSuccess: (_, { sessionId }) => {
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-    },
-  });
-}
-
-/**
- * Revise summary with AI assistance
- */
-export function useReviseSummary() {
-  return useMutation({
-    mutationFn: ({
-      sessionId,
-      instruction,
-      currentSummary,
-    }: {
-      sessionId: string;
-      instruction: string;
-      currentSummary: string;
-    }) => monitoringService.reviseSummary(sessionId, instruction, currentSummary),
-  });
-}
-
-/**
- * Fetch the current active session from the database (if any)
- * Used for crash recovery detection
- */
-export function useActiveSession() {
-  const { user } = useUser();
-
-  return useQuery({
-    queryKey: [...monitoringKeys.all, "active"] as const,
-    queryFn: async () => {
-      const response = await monitoringService.fetchActiveSession();
-      return response.session;
-    },
-    enabled: !!user,
-    staleTime: 0, // Always check fresh
-  });
-}
-
-/**
- * Force end a session without Electron state (for crash recovery)
- */
-export function useForceEndSession() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ sessionId, reason }: { sessionId: string; reason?: string }) =>
-      monitoringService.forceEndSession(sessionId, reason),
-    onSuccess: (_, { sessionId }) => {
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
-      queryClient.invalidateQueries({ queryKey: [...monitoringKeys.all, "active"] });
     },
   });
 }

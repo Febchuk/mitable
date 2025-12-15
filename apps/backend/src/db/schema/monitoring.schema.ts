@@ -32,11 +32,6 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
 
   // Session metadata
   name: varchar("name", { length: 255 }), // Optional user-provided session name
-  sessionGoal: text("session_goal"), // Optional: "Working on LIN-341: Add JWT auth"
-
-  // Local storage path (for v2 architecture)
-  localPath: text("local_path"), // e.g., "~/Library/Application Support/Mitable/sessions/{id}"
-  cloudPath: text("cloud_path"), // e.g., "org_123/user_456/sess_789" (populated at end)
 
   // Session state
   status: varchar("status", { length: 50 }).notNull().default("active"),
@@ -58,13 +53,6 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
   pausedAt: timestamp("paused_at"), // Last pause timestamp
   totalPausedMs: integer("total_paused_ms").notNull().default(0), // Cumulative pause duration
   endedAt: timestamp("ended_at"),
-
-  // Checkpoint & Recovery (for crash recovery)
-  lastCheckpointAt: timestamp("last_checkpoint_at"),
-  lastCheckpointFrameId: varchar("last_checkpoint_frame_id", { length: 50 }),
-  lastCheckpointFrameCount: integer("last_checkpoint_frame_count"),
-  recoveryStatus: varchar("recovery_status", { length: 50 }),
-  // Recovery states: null | 'needs_recovery' | 'recovered' | 'discarded'
 
   // Summary (populated at session end)
   rawActivitySummary: text("raw_activity_summary"), // Initial AI-generated summary
@@ -129,24 +117,6 @@ export const sessionCaptures = pgTable("session_captures", {
   activityDescription: text("activity_description"), // What Gemini detected
   confidence: decimal("confidence", { precision: 3, scale: 2 }), // 0.00-1.00
   detectedElements: jsonb("detected_elements").default("[]"), // UI elements if relevant
-
-  // Delta detection (compared to previous frame)
-  deltaChanged: integer("delta_changed"), // 0 = no change, 1 = changed (using int for SQLite compat)
-  deltaChangeType: varchar("delta_change_type", { length: 50 }),
-  // Types: 'none' | 'typing' | 'navigation' | 'scroll' | 'focus_change' | 'content_update'
-  deltaChangeDescription: text("delta_change_description"), // "User typed in search field"
-  deltaUserAction: varchar("delta_user_action", { length: 100 }), // Inferred user action
-
-  // Per-window task correlation (replaces group-level correlation)
-  onTask: integer("on_task"), // 0 = off-task, 1 = on-task (using int for boolean)
-  taskRelevance: text("task_relevance"), // Why this frame is/isn't task-relevant
-
-  // Top-K selection scoring
-  importanceScore: decimal("importance_score", { precision: 5, scale: 4 }), // 0.0000-1.0000
-  importanceReason: text("importance_reason"), // "High delta + task-relevant + key transition"
-
-  // Privacy controls
-  isRedacted: integer("is_redacted").default(0), // 0 = visible, 1 = redacted
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -244,30 +214,3 @@ export interface DeliveryTarget {
 export interface TimeBreakdown {
   [appName: string]: number; // durationMs
 }
-
-// Delta detection types
-export type DeltaChangeType =
-  | "none"
-  | "typing"
-  | "navigation"
-  | "scroll"
-  | "focus_change"
-  | "content_update";
-
-export interface DeltaAnalysis {
-  changed: boolean;
-  changeType: DeltaChangeType;
-  changeDescription: string;
-  userAction?: string;
-}
-
-// Top-K selection types
-export interface FrameImportance {
-  score: number; // 0.0-1.0
-  reason: string;
-  onTask: boolean;
-  taskRelevance?: string;
-}
-
-// Recovery status types
-export type RecoveryStatus = "needs_recovery" | "recovered" | "discarded" | null;
