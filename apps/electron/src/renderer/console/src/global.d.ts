@@ -1,6 +1,6 @@
 // Global type declarations for Electron preload API
 
-import type { MultiWindowCaptureResult } from "@mitable/shared";
+import type { MultiWindowCaptureResult, MonitoringSessionState, SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
 
 interface ConsoleAPI {
   // Help system
@@ -9,6 +9,13 @@ interface ConsoleAPI {
 
   // Screenshot capture - multi-window capture with policy filtering
   captureScreenshot: () => Promise<MultiWindowCaptureResult>;
+
+  // Get all visible windows for monitoring session selection
+  getVisibleWindows: () => Promise<{
+    success: boolean;
+    windows: WatchableWindow[];
+    error?: string;
+  }>;
 
   // Guide system
   startGuide: (data: unknown) => void;
@@ -36,6 +43,44 @@ interface ConsoleAPI {
   setAuthTokens: (accessToken: string, refreshToken: string) => void;
   clearAuthTokens: () => void;
   onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
+
+  // Monitoring session management
+  startMonitoringSession: (config: {
+    sessionId: string; // Backend's session ID - ensures Electron uses same ID
+    selectedWindows: SelectedWindowInfo[];
+    captureIntervalMs: number;
+    name?: string;
+    userId: string;
+    organizationId: string;
+  }) => Promise<{ sessionId: string; error?: string }>;
+  pauseMonitoringSession: () => Promise<{ success: boolean; error?: string }>;
+  resumeMonitoringSession: () => Promise<{ success: boolean; error?: string }>;
+  endMonitoringSession: () => Promise<{
+    success: boolean;
+    sessionId?: string;
+    captureCount?: number;
+    captures?: Array<{
+      sequenceNumber: number;
+      captureTrigger: "periodic" | "focus_change" | "manual";
+      capturedAt: number;
+      windowId?: string;
+      appName?: string;
+      windowTitle?: string;
+      screenshotPath?: string;
+      screenshotHash?: string;
+    }>;
+    error?: string;
+  }>;
+  resetMonitoringSession: () => Promise<{ success: boolean }>;
+  getMonitoringSessionState: () => Promise<MonitoringSessionState | null>;
+  onMonitoringSessionUpdate: (callback: (state: MonitoringSessionState | null) => void) => void;
+  onMonitoringCaptureProgress: (
+    callback: (progress: {
+      sessionId: string;
+      captureCount: number;
+      latestCapture: unknown;
+    }) => void
+  ) => void;
 }
 
 declare global {

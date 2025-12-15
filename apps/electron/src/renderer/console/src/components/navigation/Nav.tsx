@@ -1,4 +1,4 @@
-import { Layers, Users, MessageSquare, BarChart3, Plug, FileEdit } from "lucide-react";
+import { Layers, Users, MessageSquare, BarChart3, Plug, FileEdit, Activity } from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 
@@ -22,6 +22,7 @@ export default function Nav() {
   return (
     <nav className="space-y-1 px-2">
       {/* <NavItem to="/home" icon={Home} label="Home" /> */}
+      <NavItem to="/monitoring" icon={Activity} label="Sessions" />
       <NavItem to="/roadmap" icon={Layers} label="Roadmap" />
       <NavItem to="/nudges" icon={Users} label="Nudges" />
       <NavItem to="/chats" icon={MessageSquare} label="Chats" />

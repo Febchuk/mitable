@@ -39,6 +39,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
           currentWeek: response.profile.currentWeek || 1,
           role: response.profile.role,
           originalRole: response.profile.role,
+          organizationId: response.profile.organizationId || "",
         });
         setIsAuthenticated(true);
 
@@ -68,6 +69,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
               currentWeek: response.profile.currentWeek || 1,
               role: response.profile.role,
               originalRole: response.profile.role,
+              organizationId: response.profile.organizationId || "",
             });
             setIsAuthenticated(true);
           } catch (refreshError) {

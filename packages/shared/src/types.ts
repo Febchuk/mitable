@@ -182,3 +182,71 @@ export interface WatchButtonState {
   status: "unwatched" | "watching" | "blocked";
   blockReason?: string;
 }
+
+// Monitoring Session Types for work session tracking
+export type MonitoringSessionStatus =
+  | "active"
+  | "paused"
+  | "ended"
+  | "summarizing"
+  | "ready"
+  | "delivered";
+
+export interface MonitoringSessionConfig {
+  selectedWindows: SelectedWindowInfo[];
+  captureIntervalMs: number;
+  name?: string;
+}
+
+export interface MonitoringSessionState {
+  id: string;
+  status: MonitoringSessionStatus;
+  name?: string;
+  selectedWindows: SelectedWindowInfo[];
+  captureIntervalMs: number;
+  startedAt: number;
+  pausedAt?: number;
+  totalPausedMs: number;
+  captureCount: number;
+  elapsedMs: number; // Active time (excluding pauses)
+}
+
+export interface MonitoringCapture {
+  id: string;
+  sessionId: string;
+  sequenceNumber: number;
+  captureTrigger: "periodic" | "focus_change" | "manual";
+  capturedAt: number;
+  windowId?: string;
+  appName?: string;
+  windowTitle?: string;
+  screenshotHash?: string;
+  analysisStatus: "pending" | "analyzed" | "skipped" | "duplicate";
+  activityDescription?: string;
+  confidence?: number;
+}
+
+export interface MonitoringSummary {
+  id: string;
+  sessionId: string;
+  version: number;
+  summaryType: "auto" | "user_edited" | "regenerated";
+  narrativeSummary: string;
+  activities: string[];
+  timeBreakdown: Record<string, number>; // appName -> durationMs
+  modelUsed?: string;
+  tokenCount?: number;
+  generationTimeMs?: number;
+}
+
+export interface MonitoringDeliveryTarget {
+  channelId?: string;
+  channelName?: string;
+  email?: string;
+}
+
+export interface MonitoringDeliveryResult {
+  success: boolean;
+  messageTs?: string; // Slack message timestamp
+  error?: string;
+}

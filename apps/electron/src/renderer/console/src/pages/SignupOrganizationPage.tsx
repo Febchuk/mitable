@@ -51,6 +51,7 @@ export default function SignupOrganizationPage() {
         avatarUrl: response.profile.avatarUrl || undefined,
         currentWeek: response.profile.currentWeek || 1,
         role: response.profile.role,
+        organizationId: response.profile.organizationId || "",
       });
 
       // Redirect to admin dashboard

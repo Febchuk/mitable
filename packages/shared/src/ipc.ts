@@ -112,6 +112,17 @@ export const IPC_CHANNELS = {
   WATCHING_PILL_RESUME: "watching-pill-resume",
   WATCHING_PILL_SEND_UPDATE: "watching-pill-send-update",
 
+  // Monitoring Session system (Work Session Tracking)
+  MONITORING_SESSION_START: "monitoring-session-start", // Start new monitoring session
+  MONITORING_SESSION_PAUSE: "monitoring-session-pause", // Pause active session
+  MONITORING_SESSION_RESUME: "monitoring-session-resume", // Resume paused session
+  MONITORING_SESSION_END: "monitoring-session-end", // End session and trigger summary
+  MONITORING_SESSION_STATUS: "monitoring-session-status", // Get current session status
+  MONITORING_SESSION_UPDATE: "monitoring-session-update", // Broadcast session state changes
+  MONITORING_SESSION_RESET: "monitoring-session-reset", // Reset/clear session state (after external delete)
+  MONITORING_CAPTURE_TAKEN: "monitoring-capture-taken", // Notify when capture is taken
+  MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress", // Capture count update
+
   // Drafts system (Console)
   DRAFTS_NAVIGATE: "drafts-navigate",
 } as const;

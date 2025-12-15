@@ -200,6 +200,77 @@ class SlackService {
       return null;
     }
   }
+
+  /**
+   * Send a message to a Slack channel
+   * Used for delivering session summaries and other notifications
+   */
+  async sendMessage(
+    organizationId: string,
+    channelId: string,
+    message: {
+      text: string;
+      blocks?: any[];
+      thread_ts?: string;
+    }
+  ): Promise<{ ok: boolean; ts?: string; error?: string }> {
+    const client = await this.getClient(organizationId);
+
+    try {
+      const result = await client.chat.postMessage({
+        channel: channelId,
+        text: message.text,
+        blocks: message.blocks,
+        thread_ts: message.thread_ts,
+        unfurl_links: false,
+        unfurl_media: false,
+      });
+
+      return {
+        ok: result.ok || false,
+        ts: result.ts,
+      };
+    } catch (error: any) {
+      console.error("[SlackService] Failed to send message:", error);
+      return {
+        ok: false,
+        error: error.message || "Failed to send message",
+      };
+    }
+  }
+
+  /**
+   * Update an existing message in a Slack channel
+   * Used for updating session summary status
+   */
+  async updateMessage(
+    organizationId: string,
+    channelId: string,
+    messageTs: string,
+    message: {
+      text: string;
+      blocks?: any[];
+    }
+  ): Promise<{ ok: boolean; error?: string }> {
+    const client = await this.getClient(organizationId);
+
+    try {
+      const result = await client.chat.update({
+        channel: channelId,
+        ts: messageTs,
+        text: message.text,
+        blocks: message.blocks,
+      });
+
+      return { ok: result.ok || false };
+    } catch (error: any) {
+      console.error("[SlackService] Failed to update message:", error);
+      return {
+        ok: false,
+        error: error.message || "Failed to update message",
+      };
+    }
+  }
 }
 
 export const slackService = new SlackService();
