@@ -405,8 +405,8 @@ function createWatchingPillWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
 
-  const windowWidth = 130; // Wide enough for dropdown options
-  const windowHeight = 160; // Tall enough for pill + dropdown
+  const windowWidth = 280; // Wide enough for w-56 (224px) dropdown + margins
+  const windowHeight = 400; // Tall enough for pill + expanded dropdown lists
   const rightMargin = 5;
 
   watchingPillWindow = new BrowserWindow({
@@ -1081,30 +1081,8 @@ function setupIPC() {
   });
 
   // ==================== Watching Pill IPC Handlers ====================
-
-  // Pause watching
-  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_PAUSE, () => {
-    console.log("[WatchingPill] Watching paused");
-    // In a real implementation, this would pause the screen monitoring
-  });
-
-  // Resume watching
-  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_RESUME, () => {
-    console.log("[WatchingPill] Watching resumed");
-    // In a real implementation, this would resume the screen monitoring
-  });
-
-  // Send update - open Console and navigate to drafts
-  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_SEND_UPDATE, () => {
-    console.log("[WatchingPill] Send update - opening Console drafts");
-
-    if (consoleWindow && !consoleWindow.isDestroyed()) {
-      consoleWindow.show();
-      consoleWindow.focus();
-      // Navigate to draft detail
-      consoleWindow.webContents.send(IPC_CHANNELS.DRAFTS_NAVIGATE, "demo-draft-001");
-    }
-  });
+  // Note: Session lifecycle (pause/resume/start/end) is handled by the monitoring session handlers
+  // which broadcast to all windows including the watching pill
 
   // Hide watching pill
   ipcMain.on(IPC_CHANNELS.WATCHING_PILL_HIDE, () => {
@@ -1113,6 +1091,85 @@ function setupIPC() {
       watchingPillWindow.hide();
     }
   });
+
+  // Show watching pill
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_SHOW, () => {
+    console.log("[WatchingPill] Show requested");
+    if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+      createWatchingPillWindow();
+    }
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.show();
+    }
+  });
+
+  // Show console window
+  ipcMain.on(IPC_CHANNELS.SHOW_CONSOLE, () => {
+    console.log("[Console] Show requested");
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+    }
+  });
+
+  // ==================== User Context IPC Handlers ====================
+  // Store user context for cross-window access (e.g., WatchingPill needs userId/orgId)
+  let currentUserContext: { userId: string; organizationId: string } | null = null;
+
+  ipcMain.on(IPC_CHANNELS.USER_CONTEXT_SET, (_event, user: { userId: string; organizationId: string }) => {
+    console.log("[UserContext] Set:", user);
+    currentUserContext = user;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.USER_CONTEXT_GET, () => {
+    return currentUserContext;
+  });
+
+  // ==================== Backend Session Creation ====================
+  // Allow windows without direct API access to create backend sessions
+  ipcMain.handle(
+    IPC_CHANNELS.CREATE_BACKEND_SESSION,
+    async (
+      _event,
+      config: {
+        selectedWindows: Array<{ windowId: string; appName: string; windowTitle?: string }>;
+        captureIntervalMs: number;
+        name?: string;
+      }
+    ) => {
+      console.log("[BackendSession] Creating session:", config);
+      try {
+        // Get auth token
+        const token = authTokens.accessToken;
+        if (!token) {
+          return { error: "No auth token available" };
+        }
+
+        const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
+        const response = await fetch(`${API_BASE_URL}/api/monitoring/sessions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(config),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("[BackendSession] Error:", errorText);
+          return { error: `Failed to create session: ${response.status}` };
+        }
+
+        const result = await response.json();
+        console.log("[BackendSession] Created:", result);
+        return result;
+      } catch (error) {
+        console.error("[BackendSession] Error:", error);
+        return { error: String(error) };
+      }
+    }
+  );
 
   // Screenshot Capture - Multi-window capture with smart caching
   ipcMain.handle(

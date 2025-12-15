@@ -15,8 +15,6 @@ import CreateNudge from "./components/views/employee/NudgesView/CreateNudge";
 import ChatsView from "./components/views/employee/ChatsView";
 import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
-import DraftsView from "./components/views/employee/DraftsView";
-import DraftDetail from "./components/views/employee/DraftsView/DraftDetail";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
 import DashboardView from "./components/views/admin/DashboardView";
@@ -125,9 +123,6 @@ function App() {
               <Route path="chats" element={<ChatsView />} />
               <Route path="chats/new" element={<NewChat />} />
               <Route path="chats/:chatId" element={<ChatDetail />} />
-              {/* Drafts Routes (Update Buddy) */}
-              <Route path="drafts" element={<DraftsView />} />
-              <Route path="drafts/:draftId" element={<DraftDetail />} />
               {/* Monitoring Routes */}
               <Route path="monitoring" element={<MonitoringView />} />
               <Route path="monitoring/:sessionId" element={<SessionDetail />} />

@@ -96,6 +96,16 @@ export const IPC_CHANNELS = {
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
 
+  // User context (cross-window user info sharing)
+  USER_CONTEXT_SET: "user-context-set",
+  USER_CONTEXT_GET: "user-context-get",
+
+  // Backend session creation (for windows without direct API access)
+  CREATE_BACKEND_SESSION: "create-backend-session",
+
+  // Console window
+  SHOW_CONSOLE: "show-console",
+
   // Update Prompt system (proactive status update suggestions)
   UPDATE_PROMPT_SHOW: "update-prompt-show",
   UPDATE_PROMPT_HIDE: "update-prompt-hide",

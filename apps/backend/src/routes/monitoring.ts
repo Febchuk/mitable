@@ -8,7 +8,6 @@ import { sessionSummarizationService } from "../services/session-summarization.s
 import type {
   SelectedWindowInfo,
   MonitoringSessionState,
-  MonitoringDeliveryTarget,
 } from "@mitable/shared";
 
 const router = Router();
@@ -824,8 +823,77 @@ router.patch(
 );
 
 /**
+ * POST /api/monitoring/sessions/:id/summary/revise
+ * AI-assisted summary revision
+ */
+router.post(
+  "/sessions/:id/summary/revise",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { instruction, currentSummary }: { instruction: string; currentSummary: string } = req.body;
+
+    if (!instruction || !currentSummary) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "instruction and currentSummary are required",
+      });
+      return;
+    }
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to revise this session",
+        });
+        return;
+      }
+
+      // Generate revised summary using AI
+      const suggestion = await sessionSummarizationService.reviseSummary(
+        currentSummary,
+        instruction
+      );
+
+      console.log(`[Monitoring] Summary revision generated for session ${id}`);
+
+      res.json({ suggestion });
+    } catch (error) {
+      console.error("[Monitoring] Error revising summary:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to revise summary",
+      });
+    }
+  }
+);
+
+interface DeliveryTarget {
+  type: "channel" | "dm";
+  id: string;
+  name?: string;
+}
+
+/**
  * POST /api/monitoring/sessions/:id/deliver
- * Send summary to Slack
+ * Send summary to multiple Slack channels and/or DMs
  */
 router.post(
   "/sessions/:id/deliver",
@@ -835,16 +903,16 @@ router.post(
     const { id } = req.params;
     const {
       channel,
-      target,
+      targets,
     }: {
       channel: "slack";
-      target: MonitoringDeliveryTarget;
+      targets: DeliveryTarget[];
     } = req.body;
 
-    if (!channel || !target) {
+    if (!channel || !targets) {
       res.status(400).json({
         error: "Bad Request",
-        message: "channel and target are required",
+        message: "channel and targets are required",
       });
       return;
     }
@@ -857,12 +925,30 @@ router.post(
       return;
     }
 
-    if (!target.channelId) {
+    if (!Array.isArray(targets) || targets.length === 0) {
       res.status(400).json({
         error: "Bad Request",
-        message: "target.channelId is required for Slack delivery",
+        message: "At least one target is required",
       });
       return;
+    }
+
+    // Validate each target
+    for (const target of targets) {
+      if (!target.id || !target.type) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "Each target must have an id and type",
+        });
+        return;
+      }
+      if (target.type !== "channel" && target.type !== "dm") {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "Target type must be 'channel' or 'dm'",
+        });
+        return;
+      }
     }
 
     try {
@@ -903,45 +989,45 @@ router.post(
         .set({
           deliveryStatus: "pending",
           deliveryChannel: channel,
-          deliveryTarget: target.channelId,
+          deliveryTarget: JSON.stringify(targets.map((t) => t.id)),
           updatedAt: new Date(),
         })
         .where(eq(schema.monitoringSessions.id, id));
 
-      // Deliver using the session delivery service
-      const result = await sessionDeliveryService.deliverSummary({
+      // Deliver to multiple targets using the session delivery service
+      const result = await sessionDeliveryService.deliverToMultipleTargets({
         sessionId: id,
-        target: {
-          type: "slack",
-          channelId: target.channelId,
-          channelName: target.channelName,
-        },
+        targets,
       });
 
-      if (!result.success) {
-        // Update as failed
-        await db
-          .update(schema.monitoringSessions)
-          .set({
-            deliveryStatus: "failed",
-            deliveryError: result.error,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.monitoringSessions.id, id));
+      // Determine overall status
+      const allSucceeded = result.results.every((r) => r.status === "delivered");
+      const anySucceeded = result.results.some((r) => r.status === "delivered");
 
-        res.status(500).json({
-          error: "Delivery Failed",
-          message: result.error || "Failed to deliver summary to Slack",
-        });
-        return;
-      }
+      // Update session based on results
+      await db
+        .update(schema.monitoringSessions)
+        .set({
+          deliveryStatus: allSucceeded ? "delivered" : anySucceeded ? "partial" : "failed",
+          deliveredAt: anySucceeded ? new Date() : null,
+          deliveryError: allSucceeded
+            ? null
+            : result.results
+                .filter((r) => r.status === "failed")
+                .map((r) => `${r.name || r.id}: ${r.error}`)
+                .join("; "),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.monitoringSessions.id, id));
 
-      console.log(`[Monitoring] Summary delivered to Slack channel ${target.channelId}`);
+      const successCount = result.results.filter((r) => r.status === "delivered").length;
+      console.log(
+        `[Monitoring] Summary delivered to ${successCount}/${targets.length} targets`
+      );
 
       res.json({
-        success: true,
-        deliveryStatus: "delivered",
-        messageTs: result.messageTs,
+        success: allSucceeded,
+        results: result.results,
         deliveredAt: new Date().toISOString(),
       });
     } catch (error) {
