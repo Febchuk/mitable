@@ -124,14 +124,22 @@ router.post(
         return;
       }
 
-      // Required bot token scopes for message fetching and metadata
+      // Required bot token scopes for message fetching, metadata, and session summaries
       const scopes = [
+        // === READ: Message Ingestion ===
         "channels:history", // Read public channel messages
         "channels:read", // List public channels
         "groups:history", // Read private channel messages
         "groups:read", // List private channels
         "users:read", // Get user information (names, emails)
-        "chat:write", // Optional: post messages (for future features)
+
+        // === READ: Enhanced Content ===
+        "canvases:read", // Read Slack canvases (rich documents)
+        "reactions:read", // Read emoji reactions on messages
+
+        // === WRITE: Session Summaries ===
+        "chat:write", // Post session summaries to channels (requires bot to be added to channel)
+        "im:write", // Open DMs with users to send session summaries directly
       ];
 
       // Build Slack OAuth URL
