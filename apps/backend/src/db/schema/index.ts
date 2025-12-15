@@ -10,6 +10,7 @@ export * from "./user-roadmaps.schema";
 export * from "./analytics.schema";
 export * from "./search-content.schema";
 export * from "./workflows.schema";
+export * from "./monitoring.schema";
 
 // GitHub schemas
 export * from "./github/github-repos.schema";

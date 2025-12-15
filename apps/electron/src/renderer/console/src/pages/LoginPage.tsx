@@ -34,6 +34,7 @@ export default function LoginPage() {
         avatarUrl: response.profile.avatarUrl || undefined,
         currentWeek: response.profile.currentWeek || 1,
         role: response.profile.role,
+        organizationId: response.profile.organizationId || "",
       });
 
       // Redirect based on role
