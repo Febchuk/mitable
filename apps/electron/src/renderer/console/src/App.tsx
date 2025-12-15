@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
 import { UserProvider, useUser } from "./context/UserContext";
@@ -39,6 +39,25 @@ function NavigationHandler() {
       navigate(`/chats/${conversationId}`);
     });
   }, [navigate]);
+
+  return null;
+}
+
+// Monitoring session handler - listens for session updates from WatchingPill/main process
+function MonitoringSessionHandler() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    window.consoleAPI.onMonitoringSessionUpdate((state) => {
+      console.log("[Console] Monitoring session update:", state?.status, state?.id);
+
+      // Invalidate session queries to trigger refetch when session ends
+      if (state?.status === "ended" && state.id) {
+        queryClient.invalidateQueries({ queryKey: ["monitoring", "session", state.id] });
+        queryClient.invalidateQueries({ queryKey: ["monitoring", "sessions"] });
+      }
+    });
+  }, [queryClient]);
 
   return null;
 }
@@ -88,6 +107,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <HashRouter>
         <NavigationHandler />
+        <MonitoringSessionHandler />
         <UserProvider>
           <Routes>
             {/* Public routes */}
