@@ -43,6 +43,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
         });
         setIsAuthenticated(true);
 
+        // Share user context with main process for cross-window access (WatchingPill, etc.)
+        if (window.consoleAPI?.setCurrentUser) {
+          window.consoleAPI.setCurrentUser({
+            userId: response.profile.id,
+            organizationId: response.profile.organizationId || "",
+          });
+        }
+
         // Broadcast token to main process for cross-window sharing (Agent pill, etc.)
         const refreshToken = authService.getRefreshToken();
         if (refreshToken) {
@@ -72,6 +80,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
               organizationId: response.profile.organizationId || "",
             });
             setIsAuthenticated(true);
+
+            // Share user context with main process for cross-window access (WatchingPill, etc.)
+            if (window.consoleAPI?.setCurrentUser) {
+              window.consoleAPI.setCurrentUser({
+                userId: response.profile.id,
+                organizationId: response.profile.organizationId || "",
+              });
+            }
           } catch (refreshError) {
             console.error("Failed to refresh token:", refreshError);
             authService.clearTokens();

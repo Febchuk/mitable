@@ -44,6 +44,9 @@ interface ConsoleAPI {
   clearAuthTokens: () => void;
   onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
 
+  // User context - share userId/orgId with main process for cross-window access
+  setCurrentUser: (user: { userId: string; organizationId: string }) => void;
+
   // Monitoring session management
   startMonitoringSession: (config: {
     sessionId: string; // Backend's session ID - ensures Electron uses same ID

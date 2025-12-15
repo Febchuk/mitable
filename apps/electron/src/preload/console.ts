@@ -17,6 +17,7 @@ const IPC_CHANNELS = {
   AUTH_SET_TOKENS: "auth-set-tokens",
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
+  USER_CONTEXT_SET: "user-context-set",
   DRAFTS_NAVIGATE: "drafts-navigate", // Update Buddy: Navigate to draft detail
   // Monitoring session channels
   MONITORING_SESSION_START: "monitoring-session-start",
@@ -116,6 +117,10 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       (_event: IpcRendererEvent, token: string | null) => callback(token)
     );
   },
+
+  // User context - Share userId/orgId with main process for cross-window access
+  setCurrentUser: (user: { userId: string; organizationId: string }) =>
+    ipcRenderer.send(IPC_CHANNELS.USER_CONTEXT_SET, user),
 
   // Monitoring session management
   startMonitoringSession: (config: {

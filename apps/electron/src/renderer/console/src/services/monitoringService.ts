@@ -91,6 +91,15 @@ export interface SlackChannel {
   num_members?: number;
 }
 
+export interface SlackUser {
+  id: string;
+  name: string;
+  real_name: string;
+  display_name: string;
+  avatar: string;
+  is_bot: boolean;
+}
+
 // ===========================
 // API Functions
 // ===========================
@@ -124,7 +133,7 @@ export async function createSession(data: CreateSessionRequest): Promise<{ sessi
  */
 export async function updateSession(
   sessionId: string,
-  data: { status?: string; name?: string }
+  data: { action?: "pause" | "resume"; name?: string }
 ): Promise<{ session: MonitoringSession }> {
   return apiRequest<{ session: MonitoringSession }>(`/monitoring/sessions/${sessionId}`, {
     method: "PATCH",
@@ -192,23 +201,37 @@ export async function updateSessionSummary(
   });
 }
 
+export interface DeliveryTarget {
+  type: "channel" | "dm";
+  id: string;
+  name?: string;
+}
+
+export interface DeliveryResult {
+  id: string;
+  type: "channel" | "dm";
+  name?: string;
+  status: "delivered" | "failed";
+  messageTs?: string;
+  error?: string;
+}
+
 /**
- * Deliver summary to Slack
+ * Deliver summary to multiple Slack channels and/or direct messages
  */
 export async function deliverSummary(
   sessionId: string,
-  target: { channelId: string; channelName?: string }
+  targets: DeliveryTarget[]
 ): Promise<{
   success: boolean;
-  deliveryStatus: string;
-  messageTs?: string;
+  results: DeliveryResult[];
   deliveredAt: string;
 }> {
   return apiRequest(`/monitoring/sessions/${sessionId}/deliver`, {
     method: "POST",
     body: JSON.stringify({
       channel: "slack",
-      target,
+      targets,
     }),
   });
 }
@@ -219,6 +242,14 @@ export async function deliverSummary(
 export async function fetchSlackChannels(): Promise<SlackChannel[]> {
   const response = await apiRequest<{ channels: SlackChannel[] }>("/integrations/slack/channels");
   return response.channels;
+}
+
+/**
+ * Fetch available Slack users for direct message delivery
+ */
+export async function fetchSlackUsers(): Promise<SlackUser[]> {
+  const response = await apiRequest<{ users: SlackUser[] }>("/integrations/slack/users");
+  return response.users;
 }
 
 /**
@@ -300,4 +331,18 @@ export async function uploadCaptures(
  */
 export async function getMonitoringSessionState(): Promise<MonitoringSessionState | null> {
   return window.consoleAPI.getMonitoringSessionState();
+}
+
+/**
+ * Request AI revision of a session summary
+ */
+export async function reviseSummary(
+  sessionId: string,
+  instruction: string,
+  currentSummary: string
+): Promise<{ suggestion: string }> {
+  return apiRequest(`/monitoring/sessions/${sessionId}/summary/revise`, {
+    method: "POST",
+    body: JSON.stringify({ instruction, currentSummary }),
+  });
 }

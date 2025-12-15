@@ -427,6 +427,40 @@ router.get("/slack/channels", requireAuth, async (req: Request, res: Response): 
 });
 
 /**
+ * GET /api/integrations/slack/users
+ * Fetch workspace users for DM delivery
+ */
+router.get("/slack/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    // Get user's organization
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+
+    if (!user) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "User not found",
+      });
+      return;
+    }
+
+    // Import slack service dynamically
+    const { slackService } = await import("../services/slack.service.js");
+
+    const users = await slackService.listUsers(user.organizationId);
+
+    res.json({ users });
+  } catch (error) {
+    console.error("Error fetching Slack users:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to fetch users",
+    });
+  }
+});
+
+/**
  * POST /api/integrations/slack/configure
  * Save selected channels for syncing
  */
