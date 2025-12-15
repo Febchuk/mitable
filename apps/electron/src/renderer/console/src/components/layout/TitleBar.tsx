@@ -11,6 +11,9 @@ import { useUser } from "../../context/UserContext";
 
 import { useNavigate } from "react-router-dom";
 
+// Detect platform for layout adjustments
+const isMac = navigator.platform.toLowerCase().includes("mac");
+
 export default function TitleBar() {
   const { user, updateUser } = useUser();
   const { toggle } = useSidebar();
@@ -37,9 +40,14 @@ export default function TitleBar() {
     }
   };
 
+  // macOS: left padding for traffic lights, Windows: right padding for titleBarOverlay controls
+  const titleBarPadding = isMac ? "pl-20 pr-3" : "pl-3 pr-36";
+
   if (!canSwitchRoles) {
     return (
-      <div className="h-8 flex items-center justify-between pl-20 pr-3 py-4 app-drag relative z-50">
+      <div
+        className={`h-8 flex items-center justify-between ${titleBarPadding} py-4 app-drag relative z-50`}
+      >
         <div className="app-no-drag">
           <Button
             variant="ghost"
@@ -55,7 +63,9 @@ export default function TitleBar() {
   }
 
   return (
-    <div className="h-8 flex items-center justify-between pl-20 pr-3 py-4 app-drag relative z-50">
+    <div
+      className={`h-8 flex items-center justify-between ${titleBarPadding} py-4 app-drag relative z-50`}
+    >
       <div className="app-no-drag">
         <Button
           variant="ghost"

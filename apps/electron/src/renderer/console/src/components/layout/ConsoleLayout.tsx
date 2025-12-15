@@ -5,6 +5,9 @@ import { ScrollArea } from "../ui/scroll-area";
 import Sidebar from "./Sidebar";
 import TitleBar from "./TitleBar";
 
+// Detect platform for styling
+const isMac = navigator.platform.toLowerCase().includes("mac");
+
 export default function ConsoleLayout() {
   const navigate = useNavigate();
 
@@ -26,10 +29,13 @@ export default function ConsoleLayout() {
     }
   }, [navigate]);
 
+  // macOS: transparent to show vibrancy, Windows: solid background (Mica handles the effect)
+  const rootBackground = isMac ? "bg-black/20" : "bg-[#1a1a1a]";
+
   return (
     <SidebarProvider>
-      {/* Root container with transparent background to let Electron vibrancy show through */}
-      <div className="flex flex-col h-screen overflow-hidden bg-black/20">
+      {/* Root container - transparent on macOS for vibrancy, solid on Windows for Mica */}
+      <div className={`flex flex-col h-screen overflow-hidden ${rootBackground}`}>
         {/* Custom Title Bar - Spans full width */}
         <TitleBar />
 
