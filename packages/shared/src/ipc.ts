@@ -127,6 +127,7 @@ export const IPC_CHANNELS = {
   MONITORING_SESSION_PAUSE: "monitoring-session-pause", // Pause active session
   MONITORING_SESSION_RESUME: "monitoring-session-resume", // Resume paused session
   MONITORING_SESSION_END: "monitoring-session-end", // End session and trigger summary
+  MONITORING_SESSION_FINALIZE: "monitoring-session-finalize", // Upload captures + trigger backend summarization
   MONITORING_SESSION_STATUS: "monitoring-session-status", // Get current session status
   MONITORING_SESSION_UPDATE: "monitoring-session-update", // Broadcast session state changes
   MONITORING_SESSION_RESET: "monitoring-session-reset", // Reset/clear session state (after external delete)

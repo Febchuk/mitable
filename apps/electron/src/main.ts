@@ -1492,6 +1492,78 @@ function setupMonitoringSessionHandlers() {
     return monitoringSessionService.endSession();
   });
 
+  // Finalize session: upload captures to backend + trigger summarization
+  ipcMain.handle(
+    IPC_CHANNELS.MONITORING_SESSION_FINALIZE,
+    async (
+      _event,
+      sessionId: string,
+      captures: Array<{
+        sequenceNumber: number;
+        captureTrigger: "periodic" | "focus_change" | "manual";
+        capturedAt: number;
+        windowId?: string;
+        appName?: string;
+        windowTitle?: string;
+        screenshotPath?: string;
+        screenshotHash?: string;
+      }>
+    ) => {
+      console.log("[Monitoring Session] Finalizing session:", sessionId, "captures:", captures.length);
+
+      try {
+        const token = authTokens.accessToken;
+        if (!token) {
+          return { success: false, error: "No auth token available" };
+        }
+
+        const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
+
+        // Step 1: Upload captures to backend
+        if (captures.length > 0) {
+          console.log("[Monitoring Session] Uploading", captures.length, "captures to backend");
+          const uploadResponse = await fetch(`${API_BASE_URL}/api/monitoring/sessions/${sessionId}/captures`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ captures }),
+          });
+
+          if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text();
+            console.error("[Monitoring Session] Upload captures error:", errorText);
+            return { success: false, error: `Failed to upload captures: ${uploadResponse.status}` };
+          }
+          console.log("[Monitoring Session] Captures uploaded successfully");
+        }
+
+        // Step 2: Call /end endpoint to trigger summarization
+        console.log("[Monitoring Session] Triggering summarization");
+        const endResponse = await fetch(`${API_BASE_URL}/api/monitoring/sessions/${sessionId}/end`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!endResponse.ok) {
+          const errorText = await endResponse.text();
+          console.error("[Monitoring Session] End session error:", errorText);
+          return { success: false, error: `Failed to end session: ${endResponse.status}` };
+        }
+
+        console.log("[Monitoring Session] Session finalized successfully");
+        return { success: true };
+      } catch (error) {
+        console.error("[Monitoring Session] Finalize error:", error);
+        return { success: false, error: String(error) };
+      }
+    }
+  );
+
   // Reset/clear session state (used when session is deleted externally)
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESET, async () => {
     console.log("[Monitoring Session] Resetting session state");
