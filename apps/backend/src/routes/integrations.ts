@@ -131,7 +131,8 @@ router.post(
         "groups:history", // Read private channel messages
         "groups:read", // List private channels
         "users:read", // Get user information (names, emails)
-        "chat:write", // Optional: post messages (for future features)
+        "chat:write", // Post messages to channels/DMs
+        "files:write", // Upload screenshots with session summaries
       ];
 
       // Build Slack OAuth URL

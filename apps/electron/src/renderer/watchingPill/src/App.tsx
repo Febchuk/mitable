@@ -296,13 +296,17 @@ export default function App() {
               {/* Available windows to add */}
               <div className="text-[10px] text-white/50 px-3 py-1">Add Window</div>
               <div className="max-h-32 overflow-y-auto">
-                {availableWindows.filter((w) => !w.isBlocked && !selectedWindows.some((s) => s.windowId === w.windowId)).length === 0 ? (
+                {availableWindows.filter(
+                  (w) => !w.isBlocked && !selectedWindows.some((s) => s.windowId === w.windowId)
+                ).length === 0 ? (
                   <div className="px-3 py-2 text-xs text-white/30">
                     {availableWindows.length === 0 ? "No windows available" : "All windows added"}
                   </div>
                 ) : (
                   availableWindows
-                    .filter((w) => !w.isBlocked && !selectedWindows.some((s) => s.windowId === w.windowId))
+                    .filter(
+                      (w) => !w.isBlocked && !selectedWindows.some((s) => s.windowId === w.windowId)
+                    )
                     .map((windowInfo) => (
                       <button
                         key={windowInfo.windowId}

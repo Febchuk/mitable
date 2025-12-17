@@ -119,10 +119,7 @@ export default function RecipientSelector({
 
       {/* Search input */}
       <div className="relative">
-        <Search
-          size={14}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
-        />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
         <Input
           type="text"
           placeholder="Search channels and people..."
@@ -147,9 +144,7 @@ export default function RecipientSelector({
                   <label
                     key={channel.id}
                     className={`flex items-center gap-3 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
-                      disabled
-                        ? "opacity-50 cursor-not-allowed"
-                        : "hover:bg-background-elevated"
+                      disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-background-elevated"
                     }`}
                   >
                     <Checkbox
@@ -186,9 +181,7 @@ export default function RecipientSelector({
                   <label
                     key={user.id}
                     className={`flex items-center gap-3 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
-                      disabled
-                        ? "opacity-50 cursor-not-allowed"
-                        : "hover:bg-background-elevated"
+                      disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-background-elevated"
                     }`}
                   >
                     <Checkbox

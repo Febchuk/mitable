@@ -59,7 +59,9 @@ export default function App() {
               <CheckCircle className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-white font-medium text-sm">{DEMO_CONFIG.notifications.updatePrompt.successTitle}</p>
+              <p className="text-white font-medium text-sm">
+                {DEMO_CONFIG.notifications.updatePrompt.successTitle}
+              </p>
               <p className="text-text-secondary text-xs">
                 {DEMO_CONFIG.notifications.updatePrompt.successMessage} {draft.recipient}
               </p>
@@ -77,11 +79,7 @@ export default function App() {
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <img
-              src={LogoIcon}
-              alt="Mitable"
-              className="h-7 w-auto flex-shrink-0"
-            />
+            <img src={LogoIcon} alt="Mitable" className="h-7 w-auto flex-shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-white font-medium text-sm truncate">{draft.topic}</p>
               <p className="text-text-secondary text-xs">

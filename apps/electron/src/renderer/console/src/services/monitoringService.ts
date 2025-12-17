@@ -30,6 +30,7 @@ export interface MonitoringSession {
   deliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
+  captureCount?: number;
 }
 
 export interface SessionListItem {
@@ -65,6 +66,7 @@ export interface SessionCapture {
   analysisStatus: string | null;
   activityDescription: string | null;
   confidence: number | null;
+  imageData: string | null;
 }
 
 export interface SessionSummary {
@@ -121,7 +123,9 @@ export async function fetchSession(sessionId: string): Promise<{ session: Monito
 /**
  * Create a new monitoring session (backend only - Electron handles capture)
  */
-export async function createSession(data: CreateSessionRequest): Promise<{ session: MonitoringSession }> {
+export async function createSession(
+  data: CreateSessionRequest
+): Promise<{ session: MonitoringSession }> {
   return apiRequest<{ session: MonitoringSession }>("/monitoring/sessions", {
     method: "POST",
     body: JSON.stringify(data),
@@ -177,7 +181,9 @@ export async function deleteSession(sessionId: string): Promise<{ success: boole
 /**
  * Fetch captures for a session
  */
-export async function fetchSessionCaptures(sessionId: string): Promise<{ captures: SessionCapture[] }> {
+export async function fetchSessionCaptures(
+  sessionId: string
+): Promise<{ captures: SessionCapture[] }> {
   return apiRequest<{ captures: SessionCapture[] }>(`/monitoring/sessions/${sessionId}/captures`);
 }
 
@@ -306,6 +312,7 @@ export async function endMonitoringSession(): Promise<{
 
 /**
  * Upload captures to backend (call after ending Electron session, before triggering summarization)
+ * Includes base64 imageData for backend AI analysis
  */
 export async function uploadCaptures(
   sessionId: string,
@@ -318,6 +325,7 @@ export async function uploadCaptures(
     windowTitle?: string;
     screenshotPath?: string;
     screenshotHash?: string;
+    imageData?: string;
   }>
 ): Promise<{ success: boolean; insertedCount?: number }> {
   return apiRequest(`/monitoring/sessions/${sessionId}/captures`, {

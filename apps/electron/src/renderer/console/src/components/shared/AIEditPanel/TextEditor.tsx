@@ -29,9 +29,7 @@ export default function TextEditor({
           disabled={disabled}
         />
       </div>
-      <p className="text-xs text-text-tertiary pt-4">
-        Supports markdown formatting
-      </p>
+      <p className="text-xs text-text-tertiary pt-4">Supports markdown formatting</p>
     </div>
   );
 }

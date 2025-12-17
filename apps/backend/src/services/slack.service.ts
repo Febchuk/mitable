@@ -319,6 +319,46 @@ class SlackService {
   }
 
   /**
+   * Upload a file to a Slack channel (as a thread reply if thread_ts provided)
+   * Used for attaching screenshots to session summaries
+   */
+  async uploadFile(
+    organizationId: string,
+    channelId: string,
+    options: {
+      file: Buffer;
+      filename: string;
+      title?: string;
+      initial_comment?: string;
+      thread_ts?: string;
+    }
+  ): Promise<{ ok: boolean; file_id?: string; error?: string }> {
+    const client = await this.getClient(organizationId);
+
+    try {
+      const result = await client.filesUploadV2({
+        channel_id: channelId,
+        file: options.file,
+        filename: options.filename,
+        title: options.title,
+        initial_comment: options.initial_comment,
+        thread_ts: options.thread_ts,
+      } as any); // Type assertion needed for Buffer support
+
+      return {
+        ok: true,
+        file_id: (result as any).files?.[0]?.id,
+      };
+    } catch (error: any) {
+      console.error("[SlackService] Failed to upload file:", error);
+      return {
+        ok: false,
+        error: error.message || "Failed to upload file",
+      };
+    }
+  }
+
+  /**
    * Update an existing message in a Slack channel
    * Used for updating session summary status
    */

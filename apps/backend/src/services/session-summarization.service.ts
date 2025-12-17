@@ -155,7 +155,11 @@ class SessionSummarizationService {
     const step = Math.floor(unique.length / SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE);
     const sampled: any[] = [];
 
-    for (let i = 0; i < unique.length && sampled.length < SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE; i += step) {
+    for (
+      let i = 0;
+      i < unique.length && sampled.length < SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE;
+      i += step
+    ) {
       sampled.push(unique[i]);
     }
 
@@ -202,29 +206,21 @@ class SessionSummarizationService {
     // For each capture in the batch, analyze individually (simpler and more reliable)
     for (const capture of captures) {
       try {
-        // Check if screenshot file exists
-        if (!capture.screenshotPath) {
-          // Generate analysis from metadata only
-          analyses.push({
-            captureId: capture.id,
-            sequenceNumber: capture.sequenceNumber,
-            timestamp: new Date(capture.capturedAt).getTime(),
-            appName: capture.appName || "Unknown",
-            windowTitle: capture.windowTitle || "",
-            activity: this.inferActivityFromMetadata(capture),
-            context: [],
-            confidence: "low",
-          });
-          continue;
+        // Check if we have image data (either from DB or from file)
+        let imageData: string | null = capture.imageData || null;
+
+        // Fallback: try to read from file if no imageData in DB (legacy support)
+        if (!imageData && capture.screenshotPath) {
+          try {
+            const buffer = await fs.readFile(capture.screenshotPath);
+            imageData = buffer.toString("base64");
+          } catch (fileError) {
+            // File not accessible (expected for remote clients)
+          }
         }
 
-        // Read screenshot file
-        let imageData: string;
-        try {
-          const buffer = await fs.readFile(capture.screenshotPath);
-          imageData = buffer.toString("base64");
-        } catch (fileError) {
-          // File may have been cleaned up
+        // No image data available - use metadata only
+        if (!imageData) {
           analyses.push({
             captureId: capture.id,
             sequenceNumber: capture.sequenceNumber,
@@ -285,10 +281,10 @@ Respond with JSON:
           .set({
             analysisStatus: "analyzed",
             activityDescription: parsed.activity,
-            confidence: parsed.confidence === "high" ? "0.9" : parsed.confidence === "medium" ? "0.7" : "0.5",
+            confidence:
+              parsed.confidence === "high" ? "0.9" : parsed.confidence === "medium" ? "0.7" : "0.5",
           })
           .where(eq(schema.sessionCaptures.id, capture.id));
-
       } catch (error) {
         console.error(`[SessionSummarization] Failed to analyze capture ${capture.id}:`, error);
         // Add fallback analysis
@@ -326,7 +322,11 @@ Respond with JSON:
       return `Working in ${app}`;
     }
 
-    if (app.toLowerCase().includes("chrome") || app.toLowerCase().includes("firefox") || app.toLowerCase().includes("safari")) {
+    if (
+      app.toLowerCase().includes("chrome") ||
+      app.toLowerCase().includes("firefox") ||
+      app.toLowerCase().includes("safari")
+    ) {
       if (title.toLowerCase().includes("github")) {
         return "Browsing GitHub";
       }

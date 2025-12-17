@@ -113,9 +113,7 @@ export default function SessionCard({ session, onClick }: SessionCardProps) {
 
       {/* Action Hint */}
       {session.status === "ready" && !session.deliveryStatus && (
-        <p className="text-text-tertiary text-sm italic">
-          Click to review and share summary
-        </p>
+        <p className="text-text-tertiary text-sm italic">Click to review and share summary</p>
       )}
     </div>
   );

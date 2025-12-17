@@ -33,13 +33,10 @@ contextBridge.exposeInMainWorld("updatePromptAPI", {
 
   // Event listeners - receive data from main process
   onTrigger: (callback: (draft: DraftInfo) => void) => {
-    ipcRenderer.on(
-      IPC_CHANNELS.UPDATE_PROMPT_TRIGGER,
-      (_event, draft: DraftInfo) => {
-        console.log("[UpdatePrompt Preload] Received trigger:", draft);
-        callback(draft);
-      }
-    );
+    ipcRenderer.on(IPC_CHANNELS.UPDATE_PROMPT_TRIGGER, (_event, draft: DraftInfo) => {
+      console.log("[UpdatePrompt Preload] Received trigger:", draft);
+      callback(draft);
+    });
   },
 });
 

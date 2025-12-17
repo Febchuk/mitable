@@ -196,7 +196,9 @@ export default function SessionDetail() {
 
       // 2. Upload captures to backend (so summarization can use them)
       if (electronResult.captures && electronResult.captures.length > 0) {
-        console.log(`[SessionDetail] Uploading ${electronResult.captures.length} captures to backend`);
+        console.log(
+          `[SessionDetail] Uploading ${electronResult.captures.length} captures to backend`
+        );
         await uploadCaptures(sessionId, electronResult.captures);
       } else {
         console.log("[SessionDetail] No captures to upload");
@@ -384,8 +386,9 @@ export default function SessionDetail() {
               </Button>
             </>
           )}
-          {session.status !== "active" && session.status !== "paused" && (
-            isDelivered ? (
+          {session.status !== "active" &&
+            session.status !== "paused" &&
+            (isDelivered ? (
               <Badge className="bg-status-success/20 text-status-success border-transparent">
                 <CheckCircle size={14} className="mr-1" />
                 Delivered
@@ -399,8 +402,7 @@ export default function SessionDetail() {
                 <Send size={16} />
                 Send to Slack
               </Button>
-            )
-          )}
+            ))}
           <Button
             variant="ghost"
             size="icon"
@@ -432,14 +434,18 @@ export default function SessionDetail() {
         <div className="flex items-center gap-2 text-text-secondary">
           <Camera size={18} />
           <span>
-            Captures: <span className="text-text-primary font-medium">N/A</span>
+            Captures:{" "}
+            <span className="text-text-primary font-medium">{session.captureCount ?? 0}</span>
           </span>
         </div>
         {session.deliveredAt && (
           <div className="flex items-center gap-2 text-text-secondary">
             <Send size={18} />
             <span>
-              Delivered: <span className="text-text-primary font-medium">{formatDateTime(session.deliveredAt)}</span>
+              Delivered:{" "}
+              <span className="text-text-primary font-medium">
+                {formatDateTime(session.deliveredAt)}
+              </span>
             </span>
           </div>
         )}
@@ -483,24 +489,28 @@ export default function SessionDetail() {
       </div>
 
       {/* Key Activities (if available) */}
-      {session.keyActivities && Array.isArray(session.keyActivities) && session.keyActivities.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-text-primary">Key Activities</h2>
-          <ul className="space-y-2">
-            {session.keyActivities.map((activity: any, i: number) => (
-              <li
-                key={i}
-                className="flex items-start gap-3 p-3 bg-background-elevated rounded-lg border border-border-subtle"
-              >
-                <CheckCircle size={18} className="text-status-success mt-0.5 flex-shrink-0" />
-                <span className="text-text-primary">
-                  {typeof activity === "string" ? activity : activity.activity || activity.description || JSON.stringify(activity)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {session.keyActivities &&
+        Array.isArray(session.keyActivities) &&
+        session.keyActivities.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-text-primary">Key Activities</h2>
+            <ul className="space-y-2">
+              {session.keyActivities.map((activity: any, i: number) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-3 p-3 bg-background-elevated rounded-lg border border-border-subtle"
+                >
+                  <CheckCircle size={18} className="text-status-success mt-0.5 flex-shrink-0" />
+                  <span className="text-text-primary">
+                    {typeof activity === "string"
+                      ? activity
+                      : activity.activity || activity.description || JSON.stringify(activity)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
       {/* Delivery Dialog */}
       <Dialog open={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen}>

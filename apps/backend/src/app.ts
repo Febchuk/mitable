@@ -42,7 +42,7 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "10mb" })); // Increased limit for screenshot uploads (~2MB base64)
+app.use(express.json({ limit: "100mb" })); // Large limit for batch screenshot uploads (16+ captures with base64 images)
 
 // Swagger API Documentation
 app.use(

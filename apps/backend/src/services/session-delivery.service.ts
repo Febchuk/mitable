@@ -161,7 +161,9 @@ class SessionDeliveryService {
 
         // For DMs, we need to open a DM channel first
         if (target.type === "dm") {
-          console.log(`[SessionDeliveryService] Opening DM with user: ${target.id} (${target.name})`);
+          console.log(
+            `[SessionDeliveryService] Opening DM with user: ${target.id} (${target.name})`
+          );
           try {
             channelId = await slackService.openDM(session.organizationId, target.id);
             console.log(`[SessionDeliveryService] DM channel opened successfully: ${channelId}`);
@@ -187,13 +189,24 @@ class SessionDeliveryService {
           blocks,
         });
 
-        console.log(`[SessionDeliveryService] Message send result for ${target.type} ${target.name}:`, {
-          ok: result.ok,
-          ts: result.ts,
-          error: result.error,
-        });
+        console.log(
+          `[SessionDeliveryService] Message send result for ${target.type} ${target.name}:`,
+          {
+            ok: result.ok,
+            ts: result.ts,
+            error: result.error,
+          }
+        );
 
-        if (result.ok) {
+        if (result.ok && result.ts) {
+          // Upload sampled screenshots as thread replies
+          await this.uploadScreenshotsToThread(
+            session.organizationId,
+            sessionId,
+            channelId,
+            result.ts
+          );
+
           return {
             id: target.id,
             type: target.type,
@@ -254,14 +267,10 @@ class SessionDeliveryService {
       : `Work Session Summary: ${session.name || "Session"} (${duration})`;
 
     // Send to Slack
-    const result = await slackService.sendMessage(
-      session.organizationId,
-      target.channelId,
-      {
-        text: fallbackText,
-        blocks,
-      }
-    );
+    const result = await slackService.sendMessage(session.organizationId, target.channelId, {
+      text: fallbackText,
+      blocks,
+    });
 
     if (result.ok) {
       // Update session with delivery info
@@ -391,9 +400,10 @@ class SessionDeliveryService {
       const activityList = keyActivities
         .slice(0, 5) // Limit to 5 activities
         .map((activity: any) => {
-          const text = typeof activity === "string"
-            ? activity
-            : activity.activity || activity.description || JSON.stringify(activity);
+          const text =
+            typeof activity === "string"
+              ? activity
+              : activity.activity || activity.description || JSON.stringify(activity);
           return `• ${text}`;
         })
         .join("\n");
@@ -441,10 +451,7 @@ class SessionDeliveryService {
   /**
    * Update an already-delivered message (e.g., when summary is edited)
    */
-  async updateDeliveredMessage(
-    sessionId: string,
-    messageTs: string
-  ): Promise<DeliveryResult> {
+  async updateDeliveredMessage(sessionId: string, messageTs: string): Promise<DeliveryResult> {
     try {
       // Fetch session data
       const [session] = await db
@@ -467,9 +474,10 @@ class SessionDeliveryService {
       }
 
       // deliveryTarget is stored as jsonb but contains the channel ID string
-      const channelId = typeof session.deliveryTarget === "string"
-        ? session.deliveryTarget
-        : String(session.deliveryTarget);
+      const channelId =
+        typeof session.deliveryTarget === "string"
+          ? session.deliveryTarget
+          : String(session.deliveryTarget);
 
       const duration = this.calculateDuration(session);
       const blocks = this.formatSlackBlocks(session, summary, duration);
@@ -532,6 +540,98 @@ class SessionDeliveryService {
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
+  }
+
+  /**
+   * Upload sampled screenshots as thread replies to the summary message
+   * Samples 3-5 key screenshots: first, last, and evenly distributed middle ones
+   */
+  private async uploadScreenshotsToThread(
+    organizationId: string,
+    sessionId: string,
+    channelId: string,
+    threadTs: string
+  ): Promise<void> {
+    try {
+      // Fetch captures with image data
+      const captures = await db
+        .select({
+          id: schema.sessionCaptures.id,
+          sequenceNumber: schema.sessionCaptures.sequenceNumber,
+          appName: schema.sessionCaptures.appName,
+          capturedAt: schema.sessionCaptures.capturedAt,
+          imageData: schema.sessionCaptures.imageData,
+        })
+        .from(schema.sessionCaptures)
+        .where(eq(schema.sessionCaptures.sessionId, sessionId))
+        .orderBy(schema.sessionCaptures.sequenceNumber);
+
+      // Filter to only captures with image data
+      const capturesWithImages = captures.filter((c) => c.imageData);
+
+      if (capturesWithImages.length === 0) {
+        console.log("[SessionDeliveryService] No screenshots to attach");
+        return;
+      }
+
+      // Sample 3-5 key screenshots
+      const sampled = this.sampleScreenshots(capturesWithImages, 4);
+
+      console.log(`[SessionDeliveryService] Uploading ${sampled.length} screenshots to thread`);
+
+      // Upload each screenshot as a thread reply
+      for (const capture of sampled) {
+        const buffer = Buffer.from(capture.imageData!, "base64");
+        const timestamp = new Date(capture.capturedAt).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        await slackService.uploadFile(organizationId, channelId, {
+          file: buffer,
+          filename: `screenshot_${capture.sequenceNumber}.png`,
+          title: `${capture.appName || "Screenshot"} at ${timestamp}`,
+          thread_ts: threadTs,
+        });
+      }
+
+      console.log("[SessionDeliveryService] Screenshots uploaded successfully");
+    } catch (error) {
+      // Non-critical - log but don't fail delivery
+      console.error("[SessionDeliveryService] Failed to upload screenshots:", error);
+    }
+  }
+
+  /**
+   * Sample key screenshots: first, last, and evenly distributed middle ones
+   */
+  private sampleScreenshots<T>(items: T[], maxCount: number): T[] {
+    if (items.length <= maxCount) {
+      return items;
+    }
+
+    const result: T[] = [];
+
+    // Always include first
+    result.push(items[0]);
+
+    // Always include last
+    const last = items[items.length - 1];
+
+    // Add evenly distributed middle items
+    const middleCount = maxCount - 2;
+    const step = (items.length - 1) / (middleCount + 1);
+
+    for (let i = 1; i <= middleCount; i++) {
+      const index = Math.round(step * i);
+      if (index > 0 && index < items.length - 1) {
+        result.push(items[index]);
+      }
+    }
+
+    result.push(last);
+
+    return result;
   }
 }
 

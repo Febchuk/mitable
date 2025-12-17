@@ -145,7 +145,10 @@ class MonitoringSessionService {
     }
 
     if (this.activeSession.status !== "active") {
-      return { success: false, error: `Cannot pause session with status: ${this.activeSession.status}` };
+      return {
+        success: false,
+        error: `Cannot pause session with status: ${this.activeSession.status}`,
+      };
     }
 
     // Stop capture loop
@@ -172,7 +175,10 @@ class MonitoringSessionService {
     }
 
     if (this.activeSession.status !== "paused") {
-      return { success: false, error: `Cannot resume session with status: ${this.activeSession.status}` };
+      return {
+        success: false,
+        error: `Cannot resume session with status: ${this.activeSession.status}`,
+      };
     }
 
     // Calculate pause duration and add to total
@@ -199,6 +205,7 @@ class MonitoringSessionService {
   /**
    * End the active session
    * Returns captures data so frontend can upload to backend before summarization
+   * Includes base64 image data for backend analysis
    */
   async endSession(): Promise<{
     success: boolean;
@@ -213,6 +220,7 @@ class MonitoringSessionService {
       windowTitle?: string;
       screenshotPath?: string;
       screenshotHash?: string;
+      imageData?: string; // Base64 encoded image for backend analysis
     }>;
     error?: string;
   }> {
@@ -233,17 +241,37 @@ class MonitoringSessionService {
     const sessionId = this.activeSession.id;
     const captureCount = this.activeSession.captures.length;
 
-    // Extract captures data to return to frontend (for backend upload)
-    const captures = this.activeSession.captures.map((c) => ({
-      sequenceNumber: c.sequenceNumber,
-      captureTrigger: c.captureTrigger,
-      capturedAt: c.capturedAt,
-      windowId: c.windowId,
-      appName: c.appName,
-      windowTitle: c.windowTitle,
-      screenshotPath: c.screenshotPath,
-      screenshotHash: c.screenshotHash,
-    }));
+    // Extract captures data with base64 image data for backend upload
+    const captures = await Promise.all(
+      this.activeSession.captures.map(async (c) => {
+        let imageData: string | undefined;
+
+        // Read screenshot file and convert to base64 for backend
+        if (c.screenshotPath) {
+          try {
+            const buffer = await fs.readFile(c.screenshotPath);
+            imageData = buffer.toString("base64");
+          } catch (err) {
+            console.warn(
+              `[MonitoringSessionService] Failed to read screenshot: ${c.screenshotPath}`,
+              err
+            );
+          }
+        }
+
+        return {
+          sequenceNumber: c.sequenceNumber,
+          captureTrigger: c.captureTrigger,
+          capturedAt: c.capturedAt,
+          windowId: c.windowId,
+          appName: c.appName,
+          windowTitle: c.windowTitle,
+          screenshotPath: c.screenshotPath,
+          screenshotHash: c.screenshotHash,
+          imageData,
+        };
+      })
+    );
 
     this.activeSession.status = "ended";
 
@@ -259,9 +287,12 @@ class MonitoringSessionService {
     this.activeSession = null;
 
     // Schedule cleanup of session directory after summary is generated (10 minutes)
-    setTimeout(() => {
-      this.cleanupSessionFiles(sessionId);
-    }, 10 * 60 * 1000);
+    setTimeout(
+      () => {
+        this.cleanupSessionFiles(sessionId);
+      },
+      10 * 60 * 1000
+    );
 
     return { success: true, sessionId, captureCount, captures };
   }
@@ -291,7 +322,7 @@ class MonitoringSessionService {
 
     // If currently paused, subtract current pause duration
     if (this.activeSession.status === "paused" && this.activeSession.pausedAt) {
-      elapsedMs -= (now - this.activeSession.pausedAt);
+      elapsedMs -= now - this.activeSession.pausedAt;
     }
 
     return {
@@ -381,7 +412,6 @@ class MonitoringSessionService {
 
       // Broadcast capture progress
       this.broadcastCaptureProgress();
-
     } catch (error) {
       console.error("[MonitoringSessionService] Error capturing windows:", error);
     }
@@ -446,7 +476,6 @@ class MonitoringSessionService {
         trigger,
         app: screenshot.appName,
       });
-
     } catch (error) {
       console.error("[MonitoringSessionService] Error saving capture:", error);
     }

@@ -19,10 +19,7 @@ async function runMigration() {
     console.log("Starting migration 0015: Add monitoring tables...");
 
     // Read the SQL migration file
-    const migrationPath = path.join(
-      __dirname,
-      "../db/migrations/0015_add_monitoring_tables.sql"
-    );
+    const migrationPath = path.join(__dirname, "../db/migrations/0015_add_monitoring_tables.sql");
     const migrationSQL = fs.readFileSync(migrationPath, "utf-8");
 
     // Execute the migration
