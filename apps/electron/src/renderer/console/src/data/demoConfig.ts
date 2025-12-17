@@ -134,8 +134,7 @@ export const DEMO_CONFIG = {
 
       metrics: {
         keywords: ["metric", "metrics", "number", "numbers", "data", "quantify"],
-        aiResponse:
-          "I'll add quantifiable metrics to make the update more impactful:",
+        aiResponse: "I'll add quantifiable metrics to make the update more impactful:",
         suggestedEdit: `## What I worked on this week
 
 - Completed the user authentication flow refactor (PR #342) - reduced code complexity by 30%
@@ -234,9 +233,7 @@ export function findAIResponseFromConfig(
 /**
  * Get a recipient by ID (user or channel)
  */
-export function getRecipientByIdFromConfig(
-  id: string
-): (DemoUser | DemoChannel) | undefined {
+export function getRecipientByIdFromConfig(id: string): (DemoUser | DemoChannel) | undefined {
   const user = DEMO_CONFIG.recipients.users.find((u) => u.id === id);
   if (user) return user;
 
@@ -248,8 +245,5 @@ export function getRecipientByIdFromConfig(
  * Get all recipients (users + channels combined)
  */
 export function getAllRecipientsFromConfig(): (DemoUser | DemoChannel)[] {
-  return [
-    ...DEMO_CONFIG.recipients.users,
-    ...DEMO_CONFIG.recipients.channels,
-  ];
+  return [...DEMO_CONFIG.recipients.users, ...DEMO_CONFIG.recipients.channels];
 }

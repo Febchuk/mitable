@@ -40,10 +40,7 @@ export function useSessions() {
  * @param sessionId - The session ID to fetch
  * @param options.pollWhileSummarizing - If true, poll every 2s while status is "summarizing"
  */
-export function useSession(
-  sessionId: string,
-  options?: { pollWhileSummarizing?: boolean }
-) {
+export function useSession(sessionId: string, options?: { pollWhileSummarizing?: boolean }) {
   const { user } = useUser();
 
   return useQuery({
@@ -79,10 +76,7 @@ export function useSessionCaptures(sessionId: string) {
  * @param sessionId - The session ID to fetch summary for
  * @param sessionStatus - Current session status (for conditional polling)
  */
-export function useSessionSummary(
-  sessionId: string,
-  sessionStatus?: string
-) {
+export function useSessionSummary(sessionId: string, sessionStatus?: string) {
   return useQuery({
     queryKey: monitoringKeys.summary(sessionId),
     queryFn: () => monitoringService.fetchSessionSummary(sessionId),

@@ -25,7 +25,8 @@ interface AIChatPanelProps {
   contextLabel?: string; // e.g., "session summary"
 }
 
-const WELCOME_MESSAGE = "I can help you refine your summary. Try asking me to:\n\n• Make it more concise\n• Add more detail\n• Make it more professional\n• Focus on accomplishments";
+const WELCOME_MESSAGE =
+  "I can help you refine your summary. Try asking me to:\n\n• Make it more concise\n• Add more detail\n• Make it more professional\n• Focus on accomplishments";
 
 export default function AIChatPanel({
   currentContent,
@@ -87,9 +88,7 @@ export default function AIChatPanel({
       };
 
       // Remove typing indicator and add real message
-      setMessages((prev) =>
-        prev.filter((m) => m.id !== typingId).concat(assistantMessage)
-      );
+      setMessages((prev) => prev.filter((m) => m.id !== typingId).concat(assistantMessage));
     } catch (error) {
       // Handle error
       const errorMessage: Message = {
@@ -97,9 +96,7 @@ export default function AIChatPanel({
         role: "assistant",
         content: "Sorry, I couldn't process that request. Please try again.",
       };
-      setMessages((prev) =>
-        prev.filter((m) => m.id !== typingId).concat(errorMessage)
-      );
+      setMessages((prev) => prev.filter((m) => m.id !== typingId).concat(errorMessage));
     } finally {
       setIsLoading(false);
     }
@@ -129,22 +126,15 @@ export default function AIChatPanel({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {messages.map((message) => (
-          <div
-            key={message.id}
-            className="animate-in fade-in slide-in-from-bottom-2 duration-200"
-          >
+          <div key={message.id} className="animate-in fade-in slide-in-from-bottom-2 duration-200">
             {/* Message bubble */}
             <div
-              className={`flex gap-2 ${
-                message.role === "user" ? "flex-row-reverse" : "flex-row"
-              }`}
+              className={`flex gap-2 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
             >
               {/* Avatar */}
               <div
                 className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  message.role === "user"
-                    ? "bg-primary/20"
-                    : "bg-background-elevated"
+                  message.role === "user" ? "bg-primary/20" : "bg-background-elevated"
                 }`}
               >
                 {message.role === "user" ? (
@@ -156,9 +146,7 @@ export default function AIChatPanel({
 
               {/* Content */}
               <div
-                className={`max-w-[85%] ${
-                  message.role === "user" ? "text-right" : "text-left"
-                }`}
+                className={`max-w-[85%] ${message.role === "user" ? "text-right" : "text-left"}`}
               >
                 <div
                   className={`inline-block rounded-lg px-3 py-2 text-sm ${

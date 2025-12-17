@@ -260,11 +260,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
               <div className="text-center py-8 text-text-secondary">
                 <Monitor size={32} className="mx-auto mb-2 opacity-50" />
                 <p>No windows detected</p>
-                <Button
-                  variant="link"
-                  onClick={loadAvailableWindows}
-                  className="text-primary mt-2"
-                >
+                <Button variant="link" onClick={loadAvailableWindows} className="text-primary mt-2">
                   Refresh
                 </Button>
               </div>

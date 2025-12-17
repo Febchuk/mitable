@@ -1,6 +1,11 @@
 // Global type declarations for Electron preload API
 
-import type { MultiWindowCaptureResult, MonitoringSessionState, SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
+import type {
+  MultiWindowCaptureResult,
+  MonitoringSessionState,
+  SelectedWindowInfo,
+  WatchableWindow,
+} from "@mitable/shared";
 
 interface ConsoleAPI {
   // Help system
@@ -71,6 +76,7 @@ interface ConsoleAPI {
       windowTitle?: string;
       screenshotPath?: string;
       screenshotHash?: string;
+      imageData?: string;
     }>;
     error?: string;
   }>;

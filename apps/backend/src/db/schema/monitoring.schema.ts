@@ -106,9 +106,10 @@ export const sessionCaptures = pgTable("session_captures", {
   appName: varchar("app_name", { length: 255 }),
   windowTitle: text("window_title"),
 
-  // Screenshot storage (efficient approach - only store reference)
-  screenshotPath: text("screenshot_path"), // Path to temp file (cleaned after summary)
+  // Screenshot storage
+  screenshotPath: text("screenshot_path"), // Original local path (for reference only)
   screenshotHash: varchar("screenshot_hash", { length: 64 }), // SHA-256 for deduplication
+  imageData: text("image_data"), // Base64 encoded full image for AI analysis
   thumbnailData: text("thumbnail_data"), // Small base64 thumbnail for UI preview (optional)
 
   // Analysis results (populated during or after capture)
@@ -154,21 +155,18 @@ export const sessionSummaries = pgTable("session_summaries", {
 });
 
 // Relations
-export const monitoringSessionsRelations = relations(
-  monitoringSessions,
-  ({ one, many }) => ({
-    organization: one(organizations, {
-      fields: [monitoringSessions.organizationId],
-      references: [organizations.id],
-    }),
-    user: one(users, {
-      fields: [monitoringSessions.userId],
-      references: [users.id],
-    }),
-    captures: many(sessionCaptures),
-    summaries: many(sessionSummaries),
-  })
-);
+export const monitoringSessionsRelations = relations(monitoringSessions, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [monitoringSessions.organizationId],
+    references: [organizations.id],
+  }),
+  user: one(users, {
+    fields: [monitoringSessions.userId],
+    references: [users.id],
+  }),
+  captures: many(sessionCaptures),
+  summaries: many(sessionSummaries),
+}));
 
 export const sessionCapturesRelations = relations(sessionCaptures, ({ one }) => ({
   session: one(monitoringSessions, {

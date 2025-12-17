@@ -72,7 +72,8 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
   // ===========================
 
   onSessionUpdate: (callback: (state: MonitoringSessionState | null) => void): (() => void) => {
-    const handler = (_event: IpcRendererEvent, state: MonitoringSessionState | null) => callback(state);
+    const handler = (_event: IpcRendererEvent, state: MonitoringSessionState | null) =>
+      callback(state);
     ipcRenderer.on(IPC_CHANNELS.MONITORING_SESSION_UPDATE, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_SESSION_UPDATE, handler);
   },

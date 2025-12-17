@@ -1116,10 +1116,13 @@ function setupIPC() {
   // Store user context for cross-window access (e.g., WatchingPill needs userId/orgId)
   let currentUserContext: { userId: string; organizationId: string } | null = null;
 
-  ipcMain.on(IPC_CHANNELS.USER_CONTEXT_SET, (_event, user: { userId: string; organizationId: string }) => {
-    console.log("[UserContext] Set:", user);
-    currentUserContext = user;
-  });
+  ipcMain.on(
+    IPC_CHANNELS.USER_CONTEXT_SET,
+    (_event, user: { userId: string; organizationId: string }) => {
+      console.log("[UserContext] Set:", user);
+      currentUserContext = user;
+    }
+  );
 
   ipcMain.handle(IPC_CHANNELS.USER_CONTEXT_GET, () => {
     return currentUserContext;
@@ -1546,7 +1549,12 @@ function setupMonitoringSessionHandlers() {
         screenshotHash?: string;
       }>
     ) => {
-      console.log("[Monitoring Session] Finalizing session:", sessionId, "captures:", captures.length);
+      console.log(
+        "[Monitoring Session] Finalizing session:",
+        sessionId,
+        "captures:",
+        captures.length
+      );
 
       try {
         const token = authTokens.accessToken;
@@ -1559,14 +1567,17 @@ function setupMonitoringSessionHandlers() {
         // Step 1: Upload captures to backend
         if (captures.length > 0) {
           console.log("[Monitoring Session] Uploading", captures.length, "captures to backend");
-          const uploadResponse = await fetch(`${API_BASE_URL}/api/monitoring/sessions/${sessionId}/captures`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ captures }),
-          });
+          const uploadResponse = await fetch(
+            `${API_BASE_URL}/api/monitoring/sessions/${sessionId}/captures`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ captures }),
+            }
+          );
 
           if (!uploadResponse.ok) {
             const errorText = await uploadResponse.text();
@@ -1578,13 +1589,16 @@ function setupMonitoringSessionHandlers() {
 
         // Step 2: Call /end endpoint to trigger summarization
         console.log("[Monitoring Session] Triggering summarization");
-        const endResponse = await fetch(`${API_BASE_URL}/api/monitoring/sessions/${sessionId}/end`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const endResponse = await fetch(
+          `${API_BASE_URL}/api/monitoring/sessions/${sessionId}/end`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
         if (!endResponse.ok) {
           const errorText = await endResponse.text();

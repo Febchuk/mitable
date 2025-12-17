@@ -1,5 +1,5 @@
 /**
- * Migration 0016: Add documentation tables
+ * Migration 0016: Add image_data column to session_captures
  *
  * Run with: npm run migrate:0016
  */
@@ -16,33 +16,19 @@ const __dirname = path.dirname(__filename);
 
 async function runMigration() {
   try {
-    console.log("Starting migration 0016: Add documentation tables...");
+    console.log("Starting migration 0016: Add image_data column...");
 
     // Read the SQL migration file
-    const migrationPath = path.join(
-      __dirname,
-      "../db/migrations/0016_add_documentation_tables.sql"
-    );
+    const migrationPath = path.join(__dirname, "../db/migrations/0016_add_capture_image_data.sql");
     const migrationSQL = fs.readFileSync(migrationPath, "utf-8");
 
     // Execute the migration
     await db.execute(sql.raw(migrationSQL));
 
     console.log("✅ Migration 0016 completed successfully!");
-    console.log("\nTables created:");
-    console.log("  - documents - Knowledge base documents");
-    console.log("  - document_versions - Version history");
-    console.log("  - session_document_contributions - Session links");
-    console.log("\nIndexes created:");
-    console.log("  - idx_documents_org");
-    console.log("  - idx_documents_type");
-    console.log("  - idx_documents_status");
-    console.log("  - idx_documents_org_type");
-    console.log("  - idx_documents_created_by");
-    console.log("  - idx_document_versions_doc");
-    console.log("  - idx_session_doc_contributions_session");
-    console.log("  - idx_session_doc_contributions_doc");
-    console.log("  - idx_documents_fts (full-text search)");
+    console.log("\nChanges:");
+    console.log("  - Added image_data column to session_captures");
+    console.log("  - Stores base64 encoded screenshots for AI analysis");
 
     process.exit(0);
   } catch (error) {

@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
-import type { MultiWindowCaptureResult, MonitoringSessionState, SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
+import type {
+  MultiWindowCaptureResult,
+  MonitoringSessionState,
+  SelectedWindowInfo,
+  WatchableWindow,
+} from "@mitable/shared";
 
 console.log("[Preload] Console preload script starting...");
 
@@ -143,6 +148,17 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     success: boolean;
     sessionId?: string;
     captureCount?: number;
+    captures?: Array<{
+      sequenceNumber: number;
+      captureTrigger: "periodic" | "focus_change" | "manual";
+      capturedAt: number;
+      windowId?: string;
+      appName?: string;
+      windowTitle?: string;
+      screenshotPath?: string;
+      screenshotHash?: string;
+      imageData?: string;
+    }>;
     error?: string;
   }> => ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_END),
 

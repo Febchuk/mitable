@@ -64,19 +64,12 @@ export default function AIEditPanel({
           </Button>
           <div>
             <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
-            {subtitle && (
-              <p className="text-sm text-text-secondary">{subtitle}</p>
-            )}
+            {subtitle && <p className="text-sm text-text-secondary">{subtitle}</p>}
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            onClick={onCancel}
-            disabled={isSaving}
-            className="gap-2"
-          >
+          <Button variant="ghost" onClick={onCancel} disabled={isSaving} className="gap-2">
             <X size={16} />
             Cancel
           </Button>

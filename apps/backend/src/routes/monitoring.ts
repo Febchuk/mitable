@@ -5,10 +5,7 @@ import * as schema from "../db/schema/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sessionDeliveryService } from "../services/session-delivery.service.js";
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
-import type {
-  SelectedWindowInfo,
-  MonitoringSessionState,
-} from "@mitable/shared";
+import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 
 const router = Router();
 
@@ -416,113 +413,138 @@ router.patch("/sessions/:id", requireAuth, async (req: Request, res: Response): 
  * POST /api/monitoring/sessions/:id/end
  * End a session and trigger summary generation
  */
-router.post("/sessions/:id/end", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const userId = req.userId!;
-  const { id } = req.params;
+router.post(
+  "/sessions/:id/end",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
 
-  try {
-    // Verify ownership
-    const [session] = await db
-      .select()
-      .from(schema.monitoringSessions)
-      .where(eq(schema.monitoringSessions.id, id))
-      .limit(1);
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
 
-    if (!session) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "Session not found",
-      });
-      return;
-    }
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
 
-    if (session.userId !== userId) {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "You do not have permission to end this session",
-      });
-      return;
-    }
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to end this session",
+        });
+        return;
+      }
 
-    if (session.status !== "active" && session.status !== "paused") {
-      res.status(400).json({
-        error: "Bad Request",
-        message: `Cannot end session with status: ${session.status}`,
-      });
-      return;
-    }
+      if (session.status !== "active" && session.status !== "paused") {
+        res.status(400).json({
+          error: "Bad Request",
+          message: `Cannot end session with status: ${session.status}`,
+        });
+        return;
+      }
 
-    // Calculate final duration
-    const endTime = new Date();
-    const startTime = new Date(session.startedAt).getTime();
-    let totalPausedMs = session.totalPausedMs || 0;
+      // Calculate final duration
+      const endTime = new Date();
+      const startTime = new Date(session.startedAt).getTime();
+      let totalPausedMs = session.totalPausedMs || 0;
 
-    // If currently paused, add remaining pause time
-    if (session.status === "paused" && session.pausedAt) {
-      totalPausedMs += Date.now() - new Date(session.pausedAt).getTime();
-    }
+      // If currently paused, add remaining pause time
+      if (session.status === "paused" && session.pausedAt) {
+        totalPausedMs += Date.now() - new Date(session.pausedAt).getTime();
+      }
 
-    const activeDurationMs = endTime.getTime() - startTime - totalPausedMs;
+      const activeDurationMs = endTime.getTime() - startTime - totalPausedMs;
 
-    // Update session status
-    const [updated] = await db
-      .update(schema.monitoringSessions)
-      .set({
-        status: "summarizing",
-        endedAt: endTime,
-        totalPausedMs,
-        updatedAt: endTime,
-      })
-      .where(eq(schema.monitoringSessions.id, id))
-      .returning();
+      // Update session status
+      const [updated] = await db
+        .update(schema.monitoringSessions)
+        .set({
+          status: "summarizing",
+          endedAt: endTime,
+          totalPausedMs,
+          updatedAt: endTime,
+        })
+        .where(eq(schema.monitoringSessions.id, id))
+        .returning();
 
-    // Get capture count
-    const [{ count: captureCount }] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(schema.sessionCaptures)
-      .where(eq(schema.sessionCaptures.sessionId, id));
+      // Get capture count
+      const [{ count: captureCount }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.sessionCaptures)
+        .where(eq(schema.sessionCaptures.sessionId, id));
 
-    console.log(`[Monitoring] Session ended: ${id}`, {
-      captureCount,
-      activeDurationMs,
-    });
-
-    // Trigger async summary generation (don't await - let it run in background)
-    sessionSummarizationService.generateSessionSummary(id)
-      .then(() => {
-        console.log(`[Monitoring] Summary generated for session ${id}`);
-      })
-      .catch((error) => {
-        console.error(`[Monitoring] Summary generation failed for session ${id}:`, error);
-        // Update status to indicate completion (even without summary)
-        db.update(schema.monitoringSessions)
-          .set({ status: "ready" })
-          .where(eq(schema.monitoringSessions.id, id));
-      });
-
-    res.json({
-      success: true,
-      session: {
-        id: updated.id,
-        status: "ready", // Updated after mock summary
-        startedAt: updated.startedAt,
-        endedAt: updated.endedAt,
-        duration: {
-          totalMs: endTime.getTime() - startTime,
-          activeMs: activeDurationMs,
-          pausedMs: totalPausedMs,
-        },
+      console.log(`[Monitoring] Session ended: ${id}`, {
         captureCount,
-      },
-    });
-  } catch (error) {
-    console.error("[Monitoring] Error ending session:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: error instanceof Error ? error.message : "Failed to end session",
-    });
+        activeDurationMs,
+      });
+
+      // Trigger async summary generation (don't await - let it run in background)
+      sessionSummarizationService
+        .generateSessionSummary(id)
+        .then(() => {
+          console.log(`[Monitoring] Summary generated for session ${id}`);
+        })
+        .catch((error) => {
+          console.error(`[Monitoring] Summary generation failed for session ${id}:`, error);
+          // Update status to indicate completion (even without summary)
+          db.update(schema.monitoringSessions)
+            .set({ status: "ready" })
+            .where(eq(schema.monitoringSessions.id, id));
+        });
+
+      // Schedule cleanup of imageData after 1 hour to free up storage
+      // Screenshots are only needed for AI analysis and Slack delivery
+      setTimeout(
+        async () => {
+          try {
+            await db
+              .update(schema.sessionCaptures)
+              .set({ imageData: null })
+              .where(eq(schema.sessionCaptures.sessionId, id));
+            console.log(`[Monitoring] Cleared imageData for session ${id} (1 hour cleanup)`);
+          } catch (cleanupError) {
+            console.error(
+              `[Monitoring] Failed to clear imageData for session ${id}:`,
+              cleanupError
+            );
+          }
+        },
+        60 * 60 * 1000
+      ); // 1 hour
+
+      res.json({
+        success: true,
+        session: {
+          id: updated.id,
+          status: "ready", // Updated after mock summary
+          startedAt: updated.startedAt,
+          endedAt: updated.endedAt,
+          duration: {
+            totalMs: endTime.getTime() - startTime,
+            activeMs: activeDurationMs,
+            pausedMs: totalPausedMs,
+          },
+          captureCount,
+        },
+      });
+    } catch (error) {
+      console.error("[Monitoring] Error ending session:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to end session",
+      });
+    }
   }
-});
+);
 
 /**
  * POST /api/monitoring/sessions/:id/captures
@@ -546,6 +568,7 @@ router.post(
         windowTitle?: string;
         screenshotPath?: string;
         screenshotHash?: string;
+        imageData?: string;
       }>;
     } = req.body;
 
@@ -581,7 +604,7 @@ router.post(
         return;
       }
 
-      // Insert captures
+      // Insert captures with imageData for AI analysis
       const insertedCaptures = await db
         .insert(schema.sessionCaptures)
         .values(
@@ -595,6 +618,7 @@ router.post(
             windowTitle: c.windowTitle || null,
             screenshotPath: c.screenshotPath || null,
             screenshotHash: c.screenshotHash || null,
+            imageData: c.imageData || null,
             analysisStatus: "pending",
           }))
         )
@@ -662,6 +686,7 @@ router.get(
           analysisStatus: schema.sessionCaptures.analysisStatus,
           activityDescription: schema.sessionCaptures.activityDescription,
           confidence: schema.sessionCaptures.confidence,
+          imageData: schema.sessionCaptures.imageData,
         })
         .from(schema.sessionCaptures)
         .where(eq(schema.sessionCaptures.sessionId, id))
@@ -832,7 +857,8 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.userId!;
     const { id } = req.params;
-    const { instruction, currentSummary }: { instruction: string; currentSummary: string } = req.body;
+    const { instruction, currentSummary }: { instruction: string; currentSummary: string } =
+      req.body;
 
     if (!instruction || !currentSummary) {
       res.status(400).json({
@@ -1021,9 +1047,7 @@ router.post(
         .where(eq(schema.monitoringSessions.id, id));
 
       const successCount = result.results.filter((r) => r.status === "delivered").length;
-      console.log(
-        `[Monitoring] Summary delivered to ${successCount}/${targets.length} targets`
-      );
+      console.log(`[Monitoring] Summary delivered to ${successCount}/${targets.length} targets`);
 
       res.json({
         success: allSucceeded,
