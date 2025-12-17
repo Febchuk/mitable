@@ -1373,7 +1373,7 @@ function setupWatchModeHandlers() {
   // Broadcast updated window list to all windows
   function broadcastWatchWindowsUpdate() {
     const selectedWindows = windowDetectionService.getSelectedWindows();
-    const windows = [agentWindow, agentPanelWindow, conversationWindow];
+    const windows = [agentWindow, agentPanelWindow, conversationWindow, watchingPillWindow];
 
     for (const window of windows) {
       if (window && !window.isDestroyed()) {
