@@ -51,8 +51,8 @@ function MonitoringSessionHandler() {
     window.consoleAPI.onMonitoringSessionUpdate((state) => {
       console.log("[Console] Monitoring session update:", state?.status, state?.id);
 
-      // Invalidate session queries to trigger refetch when session ends
-      if (state?.status === "ended" && state.id) {
+      // Invalidate session queries on any status change (paused, active, ended)
+      if (state?.id) {
         queryClient.invalidateQueries({ queryKey: ["monitoring", "session", state.id] });
         queryClient.invalidateQueries({ queryKey: ["monitoring", "sessions"] });
       }
