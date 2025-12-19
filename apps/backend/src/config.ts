@@ -111,6 +111,15 @@ export const config = {
     ).trim(),
   },
 
+  // Linear OAuth Configuration (per-user auth for session updates)
+  linear: {
+    clientId: (process.env.LINEAR_CLIENT_ID || "").trim(),
+    clientSecret: (process.env.LINEAR_CLIENT_SECRET || "").trim(),
+    redirectUri: (
+      process.env.LINEAR_REDIRECT_URI || `http://localhost:${PORT}/api/integrations/linear/callback`
+    ).trim(),
+  },
+
   // Google Cloud DLP Configuration (for PII redaction)
   googleCloud: {
     projectId: (process.env.GOOGLE_CLOUD_PROJECT_ID || "").trim(),

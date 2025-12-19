@@ -6,6 +6,7 @@
  */
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   useSession,
@@ -32,9 +33,17 @@ import {
   Square,
   Pause,
   Play,
+  RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +55,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import AIEditPanel from "@/console/src/components/shared/AIEditPanel";
 import RecipientSelector from "@/console/src/components/shared/RecipientSelector";
+import LinearUpdateDialog from "./LinearUpdateDialog";
+import { SiLinear } from "react-icons/si";
 
 function formatDateTime(dateString: string | null): string {
   if (!dateString) return "N/A";
@@ -64,6 +75,7 @@ export default function SessionDetail() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Poll for updates while session is summarizing
   const { data: session, isLoading: isLoadingSession } = useSession(sessionId || "", {
@@ -86,6 +98,38 @@ export default function SessionDetail() {
   const [isAIEditMode, setIsAIEditMode] = useState(false);
   const [isPauseLoading, setIsPauseLoading] = useState(false);
   const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
+  const [isLinearDialogOpen, setIsLinearDialogOpen] = useState(false);
+  // Handle Linear button click - check connection and open dialog or redirect to settings
+  const handleLinearClick = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/settings");
+        return;
+      }
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/integrations/linear/status`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.connected) {
+          setIsLinearDialogOpen(true);
+        } else {
+          toast({
+            title: "Linear Not Connected",
+            description: "Please connect your Linear account in Settings first.",
+          });
+          navigate("/settings");
+        }
+      } else {
+        navigate("/settings");
+      }
+    } catch (error) {
+      console.error("Error checking Linear status:", error);
+      navigate("/settings");
+    }
+  };
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
 
@@ -389,19 +433,58 @@ export default function SessionDetail() {
           {session.status !== "active" &&
             session.status !== "paused" &&
             (isDelivered ? (
-              <Badge className="bg-status-success/20 text-status-success border-transparent">
-                <CheckCircle size={14} className="mr-1" />
-                Delivered
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-status-success/20 text-status-success border-transparent">
+                  <CheckCircle size={14} className="mr-1" />
+                  Delivered
+                </Badge>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 text-text-secondary hover:text-text-primary hover:bg-transparent"
+                    >
+                      <RefreshCw size={14} />
+                      Resend
+                      <ChevronDown size={14} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleLinearClick} disabled={!summary}>
+                      <SiLinear className="w-4 h-4 mr-2 text-[#5E6AD2]" />
+                      Send to Linear
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsDeliveryDialogOpen(true)}
+                      disabled={!summary}
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Send to Slack
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ) : (
-              <Button
-                onClick={() => setIsDeliveryDialogOpen(true)}
-                disabled={!summary}
-                className="gap-2 bg-primary text-white hover:bg-primary/90"
-              >
-                <Send size={16} />
-                Send to Slack
-              </Button>
+              <>
+                <Button
+                  onClick={handleLinearClick}
+                  disabled={!summary}
+                  variant="outline"
+                  className="gap-2 border-[#5E6AD2] text-[#5E6AD2] hover:bg-[#5E6AD2]/10"
+                >
+                  <SiLinear size={14} />
+                  Send to Linear
+                </Button>
+                <Button
+                  onClick={() => setIsDeliveryDialogOpen(true)}
+                  disabled={!summary}
+                  className="gap-2 bg-primary text-white hover:bg-primary/90"
+                >
+                  <Send size={16} />
+                  Send to Slack
+                </Button>
+              </>
             ))}
           <Button
             variant="ghost"
@@ -586,6 +669,19 @@ export default function SessionDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Linear Update Dialog */}
+      <LinearUpdateDialog
+        open={isLinearDialogOpen}
+        onOpenChange={setIsLinearDialogOpen}
+        sessionId={sessionId || ""}
+        sessionName={session.name || "Work Session"}
+        summary={summary}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["monitoring", "session", sessionId] });
+          queryClient.invalidateQueries({ queryKey: ["monitoring", "sessions"] });
+        }}
+      />
     </div>
   );
 }

@@ -945,7 +945,7 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
     // Define all available integrations
     const integrationMap: Record<
       string,
-      { name: string; description: string; updatesPerDay: number }
+      { name: string; description: string; updatesPerDay: number; isPerUser?: boolean }
     > = {
       slack: {
         name: "Slack",
@@ -967,6 +967,12 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
         description: "Access your files and documents. Updates once a day.",
         updatesPerDay: 1,
       },
+      linear: {
+        name: "Linear",
+        description: "Send session updates to Linear tickets. Per-user connection.",
+        updatesPerDay: 0,
+        isPerUser: true,
+      },
     };
 
     // Create map of existing integrations
@@ -974,13 +980,41 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
       dbIntegrations.map((integration) => [integration.provider, integration])
     );
 
+    // Count users with Linear connected (per-user integration)
+    const [linearUsersResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.users)
+      .where(
+        and(
+          eq(schema.users.organizationId, currentUser.organizationId),
+          sql`${schema.users.linearAccessTokenEncrypted} IS NOT NULL`
+        )
+      );
+    const linearConnectedUsers = linearUsersResult?.count || 0;
+
     // Return all possible integrations, marking status based on DB presence
     const formattedIntegrations = Object.entries(integrationMap).map(([provider, providerInfo]) => {
       const existing = existingIntegrations.get(provider);
 
+      // Special handling for per-user integrations like Linear
+      if (providerInfo.isPerUser) {
+        const connectedCount = provider === "linear" ? linearConnectedUsers : 0;
+        return {
+          id: `${provider}-per-user`,
+          provider: provider as "slack" | "notion" | "github" | "google-drive" | "linear",
+          name: providerInfo.name,
+          description: providerInfo.description,
+          status: connectedCount > 0 ? "connected" : "disconnected",
+          updatesPerDay: providerInfo.updatesPerDay,
+          connectedAt: undefined,
+          isPerUser: true,
+          connectedUsersCount: connectedCount,
+        };
+      }
+
       return {
         id: existing?.id || `${provider}-placeholder`,
-        provider: provider as "slack" | "notion" | "github" | "google-drive",
+        provider: provider as "slack" | "notion" | "github" | "google-drive" | "linear",
         name: providerInfo.name,
         description: providerInfo.description,
         status: existing?.status || "disconnected",
@@ -998,6 +1032,79 @@ router.get("/integrations", requireAuth, async (req: Request, res: Response): Pr
     });
   }
 });
+
+/**
+ * GET /admin/integrations/linear/users
+ * Get list of users who have connected their Linear account
+ */
+router.get(
+  "/integrations/linear/users",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      // Get user's organization
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!currentUser) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "User not found",
+        });
+        return;
+      }
+
+      // Verify user is admin
+      if (currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
+
+      // Fetch users with Linear connected
+      const linearUsers = await db
+        .select({
+          id: schema.users.id,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+          email: schema.users.email,
+          avatarUrl: schema.users.avatarUrl,
+          connectedAt: schema.users.updatedAt,
+        })
+        .from(schema.users)
+        .where(
+          and(
+            eq(schema.users.organizationId, currentUser.organizationId),
+            sql`${schema.users.linearAccessTokenEncrypted} IS NOT NULL`
+          )
+        )
+        .orderBy(schema.users.firstName);
+
+      const formattedUsers = linearUsers.map((user) => ({
+        id: user.id,
+        name: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+        connectedAt: user.connectedAt,
+      }));
+
+      res.json({ users: formattedUsers });
+    } catch (error) {
+      console.error("Error fetching Linear users:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to fetch Linear users",
+      });
+    }
+  }
+);
 
 /**
  * POST /admin/integrations/:id/sync

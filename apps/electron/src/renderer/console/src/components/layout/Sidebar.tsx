@@ -47,6 +47,7 @@ export default function Sidebar() {
           )}
         </button>
         <button
+          onClick={() => navigate("/settings")}
           className="group flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-white/10 transition-all duration-200"
           title="Settings"
         >

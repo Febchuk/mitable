@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Check, Link, ChevronDown, Settings, RefreshCw, Info, LogOut } from "lucide-react";
+import { Check, Link, ChevronDown, Settings, RefreshCw, Info, LogOut, Users } from "lucide-react";
 import { getIntegrationIcon } from "@/components/icons/integrations";
 
 interface IntegrationCardProps {
@@ -63,7 +63,26 @@ export default function IntegrationCard({
       </div>
 
       {/* Action Button */}
-      {isConnected ? (
+      {integration.isPerUser ? (
+        // Per-user integration (e.g., Linear) - show View button
+        <Button
+          variant="default"
+          onClick={() => (onCustomConnect ? onCustomConnect() : onConfigure?.(integration.id))}
+          className={`gap-2 ${
+            (integration.connectedUsersCount ?? 0) > 0
+              ? "bg-status-success hover:bg-status-success/90"
+              : "bg-primary hover:bg-primary/90"
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          View
+          {(integration.connectedUsersCount ?? 0) > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 text-xs bg-white/20 rounded">
+              {integration.connectedUsersCount}
+            </span>
+          )}
+        </Button>
+      ) : isConnected ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button className="bg-status-success hover:bg-status-success/90 text-white gap-2">

@@ -182,9 +182,9 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] bg-background-primary border-border-subtle">
-        <DialogHeader>
+        <DialogHeader className="pr-10">
           <DialogTitle className="text-text-primary">Start Monitoring Session</DialogTitle>
-          <DialogDescription className="text-text-secondary">
+          <DialogDescription className="text-text-secondary whitespace-normal break-words">
             Select the windows you want to monitor. We'll capture screenshots periodically to
             summarize your work.
           </DialogDescription>
@@ -225,7 +225,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
           </div>
 
           {/* Window Selection */}
-          <div className="space-y-3">
+          <div className="space-y-3 w-full">
             <div className="flex items-center justify-between">
               <Label className="text-text-primary">Windows to Monitor</Label>
               <div className="flex items-center gap-2">
@@ -265,7 +265,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
                 </Button>
               </div>
             ) : (
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-3">
                 {availableWindows.map((window) => (
                   <label
                     key={window.windowId}
@@ -274,6 +274,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
                     <Checkbox
                       checked={selectedWindows.includes(window.windowId)}
                       onCheckedChange={() => handleWindowToggle(window.windowId)}
+                      className="flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-text-primary font-medium truncate">{window.appName}</p>

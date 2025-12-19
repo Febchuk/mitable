@@ -1076,6 +1076,56 @@ router.post(
 );
 
 /**
+ * POST /api/monitoring/sessions/:id/mark-delivered
+ * Mark a session as delivered (for Linear or other integrations)
+ */
+router.post(
+  "/sessions/:id/mark-delivered",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({ error: "Not Found", message: "Session not found" });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({ error: "Forbidden", message: "Not authorized" });
+        return;
+      }
+
+      // Mark as delivered
+      await db
+        .update(schema.monitoringSessions)
+        .set({
+          deliveryStatus: "delivered",
+          deliveredAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.monitoringSessions.id, id));
+
+      res.json({ success: true, deliveredAt: new Date().toISOString() });
+    } catch (error) {
+      console.error("[Monitoring] Error marking session as delivered:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to mark session as delivered",
+      });
+    }
+  }
+);
+
+/**
  * DELETE /api/monitoring/sessions/:id
  * Delete a session
  */

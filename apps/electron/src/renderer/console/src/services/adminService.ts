@@ -68,11 +68,21 @@ export interface TemplateDetail {
 
 export interface Integration {
   id: string;
-  provider: "slack" | "notion" | "github" | "google-drive";
+  provider: "slack" | "notion" | "github" | "google-drive" | "linear";
   name: string;
   description: string;
   status: "connected" | "disconnected";
   updatesPerDay: number;
+  connectedAt?: Date;
+  isPerUser?: boolean;
+  connectedUsersCount?: number;
+}
+
+export interface LinearConnectedUser {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
   connectedAt?: Date;
 }
 
@@ -169,6 +179,21 @@ export async function fetchIntegrations(): Promise<Integration[]> {
     return response.integrations;
   } catch (error) {
     console.error("Error fetching integrations:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch users with Linear connected (admin only)
+ */
+export async function fetchLinearConnectedUsers(): Promise<LinearConnectedUser[]> {
+  try {
+    const response = await apiRequest<{ users: LinearConnectedUser[] }>(
+      "/admin/integrations/linear/users"
+    );
+    return response.users;
+  } catch (error) {
+    console.error("Error fetching Linear users:", error);
     throw error;
   }
 }

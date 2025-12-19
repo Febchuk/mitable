@@ -6,6 +6,7 @@ import SlackConfigureDialog from "./components/SlackConfigureDialog";
 import NotionConnectDialog from "./components/NotionConnectDialog";
 import NotionConfigureDialog from "./components/NotionConfigureDialog";
 import GitHubConnectDialog from "./components/GitHubConnectDialog";
+import LinearUsersDialog from "./components/LinearUsersDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +32,7 @@ export default function IntegrationsView() {
   const [notionDialogOpen, setNotionDialogOpen] = useState(false);
   const [notionConfigureDialogOpen, setNotionConfigureDialogOpen] = useState(false);
   const [githubDialogOpen, setGithubDialogOpen] = useState(false);
+  const [linearUsersDialogOpen, setLinearUsersDialogOpen] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSlackConnect = () => {
@@ -67,6 +69,10 @@ export default function IntegrationsView() {
 
   const handleGithubConnect = () => {
     setGithubDialogOpen(true);
+  };
+
+  const handleLinearViewUsers = () => {
+    setLinearUsersDialogOpen(true);
   };
 
   const handleGithubOAuthComplete = () => {
@@ -402,9 +408,11 @@ export default function IntegrationsView() {
                   onConfigure={
                     integration.provider === "slack"
                       ? handleSlackConfigure
-                      : handleConfigureIntegration
+                      : integration.provider === "linear"
+                        ? handleLinearViewUsers
+                        : handleConfigureIntegration
                   }
-                  onSync={handleSyncIntegration}
+                  onSync={integration.provider === "linear" ? undefined : handleSyncIntegration}
                   onViewDetails={handleViewDetails}
                   onCustomConnect={
                     integration.provider === "slack"
@@ -413,7 +421,9 @@ export default function IntegrationsView() {
                         ? handleNotionConnect
                         : integration.provider === "github"
                           ? handleGithubConnect
-                          : undefined
+                          : integration.provider === "linear"
+                            ? handleLinearViewUsers
+                            : undefined
                   }
                   position={getCardPosition(index, sortedIntegrations.length)}
                 />
@@ -445,9 +455,11 @@ export default function IntegrationsView() {
                         ? handleSlackConfigure
                         : integration.provider === "notion"
                           ? handleNotionConfigure
-                          : handleConfigureIntegration
+                          : integration.provider === "linear"
+                            ? handleLinearViewUsers
+                            : handleConfigureIntegration
                     }
-                    onSync={handleSyncIntegration}
+                    onSync={integration.provider === "linear" ? undefined : handleSyncIntegration}
                     onViewDetails={handleViewDetails}
                     onCustomConnect={
                       integration.provider === "slack"
@@ -456,7 +468,9 @@ export default function IntegrationsView() {
                           ? handleNotionConnect
                           : integration.provider === "github"
                             ? handleGithubConnect
-                            : undefined
+                            : integration.provider === "linear"
+                              ? handleLinearViewUsers
+                              : undefined
                     }
                     position={getCardPosition(index, connectedIntegrations.length)}
                   />
@@ -483,9 +497,11 @@ export default function IntegrationsView() {
                         ? handleSlackConfigure
                         : integration.provider === "notion"
                           ? handleNotionConfigure
-                          : handleConfigureIntegration
+                          : integration.provider === "linear"
+                            ? handleLinearViewUsers
+                            : handleConfigureIntegration
                     }
-                    onSync={handleSyncIntegration}
+                    onSync={integration.provider === "linear" ? undefined : handleSyncIntegration}
                     onViewDetails={handleViewDetails}
                     onCustomConnect={
                       integration.provider === "slack"
@@ -494,7 +510,9 @@ export default function IntegrationsView() {
                           ? handleNotionConnect
                           : integration.provider === "github"
                             ? handleGithubConnect
-                            : undefined
+                            : integration.provider === "linear"
+                              ? handleLinearViewUsers
+                              : undefined
                     }
                     position={getCardPosition(index, availableIntegrations.length)}
                   />
@@ -544,6 +562,9 @@ export default function IntegrationsView() {
         onOpenChange={setGithubDialogOpen}
         onConnect={handleGithubOAuthComplete}
       />
+
+      {/* Linear Users Dialog */}
+      <LinearUsersDialog open={linearUsersDialogOpen} onOpenChange={setLinearUsersDialogOpen} />
     </div>
   );
 }

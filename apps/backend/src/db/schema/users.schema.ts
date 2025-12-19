@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, integer, timestamp, date, text } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./organizations.schema";
 
@@ -15,6 +15,12 @@ export const users = pgTable("users", {
   currentWeek: integer("current_week").default(1),
   startDate: date("start_date"),
   status: varchar("status", { length: 50 }).default("active"), // 'active' | 'inactive' | 'archived'
+
+  // Linear OAuth tokens (per-user, encrypted)
+  linearAccessTokenEncrypted: text("linear_access_token_encrypted"),
+  linearRefreshTokenEncrypted: text("linear_refresh_token_encrypted"),
+  linearTokenExpiresAt: timestamp("linear_token_expires_at"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

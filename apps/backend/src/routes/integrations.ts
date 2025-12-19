@@ -1576,4 +1576,488 @@ router.post("/github/sync", requireAuth, async (req: Request, res: Response): Pr
   }
 });
 
+// ============================================================================
+// LINEAR INTEGRATION ROUTES (Per-user OAuth for session updates)
+// ============================================================================
+
+/**
+ * POST /api/integrations/linear/oauth/start
+ * Initiate Linear OAuth flow for the current user
+ * Returns the authorization URL for the user to visit
+ */
+router.post(
+  "/linear/oauth/start",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      // Validate Linear credentials are configured
+      if (!config.linear.clientId || !config.linear.clientSecret) {
+        sendError(
+          res,
+          500,
+          "LINEAR_NOT_CONFIGURED",
+          "Linear OAuth credentials not configured. Please set LINEAR_CLIENT_ID and LINEAR_CLIENT_SECRET."
+        );
+        return;
+      }
+
+      // Build Linear OAuth URL
+      // Scopes: read (view issues), write (create comments, update status)
+      const scopes = "read,write";
+      const state = userId; // Use userId as state to identify user after redirect
+
+      const authUrl =
+        `https://linear.app/oauth/authorize?` +
+        `client_id=${config.linear.clientId}&` +
+        `redirect_uri=${encodeURIComponent(config.linear.redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${scopes}&` +
+        `state=${state}`;
+
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting Linear OAuth:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to initiate Linear OAuth",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/integrations/linear/callback
+ * Linear OAuth callback endpoint
+ * Linear redirects here after user approves the app
+ */
+router.get("/linear/callback", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { code, state, error } = req.query;
+
+    // Handle OAuth error (user denied access)
+    if (error) {
+      res.status(400).send(`
+        <html>
+          <head>
+            <title>Linear Connection Failed</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+              h1 { color: #5E6AD2; }
+            </style>
+          </head>
+          <body>
+            <h1>❌ Linear Connection Failed</h1>
+            <p>You denied access or an error occurred.</p>
+            <p>Error: ${error}</p>
+            <p>You can close this window and try again.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    if (!code || !state) {
+      res.status(400).send(`
+        <html>
+          <head>
+            <title>Invalid Request</title>
+          </head>
+          <body>
+            <h1>Invalid OAuth callback</h1>
+            <p>Missing authorization code or state parameter.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    const userId = state as string;
+
+    // Import Linear service
+    const { linearService } = await import("../services/linear.service.js");
+
+    // Exchange authorization code for access token
+    const tokenData = await linearService.exchangeCodeForToken(code as string);
+
+    // Calculate token expiration
+    const tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+
+    // Encrypt tokens before storing
+    const encryptedAccessToken = encryptionService.encrypt(tokenData.access_token);
+    const encryptedRefreshToken = tokenData.refresh_token
+      ? encryptionService.encrypt(tokenData.refresh_token)
+      : null;
+
+    // Store tokens on user record
+    await db
+      .update(schema.users)
+      .set({
+        linearAccessTokenEncrypted: encryptedAccessToken,
+        linearRefreshTokenEncrypted: encryptedRefreshToken,
+        linearTokenExpiresAt: tokenExpiresAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, userId));
+
+    // Get user info from Linear for logging
+    const viewer = await linearService.getViewer(tokenData.access_token);
+
+    console.log(`✅ Linear connected for user: ${userId} (${viewer.email})`);
+
+    // Return success page
+    res.send(`
+      <html>
+        <head>
+          <title>Linear Connected</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              text-align: center;
+              padding: 50px;
+              background: linear-gradient(135deg, #5E6AD2 0%, #8B5CF6 100%);
+              color: white;
+            }
+            .container {
+              background: white;
+              color: #333;
+              border-radius: 10px;
+              padding: 40px;
+              max-width: 500px;
+              margin: 0 auto;
+              box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            }
+            h1 { color: #5E6AD2; margin-bottom: 10px; }
+            p { font-size: 16px; line-height: 1.6; }
+            .user-name { font-weight: bold; color: #5E6AD2; }
+            button {
+              margin-top: 20px;
+              padding: 12px 24px;
+              background: #5E6AD2;
+              color: white;
+              border: none;
+              border-radius: 5px;
+              font-size: 16px;
+              cursor: pointer;
+            }
+            button:hover { background: #4F5ABF; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>✅ Linear Connected Successfully!</h1>
+            <p>Connected as <span class="user-name">${viewer.displayName || viewer.name}</span></p>
+            <p>You can now send session updates to your Linear tickets.</p>
+            <button onclick="window.close()">Close Window</button>
+          </div>
+          <script>
+            // Auto-close after 2 seconds
+            setTimeout(() => window.close(), 2000);
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Linear OAuth callback error:", error);
+    res.status(500).send(`
+      <html>
+        <head>
+          <title>Connection Error</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            h1 { color: #e01e5a; }
+          </style>
+        </head>
+        <body>
+          <h1>❌ Connection Error</h1>
+          <p>Failed to connect to Linear. Please try again.</p>
+          <p>Error: ${error instanceof Error ? error.message : "Unknown error"}</p>
+        </body>
+      </html>
+    `);
+  }
+});
+
+/**
+ * GET /api/integrations/linear/status
+ * Check if the current user has Linear connected
+ */
+router.get("/linear/status", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const [user] = await db
+      .select({
+        linearAccessTokenEncrypted: schema.users.linearAccessTokenEncrypted,
+        linearTokenExpiresAt: schema.users.linearTokenExpiresAt,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "Not Found", message: "User not found" });
+      return;
+    }
+
+    const isConnected = !!user.linearAccessTokenEncrypted;
+    const isExpired = user.linearTokenExpiresAt
+      ? new Date(user.linearTokenExpiresAt) < new Date()
+      : false;
+
+    res.json({
+      connected: isConnected && !isExpired,
+      expired: isExpired,
+    });
+  } catch (error) {
+    console.error("Error checking Linear status:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to check Linear status",
+    });
+  }
+});
+
+/**
+ * DELETE /api/integrations/linear/disconnect
+ * Disconnect Linear for the current user
+ */
+router.delete(
+  "/linear/disconnect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      await db
+        .update(schema.users)
+        .set({
+          linearAccessTokenEncrypted: null,
+          linearRefreshTokenEncrypted: null,
+          linearTokenExpiresAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, userId));
+
+      console.log(`✅ Linear disconnected for user: ${userId}`);
+
+      res.json({ success: true, message: "Linear disconnected" });
+    } catch (error) {
+      console.error("Error disconnecting Linear:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to disconnect Linear",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/integrations/linear/issues
+ * Get the current user's assigned Linear issues
+ */
+router.get("/linear/issues", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const [user] = await db
+      .select({
+        linearAccessTokenEncrypted: schema.users.linearAccessTokenEncrypted,
+        linearTokenExpiresAt: schema.users.linearTokenExpiresAt,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!user?.linearAccessTokenEncrypted) {
+      res.status(400).json({
+        error: "Linear Not Connected",
+        message: "Please connect your Linear account first",
+      });
+      return;
+    }
+
+    // Check if token is expired
+    if (user.linearTokenExpiresAt && new Date(user.linearTokenExpiresAt) < new Date()) {
+      res.status(401).json({
+        error: "Token Expired",
+        message: "Your Linear connection has expired. Please reconnect.",
+      });
+      return;
+    }
+
+    // Decrypt access token
+    const accessToken = encryptionService.decrypt(user.linearAccessTokenEncrypted);
+
+    // Fetch issues from Linear
+    const { linearService } = await import("../services/linear.service.js");
+    const issues = await linearService.getAssignedIssues(accessToken);
+
+    res.json({ issues });
+  } catch (error) {
+    console.error("Error fetching Linear issues:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to fetch issues",
+    });
+  }
+});
+
+/**
+ * GET /api/integrations/linear/teams
+ * Get teams and workflow states for the current user
+ */
+router.get("/linear/teams", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const [user] = await db
+      .select({
+        linearAccessTokenEncrypted: schema.users.linearAccessTokenEncrypted,
+        linearTokenExpiresAt: schema.users.linearTokenExpiresAt,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!user?.linearAccessTokenEncrypted) {
+      res.status(400).json({
+        error: "Linear Not Connected",
+        message: "Please connect your Linear account first",
+      });
+      return;
+    }
+
+    // Decrypt access token
+    const accessToken = encryptionService.decrypt(user.linearAccessTokenEncrypted);
+
+    // Fetch teams from Linear
+    const { linearService } = await import("../services/linear.service.js");
+    const teams = await linearService.getTeams(accessToken);
+
+    res.json({ teams });
+  } catch (error) {
+    console.error("Error fetching Linear teams:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to fetch teams",
+    });
+  }
+});
+
+/**
+ * POST /api/integrations/linear/issues/:issueId/comment
+ * Create a comment on a Linear issue
+ */
+router.post(
+  "/linear/issues/:issueId/comment",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const { issueId } = req.params;
+      const { body } = req.body;
+
+      if (!body) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "Comment body is required",
+        });
+        return;
+      }
+
+      const [user] = await db
+        .select({
+          linearAccessTokenEncrypted: schema.users.linearAccessTokenEncrypted,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!user?.linearAccessTokenEncrypted) {
+        res.status(400).json({
+          error: "Linear Not Connected",
+          message: "Please connect your Linear account first",
+        });
+        return;
+      }
+
+      // Decrypt access token
+      const accessToken = encryptionService.decrypt(user.linearAccessTokenEncrypted);
+
+      // Create comment on Linear
+      const { linearService } = await import("../services/linear.service.js");
+      const result = await linearService.createComment(accessToken, issueId, body);
+
+      console.log(`✅ Comment created on Linear issue ${issueId} by user ${userId}`);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating Linear comment:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to create comment",
+      });
+    }
+  }
+);
+
+/**
+ * PATCH /api/integrations/linear/issues/:issueId/state
+ * Update an issue's workflow state
+ */
+router.patch(
+  "/linear/issues/:issueId/state",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const { issueId } = req.params;
+      const { stateId } = req.body;
+
+      if (!stateId) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "stateId is required",
+        });
+        return;
+      }
+
+      const [user] = await db
+        .select({
+          linearAccessTokenEncrypted: schema.users.linearAccessTokenEncrypted,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!user?.linearAccessTokenEncrypted) {
+        res.status(400).json({
+          error: "Linear Not Connected",
+          message: "Please connect your Linear account first",
+        });
+        return;
+      }
+
+      // Decrypt access token
+      const accessToken = encryptionService.decrypt(user.linearAccessTokenEncrypted);
+
+      // Update issue state on Linear
+      const { linearService } = await import("../services/linear.service.js");
+      const result = await linearService.updateIssueState(accessToken, issueId, stateId);
+
+      console.log(`✅ Linear issue ${issueId} state updated by user ${userId}`);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating Linear issue state:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to update issue state",
+      });
+    }
+  }
+);
+
 export default router;

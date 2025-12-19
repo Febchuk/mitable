@@ -17,6 +17,7 @@ import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
+import SettingsView from "./components/views/employee/SettingsView";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
@@ -146,6 +147,7 @@ function App() {
               {/* Monitoring Routes */}
               <Route path="monitoring" element={<MonitoringView />} />
               <Route path="monitoring/:sessionId" element={<SessionDetail />} />
+              <Route path="settings" element={<SettingsView />} />
             </Route>
           </Routes>
           <Toaster />
