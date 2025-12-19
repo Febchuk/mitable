@@ -4,6 +4,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
 import { UserProvider, useUser } from "./context/UserContext";
 import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
 import LoginPage from "./pages/LoginPage";
 import SignupOrganizationPage from "./pages/SignupOrganizationPage";
@@ -17,6 +18,8 @@ import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
+import DocsView from "./components/views/employee/DocsView";
+import DocDetail from "./components/views/employee/DocsView/DocDetail";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
@@ -109,6 +112,7 @@ function App() {
         <NavigationHandler />
         <MonitoringSessionHandler />
         <UserProvider>
+          <TooltipProvider>
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
@@ -146,9 +150,13 @@ function App() {
               {/* Monitoring Routes */}
               <Route path="monitoring" element={<MonitoringView />} />
               <Route path="monitoring/:sessionId" element={<SessionDetail />} />
+              {/* Docs Routes */}
+              <Route path="docs" element={<DocsView />} />
+              <Route path="docs/:docId" element={<DocDetail />} />
             </Route>
           </Routes>
           <Toaster />
+          </TooltipProvider>
         </UserProvider>
       </HashRouter>
       <ReactQueryDevtools initialIsOpen={false} />
