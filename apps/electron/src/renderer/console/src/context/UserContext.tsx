@@ -39,8 +39,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
           currentWeek: response.profile.currentWeek || 1,
           role: response.profile.role,
           originalRole: response.profile.role,
+          organizationId: response.profile.organizationId || "",
         });
         setIsAuthenticated(true);
+
+        // Share user context with main process for cross-window access (WatchingPill, etc.)
+        if (window.consoleAPI?.setCurrentUser) {
+          window.consoleAPI.setCurrentUser({
+            userId: response.profile.id,
+            organizationId: response.profile.organizationId || "",
+          });
+        }
 
         // Broadcast token to main process for cross-window sharing (Agent pill, etc.)
         const refreshToken = authService.getRefreshToken();
@@ -68,8 +77,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
               currentWeek: response.profile.currentWeek || 1,
               role: response.profile.role,
               originalRole: response.profile.role,
+              organizationId: response.profile.organizationId || "",
             });
             setIsAuthenticated(true);
+
+            // Share user context with main process for cross-window access (WatchingPill, etc.)
+            if (window.consoleAPI?.setCurrentUser) {
+              window.consoleAPI.setCurrentUser({
+                userId: response.profile.id,
+                organizationId: response.profile.organizationId || "",
+              });
+            }
           } catch (refreshError) {
             console.error("Failed to refresh token:", refreshError);
             authService.clearTokens();

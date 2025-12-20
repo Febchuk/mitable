@@ -79,6 +79,7 @@ export interface User {
   currentWeek: number;
   role: UserRole;
   originalRole?: UserRole;
+  organizationId: string;
 }
 
 // ============================================

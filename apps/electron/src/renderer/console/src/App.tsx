@@ -1,9 +1,10 @@
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
 import { UserProvider, useUser } from "./context/UserContext";
 import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
 import LoginPage from "./pages/LoginPage";
 import SignupOrganizationPage from "./pages/SignupOrganizationPage";
@@ -15,6 +16,10 @@ import CreateNudge from "./components/views/employee/NudgesView/CreateNudge";
 import ChatsView from "./components/views/employee/ChatsView";
 import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
+import MonitoringView from "./components/views/employee/MonitoringView";
+import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
+import DocsView from "./components/views/employee/DocsView";
+import DocDetail from "./components/views/employee/DocsView/DocDetail";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
@@ -41,10 +46,29 @@ function NavigationHandler() {
   return null;
 }
 
+// Monitoring session handler - listens for session updates from WatchingPill/main process
+function MonitoringSessionHandler() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    window.consoleAPI.onMonitoringSessionUpdate((state) => {
+      console.log("[Console] Monitoring session update:", state?.status, state?.id);
+
+      // Invalidate session queries on any status change (paused, active, ended)
+      if (state?.id) {
+        queryClient.invalidateQueries({ queryKey: ["monitoring", "session", state.id] });
+        queryClient.invalidateQueries({ queryKey: ["monitoring", "sessions"] });
+      }
+    });
+  }, [queryClient]);
+
+  return null;
+}
+
 // Dynamic default route based on user role
 function DefaultRoute() {
   const { user } = useUser();
-  const defaultPath = user?.role === "admin" ? "/dashboard" : "/roadmap";
+  const defaultPath = user?.role === "admin" ? "/dashboard" : "/monitoring";
   return <Navigate to={defaultPath} replace />;
 }
 
@@ -86,7 +110,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <HashRouter>
         <NavigationHandler />
+        <MonitoringSessionHandler />
         <UserProvider>
+          <TooltipProvider>
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
@@ -121,9 +147,16 @@ function App() {
               <Route path="chats" element={<ChatsView />} />
               <Route path="chats/new" element={<NewChat />} />
               <Route path="chats/:chatId" element={<ChatDetail />} />
+              {/* Monitoring Routes */}
+              <Route path="monitoring" element={<MonitoringView />} />
+              <Route path="monitoring/:sessionId" element={<SessionDetail />} />
+              {/* Docs Routes */}
+              <Route path="docs" element={<DocsView />} />
+              <Route path="docs/:docId" element={<DocDetail />} />
             </Route>
           </Routes>
           <Toaster />
+          </TooltipProvider>
         </UserProvider>
       </HashRouter>
       <ReactQueryDevtools initialIsOpen={false} />
