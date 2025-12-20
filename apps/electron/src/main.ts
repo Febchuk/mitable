@@ -252,20 +252,57 @@ function createConsoleWindow() {
   console.log("[Console] Creating console window...");
   console.log("[Console] Preload script path:", join(__dirname, "../preload/console.cjs"));
 
+  // Get screen dimensions for responsive window sizing
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+  // Calculate window dimensions based on screen size (max 1264x888, with padding)
+  const maxWidth = 1264;
+  const maxHeight = 888;
+  const padding = 100; // Minimum padding from screen edges
+  const windowWidth = Math.min(maxWidth, screenWidth - padding);
+  const windowHeight = Math.min(maxHeight, screenHeight - padding);
+
+  // Platform-specific window configuration
+  const isMac = process.platform === "darwin";
+  const isWindows = process.platform === "win32";
+
   consoleWindow = new BrowserWindow({
-    width: 1264,
-    height: 888,
-    transparent: true,
-    backgroundColor: "#00000000", // Fully transparent hex for vibrancy support
-    // Hidden title bar on macOS for native traffic lights with custom positioning
-    titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
-    frame: process.platform !== "darwin",
-    maximizable: false,
-    // Native frosted glass - platform specific
-    ...(process.platform === "darwin" && {
+    width: windowWidth,
+    height: windowHeight,
+    // Center the window
+    x: Math.floor((screenWidth - windowWidth) / 2),
+    y: Math.floor((screenHeight - windowHeight) / 2),
+    // Hidden title bar with native controls
+    titleBarStyle: "hidden",
+    // Show native window controls on Windows/Linux via titleBarOverlay
+    ...(isMac
+      ? {}
+      : {
+          titleBarOverlay: {
+            color: "#1a1a1a",
+            symbolColor: "#ffffff",
+            height: 32,
+          },
+        }),
+    maximizable: true,
+    // Platform-specific transparency and background
+    ...(isMac && {
+      transparent: true,
+      backgroundColor: "#00000000",
       vibrancy: "under-window" as const,
       visualEffectState: "active" as const,
     }),
+    // Windows: use Mica/Acrylic on Windows 11, solid background otherwise
+    ...(isWindows && {
+      backgroundColor: "#1a1a1a",
+      backgroundMaterial: "mica" as const,
+    }),
+    // Linux: solid background
+    ...(!isMac &&
+      !isWindows && {
+        backgroundColor: "#1a1a1a",
+      }),
     webPreferences: {
       preload: join(__dirname, "../preload/console.cjs"),
       contextIsolation: true,
