@@ -14,9 +14,9 @@ import { groqVisionService } from "./groq-vision.service";
 import {
   buildProgressionDetectorPrompt,
   parseProgressionResponse,
-  ProgressionDetectorResponse,
+  ChangeType,
+  ChangeMagnitude,
 } from "../prompts/session-prompts";
-import { DeltaChangeType } from "../db/schema/monitoring.schema";
 
 // Types
 export interface FrameAnalysisInput {
@@ -37,11 +37,11 @@ export interface FrameAnalysisResult {
   progressionDetected: boolean;
   summaryOfAction: string;
 
-  // Enhanced delta detection (mapped from progression result)
+  // Observable delta detection (what visually changed, not how)
   deltaChanged: boolean;
-  deltaChangeType: DeltaChangeType;
-  deltaChangeDescription: string;
-  deltaUserAction: string | null;
+  changeType: ChangeType;
+  changeMagnitude: ChangeMagnitude;
+  changeDescription: string;
 
   // Metadata
   confidence: number;
@@ -81,21 +81,21 @@ class FrameAnalysisService {
         return this.createFallbackResult(input, visionResult);
       }
 
-      // Map progression result to enhanced delta detection
-      const deltaResult = this.mapToEnhancedDelta(
-        progressionResult,
-        input.previousFrame === null
-      );
+      // Map progression result - directly use LLM's observable classifications
+      const isFirstFrame = input.previousFrame === null;
+      const deltaChanged = isFirstFrame || progressionResult.progression_detected;
 
       return {
         frameId: input.frameId,
         progressionDetected: progressionResult.progression_detected,
         summaryOfAction: progressionResult.summary_of_action,
-        deltaChanged: deltaResult.changed,
-        deltaChangeType: deltaResult.changeType,
-        deltaChangeDescription: deltaResult.changeDescription,
-        deltaUserAction: deltaResult.userAction,
-        confidence: progressionResult.progression_detected ? 0.85 : 0.7,
+        deltaChanged,
+        changeType: isFirstFrame ? "none" : progressionResult.change_type,
+        changeMagnitude: isFirstFrame ? "trivial" : progressionResult.change_magnitude,
+        changeDescription: isFirstFrame
+          ? "First frame in session"
+          : progressionResult.summary_of_action,
+        confidence: progressionResult.confidence,
         analysisLatencyMs: visionResult.latencyMs,
         model: visionResult.model,
         tokenUsage: {
@@ -128,91 +128,6 @@ class FrameAnalysisService {
   }
 
   /**
-   * Map progression detection to enhanced delta types
-   */
-  private mapToEnhancedDelta(
-    progression: ProgressionDetectorResponse,
-    isFirstFrame: boolean
-  ): {
-    changed: boolean;
-    changeType: DeltaChangeType;
-    changeDescription: string;
-    userAction: string | null;
-  } {
-    if (isFirstFrame) {
-      return {
-        changed: true,
-        changeType: "none",
-        changeDescription: "First frame in session",
-        userAction: "Started monitoring session",
-      };
-    }
-
-    if (!progression.progression_detected) {
-      return {
-        changed: false,
-        changeType: "none",
-        changeDescription: "No meaningful change detected",
-        userAction: null,
-      };
-    }
-
-    // Infer change type from summary
-    const summary = progression.summary_of_action.toLowerCase();
-    let changeType: DeltaChangeType = "content_update";
-    let userAction: string | null = null;
-
-    // Typing patterns
-    if (
-      summary.includes("typed") ||
-      summary.includes("wrote") ||
-      summary.includes("entered") ||
-      summary.includes("edited") ||
-      summary.includes("modified")
-    ) {
-      changeType = "typing";
-      userAction = "typing";
-    }
-    // Navigation patterns
-    else if (
-      summary.includes("navigated") ||
-      summary.includes("clicked") ||
-      summary.includes("opened") ||
-      summary.includes("switched to") ||
-      summary.includes("went to")
-    ) {
-      changeType = "navigation";
-      userAction = "clicking";
-    }
-    // Scroll patterns
-    else if (summary.includes("scrolled") || summary.includes("scroll")) {
-      changeType = "scroll";
-      userAction = "scrolling";
-    }
-    // Focus change patterns
-    else if (
-      summary.includes("focused") ||
-      summary.includes("switched window") ||
-      summary.includes("moved to")
-    ) {
-      changeType = "focus_change";
-      userAction = "clicking";
-    }
-    // Default to content update
-    else {
-      changeType = "content_update";
-      userAction = "viewing";
-    }
-
-    return {
-      changed: true,
-      changeType,
-      changeDescription: progression.summary_of_action,
-      userAction,
-    };
-  }
-
-  /**
    * Create fallback result when parsing fails
    */
   private createFallbackResult(
@@ -228,11 +143,11 @@ class FrameAnalysisService {
         ? "Session started"
         : "Unable to determine activity",
       deltaChanged: isFirstFrame,
-      deltaChangeType: "none",
-      deltaChangeDescription: isFirstFrame
+      changeType: "none",
+      changeMagnitude: "trivial",
+      changeDescription: isFirstFrame
         ? "First frame in session"
         : "Analysis inconclusive",
-      deltaUserAction: null,
       confidence: 0.5,
       analysisLatencyMs: visionResult.latencyMs,
       model: visionResult.model,

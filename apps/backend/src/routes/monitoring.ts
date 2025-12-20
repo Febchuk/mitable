@@ -5,6 +5,7 @@ import * as schema from "../db/schema/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sessionDeliveryService } from "../services/session-delivery.service.js";
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
+import { frameAnalysisService } from "../services/frame-analysis.service.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 
 const router = Router();
@@ -569,6 +570,15 @@ router.post(
         screenshotPath?: string;
         screenshotHash?: string;
         imageData?: string;
+        // Analysis metadata (from frame analysis)
+        deltaChanged?: boolean;
+        deltaChangeType?: string;
+        deltaChangeDescription?: string;
+        deltaUserAction?: string;
+        onTask?: boolean;
+        taskRelevance?: string;
+        importanceScore?: number;
+        importanceReason?: string;
       }>;
     } = req.body;
 
@@ -604,7 +614,7 @@ router.post(
         return;
       }
 
-      // Insert captures with imageData for AI analysis
+      // Insert captures with imageData and analysis metadata
       const insertedCaptures = await db
         .insert(schema.sessionCaptures)
         .values(
@@ -619,7 +629,17 @@ router.post(
             screenshotPath: c.screenshotPath || null,
             screenshotHash: c.screenshotHash || null,
             imageData: c.imageData || null,
-            analysisStatus: "pending",
+            analysisStatus: c.deltaChanged !== undefined ? "analyzed" : "pending",
+            // Analysis metadata
+            deltaChanged: c.deltaChanged ?? false,
+            deltaChangeType: c.deltaChangeType || null,
+            deltaChangeDescription: c.deltaChangeDescription || null,
+            deltaUserAction: c.deltaUserAction || null,
+            onTask: c.onTask ?? true,
+            taskRelevance: c.taskRelevance || null,
+            importanceScore: c.importanceScore ?? 0,
+            importanceReason: c.importanceReason || null,
+            selectedForExport: true, // These are Top-K frames being uploaded
           }))
         )
         .returning({ id: schema.sessionCaptures.id });
@@ -639,6 +659,232 @@ router.post(
     }
   }
 );
+
+/**
+ * POST /api/monitoring/sessions/:id/analyze-frame
+ * Analyze a frame using delta detection (Groq Vision)
+ * Compares current frame with previous frame to detect meaningful changes
+ */
+router.post(
+  "/sessions/:id/analyze-frame",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const {
+      frameId,
+      currentImage,
+      previousImage,
+      windowInfo,
+      sessionGoal,
+    }: {
+      frameId: string;
+      currentImage: string; // Base64 image data
+      previousImage: string | null; // Base64 image data (null for first frame)
+      windowInfo: {
+        windowSourceId: string;
+        appName: string;
+        windowTitle: string;
+      };
+      sessionGoal?: string;
+    } = req.body;
+
+    if (!frameId || !currentImage || !windowInfo) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "frameId, currentImage, and windowInfo are required",
+      });
+      return;
+    }
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to access this session",
+        });
+        return;
+      }
+
+      // Check if frame analysis service is available
+      if (!frameAnalysisService.isAvailable()) {
+        console.warn("[Monitoring] Frame analysis service not available (no GROQ_API_KEY)");
+        // Return default analysis when service unavailable
+        res.json({
+          success: true,
+          analysis: {
+            frameId,
+            progressionDetected: previousImage === null,
+            summaryOfAction: previousImage === null ? "Session started" : "Analysis unavailable",
+            deltaChanged: previousImage === null,
+            changeType: "none",
+            changeMagnitude: "trivial",
+            changeDescription: previousImage === null ? "First frame" : "Service unavailable",
+            onTask: true, // Default to on-task when unavailable
+            taskRelevance: null,
+            importanceScore: previousImage === null ? 0.5 : 0.3, // Default scores
+            importanceReason: "Default scoring (analysis service unavailable)",
+            confidence: 0.5,
+          },
+        });
+        return;
+      }
+
+      // Analyze frame
+      const analysisResult = await frameAnalysisService.analyzeFrame({
+        sessionId: id,
+        frameId,
+        currentFrame: currentImage,
+        previousFrame: previousImage,
+        windowInfo,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Calculate importance score based on analysis
+      const importanceScore = calculateImportanceScore(analysisResult, sessionGoal);
+
+      console.log(`[Monitoring] Frame analyzed: ${frameId}`, {
+        progressionDetected: analysisResult.progressionDetected,
+        changeType: analysisResult.changeType,
+        changeMagnitude: analysisResult.changeMagnitude,
+        importanceScore,
+      });
+
+      res.json({
+        success: true,
+        analysis: {
+          frameId: analysisResult.frameId,
+          progressionDetected: analysisResult.progressionDetected,
+          summaryOfAction: analysisResult.summaryOfAction,
+          deltaChanged: analysisResult.deltaChanged,
+          changeType: analysisResult.changeType,
+          changeMagnitude: analysisResult.changeMagnitude,
+          changeDescription: analysisResult.changeDescription,
+          onTask: true, // TODO: Implement task correlation with sessionGoal
+          taskRelevance: null, // TODO: Implement task relevance extraction
+          importanceScore,
+          importanceReason: getImportanceReason(analysisResult, importanceScore),
+          confidence: analysisResult.confidence,
+          model: analysisResult.model,
+          latencyMs: analysisResult.analysisLatencyMs,
+        },
+      });
+    } catch (error) {
+      console.error("[Monitoring] Error analyzing frame:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to analyze frame",
+      });
+    }
+  }
+);
+
+/**
+ * Calculate importance score (0-1) based on frame analysis
+ * Uses observable change types and magnitudes (no input method guessing)
+ */
+function calculateImportanceScore(
+  analysis: {
+    progressionDetected: boolean;
+    deltaChanged: boolean;
+    changeType: string;
+    changeMagnitude: string;
+  },
+  _sessionGoal?: string
+): number {
+  let score = 0.3; // Base score
+
+  // Progression detected is a strong signal
+  if (analysis.progressionDetected) {
+    score += 0.2;
+  }
+
+  // Change magnitude affects score
+  switch (analysis.changeMagnitude) {
+    case "major":
+      score += 0.25;
+      break;
+    case "minor":
+      score += 0.15;
+      break;
+    case "trivial":
+      score += 0.05;
+      break;
+  }
+
+  // Change type affects score (observable outcomes only)
+  if (analysis.deltaChanged) {
+    switch (analysis.changeType) {
+      case "content_addition":
+        score += 0.25; // New content is high value
+        break;
+      case "content_modification":
+        score += 0.2; // Edits are valuable
+        break;
+      case "content_deletion":
+        score += 0.15; // Deletions matter
+        break;
+      case "navigation":
+      case "file_switch":
+        score += 0.15; // Context changes
+        break;
+      case "focus_change":
+        score += 0.1; // Window switches
+        break;
+      case "ui_state_change":
+        score += 0.08; // UI interactions
+        break;
+      case "scroll":
+        score += 0.05; // Passive viewing
+        break;
+      case "none":
+        score += 0.0; // No change
+        break;
+      default:
+        score += 0.1;
+    }
+  }
+
+  // Clamp to 0-1 range
+  return Math.min(1, Math.max(0, score));
+}
+
+/**
+ * Generate human-readable importance reason
+ */
+function getImportanceReason(
+  analysis: {
+    progressionDetected: boolean;
+    deltaChanged: boolean;
+    changeType: string;
+    changeMagnitude: string;
+    summaryOfAction: string;
+  },
+  score: number
+): string {
+  if (score >= 0.7) {
+    return `High importance: ${analysis.summaryOfAction}`;
+  } else if (score >= 0.4) {
+    return `Medium importance: ${analysis.changeType} (${analysis.changeMagnitude})`;
+  } else {
+    return `Low importance: ${analysis.deltaChanged ? "Minor change" : "No significant change"}`;
+  }
+}
 
 /**
  * GET /api/monitoring/sessions/:id/captures

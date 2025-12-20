@@ -1,14 +1,15 @@
 /**
  * Groq Vision Service
  *
- * Provides vision analysis capabilities using Groq's Llama models.
+ * Provides vision analysis capabilities using Groq's Llama 4 models.
  * Optimized for the Progression Detector use case with two-image comparison.
  *
- * Models:
- * - llama-3.2-90b-vision-preview: Best quality, supports multi-image
- * - llama-3.2-11b-vision-preview: Faster, good for simple tasks
+ * Models (as of Dec 2025):
+ * - llama-4-scout-17b-16e-instruct: Fast, 17B active params, up to 5 images
+ * - llama-4-maverick-17b-128e-instruct: Higher quality, 400B total params
  *
- * Note: Groq vision uses the same chat completions API with image content parts.
+ * Note: Llama 3.2 vision models were decommissioned. Now using Llama 4.
+ * Max image size: 4MB for base64, 20MB for URLs.
  */
 
 import Groq from "groq-sdk";
@@ -17,8 +18,8 @@ import { withRetry } from "../utils/retry";
 
 // Configuration
 const VISION_CONFIG = {
-  DEFAULT_MODEL: "llama-3.2-90b-vision-preview", // Best for multi-image comparison
-  FAST_MODEL: "llama-3.2-11b-vision-preview", // Faster alternative
+  DEFAULT_MODEL: "meta-llama/llama-4-scout-17b-16e-instruct", // Fast, good for frame comparison
+  FAST_MODEL: "meta-llama/llama-4-scout-17b-16e-instruct", // Same (Scout is already fast at 460+ tok/s)
   MAX_TOKENS: 1024,
   TEMPERATURE: 0.2, // Lower for more deterministic outputs
   RETRY_ATTEMPTS: 3,

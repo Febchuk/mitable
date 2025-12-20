@@ -8,6 +8,7 @@ import { captureService } from "./services/captureService";
 import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
 import { windowDetectionService } from "./services/windowDetectionService";
 import { monitoringSessionService } from "./services/monitoringSessionService";
+import { authManager } from "./services/authManager";
 
 // Window references
 let agentWindow: BrowserWindow | null = null;
@@ -1010,6 +1011,9 @@ function setupIPC() {
     authTokens.accessToken = accessToken;
     authTokens.refreshToken = refreshToken;
 
+    // Update centralized auth manager (used by services like monitoringSessionService)
+    authManager.setTokens(accessToken, refreshToken);
+
     // Broadcast token update to all windows
     const allWindows = [agentWindow, agentPanelWindow, conversationWindow, consoleWindow];
     allWindows.forEach((win) => {
@@ -1030,6 +1034,9 @@ function setupIPC() {
     console.log("[Auth] Tokens cleared");
     authTokens.accessToken = null;
     authTokens.refreshToken = null;
+
+    // Clear centralized auth manager
+    authManager.clearTokens();
 
     // Broadcast token clear to all windows
     const allWindows = [agentWindow, agentPanelWindow, conversationWindow, consoleWindow];
@@ -1627,6 +1634,23 @@ function setupMonitoringSessionHandlers() {
     return monitoringSessionService.getSessionState();
   });
 
+  // Session Recovery handlers
+  ipcMain.handle(IPC_CHANNELS.SESSION_GET_RECOVERABLE, async () => {
+    console.log("[Session Recovery] Getting recoverable sessions");
+    return monitoringSessionService.getRecoverableSessions();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SESSION_RECOVER, async (_, sessionId: string) => {
+    console.log("[Session Recovery] Recovering session:", sessionId);
+    return monitoringSessionService.recoverSession(sessionId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SESSION_DISCARD, async (_, sessionId: string) => {
+    console.log("[Session Recovery] Discarding session:", sessionId);
+    await monitoringSessionService.discardRecoverableSession(sessionId);
+    return { success: true };
+  });
+
   console.log("[IPC] Monitoring session handlers registered successfully");
 }
 
@@ -1793,7 +1817,7 @@ function registerGlobalShortcuts() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Initialize active window bridge for capture policy
   initActiveWindowBridge();
 
@@ -1804,6 +1828,22 @@ app.whenReady().then(() => {
 
   setupIPC();
   registerGlobalShortcuts();
+
+  // Check for recoverable sessions on startup (crash recovery)
+  try {
+    const recoverableSessions = await monitoringSessionService.getRecoverableSessions();
+    if (recoverableSessions.length > 0) {
+      console.log(`[Session Recovery] Found ${recoverableSessions.length} recoverable session(s)`);
+      // Notify console window to show recovery dialog
+      setTimeout(() => {
+        if (consoleWindow && !consoleWindow.isDestroyed()) {
+          consoleWindow.webContents.send(IPC_CHANNELS.SESSION_SHOW_RECOVERY_DIALOG, recoverableSessions);
+        }
+      }, 2000); // Give console time to fully load
+    }
+  } catch (error) {
+    console.error("[Session Recovery] Error checking for recoverable sessions:", error);
+  }
 });
 
 app.on("window-all-closed", () => {

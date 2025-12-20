@@ -137,37 +137,76 @@ class SessionSummarizationService {
   }
 
   /**
-   * Sample captures for analysis (skip duplicates, ensure coverage)
+   * Sample captures for analysis using analysis metadata
+   * Prioritizes:
+   * 1. Frames with high importance scores
+   * 2. Frames with delta_changed = true
+   * 3. Frames marked as on_task
    */
   private sampleCaptures(captures: any[]): any[] {
-    if (captures.length <= SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE) {
-      return captures;
+    if (captures.length === 0) return [];
+
+    // Filter out duplicates and skipped frames
+    const valid = captures.filter(
+      (c) => c.analysisStatus !== "duplicate" && c.analysisStatus !== "skipped"
+    );
+
+    if (valid.length <= SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE) {
+      return valid;
     }
 
-    // Filter out duplicates first
-    const unique = captures.filter((c) => c.analysisStatus !== "duplicate");
+    // Prioritize frames that are already analyzed with high importance
+    const analyzed = valid.filter((c) => c.analysisStatus === "analyzed");
+    const pending = valid.filter((c) => c.analysisStatus === "pending");
 
-    if (unique.length <= SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE) {
-      return unique;
-    }
+    // Sort analyzed frames by importance score (descending)
+    analyzed.sort((a, b) => (b.importanceScore || 0) - (a.importanceScore || 0));
 
-    // Sample evenly across the session
-    const step = Math.floor(unique.length / SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE);
+    // Select top frames with delta changes and on-task
+    const highPriority = analyzed.filter((c) => c.deltaChanged === true && c.onTask !== false);
+    const mediumPriority = analyzed.filter(
+      (c) => !highPriority.includes(c) && (c.deltaChanged === true || c.onTask !== false)
+    );
+    const lowPriority = analyzed.filter(
+      (c) => !highPriority.includes(c) && !mediumPriority.includes(c)
+    );
+
+    // Build sample: high priority first, then medium, then low, then pending
     const sampled: any[] = [];
+    const addFromArray = (arr: any[], max: number) => {
+      for (const item of arr) {
+        if (sampled.length >= max) break;
+        if (!sampled.includes(item)) {
+          sampled.push(item);
+        }
+      }
+    };
 
-    for (
-      let i = 0;
-      i < unique.length && sampled.length < SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE;
-      i += step
-    ) {
-      sampled.push(unique[i]);
+    const maxToSample = SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE;
+
+    // Take up to 60% from high priority
+    addFromArray(highPriority, Math.floor(maxToSample * 0.6));
+    // Take up to 30% from medium priority
+    addFromArray(mediumPriority, Math.floor(maxToSample * 0.9));
+    // Fill remaining with low priority and pending
+    addFromArray(lowPriority, maxToSample);
+    addFromArray(pending, maxToSample);
+
+    // Always include first and last capture for context
+    const firstCapture = valid[0];
+    const lastCapture = valid[valid.length - 1];
+
+    if (!sampled.includes(firstCapture)) {
+      sampled.unshift(firstCapture);
+      if (sampled.length > maxToSample) sampled.pop();
     }
-
-    // Always include the last capture
-    const lastCapture = unique[unique.length - 1];
     if (!sampled.includes(lastCapture)) {
       sampled.push(lastCapture);
+      if (sampled.length > maxToSample) sampled.shift();
     }
+
+    // Sort by sequence number for chronological order
+    sampled.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
 
     return sampled;
   }
@@ -199,14 +238,34 @@ class SessionSummarizationService {
 
   /**
    * Analyze a batch of screenshots
+   * Uses existing analysis data when available, only falls back to Gemini Vision for pending frames
    */
   private async analyzeBatch(captures: any[]): Promise<ScreenshotAnalysis[]> {
     const analyses: ScreenshotAnalysis[] = [];
 
-    // For each capture in the batch, analyze individually (simpler and more reliable)
     for (const capture of captures) {
       try {
-        // Check if we have image data (either from DB or from file)
+        // Check if we already have analysis data from frame-analysis
+        if (capture.analysisStatus === "analyzed" && capture.deltaChangeDescription) {
+          // Use existing analysis data - no need to re-analyze
+          analyses.push({
+            captureId: capture.id,
+            sequenceNumber: capture.sequenceNumber,
+            timestamp: new Date(capture.capturedAt).getTime(),
+            appName: capture.appName || "Unknown",
+            windowTitle: capture.windowTitle || "",
+            activity: capture.deltaChangeDescription || capture.activityDescription || this.inferActivityFromMetadata(capture),
+            context: [
+              capture.deltaChangeType ? `Action: ${capture.deltaChangeType}` : null,
+              capture.deltaUserAction ? `User: ${capture.deltaUserAction}` : null,
+              capture.taskRelevance || null,
+            ].filter(Boolean) as string[],
+            confidence: capture.importanceScore >= 0.7 ? "high" : capture.importanceScore >= 0.4 ? "medium" : "low",
+          });
+          continue;
+        }
+
+        // Check if we have image data for Vision analysis
         let imageData: string | null = capture.imageData || null;
 
         // Fallback: try to read from file if no imageData in DB (legacy support)
@@ -219,7 +278,7 @@ class SessionSummarizationService {
           }
         }
 
-        // No image data available - use metadata only
+        // No image data and no analysis - use metadata only
         if (!imageData) {
           analyses.push({
             captureId: capture.id,
@@ -227,14 +286,14 @@ class SessionSummarizationService {
             timestamp: new Date(capture.capturedAt).getTime(),
             appName: capture.appName || "Unknown",
             windowTitle: capture.windowTitle || "",
-            activity: this.inferActivityFromMetadata(capture),
+            activity: capture.activityDescription || this.inferActivityFromMetadata(capture),
             context: [],
             confidence: "low",
           });
           continue;
         }
 
-        // Analyze with Gemini Vision
+        // Analyze with Gemini Vision (only for frames without existing analysis)
         const prompt = `Analyze this screenshot and describe what the user is doing in 10-15 words.
 Focus on the ACTIVITY, not the UI elements.
 
@@ -294,7 +353,7 @@ Respond with JSON:
           timestamp: new Date(capture.capturedAt).getTime(),
           appName: capture.appName || "Unknown",
           windowTitle: capture.windowTitle || "",
-          activity: this.inferActivityFromMetadata(capture),
+          activity: capture.activityDescription || this.inferActivityFromMetadata(capture),
           context: [],
           confidence: "low",
         });

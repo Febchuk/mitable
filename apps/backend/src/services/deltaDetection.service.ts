@@ -61,7 +61,7 @@ export function detectDelta(
       changed: true,
       changeType: "none",
       changeDescription: "First frame in session",
-      userAction: "Started monitoring session",
+      userAction: "viewing",
     };
   }
 
@@ -71,7 +71,7 @@ export function detectDelta(
       changed: true,
       changeType: "focus_change",
       changeDescription: `Switched from ${previousFrame.appName} to ${currentFrame.appName}`,
-      userAction: `Focused ${currentFrame.appName}: ${currentFrame.windowTitle}`,
+      userAction: "clicking",
     };
   }
 
@@ -86,6 +86,7 @@ export function detectDelta(
       changed: false,
       changeType: "none",
       changeDescription: "No significant change detected",
+      userAction: "viewing",
     };
   }
 
@@ -102,8 +103,9 @@ function analyzeContentChange(
   if (!currentDescription || !previousDescription) {
     return {
       changed: !!currentDescription,
-      changeType: currentDescription ? "content_update" : "none",
+      changeType: currentDescription ? "content_edit" : "none",
       changeDescription: currentDescription || "No description available",
+      userAction: currentDescription ? "viewing" : "unknown",
     };
   }
 
@@ -126,9 +128,9 @@ function analyzeContentChange(
   if (isTyping) {
     return {
       changed: true,
-      changeType: "typing",
+      changeType: "content_edit",
       changeDescription: currentDescription,
-      userAction: "Entered text or modified content",
+      userAction: "typing",
     };
   }
 
@@ -154,7 +156,7 @@ function analyzeContentChange(
       changed: true,
       changeType: "navigation",
       changeDescription: currentDescription,
-      userAction: "Navigated to different view or section",
+      userAction: "clicking",
     };
   }
 
@@ -171,7 +173,7 @@ function analyzeContentChange(
       changed: true,
       changeType: "scroll",
       changeDescription: currentDescription,
-      userAction: "Scrolled to view different content",
+      userAction: "scrolling",
     };
   }
 
@@ -180,9 +182,9 @@ function analyzeContentChange(
   if (similarity < 0.7) {
     return {
       changed: true,
-      changeType: "content_update",
+      changeType: "content_edit",
       changeDescription: currentDescription,
-      userAction: "Content or view changed",
+      userAction: "viewing",
     };
   }
 
@@ -190,6 +192,7 @@ function analyzeContentChange(
     changed: false,
     changeType: "none",
     changeDescription: "Content appears unchanged",
+    userAction: "viewing",
   };
 }
 
@@ -425,9 +428,9 @@ export function calculateImportanceScore(
   // Base score for changed frames
   if (delta.changed) {
     const changeWeights: Record<DeltaChangeType, number> = {
-      typing: 0.9,
+      content_edit: 0.9,
+      file_switch: 0.8,
       navigation: 0.7,
-      content_update: 0.6,
       focus_change: 0.5,
       scroll: 0.3,
       none: 0.1,

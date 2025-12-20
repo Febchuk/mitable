@@ -134,6 +134,12 @@ export const IPC_CHANNELS = {
   MONITORING_CAPTURE_TAKEN: "monitoring-capture-taken", // Notify when capture is taken
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress", // Capture count update
 
+  // Session Recovery (crash recovery)
+  SESSION_GET_RECOVERABLE: "session-get-recoverable", // Get list of recoverable sessions
+  SESSION_RECOVER: "session-recover", // Recover a specific session
+  SESSION_DISCARD: "session-discard", // Discard a recoverable session
+  SESSION_SHOW_RECOVERY_DIALOG: "session-show-recovery-dialog", // Show recovery dialog in console
+
   // Drafts system (Console)
   DRAFTS_NAVIGATE: "drafts-navigate",
 } as const;

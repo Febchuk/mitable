@@ -406,6 +406,60 @@ class LocalFrameStorage {
   }
 
   /**
+   * Get previous frame for a specific window (for delta comparison)
+   * Returns the most recent frame for the given window that has image data available
+   */
+  async getPreviousFrameForWindow(
+    sessionId: string,
+    windowSourceId: string
+  ): Promise<{ metadata: FrameMetadata; imageData: string } | null> {
+    const manifest = await this.loadManifest(sessionId);
+    if (!manifest || manifest.frames.length === 0) return null;
+
+    // Find frames for this window (sorted by sequence, most recent first)
+    const windowFrames = manifest.frames
+      .filter((f) => f.windowSourceId === windowSourceId)
+      .sort((a, b) => b.sequenceNumber - a.sequenceNumber);
+
+    // Skip the current frame (just added), get the previous one
+    const previousFrame = windowFrames.length > 1 ? windowFrames[1] : null;
+    if (!previousFrame) return null;
+
+    // Read the image data
+    const imageBuffer = await this.readFrame(sessionId, previousFrame.filename);
+    if (!imageBuffer) return null;
+
+    return {
+      metadata: previousFrame,
+      imageData: imageBuffer.toString("base64"),
+    };
+  }
+
+  /**
+   * Update frame with analysis results
+   * Convenience method for updating delta detection and importance scoring
+   */
+  async updateFrameAnalysis(
+    sessionId: string,
+    frameId: string,
+    analysis: {
+      deltaChanged?: boolean;
+      deltaChangeType?: string;
+      deltaChangeDescription?: string;
+      deltaUserAction?: string;
+      onTask?: boolean;
+      taskRelevance?: string;
+      importanceScore?: number;
+      importanceReason?: string;
+    }
+  ): Promise<void> {
+    await this.updateFrameMetadata(sessionId, frameId, {
+      ...analysis,
+      analysisStatus: "analyzed",
+    });
+  }
+
+  /**
    * Get pending frames for analysis
    */
   async getPendingFrames(sessionId: string): Promise<FrameMetadata[]> {

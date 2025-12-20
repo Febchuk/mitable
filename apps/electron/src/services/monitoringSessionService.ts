@@ -6,18 +6,22 @@
  * - Periodic screenshot capture loop
  * - Focus change detection for extra captures
  * - Screenshot deduplication via SHA-256 hash
- * - Temp file management with auto-cleanup
+ * - Local frame storage with manifest tracking
+ * - Checkpoint-based crash recovery
  * - Backend API synchronization
+ *
+ * Architecture v2: Uses LocalFrameStorage for persistent storage
+ * and CheckpointService for crash recovery.
  *
  * @module monitoringSessionService
  */
 
 import { BrowserWindow } from "electron";
-import { promises as fs } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
 import crypto from "crypto";
 import { captureService } from "./captureService";
+import { localFrameStorage, type FrameMetadata } from "./localFrameStorage";
+import { checkpointService } from "./checkpointService";
+import { authManager } from "./authManager";
 import { IPC_CHANNELS } from "@mitable/shared";
 import type {
   SelectedWindowInfo,
@@ -29,24 +33,12 @@ import type {
 // Types & Interfaces
 // ===========================
 
-interface CaptureMetadata {
-  id: string;
-  sequenceNumber: number;
-  captureTrigger: "periodic" | "focus_change" | "manual";
-  capturedAt: number;
-  windowId?: string;
-  appName?: string;
-  windowTitle?: string;
-  screenshotPath?: string;
-  screenshotHash?: string;
-  isDuplicate: boolean;
-}
-
 interface SessionConfig {
   sessionId: string; // Backend's session ID - passed from renderer
   selectedWindows: SelectedWindowInfo[];
   captureIntervalMs: number;
   name?: string;
+  sessionGoal?: string; // Optional goal for on_task detection
   userId: string;
   organizationId: string;
 }
@@ -58,7 +50,7 @@ interface ActiveSession {
   startedAt: number;
   pausedAt?: number;
   totalPausedMs: number;
-  captures: CaptureMetadata[];
+  captureCount: number; // Track count from manifest
   lastCaptureHash?: string; // For deduplication
 }
 
@@ -69,10 +61,9 @@ interface ActiveSession {
 class MonitoringSessionService {
   private activeSession: ActiveSession | null = null;
   private captureTimer: NodeJS.Timeout | null = null;
-  private sessionDir: string | null = null;
 
   constructor() {
-    console.log("[MonitoringSessionService] Initialized");
+    console.log("[MonitoringSessionService] Initialized with LocalFrameStorage + CheckpointService");
   }
 
   /**
@@ -103,37 +94,77 @@ class MonitoringSessionService {
       };
     }
 
-    // Use the session ID provided by backend (ensures Electron and backend use same ID)
     const sessionId = config.sessionId;
 
-    // Create session directory for screenshots
-    this.sessionDir = join(tmpdir(), "mitable-sessions", sessionId);
-    await fs.mkdir(this.sessionDir, { recursive: true });
+    try {
+      // Initialize local frame storage (persistent directory)
+      const localPath = await localFrameStorage.initSession({
+        sessionId,
+        organizationId: config.organizationId,
+        userId: config.userId,
+        sessionGoal: config.sessionGoal,
+        captureIntervalMs: config.captureIntervalMs,
+        selectedWindows: config.selectedWindows.map((w) => ({
+          windowId: w.windowId,
+          appName: w.appName,
+          windowTitle: w.windowTitle,
+        })),
+      });
 
-    console.log(`[MonitoringSessionService] Created session directory: ${this.sessionDir}`);
+      console.log(`[MonitoringSessionService] Session folder created: ${localPath}`);
 
-    // Initialize session
-    this.activeSession = {
-      id: sessionId,
-      config,
-      status: "active",
-      startedAt: Date.now(),
-      totalPausedMs: 0,
-      captures: [],
-    };
+      // Initialize active session
+      const startedAt = Date.now();
+      this.activeSession = {
+        id: sessionId,
+        config,
+        status: "active",
+        startedAt,
+        totalPausedMs: 0,
+        captureCount: 0,
+      };
 
-    // Start capture loop
-    this.startCaptureLoop();
+      // Start checkpoint tracking for crash recovery
+      checkpointService.startSession({
+        sessionId,
+        organizationId: config.organizationId,
+        userId: config.userId,
+        sessionGoal: config.sessionGoal,
+        status: "active",
+        frameCount: 0,
+        lastFrameId: "",
+        lastFrameTimestamp: "",
+        startedAt: new Date(startedAt).toISOString(),
+        totalPausedMs: 0,
+        localPath,
+        manifestPath: `${localPath}/manifest.json`,
+        selectedWindows: config.selectedWindows.map((w) => ({
+          windowId: w.windowId,
+          appName: w.appName,
+          windowTitle: w.windowTitle,
+        })),
+        captureIntervalMs: config.captureIntervalMs,
+      });
 
-    // Broadcast session started
-    this.broadcastSessionUpdate();
+      // Start capture loop
+      this.startCaptureLoop();
 
-    console.log(`[MonitoringSessionService] Session started: ${sessionId}`, {
-      windowCount: config.selectedWindows.length,
-      intervalMs: config.captureIntervalMs,
-    });
+      // Broadcast session started
+      this.broadcastSessionUpdate();
 
-    return { sessionId };
+      console.log(`[MonitoringSessionService] Session started: ${sessionId}`, {
+        windowCount: config.selectedWindows.length,
+        intervalMs: config.captureIntervalMs,
+      });
+
+      return { sessionId };
+    } catch (error) {
+      console.error("[MonitoringSessionService] Failed to start session:", error);
+      return {
+        sessionId: "",
+        error: `Failed to start session: ${error instanceof Error ? error.message : "Unknown error"}`,
+      };
+    }
   }
 
   /**
@@ -157,6 +188,12 @@ class MonitoringSessionService {
     // Update session state
     this.activeSession.status = "paused";
     this.activeSession.pausedAt = Date.now();
+
+    // Update local storage status
+    await localFrameStorage.updateSessionStatus(this.activeSession.id, "paused");
+
+    // Save checkpoint (important for crash recovery)
+    await checkpointService.onSessionPaused();
 
     // Broadcast update
     this.broadcastSessionUpdate();
@@ -191,6 +228,14 @@ class MonitoringSessionService {
     this.activeSession.status = "active";
     this.activeSession.pausedAt = undefined;
 
+    // Update local storage status
+    await localFrameStorage.updateSessionStatus(this.activeSession.id, "active", {
+      totalPausedMs: this.activeSession.totalPausedMs,
+    });
+
+    // Update checkpoint
+    await checkpointService.onSessionResumed(this.activeSession.totalPausedMs);
+
     // Restart capture loop
     this.startCaptureLoop();
 
@@ -204,8 +249,7 @@ class MonitoringSessionService {
 
   /**
    * End the active session
-   * Returns captures data so frontend can upload to backend before summarization
-   * Includes base64 image data for backend analysis
+   * Returns Top-K frames for upload to backend
    */
   async endSession(): Promise<{
     success: boolean;
@@ -218,9 +262,17 @@ class MonitoringSessionService {
       windowId?: string;
       appName?: string;
       windowTitle?: string;
-      screenshotPath?: string;
       screenshotHash?: string;
-      imageData?: string; // Base64 encoded image for backend analysis
+      imageData?: string;
+      // Analysis metadata
+      deltaChanged?: boolean;
+      deltaChangeType?: string;
+      deltaChangeDescription?: string;
+      deltaUserAction?: string;
+      onTask?: boolean;
+      taskRelevance?: string;
+      importanceScore?: number;
+      importanceReason?: string;
     }>;
     error?: string;
   }> {
@@ -237,64 +289,83 @@ class MonitoringSessionService {
       this.activeSession.totalPausedMs += pauseDuration;
     }
 
-    // Update session state
     const sessionId = this.activeSession.id;
-    const captureCount = this.activeSession.captures.length;
 
-    // Extract captures data with base64 image data for backend upload
-    const captures = await Promise.all(
-      this.activeSession.captures.map(async (c) => {
-        let imageData: string | undefined;
+    try {
+      // Get manifest to access all frames
+      const manifest = await localFrameStorage.loadManifest(sessionId);
+      if (!manifest) {
+        throw new Error("Session manifest not found");
+      }
 
-        // Read screenshot file and convert to base64 for backend
-        if (c.screenshotPath) {
-          try {
-            const buffer = await fs.readFile(c.screenshotPath);
-            imageData = buffer.toString("base64");
-          } catch (err) {
-            console.warn(
-              `[MonitoringSessionService] Failed to read screenshot: ${c.screenshotPath}`,
-              err
-            );
-          }
-        }
+      // Select Top-K frames based on importance scores
+      const topKFrameIds = this.selectTopKFrames(manifest.frames, 10);
 
-        return {
-          sequenceNumber: c.sequenceNumber,
-          captureTrigger: c.captureTrigger,
-          capturedAt: c.capturedAt,
-          windowId: c.windowId,
-          appName: c.appName,
-          windowTitle: c.windowTitle,
-          screenshotPath: c.screenshotPath,
-          screenshotHash: c.screenshotHash,
-          imageData,
-        };
-      })
-    );
+      // End session in local storage with Top-K selection
+      await localFrameStorage.endSession(sessionId, topKFrameIds);
 
-    this.activeSession.status = "ended";
+      // Get Top-K frames for upload
+      const topKFrames = await localFrameStorage.getTopKFrames(sessionId);
 
-    // Broadcast update
-    this.broadcastSessionUpdate();
+      // Convert to upload format with base64 data
+      const captures = await Promise.all(
+        topKFrames.map(async ({ metadata, imageBuffer }) => ({
+          sequenceNumber: metadata.sequenceNumber,
+          captureTrigger: metadata.trigger,
+          capturedAt: new Date(metadata.timestamp).getTime(),
+          windowId: metadata.windowSourceId,
+          appName: metadata.appName,
+          windowTitle: metadata.windowTitle,
+          screenshotHash: metadata.hash,
+          imageData: imageBuffer.toString("base64"),
+          // Include analysis metadata
+          deltaChanged: metadata.deltaChanged,
+          deltaChangeType: metadata.deltaChangeType,
+          deltaChangeDescription: metadata.deltaChangeDescription,
+          deltaUserAction: metadata.deltaUserAction,
+          onTask: metadata.onTask,
+          taskRelevance: metadata.taskRelevance,
+          importanceScore: metadata.importanceScore,
+          importanceReason: metadata.importanceReason,
+        }))
+      );
 
-    console.log(`[MonitoringSessionService] Session ended: ${sessionId}`, {
-      captureCount,
-      duration: Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs,
-    });
+      const captureCount = manifest.totalFrameCount;
 
-    // Cleanup session state (data was already used above)
-    this.activeSession = null;
+      // End checkpoint tracking (removes checkpoint file)
+      await checkpointService.endSession();
 
-    // Schedule cleanup of session directory after summary is generated (10 minutes)
-    setTimeout(
-      () => {
-        this.cleanupSessionFiles(sessionId);
-      },
-      10 * 60 * 1000
-    );
+      // Update internal state
+      this.activeSession.status = "ended";
 
-    return { success: true, sessionId, captureCount, captures };
+      // Broadcast update
+      this.broadcastSessionUpdate();
+
+      console.log(`[MonitoringSessionService] Session ended: ${sessionId}`, {
+        totalCaptureCount: captureCount,
+        uploadCount: captures.length,
+        duration: Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs,
+      });
+
+      // Cleanup session state
+      this.activeSession = null;
+
+      // Schedule cleanup of local frames after 10 minutes (allows for re-summarization)
+      setTimeout(
+        () => {
+          this.cleanupSessionFiles(sessionId);
+        },
+        10 * 60 * 1000
+      );
+
+      return { success: true, sessionId, captureCount, captures };
+    } catch (error) {
+      console.error("[MonitoringSessionService] Failed to end session:", error);
+      return {
+        success: false,
+        error: `Failed to end session: ${error instanceof Error ? error.message : "Unknown error"}`,
+      };
+    }
   }
 
   /**
@@ -304,7 +375,6 @@ class MonitoringSessionService {
   resetSession(): void {
     this.stopCaptureLoop();
     this.activeSession = null;
-    this.sessionDir = null;
     this.broadcastSessionUpdate();
     console.log("[MonitoringSessionService] Session reset (external deletion)");
   }
@@ -334,16 +404,109 @@ class MonitoringSessionService {
       startedAt: this.activeSession.startedAt,
       pausedAt: this.activeSession.pausedAt,
       totalPausedMs: this.activeSession.totalPausedMs,
-      captureCount: this.activeSession.captures.length,
+      captureCount: this.activeSession.captureCount,
       elapsedMs,
     };
   }
 
   /**
-   * Get captures for the current session
+   * Get captures for the current session from local storage
    */
-  getCaptures(): CaptureMetadata[] {
-    return this.activeSession?.captures || [];
+  async getCaptures(): Promise<FrameMetadata[]> {
+    if (!this.activeSession) return [];
+
+    const manifest = await localFrameStorage.loadManifest(this.activeSession.id);
+    return manifest?.frames || [];
+  }
+
+  /**
+   * Recover session from checkpoint (crash recovery)
+   */
+  async recoverSession(sessionId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const checkpoint = await checkpointService.restoreFromCheckpoint(sessionId);
+      if (!checkpoint) {
+        return { success: false, error: "Checkpoint not found" };
+      }
+
+      // Load manifest from local storage
+      const manifest = await localFrameStorage.loadManifest(sessionId);
+      if (!manifest) {
+        return { success: false, error: "Session manifest not found" };
+      }
+
+      // Restore active session state
+      this.activeSession = {
+        id: sessionId,
+        config: {
+          sessionId,
+          selectedWindows: checkpoint.selectedWindows.map((w) => ({
+            windowId: w.windowId,
+            appName: w.appName,
+            windowTitle: w.windowTitle,
+          })),
+          captureIntervalMs: checkpoint.captureIntervalMs,
+          sessionGoal: checkpoint.sessionGoal,
+          userId: checkpoint.userId,
+          organizationId: checkpoint.organizationId,
+        },
+        status: checkpoint.status === "paused" ? "paused" : "active",
+        startedAt: new Date(checkpoint.startedAt).getTime(),
+        pausedAt: checkpoint.pausedAt ? new Date(checkpoint.pausedAt).getTime() : undefined,
+        totalPausedMs: checkpoint.totalPausedMs,
+        captureCount: checkpoint.frameCount,
+      };
+
+      // Resume capture loop if session was active
+      if (checkpoint.status === "active") {
+        this.startCaptureLoop();
+      }
+
+      // Broadcast update
+      this.broadcastSessionUpdate();
+
+      console.log(`[MonitoringSessionService] Session recovered: ${sessionId}`, {
+        frameCount: checkpoint.frameCount,
+        status: checkpoint.status,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error("[MonitoringSessionService] Failed to recover session:", error);
+      return {
+        success: false,
+        error: `Failed to recover session: ${error instanceof Error ? error.message : "Unknown error"}`,
+      };
+    }
+  }
+
+  /**
+   * Discard a recoverable session
+   */
+  async discardRecoverableSession(sessionId: string): Promise<void> {
+    await checkpointService.discardCheckpoint(sessionId);
+    await localFrameStorage.deleteSession(sessionId);
+    console.log(`[MonitoringSessionService] Discarded recoverable session: ${sessionId}`);
+  }
+
+  /**
+   * Check for recoverable sessions on startup
+   */
+  async getRecoverableSessions(): Promise<
+    Array<{
+      sessionId: string;
+      frameCount: number;
+      lastCheckpoint: string;
+      status: string;
+    }>
+  > {
+    const checkpoints = await checkpointService.getIncompleteCheckpoints();
+    return checkpoints.map((c) => ({
+      sessionId: c.sessionId,
+      frameCount: c.frameCount,
+      lastCheckpoint: c.checkpointAt,
+      status: c.status,
+    }));
   }
 
   // ===========================
@@ -418,13 +581,13 @@ class MonitoringSessionService {
   }
 
   /**
-   * Process a single capture (deduplication, save to disk)
+   * Process a single capture (deduplication, save to local storage, analyze)
    */
   private async processCapture(
     screenshot: { windowId: string; windowTitle: string; appName: string; dataUrl: string },
     trigger: "periodic" | "focus_change" | "manual"
   ): Promise<void> {
-    if (!this.activeSession || !this.sessionDir) {
+    if (!this.activeSession) {
       return;
     }
 
@@ -442,50 +605,210 @@ class MonitoringSessionService {
     // Update last hash
     this.activeSession.lastCaptureHash = hash;
 
-    // Generate capture ID and sequence number
-    const captureId = crypto.randomUUID();
-    const sequenceNumber = this.activeSession.captures.length + 1;
-
-    // Save to disk
-    const filename = `capture_${sequenceNumber.toString().padStart(4, "0")}_${trigger}.png`;
-    const filePath = join(this.sessionDir, filename);
-
     try {
-      // Extract base64 data and save
+      // Extract base64 data and convert to buffer
       const base64Data = screenshot.dataUrl.replace(/^data:image\/\w+;base64,/, "");
-      await fs.writeFile(filePath, Buffer.from(base64Data, "base64"));
+      const imageBuffer = Buffer.from(base64Data, "base64");
 
-      // Create capture metadata
-      const capture: CaptureMetadata = {
-        id: captureId,
-        sequenceNumber,
-        captureTrigger: trigger,
-        capturedAt: Date.now(),
-        windowId: screenshot.windowId,
+      // Get previous frame for this window (for delta analysis)
+      const previousFrame = await localFrameStorage.getPreviousFrameForWindow(
+        this.activeSession.id,
+        screenshot.windowId
+      );
+
+      // Save to local frame storage
+      const frameMetadata = await localFrameStorage.saveFrame(this.activeSession.id, imageBuffer, {
+        windowSourceId: screenshot.windowId,
         appName: screenshot.appName,
         windowTitle: screenshot.windowTitle,
-        screenshotPath: filePath,
-        screenshotHash: hash,
-        isDuplicate,
-      };
+        trigger,
+      });
 
-      this.activeSession.captures.push(capture);
+      // Update capture count
+      this.activeSession.captureCount++;
 
-      console.log(`[MonitoringSessionService] Capture saved: ${filename}`, {
-        sequenceNumber,
+      // Update checkpoint
+      await checkpointService.onFrameCaptured(frameMetadata.frameId, frameMetadata.timestamp);
+
+      console.log(`[MonitoringSessionService] Capture saved: ${frameMetadata.frameId}`, {
+        sequenceNumber: frameMetadata.sequenceNumber,
         trigger,
         app: screenshot.appName,
       });
+
+      // Trigger async frame analysis (don't block capture loop)
+      this.analyzeFrameAsync(
+        this.activeSession.id,
+        frameMetadata.frameId,
+        base64Data,
+        previousFrame?.imageData || null,
+        {
+          windowSourceId: screenshot.windowId,
+          appName: screenshot.appName,
+          windowTitle: screenshot.windowTitle,
+        }
+      );
     } catch (error) {
       console.error("[MonitoringSessionService] Error saving capture:", error);
     }
   }
 
   /**
+   * Analyze frame asynchronously (don't block capture loop)
+   */
+  private async analyzeFrameAsync(
+    sessionId: string,
+    frameId: string,
+    currentImage: string,
+    previousImage: string | null,
+    windowInfo: { windowSourceId: string; appName: string; windowTitle: string }
+  ): Promise<void> {
+    // Don't attempt analysis if no auth token
+    if (!authManager.getAccessToken()) {
+      console.log("[MonitoringSessionService] Skipping analysis - no auth token");
+      return;
+    }
+
+    try {
+      const response = await authManager.authenticatedFetch(
+        `/api/monitoring/sessions/${sessionId}/analyze-frame`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            frameId,
+            currentImage,
+            previousImage,
+            windowInfo,
+            sessionGoal: this.activeSession?.config.sessionGoal,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`[MonitoringSessionService] Frame analysis failed: ${response.status}`, errorText);
+        return;
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.analysis) {
+        // Update frame metadata with analysis results
+        await localFrameStorage.updateFrameAnalysis(sessionId, frameId, {
+          deltaChanged: result.analysis.deltaChanged,
+          deltaChangeType: result.analysis.deltaChangeType,
+          deltaChangeDescription: result.analysis.deltaChangeDescription,
+          deltaUserAction: result.analysis.deltaUserAction,
+          onTask: result.analysis.onTask,
+          taskRelevance: result.analysis.taskRelevance,
+          importanceScore: result.analysis.importanceScore,
+          importanceReason: result.analysis.importanceReason,
+        });
+
+        console.log(`[MonitoringSessionService] Frame analyzed: ${frameId}`, {
+          deltaChangeType: result.analysis.deltaChangeType,
+          importanceScore: result.analysis.importanceScore,
+        });
+      }
+    } catch (error) {
+      // Log but don't throw - analysis failure shouldn't stop session
+      console.error("[MonitoringSessionService] Error analyzing frame:", error);
+    }
+  }
+
+  /**
+   * Select Top-K frames based on importance scores
+   * Uses a combination of:
+   * 1. Importance score from frame analysis
+   * 2. Temporal diversity (avoid consecutive frames)
+   * 3. Always include first and last frames for context
+   */
+  private selectTopKFrames(
+    frames: Array<{
+      frameId: string;
+      timestamp: string;
+      importanceScore?: number;
+      sequenceNumber: number;
+    }>,
+    k: number = 10
+  ): string[] {
+    if (frames.length <= k) {
+      // If we have fewer frames than K, return all
+      return frames.map((f) => f.frameId);
+    }
+
+    const selectedIds: Set<string> = new Set();
+
+    // Always include first and last frame for context
+    const firstFrame = frames[0];
+    const lastFrame = frames[frames.length - 1];
+    selectedIds.add(firstFrame.frameId);
+    selectedIds.add(lastFrame.frameId);
+
+    // Sort remaining frames by importance score (descending)
+    const remainingFrames = frames
+      .filter((f) => f.frameId !== firstFrame.frameId && f.frameId !== lastFrame.frameId)
+      .map((f) => ({
+        ...f,
+        // Default to 0.5 if no importance score (unanalyzed frames)
+        score: f.importanceScore ?? 0.5,
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    // Group by time buckets (15-minute intervals) to ensure temporal diversity
+    const BUCKET_SIZE_MS = 15 * 60 * 1000; // 15 minutes
+    const buckets = new Map<number, typeof remainingFrames>();
+
+    for (const frame of remainingFrames) {
+      const timestamp = new Date(frame.timestamp).getTime();
+      const bucketKey = Math.floor(timestamp / BUCKET_SIZE_MS);
+
+      if (!buckets.has(bucketKey)) {
+        buckets.set(bucketKey, []);
+      }
+      buckets.get(bucketKey)!.push(frame);
+    }
+
+    // Select from buckets to ensure temporal diversity
+    // Take max 2 frames per bucket, prioritize by importance score
+    const maxPerBucket = 2;
+    const sortedBucketKeys = [...buckets.keys()].sort((a, b) => a - b);
+
+    for (const bucketKey of sortedBucketKeys) {
+      if (selectedIds.size >= k) break;
+
+      const bucketFrames = buckets.get(bucketKey)!;
+      // Already sorted by score within the bucket (from earlier sort)
+      let selectedFromBucket = 0;
+
+      for (const frame of bucketFrames) {
+        if (selectedIds.size >= k) break;
+        if (selectedFromBucket >= maxPerBucket) break;
+
+        selectedIds.add(frame.frameId);
+        selectedFromBucket++;
+      }
+    }
+
+    // If still under K, add remaining highest-scored frames
+    for (const frame of remainingFrames) {
+      if (selectedIds.size >= k) break;
+      selectedIds.add(frame.frameId);
+    }
+
+    console.log(`[MonitoringSessionService] Selected ${selectedIds.size} top-K frames from ${frames.length} total`, {
+      firstFrameId: firstFrame.frameId,
+      lastFrameId: lastFrame.frameId,
+      bucketCount: buckets.size,
+    });
+
+    return Array.from(selectedIds);
+  }
+
+  /**
    * Generate SHA-256 hash of screenshot data
    */
   private hashScreenshot(dataUrl: string): string {
-    // Use only the base64 data (skip the data URL prefix)
     const data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
     return crypto.createHash("sha256").update(data).digest("hex").substring(0, 16);
   }
@@ -494,11 +817,9 @@ class MonitoringSessionService {
    * Cleanup session files
    */
   private async cleanupSessionFiles(sessionId: string): Promise<void> {
-    const sessionDir = join(tmpdir(), "mitable-sessions", sessionId);
-
     try {
-      await fs.rm(sessionDir, { recursive: true, force: true });
-      console.log(`[MonitoringSessionService] Cleaned up session directory: ${sessionDir}`);
+      await localFrameStorage.deleteSession(sessionId);
+      console.log(`[MonitoringSessionService] Cleaned up session: ${sessionId}`);
     } catch (error) {
       console.error("[MonitoringSessionService] Error cleaning up session:", error);
     }
@@ -524,10 +845,23 @@ class MonitoringSessionService {
   private broadcastCaptureProgress(): void {
     if (!this.activeSession) return;
 
+    const manifest = localFrameStorage.getCurrentManifest();
+    const latestFrame = manifest?.frames[manifest.frames.length - 1];
+
     const progress = {
       sessionId: this.activeSession.id,
-      captureCount: this.activeSession.captures.length,
-      latestCapture: this.activeSession.captures[this.activeSession.captures.length - 1],
+      captureCount: this.activeSession.captureCount,
+      latestCapture: latestFrame
+        ? {
+            id: latestFrame.frameId,
+            sequenceNumber: latestFrame.sequenceNumber,
+            captureTrigger: latestFrame.trigger,
+            capturedAt: new Date(latestFrame.timestamp).getTime(),
+            windowId: latestFrame.windowSourceId,
+            appName: latestFrame.appName,
+            windowTitle: latestFrame.windowTitle,
+          }
+        : undefined,
     };
 
     // Send to all renderer windows

@@ -55,14 +55,37 @@ Lean toward "no" for:
 Respond with only this JSON structure:
 {
   "progression_detected": true or false,
-  "summary_of_action": "Brief plain-language description of what happened"
+  "summary_of_action": "Brief description of what visually changed",
+  "change_type": "content_addition" | "content_modification" | "content_deletion" | "navigation" | "scroll" | "file_switch" | "focus_change" | "ui_state_change" | "none",
+  "change_magnitude": "major" | "minor" | "trivial",
+  "confidence": 0.0 to 1.0
 }
 
-Example summaries:
-- "Ran npm install command in terminal"
-- "Searched for 'JWT authentication' in documentation"
-- "Saved changes to config file"
-- "Error message appeared after running tests"
+IMPORTANT: Only classify what you can OBSERVE in the screenshots.
+Do NOT guess how the change was made (typing vs clicking vs pasting).
+Focus on WHAT changed, not HOW it changed.
+
+change_type values (what visually changed):
+- content_addition: New text/content appeared that wasn't there before
+- content_modification: Existing text/content was edited or changed
+- content_deletion: Text/content was removed
+- navigation: Different page, screen, or view is now visible
+- scroll: Same content but different viewport position
+- file_switch: Different file or document is now open
+- focus_change: Different window or application is now active
+- ui_state_change: UI element state changed (menu opened, dialog appeared, toggle flipped)
+- none: No meaningful visual difference
+
+change_magnitude values (scope of what changed):
+- major: Significant change (new page, large content block, major UI transition)
+- minor: Small change (one line edited, single field updated)
+- trivial: Minimal change (cursor position, text selection, hover state)
+
+Example responses:
+- {"progression_detected": true, "summary_of_action": "Terminal output appeared showing npm packages installed", "change_type": "content_addition", "change_magnitude": "major", "confidence": 0.95}
+- {"progression_detected": true, "summary_of_action": "Browser now showing API documentation page", "change_type": "navigation", "change_magnitude": "major", "confidence": 0.92}
+- {"progression_detected": true, "summary_of_action": "One line of code was modified in the editor", "change_type": "content_modification", "change_magnitude": "minor", "confidence": 0.88}
+- {"progression_detected": false, "summary_of_action": "No meaningful visual change", "change_type": "none", "change_magnitude": "trivial", "confidence": 0.85}
 </output_format>`;
 
 /**
@@ -200,12 +223,50 @@ Return ONLY the updated story (including the previous content plus your addition
 // ============================================================================
 
 /**
+ * Observable change types - what visually changed between frames
+ * These are things we can actually SEE in screenshots, not infer
+ */
+export type ChangeType =
+  | "content_addition"     // New text/content appeared
+  | "content_modification" // Existing content was edited
+  | "content_deletion"     // Content was removed
+  | "navigation"           // Different page/screen/view
+  | "scroll"               // Same content, different viewport
+  | "file_switch"          // Different file/document
+  | "focus_change"         // Different window/application
+  | "ui_state_change"      // UI element state changed (menu, dialog, toggle)
+  | "none";                // No meaningful visual change
+
+/**
+ * Magnitude of the observed change
+ */
+export type ChangeMagnitude = "major" | "minor" | "trivial";
+
+/**
  * Expected response from the Progression Detector
  */
 export interface ProgressionDetectorResponse {
   progression_detected: boolean;
   summary_of_action: string;
+  change_type: ChangeType;
+  change_magnitude: ChangeMagnitude;
+  confidence: number;
 }
+
+// Valid change type values for validation
+const VALID_CHANGE_TYPES: ChangeType[] = [
+  "content_addition",
+  "content_modification",
+  "content_deletion",
+  "navigation",
+  "scroll",
+  "file_switch",
+  "focus_change",
+  "ui_state_change",
+  "none",
+];
+
+const VALID_CHANGE_MAGNITUDES: ChangeMagnitude[] = ["major", "minor", "trivial"];
 
 /**
  * Validate and parse Progression Detector response
@@ -223,6 +284,7 @@ export function parseProgressionResponse(
 
     const parsed = JSON.parse(jsonMatch[0]);
 
+    // Validate required fields
     if (
       typeof parsed.progression_detected !== "boolean" ||
       typeof parsed.summary_of_action !== "string"
@@ -231,9 +293,32 @@ export function parseProgressionResponse(
       return null;
     }
 
+    // Validate and default change_type
+    const changeType: ChangeType = VALID_CHANGE_TYPES.includes(
+      parsed.change_type
+    )
+      ? parsed.change_type
+      : "none";
+
+    // Validate and default change_magnitude
+    const changeMagnitude: ChangeMagnitude = VALID_CHANGE_MAGNITUDES.includes(
+      parsed.change_magnitude
+    )
+      ? parsed.change_magnitude
+      : "minor";
+
+    // Validate and default confidence (clamp to 0-1 range)
+    let confidence = 0.8;
+    if (typeof parsed.confidence === "number") {
+      confidence = Math.max(0, Math.min(1, parsed.confidence));
+    }
+
     return {
       progression_detected: parsed.progression_detected,
       summary_of_action: parsed.summary_of_action,
+      change_type: changeType,
+      change_magnitude: changeMagnitude,
+      confidence,
     };
   } catch (error) {
     console.error("[ProgressionDetector] Failed to parse response:", error);

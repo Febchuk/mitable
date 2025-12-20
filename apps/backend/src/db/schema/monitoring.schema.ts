@@ -7,6 +7,9 @@ import {
   timestamp,
   integer,
   decimal,
+  boolean,
+  real,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "./users.schema";
@@ -32,6 +35,7 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
 
   // Session metadata
   name: varchar("name", { length: 255 }), // Optional user-provided session name
+  sessionGoal: text("session_goal"), // Optional: "Working on LIN-341: Add JWT auth" - improves on_task detection
 
   // Session state
   status: varchar("status", { length: 50 }).notNull().default("active"),
@@ -119,8 +123,32 @@ export const sessionCaptures = pgTable("session_captures", {
   confidence: decimal("confidence", { precision: 3, scale: 2 }), // 0.00-1.00
   detectedElements: jsonb("detected_elements").default("[]"), // UI elements if relevant
 
+  // Delta detection (what changed between frames)
+  deltaChanged: boolean("delta_changed").default(false),
+  deltaChangeType: varchar("delta_change_type", { length: 20 }),
+  // Types: 'content_edit' | 'navigation' | 'scroll' | 'file_switch' | 'focus_change' | 'none'
+  deltaChangeDescription: text("delta_change_description"),
+  deltaUserAction: varchar("delta_user_action", { length: 20 }),
+  // Actions: 'typing' | 'clicking' | 'scrolling' | 'viewing' | 'unknown'
+
+  // Per-window task relevance (replaces group-level correlation)
+  onTask: boolean("on_task").default(true),
+  taskRelevance: text("task_relevance"), // e.g., "Implementing JWT auth for LIN-341"
+
+  // Importance scoring for Top-K selection
+  importanceScore: real("importance_score").default(0), // 0-1, higher = more important
+  importanceReason: text("importance_reason"), // e.g., "Active code editing with visible changes"
+
+  // Flag for Top-K selected frames (uploaded to cloud)
+  selectedForExport: boolean("selected_for_export").default(false),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Indexes for common queries
+  importanceIdx: index("idx_captures_importance").on(table.sessionId, table.importanceScore),
+  onTaskIdx: index("idx_captures_on_task").on(table.sessionId, table.onTask),
+  deltaIdx: index("idx_captures_delta").on(table.sessionId, table.deltaChanged),
+}));
 
 /**
  * Session Summaries
@@ -211,4 +239,35 @@ export interface DeliveryTarget {
 
 export interface TimeBreakdown {
   [appName: string]: number; // durationMs
+}
+
+// Delta detection types
+export type DeltaChangeType =
+  | "content_edit"
+  | "navigation"
+  | "scroll"
+  | "file_switch"
+  | "focus_change"
+  | "none";
+
+export type DeltaUserAction =
+  | "typing"
+  | "clicking"
+  | "scrolling"
+  | "viewing"
+  | "unknown";
+
+export interface DeltaAnalysis {
+  changed: boolean;
+  changeType: DeltaChangeType;
+  changeDescription: string | null;
+  userAction: DeltaUserAction;
+}
+
+export interface FrameAnalysisResult {
+  delta: DeltaAnalysis;
+  onTask: boolean;
+  taskRelevance: string | null;
+  importanceScore: number;
+  importanceReason: string | null;
 }

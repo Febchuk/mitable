@@ -35,6 +35,11 @@ const IPC_CHANNELS = {
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress",
   // Window detection
   WATCH_WINDOWS_GET_ALL: "watch-windows-get-all",
+  // Session Recovery
+  SESSION_GET_RECOVERABLE: "session-get-recoverable",
+  SESSION_RECOVER: "session-recover",
+  SESSION_DISCARD: "session-discard",
+  SESSION_SHOW_RECOVERY_DIALOG: "session-show-recovery-dialog",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -188,6 +193,46 @@ contextBridge.exposeInMainWorld("consoleAPI", {
         _event: IpcRendererEvent,
         progress: { sessionId: string; captureCount: number; latestCapture: unknown }
       ) => callback(progress)
+    );
+  },
+
+  // Session Recovery
+  getRecoverableSessions: (): Promise<
+    Array<{
+      sessionId: string;
+      frameCount: number;
+      lastCheckpoint: string;
+      status: string;
+    }>
+  > => ipcRenderer.invoke(IPC_CHANNELS.SESSION_GET_RECOVERABLE),
+
+  recoverSession: (sessionId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SESSION_RECOVER, sessionId),
+
+  discardRecoverableSession: (sessionId: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SESSION_DISCARD, sessionId),
+
+  onShowRecoveryDialog: (
+    callback: (
+      sessions: Array<{
+        sessionId: string;
+        frameCount: number;
+        lastCheckpoint: string;
+        status: string;
+      }>
+    ) => void
+  ) => {
+    ipcRenderer.on(
+      IPC_CHANNELS.SESSION_SHOW_RECOVERY_DIALOG,
+      (
+        _event: IpcRendererEvent,
+        sessions: Array<{
+          sessionId: string;
+          frameCount: number;
+          lastCheckpoint: string;
+          status: string;
+        }>
+      ) => callback(sessions)
     );
   },
 });
