@@ -5,6 +5,8 @@ import * as schema from "../db/schema/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sessionDeliveryService } from "../services/session-delivery.service.js";
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
+import { frameAnalysisService } from "../services/frame-analysis.service.js";
+import { masterStoryService } from "../services/master-story.service.js";
 import type {
   SelectedWindowInfo,
   MonitoringSessionState,
@@ -40,10 +42,12 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
     selectedWindows,
     captureIntervalMs = 30000,
     name,
+    sessionGoal,
   }: {
     selectedWindows: SelectedWindowInfo[];
     captureIntervalMs?: number;
     name?: string;
+    sessionGoal?: string;
   } = req.body;
 
   // Get user's organizationId from database
@@ -100,12 +104,21 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
         organizationId,
         userId,
         name: name || null,
+        sessionGoal: sessionGoal || null,
         status: "active",
         captureIntervalMs,
         selectedWindows: selectedWindows as any,
         startedAt: new Date(),
       })
       .returning();
+
+    // Initialize master story for the session
+    try {
+      await masterStoryService.initializeStory(session.id, sessionGoal);
+    } catch (storyError) {
+      console.warn(`[Monitoring] Failed to initialize master story:`, storyError);
+      // Don't fail session creation if story init fails
+    }
 
     console.log(`[Monitoring] Session started: ${session.id}`);
 
@@ -525,6 +538,114 @@ router.post("/sessions/:id/end", requireAuth, async (req: Request, res: Response
 });
 
 /**
+ * POST /api/monitoring/sessions/:id/force-end
+ * Force end a session without Electron state (for crash recovery)
+ * This skips the normal capture upload and summarization flow
+ */
+router.post(
+  "/sessions/:id/force-end",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { reason }: { reason?: string } = req.body;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to end this session",
+        });
+        return;
+      }
+
+      // Allow force-ending any session that's not already ended
+      if (session.status === "ended" || session.status === "crashed") {
+        res.status(400).json({
+          error: "Bad Request",
+          message: `Session is already ${session.status}`,
+        });
+        return;
+      }
+
+      const endTime = new Date();
+      const startTime = new Date(session.startedAt).getTime();
+      let totalPausedMs = session.totalPausedMs || 0;
+
+      // If was paused, add remaining pause time
+      if (session.status === "paused" && session.pausedAt) {
+        totalPausedMs += Date.now() - new Date(session.pausedAt).getTime();
+      }
+
+      const activeDurationMs = endTime.getTime() - startTime - totalPausedMs;
+
+      // Update session to crashed/ended state
+      const [updated] = await db
+        .update(schema.monitoringSessions)
+        .set({
+          status: "crashed", // Mark as crashed to distinguish from normal end
+          endedAt: endTime,
+          totalPausedMs,
+          recoveryStatus: reason || "force_ended_after_crash",
+          updatedAt: endTime,
+        })
+        .where(eq(schema.monitoringSessions.id, id))
+        .returning();
+
+      // Get capture count (if any were saved before crash)
+      const [{ count: captureCount }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.sessionCaptures)
+        .where(eq(schema.sessionCaptures.sessionId, id));
+
+      console.log(`[Monitoring] Session force-ended: ${id}`, {
+        previousStatus: session.status,
+        captureCount,
+        reason: reason || "force_ended_after_crash",
+      });
+
+      res.json({
+        success: true,
+        session: {
+          id: updated.id,
+          status: updated.status,
+          startedAt: updated.startedAt,
+          endedAt: updated.endedAt,
+          duration: {
+            totalMs: endTime.getTime() - startTime,
+            activeMs: activeDurationMs,
+            pausedMs: totalPausedMs,
+          },
+          captureCount,
+          recoveryStatus: updated.recoveryStatus,
+        },
+      });
+    } catch (error) {
+      console.error("[Monitoring] Error force-ending session:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to force-end session",
+      });
+    }
+  }
+);
+
+/**
  * POST /api/monitoring/sessions/:id/captures
  * Upload captures batch (from Electron)
  */
@@ -611,6 +732,168 @@ router.post(
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to add captures",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/monitoring/sessions/:id/frame/analyze
+ * Analyze a single frame using the Progression Detector
+ * Only extends the master story if progression is detected
+ */
+router.post(
+  "/sessions/:id/frame/analyze",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const {
+      frameId,
+      currentFrame,
+      previousFrame,
+      windowInfo,
+      timestamp,
+    }: {
+      frameId: string;
+      currentFrame: string; // Base64 image
+      previousFrame: string | null; // Base64 image (null for first frame)
+      windowInfo: {
+        windowSourceId: string;
+        appName: string;
+        windowTitle: string;
+      };
+      timestamp: string;
+    } = req.body;
+
+    if (!frameId || !currentFrame || !windowInfo) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "frameId, currentFrame, and windowInfo are required",
+      });
+      return;
+    }
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to analyze frames for this session",
+        });
+        return;
+      }
+
+      // Analyze frame using Progression Detector
+      const analysisResult = await frameAnalysisService.analyzeFrame({
+        sessionId: id,
+        frameId,
+        currentFrame,
+        previousFrame,
+        windowInfo,
+        timestamp,
+      });
+
+      // If progression detected, extend the master story
+      let storyUpdate = null;
+      if (analysisResult.progressionDetected) {
+        storyUpdate = await masterStoryService.extendStory({
+          sessionId: id,
+          userId,
+          frameAnalysis: analysisResult,
+          windowInfo,
+        });
+      }
+
+      console.log(
+        `[Monitoring] Frame analyzed: ${frameId}, progression: ${analysisResult.progressionDetected}`
+      );
+
+      res.json({
+        success: true,
+        analysis: {
+          frameId: analysisResult.frameId,
+          progressionDetected: analysisResult.progressionDetected,
+          summaryOfAction: analysisResult.summaryOfAction,
+          deltaChanged: analysisResult.deltaChanged,
+          deltaChangeType: analysisResult.deltaChangeType,
+          confidence: analysisResult.confidence,
+        },
+        storyUpdated: storyUpdate?.success || false,
+        storyVersion: storyUpdate?.version || null,
+        latencyMs: analysisResult.analysisLatencyMs,
+      });
+    } catch (error) {
+      console.error("[Monitoring] Error analyzing frame:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to analyze frame",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/monitoring/sessions/:id/story
+ * Get the current master story for a session
+ */
+router.get(
+  "/sessions/:id/story",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to access this session",
+        });
+        return;
+      }
+
+      const story = await masterStoryService.getCurrentStory(id);
+      const metadata = await masterStoryService.getStoryMetadata(id);
+
+      res.json({
+        story,
+        metadata,
+      });
+    } catch (error) {
+      console.error("[Monitoring] Error fetching master story:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to fetch master story",
       });
     }
   }

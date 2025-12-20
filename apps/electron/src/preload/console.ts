@@ -30,6 +30,13 @@ const IPC_CHANNELS = {
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress",
   // Window detection
   WATCH_WINDOWS_GET_ALL: "watch-windows-get-all",
+  // Session recovery
+  SESSION_GET_INCOMPLETE: "session-get-incomplete",
+  SESSION_RECOVER: "session-recover",
+  SESSION_DISCARD: "session-discard",
+  SESSION_RECOVER_ALL: "session-recover-all",
+  SESSION_DISCARD_ALL: "session-discard-all",
+  SESSION_SHOW_RECOVERY_DIALOG: "session-show-recovery-dialog",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -172,6 +179,69 @@ contextBridge.exposeInMainWorld("consoleAPI", {
         _event: IpcRendererEvent,
         progress: { sessionId: string; captureCount: number; latestCapture: unknown }
       ) => callback(progress)
+    );
+  },
+
+  // Session recovery API
+  getIncompleteSessions: (): Promise<
+    Array<{
+      sessionId: string;
+      sessionGoal?: string;
+      frameCount: number;
+      lastFrameTimestamp: string;
+      checkpointAt: string;
+      duration: string;
+      localPath: string;
+    }>
+  > => ipcRenderer.invoke(IPC_CHANNELS.SESSION_GET_INCOMPLETE),
+
+  recoverSession: (
+    sessionId: string
+  ): Promise<{ sessionId: string; action: string; success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SESSION_RECOVER, sessionId),
+
+  discardSession: (
+    sessionId: string
+  ): Promise<{ sessionId: string; action: string; success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SESSION_DISCARD, sessionId),
+
+  recoverAllSessions: (): Promise<
+    Array<{ sessionId: string; action: string; success: boolean; error?: string }>
+  > => ipcRenderer.invoke(IPC_CHANNELS.SESSION_RECOVER_ALL),
+
+  discardAllSessions: (): Promise<
+    Array<{ sessionId: string; action: string; success: boolean; error?: string }>
+  > => ipcRenderer.invoke(IPC_CHANNELS.SESSION_DISCARD_ALL),
+
+  onShowRecoveryDialog: (
+    callback: (data: {
+      sessions: Array<{
+        sessionId: string;
+        sessionGoal?: string;
+        frameCount: number;
+        lastFrameTimestamp: string;
+        checkpointAt: string;
+        duration: string;
+        localPath: string;
+      }>;
+    }) => void
+  ) => {
+    ipcRenderer.on(
+      IPC_CHANNELS.SESSION_SHOW_RECOVERY_DIALOG,
+      (
+        _event: IpcRendererEvent,
+        data: {
+          sessions: Array<{
+            sessionId: string;
+            sessionGoal?: string;
+            frameCount: number;
+            lastFrameTimestamp: string;
+            checkpointAt: string;
+            duration: string;
+            localPath: string;
+          }>;
+        }
+      ) => callback(data)
     );
   },
 });

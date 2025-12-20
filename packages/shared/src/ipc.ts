@@ -136,6 +136,15 @@ export const IPC_CHANNELS = {
 
   // Drafts system (Console)
   DRAFTS_NAVIGATE: "drafts-navigate",
+
+  // Session Recovery system (crash recovery)
+  SESSION_GET_INCOMPLETE: "session-get-incomplete", // Get incomplete sessions for recovery dialog
+  SESSION_RECOVER: "session-recover", // Recover a specific session
+  SESSION_DISCARD: "session-discard", // Discard a specific session
+  SESSION_RECOVER_ALL: "session-recover-all", // Recover all incomplete sessions
+  SESSION_DISCARD_ALL: "session-discard-all", // Discard all incomplete sessions
+  SESSION_SHOW_RECOVERY_DIALOG: "session-show-recovery-dialog", // Show recovery dialog in console
+  SESSION_RECOVERY_COMPLETE: "session-recovery-complete", // Recovery process completed
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

@@ -346,3 +346,38 @@ export async function reviseSummary(
     body: JSON.stringify({ instruction, currentSummary }),
   });
 }
+
+/**
+ * Fetch the current active session (if any)
+ */
+export async function fetchActiveSession(): Promise<{ session: MonitoringSessionState | null }> {
+  return apiRequest<{ session: MonitoringSessionState | null }>("/monitoring/sessions/active");
+}
+
+/**
+ * Force end a session without Electron state (for crash recovery)
+ */
+export async function forceEndSession(
+  sessionId: string,
+  reason?: string
+): Promise<{
+  success: boolean;
+  session: {
+    id: string;
+    status: string;
+    startedAt: string;
+    endedAt: string;
+    duration: {
+      totalMs: number;
+      activeMs: number;
+      pausedMs: number;
+    };
+    captureCount: number;
+    recoveryStatus: string;
+  };
+}> {
+  return apiRequest(`/monitoring/sessions/${sessionId}/force-end`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}

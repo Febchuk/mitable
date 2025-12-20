@@ -1,527 +1,95 @@
-@mitable/electron:dev: [Conversation] Renderer loaded and ready for IPC
-@mitable/electron:dev: [AgentPanel] Window finished loading
-@mitable/electron:dev: [Console] DOM ready - window.consoleAPI should be available now
-@mitable/electron:dev: [Console] Window finished loading - preload script should be ready
+:3000/api/monitoring/sessions:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+StartSessionDialog.tsx:175 Error starting session: Error: Failed query: select "id", "organization_id", "user_id", "name", "session_goal", "local_path", "cloud_path", "status", "capture_interval_ms", "selected_windows", "started_at", "paused_at", "total_paused_ms", "ended_at", "last_checkpoint_at", "last_checkpoint_frame_id", "last_checkpoint_frame_count", "recovery_status", "raw_activity_summary", "final_summary", "key_activities", "accomplishments", "blockers", "time_breakdown", "delivery_status", "delivery_channel", "delivery_target", "delivered_at", "delivery_error", "slack_message_ts", "created_at", "updated_at" from "monitoring_sessions" where ("monitoring_sessions"."user_id" = $1 and "monitoring_sessions"."status" = $2) limit $3
+params: 0a484b0b-59c7-467e-a492-4a8c72ff7bc6,active,1
+    at apiRequest (api.ts:41:11)
+    at async handleStartSession (StartSessionDialog.tsx:141:29)
+
+    [GuideGenerationService] Initialized 3 pre-defined guides
+@mitable/backend:dev: 🔍 Validating configuration...
+@mitable/backend:dev: 🔍 Checking port 3000 availability...
+@mitable/backend:dev: 🔌 Testing database connection...
+@mitable/backend:dev: 🔌 New database connection established
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/backend:dev: ✅ Database connected: 2025-12-20T17:11:01.636Z
+@mitable/backend:dev: 📊 Initial pool stats: { total: 1, idle: 0, waiting: 0 }
+@mitable/backend:dev: 🔧 Initializing vector service...
+@mitable/backend:dev: ✅ Vector service initialized
+@mitable/backend:dev: 🔧 Initializing PII redaction service...
+@mitable/backend:dev: [PIIRedactionService] Initializing 5 Tesseract.js workers for parallel OCR...
+@mitable/backend:dev: [PIIRedactionService] 5 parallel OCR workers initialized and ready
+@mitable/backend:dev: ✅ PII redaction service hot and ready (5 workers)
+@mitable/backend:dev: 🚀 Mitable Backend API running on http://localhost:3000
+@mitable/backend:dev: 📊 Environment: development
 @mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
 @mitable/electron:dev: [Auth] Tokens set from Console window
-@mitable/electron:dev: [Auth] Tokens set from Console window
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
-@mitable/backend:dev: 📊 Pool stats - Total: 2, Idle: 1, Waiting: 0
-@mitable/backend:dev: [Monitoring] Session deleted: cc9d2c74-edac-417d-982a-62ebc947289d
-@mitable/electron:dev: [Monitoring Session] Resetting session state
-@mitable/electron:dev: [MonitoringSessionService] Capture loop stopped
-@mitable/electron:dev: [MonitoringSessionService] Session reset (external deletion)
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/electron:dev: [WindowDetectionService] Detected 11 total windows
+@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
+@mitable/electron:dev: [WindowDetectionService] Detected 22 total windows
 @mitable/electron:dev: [WindowDetectionService] Window detected: { app: 'Grain', title: 'Grain', blocked: false, reason: undefined }
 @mitable/electron:dev: [WindowDetectionService] Skipping Mitable window: Mitable Console
 @mitable/electron:dev: [WindowDetectionService] Window detected: {
 @mitable/electron:dev:   app: 'Cursor',
-@mitable/electron:dev:   title: 'rollback-procedure.md — mitable',
+@mitable/electron:dev:   title: 'session-prompts.ts — mitable',
+@mitable/electron:dev:   blocked: false,
+@mitable/electron:dev:   reason: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'Slack',
+@mitable/electron:dev:   title: 'engineering (Channel) - Mitable - 4 new items - Sl...',
+@mitable/electron:dev:   blocked: true,
+@mitable/electron:dev:   reason: 'Window title denied by capture policy'
+@mitable/electron:dev: }
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'Finder',
+@mitable/electron:dev:   title: 'Downloads',
 @mitable/electron:dev:   blocked: false,
 @mitable/electron:dev:   reason: undefined
 @mitable/electron:dev: }
 @mitable/electron:dev: [WindowDetectionService] Window detected: {
 @mitable/electron:dev:   app: 'Google Chrome',
-@mitable/electron:dev:   title: '(24) Feed | LinkedIn',
-@mitable/electron:dev:   blocked: false,
-@mitable/electron:dev:   reason: undefined
-@mitable/electron:dev: }
-@mitable/electron:dev: [WindowDetectionService] Window detected: { app: 'Grain', title: 'Deals', blocked: false, reason: undefined }
-@mitable/electron:dev: [WindowDetectionService] Window detected: {
-@mitable/electron:dev:   app: 'System Settings',
-@mitable/electron:dev:   title: 'Software Update',
-@mitable/electron:dev:   blocked: false,
-@mitable/electron:dev:   reason: undefined
-@mitable/electron:dev: }
-@mitable/electron:dev: [WindowDetectionService] Window detected: { app: 'Finder', title: 'Desktop', blocked: false, reason: undefined }
-@mitable/electron:dev: [WindowDetectionService] Returning 6 watchable windows
-@mitable/electron:dev: [Watch Mode] Returning 6 visible windows
-@mitable/electron:dev: [Monitoring Session] Starting session: { windowCount: 1, intervalMs: 5000 }
-@mitable/electron:dev: [MonitoringSessionService] Created session directory: /var/folders/y_/hlp3gt593rg287xq4czxpm_m0000gn/T/mitable-sessions/974bee17-284f-4fe0-ab41-6b2a203ec0bf
-@mitable/electron:dev: [MonitoringSessionService] Capture loop started (interval: 5000ms)
-@mitable/electron:dev: [MonitoringSessionService] Session started: 974bee17-284f-4fe0-ab41-6b2a203ec0bf { windowCount: 1, intervalMs: 5000 }
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Feed | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0001_periodic.png { sequenceNumber: 1, trigger: 'periodic', app: '(24) Feed | LinkedIn' }
-@mitable/backend:dev: [Monitoring] Session started: 44320747-aac4-48fd-bd89-3ff4b0030c85
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Feed | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0002_periodic.png { sequenceNumber: 2, trigger: 'periodic', app: '(24) Feed | LinkedIn' }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Feed | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0003_periodic.png { sequenceNumber: 3, trigger: 'periodic', app: '(24) Feed | LinkedIn' }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Feed | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0004_periodic.png { sequenceNumber: 4, trigger: 'periodic', app: '(24) Feed | LinkedIn' }
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Feed | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0005_periodic.png { sequenceNumber: 5, trigger: 'periodic', app: '(24) Feed | LinkedIn' }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Panoplia Laboratories: Overview | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0006_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 6,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Panoplia Laboratories: Overview | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0007_periodic.png { sequenceNumber: 7, trigger: 'periodic', app: '(24) LinkedIn' }
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Panoplia Laboratories: About | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0008_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 8,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Panoplia Laboratories: About | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0009_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 9,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Search | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0010_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 10,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Search | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Julian Cohen | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0011_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 11,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Julian Cohen | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0012_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 12,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Search | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0013_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 13,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Search | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Jacob Swett | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0014_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 14,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Jacob Swett | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Jacob Swett | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0015_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 15,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Jacob Swett | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Michelle Zhang | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0016_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 16,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Michelle Zhang | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Michelle Zhang | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0017_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 17,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Michelle Zhang | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0018_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 18,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: '(24) Search | LinkedIn'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 6 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Skipping duplicate capture
-@mitable/electron:dev: [CaptureService] Detected 7 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Skipping duplicate capture
-@mitable/electron:dev: [83857:1214/160342.688888:ERROR:CONSOLE:1] "Request Autofill.enable failed. {"code":-32601,"message":"'Autofill.enable' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
-@mitable/electron:dev: [83857:1214/160342.688925:ERROR:CONSOLE:1] "Request Autofill.setAddresses failed. {"code":-32601,"message":"'Autofill.setAddresses' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Skipping duplicate capture
-@mitable/electron:dev: [Auth] Tokens cleared
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Skipping duplicate capture
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Skipping duplicate capture
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Skipping duplicate capture
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
-@mitable/electron:dev: [Auth] Tokens set from Console window
-@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Skipping duplicate capture
-@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/electron:dev: [Monitoring Session] Ending session
-@mitable/electron:dev: [MonitoringSessionService] Capture loop stopped
-@mitable/electron:dev: [MonitoringSessionService] Session ended: 974bee17-284f-4fe0-ab41-6b2a203ec0bf { captureCount: 18, duration: 125226 }
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 1 windows matching allowed IDs: 513
-@mitable/electron:dev: [CaptureService] Capturing 1 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3728, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1864, height: 1080 }
-@mitable/electron:dev: }
-@mitable/backend:dev: [Monitoring] Session ended: 44320747-aac4-48fd-bd89-3ff4b0030c85 { captureCount: 0, activeDurationMs: 125130 }
-@mitable/backend:dev: [SessionSummarization] Starting summary generation for session: 44320747-aac4-48fd-bd89-3ff4b0030c85
-@mitable/backend:dev: [SessionSummarization] Found 0 captures
-@mitable/backend:dev: [SessionSummarization] Sampled 0 captures for analysis
-@mitable/backend:dev: [SessionSummarization] Analyzed 0 screenshots
-@mitable/backend:dev: [SessionSummarization] Aggregated into 0 activities
-@mitable/backend:dev: [SessionSummarization] Summary generated in 631ms
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/backend:dev: [SessionSummarization] Summary saved (version 1)
-@mitable/backend:dev: [Monitoring] Summary generated for session 44320747-aac4-48fd-bd89-3ff4b0030c85
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/electron:dev: [83857:1214/160434.241817:ERROR:CONSOLE:1] "Request Autofill.enable failed. {"code":-32601,"message":"'Autofill.enable' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
-@mitable/electron:dev: [83857:1214/160434.241856:ERROR:CONSOLE:1] "Request Autofill.setAddresses failed. {"code":-32601,"message":"'Autofill.setAddresses' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/electron:dev: [WindowDetectionService] Detected 13 total windows
-@mitable/electron:dev: [WindowDetectionService] Window detected: { app: 'Grain', title: 'Grain', blocked: false, reason: undefined }
-@mitable/electron:dev: [WindowDetectionService] Skipping Mitable window: Mitable Console
-@mitable/electron:dev: [WindowDetectionService] Window detected: {
-@mitable/electron:dev:   app: 'Cursor',
-@mitable/electron:dev:   title: 'rollback-procedure.md — mitable',
+@mitable/electron:dev:   title: 'AI Command (Soon) - Novel Docs',
 @mitable/electron:dev:   blocked: false,
 @mitable/electron:dev:   reason: undefined
 @mitable/electron:dev: }
 @mitable/electron:dev: [WindowDetectionService] Window detected: {
-@mitable/electron:dev:   app: 'Electron',
-@mitable/electron:dev:   title: 'Developer Tools - http://localhost:5173/console/in...',
+@mitable/electron:dev:   app: 'Google Chrome',
+@mitable/electron:dev:   title: 'Bay Padel - Dogpatch - Google Maps',
 @mitable/electron:dev:   blocked: false,
 @mitable/electron:dev:   reason: undefined
 @mitable/electron:dev: }
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'Messages',
+@mitable/electron:dev:   title: 'Raphael Bernabe',
+@mitable/electron:dev:   blocked: true,
+@mitable/electron:dev:   reason: 'App name denied by capture policy'
+@mitable/electron:dev: }
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'Safari',
+@mitable/electron:dev:   title: 'Sign in - Google Accounts',
+@mitable/electron:dev:   blocked: false,
+@mitable/electron:dev:   reason: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'Google Chrome',
+@mitable/electron:dev:   title: 'Plate Pro',
+@mitable/electron:dev:   blocked: false,
+@mitable/electron:dev:   reason: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'FaceTime',
+@mitable/electron:dev:   title: 'FaceTime',
+@mitable/electron:dev:   blocked: false,
+@mitable/electron:dev:   reason: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [WindowDetectionService] Window detected: { app: 'Grain', title: 'Meetings', blocked: false, reason: undefined }
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'Willow Voice',
+@mitable/electron:dev:   title: 'Dashboard',
+@mitable/electron:dev:   blocked: false,
+@mitable/electron:dev:   reason: undefined
+@mitable/electron:dev: }
+@mitable/electron:dev: [WindowDetectionService] Window detected: { app: 'Granola', title: 'Granola', blocked: false, reason: undefined }
+@mitable/electron:dev: [WindowDetectionService] Window detected: { app: 'Music', title: 'Window', blocked: false, reason: undefined }
+@mitable/electron:dev: [WindowDetectionService] Window detected: { app: 'Music', title: 'Music', blocked: false, reason: undefined }
 @mitable/electron:dev: [WindowDetectionService] Window detected: {
 @mitable/electron:dev:   app: 'Spotify',
 @mitable/electron:dev:   title: 'Spotify Premium',
@@ -529,344 +97,66 @@
 @mitable/electron:dev:   reason: undefined
 @mitable/electron:dev: }
 @mitable/electron:dev: [WindowDetectionService] Window detected: {
-@mitable/electron:dev:   app: 'Google Chrome',
-@mitable/electron:dev:   title: '(24) Search | LinkedIn',
+@mitable/electron:dev:   app: 'Notification Center',
+@mitable/electron:dev:   title: 'Featured',
 @mitable/electron:dev:   blocked: false,
 @mitable/electron:dev:   reason: undefined
 @mitable/electron:dev: }
-@mitable/electron:dev: [WindowDetectionService] Window detected: { app: 'Grain', title: 'Deals', blocked: false, reason: undefined }
 @mitable/electron:dev: [WindowDetectionService] Window detected: {
-@mitable/electron:dev:   app: 'System Settings',
-@mitable/electron:dev:   title: 'Software Update',
+@mitable/electron:dev:   app: 'Notification Center',
+@mitable/electron:dev:   title: 'People',
 @mitable/electron:dev:   blocked: false,
 @mitable/electron:dev:   reason: undefined
 @mitable/electron:dev: }
-@mitable/electron:dev: [WindowDetectionService] Window detected: { app: 'Finder', title: 'Desktop', blocked: false, reason: undefined }
-@mitable/electron:dev: [WindowDetectionService] Returning 8 watchable windows
-@mitable/electron:dev: [Watch Mode] Returning 8 visible windows
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/electron:dev: [Monitoring Session] Starting session: { windowCount: 2, intervalMs: 5000 }
-@mitable/electron:dev: [MonitoringSessionService] Created session directory: /var/folders/y_/hlp3gt593rg287xq4czxpm_m0000gn/T/mitable-sessions/f4fd9057-cdf5-4673-883f-ff99fdec19c5
-@mitable/electron:dev: [MonitoringSessionService] Capture loop started (interval: 5000ms)
-@mitable/electron:dev: [MonitoringSessionService] Session started: f4fd9057-cdf5-4673-883f-ff99fdec19c5 { windowCount: 2, intervalMs: 5000 }
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'Notification Center',
+@mitable/electron:dev:   title: 'Status',
+@mitable/electron:dev:   blocked: false,
+@mitable/electron:dev:   reason: undefined
 @mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1968 },
-@mitable/electron:dev:   resized: { width: 1920, height: 984 }
+@mitable/electron:dev: [WindowDetectionService] Window detected: {
+@mitable/electron:dev:   app: 'Notification Center',
+@mitable/electron:dev:   title: 'Clock Digital',
+@mitable/electron:dev:   blocked: false,
+@mitable/electron:dev:   reason: undefined
 @mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0001_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 1,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0002_periodic.png { sequenceNumber: 2, trigger: 'periodic', app: 'Spotify Premium' }
-@mitable/backend:dev: 🔌 New database connection established
+@mitable/electron:dev: [WindowDetectionService] Returning 20 watchable windows
+@mitable/electron:dev: [Watch Mode] Returning 20 visible windows
 @mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
-@mitable/backend:dev: [Monitoring] Session started: e7ae5d30-c059-475c-82d8-4cbcc4cbbc00
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1968 },
-@mitable/electron:dev:   resized: { width: 1920, height: 984 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0003_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 3,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0004_periodic.png { sequenceNumber: 4, trigger: 'periodic', app: 'Spotify Premium' }
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1968 },
-@mitable/electron:dev:   resized: { width: 1920, height: 984 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0005_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 5,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0006_periodic.png { sequenceNumber: 6, trigger: 'periodic', app: 'Spotify Premium' }
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1968 },
-@mitable/electron:dev:   resized: { width: 1920, height: 984 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0007_periodic.png { sequenceNumber: 7, trigger: 'periodic', app: 'Spotify Premium' }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0008_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 8,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1968 },
-@mitable/electron:dev:   resized: { width: 1920, height: 984 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0009_periodic.png { sequenceNumber: 9, trigger: 'periodic', app: 'Spotify Premium' }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0010_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 10,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1968 },
-@mitable/electron:dev:   resized: { width: 1920, height: 984 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0011_periodic.png { sequenceNumber: 11, trigger: 'periodic', app: 'Spotify Premium' }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0012_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 12,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1968 },
-@mitable/electron:dev:   resized: { width: 1920, height: 984 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0013_periodic.png { sequenceNumber: 13, trigger: 'periodic', app: 'Spotify Premium' }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0014_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 14,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
+@mitable/backend:dev: [Monitoring] Error starting session: DrizzleQueryError: Failed query: select "id", "organization_id", "user_id", "name", "session_goal", "local_path", "cloud_path", "status", "capture_interval_ms", "selected_windows", "started_at", "paused_at", "total_paused_ms", "ended_at", "last_checkpoint_at", "last_checkpoint_frame_id", "last_checkpoint_frame_count", "recovery_status", "raw_activity_summary", "final_summary", "key_activities", "accomplishments", "blockers", "time_breakdown", "delivery_status", "delivery_channel", "delivery_target", "delivered_at", "delivery_error", "slack_message_ts", "created_at", "updated_at" from "monitoring_sessions" where ("monitoring_sessions"."user_id" = $1 and "monitoring_sessions"."status" = $2) limit $3
+@mitable/backend:dev: params: 0a484b0b-59c7-467e-a492-4a8c72ff7bc6,active,1
+@mitable/backend:dev:     at NodePgPreparedQuery.queryWithCache (/Users/febechukwuma/Documents/mitable/node_modules/src/pg-core/session.ts:73:11)
+@mitable/backend:dev:     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+@mitable/backend:dev:     at async <anonymous> (/Users/febechukwuma/Documents/mitable/node_modules/src/node-postgres/session.ts:154:19)
+@mitable/backend:dev:     at async <anonymous> (/Users/febechukwuma/Documents/mitable/apps/backend/src/routes/monitoring.ts:80:29) {
+@mitable/backend:dev:   query: 'select "id", "organization_id", "user_id", "name", "session_goal", "local_path", "cloud_path", "status", "capture_interval_ms", "selected_windows", "started_at", "paused_at", "total_paused_ms", "ended_at", "last_checkpoint_at", "last_checkpoint_frame_id", "last_checkpoint_frame_count", "recovery_status", "raw_activity_summary", "final_summary", "key_activities", "accomplishments", "blockers", "time_breakdown", "delivery_status", "delivery_channel", "delivery_target", "delivered_at", "delivery_error", "slack_message_ts", "created_at", "updated_at" from "monitoring_sessions" where ("monitoring_sessions"."user_id" = $1 and "monitoring_sessions"."status" = $2) limit $3',
+@mitable/backend:dev:   params: [ '0a484b0b-59c7-467e-a492-4a8c72ff7bc6', 'active', 1 ],
+@mitable/backend:dev:   cause: error: column "session_goal" does not exist
+@mitable/backend:dev:       at /Users/febechukwuma/Documents/mitable/node_modules/pg-pool/index.js:45:11
+@mitable/backend:dev:       at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+@mitable/backend:dev:       at async <anonymous> (/Users/febechukwuma/Documents/mitable/node_modules/src/node-postgres/session.ts:161:13)
+@mitable/backend:dev:       at async NodePgPreparedQuery.queryWithCache (/Users/febechukwuma/Documents/mitable/node_modules/src/pg-core/session.ts:71:12)
+@mitable/backend:dev:       at async <anonymous> (/Users/febechukwuma/Documents/mitable/node_modules/src/node-postgres/session.ts:154:19)
+@mitable/backend:dev:       at async <anonymous> (/Users/febechukwuma/Documents/mitable/apps/backend/src/routes/monitoring.ts:80:29) {
+@mitable/backend:dev:     length: 112,
+@mitable/backend:dev:     severity: 'ERROR',
+@mitable/backend:dev:     code: '42703',
+@mitable/backend:dev:     detail: undefined,
+@mitable/backend:dev:     hint: undefined,
+@mitable/backend:dev:     position: '52',
+@mitable/backend:dev:     internalPosition: undefined,
+@mitable/backend:dev:     internalQuery: undefined,
+@mitable/backend:dev:     where: undefined,
+@mitable/backend:dev:     schema: undefined,
+@mitable/backend:dev:     table: undefined,
+@mitable/backend:dev:     column: undefined,
+@mitable/backend:dev:     dataType: undefined,
+@mitable/backend:dev:     constraint: undefined,
+@mitable/backend:dev:     file: 'parse_relation.c',
+@mitable/backend:dev:     line: '3716',
+@mitable/backend:dev:     routine: 'errorMissingColumn'
+@mitable/backend:dev:   }
+@mitable/backend:dev: }
 @mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Spotify Premium
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1968 },
-@mitable/electron:dev:   resized: { width: 1920, height: 984 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0015_periodic.png { sequenceNumber: 15, trigger: 'periodic', app: 'Spotify Premium' }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0016_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 16,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Jake Houlsby - Howl
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1968 },
-@mitable/electron:dev:   resized: { width: 1920, height: 984 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0017_periodic.png { sequenceNumber: 17, trigger: 'periodic', app: 'Jake Houlsby' }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0018_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 18,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 8 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Jake Houlsby - Howl
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1968 },
-@mitable/electron:dev:   resized: { width: 1920, height: 984 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0019_periodic.png { sequenceNumber: 19, trigger: 'periodic', app: 'Jake Houlsby' }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0020_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 20,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Detected 9 visible windows
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Mitable Console
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Jake Houlsby - Howl
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Dock
-@mitable/electron:dev: [CaptureService] ✅ Allowed: rollback-procedure.md — mitable
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Developer Tools - http://localhost:5173/console/index.html
-@mitable/electron:dev: [CaptureService] ✅ Allowed: (24) Search | LinkedIn
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Deals
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Software Update
-@mitable/electron:dev: [CaptureService] ✅ Allowed: Desktop
-@mitable/electron:dev: [CaptureService] Filtered to 2 windows matching allowed IDs: 314, 158
-@mitable/electron:dev: [CaptureService] Capturing 2 windows
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3840, height: 1971 },
-@mitable/electron:dev:   resized: { width: 1920, height: 986 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [CaptureService] Resizing image: {
-@mitable/electron:dev:   original: { width: 3274, height: 2160 },
-@mitable/electron:dev:   resized: { width: 1637, height: 1080 }
-@mitable/electron:dev: }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0021_periodic.png { sequenceNumber: 21, trigger: 'periodic', app: 'Jake Houlsby' }
-@mitable/electron:dev: [MonitoringSessionService] Capture saved: capture_0022_periodic.png {
-@mitable/electron:dev:   sequenceNumber: 22,
-@mitable/electron:dev:   trigger: 'periodic',
-@mitable/electron:dev:   app: 'rollback-procedure.md — mitable'
-@mitable/electron:dev: }
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 0, Waiting: 0
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/electron:dev: [Monitoring Session] Ending session
-@mitable/electron:dev: [MonitoringSessionService] Capture loop stopped
-@mitable/electron:dev: [MonitoringSessionService] Session ended: f4fd9057-cdf5-4673-883f-ff99fdec19c5 { captureCount: 22, duration: 53292 }
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/backend:dev: [Monitoring] Session ended: e7ae5d30-c059-475c-82d8-4cbcc4cbbc00 { captureCount: 0, activeDurationMs: 52708 }
-@mitable/backend:dev: [SessionSummarization] Starting summary generation for session: e7ae5d30-c059-475c-82d8-4cbcc4cbbc00
-@mitable/backend:dev: [SessionSummarization] Found 0 captures
-@mitable/backend:dev: [SessionSummarization] Sampled 0 captures for analysis
-@mitable/backend:dev: [SessionSummarization] Analyzed 0 screenshots
-@mitable/backend:dev: [SessionSummarization] Aggregated into 0 activities
-@mitable/backend:dev: [SessionSummarization] Summary generated in 485ms
-@mitable/backend:dev: [SessionSummarization] Summary saved (version 1)
-@mitable/backend:dev: [Monitoring] Summary generated for session e7ae5d30-c059-475c-82d8-4cbcc4cbbc00
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/electron:dev: [MonitoringSessionService] Cleaned up session directory: /var/folders/y_/hlp3gt593rg287xq4czxpm_m0000gn/T/mitable-sessions/974bee17-284f-4fe0-ab41-6b2a203ec0bf
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
-@mitable/backend:dev: 📊 Pool stats - Total: 1, Idle: 0, Waiting: 0
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 2, Waiting: 0
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/electron:dev: [MonitoringSessionService] Cleaned up session directory: /var/folders/y_/hlp3gt593rg287xq4czxpm_m0000gn/T/mitable-sessions/f4fd9057-cdf5-4673-883f-ff99fdec19c5
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 📊 Pool stats - Total: 3, Idle: 0, Waiting: 0
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 🔌 New database connection established
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
-@mitable/backend:dev: 🔌 Database connection removed from pool
+@mitable/electron:dev: [7731:1220/091143.275441:ERROR:CONSOLE:1] "Request Autofill.enable failed. {"code":-32601,"message":"'Autofill.enable' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
+@mitable/electron:dev: [7731:1220/091143.275478:ERROR:CONSOLE:1] "Request Autofill.setAddresses failed. {"code":-32601,"message":"'Autofill.setAddresses' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)

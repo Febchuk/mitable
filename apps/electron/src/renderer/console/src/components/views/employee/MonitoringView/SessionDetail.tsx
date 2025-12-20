@@ -18,6 +18,7 @@ import {
   useSlackUsers,
   useReviseSummary,
   useUpdateSession,
+  useForceEndSession,
 } from "@/console/src/hooks/queries/monitoring";
 import { uploadCaptures } from "@/console/src/services/monitoringService";
 import {
@@ -32,6 +33,7 @@ import {
   Square,
   Pause,
   Play,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -82,11 +84,13 @@ export default function SessionDetail() {
   const endSessionMutation = useEndSession();
   const reviseSummaryMutation = useReviseSummary();
   const updateSessionMutation = useUpdateSession();
+  const forceEndMutation = useForceEndSession();
 
   const [isAIEditMode, setIsAIEditMode] = useState(false);
   const [isPauseLoading, setIsPauseLoading] = useState(false);
   const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isForceEndDialogOpen, setIsForceEndDialogOpen] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
 
   const handleSaveSummary = async (content: string) => {
@@ -191,6 +195,13 @@ export default function SessionDetail() {
       const electronResult = await window.consoleAPI.endMonitoringSession();
 
       if (electronResult.error) {
+        // Check if this is a "No active session" error (crash recovery case)
+        if (electronResult.error.includes("No active session") ||
+            electronResult.error.includes("no active session")) {
+          // Show force-end dialog
+          setIsForceEndDialogOpen(true);
+          return;
+        }
         throw new Error(electronResult.error);
       }
 
@@ -214,6 +225,30 @@ export default function SessionDetail() {
       toast({
         title: "Error",
         description: "Failed to end session. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleForceEndSession = async () => {
+    if (!sessionId) return;
+
+    try {
+      await forceEndMutation.mutateAsync({
+        sessionId,
+        reason: "force_ended_after_app_crash",
+      });
+
+      setIsForceEndDialogOpen(false);
+      toast({
+        title: "Session ended",
+        description: "The session has been force-ended. No summary was generated due to the crash.",
+      });
+    } catch (error) {
+      console.error("[SessionDetail] Error force-ending session:", error);
+      toast({
+        title: "Error",
+        description: "Failed to force-end session. Please try again.",
         variant: "destructive",
       });
     }
@@ -571,6 +606,47 @@ export default function SessionDetail() {
                 </>
               ) : (
                 "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Force End Dialog (Crash Recovery) */}
+      <Dialog open={isForceEndDialogOpen} onOpenChange={setIsForceEndDialogOpen}>
+        <DialogContent className="bg-background-primary border-border-subtle">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-amber-500/10 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              </div>
+              <DialogTitle className="text-text-primary">Session Recovery Required</DialogTitle>
+            </div>
+            <DialogDescription className="text-text-secondary">
+              The app was closed unexpectedly while this session was running. The session's local
+              capture data may have been lost.
+              <br /><br />
+              You can force-end this session to clear it from the system. No summary will be
+              generated since the capture data is unavailable.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsForceEndDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleForceEndSession}
+              disabled={forceEndMutation.isPending}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {forceEndMutation.isPending ? (
+                <>
+                  <Loader2 className="animate-spin mr-2" size={16} />
+                  Ending...
+                </>
+              ) : (
+                "Force End Session"
               )}
             </Button>
           </DialogFooter>

@@ -210,3 +210,38 @@ export function useReviseSummary() {
     }) => monitoringService.reviseSummary(sessionId, instruction, currentSummary),
   });
 }
+
+/**
+ * Fetch the current active session from the database (if any)
+ * Used for crash recovery detection
+ */
+export function useActiveSession() {
+  const { user } = useUser();
+
+  return useQuery({
+    queryKey: [...monitoringKeys.all, "active"] as const,
+    queryFn: async () => {
+      const response = await monitoringService.fetchActiveSession();
+      return response.session;
+    },
+    enabled: !!user,
+    staleTime: 0, // Always check fresh
+  });
+}
+
+/**
+ * Force end a session without Electron state (for crash recovery)
+ */
+export function useForceEndSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sessionId, reason }: { sessionId: string; reason?: string }) =>
+      monitoringService.forceEndSession(sessionId, reason),
+    onSuccess: (_, { sessionId }) => {
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+      queryClient.invalidateQueries({ queryKey: [...monitoringKeys.all, "active"] });
+    },
+  });
+}
