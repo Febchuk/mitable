@@ -1,17 +1,12 @@
-'use client';
+"use client";
 
-import * as React from 'react';
+import * as React from "react";
 
-import {
-  AIChatPlugin,
-  AIPlugin,
-  useEditorChat,
-  useLastAssistantMessage,
-} from '@platejs/ai/react';
-import { getTransientCommentKey } from '@platejs/comment';
-import { BlockSelectionPlugin, useIsSelecting } from '@platejs/selection/react';
-import { getTransientSuggestionKey } from '@platejs/suggestion';
-import { Command as CommandPrimitive } from 'cmdk';
+import { AIChatPlugin, AIPlugin, useEditorChat, useLastAssistantMessage } from "@platejs/ai/react";
+import { getTransientCommentKey } from "@platejs/comment";
+import { BlockSelectionPlugin, useIsSelecting } from "@platejs/selection/react";
+import { getTransientSuggestionKey } from "@platejs/suggestion";
+import { Command as CommandPrimitive } from "cmdk";
 import {
   Album,
   BadgeHelp,
@@ -28,63 +23,38 @@ import {
   SmileIcon,
   Wand,
   X,
-} from 'lucide-react';
-import {
-  type NodeEntry,
-  type SlateEditor,
-  isHotkey,
-  KEYS,
-  NodeApi,
-  TextApi,
-} from 'platejs';
-import {
-  useEditorPlugin,
-  useFocusedLast,
-  useHotkeys,
-  usePluginOption,
-} from 'platejs/react';
-import { type PlateEditor, useEditorRef } from 'platejs/react';
+} from "lucide-react";
+import { type NodeEntry, type SlateEditor, isHotkey, KEYS, NodeApi, TextApi } from "platejs";
+import { useEditorPlugin, useFocusedLast, useHotkeys, usePluginOption } from "platejs/react";
+import { type PlateEditor, useEditorRef } from "platejs/react";
 
-import { Button } from '@/components/ui/button';
-import {
-  Command,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-} from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { commentPlugin } from '@/components/editor/plugins/comment-kit';
+import { Button } from "@/components/ui/button";
+import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { commentPlugin } from "@/components/editor/plugins/comment-kit";
 
-import { AIChatEditor } from './ai-chat-editor';
+import { AIChatEditor } from "./ai-chat-editor";
 
 export function AIMenu() {
   const { api, editor } = useEditorPlugin(AIChatPlugin);
-  const mode = usePluginOption(AIChatPlugin, 'mode');
-  const toolName = usePluginOption(AIChatPlugin, 'toolName');
+  const mode = usePluginOption(AIChatPlugin, "mode");
+  const toolName = usePluginOption(AIChatPlugin, "toolName");
 
-  const streaming = usePluginOption(AIChatPlugin, 'streaming');
+  const streaming = usePluginOption(AIChatPlugin, "streaming");
   const isSelecting = useIsSelecting();
   const isFocusedLast = useFocusedLast();
-  const open = usePluginOption(AIChatPlugin, 'open') && isFocusedLast;
-  const [value, setValue] = React.useState('');
+  const open = usePluginOption(AIChatPlugin, "open") && isFocusedLast;
+  const [value, setValue] = React.useState("");
 
-  const [input, setInput] = React.useState('');
+  const [input, setInput] = React.useState("");
 
-  const chat = usePluginOption(AIChatPlugin, 'chat');
+  const chat = usePluginOption(AIChatPlugin, "chat");
 
   const { messages, status } = chat;
-  const [anchorElement, setAnchorElement] = React.useState<HTMLElement | null>(
-    null
-  );
+  const [anchorElement, setAnchorElement] = React.useState<HTMLElement | null>(null);
 
-  const content = useLastAssistantMessage()?.parts.find(
-    (part) => part.type === 'text'
-  )?.text;
+  const content = useLastAssistantMessage()?.parts.find((part) => part.type === "text")?.text;
 
   React.useEffect(() => {
     if (streaming) {
@@ -94,7 +64,6 @@ export function AIMenu() {
         setAnchorElement(anchorDom);
       }, 0);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streaming]);
 
   const setOpen = (open: boolean) => {
@@ -117,16 +86,14 @@ export function AIMenu() {
     onOpenChange: (open) => {
       if (!open) {
         setAnchorElement(null);
-        setInput('');
+        setInput("");
       }
     },
     onOpenCursor: () => {
       const [ancestor] = editor.api.block({ highest: true })!;
 
       if (!editor.api.isAt({ end: true }) && !editor.api.isEmpty(ancestor)) {
-        editor
-          .getApi(BlockSelectionPlugin)
-          .blockSelection.set(ancestor.id as string);
+        editor.getApi(BlockSelectionPlugin).blockSelection.set(ancestor.id as string);
       }
 
       show(editor.api.toDOMNode(ancestor)!);
@@ -136,17 +103,17 @@ export function AIMenu() {
     },
   });
 
-  useHotkeys('esc', () => {
+  useHotkeys("esc", () => {
     api.aiChat.stop();
 
     // remove when you implement the route /api/ai/command
     (chat as any)._abortFakeStream();
   });
 
-  const isLoading = status === 'streaming' || status === 'submitted';
+  const isLoading = status === "streaming" || status === "submitted";
 
   React.useEffect(() => {
-    if (toolName === 'edit' && mode === 'chat' && !isLoading) {
+    if (toolName === "edit" && mode === "chat" && !isLoading) {
       let anchorNode = editor.api.node({
         at: [],
         reverse: true,
@@ -165,14 +132,13 @@ export function AIMenu() {
       const block = editor.api.block({ at: anchorNode[1] });
       setAnchorElement(editor.api.toDOMNode(block![0]!)!);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading]);
 
-  if (isLoading && mode === 'insert') return null;
+  if (isLoading && mode === "insert") return null;
 
-  if (toolName === 'comment') return null;
+  if (toolName === "comment") return null;
 
-  if (toolName === 'edit' && mode === 'chat' && isLoading) return null;
+  if (toolName === "edit" && mode === "chat" && isLoading) return null;
 
   return (
     <Popover open={open} onOpenChange={setOpen} modal={false}>
@@ -196,33 +162,32 @@ export function AIMenu() {
           value={value}
           onValueChange={setValue}
         >
-          {mode === 'chat' &&
-            isSelecting &&
-            content &&
-            toolName === 'generate' && <AIChatEditor content={content} />}
+          {mode === "chat" && isSelecting && content && toolName === "generate" && (
+            <AIChatEditor content={content} />
+          )}
 
           {isLoading ? (
             <div className="flex grow select-none items-center gap-2 p-2 text-muted-foreground text-sm">
               <Loader2Icon className="size-4 animate-spin" />
-              {messages.length > 1 ? 'Editing...' : 'Thinking...'}
+              {messages.length > 1 ? "Editing..." : "Thinking..."}
             </div>
           ) : (
             <CommandPrimitive.Input
               className={cn(
-                'flex h-9 w-full min-w-0 border-input bg-transparent px-3 py-1 text-base outline-none transition-[color,box-shadow] placeholder:text-muted-foreground md:text-sm dark:bg-input/30',
-                'aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
-                'border-b focus-visible:ring-transparent'
+                "flex h-9 w-full min-w-0 border-input bg-transparent px-3 py-1 text-base outline-none transition-[color,box-shadow] placeholder:text-muted-foreground md:text-sm dark:bg-input/30",
+                "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
+                "border-b focus-visible:ring-transparent"
               )}
               value={input}
               onKeyDown={(e) => {
-                if (isHotkey('backspace')(e) && input.length === 0) {
+                if (isHotkey("backspace")(e) && input.length === 0) {
                   e.preventDefault();
                   api.aiChat.hide();
                 }
-                if (isHotkey('enter')(e) && !e.shiftKey && !value) {
+                if (isHotkey("enter")(e) && !e.shiftKey && !value) {
                   e.preventDefault();
                   void api.aiChat.submit(input);
-                  setInput('');
+                  setInput("");
                 }
               }}
               onValueChange={setInput}
@@ -234,11 +199,7 @@ export function AIMenu() {
 
           {!isLoading && (
             <CommandList>
-              <AIMenuItems
-                input={input}
-                setInput={setInput}
-                setValue={setValue}
-              />
+              <AIMenuItems input={input} setInput={setInput} setValue={setValue} />
             </CommandList>
           )}
         </Command>
@@ -248,10 +209,10 @@ export function AIMenu() {
 }
 
 type EditorChatState =
-  | 'cursorCommand'
-  | 'cursorSuggestion'
-  | 'selectionCommand'
-  | 'selectionSuggestion';
+  | "cursorCommand"
+  | "cursorSuggestion"
+  | "selectionCommand"
+  | "selectionSuggestion";
 
 const AICommentIcon = () => (
   <svg
@@ -276,38 +237,36 @@ const AICommentIcon = () => (
 const aiChatItems = {
   accept: {
     icon: <Check />,
-    label: 'Accept',
-    value: 'accept',
+    label: "Accept",
+    value: "accept",
     onSelect: ({ aiEditor, editor }) => {
       const { mode, toolName } = editor.getOptions(AIChatPlugin);
 
-      if (mode === 'chat' && toolName === 'generate') {
-        return editor
-          .getTransforms(AIChatPlugin)
-          .aiChat.replaceSelection(aiEditor);
+      if (mode === "chat" && toolName === "generate") {
+        return editor.getTransforms(AIChatPlugin).aiChat.replaceSelection(aiEditor);
       }
 
       editor.getTransforms(AIChatPlugin).aiChat.accept();
-      editor.tf.focus({ edge: 'end' });
+      editor.tf.focus({ edge: "end" });
     },
   },
   comment: {
     icon: <AICommentIcon />,
-    label: 'Comment',
-    value: 'comment',
+    label: "Comment",
+    value: "comment",
     onSelect: ({ editor, input }) => {
       editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        mode: 'insert',
+        mode: "insert",
         prompt:
-          'Please comment on the following content and provide reasonable and meaningful feedback.',
-        toolName: 'comment',
+          "Please comment on the following content and provide reasonable and meaningful feedback.",
+        toolName: "comment",
       });
     },
   },
   continueWrite: {
     icon: <PenLine />,
-    label: 'Continue writing',
-    value: 'continueWrite',
+    label: "Continue writing",
+    value: "continueWrite",
     onSelect: ({ editor, input }) => {
       const ancestorNode = editor.api.block({ highest: true });
 
@@ -316,22 +275,22 @@ const aiChatItems = {
       const isEmpty = NodeApi.string(ancestorNode[0]).trim().length === 0;
 
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        mode: 'insert',
+        mode: "insert",
         prompt: isEmpty
           ? `<Document>
 {editor}
 </Document>
 Start writing a new paragraph AFTER <Document> ONLY ONE SENTENCE`
-          : 'Continue writing AFTER <Block> ONLY ONE SENTENCE. DONT REPEAT THE TEXT.',
-        toolName: 'generate',
+          : "Continue writing AFTER <Block> ONLY ONE SENTENCE. DONT REPEAT THE TEXT.",
+        toolName: "generate",
       });
     },
   },
   discard: {
     icon: <X />,
-    label: 'Discard',
-    shortcut: 'Escape',
-    value: 'discard',
+    label: "Discard",
+    shortcut: "Escape",
+    value: "discard",
     onSelect: ({ editor }) => {
       editor.getTransforms(AIPlugin).ai.undo();
       editor.getApi(AIChatPlugin).aiChat.hide();
@@ -339,144 +298,142 @@ Start writing a new paragraph AFTER <Document> ONLY ONE SENTENCE`
   },
   emojify: {
     icon: <SmileIcon />,
-    label: 'Emojify',
-    value: 'emojify',
+    label: "Emojify",
+    value: "emojify",
     onSelect: ({ editor, input }) => {
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        prompt: 'Emojify',
-        toolName: 'edit',
+        prompt: "Emojify",
+        toolName: "edit",
       });
     },
   },
   explain: {
     icon: <BadgeHelp />,
-    label: 'Explain',
-    value: 'explain',
+    label: "Explain",
+    value: "explain",
     onSelect: ({ editor, input }) => {
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
         prompt: {
-          default: 'Explain {editor}',
-          selecting: 'Explain',
+          default: "Explain {editor}",
+          selecting: "Explain",
         },
-        toolName: 'generate',
+        toolName: "generate",
       });
     },
   },
   fixSpelling: {
     icon: <Check />,
-    label: 'Fix spelling & grammar',
-    value: 'fixSpelling',
+    label: "Fix spelling & grammar",
+    value: "fixSpelling",
     onSelect: ({ editor, input }) => {
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        prompt: 'Fix spelling and grammar',
-        toolName: 'edit',
+        prompt: "Fix spelling and grammar",
+        toolName: "edit",
       });
     },
   },
   generateMarkdownSample: {
     icon: <BookOpenCheck />,
-    label: 'Generate Markdown sample',
-    value: 'generateMarkdownSample',
+    label: "Generate Markdown sample",
+    value: "generateMarkdownSample",
     onSelect: ({ editor, input }) => {
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        prompt: 'Generate a markdown sample',
-        toolName: 'generate',
+        prompt: "Generate a markdown sample",
+        toolName: "generate",
       });
     },
   },
   generateMdxSample: {
     icon: <BookOpenCheck />,
-    label: 'Generate MDX sample',
-    value: 'generateMdxSample',
+    label: "Generate MDX sample",
+    value: "generateMdxSample",
     onSelect: ({ editor, input }) => {
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        prompt: 'Generate a mdx sample',
-        toolName: 'generate',
+        prompt: "Generate a mdx sample",
+        toolName: "generate",
       });
     },
   },
   improveWriting: {
     icon: <Wand />,
-    label: 'Improve writing',
-    value: 'improveWriting',
+    label: "Improve writing",
+    value: "improveWriting",
     onSelect: ({ editor, input }) => {
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        prompt: 'Improve the writing',
-        toolName: 'edit',
+        prompt: "Improve the writing",
+        toolName: "edit",
       });
     },
   },
   insertBelow: {
     icon: <ListEnd />,
-    label: 'Insert below',
-    value: 'insertBelow',
+    label: "Insert below",
+    value: "insertBelow",
     onSelect: ({ aiEditor, editor }) => {
       /** Format: 'none' Fix insert table */
-      void editor
-        .getTransforms(AIChatPlugin)
-        .aiChat.insertBelow(aiEditor, { format: 'none' });
+      void editor.getTransforms(AIChatPlugin).aiChat.insertBelow(aiEditor, { format: "none" });
     },
   },
   makeLonger: {
     icon: <ListPlus />,
-    label: 'Make longer',
-    value: 'makeLonger',
+    label: "Make longer",
+    value: "makeLonger",
     onSelect: ({ editor, input }) => {
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        prompt: 'Make longer',
-        toolName: 'edit',
+        prompt: "Make longer",
+        toolName: "edit",
       });
     },
   },
   makeShorter: {
     icon: <ListMinus />,
-    label: 'Make shorter',
-    value: 'makeShorter',
+    label: "Make shorter",
+    value: "makeShorter",
     onSelect: ({ editor, input }) => {
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        prompt: 'Make shorter',
-        toolName: 'edit',
+        prompt: "Make shorter",
+        toolName: "edit",
       });
     },
   },
   replace: {
     icon: <Check />,
-    label: 'Replace selection',
-    value: 'replace',
+    label: "Replace selection",
+    value: "replace",
     onSelect: ({ aiEditor, editor }) => {
       void editor.getTransforms(AIChatPlugin).aiChat.replaceSelection(aiEditor);
     },
   },
   simplifyLanguage: {
     icon: <FeatherIcon />,
-    label: 'Simplify language',
-    value: 'simplifyLanguage',
+    label: "Simplify language",
+    value: "simplifyLanguage",
     onSelect: ({ editor, input }) => {
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        prompt: 'Simplify the language',
-        toolName: 'edit',
+        prompt: "Simplify the language",
+        toolName: "edit",
       });
     },
   },
   summarize: {
     icon: <Album />,
-    label: 'Add a summary',
-    value: 'summarize',
+    label: "Add a summary",
+    value: "summarize",
     onSelect: ({ editor, input }) => {
       void editor.getApi(AIChatPlugin).aiChat.submit(input, {
-        mode: 'insert',
+        mode: "insert",
         prompt: {
-          default: 'Summarize {editor}',
-          selecting: 'Summarize',
+          default: "Summarize {editor}",
+          selecting: "Summarize",
         },
-        toolName: 'generate',
+        toolName: "generate",
       });
     },
   },
   tryAgain: {
     icon: <CornerUpLeft />,
-    label: 'Try again',
-    value: 'tryAgain',
+    label: "Try again",
+    value: "tryAgain",
     onSelect: ({ editor }) => {
       void editor.getApi(AIChatPlugin).aiChat.reload();
     },
@@ -562,16 +519,16 @@ export const AIMenuItems = ({
   setValue: (value: string) => void;
 }) => {
   const editor = useEditorRef();
-  const { messages } = usePluginOption(AIChatPlugin, 'chat');
-  const aiEditor = usePluginOption(AIChatPlugin, 'aiEditor')!;
+  const { messages } = usePluginOption(AIChatPlugin, "chat");
+  const aiEditor = usePluginOption(AIChatPlugin, "aiEditor")!;
   const isSelecting = useIsSelecting();
 
   const menuState = React.useMemo(() => {
     if (messages && messages.length > 0) {
-      return isSelecting ? 'selectionSuggestion' : 'cursorSuggestion';
+      return isSelecting ? "selectionSuggestion" : "cursorSuggestion";
     }
 
-    return isSelecting ? 'selectionCommand' : 'cursorCommand';
+    return isSelecting ? "selectionCommand" : "cursorCommand";
   }, [isSelecting, messages]);
 
   const menuGroups = React.useMemo(() => {
@@ -601,7 +558,7 @@ export const AIMenuItems = ({
                   editor,
                   input,
                 });
-                setInput('');
+                setInput("");
               }}
             >
               {menuItem.icon}
@@ -617,34 +574,32 @@ export const AIMenuItems = ({
 export function AILoadingBar() {
   const editor = useEditorRef();
 
-  const toolName = usePluginOption(AIChatPlugin, 'toolName');
-  const chat = usePluginOption(AIChatPlugin, 'chat');
-  const mode = usePluginOption(AIChatPlugin, 'mode');
+  const toolName = usePluginOption(AIChatPlugin, "toolName");
+  const chat = usePluginOption(AIChatPlugin, "chat");
+  const mode = usePluginOption(AIChatPlugin, "mode");
 
   const { status } = chat;
 
   const { api } = useEditorPlugin(AIChatPlugin);
 
-  const isLoading = status === 'streaming' || status === 'submitted';
+  const isLoading = status === "streaming" || status === "submitted";
 
-  const handleComments = (type: 'accept' | 'reject') => {
-    if (type === 'accept') {
+  const handleComments = (type: "accept" | "reject") => {
+    if (type === "accept") {
       editor.tf.unsetNodes([getTransientCommentKey()], {
         at: [],
         match: (n) => TextApi.isText(n) && !!n[KEYS.comment],
       });
     }
 
-    if (type === 'reject') {
-      editor
-        .getTransforms(commentPlugin)
-        .comment.unsetMark({ transient: true });
+    if (type === "reject") {
+      editor.getTransforms(commentPlugin).comment.unsetMark({ transient: true });
     }
 
     api.aiChat.hide();
   };
 
-  useHotkeys('esc', () => {
+  useHotkeys("esc", () => {
     api.aiChat.stop();
 
     // remove when you implement the route /api/ai/command
@@ -653,18 +608,16 @@ export function AILoadingBar() {
 
   if (
     isLoading &&
-    (mode === 'insert' ||
-      toolName === 'comment' ||
-      (toolName === 'edit' && mode === 'chat'))
+    (mode === "insert" || toolName === "comment" || (toolName === "edit" && mode === "chat"))
   ) {
     return (
       <div
         className={cn(
-          '-translate-x-1/2 absolute bottom-4 left-1/2 z-20 flex items-center gap-3 rounded-md border border-border bg-muted px-3 py-1.5 text-muted-foreground text-sm shadow-md transition-all duration-300'
+          "-translate-x-1/2 absolute bottom-4 left-1/2 z-20 flex items-center gap-3 rounded-md border border-border bg-muted px-3 py-1.5 text-muted-foreground text-sm shadow-md transition-all duration-300"
         )}
       >
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-        <span>{status === 'submitted' ? 'Thinking...' : 'Writing...'}</span>
+        <span>{status === "submitted" ? "Thinking..." : "Writing..."}</span>
         <Button
           size="sm"
           variant="ghost"
@@ -681,30 +634,22 @@ export function AILoadingBar() {
     );
   }
 
-  if (toolName === 'comment' && status === 'ready') {
+  if (toolName === "comment" && status === "ready") {
     return (
       <div
         className={cn(
-          '-translate-x-1/2 absolute bottom-4 left-1/2 z-50 flex flex-col items-center gap-0 rounded-xl border border-border/50 bg-popover p-1 text-muted-foreground text-sm shadow-xl backdrop-blur-sm',
-          'p-3'
+          "-translate-x-1/2 absolute bottom-4 left-1/2 z-50 flex flex-col items-center gap-0 rounded-xl border border-border/50 bg-popover p-1 text-muted-foreground text-sm shadow-xl backdrop-blur-sm",
+          "p-3"
         )}
       >
         {/* Header with controls */}
         <div className="flex w-full items-center justify-between gap-3">
           <div className="flex items-center gap-5">
-            <Button
-              size="sm"
-              disabled={isLoading}
-              onClick={() => handleComments('accept')}
-            >
+            <Button size="sm" disabled={isLoading} onClick={() => handleComments("accept")}>
               Accept
             </Button>
 
-            <Button
-              size="sm"
-              disabled={isLoading}
-              onClick={() => handleComments('reject')}
-            >
+            <Button size="sm" disabled={isLoading} onClick={() => handleComments("reject")}>
               Reject
             </Button>
           </div>

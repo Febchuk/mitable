@@ -3,9 +3,9 @@
  * Handles offline queuing of frames with persistence for crash recovery
  */
 
-import { app } from 'electron';
-import * as fs from 'fs';
-import * as path from 'path';
+import { app } from "electron";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface QueuedFrame {
   id: string;
@@ -15,7 +15,7 @@ export interface QueuedFrame {
   windowSourceId: string;
   timestamp: string;
   hash: string;
-  trigger: 'periodic' | 'focus_change' | 'manual';
+  trigger: "periodic" | "focus_change" | "manual";
   queuedAt: string;
   retryCount: number;
   lastError?: string;
@@ -27,7 +27,7 @@ export interface QueueStats {
   oldestQueuedAt: string | null;
 }
 
-type QueueEventType = 'frame_queued' | 'frame_processed' | 'frame_failed' | 'queue_cleared';
+type QueueEventType = "frame_queued" | "frame_processed" | "frame_failed" | "queue_cleared";
 
 class FrameQueueService {
   private queue: QueuedFrame[] = [];
@@ -43,8 +43,8 @@ class FrameQueueService {
   private readonly batchSize = 10;
 
   constructor() {
-    const userDataPath = app.getPath('userData');
-    this.queueFilePath = path.join(userDataPath, 'frame-queue.json');
+    const userDataPath = app.getPath("userData");
+    this.queueFilePath = path.join(userDataPath, "frame-queue.json");
     this.loadQueue();
   }
 
@@ -54,7 +54,7 @@ class FrameQueueService {
   private loadQueue(): void {
     try {
       if (fs.existsSync(this.queueFilePath)) {
-        const data = fs.readFileSync(this.queueFilePath, 'utf-8');
+        const data = fs.readFileSync(this.queueFilePath, "utf-8");
         const parsed = JSON.parse(data);
         this.queue = parsed.queue || [];
         this.failedFrames = parsed.failed || [];
@@ -63,7 +63,7 @@ class FrameQueueService {
         );
       }
     } catch (error) {
-      console.error('[FrameQueue] Failed to load queue from disk:', error);
+      console.error("[FrameQueue] Failed to load queue from disk:", error);
       this.queue = [];
       this.failedFrames = [];
     }
@@ -83,16 +83,16 @@ class FrameQueueService {
         null,
         2
       );
-      await fs.promises.writeFile(this.queueFilePath, data, 'utf-8');
+      await fs.promises.writeFile(this.queueFilePath, data, "utf-8");
     } catch (error) {
-      console.error('[FrameQueue] Failed to save queue to disk:', error);
+      console.error("[FrameQueue] Failed to save queue to disk:", error);
     }
   }
 
   /**
    * Add a frame to the queue
    */
-  async enqueue(frame: Omit<QueuedFrame, 'queuedAt' | 'retryCount'>): Promise<void> {
+  async enqueue(frame: Omit<QueuedFrame, "queuedAt" | "retryCount">): Promise<void> {
     const queuedFrame: QueuedFrame = {
       ...frame,
       queuedAt: new Date().toISOString(),
@@ -101,7 +101,7 @@ class FrameQueueService {
 
     this.queue.push(queuedFrame);
     await this.saveQueue();
-    this.emit('frame_queued', queuedFrame);
+    this.emit("frame_queued", queuedFrame);
 
     console.log(`[FrameQueue] Frame ${frame.frameId} queued (total: ${this.queue.length})`);
 
@@ -127,7 +127,7 @@ class FrameQueueService {
       for (const frame of batch) {
         try {
           await this.processFrame(frame);
-          this.emit('frame_processed', frame);
+          this.emit("frame_processed", frame);
         } catch (error) {
           frame.retryCount++;
           frame.lastError = error instanceof Error ? error.message : String(error);
@@ -141,7 +141,7 @@ class FrameQueueService {
           } else {
             // Move to failed queue
             this.failedFrames.push(frame);
-            this.emit('frame_failed', frame);
+            this.emit("frame_failed", frame);
             console.error(
               `[FrameQueue] Frame ${frame.frameId} permanently failed after ${this.maxRetries} attempts`
             );
@@ -164,7 +164,7 @@ class FrameQueueService {
     if (this.frameProcessor) {
       await this.frameProcessor(frame);
     } else {
-      throw new Error('No frame processor configured');
+      throw new Error("No frame processor configured");
     }
   }
 
@@ -194,7 +194,7 @@ class FrameQueueService {
       this.processQueue();
     }
 
-    console.log('[FrameQueue] Started automatic processing');
+    console.log("[FrameQueue] Started automatic processing");
   }
 
   /**
@@ -205,7 +205,7 @@ class FrameQueueService {
       clearInterval(this.processingTimer);
       this.processingTimer = null;
     }
-    console.log('[FrameQueue] Stopped automatic processing');
+    console.log("[FrameQueue] Stopped automatic processing");
   }
 
   /**
@@ -216,7 +216,7 @@ class FrameQueueService {
     this.isOnline = online;
 
     if (online && wasOffline && this.queue.length > 0) {
-      console.log('[FrameQueue] Back online, processing queue...');
+      console.log("[FrameQueue] Back online, processing queue...");
       this.processQueue();
     }
   }
@@ -271,7 +271,7 @@ class FrameQueueService {
     this.queue = this.queue.filter((f) => f.sessionId !== sessionId);
     this.failedFrames = this.failedFrames.filter((f) => f.sessionId !== sessionId);
     await this.saveQueue();
-    this.emit('queue_cleared');
+    this.emit("queue_cleared");
   }
 
   /**
@@ -281,7 +281,7 @@ class FrameQueueService {
     this.queue = [];
     this.failedFrames = [];
     await this.saveQueue();
-    this.emit('queue_cleared');
+    this.emit("queue_cleared");
   }
 
   /**

@@ -5,12 +5,13 @@
  * Shows summary, allows editing, and provides delivery options.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   useSession,
   useSessionSummary,
+  useSessionStory,
   useUpdateSummary,
   useDeliverSummary,
   useDeleteSession,
@@ -19,6 +20,7 @@ import {
   useSlackUsers,
   useReviseSummary,
   useUpdateSession,
+  monitoringKeys,
 } from "@/console/src/hooks/queries/monitoring";
 import { uploadCaptures } from "@/console/src/services/monitoringService";
 import {
@@ -35,6 +37,9 @@ import {
   Play,
   RefreshCw,
   ChevronDown,
+  BookOpen,
+  ChevronUp,
+  Image,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +93,9 @@ export default function SessionDetail() {
   const { data: slackChannels = [], isLoading: isLoadingChannels } = useSlackChannels();
   const { data: slackUsers = [], isLoading: isLoadingUsers } = useSlackUsers();
 
+  // Fetch progressive story (polls while session is active/paused)
+  const { data: storyData } = useSessionStory(sessionId || "", session?.status);
+
   const updateSummaryMutation = useUpdateSummary();
   const deliverSummaryMutation = useDeliverSummary();
   const deleteSessionMutation = useDeleteSession();
@@ -99,6 +107,23 @@ export default function SessionDetail() {
   const [isPauseLoading, setIsPauseLoading] = useState(false);
   const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
   const [isLinearDialogOpen, setIsLinearDialogOpen] = useState(false);
+  const [isStoryExpanded, setIsStoryExpanded] = useState(true);
+  const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
+
+  // Listen for session updates from watch pill (e.g., pause/resume)
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const unsubscribe = window.consoleAPI?.onMonitoringSessionUpdate?.(() => {
+      // Invalidate session query to force refetch when state changes from watch pill
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [sessionId, queryClient]);
+
   // Handle Linear button click - check connection and open dialog or redirect to settings
   const handleLinearClick = async () => {
     try {
@@ -534,6 +559,47 @@ export default function SessionDetail() {
         )}
       </div>
 
+      {/* Progressive Story Section - Shows during active/paused sessions */}
+      {storyData?.story && (session?.status === "active" || session?.status === "paused") && (
+        <div className="space-y-3">
+          <button
+            onClick={() => setIsStoryExpanded(!isStoryExpanded)}
+            className="flex items-center gap-2 w-full text-left group"
+          >
+            <BookOpen size={18} className="text-primary" />
+            <h2 className="text-lg font-semibold text-text-primary flex-1">Live Progress Story</h2>
+            <Badge variant="secondary" className="text-xs">
+              v{storyData.metadata?.version || 0}
+            </Badge>
+            {isStoryExpanded ? (
+              <ChevronUp size={18} className="text-text-secondary group-hover:text-text-primary" />
+            ) : (
+              <ChevronDown
+                size={18}
+                className="text-text-secondary group-hover:text-text-primary"
+              />
+            )}
+          </button>
+
+          {isStoryExpanded && (
+            <div className="bg-background-elevated rounded-lg border border-primary/20 p-4">
+              <div className="prose prose-invert prose-sm max-w-none">
+                {storyData.story.split("\n").map((paragraph, i) => (
+                  <p key={i} className="text-text-primary mb-2 last:mb-0 text-sm leading-relaxed">
+                    {paragraph || <br />}
+                  </p>
+                ))}
+              </div>
+              {storyData.metadata?.lastUpdated && (
+                <div className="mt-3 pt-2 border-t border-border-subtle text-xs text-text-tertiary">
+                  Last updated: {new Date(storyData.metadata.lastUpdated).toLocaleTimeString()}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Summary Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -594,6 +660,95 @@ export default function SessionDetail() {
             </ul>
           </div>
         )}
+
+      {/* Top-K Frames Gallery - Shows after session ends */}
+      {session.topKFrames && session.topKFrames.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Image size={18} className="text-primary" />
+            <h2 className="text-xl font-semibold text-text-primary">
+              Key Frames ({session.topKFrames.length})
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {session.topKFrames.map((frame: any) => (
+              <div
+                key={frame.id}
+                className="group relative bg-background-elevated rounded-lg border border-border-subtle overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => setSelectedFrame(frame.id)}
+              >
+                {frame.imageData ? (
+                  <img
+                    src={`data:image/png;base64,${frame.imageData}`}
+                    alt={frame.activityDescription || "Session capture"}
+                    className="w-full aspect-video object-cover"
+                  />
+                ) : (
+                  <div className="w-full aspect-video bg-background-tertiary flex items-center justify-center">
+                    <Camera size={24} className="text-text-tertiary" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-white text-xs line-clamp-2">
+                    {frame.activityDescription || frame.appName || "Captured frame"}
+                  </p>
+                  <p className="text-white/60 text-xs mt-1">
+                    {new Date(frame.capturedAt).toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Frame Preview Dialog */}
+      <Dialog open={!!selectedFrame} onOpenChange={() => setSelectedFrame(null)}>
+        <DialogContent className="bg-background-primary border-border-subtle max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="text-text-primary">Frame Preview</DialogTitle>
+          </DialogHeader>
+          {selectedFrame &&
+            (() => {
+              const frame = session.topKFrames?.find((f: any) => f.id === selectedFrame);
+              if (!frame) return null;
+              return (
+                <div className="space-y-4">
+                  {frame.imageData ? (
+                    <img
+                      src={`data:image/png;base64,${frame.imageData}`}
+                      alt={frame.activityDescription || "Session capture"}
+                      className="w-full rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-full aspect-video bg-background-tertiary flex items-center justify-center rounded-lg">
+                      <Camera size={48} className="text-text-tertiary" />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <p className="text-text-primary">
+                      {frame.activityDescription || "No description available"}
+                    </p>
+                    <div className="flex items-center gap-4 text-sm text-text-secondary">
+                      <span>{frame.appName || "Unknown app"}</span>
+                      <span>•</span>
+                      <span>{new Date(frame.capturedAt).toLocaleString()}</span>
+                      {frame.importanceScore && (
+                        <>
+                          <span>•</span>
+                          <Badge variant="secondary">
+                            Importance: {(frame.importanceScore * 100).toFixed(0)}%
+                          </Badge>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Delivery Dialog */}
       <Dialog open={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen}>

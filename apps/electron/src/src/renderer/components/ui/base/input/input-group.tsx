@@ -38,11 +38,10 @@ export const InputPrefix = ({ isDisabled, children, ...props }: InputPrefixProps
 );
 
 // `${string}ClassName` is used to omit any className prop that ends with a `ClassName` suffix
-interface InputGroupProps
-  extends Omit<
-    InputBaseProps,
-    "type" | "icon" | "placeholder" | "tooltip" | "shortcut" | `${string}ClassName`
-  > {
+interface InputGroupProps extends Omit<
+  InputBaseProps,
+  "type" | "icon" | "placeholder" | "tooltip" | "shortcut" | `${string}ClassName`
+> {
   /** A prefix text that is displayed in the same box as the input.*/
   prefix?: string;
   /** A leading addon that is displayed with visual separation from the input. */

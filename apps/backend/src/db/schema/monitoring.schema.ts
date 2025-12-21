@@ -37,6 +37,13 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
   name: varchar("name", { length: 255 }), // Optional user-provided session name
   sessionGoal: text("session_goal"), // Optional: "Working on LIN-341: Add JWT auth" - improves on_task detection
 
+  // Goal context (optional - for enhanced analysis)
+  linearIssueId: varchar("linear_issue_id", { length: 100 }), // e.g., "LIN-341"
+  linearIssueTitle: text("linear_issue_title"), // e.g., "Add JWT authentication"
+  linearIssueDescription: text("linear_issue_description"), // Full issue description
+  additionalContext: text("additional_context"), // User's free-text context about what they're working on
+  relatedDocsContext: text("related_docs_context"), // RAG-retrieved docs at session start
+
   // Session state
   status: varchar("status", { length: 50 }).notNull().default("active"),
   // States:
@@ -90,65 +97,69 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
  * Captures are stored to disk (not in DB) and cleaned up after summary generation.
  * Only metadata and analysis results are persisted long-term.
  */
-export const sessionCaptures = pgTable("session_captures", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  sessionId: uuid("session_id")
-    .notNull()
-    .references(() => monitoringSessions.id, { onDelete: "cascade" }),
+export const sessionCaptures = pgTable(
+  "session_captures",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => monitoringSessions.id, { onDelete: "cascade" }),
 
-  // Capture metadata
-  sequenceNumber: integer("sequence_number").notNull(), // Order within session
-  captureTrigger: varchar("capture_trigger", { length: 50 }).notNull(),
-  // Triggers:
-  //   - 'periodic': Regular interval capture
-  //   - 'focus_change': User switched to watched window
-  //   - 'manual': User manually triggered capture
-  capturedAt: timestamp("captured_at").defaultNow().notNull(),
+    // Capture metadata
+    sequenceNumber: integer("sequence_number").notNull(), // Order within session
+    captureTrigger: varchar("capture_trigger", { length: 50 }).notNull(),
+    // Triggers:
+    //   - 'periodic': Regular interval capture
+    //   - 'focus_change': User switched to watched window
+    //   - 'manual': User manually triggered capture
+    capturedAt: timestamp("captured_at").defaultNow().notNull(),
 
-  // Window context
-  windowId: varchar("window_id", { length: 255 }),
-  appName: varchar("app_name", { length: 255 }),
-  windowTitle: text("window_title"),
+    // Window context
+    windowId: varchar("window_id", { length: 255 }),
+    appName: varchar("app_name", { length: 255 }),
+    windowTitle: text("window_title"),
 
-  // Screenshot storage
-  screenshotPath: text("screenshot_path"), // Original local path (for reference only)
-  screenshotHash: varchar("screenshot_hash", { length: 64 }), // SHA-256 for deduplication
-  imageData: text("image_data"), // Base64 encoded full image for AI analysis
-  thumbnailData: text("thumbnail_data"), // Small base64 thumbnail for UI preview (optional)
+    // Screenshot storage
+    screenshotPath: text("screenshot_path"), // Original local path (for reference only)
+    screenshotHash: varchar("screenshot_hash", { length: 64 }), // SHA-256 for deduplication
+    imageData: text("image_data"), // Base64 encoded full image for AI analysis
+    thumbnailData: text("thumbnail_data"), // Small base64 thumbnail for UI preview (optional)
 
-  // Analysis results (populated during or after capture)
-  analysisStatus: varchar("analysis_status", { length: 50 }).default("pending"),
-  // States: 'pending' | 'analyzed' | 'skipped' | 'duplicate'
-  activityDescription: text("activity_description"), // What Gemini detected
-  confidence: decimal("confidence", { precision: 3, scale: 2 }), // 0.00-1.00
-  detectedElements: jsonb("detected_elements").default("[]"), // UI elements if relevant
+    // Analysis results (populated during or after capture)
+    analysisStatus: varchar("analysis_status", { length: 50 }).default("pending"),
+    // States: 'pending' | 'analyzed' | 'skipped' | 'duplicate'
+    activityDescription: text("activity_description"), // What Gemini detected
+    confidence: decimal("confidence", { precision: 3, scale: 2 }), // 0.00-1.00
+    detectedElements: jsonb("detected_elements").default("[]"), // UI elements if relevant
 
-  // Delta detection (what changed between frames)
-  deltaChanged: boolean("delta_changed").default(false),
-  deltaChangeType: varchar("delta_change_type", { length: 20 }),
-  // Types: 'content_edit' | 'navigation' | 'scroll' | 'file_switch' | 'focus_change' | 'none'
-  deltaChangeDescription: text("delta_change_description"),
-  deltaUserAction: varchar("delta_user_action", { length: 20 }),
-  // Actions: 'typing' | 'clicking' | 'scrolling' | 'viewing' | 'unknown'
+    // Delta detection (what changed between frames)
+    deltaChanged: boolean("delta_changed").default(false),
+    deltaChangeType: varchar("delta_change_type", { length: 20 }),
+    // Types: 'content_edit' | 'navigation' | 'scroll' | 'file_switch' | 'focus_change' | 'none'
+    deltaChangeDescription: text("delta_change_description"),
+    deltaUserAction: varchar("delta_user_action", { length: 20 }),
+    // Actions: 'typing' | 'clicking' | 'scrolling' | 'viewing' | 'unknown'
 
-  // Per-window task relevance (replaces group-level correlation)
-  onTask: boolean("on_task").default(true),
-  taskRelevance: text("task_relevance"), // e.g., "Implementing JWT auth for LIN-341"
+    // Per-window task relevance (replaces group-level correlation)
+    onTask: boolean("on_task").default(true),
+    taskRelevance: text("task_relevance"), // e.g., "Implementing JWT auth for LIN-341"
 
-  // Importance scoring for Top-K selection
-  importanceScore: real("importance_score").default(0), // 0-1, higher = more important
-  importanceReason: text("importance_reason"), // e.g., "Active code editing with visible changes"
+    // Importance scoring for Top-K selection
+    importanceScore: real("importance_score").default(0), // 0-1, higher = more important
+    importanceReason: text("importance_reason"), // e.g., "Active code editing with visible changes"
 
-  // Flag for Top-K selected frames (uploaded to cloud)
-  selectedForExport: boolean("selected_for_export").default(false),
+    // Flag for Top-K selected frames (uploaded to cloud)
+    selectedForExport: boolean("selected_for_export").default(false),
 
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  // Indexes for common queries
-  importanceIdx: index("idx_captures_importance").on(table.sessionId, table.importanceScore),
-  onTaskIdx: index("idx_captures_on_task").on(table.sessionId, table.onTask),
-  deltaIdx: index("idx_captures_delta").on(table.sessionId, table.deltaChanged),
-}));
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    // Indexes for common queries
+    importanceIdx: index("idx_captures_importance").on(table.sessionId, table.importanceScore),
+    onTaskIdx: index("idx_captures_on_task").on(table.sessionId, table.onTask),
+    deltaIdx: index("idx_captures_delta").on(table.sessionId, table.deltaChanged),
+  })
+);
 
 /**
  * Session Summaries
@@ -250,12 +261,7 @@ export type DeltaChangeType =
   | "focus_change"
   | "none";
 
-export type DeltaUserAction =
-  | "typing"
-  | "clicking"
-  | "scrolling"
-  | "viewing"
-  | "unknown";
+export type DeltaUserAction = "typing" | "clicking" | "scrolling" | "viewing" | "unknown";
 
 export interface DeltaAnalysis {
   changed: boolean;

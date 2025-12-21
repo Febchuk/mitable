@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * useDocChat
@@ -7,17 +7,17 @@
  * Connects Plate editor AI features to our backend API.
  */
 
-import * as React from 'react';
+import * as React from "react";
 
-import { useChat as useBaseChat } from '@ai-sdk/react';
-import { AIChatPlugin } from '@platejs/ai/react';
-import { DefaultChatTransport } from 'ai';
-import { useEditorRef, usePluginOption } from 'platejs/react';
+import { useChat as useBaseChat } from "@ai-sdk/react";
+import { AIChatPlugin } from "@platejs/ai/react";
+import { DefaultChatTransport } from "ai";
+import { useEditorRef, usePluginOption } from "platejs/react";
 
-import { aiChatPlugin } from '@/components/editor/plugins/ai-kit';
+import { aiChatPlugin } from "@/components/editor/plugins/ai-kit";
 
 // API base URL from environment
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 /**
  * Hook to connect Plate editor AI features to our backend
@@ -26,10 +26,10 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
  */
 export const useDocChat = (documentId?: string) => {
   const editor = useEditorRef();
-  const options = usePluginOption(aiChatPlugin, 'chatOptions');
+  const options = usePluginOption(aiChatPlugin, "chatOptions");
 
   const baseChat = useBaseChat({
-    id: documentId ? `doc-${documentId}` : 'editor',
+    id: documentId ? `doc-${documentId}` : "editor",
     transport: new DefaultChatTransport({
       api: `${API_BASE_URL}/api/documents/ai-command`,
       fetch: async (input, init) => {
@@ -50,26 +50,30 @@ export const useDocChat = (documentId?: string) => {
             body: JSON.stringify(body),
             headers: {
               ...init?.headers,
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
           });
 
           if (!res.ok) {
             // If backend not available, use a helpful error response
-            console.warn('AI command API not available, using fallback');
+            console.warn("AI command API not available, using fallback");
             return createFallbackResponse();
           }
 
           return res;
         } catch (error) {
-          console.error('AI command request failed:', error);
+          console.error("AI command request failed:", error);
           return createFallbackResponse();
         }
       },
     }),
     onData(data) {
-      if (data.type === 'data-toolName') {
-        editor.setOption(AIChatPlugin, 'toolName', data.data);
+      if (data.type === "data-toolName") {
+        editor.setOption(
+          AIChatPlugin,
+          "toolName",
+          data.data as Parameters<typeof editor.setOption<typeof AIChatPlugin, "toolName">>[2]
+        );
       }
     },
     ...options,
@@ -78,8 +82,11 @@ export const useDocChat = (documentId?: string) => {
   // Set up the chat on the editor
   React.useEffect(() => {
     // Use type assertion to avoid complex generic type issues
-    editor.setOption(AIChatPlugin, 'chat', baseChat as unknown as Parameters<typeof editor.setOption>[2]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    editor.setOption(
+      AIChatPlugin,
+      "chat",
+      baseChat as unknown as Parameters<typeof editor.setOption>[2]
+    );
   }, [baseChat.status, baseChat.messages, baseChat.error]);
 
   return baseChat;
@@ -94,7 +101,7 @@ function createFallbackResponse(): Response {
 
   const messageId = `msg_fallback_${Date.now()}`;
   const fallbackText =
-    'AI assistance is currently unavailable. The backend API endpoint `/api/documents/ai-command` needs to be implemented to enable AI features.\n\nIn the meantime, you can:\n- Continue editing manually\n- Use markdown shortcuts (e.g., ## for headings, - for lists)\n- Press / for slash commands';
+    "AI assistance is currently unavailable. The backend API endpoint `/api/documents/ai-command` needs to be implemented to enable AI features.\n\nIn the meantime, you can:\n- Continue editing manually\n- Use markdown shortcuts (e.g., ## for headings, - for lists)\n- Press / for slash commands";
 
   // Create a simple streaming response
   const stream = new ReadableStream({
@@ -106,20 +113,16 @@ function createFallbackResponse(): Response {
       controller.enqueue(encoder.encode('data: {"type":"start-step"}\n\n'));
       await delay(10);
 
-      controller.enqueue(
-        encoder.encode(
-          `data: {"type":"text-start","id":"${messageId}"}\n\n`
-        )
-      );
+      controller.enqueue(encoder.encode(`data: {"type":"text-start","id":"${messageId}"}\n\n`));
       await delay(10);
 
       // Stream the fallback text in chunks
-      const words = fallbackText.split(' ');
+      const words = fallbackText.split(" ");
       for (const word of words) {
-        const escapedText = (word + ' ')
-          .replace(/\\/g, '\\\\')
+        const escapedText = (word + " ")
+          .replace(/\\/g, "\\\\")
           .replace(/"/g, '\\"')
-          .replace(/\n/g, '\\n');
+          .replace(/\n/g, "\\n");
 
         controller.enqueue(
           encoder.encode(
@@ -130,9 +133,7 @@ function createFallbackResponse(): Response {
       }
 
       // End events
-      controller.enqueue(
-        encoder.encode(`data: {"type":"text-end","id":"${messageId}"}\n\n`)
-      );
+      controller.enqueue(encoder.encode(`data: {"type":"text-end","id":"${messageId}"}\n\n`));
       await delay(10);
 
       controller.enqueue(encoder.encode('data: {"type":"finish-step"}\n\n'));
@@ -141,7 +142,7 @@ function createFallbackResponse(): Response {
       controller.enqueue(encoder.encode('data: {"type":"finish"}\n\n'));
       await delay(10);
 
-      controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
 
       controller.close();
     },
@@ -149,8 +150,8 @@ function createFallbackResponse(): Response {
 
   return new Response(stream, {
     headers: {
-      'Content-Type': 'text/plain',
-      Connection: 'keep-alive',
+      "Content-Type": "text/plain",
+      Connection: "keep-alive",
     },
   });
 }

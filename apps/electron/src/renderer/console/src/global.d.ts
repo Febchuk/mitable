@@ -44,6 +44,9 @@ interface ConsoleAPI {
   // Drafts navigation (Update Buddy)
   onDraftsNavigate: (callback: (draftId: string) => void) => void;
 
+  // Active session navigation (from native notification click)
+  onNavigateToActiveSession: (callback: () => void) => void;
+
   // Auth management
   setAuthTokens: (accessToken: string, refreshToken: string) => void;
   clearAuthTokens: () => void;
@@ -82,14 +85,16 @@ interface ConsoleAPI {
   }>;
   resetMonitoringSession: () => Promise<{ success: boolean }>;
   getMonitoringSessionState: () => Promise<MonitoringSessionState | null>;
-  onMonitoringSessionUpdate: (callback: (state: MonitoringSessionState | null) => void) => void;
+  onMonitoringSessionUpdate: (
+    callback: (state: MonitoringSessionState | null) => void
+  ) => () => void;
   onMonitoringCaptureProgress: (
     callback: (progress: {
       sessionId: string;
       captureCount: number;
       latestCapture: unknown;
     }) => void
-  ) => void;
+  ) => () => void;
 }
 
 declare global {

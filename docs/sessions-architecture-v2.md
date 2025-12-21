@@ -54,24 +54,24 @@ Path structure:
 
 ### Why This Structure
 
-| Decision | Rationale |
-|----------|-----------|
-| Local-first | 100s of frames captured, <10 needed for output |
-| Ephemeral local storage | Auto-deleted after session summary generated |
-| Top-K upload only | Reduces storage costs by 95%+, faster exports |
-| Private bucket | Backend uses service key, no public access |
+| Decision                | Rationale                                      |
+| ----------------------- | ---------------------------------------------- |
+| Local-first             | 100s of frames captured, <10 needed for output |
+| Ephemeral local storage | Auto-deleted after session summary generated   |
+| Top-K upload only       | Reduces storage costs by 95%+, faster exports  |
+| Private bucket          | Backend uses service key, no public access     |
 
 ### Lifecycle
 
-| Event | Action |
-|-------|--------|
-| Session starts | Create session row in DB, create local folder |
-| Frame captured | Save PNG locally, INSERT frame metadata in DB |
-| Frame analyzed | Update importance_score in DB |
-| 300 capture groups reached | Generate chunk summary (text only) |
-| Session ends | Run Top-K selection, upload important frames to Storage |
-| Summary delivered | Delete local frames folder |
-| Session deleted | Delete cloud `{session}/` folder |
+| Event                      | Action                                                  |
+| -------------------------- | ------------------------------------------------------- |
+| Session starts             | Create session row in DB, create local folder           |
+| Frame captured             | Save PNG locally, INSERT frame metadata in DB           |
+| Frame analyzed             | Update importance_score in DB                           |
+| 300 capture groups reached | Generate chunk summary (text only)                      |
+| Session ends               | Run Top-K selection, upload important frames to Storage |
+| Summary delivered          | Delete local frames folder                              |
+| Session deleted            | Delete cloud `{session}/` folder                        |
 
 ---
 
@@ -85,34 +85,34 @@ Path structure:
   "session_id": "sess_abc123",
   "org_id": "org_456",
   "user_id": "user_789",
-  
+
   "chunk_index": 1,
   "chunk_range": {
     "start": "2025-12-18T10:00:00.000Z",
     "end": "2025-12-18T11:15:00.000Z"
   },
   "is_final": false,
-  
+
   "user_profile": {
     "name": "Aurel",
     "role": "Backend Engineer",
     "team": "Platform"
   },
-  
-  // NOTE: Full user_context (GitHub commits/PRs, Linear tickets) is fetched 
-  // at summary time, NOT stored in manifest. This avoids stale context for 
+
+  // NOTE: Full user_context (GitHub commits/PRs, Linear tickets) is fetched
+  // at summary time, NOT stored in manifest. This avoids stale context for
   // long sessions and reduces data exposure.
-  
+
   "config": {
     "capture_interval_ms": 10000,
     "triggers": ["periodic", "focus_change"]
   },
-  
+
   "watched_windows": [
     { "window_source_id": "window:123", "label": "VS Code - mitable" },
     { "window_source_id": "window:456", "label": "Chrome" }
   ],
-  
+
   "capture_groups": [
     {
       "group_id": "grp_001",
@@ -267,7 +267,7 @@ Path structure:
       ]
     }
   ],
-  
+
   "chunk_summary": {
     "generated_at": "2025-12-18T11:15:05.000Z",
     "narrative": "First chunk: Aurel focused on implementing JWT authentication for ticket LIN-341. Work included editing auth.service.ts, researching best practices via YouTube tutorial, and writing unit tests. Chrome was used for task tracking (Linear) and research, with some background music.",
@@ -280,15 +280,15 @@ Path structure:
 
 ### Schema Design Principles
 
-| Principle | Implementation |
-|-----------|----------------|
-| **Fixed fields** | `frame_id`, `filename`, `timestamp`, `hash`, `window_source_id` |
-| **Delta tracking** | `analysis.delta` captures what CHANGED between frames, not just what's visible |
-| **Per-window correlation** | `on_task` and `task_relevance` per frame, not binary group-level |
-| **Dynamic context** | `analysis.context` is AI-generated based on what's visible |
-| **Importance scoring** | `importance_score` (0-1) + `importance_reason` for Top-K selection |
-| **User context** | Fetched at summary time (session end), not stored in manifest |
-| **Chunk summaries** | Generated when manifest reaches 300 groups or session ends |
+| Principle                  | Implementation                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| **Fixed fields**           | `frame_id`, `filename`, `timestamp`, `hash`, `window_source_id`                |
+| **Delta tracking**         | `analysis.delta` captures what CHANGED between frames, not just what's visible |
+| **Per-window correlation** | `on_task` and `task_relevance` per frame, not binary group-level               |
+| **Dynamic context**        | `analysis.context` is AI-generated based on what's visible                     |
+| **Importance scoring**     | `importance_score` (0-1) + `importance_reason` for Top-K selection             |
+| **User context**           | Fetched at summary time (session end), not stored in manifest                  |
+| **Chunk summaries**        | Generated when manifest reaches 300 groups or session ends                     |
 
 ### Per-Window Correlation (Not Group-Level)
 
@@ -312,12 +312,12 @@ This allows the summary to accurately say: "2 of 3 windows were on-task" and fil
 
 ## 3. Constraints & Limits
 
-| Constraint | Value | Rationale |
-|------------|-------|-----------|
-| **Max watched windows** | 5 | Simple UX, manageable correlation |
-| **Capture groups per manifest** | 300 | ~50-80 min of active work, keeps LLM context manageable |
-| **Correlation** | Skip if 1 window | No wasted compute for single-window sessions |
-| **Min capture interval** | 10 seconds | Balance between detail and storage/cost |
+| Constraint                      | Value            | Rationale                                               |
+| ------------------------------- | ---------------- | ------------------------------------------------------- |
+| **Max watched windows**         | 5                | Simple UX, manageable correlation                       |
+| **Capture groups per manifest** | 300              | ~50-80 min of active work, keeps LLM context manageable |
+| **Correlation**                 | Skip if 1 window | No wasted compute for single-window sessions            |
+| **Min capture interval**        | 10 seconds       | Balance between detail and storage/cost                 |
 
 ### Manifest Splitting Logic
 
@@ -345,7 +345,7 @@ At session end, we select the most important frames for upload and inclusion in 
 ```typescript
 interface FrameScore {
   frame_id: string;
-  final_score: number;  // 0-1, higher = more important
+  final_score: number; // 0-1, higher = more important
 }
 
 function calculateFinalScore(frame: Frame): number {
@@ -353,19 +353,19 @@ function calculateFinalScore(frame: Frame): number {
   let score = frame.importance_score;
 
   // Boost for actual user actions (not just viewing)
-  if (frame.delta.user_action === 'typing') score += 0.15;
-  if (frame.delta.user_action === 'clicking') score += 0.1;
+  if (frame.delta.user_action === "typing") score += 0.15;
+  if (frame.delta.user_action === "clicking") score += 0.1;
 
   // Boost for meaningful changes
-  if (frame.delta.change_type === 'content_edit') score += 0.2;
-  if (frame.delta.change_type === 'file_switch') score += 0.1;
+  if (frame.delta.change_type === "content_edit") score += 0.2;
+  if (frame.delta.change_type === "file_switch") score += 0.1;
 
   // Boost for milestone indicators
-  if (frame.importance_reason?.includes('test')) score += 0.15;
-  if (frame.importance_reason?.includes('error')) score += 0.2;
-  if (frame.importance_reason?.includes('PR')) score += 0.2;
-  if (frame.importance_reason?.includes('commit')) score += 0.15;
-  if (frame.importance_reason?.includes('ticket')) score += 0.1;
+  if (frame.importance_reason?.includes("test")) score += 0.15;
+  if (frame.importance_reason?.includes("error")) score += 0.2;
+  if (frame.importance_reason?.includes("PR")) score += 0.2;
+  if (frame.importance_reason?.includes("commit")) score += 0.15;
+  if (frame.importance_reason?.includes("ticket")) score += 0.1;
 
   // Penalize off-task frames
   if (!frame.on_task) score *= 0.3;
@@ -373,22 +373,22 @@ function calculateFinalScore(frame: Frame): number {
   // Penalize duplicate content (same file, same function)
   if (frame.is_similar_to_previous) score *= 0.5;
 
-  return Math.min(score, 1.0);  // Cap at 1.0
+  return Math.min(score, 1.0); // Cap at 1.0
 }
 ```
 
 ### Selection Process
 
 ```typescript
-const K = 10;  // Max frames to upload
+const K = 10; // Max frames to upload
 
 function selectTopKFrames(session: Session): Frame[] {
-  const allFrames = session.frames.filter(f => !f.skipped);
+  const allFrames = session.frames.filter((f) => !f.skipped);
   const sessionDuration = session.ended_at - session.started_at;
 
   // TEMPORAL DIVERSITY: Divide session into time buckets
   // This prevents a burst of activity in first 10 minutes from dominating all slots
-  const BUCKET_DURATION_MS = 15 * 60 * 1000;  // 15-minute buckets
+  const BUCKET_DURATION_MS = 15 * 60 * 1000; // 15-minute buckets
   const bucketCount = Math.max(1, Math.ceil(sessionDuration / BUCKET_DURATION_MS));
   const framesPerBucket = Math.ceil(K / bucketCount);
 
@@ -401,10 +401,12 @@ function selectTopKFrames(session: Session): Frame[] {
   // Select top frames from each bucket
   for (const bucket of buckets) {
     // Score frames in this bucket
-    const scored = bucket.map(f => ({
-      frame: f,
-      score: calculateFinalScore(f)
-    })).sort((a, b) => b.score - a.score);
+    const scored = bucket
+      .map((f) => ({
+        frame: f,
+        score: calculateFinalScore(f),
+      }))
+      .sort((a, b) => b.score - a.score);
 
     let selectedFromBucket = 0;
 
@@ -425,10 +427,10 @@ function selectTopKFrames(session: Session): Frame[] {
 
   // If we have spare slots (sparse buckets), fill from highest-scoring remaining
   if (selected.length < K) {
-    const selectedIds = new Set(selected.map(f => f.frame_id));
+    const selectedIds = new Set(selected.map((f) => f.frame_id));
     const remaining = allFrames
-      .filter(f => !selectedIds.has(f.frame_id))
-      .map(f => ({ frame: f, score: calculateFinalScore(f) }))
+      .filter((f) => !selectedIds.has(f.frame_id))
+      .map((f) => ({ frame: f, score: calculateFinalScore(f) }))
       .sort((a, b) => b.score - a.score);
 
     for (const { frame } of remaining) {
@@ -444,9 +446,7 @@ function selectTopKFrames(session: Session): Frame[] {
   }
 
   // Sort by timestamp for chronological order in exports
-  return selected.sort((a, b) =>
-    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
+  return selected.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 }
 
 function partitionByTime(
@@ -473,24 +473,24 @@ function partitionByTime(
 
 ### Diversity Guarantees
 
-| Type | Constraint | Rationale |
-|------|------------|-----------|
-| **Temporal** | Frames spread across 15-min buckets | Prevents burst activity from dominating |
-| **Context** | Max 2 frames per file/website | Ensures variety in visual output |
-| **Fallback** | Fill remaining slots by score | Doesn't waste slots if buckets are sparse |
+| Type         | Constraint                          | Rationale                                 |
+| ------------ | ----------------------------------- | ----------------------------------------- |
+| **Temporal** | Frames spread across 15-min buckets | Prevents burst activity from dominating   |
+| **Context**  | Max 2 frames per file/website       | Ensures variety in visual output          |
+| **Fallback** | Fill remaining slots by score       | Doesn't waste slots if buckets are sparse |
 
 ### What Qualifies as "Important"
 
-| Signal | Score Boost | Rationale |
-|--------|-------------|-----------|
-| Active typing | +0.15 | User is producing, not just viewing |
-| Content edit visible | +0.20 | Actual code/doc change happened |
-| File switch | +0.10 | Context change, likely new task |
-| Test file | +0.15 | Milestone: testing work |
-| Error visible | +0.20 | Debugging moment, diagnostic value |
-| PR/commit visible | +0.20 | Milestone: code shipping |
-| Ticket visible | +0.10 | Task context |
-| Off-task | ×0.30 | Heavily penalize background media |
+| Signal               | Score Boost | Rationale                           |
+| -------------------- | ----------- | ----------------------------------- |
+| Active typing        | +0.15       | User is producing, not just viewing |
+| Content edit visible | +0.20       | Actual code/doc change happened     |
+| File switch          | +0.10       | Context change, likely new task     |
+| Test file            | +0.15       | Milestone: testing work             |
+| Error visible        | +0.20       | Debugging moment, diagnostic value  |
+| PR/commit visible    | +0.20       | Milestone: code shipping            |
+| Ticket visible       | +0.10       | Task context                        |
+| Off-task             | ×0.30       | Heavily penalize background media   |
 
 ### Fallback: Ask Groq
 
@@ -669,13 +669,10 @@ const RETRY_CONFIG = {
   maxRetries: 3,
   baseDelayMs: 1000,
   maxDelayMs: 30000,
-  backoffMultiplier: 2
+  backoffMultiplier: 2,
 };
 
-async function withRetry<T>(
-  operation: () => Promise<T>,
-  context: string
-): Promise<T> {
+async function withRetry<T>(operation: () => Promise<T>, context: string): Promise<T> {
   let lastError: Error;
   let delay = RETRY_CONFIG.baseDelayMs;
 
@@ -693,7 +690,9 @@ async function withRetry<T>(
     }
   }
 
-  throw new Error(`[${context}] All ${RETRY_CONFIG.maxRetries} attempts failed: ${lastError.message}`);
+  throw new Error(
+    `[${context}] All ${RETRY_CONFIG.maxRetries} attempts failed: ${lastError.message}`
+  );
 }
 ```
 
@@ -715,13 +714,13 @@ class FrameQueue {
 
   async enqueue(frame: QueuedFrame): Promise<void> {
     this.queue.push(frame);
-    await this.persistQueue();  // Save to localStorage for crash recovery
+    await this.persistQueue(); // Save to localStorage for crash recovery
   }
 
   async processQueue(): Promise<void> {
     if (!this.isOnline || this.queue.length === 0) return;
 
-    const batch = this.queue.splice(0, 10);  // Process 10 at a time
+    const batch = this.queue.splice(0, 10); // Process 10 at a time
 
     for (const frame of batch) {
       try {
@@ -729,7 +728,7 @@ class FrameQueue {
       } catch (error) {
         frame.retry_count++;
         if (frame.retry_count < 5) {
-          this.queue.push(frame);  // Re-queue for retry
+          this.queue.push(frame); // Re-queue for retry
         } else {
           console.error(`Frame ${frame.frame_id} failed after 5 retries, marking as failed`);
           await this.markFrameFailed(frame);
@@ -746,20 +745,17 @@ class FrameQueue {
 async function analyzeFrame(frame: Frame, sessionGoal?: string): Promise<FrameAnalysis> {
   try {
     // Try Groq vision analysis
-    return await withRetry(
-      () => groqVision.analyze(frame, sessionGoal),
-      'Groq Vision'
-    );
+    return await withRetry(() => groqVision.analyze(frame, sessionGoal), "Groq Vision");
   } catch (error) {
     // Fallback: Store frame with minimal metadata for later reprocessing
-    console.warn('Groq unavailable, storing frame for later analysis');
+    console.warn("Groq unavailable, storing frame for later analysis");
     return {
       summary: null,
-      delta: { changed: null, change_type: 'unknown', user_action: 'unknown' },
-      context: { application: 'unknown', activity_type: 'unknown' },
+      delta: { changed: null, change_type: "unknown", user_action: "unknown" },
+      context: { application: "unknown", activity_type: "unknown" },
       on_task: null,
-      needs_reanalysis: true,  // Flag for batch reprocessing later
-      importance_score: 0.5    // Neutral score until analyzed
+      needs_reanalysis: true, // Flag for batch reprocessing later
+      importance_score: 0.5, // Neutral score until analyzed
     };
   }
 }
@@ -771,9 +767,9 @@ Instead of processing each frame immediately, batch frames for efficiency:
 
 ```typescript
 const BATCH_CONFIG = {
-  intervalMs: 30000,       // Process every 30 seconds
-  maxBatchSize: 15,        // Max frames per batch
-  concurrencyLimit: 5      // Parallel API calls
+  intervalMs: 30000, // Process every 30 seconds
+  maxBatchSize: 15, // Max frames per batch
+  concurrencyLimit: 5, // Parallel API calls
 };
 
 class BatchProcessor {
@@ -799,10 +795,14 @@ class BatchProcessor {
     const batch = this.pending.splice(0, BATCH_CONFIG.maxBatchSize);
 
     // Process with concurrency limit
-    await pMap(batch, async (frame) => {
-      const analysis = await analyzeFrame(frame);
-      await saveFrameMetadata(frame, analysis);
-    }, { concurrency: BATCH_CONFIG.concurrencyLimit });
+    await pMap(
+      batch,
+      async (frame) => {
+        const analysis = await analyzeFrame(frame);
+        await saveFrameMetadata(frame, analysis);
+      },
+      { concurrency: BATCH_CONFIG.concurrencyLimit }
+    );
   }
 }
 ```
@@ -812,7 +812,7 @@ class BatchProcessor {
 Show progress to user without ending session:
 
 ```typescript
-const INTERIM_SUMMARY_INTERVAL = 15 * 60 * 1000;  // Every 15 minutes
+const INTERIM_SUMMARY_INTERVAL = 15 * 60 * 1000; // Every 15 minutes
 
 class InterimSummaryService {
   private timer: NodeJS.Timer;
@@ -825,30 +825,33 @@ class InterimSummaryService {
 
   private async generateAndEmit(sessionId: string): Promise<void> {
     // Get frames since last interim summary
-    const frames = await db.query(`
+    const frames = await db.query(
+      `
       SELECT * FROM session_frames
       WHERE session_id = $1
         AND on_task = TRUE
         AND delta_changed = TRUE
       ORDER BY timestamp DESC
       LIMIT 50
-    `, [sessionId]);
+    `,
+      [sessionId]
+    );
 
     if (frames.length === 0) return;
 
     // Generate quick summary (use Groq, not Gemini, for speed)
     const interim = await groq.summarize({
-      frames: frames.map(f => ({ summary: f.quick_summary, context: f.analysis_context })),
-      prompt: 'Summarize recent activity in 2-3 sentences'
+      frames: frames.map((f) => ({ summary: f.quick_summary, context: f.analysis_context })),
+      prompt: "Summarize recent activity in 2-3 sentences",
     });
 
     // Emit to frontend via IPC
-    emitToRenderer('session:interim-summary', {
+    emitToRenderer("session:interim-summary", {
       session_id: sessionId,
       summary: interim.text,
       frame_count: frames.length,
       top_activities: extractTopActivities(frames),
-      generated_at: new Date().toISOString()
+      generated_at: new Date().toISOString(),
     });
   }
 }
@@ -879,7 +882,7 @@ class InterimSummaryService {
 
 This prompt receives TWO images: the **previous frame** and the **current frame** for the same window. This enables accurate delta detection.
 
-```
+````
 You are analyzing two consecutive screenshots from the same window in a work monitoring session.
 
 IMAGE 1: Previous frame (may be null if this is the first frame for this window)
@@ -904,28 +907,33 @@ Return JSON with these fields:
   "change_description": "What specifically changed",
   "user_action": "typing" | "clicking" | "scrolling" | "viewing" | "unknown"
 }
-```
+````
 
 **IMPORTANT**: If the frames look identical or nearly identical:
+
 - Set `changed: false`
 - Set `user_action: "viewing"`
 - The summary should NOT claim the user "did" anything—say "viewing" or "has open"
 
 **REQUIRED fields in context (always include):**
+
 - "application": The app name (VS Code, Chrome, Slack, etc.)
 - "activity_type": One of: coding, research, communication, task_tracking, learning, testing, debugging, documentation, background_media, other
 
 **OPTIONAL fields (include when visible):**
+
 - For code editors: file, function, class, language, project
 - For browsers: website, page_title, url_path
 - For task trackers: ticket_id, ticket_title, status, priority
 - For communication: channel, thread_topic, participants
 
 **IMPORTANCE scoring:**
+
 - "importance": 0.0-1.0 score
 - "importance_reason": Why this frame is important
 
 **Scoring guidance:**
+
 - 0.9+: Visible commit, PR merge, test pass/fail, error screen
 - 0.7-0.9: Active code editing (visible changes), ticket update
 - 0.5-0.7: File/page navigation, research, reference material
@@ -933,6 +941,7 @@ Return JSON with these fields:
 - 0.0-0.3: Background media, unrelated content
 
 **Example: Code editor with changes**
+
 ```json
 {
   "summary": "User added JWT validation logic to authenticateUser function",
@@ -957,6 +966,7 @@ Return JSON with these fields:
 ```
 
 **Example: Static view (no change)**
+
 ```json
 {
   "summary": "User has Linear ticket LIN-341 open for reference",
@@ -981,6 +991,7 @@ Return JSON with these fields:
 ```
 
 **Example: Background media**
+
 ```json
 {
   "summary": "User has background music playing",
@@ -1002,6 +1013,7 @@ Return JSON with these fields:
   "importance_reason": "Background media, not work-related"
 }
 ```
+
 ```
 
 ### Task Context Inference (Optional — Run Once Per Chunk)
@@ -1011,30 +1023,35 @@ Since each frame now has its own `on_task` flag, we no longer need per-group cor
 This is run once per chunk (not per group) to reduce API calls.
 
 ```
+
 You are analyzing a work session chunk. Here are summaries from on-task frames:
 
 WINDOW 1 (VS Code):
+
 - "User editing auth.service.ts, adding JWT validation"
 - "User writing unit tests for authenticateUser"
 
 WINDOW 2 (Chrome - Linear):
+
 - "User viewing ticket LIN-341: Add JWT authentication"
 
 WINDOW 3 (Chrome - YouTube):
+
 - Excluded (on_task: false, background media)
 
 What is the primary task being worked on in this chunk?
 
 Return JSON:
 {
-  "primary_task": "Implementing JWT authentication for ticket LIN-341",
-  "confidence": "high",
-  "evidence": [
-    "Linear ticket LIN-341 visible with title 'Add JWT authentication'",
-    "Code changes in auth.service.ts match ticket scope",
-    "Test file created for the authentication function"
-  ]
+"primary_task": "Implementing JWT authentication for ticket LIN-341",
+"confidence": "high",
+"evidence": [
+"Linear ticket LIN-341 visible with title 'Add JWT authentication'",
+"Code changes in auth.service.ts match ticket scope",
+"Test file created for the authentication function"
+]
 }
+
 ```
 
 **Note**: This replaces the per-group correlation model. Per-window `on_task` flags handle the 2-of-3-windows scenario that group-level correlation couldn't address.
@@ -1044,6 +1061,7 @@ Return JSON:
 Use a capable reasoning model for chunk summaries since this aggregates many capture groups.
 
 ```
+
 You are summarizing a chunk of a work session. Focus on what the user ACTUALLY DID (based on deltas), not just what was visible.
 
 USER PROFILE:
@@ -1051,21 +1069,22 @@ USER PROFILE:
 
 FRAMES WITH CHANGES (on_task only):
 {manifest.capture_groups
-  .flatMap(g => g.frames)
-  .filter(f => f.on_task && f.delta?.changed)
-  .map(f => ({
-    timestamp: f.timestamp,
-    summary: f.summary,
-    change: f.delta.change_description,
-    action: f.delta.user_action,
-    context: f.context
-  }))
+.flatMap(g => g.frames)
+.filter(f => f.on_task && f.delta?.changed)
+.map(f => ({
+timestamp: f.timestamp,
+summary: f.summary,
+change: f.delta.change_description,
+action: f.delta.user_action,
+context: f.context
+}))
 }
 
 TASK CONTEXT (if inferred):
 {chunk.primary_task}
 
 Generate a summary that:
+
 1. Describes what the user ACCOMPLISHED (based on visible changes, not just viewing)
 2. Distinguishes between "edited", "viewed", and "researched"
 3. Filters out background media and static reference views
@@ -1073,40 +1092,44 @@ Generate a summary that:
 
 Return JSON:
 {
-  "narrative": "2-3 sentence summary focusing on user ACTIONS, not observations",
-  "key_activities": ["coding", "testing", etc.],
-  "tickets_touched": ["LIN-XXX", ...],
-  "files_touched": ["file.ts", ...],
-  "accomplishments": [
-    "Added JWT validation to auth.service.ts",
-    "Created unit tests for authenticateUser function"
-  ]
+"narrative": "2-3 sentence summary focusing on user ACTIONS, not observations",
+"key_activities": ["coding", "testing", etc.],
+"tickets_touched": ["LIN-XXX", ...],
+"files_touched": ["file.ts", ...],
+"accomplishments": [
+"Added JWT validation to auth.service.ts",
+"Created unit tests for authenticateUser function"
+]
 }
 
 **CRITICAL**: Do NOT say "user worked on X" if they only VIEWED X without making changes.
+
 ```
 
 ### Final Summary (Gemini 3.5 Pro) — At Session End
 
 ```
+
 You are generating a work session summary.
 
 USER CONTEXT:
 {user_context}
 
 SESSION INFO:
+
 - Duration: {total_duration}
 - Windows watched: {watched_windows}
 - Total chunks: {chunk_count}
 
 CHUNK SUMMARIES:
 {chunks.map(c => ({
-  chunk: c.chunk_index,
-  time_range: c.chunk_range,
-  summary: c.chunk_summary
+chunk: c.chunk_index,
+time_range: c.chunk_range,
+summary: c.chunk_summary
 }))}
 
 INSTRUCTIONS:
+
 1. Synthesize what the user accomplished during this entire session
 2. Correlate activities with their tickets (Linear) and code (GitHub)
 3. Identify what's done vs in-progress
@@ -1115,30 +1138,31 @@ INSTRUCTIONS:
 
 Return JSON:
 {
-  "narrative": "2-3 paragraph summary of the entire session",
-  "structured": {
-    "workstreams": [
-      {
-        "title": "descriptive title",
-        "ticket": "LIN-XXX" or null,
-        "pr": 234 or null,
-        "files": ["file1.ts", "file2.ts"],
-        "status": "done" or "in_progress",
-        "activities": ["activity 1", "activity 2"]
-      }
-    ],
-    "files_touched": ["all files worked on"],
-    "tickets_impacted": ["all ticket IDs"],
-    "time_breakdown": {
-      "coding": "X min",
-      "research": "X min",
-      "communication": "X min",
-      "testing": "X min"
-    },
-    "suggested_next_steps": ["suggestion 1", "suggestion 2"]
-  }
+"narrative": "2-3 paragraph summary of the entire session",
+"structured": {
+"workstreams": [
+{
+"title": "descriptive title",
+"ticket": "LIN-XXX" or null,
+"pr": 234 or null,
+"files": ["file1.ts", "file2.ts"],
+"status": "done" or "in_progress",
+"activities": ["activity 1", "activity 2"]
 }
-```
+],
+"files_touched": ["all files worked on"],
+"tickets_impacted": ["all ticket IDs"],
+"time_breakdown": {
+"coding": "X min",
+"research": "X min",
+"communication": "X min",
+"testing": "X min"
+},
+"suggested_next_steps": ["suggestion 1", "suggestion 2"]
+}
+}
+
+````
 
 ---
 
@@ -1188,7 +1212,7 @@ Return JSON:
   };
   manifest_split?: boolean;       // True if this frame triggered a new manifest chunk
 }
-```
+````
 
 ---
 
@@ -1304,19 +1328,23 @@ Manifest is a **derived view**, generated on demand from DB:
 async function generateManifest(sessionId: string, chunkIndex: number): Promise<Manifest> {
   // Get distinct group_ids for this chunk (300 groups per chunk)
   // Page by group, not by raw frame count, to ensure consistent chunk boundaries
-  const groups = await db.query(`
+  const groups = await db.query(
+    `
     SELECT DISTINCT group_id
     FROM session_frames
     WHERE session_id = $1
     ORDER BY group_id
     LIMIT 300
     OFFSET $2
-  `, [sessionId, (chunkIndex - 1) * 300]);
+  `,
+    [sessionId, (chunkIndex - 1) * 300]
+  );
 
-  const groupIds = groups.map(g => g.group_id);
+  const groupIds = groups.map((g) => g.group_id);
 
   // Query all frames for these groups (includes per-window on_task flags)
-  const frames = await db.query(`
+  const frames = await db.query(
+    `
     SELECT
       id, frame_id, group_id, local_filename, window_source_id,
       hash, timestamp, trigger, is_skipped, skip_reason,
@@ -1327,7 +1355,9 @@ async function generateManifest(sessionId: string, chunkIndex: number): Promise<
     FROM session_frames
     WHERE session_id = $1 AND group_id = ANY($2)
     ORDER BY timestamp, frame_id
-  `, [sessionId, groupIds]);
+  `,
+    [sessionId, groupIds]
+  );
 
   // NOTE: No correlations query needed — on_task is per-frame now
 
@@ -1348,32 +1378,34 @@ function buildManifestFromFrames(frames: FrameRow[]): Manifest {
   const captureGroups = Array.from(groups.entries()).map(([groupId, groupFrames]) => ({
     group_id: groupId,
     timestamp: groupFrames[0].timestamp,
-    frames: groupFrames.map(f => ({
+    frames: groupFrames.map((f) => ({
       frame_id: f.frame_id,
       filename: f.local_filename,
       window_source_id: f.window_source_id,
       hash: f.hash,
       skipped: f.is_skipped,
       skip_reason: f.skip_reason,
-      analysis: f.is_skipped ? undefined : {
-        summary: f.quick_summary,
-        delta: {
-          changed: f.delta_changed,
-          change_type: f.delta_change_type,
-          change_description: f.delta_change_description,
-          user_action: f.delta_user_action
-        },
-        context: {
-          application: f.application,
-          activity_type: f.activity_type,
-          ...f.analysis_context
-        },
-        on_task: f.on_task,
-        task_relevance: f.task_relevance
-      },
+      analysis: f.is_skipped
+        ? undefined
+        : {
+            summary: f.quick_summary,
+            delta: {
+              changed: f.delta_changed,
+              change_type: f.delta_change_type,
+              change_description: f.delta_change_description,
+              user_action: f.delta_user_action,
+            },
+            context: {
+              application: f.application,
+              activity_type: f.activity_type,
+              ...f.analysis_context,
+            },
+            on_task: f.on_task,
+            task_relevance: f.task_relevance,
+          },
       importance_score: f.importance_score,
-      importance_reason: f.importance_reason
-    }))
+      importance_reason: f.importance_reason,
+    })),
   }));
 
   return { capture_groups: captureGroups };
@@ -1393,90 +1425,90 @@ function buildManifestFromFrames(frames: FrameRow[]): Manifest {
 
 ### Phase 0: Foundation & Reliability (1 day) — NEW
 
-| Task | Effort |
-|------|--------|
-| Implement retry infrastructure with exponential backoff | 2h |
-| Add offline frame queue with localStorage persistence | 2h |
-| Implement session checkpoint mechanism | 2h |
-| Add crash recovery detection and dialog | 2h |
+| Task                                                    | Effort |
+| ------------------------------------------------------- | ------ |
+| Implement retry infrastructure with exponential backoff | 2h     |
+| Add offline frame queue with localStorage persistence   | 2h     |
+| Implement session checkpoint mechanism                  | 2h     |
+| Add crash recovery detection and dialog                 | 2h     |
 
 ### Phase 1: Local Storage + Delta Detection (2 days)
 
-| Task | Effort |
-|------|--------|
-| Create local frames folder management | 1h |
-| Create Supabase Storage bucket `mitable-sessions` | 0.5h |
-| Implement local frame storage with hash dedup | 2h |
-| Modify session start with optional session goal | 2h |
-| Implement delta detection (send prev + current to Groq) | 3h |
-| Implement per-window on_task flags (no group correlation) | 2h |
-| Testing | 2h |
+| Task                                                      | Effort |
+| --------------------------------------------------------- | ------ |
+| Create local frames folder management                     | 1h     |
+| Create Supabase Storage bucket `mitable-sessions`         | 0.5h   |
+| Implement local frame storage with hash dedup             | 2h     |
+| Modify session start with optional session goal           | 2h     |
+| Implement delta detection (send prev + current to Groq)   | 3h     |
+| Implement per-window on_task flags (no group correlation) | 2h     |
+| Testing                                                   | 2h     |
 
 ### Phase 2: Incremental Analysis (1.5 days)
 
-| Task | Effort |
-|------|--------|
-| Add Groq SDK and Llama 4 Scout integration | 2h |
-| Implement batch frame processor (30s intervals) | 2h |
-| Implement quick summary with delta + session goal | 2h |
-| Implement manifest splitting at 300 groups | 2h |
-| Implement chunk summary generation | 2h |
-| Testing | 2h |
+| Task                                              | Effort |
+| ------------------------------------------------- | ------ |
+| Add Groq SDK and Llama 4 Scout integration        | 2h     |
+| Implement batch frame processor (30s intervals)   | 2h     |
+| Implement quick summary with delta + session goal | 2h     |
+| Implement manifest splitting at 300 groups        | 2h     |
+| Implement chunk summary generation                | 2h     |
+| Testing                                           | 2h     |
 
 ### Phase 3: Top-K + Upload (1 day)
 
-| Task | Effort |
-|------|--------|
-| Implement Top-K selection with temporal diversity | 3h |
-| Implement context diversity constraint | 1h |
-| Implement Top-K frame upload at session end | 2h |
-| Implement local frames cleanup after upload | 1h |
-| Testing | 1h |
+| Task                                              | Effort |
+| ------------------------------------------------- | ------ |
+| Implement Top-K selection with temporal diversity | 3h     |
+| Implement context diversity constraint            | 1h     |
+| Implement Top-K frame upload at session end       | 2h     |
+| Implement local frames cleanup after upload       | 1h     |
+| Testing                                           | 1h     |
 
 ### Phase 4: Final Summary + Delivery (1 day)
 
-| Task | Effort |
-|------|--------|
-| Fetch GitHub commits/PRs at session END | 2h |
-| Fetch Linear tickets at session END | 1h |
-| Generate final summary with Gemini 2.5 Pro | 2h |
-| Update Slack delivery with Top-K images | 2h |
-| Testing | 1h |
+| Task                                       | Effort |
+| ------------------------------------------ | ------ |
+| Fetch GitHub commits/PRs at session END    | 2h     |
+| Fetch Linear tickets at session END        | 1h     |
+| Generate final summary with Gemini 2.5 Pro | 2h     |
+| Update Slack delivery with Top-K images    | 2h     |
+| Testing                                    | 1h     |
 
 ### Phase 5: Interim Summaries + UX (1 day)
 
-| Task | Effort |
-|------|--------|
-| Implement streaming interim summaries (every 15 min) | 3h |
-| Add interim summary UI component | 2h |
-| Implement session pause/resume | 2h |
-| Add session goal input to StartSessionDialog | 1h |
+| Task                                                 | Effort |
+| ---------------------------------------------------- | ------ |
+| Implement streaming interim summaries (every 15 min) | 3h     |
+| Add interim summary UI component                     | 2h     |
+| Implement session pause/resume                       | 2h     |
+| Add session goal input to StartSessionDialog         | 1h     |
 
 ### Phase 6: Privacy & Polish (0.5 days)
 
-| Task | Effort |
-|------|--------|
-| Implement frame redaction API | 2h |
-| Add redaction UI in frame preview | 1h |
-| Update session card with new summary format | 1h |
+| Task                                        | Effort |
+| ------------------------------------------- | ------ |
+| Implement frame redaction API               | 2h     |
+| Add redaction UI in frame preview           | 1h     |
+| Update session card with new summary format | 1h     |
 
 **Total: ~8 days**
 
 ### Priority Matrix
 
-| Feature | Priority | Phase |
-|---------|----------|-------|
-| Crash recovery + checkpoints | P0 | 0 |
-| Local storage + Top-K upload | P0 | 1, 3 |
-| Delta detection | P0 | 1 |
-| Per-window on_task | P0 | 1 |
-| Temporal diversity in Top-K | P0 | 3 |
-| Session goal for on_task | P1 | 1 |
-| Error handling/retry | P1 | 0 |
-| Batch frame processing | P2 | 2 |
-| Interim summaries | P2 | 5 |
-| Pause/Resume | P3 | 5 |
-| Privacy/Redaction | P3 | 6 |
+| Feature                      | Priority | Phase |
+| ---------------------------- | -------- | ----- |
+| Crash recovery + checkpoints | P0       | 0     |
+| Local storage + Top-K upload | P0       | 1, 3  |
+| Delta detection              | P0       | 1     |
+| Per-window on_task           | P0       | 1     |
+| Temporal diversity in Top-K  | P0       | 3     |
+| Session goal for on_task     | P1       | 1     |
+| Error handling/retry         | P1       | 0     |
+| Batch frame processing       | P2       | 2     |
+| Interim summaries            | P2       | 5     |
+| Pause/Resume                 | P3       | 5     |
+| Privacy/Redaction            | P3       | 6     |
 
 ---
 
@@ -1484,33 +1516,33 @@ function buildManifestFromFrames(frames: FrameRow[]): Manifest {
 
 ### Per-Session Costs (1 hour, 5 windows, 50% dedup)
 
-| Component | Calculation | Cost |
-|-----------|-------------|------|
-| Groq Llama 4 (quick summary w/ delta) | 180 frames × 2 images × $0.00002 | ~$0.007 |
-| Groq (task context inference) | 1 chunk × $0.0005 | ~$0.0005 |
-| Groq (chunk summary) | 1 chunk × $0.001 | ~$0.001 |
-| Gemini 2.5 Pro (final summary) | 1 call × ~$0.02 | ~$0.02 |
-| Supabase Storage (Top-K only) | 10 frames × 1MB × $0.021/GB | ~$0.0002 |
-| Local storage (ephemeral) | 180 frames × 1MB | $0 |
-| **Total per 1-hour session** | | **~$0.03** |
+| Component                             | Calculation                      | Cost       |
+| ------------------------------------- | -------------------------------- | ---------- |
+| Groq Llama 4 (quick summary w/ delta) | 180 frames × 2 images × $0.00002 | ~$0.007    |
+| Groq (task context inference)         | 1 chunk × $0.0005                | ~$0.0005   |
+| Groq (chunk summary)                  | 1 chunk × $0.001                 | ~$0.001    |
+| Gemini 2.5 Pro (final summary)        | 1 call × ~$0.02                  | ~$0.02     |
+| Supabase Storage (Top-K only)         | 10 frames × 1MB × $0.021/GB      | ~$0.0002   |
+| Local storage (ephemeral)             | 180 frames × 1MB                 | $0         |
+| **Total per 1-hour session**          |                                  | **~$0.03** |
 
 **Note**: Storage costs reduced by ~95% due to local-first approach with Top-K upload.
 
 ### Monthly Estimate
 
-| Usage | Cost |
-|-------|------|
-| 100 sessions/month | ~$3 |
-| 1,000 sessions/month | ~$30 |
+| Usage                 | Cost  |
+| --------------------- | ----- |
+| 100 sessions/month    | ~$3   |
+| 1,000 sessions/month  | ~$30  |
 | 10,000 sessions/month | ~$300 |
 
 ### Local Disk Usage
 
-| Session Duration | Frames (est.) | Disk Usage | Auto-cleaned |
-|------------------|---------------|------------|--------------|
-| 30 min | ~90 frames | ~90 MB | After summary |
-| 1 hour | ~180 frames | ~180 MB | After summary |
-| 4 hours | ~720 frames | ~720 MB | After summary |
+| Session Duration | Frames (est.) | Disk Usage | Auto-cleaned  |
+| ---------------- | ------------- | ---------- | ------------- |
+| 30 min           | ~90 frames    | ~90 MB     | After summary |
+| 1 hour           | ~180 frames   | ~180 MB    | After summary |
+| 4 hours          | ~720 frames   | ~720 MB    | After summary |
 
 Local frames are automatically deleted after session summary is generated and Top-K frames are uploaded.
 
@@ -1520,27 +1552,27 @@ Local frames are automatically deleted after session summary is generated and To
 
 ### Current Problems Solved
 
-| Problem | Solution |
-|---------|----------|
-| DB bloat from base64 images | Local-first storage + Top-K upload |
-| Uploading 100s of unneeded images | Only Top-K important frames uploaded (~10) |
-| Weak summaries (no context) | User context + incremental analysis |
-| All analysis at session end | Quick summaries during capture |
-| False attribution ("user did X") | Delta detection distinguishes viewing vs action |
-| Ambiguous multi-window correlation | Per-window `on_task` flags (not group-level) |
-| Generic output | Structured JSON with workstreams + accomplishments |
-| Fragile cleanup (setTimeout) | Local storage auto-cleanup after summary |
-| Long sessions overwhelm LLM | Manifest chunking with pre-summaries |
+| Problem                            | Solution                                           |
+| ---------------------------------- | -------------------------------------------------- |
+| DB bloat from base64 images        | Local-first storage + Top-K upload                 |
+| Uploading 100s of unneeded images  | Only Top-K important frames uploaded (~10)         |
+| Weak summaries (no context)        | User context + incremental analysis                |
+| All analysis at session end        | Quick summaries during capture                     |
+| False attribution ("user did X")   | Delta detection distinguishes viewing vs action    |
+| Ambiguous multi-window correlation | Per-window `on_task` flags (not group-level)       |
+| Generic output                     | Structured JSON with workstreams + accomplishments |
+| Fragile cleanup (setTimeout)       | Local storage auto-cleanup after summary           |
+| Long sessions overwhelm LLM        | Manifest chunking with pre-summaries               |
 
 ### Future Capabilities Unlocked
 
-| Feature | How Manifest Enables It |
-|---------|------------------------|
+| Feature              | How Manifest Enables It                             |
+| -------------------- | --------------------------------------------------- |
 | Tool call enrichment | user_context has PR numbers, ticket IDs for queries |
-| Session export | manifest.json is portable, self-contained |
-| Analytics | Queryable structured data per chunk |
-| Custom integrations | Standard format for any consumer |
-| Replay/timeline view | Ordered frames with timestamps and summaries |
+| Session export       | manifest.json is portable, self-contained           |
+| Analytics            | Queryable structured data per chunk                 |
+| Custom integrations  | Standard format for any consumer                    |
+| Replay/timeline view | Ordered frames with timestamps and summaries        |
 
 ---
 
@@ -1553,8 +1585,8 @@ If Electron crashes mid-session, all local frames could be lost before summary g
 ### Solution: Periodic Checkpoints
 
 ```typescript
-const CHECKPOINT_INTERVAL_FRAMES = 50;    // Every 50 frames
-const CHECKPOINT_INTERVAL_TIME = 15 * 60 * 1000;  // OR every 15 minutes
+const CHECKPOINT_INTERVAL_FRAMES = 50; // Every 50 frames
+const CHECKPOINT_INTERVAL_TIME = 15 * 60 * 1000; // OR every 15 minutes
 
 interface Checkpoint {
   session_id: string;
@@ -1654,11 +1686,14 @@ async function pauseSession(sessionId: string): Promise<void> {
   captureLoop.stop();
 
   // Update DB status
-  await db.query(`
+  await db.query(
+    `
     UPDATE monitoring_sessions
     SET status = 'paused', updated_at = NOW()
     WHERE id = $1
-  `, [sessionId]);
+  `,
+    [sessionId]
+  );
 
   // Keep local frames folder intact
   // Stop interim summary timer
@@ -1668,11 +1703,14 @@ async function pauseSession(sessionId: string): Promise<void> {
 // Resume session
 async function resumeSession(sessionId: string): Promise<void> {
   // Update DB status
-  await db.query(`
+  await db.query(
+    `
     UPDATE monitoring_sessions
     SET status = 'active', updated_at = NOW()
     WHERE id = $1
-  `, [sessionId]);
+  `,
+    [sessionId]
+  );
 
   // Restart capture loop from last frame
   const lastFrame = await getLastFrame(sessionId);
@@ -1739,7 +1777,8 @@ async function redactFrame(sessionId: string, frameId: string, reason: string): 
   await fs.unlink(frame.local_path);
 
   // 2. Mark as redacted in DB (keep metadata for audit)
-  await db.query(`
+  await db.query(
+    `
     UPDATE session_frames
     SET is_redacted = TRUE,
         redacted_at = NOW(),
@@ -1749,22 +1788,27 @@ async function redactFrame(sessionId: string, frameId: string, reason: string): 
         analysis_context = NULL,
         importance_score = 0
     WHERE session_id = $1 AND frame_id = $2
-  `, [sessionId, frameId, reason]);
+  `,
+    [sessionId, frameId, reason]
+  );
 
   // 3. If frame was selected for export, remove from selection
-  await db.query(`
+  await db.query(
+    `
     UPDATE session_frames
     SET selected_for_export = FALSE
     WHERE session_id = $1 AND frame_id = $2
-  `, [sessionId, frameId]);
+  `,
+    [sessionId, frameId]
+  );
 
   // 4. Log redaction for compliance
   await auditLog.record({
-    action: 'frame_redacted',
+    action: "frame_redacted",
     session_id: sessionId,
     frame_id: frameId,
     reason,
-    timestamp: new Date()
+    timestamp: new Date(),
   });
 }
 ```
@@ -1775,13 +1819,16 @@ Redacted frames are automatically excluded:
 
 ```typescript
 // In generateManifest()
-const frames = await db.query(`
+const frames = await db.query(
+  `
   SELECT * FROM session_frames
   WHERE session_id = $1
     AND group_id = ANY($2)
     AND is_redacted = FALSE  -- Exclude redacted frames
   ORDER BY timestamp, frame_id
-`, [sessionId, groupIds]);
+`,
+  [sessionId, groupIds]
+);
 ```
 
 ### UI for Redaction
@@ -1804,16 +1851,16 @@ const frames = await db.query(`
 
 ## 14. Risk Mitigation
 
-| Risk | Mitigation |
-|------|------------|
-| **App crash mid-session** | Checkpoints every 50 frames / 15 min, recovery dialog on restart |
-| Groq rate limits | Implement exponential backoff, queue frames |
-| Storage costs grow | Set retention policy (delete after 30 days) |
-| Manifest corruption mid-write | Atomic writes via temp file + rename |
-| Migration breaks existing sessions | Feature flag, run parallel with old system |
-| User forgets session running | Auto-pause after 4 hours of no new unique frames |
-| Network failure mid-capture | Offline queue with retry on reconnect |
-| **Sensitive content captured** | Redaction controls with audit logging |
+| Risk                               | Mitigation                                                       |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| **App crash mid-session**          | Checkpoints every 50 frames / 15 min, recovery dialog on restart |
+| Groq rate limits                   | Implement exponential backoff, queue frames                      |
+| Storage costs grow                 | Set retention policy (delete after 30 days)                      |
+| Manifest corruption mid-write      | Atomic writes via temp file + rename                             |
+| Migration breaks existing sessions | Feature flag, run parallel with old system                       |
+| User forgets session running       | Auto-pause after 4 hours of no new unique frames                 |
+| Network failure mid-capture        | Offline queue with retry on reconnect                            |
+| **Sensitive content captured**     | Redaction controls with audit logging                            |
 
 ---
 
@@ -1851,9 +1898,9 @@ Final summary output:
 ```typescript
 interface DeltaResult {
   changed: boolean;
-  change_type: 'content_edit' | 'navigation' | 'scroll' | 'file_switch' | 'none';
+  change_type: "content_edit" | "navigation" | "scroll" | "file_switch" | "none";
   change_description: string;
-  user_action: 'typing' | 'clicking' | 'scrolling' | 'viewing' | 'unknown';
+  user_action: "typing" | "clicking" | "scrolling" | "viewing" | "unknown";
 }
 
 // Track previous frame per window for delta detection
@@ -1875,13 +1922,13 @@ async function analyzeFrameWithDelta(
 
   // Hash match — identical frame, skip analysis
   if (previous.hash === currentHash) {
-    return { skipped: true, skip_reason: 'duplicate_hash' };
+    return { skipped: true, skip_reason: "duplicate_hash" };
   }
 
   // Send BOTH frames to Groq for delta detection
   const analysis = await groqVision.analyze({
     images: [previous.path, currentFramePath],
-    prompt: DELTA_DETECTION_PROMPT
+    prompt: DELTA_DETECTION_PROMPT,
   });
 
   // Update previous frame reference
@@ -1898,7 +1945,8 @@ const TOP_K = 10;
 
 async function selectImportantFrames(sessionId: string): Promise<string[]> {
   // Get all non-skipped, on-task frames with changes
-  const candidates = await db.query(`
+  const candidates = await db.query(
+    `
     SELECT frame_id, importance_score, importance_reason,
            delta_change_type, delta_user_action, application,
            analysis_context->>'file' as file,
@@ -1909,7 +1957,9 @@ async function selectImportantFrames(sessionId: string): Promise<string[]> {
       AND on_task = TRUE
       AND delta_changed = TRUE
     ORDER BY importance_score DESC
-  `, [sessionId]);
+  `,
+    [sessionId]
+  );
 
   // Apply diversity constraint and select Top-K
   const selected: string[] = [];
@@ -1919,7 +1969,7 @@ async function selectImportantFrames(sessionId: string): Promise<string[]> {
     if (selected.length >= TOP_K) break;
 
     // Diversity: max 2 frames per file/website
-    const contextKey = `${frame.application}:${frame.file || frame.website || 'unknown'}`;
+    const contextKey = `${frame.application}:${frame.file || frame.website || "unknown"}`;
     const count = contextCounts.get(contextKey) || 0;
     if (count >= 2) continue;
 
@@ -1934,11 +1984,14 @@ async function selectImportantFrames(sessionId: string): Promise<string[]> {
   }
 
   // Mark selected frames in DB
-  await db.query(`
+  await db.query(
+    `
     UPDATE session_frames
     SET selected_for_export = TRUE
     WHERE session_id = $1 AND frame_id = ANY($2)
-  `, [sessionId, selected]);
+  `,
+    [sessionId, selected]
+  );
 
   return selected;
 }

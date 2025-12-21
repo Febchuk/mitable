@@ -64,11 +64,7 @@ export default function DocsView() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsGenerateDialogOpen(true)}
-            className="gap-2"
-          >
+          <Button variant="outline" onClick={() => setIsGenerateDialogOpen(true)} className="gap-2">
             <Sparkles size={18} />
             Generate from Session
           </Button>
@@ -99,10 +95,7 @@ export default function DocsView() {
         </div>
 
         {/* Type Filter */}
-        <Select
-          value={docTypeFilter}
-          onValueChange={(v) => setDocTypeFilter(v as DocType | "all")}
-        >
+        <Select value={docTypeFilter} onValueChange={(v) => setDocTypeFilter(v as DocType | "all")}>
           <SelectTrigger className="w-[180px] bg-background-elevated border-transparent">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
@@ -115,10 +108,7 @@ export default function DocsView() {
         </Select>
 
         {/* Status Filter */}
-        <Select
-          value={statusFilter}
-          onValueChange={(v) => setStatusFilter(v as DocStatus | "all")}
-        >
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as DocStatus | "all")}>
           <SelectTrigger className="w-[150px] bg-background-elevated border-transparent">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
@@ -134,11 +124,7 @@ export default function DocsView() {
       {/* Documents Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {documents.map((doc) => (
-          <DocCard
-            key={doc.id}
-            document={doc}
-            onClick={() => navigate(`/docs/${doc.id}`)}
-          />
+          <DocCard key={doc.id} document={doc} onClick={() => navigate(`/docs/${doc.id}`)} />
         ))}
       </div>
 
@@ -148,9 +134,7 @@ export default function DocsView() {
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
             <FileText size={32} className="text-primary" />
           </div>
-          <h3 className="text-xl font-semibold text-text-primary mb-2">
-            No documents yet
-          </h3>
+          <h3 className="text-xl font-semibold text-text-primary mb-2">No documents yet</h3>
           <p className="text-text-secondary mb-6 max-w-md mx-auto">
             {searchQuery || docTypeFilter !== "all" || statusFilter !== "all"
               ? "No documents match your filters"
@@ -179,10 +163,7 @@ export default function DocsView() {
       )}
 
       {/* Generate Dialog */}
-      <GenerateDocDialog
-        open={isGenerateDialogOpen}
-        onOpenChange={setIsGenerateDialogOpen}
-      />
+      <GenerateDocDialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen} />
     </div>
   );
 }

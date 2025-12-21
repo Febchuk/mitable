@@ -15,8 +15,7 @@ import {
 import { cx } from "@/utils/cx";
 
 interface TooltipProps
-  extends AriaTooltipTriggerComponentProps,
-    Omit<AriaTooltipProps, "children"> {
+  extends AriaTooltipTriggerComponentProps, Omit<AriaTooltipProps, "children"> {
   /**
    * The title of the tooltip.
    */

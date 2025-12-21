@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * DocEditor
@@ -11,21 +11,20 @@
  * - Autosave functionality
  */
 
-import * as React from 'react';
+import * as React from "react";
 
-import type { Value } from 'platejs';
-import type { PlateEditor } from 'platejs/react';
+import type { Value } from "platejs";
+import type { PlateEditor } from "platejs/react";
 
-import { normalizeNodeId } from 'platejs';
-import { Plate, usePlateEditor } from 'platejs/react';
+import { normalizeNodeId } from "platejs";
+import { Plate, usePlateEditor } from "platejs/react";
 
-import { Editor, EditorContainer } from '@/components/ui/editor';
+import { Editor, EditorContainer } from "@/components/ui/editor";
 
-import { DocEditorKit } from './doc-editor-kit';
-import { createEmptyDocument, markdownToPlate, plateToMarkdown } from './markdown-utils';
+import { DocEditorKit } from "./doc-editor-kit";
+import { createEmptyDocument, markdownToPlate, plateToMarkdown } from "./markdown-utils";
 // TODO: Re-enable when AI chat is properly configured
 // import { useDocChat } from './use-doc-chat';
-
 
 export interface DocEditorProps {
   /** Initial markdown content */
@@ -43,20 +42,20 @@ export interface DocEditorProps {
   /** Autosave delay in ms (default: 2000) */
   autosaveDelay?: number;
   /** Editor variant (default, demo, fullWidth) */
-  variant?: 'default' | 'demo' | 'fullWidth';
+  variant?: "default" | "demo" | "fullWidth";
   /** Custom class name */
   className?: string;
 }
 
 export function DocEditor({
-  initialContent = '',
+  initialContent = "",
   onChange,
   onSave,
   readOnly = false,
-  placeholder = 'Start writing... Press / for commands or ⌘+J for AI assistance.',
-  documentId,
+  placeholder = "Start writing... Press / for commands or ⌘+J for AI assistance.",
+  documentId: _documentId,
   autosaveDelay = 2000,
-  variant = 'default',
+  variant = "default",
   className,
 }: DocEditorProps) {
   const autosaveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,16 +77,15 @@ export function DocEditor({
 
   // Initialize content from markdown after editor is ready
   React.useEffect(() => {
-    if (initialContent && initialContent.trim() !== '') {
+    if (initialContent && initialContent.trim() !== "") {
       try {
         const value = markdownToPlate(editor, initialContent);
         editor.tf.reset();
         editor.tf.setValue(normalizeNodeId(value as Value));
       } catch (error) {
-        console.error('Error loading markdown content:', error);
+        console.error("Error loading markdown content:", error);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
   // Handle content changes with autosave
@@ -111,7 +109,7 @@ export function DocEditor({
             onChange(markdown);
           }
         } catch (error) {
-          console.error('Error converting to markdown:', error);
+          console.error("Error converting to markdown:", error);
         }
       }, autosaveDelay);
     },
@@ -122,7 +120,7 @@ export function DocEditor({
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // ⌘+S / Ctrl+S for save
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
         if (onSave && editorRef.current) {
           try {
@@ -130,14 +128,14 @@ export function DocEditor({
             lastSavedContentRef.current = markdown;
             onSave(markdown);
           } catch (error) {
-            console.error('Error saving markdown:', error);
+            console.error("Error saving markdown:", error);
           }
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onSave]);
 
   // Cleanup autosave timer on unmount
@@ -152,11 +150,7 @@ export function DocEditor({
   return (
     <Plate editor={editor} onChange={handleChange}>
       <EditorContainer className={className}>
-        <Editor
-          variant={variant}
-          readOnly={readOnly}
-          placeholder={placeholder}
-        />
+        <Editor variant={variant} readOnly={readOnly} placeholder={placeholder} />
       </EditorContainer>
     </Plate>
   );

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * Document Editor Kit
@@ -7,23 +7,23 @@
  * Includes essential formatting, AI features, and markdown support.
  */
 
-import { TrailingBlockPlugin } from 'platejs';
+import { TrailingBlockPlugin } from "platejs";
 
-import { AIKit } from '@/components/editor/plugins/ai-kit';
-import { AutoformatKit } from '@/components/editor/plugins/autoformat-kit';
-import { BasicBlocksKit } from '@/components/editor/plugins/basic-blocks-kit';
-import { BasicMarksKit } from '@/components/editor/plugins/basic-marks-kit';
-import { BlockMenuKit } from '@/components/editor/plugins/block-menu-kit';
-import { CodeBlockKit } from '@/components/editor/plugins/code-block-kit';
-import { CursorOverlayKit } from '@/components/editor/plugins/cursor-overlay-kit';
-import { ExitBreakKit } from '@/components/editor/plugins/exit-break-kit';
-import { FixedToolbarKit } from '@/components/editor/plugins/fixed-toolbar-kit';
-import { FloatingToolbarKit } from '@/components/editor/plugins/floating-toolbar-kit';
-import { LinkKit } from '@/components/editor/plugins/link-kit';
-import { ListKit } from '@/components/editor/plugins/list-kit';
-import { MarkdownKit } from '@/components/editor/plugins/markdown-kit';
-import { SlashKit } from '@/components/editor/plugins/slash-kit';
-import { TableKit } from '@/components/editor/plugins/table-kit';
+import { AIKit } from "@/components/editor/plugins/ai-kit";
+import { AutoformatKit } from "@/components/editor/plugins/autoformat-kit";
+import { BasicBlocksKit } from "@/components/editor/plugins/basic-blocks-kit";
+import { BasicMarksKit } from "@/components/editor/plugins/basic-marks-kit";
+import { BlockMenuKit } from "@/components/editor/plugins/block-menu-kit";
+import { CodeBlockKit } from "@/components/editor/plugins/code-block-kit";
+import { CursorOverlayKit } from "@/components/editor/plugins/cursor-overlay-kit";
+import { ExitBreakKit } from "@/components/editor/plugins/exit-break-kit";
+import { FixedToolbarKit } from "@/components/editor/plugins/fixed-toolbar-kit";
+import { FloatingToolbarKit } from "@/components/editor/plugins/floating-toolbar-kit";
+import { LinkKit } from "@/components/editor/plugins/link-kit";
+import { ListKit } from "@/components/editor/plugins/list-kit";
+import { MarkdownKit } from "@/components/editor/plugins/markdown-kit";
+import { SlashKit } from "@/components/editor/plugins/slash-kit";
+import { TableKit } from "@/components/editor/plugins/table-kit";
 
 /**
  * DocEditorKit - Plugins for document editing

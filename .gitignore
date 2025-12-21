@@ -29,6 +29,7 @@ out/
 .env.production.local
 .env.production
 **/.env.production
+.env.signing
 
 # Credentials (NEVER commit these!)
 **/creds/

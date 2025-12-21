@@ -15,6 +15,7 @@ export const monitoringKeys = {
   session: (id: string) => [...monitoringKeys.sessions(), id] as const,
   captures: (sessionId: string) => [...monitoringKeys.session(sessionId), "captures"] as const,
   summary: (sessionId: string) => [...monitoringKeys.session(sessionId), "summary"] as const,
+  story: (sessionId: string) => [...monitoringKeys.session(sessionId), "story"] as const,
   slackChannels: () => [...monitoringKeys.all, "slackChannels"] as const,
   slackUsers: () => [...monitoringKeys.all, "slackUsers"] as const,
 };
@@ -47,7 +48,10 @@ export function useSession(sessionId: string, options?: { pollWhileSummarizing?:
     queryKey: monitoringKeys.session(sessionId),
     queryFn: async () => {
       const response = await monitoringService.fetchSession(sessionId);
-      return response.session;
+      return {
+        ...response.session,
+        topKFrames: response.topKFrames,
+      };
     },
     enabled: !!user && !!sessionId,
     // Poll every 2 seconds while session is being summarized
@@ -83,6 +87,21 @@ export function useSessionSummary(sessionId: string, sessionStatus?: string) {
     enabled: !!sessionId,
     // Poll every 2 seconds while session is being summarized
     refetchInterval: sessionStatus === "summarizing" ? 2000 : false,
+  });
+}
+
+/**
+ * Fetch the progressive master story for a session
+ * @param sessionId - The session ID to fetch story for
+ * @param sessionStatus - Current session status (for conditional polling)
+ */
+export function useSessionStory(sessionId: string, sessionStatus?: string) {
+  return useQuery({
+    queryKey: monitoringKeys.story(sessionId),
+    queryFn: () => monitoringService.fetchSessionStory(sessionId),
+    enabled: !!sessionId,
+    // Poll every 5 seconds while session is active or paused
+    refetchInterval: sessionStatus === "active" || sessionStatus === "paused" ? 5000 : false,
   });
 }
 

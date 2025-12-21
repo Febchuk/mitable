@@ -157,8 +157,7 @@ export default function DocDetail() {
     } catch (error) {
       toast({
         title: "Export failed",
-        description:
-          error instanceof Error ? error.message : "Failed to export to Notion.",
+        description: error instanceof Error ? error.message : "Failed to export to Notion.",
         variant: "destructive",
       });
     }
@@ -288,7 +287,11 @@ export default function DocDetail() {
           </div>
         )}
         <div className="ml-auto text-text-tertiary text-xs">
-          Press <kbd className="px-1.5 py-0.5 rounded bg-background-tertiary border border-border-subtle">⌘+J</kbd> for AI assistance
+          Press{" "}
+          <kbd className="px-1.5 py-0.5 rounded bg-background-tertiary border border-border-subtle">
+            ⌘+J
+          </kbd>{" "}
+          for AI assistance
         </div>
       </div>
 

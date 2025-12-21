@@ -39,6 +39,24 @@ function NavigationHandler() {
       console.log("[Console] Navigating to chat:", conversationId);
       navigate(`/chats/${conversationId}`);
     });
+
+    // Listen for active session navigation (from native notification click)
+    window.consoleAPI.onNavigateToActiveSession(async () => {
+      console.log("[Console] Navigate to active session requested");
+      try {
+        const sessionState = await window.consoleAPI.getMonitoringSessionState();
+        if (sessionState?.id) {
+          console.log("[Console] Navigating to active session:", sessionState.id);
+          navigate(`/monitoring/${sessionState.id}`);
+        } else {
+          console.log("[Console] No active session found, navigating to monitoring view");
+          navigate("/monitoring");
+        }
+      } catch (error) {
+        console.error("[Console] Error getting session state:", error);
+        navigate("/monitoring");
+      }
+    });
   }, [navigate]);
 
   return null;

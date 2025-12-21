@@ -6,6 +6,9 @@ import { requireAuth } from "../middleware/auth.js";
 import { sessionDeliveryService } from "../services/session-delivery.service.js";
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
 import { frameAnalysisService } from "../services/frame-analysis.service.js";
+import { masterStoryService } from "../services/master-story.service.js";
+import { searchService } from "../services/search.service.js";
+import type { GoalContext } from "../prompts/session-prompts.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 
 const router = Router();
@@ -30,6 +33,16 @@ function formatDuration(ms: number): string {
 /**
  * POST /api/monitoring/sessions
  * Start a new monitoring session
+ *
+ * Supports optional goal context:
+ * - sessionGoal: Free-text description of what user is working on
+ * - linearIssueId: Optional Linear issue identifier (e.g., "LIN-341")
+ * - linearIssueTitle: Optional Linear issue title
+ * - linearIssueDescription: Optional Linear issue description
+ * - additionalContext: Optional additional context text
+ *
+ * When goal context is provided, RAG is used to retrieve related docs
+ * which are stored in relatedDocsContext for use during frame analysis.
  */
 router.post("/sessions", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;
@@ -38,10 +51,21 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
     selectedWindows,
     captureIntervalMs = 30000,
     name,
+    // Goal context fields
+    sessionGoal,
+    linearIssueId,
+    linearIssueTitle,
+    linearIssueDescription,
+    additionalContext,
   }: {
     selectedWindows: SelectedWindowInfo[];
     captureIntervalMs?: number;
     name?: string;
+    sessionGoal?: string;
+    linearIssueId?: string;
+    linearIssueTitle?: string;
+    linearIssueDescription?: string;
+    additionalContext?: string;
   } = req.body;
 
   // Get user's organizationId from database
@@ -91,7 +115,66 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       return;
     }
 
-    // Create new session
+    // Build combined goal text for RAG retrieval
+    const goalParts: string[] = [];
+    if (linearIssueTitle) {
+      goalParts.push(`${linearIssueId ? `[${linearIssueId}] ` : ""}${linearIssueTitle}`);
+    }
+    if (linearIssueDescription) {
+      goalParts.push(linearIssueDescription.substring(0, 500)); // Limit description length
+    }
+    if (sessionGoal) {
+      goalParts.push(sessionGoal);
+    }
+    if (additionalContext) {
+      goalParts.push(additionalContext);
+    }
+    const combinedGoalText = goalParts.join("\n\n").trim();
+
+    // Build session goal (human-readable summary)
+    const computedSessionGoal =
+      sessionGoal ||
+      (linearIssueTitle
+        ? `${linearIssueId ? `[${linearIssueId}] ` : ""}${linearIssueTitle}`
+        : null);
+
+    // Retrieve related docs via RAG if goal context is provided
+    let relatedDocsContext: string | null = null;
+    if (combinedGoalText) {
+      try {
+        console.log(
+          `[Monitoring] Retrieving related docs for goal: "${combinedGoalText.substring(0, 100)}..."`
+        );
+        const searchResponse = await searchService.search({
+          query: combinedGoalText,
+          organizationId,
+          topK: 5,
+        });
+
+        if (searchResponse.results.length > 0) {
+          // Format retrieved docs for context injection
+          relatedDocsContext = searchResponse.results
+            .map((r) => {
+              const source =
+                r.source === "slack"
+                  ? `[Slack: ${r.channelName || "channel"}]`
+                  : `[Notion: ${r.pageTitle || "page"}]`;
+              return `${source}\n${r.text.substring(0, 400)}`;
+            })
+            .join("\n\n---\n\n");
+
+          console.log(`[Monitoring] Retrieved ${searchResponse.results.length} related docs`);
+        }
+      } catch (ragError) {
+        // RAG failure shouldn't block session creation
+        console.warn(
+          "[Monitoring] RAG retrieval failed, continuing without related docs:",
+          ragError
+        );
+      }
+    }
+
+    // Create new session with goal context
     const [session] = await db
       .insert(schema.monitoringSessions)
       .values({
@@ -102,10 +185,19 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
         captureIntervalMs,
         selectedWindows: selectedWindows as any,
         startedAt: new Date(),
+        // Goal context fields
+        sessionGoal: computedSessionGoal,
+        linearIssueId: linearIssueId || null,
+        linearIssueTitle: linearIssueTitle || null,
+        linearIssueDescription: linearIssueDescription || null,
+        additionalContext: additionalContext || null,
+        relatedDocsContext: relatedDocsContext,
       })
       .returning();
 
-    console.log(`[Monitoring] Session started: ${session.id}`);
+    console.log(
+      `[Monitoring] Session started: ${session.id}${computedSessionGoal ? ` (goal: ${computedSessionGoal.substring(0, 50)}...)` : ""}`
+    );
 
     res.json({
       success: true,
@@ -116,6 +208,9 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
         selectedWindows: session.selectedWindows,
         captureIntervalMs: session.captureIntervalMs,
         startedAt: session.startedAt,
+        sessionGoal: session.sessionGoal,
+        linearIssueId: session.linearIssueId,
+        hasRelatedDocs: !!relatedDocsContext,
       },
     });
   } catch (error) {
@@ -320,11 +415,33 @@ router.get("/sessions/:id", requireAuth, async (req: Request, res: Response): Pr
       .from(schema.sessionCaptures)
       .where(eq(schema.sessionCaptures.sessionId, session.id));
 
+    // Get top-k frames (those selected for export)
+    const topKFrames = await db
+      .select({
+        id: schema.sessionCaptures.id,
+        sequenceNumber: schema.sessionCaptures.sequenceNumber,
+        capturedAt: schema.sessionCaptures.capturedAt,
+        appName: schema.sessionCaptures.appName,
+        windowTitle: schema.sessionCaptures.windowTitle,
+        activityDescription: schema.sessionCaptures.activityDescription,
+        importanceScore: schema.sessionCaptures.importanceScore,
+        imageData: schema.sessionCaptures.imageData,
+      })
+      .from(schema.sessionCaptures)
+      .where(
+        and(
+          eq(schema.sessionCaptures.sessionId, session.id),
+          eq(schema.sessionCaptures.selectedForExport, true)
+        )
+      )
+      .orderBy(desc(schema.sessionCaptures.capturedAt));
+
     res.json({
       session: {
         ...session,
         captureCount,
       },
+      topKFrames,
     });
   } catch (error) {
     console.error("[Monitoring] Error fetching session:", error);
@@ -721,6 +838,17 @@ router.post(
         return;
       }
 
+      // Build goal context from session data (stored at session creation via RAG)
+      const goalContext: GoalContext | undefined =
+        session.sessionGoal || session.linearIssueTitle
+          ? {
+              sessionGoal: session.sessionGoal || undefined,
+              linearIssueId: session.linearIssueId || undefined,
+              linearIssueTitle: session.linearIssueTitle || undefined,
+              relatedDocsContext: session.relatedDocsContext || undefined,
+            }
+          : undefined;
+
       // Check if frame analysis service is available
       if (!frameAnalysisService.isAvailable()) {
         console.warn("[Monitoring] Frame analysis service not available (no GROQ_API_KEY)");
@@ -745,7 +873,7 @@ router.post(
         return;
       }
 
-      // Analyze frame
+      // Analyze frame with goal context for enhanced analysis
       const analysisResult = await frameAnalysisService.analyzeFrame({
         sessionId: id,
         frameId,
@@ -753,16 +881,40 @@ router.post(
         previousFrame: previousImage,
         windowInfo,
         timestamp: new Date().toISOString(),
+        goalContext, // Pass goal context to prompt builder
       });
 
       // Calculate importance score based on analysis
       const importanceScore = calculateImportanceScore(analysisResult, sessionGoal);
+
+      // Extend master story if progression was detected
+      let storyUpdateResult = null;
+      if (analysisResult.progressionDetected && masterStoryService.isAvailable()) {
+        storyUpdateResult = await masterStoryService.extendStory({
+          sessionId: id,
+          userId,
+          frameAnalysis: analysisResult,
+          windowInfo: {
+            appName: windowInfo.appName,
+            windowTitle: windowInfo.windowTitle,
+          },
+          goalContext, // Pass goal context for enhanced storytelling
+        });
+
+        if (!storyUpdateResult.success) {
+          console.warn(
+            `[Monitoring] Master story update failed for frame ${frameId}:`,
+            storyUpdateResult.error
+          );
+        }
+      }
 
       console.log(`[Monitoring] Frame analyzed: ${frameId}`, {
         progressionDetected: analysisResult.progressionDetected,
         changeType: analysisResult.changeType,
         changeMagnitude: analysisResult.changeMagnitude,
         importanceScore,
+        storyUpdated: storyUpdateResult?.success ?? false,
       });
 
       res.json({
@@ -1002,6 +1154,65 @@ router.get(
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to fetch summary",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/monitoring/sessions/:id/story
+ * Get the progressive master story for a session
+ * This is the "living document" narrative built incrementally during captures
+ */
+router.get(
+  "/sessions/:id/story",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to access this session",
+        });
+        return;
+      }
+
+      // Get current master story and metadata
+      const story = await masterStoryService.getCurrentStory(id);
+      const metadata = await masterStoryService.getStoryMetadata(id);
+
+      res.json({
+        story: story || "",
+        metadata: metadata || {
+          version: 0,
+          length: 0,
+          lastUpdated: null,
+          totalTokens: 0,
+        },
+      });
+    } catch (error) {
+      console.error("[Monitoring] Error fetching story:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to fetch story",
       });
     }
   }

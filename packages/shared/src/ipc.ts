@@ -106,13 +106,8 @@ export const IPC_CHANNELS = {
   // Console window
   SHOW_CONSOLE: "show-console",
 
-  // Update Prompt system (proactive status update suggestions)
-  UPDATE_PROMPT_SHOW: "update-prompt-show",
-  UPDATE_PROMPT_HIDE: "update-prompt-hide",
-  UPDATE_PROMPT_EDIT: "update-prompt-edit",
-  UPDATE_PROMPT_SEND: "update-prompt-send",
-  UPDATE_PROMPT_DISMISS: "update-prompt-dismiss",
-  UPDATE_PROMPT_TRIGGER: "update-prompt-trigger",
+  // Navigation (cross-window routing)
+  NAVIGATE_TO_ACTIVE_SESSION: "navigate-to-active-session",
 
   // Watching Pill system (Update Buddy)
   WATCHING_PILL_TOGGLE: "watching-pill-toggle",

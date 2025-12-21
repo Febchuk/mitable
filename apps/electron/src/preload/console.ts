@@ -40,6 +40,8 @@ const IPC_CHANNELS = {
   SESSION_RECOVER: "session-recover",
   SESSION_DISCARD: "session-discard",
   SESSION_SHOW_RECOVERY_DIALOG: "session-show-recovery-dialog",
+  // Navigation
+  NAVIGATE_TO_ACTIVE_SESSION: "navigate-to-active-session",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -173,11 +175,16 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   getMonitoringSessionState: (): Promise<MonitoringSessionState | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_STATUS),
 
-  onMonitoringSessionUpdate: (callback: (state: MonitoringSessionState | null) => void) => {
-    ipcRenderer.on(
-      IPC_CHANNELS.MONITORING_SESSION_UPDATE,
-      (_event: IpcRendererEvent, state: MonitoringSessionState | null) => callback(state)
-    );
+  onMonitoringSessionUpdate: (
+    callback: (state: MonitoringSessionState | null) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, state: MonitoringSessionState | null) =>
+      callback(state);
+    ipcRenderer.on(IPC_CHANNELS.MONITORING_SESSION_UPDATE, handler);
+    // Return unsubscribe function
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_SESSION_UPDATE, handler);
+    };
   },
 
   onMonitoringCaptureProgress: (
@@ -186,14 +193,16 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       captureCount: number;
       latestCapture: unknown;
     }) => void
-  ) => {
-    ipcRenderer.on(
-      IPC_CHANNELS.MONITORING_CAPTURE_PROGRESS,
-      (
-        _event: IpcRendererEvent,
-        progress: { sessionId: string; captureCount: number; latestCapture: unknown }
-      ) => callback(progress)
-    );
+  ): (() => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      progress: { sessionId: string; captureCount: number; latestCapture: unknown }
+    ) => callback(progress);
+    ipcRenderer.on(IPC_CHANNELS.MONITORING_CAPTURE_PROGRESS, handler);
+    // Return unsubscribe function
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_CAPTURE_PROGRESS, handler);
+    };
   },
 
   // Session Recovery
@@ -234,6 +243,14 @@ contextBridge.exposeInMainWorld("consoleAPI", {
         }>
       ) => callback(sessions)
     );
+  },
+
+  // Navigation - Navigate to active monitoring session
+  onNavigateToActiveSession: (callback: () => void) => {
+    ipcRenderer.on(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION, () => {
+      console.log("[Console Preload] Navigate to active session received");
+      callback();
+    });
   },
 });
 

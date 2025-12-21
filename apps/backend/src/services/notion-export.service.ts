@@ -317,9 +317,7 @@ class NotionExportService {
   /**
    * Parse inline formatting (bold, italic, code, links)
    */
-  private parseInlineFormatting(
-    text: string
-  ): Array<{
+  private parseInlineFormatting(text: string): Array<{
     type: "text";
     text: { content: string; link?: { url: string } };
     annotations?: {

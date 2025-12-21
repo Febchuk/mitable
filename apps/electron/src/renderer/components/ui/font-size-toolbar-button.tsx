@@ -1,47 +1,43 @@
-'use client';
+"use client";
 
-import * as React from 'react';
+import * as React from "react";
 
-import type { TElement } from 'platejs';
+import type { TElement } from "platejs";
 
-import { toUnitLess } from '@platejs/basic-styles';
-import { FontSizePlugin } from '@platejs/basic-styles/react';
-import { Minus, Plus } from 'lucide-react';
-import { KEYS } from 'platejs';
-import { useEditorPlugin, useEditorSelector } from 'platejs/react';
+import { toUnitLess } from "@platejs/basic-styles";
+import { FontSizePlugin } from "@platejs/basic-styles/react";
+import { Minus, Plus } from "lucide-react";
+import { KEYS } from "platejs";
+import { useEditorPlugin, useEditorSelector } from "platejs/react";
 
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
-import { ToolbarButton } from './toolbar';
+import { ToolbarButton } from "./toolbar";
 
-const DEFAULT_FONT_SIZE = '16';
+const DEFAULT_FONT_SIZE = "16";
 
 const FONT_SIZE_MAP = {
-  h1: '36',
-  h2: '24',
-  h3: '20',
+  h1: "36",
+  h2: "24",
+  h3: "20",
 } as const;
 
 const FONT_SIZES = [
-  '8',
-  '9',
-  '10',
-  '12',
-  '14',
-  '16',
-  '18',
-  '24',
-  '30',
-  '36',
-  '48',
-  '60',
-  '72',
-  '96',
+  "8",
+  "9",
+  "10",
+  "12",
+  "14",
+  "16",
+  "18",
+  "24",
+  "30",
+  "36",
+  "48",
+  "60",
+  "72",
+  "96",
 ] as const;
 
 export function FontSizeToolbarButton() {
@@ -68,10 +64,7 @@ export function FontSizeToolbarButton() {
   const handleInputChange = () => {
     const newSize = toUnitLess(inputValue);
 
-    if (
-      Number.parseInt(newSize, 10) < 1 ||
-      Number.parseInt(newSize, 10) > 100
-    ) {
+    if (Number.parseInt(newSize, 10) < 1 || Number.parseInt(newSize, 10) > 100) {
       editor.tf.focus();
 
       return;
@@ -101,7 +94,7 @@ export function FontSizeToolbarButton() {
         <PopoverTrigger asChild>
           <input
             className={cn(
-              'h-full w-10 shrink-0 bg-transparent px-1 text-center text-sm hover:bg-muted'
+              "h-full w-10 shrink-0 bg-transparent px-1 text-center text-sm hover:bg-muted"
             )}
             value={displayValue}
             onBlur={() => {
@@ -114,7 +107,7 @@ export function FontSizeToolbarButton() {
               setInputValue(toUnitLess(cursorFontSize));
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === "Enter") {
                 e.preventDefault();
                 handleInputChange();
               }
@@ -123,15 +116,12 @@ export function FontSizeToolbarButton() {
             type="text"
           />
         </PopoverTrigger>
-        <PopoverContent
-          className="w-10 px-px py-1"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
+        <PopoverContent className="w-10 px-px py-1" onOpenAutoFocus={(e) => e.preventDefault()}>
           {FONT_SIZES.map((size) => (
             <button
               key={size}
               className={cn(
-                'flex h-8 w-full items-center justify-center text-sm hover:bg-accent data-[highlighted=true]:bg-accent'
+                "flex h-8 w-full items-center justify-center text-sm hover:bg-accent data-[highlighted=true]:bg-accent"
               )}
               onClick={() => {
                 tf.fontSize.addMark(`${size}px`);

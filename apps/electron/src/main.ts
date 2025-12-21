@@ -1,6 +1,6 @@
 import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
 import { IPC_CHANNELS } from "@mitable/shared";
-import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, Notification, screen, shell } from "electron";
 import { join } from "path";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
 import { isBlockedByPolicy } from "./services/capturePolicy";
@@ -15,7 +15,6 @@ let agentWindow: BrowserWindow | null = null;
 let agentPanelWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
-let updatePromptWindow: BrowserWindow | null = null;
 let watchingPillWindow: BrowserWindow | null = null;
 
 // Watch button windows tracking (module scope for cleanup from multiple handlers)
@@ -350,55 +349,6 @@ function createConsoleWindow() {
   consoleWindow.on("closed", () => {
     app.quit(); // Quit app when main console window is closed
   });
-}
-
-function createUpdatePromptWindow() {
-  // Get screen dimensions for top-right positioning
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth } = primaryDisplay.bounds;
-
-  const windowWidth = 360;
-  const windowHeight = 140;
-  const topMargin = 20; // Higher up on screen
-  const rightMargin = 5; // Flush to right edge
-
-  updatePromptWindow = new BrowserWindow({
-    width: windowWidth,
-    height: windowHeight,
-    x: screenWidth - windowWidth - rightMargin,
-    y: topMargin,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: false,
-    skipTaskbar: true,
-    show: false,
-    webPreferences: {
-      preload: join(__dirname, "../preload/updatePrompt.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  // Platform-specific always-on-top behavior
-  if (process.platform === "darwin") {
-    updatePromptWindow.setAlwaysOnTop(true, "modal-panel");
-    updatePromptWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  } else {
-    updatePromptWindow.setAlwaysOnTop(true, "normal", 1);
-  }
-
-  if (!app.isPackaged) {
-    updatePromptWindow.loadURL("http://localhost:5173/updatePrompt/index.html");
-  } else {
-    updatePromptWindow.loadFile(join(__dirname, "../renderer/updatePrompt/index.html"));
-  }
-
-  updatePromptWindow.on("closed", () => {
-    updatePromptWindow = null;
-  });
-
-  console.log("[UpdatePrompt] Window created at top-right position");
 }
 
 function createWatchingPillWindow() {
@@ -1047,46 +997,6 @@ function setupIPC() {
     });
   });
 
-  // ==================== Update Prompt IPC Handlers ====================
-
-  // Edit draft - open console and navigate to drafts view
-  ipcMain.on(IPC_CHANNELS.UPDATE_PROMPT_EDIT, (_event, draftId: string) => {
-    console.log("[UpdatePrompt] Edit requested for draft:", draftId);
-
-    // Hide update prompt window
-    if (updatePromptWindow && !updatePromptWindow.isDestroyed()) {
-      updatePromptWindow.hide();
-    }
-
-    // Show console and navigate to draft
-    if (consoleWindow && !consoleWindow.isDestroyed()) {
-      consoleWindow.show();
-      consoleWindow.focus();
-      // Send navigation message to console
-      consoleWindow.webContents.send(IPC_CHANNELS.DRAFTS_NAVIGATE, draftId);
-    }
-  });
-
-  // Send now - dismiss after success toast (handled in renderer)
-  ipcMain.on(IPC_CHANNELS.UPDATE_PROMPT_SEND, (_event, draftId: string) => {
-    console.log("[UpdatePrompt] Send now clicked for draft:", draftId);
-    // Success toast is shown in renderer, then this is called
-    // Hide the window after a delay (toast is shown for 1.5s in renderer)
-    setTimeout(() => {
-      if (updatePromptWindow && !updatePromptWindow.isDestroyed()) {
-        updatePromptWindow.hide();
-      }
-    }, 500); // Short delay since renderer already waited 1.5s
-  });
-
-  // Dismiss prompt
-  ipcMain.on(IPC_CHANNELS.UPDATE_PROMPT_DISMISS, () => {
-    console.log("[UpdatePrompt] Dismissed");
-    if (updatePromptWindow && !updatePromptWindow.isDestroyed()) {
-      updatePromptWindow.hide();
-    }
-  });
-
   // ==================== Watching Pill IPC Handlers ====================
   // Note: Session lifecycle (pause/resume/start/end) is handled by the monitoring session handlers
   // which broadcast to all windows including the watching pill
@@ -1508,6 +1418,27 @@ function setupMonitoringSessionHandlers() {
         intervalMs: config.captureIntervalMs,
       });
 
+      // Clear old windows before registering new ones (ensures clean slate for each session)
+      windowDetectionService.clearAll();
+
+      // Register windows with windowDetectionService so watch pill can access them
+      for (const windowInfo of config.selectedWindows) {
+        windowDetectionService.addWindow({
+          windowId: windowInfo.windowId,
+          appName: windowInfo.appName,
+          windowTitle: windowInfo.windowTitle,
+        });
+      }
+
+      // Broadcast update so watch pill gets the windows immediately
+      const selectedWindows = windowDetectionService.getSelectedWindows();
+      const allWindows = [agentWindow, agentPanelWindow, conversationWindow, watchingPillWindow];
+      for (const window of allWindows) {
+        if (window && !window.isDestroyed()) {
+          window.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
+        }
+      }
+
       const result = await monitoringSessionService.startSession({
         sessionId: config.sessionId,
         selectedWindows: config.selectedWindows,
@@ -1516,6 +1447,16 @@ function setupMonitoringSessionHandlers() {
         userId: config.userId,
         organizationId: config.organizationId,
       });
+
+      // After session starts successfully, show the watching pill
+      if (!result.error) {
+        if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+          createWatchingPillWindow();
+        }
+        if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+          watchingPillWindow.show();
+        }
+      }
 
       return result;
     }
@@ -1775,44 +1716,51 @@ function registerGlobalShortcuts() {
     }
   });
 
-  // Update Prompt Demo Trigger (Cmd+Shift+U)
+  // Update Prompt Trigger (Cmd+Shift+U) - Shows notification to send update
   globalShortcut.register("CommandOrControl+Shift+U", () => {
-    console.log("[UpdatePrompt] Demo trigger shortcut activated");
-
-    // Create window if it doesn't exist
-    if (!updatePromptWindow || updatePromptWindow.isDestroyed()) {
-      createUpdatePromptWindow();
-    }
-
-    if (updatePromptWindow && !updatePromptWindow.isDestroyed()) {
-      // Send demo draft data to the window
-      updatePromptWindow.webContents.send(IPC_CHANNELS.UPDATE_PROMPT_TRIGGER, {
-        id: "demo-draft-001",
-        topic: "Weekly standup update ready",
-        recipient: "#engineering-standup",
+    try {
+      const notification = new Notification({
+        title: "Time to Send an Update",
+        body: "Click to open your session and share your progress",
+        silent: false,
       });
-      updatePromptWindow.show();
-      console.log("[UpdatePrompt] Window shown with demo data");
+
+      notification.on("click", () => {
+        if (consoleWindow && !consoleWindow.isDestroyed()) {
+          consoleWindow.show();
+          consoleWindow.focus();
+          consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
+        }
+      });
+
+      notification.show();
+    } catch {
+      // Fallback: just open console if notification fails
+      if (consoleWindow && !consoleWindow.isDestroyed()) {
+        consoleWindow.show();
+        consoleWindow.focus();
+        consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
+      }
     }
   });
 
   // Watching Pill Toggle (Cmd+Shift+W)
   globalShortcut.register("CommandOrControl+Shift+W", () => {
-    console.log("[WatchingPill] Toggle shortcut activated");
-
-    // Create window if it doesn't exist
-    if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
-      createWatchingPillWindow();
-    }
-
-    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-      if (watchingPillWindow.isVisible()) {
-        watchingPillWindow.hide();
-        console.log("[WatchingPill] Window hidden");
-      } else {
-        watchingPillWindow.show();
-        console.log("[WatchingPill] Window shown");
+    try {
+      // Create window if it doesn't exist
+      if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+        createWatchingPillWindow();
       }
+
+      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+        if (watchingPillWindow.isVisible()) {
+          watchingPillWindow.hide();
+        } else {
+          watchingPillWindow.show();
+        }
+      }
+    } catch {
+      // Silently handle errors
     }
   });
 }
@@ -1837,7 +1785,10 @@ app.whenReady().then(async () => {
       // Notify console window to show recovery dialog
       setTimeout(() => {
         if (consoleWindow && !consoleWindow.isDestroyed()) {
-          consoleWindow.webContents.send(IPC_CHANNELS.SESSION_SHOW_RECOVERY_DIALOG, recoverableSessions);
+          consoleWindow.webContents.send(
+            IPC_CHANNELS.SESSION_SHOW_RECOVERY_DIALOG,
+            recoverableSessions
+          );
         }
       }, 2000); // Give console time to fully load
     }
