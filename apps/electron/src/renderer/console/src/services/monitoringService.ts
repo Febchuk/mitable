@@ -53,6 +53,30 @@ export interface CreateSessionRequest {
   selectedWindows: SelectedWindowInfo[];
   captureIntervalMs?: number;
   name?: string;
+  // Goal context fields (optional)
+  sessionGoal?: string;
+  linearIssueId?: string;
+  linearIssueTitle?: string;
+  linearIssueDescription?: string;
+  additionalContext?: string;
+}
+
+export interface LinearIssue {
+  id: string;
+  identifier: string; // e.g., "LIN-341"
+  title: string;
+  description?: string;
+  state: {
+    id: string;
+    name: string;
+    color: string;
+  };
+  team: {
+    id: string;
+    name: string;
+    key: string;
+  };
+  url: string;
 }
 
 export interface SessionCapture {
@@ -66,6 +90,17 @@ export interface SessionCapture {
   analysisStatus: string | null;
   activityDescription: string | null;
   confidence: number | null;
+  imageData: string | null;
+}
+
+export interface TopKFrame {
+  id: string;
+  sequenceNumber: number;
+  capturedAt: string;
+  appName: string | null;
+  windowTitle: string | null;
+  activityDescription: string | null;
+  importanceScore: number | null;
   imageData: string | null;
 }
 
@@ -116,8 +151,12 @@ export async function fetchSessions(): Promise<{ sessions: SessionListItem[] }> 
 /**
  * Fetch a single session by ID
  */
-export async function fetchSession(sessionId: string): Promise<{ session: MonitoringSession }> {
-  return apiRequest<{ session: MonitoringSession }>(`/monitoring/sessions/${sessionId}`);
+export async function fetchSession(
+  sessionId: string
+): Promise<{ session: MonitoringSession; topKFrames?: TopKFrame[] }> {
+  return apiRequest<{ session: MonitoringSession; topKFrames?: TopKFrame[] }>(
+    `/monitoring/sessions/${sessionId}`
+  );
 }
 
 /**
@@ -195,6 +234,26 @@ export async function fetchSessionSummary(sessionId: string): Promise<SessionSum
 }
 
 /**
+ * Story response type
+ */
+export interface SessionStory {
+  story: string;
+  metadata: {
+    version: number;
+    length: number;
+    lastUpdated: string | null;
+    totalTokens: number;
+  };
+}
+
+/**
+ * Fetch the progressive master story for a session
+ */
+export async function fetchSessionStory(sessionId: string): Promise<SessionStory> {
+  return apiRequest<SessionStory>(`/monitoring/sessions/${sessionId}/story`);
+}
+
+/**
  * Update the summary (user edits)
  */
 export async function updateSessionSummary(
@@ -256,6 +315,33 @@ export async function fetchSlackChannels(): Promise<SlackChannel[]> {
 export async function fetchSlackUsers(): Promise<SlackUser[]> {
   const response = await apiRequest<{ users: SlackUser[] }>("/integrations/slack/users");
   return response.users;
+}
+
+/**
+ * Fetch the user's assigned Linear issues
+ * Returns empty array if Linear is not connected
+ */
+export async function fetchLinearIssues(): Promise<LinearIssue[]> {
+  try {
+    const response = await apiRequest<{ issues: LinearIssue[] }>("/integrations/linear/issues");
+    return response.issues;
+  } catch (error) {
+    // Return empty array if Linear is not connected or request fails
+    console.warn("[MonitoringService] Failed to fetch Linear issues:", error);
+    return [];
+  }
+}
+
+/**
+ * Check if user has Linear connected
+ */
+export async function checkLinearConnection(): Promise<boolean> {
+  try {
+    const response = await apiRequest<{ isConnected: boolean }>("/integrations/linear/status");
+    return response.isConnected;
+  } catch {
+    return false;
+  }
 }
 
 /**
