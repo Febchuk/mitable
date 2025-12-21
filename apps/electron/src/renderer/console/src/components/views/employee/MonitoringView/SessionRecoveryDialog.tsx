@@ -120,8 +120,8 @@ export const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
         {/* Content */}
         <div className="px-6 py-4 max-h-80 overflow-y-auto">
           <p className="text-sm text-neutral-400 mb-4">
-            These sessions were interrupted unexpectedly. You can recover them to continue
-            where you left off, or discard to delete the captured data.
+            These sessions were interrupted unexpectedly. You can recover them to continue where you
+            left off, or discard to delete the captured data.
           </p>
 
           <div className="space-y-3">

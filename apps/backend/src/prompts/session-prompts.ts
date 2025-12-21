@@ -155,6 +155,16 @@ Let the story tell you what it's about. Document what's happening, and the meani
 // ============================================================================
 
 /**
+ * Goal context for enhanced analysis
+ */
+export interface GoalContext {
+  sessionGoal?: string;
+  linearIssueId?: string;
+  linearIssueTitle?: string;
+  relatedDocsContext?: string;
+}
+
+/**
  * Context for building storyteller prompts
  */
 export interface StorytellerContext {
@@ -165,34 +175,84 @@ export interface StorytellerContext {
   windowTitle: string;
   currentStory: string;
   latestAction: string;
+  // Goal context (optional)
+  goalContext?: GoalContext;
 }
 
 /**
  * Build the complete prompt for the Progression Detector
  * Used with two images: previous frame and current frame
+ *
+ * @param goalContext Optional goal context for enhanced analysis
  */
-export function buildProgressionDetectorPrompt(): {
+export function buildProgressionDetectorPrompt(goalContext?: GoalContext): {
   system: string;
   user: string;
 } {
+  let systemPrompt = PROGRESSION_DETECTOR_SYSTEM;
+
+  // Add goal-awareness section if goal context is provided
+  if (goalContext?.sessionGoal || goalContext?.linearIssueTitle) {
+    const goalDescription = goalContext.linearIssueTitle
+      ? `${goalContext.linearIssueId ? `[${goalContext.linearIssueId}] ` : ""}${goalContext.linearIssueTitle}`
+      : goalContext.sessionGoal;
+
+    systemPrompt += `
+
+<session_goal>
+The user is working on: ${goalDescription}
+${goalContext.relatedDocsContext ? `\n<related_knowledge>\n${goalContext.relatedDocsContext.substring(0, 1000)}\n</related_knowledge>` : ""}
+</session_goal>
+
+<goal_awareness>
+Consider whether the observed change relates to this goal:
+- Is this action moving toward the stated goal?
+- Is this research or reference checking that supports the goal?
+- Is this a context switch away from the goal (might indicate a blocker)?
+
+This context helps understand the significance of the change, but still focus on what you can OBSERVE in the screenshots.
+</goal_awareness>`;
+  }
+
   return {
-    system: PROGRESSION_DETECTOR_SYSTEM,
+    system: systemPrompt,
     user: PROGRESSION_DETECTOR_USER,
   };
 }
 
 /**
  * Build the complete prompt for the Storyteller
- * Includes user context and current story state
+ * Includes user context, current story state, and optional goal context
  */
 export function buildStorytellerPrompt(context: StorytellerContext): {
   system: string;
   user: string;
 } {
+  // Build goal section if available
+  let goalSection = "";
+  if (context.goalContext?.sessionGoal || context.goalContext?.linearIssueTitle) {
+    const goalDescription = context.goalContext.linearIssueTitle
+      ? `${context.goalContext.linearIssueId ? `[${context.goalContext.linearIssueId}] ` : ""}${context.goalContext.linearIssueTitle}`
+      : context.goalContext.sessionGoal;
+
+    goalSection = `<session_goal>${goalDescription}</session_goal>\n`;
+
+    if (context.goalContext.relatedDocsContext) {
+      goalSection += `<related_knowledge>\n${context.goalContext.relatedDocsContext.substring(0, 800)}\n</related_knowledge>\n`;
+    }
+  }
+
+  // Use goal as work context if available
+  const workContext =
+    context.goalContext?.sessionGoal ||
+    context.goalContext?.linearIssueTitle ||
+    context.workContext ||
+    "Working on their tasks";
+
   const userPrompt = `<context_data>
 <user_identity>${context.userRole || "Team member"}${context.userSeniority ? `, ${context.userSeniority}` : ""}</user_identity>
-<work_context>${context.workContext || "Working on their tasks"}</work_context>
-<window_metadata>
+<work_context>${workContext}</work_context>
+${goalSection}<window_metadata>
 <app>${context.appName}</app>
 <title>${context.windowTitle}</title>
 </window_metadata>
@@ -208,6 +268,7 @@ ${context.latestAction}
 
 <task>
 You're seeing the latest meaningful action from the user's workspace. Add to the story to document this next step in their work. Write as a natural continuation of what's already there, capturing what just happened with enough context that someone reading this later will understand not just what they did, but why.
+${context.goalContext?.sessionGoal ? `\nKeep in mind the user's goal: "${context.goalContext.sessionGoal}". Note if this action seems to advance toward that goal.` : ""}
 
 Return ONLY the updated story (including the previous content plus your additions). Do not include any JSON formatting or metadata - just the narrative text.
 </task>`;
@@ -227,15 +288,15 @@ Return ONLY the updated story (including the previous content plus your addition
  * These are things we can actually SEE in screenshots, not infer
  */
 export type ChangeType =
-  | "content_addition"     // New text/content appeared
+  | "content_addition" // New text/content appeared
   | "content_modification" // Existing content was edited
-  | "content_deletion"     // Content was removed
-  | "navigation"           // Different page/screen/view
-  | "scroll"               // Same content, different viewport
-  | "file_switch"          // Different file/document
-  | "focus_change"         // Different window/application
-  | "ui_state_change"      // UI element state changed (menu, dialog, toggle)
-  | "none";                // No meaningful visual change
+  | "content_deletion" // Content was removed
+  | "navigation" // Different page/screen/view
+  | "scroll" // Same content, different viewport
+  | "file_switch" // Different file/document
+  | "focus_change" // Different window/application
+  | "ui_state_change" // UI element state changed (menu, dialog, toggle)
+  | "none"; // No meaningful visual change
 
 /**
  * Magnitude of the observed change
@@ -271,9 +332,7 @@ const VALID_CHANGE_MAGNITUDES: ChangeMagnitude[] = ["major", "minor", "trivial"]
 /**
  * Validate and parse Progression Detector response
  */
-export function parseProgressionResponse(
-  rawResponse: string
-): ProgressionDetectorResponse | null {
+export function parseProgressionResponse(rawResponse: string): ProgressionDetectorResponse | null {
   try {
     // Try to extract JSON from the response
     const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
@@ -294,9 +353,7 @@ export function parseProgressionResponse(
     }
 
     // Validate and default change_type
-    const changeType: ChangeType = VALID_CHANGE_TYPES.includes(
-      parsed.change_type
-    )
+    const changeType: ChangeType = VALID_CHANGE_TYPES.includes(parsed.change_type)
       ? parsed.change_type
       : "none";
 
@@ -331,7 +388,7 @@ export function parseProgressionResponse(
  */
 export function parseStorytellerResponse(rawResponse: string): string {
   // Remove any accidental JSON formatting or markdown code blocks
-  let cleaned = rawResponse
+  const cleaned = rawResponse
     .replace(/```[\s\S]*?```/g, "") // Remove code blocks
     .replace(/^[\s\n]*/, "") // Remove leading whitespace
     .replace(/[\s\n]*$/, ""); // Remove trailing whitespace

@@ -254,13 +254,21 @@ class SessionSummarizationService {
             timestamp: new Date(capture.capturedAt).getTime(),
             appName: capture.appName || "Unknown",
             windowTitle: capture.windowTitle || "",
-            activity: capture.deltaChangeDescription || capture.activityDescription || this.inferActivityFromMetadata(capture),
+            activity:
+              capture.deltaChangeDescription ||
+              capture.activityDescription ||
+              this.inferActivityFromMetadata(capture),
             context: [
               capture.deltaChangeType ? `Action: ${capture.deltaChangeType}` : null,
               capture.deltaUserAction ? `User: ${capture.deltaUserAction}` : null,
               capture.taskRelevance || null,
             ].filter(Boolean) as string[],
-            confidence: capture.importanceScore >= 0.7 ? "high" : capture.importanceScore >= 0.4 ? "medium" : "low",
+            confidence:
+              capture.importanceScore >= 0.7
+                ? "high"
+                : capture.importanceScore >= 0.4
+                  ? "medium"
+                  : "low",
           });
           continue;
         }

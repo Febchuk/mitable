@@ -417,9 +417,7 @@ Revised document:`;
 
     // Calculate duration
     const startTime = new Date(session.startedAt).getTime();
-    const endTime = session.endedAt
-      ? new Date(session.endedAt).getTime()
-      : Date.now();
+    const endTime = session.endedAt ? new Date(session.endedAt).getTime() : Date.now();
     const totalMs = endTime - startTime - (session.totalPausedMs || 0);
     const duration = this.formatDuration(totalMs);
 
@@ -444,22 +442,26 @@ Revised document:`;
     let prompt = DOC_TYPE_PROMPTS[docType];
 
     // Format app breakdown
-    const appBreakdown = Object.entries(sessionData.timeBreakdown)
-      .map(([app, ms]) => `${app}: ${this.formatDuration(ms)}`)
-      .join(", ") || "Various applications";
+    const appBreakdown =
+      Object.entries(sessionData.timeBreakdown)
+        .map(([app, ms]) => `${app}: ${this.formatDuration(ms)}`)
+        .join(", ") || "Various applications";
 
     // Format activities
-    const keyActivities = sessionData.keyActivities
-      .map((a) => (typeof a === "string" ? a : (a as any).activity || JSON.stringify(a)))
-      .join("\n- ") || "Work activities";
+    const keyActivities =
+      sessionData.keyActivities
+        .map((a) => (typeof a === "string" ? a : (a as any).activity || JSON.stringify(a)))
+        .join("\n- ") || "Work activities";
 
-    const accomplishments = sessionData.accomplishments
-      .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
-      .join("\n- ") || "Tasks completed";
+    const accomplishments =
+      sessionData.accomplishments
+        .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+        .join("\n- ") || "Tasks completed";
 
-    const blockers = sessionData.blockers
-      .map((b) => (typeof b === "string" ? b : JSON.stringify(b)))
-      .join("\n- ") || "None";
+    const blockers =
+      sessionData.blockers
+        .map((b) => (typeof b === "string" ? b : JSON.stringify(b)))
+        .join("\n- ") || "None";
 
     // Replace placeholders
     prompt = prompt
@@ -488,17 +490,19 @@ Revised document:`;
   ): string {
     let prompt = ENHANCEMENT_PROMPTS[enhancementType];
 
-    const newActivities = sessionData.keyActivities
-      .map((a) => (typeof a === "string" ? a : (a as any).activity || JSON.stringify(a)))
-      .join(", ") || "New activities";
+    const newActivities =
+      sessionData.keyActivities
+        .map((a) => (typeof a === "string" ? a : (a as any).activity || JSON.stringify(a)))
+        .join(", ") || "New activities";
 
-    const newInsights = sessionData.accomplishments
-      .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
-      .join(", ") || "New learnings";
+    const newInsights =
+      sessionData.accomplishments
+        .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+        .join(", ") || "New learnings";
 
-    const newBlockers = sessionData.blockers
-      .map((b) => (typeof b === "string" ? b : JSON.stringify(b)))
-      .join(", ") || "None";
+    const newBlockers =
+      sessionData.blockers.map((b) => (typeof b === "string" ? b : JSON.stringify(b))).join(", ") ||
+      "None";
 
     prompt = prompt
       .replace("{existingContent}", existingContent)

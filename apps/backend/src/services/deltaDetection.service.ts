@@ -121,8 +121,7 @@ function analyzeContentChange(
   ];
   const isTyping = typingPatterns.some(
     (p) =>
-      currentDescription.toLowerCase().includes(p) &&
-      !previousDescription.toLowerCase().includes(p)
+      currentDescription.toLowerCase().includes(p) && !previousDescription.toLowerCase().includes(p)
   );
 
   if (isTyping) {
@@ -147,8 +146,7 @@ function analyzeContentChange(
   ];
   const isNavigation = navigationPatterns.some(
     (p) =>
-      currentDescription.toLowerCase().includes(p) &&
-      !previousDescription.toLowerCase().includes(p)
+      currentDescription.toLowerCase().includes(p) && !previousDescription.toLowerCase().includes(p)
   );
 
   if (isNavigation) {
@@ -164,8 +162,7 @@ function analyzeContentChange(
   const scrollPatterns = ["scrolled", "scroll", "viewing different"];
   const isScroll = scrollPatterns.some(
     (p) =>
-      currentDescription.toLowerCase().includes(p) &&
-      !previousDescription.toLowerCase().includes(p)
+      currentDescription.toLowerCase().includes(p) && !previousDescription.toLowerCase().includes(p)
   );
 
   if (isScroll) {
@@ -234,8 +231,7 @@ export function determineOnTask(
 
   // Check for direct matches in app name, title, or description
   const matchingKeywords = goalKeywords.filter(
-    (kw) =>
-      appNameLower.includes(kw) || titleLower.includes(kw) || descLower.includes(kw)
+    (kw) => appNameLower.includes(kw) || titleLower.includes(kw) || descLower.includes(kw)
   );
 
   if (matchingKeywords.length > 0) {
@@ -466,9 +462,7 @@ export function calculateImportanceScore(
   // Selected window bonus (user explicitly chose to monitor this app)
   if (
     config.selectedWindowApps &&
-    config.selectedWindowApps.some((app) =>
-      frame.appName.toLowerCase().includes(app.toLowerCase())
-    )
+    config.selectedWindowApps.some((app) => frame.appName.toLowerCase().includes(app.toLowerCase()))
   ) {
     score += 0.1;
     reasons.push("Selected window (+0.10)");

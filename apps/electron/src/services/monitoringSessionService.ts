@@ -63,7 +63,9 @@ class MonitoringSessionService {
   private captureTimer: NodeJS.Timeout | null = null;
 
   constructor() {
-    console.log("[MonitoringSessionService] Initialized with LocalFrameStorage + CheckpointService");
+    console.log(
+      "[MonitoringSessionService] Initialized with LocalFrameStorage + CheckpointService"
+    );
   }
 
   /**
@@ -686,7 +688,10 @@ class MonitoringSessionService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.warn(`[MonitoringSessionService] Frame analysis failed: ${response.status}`, errorText);
+        console.warn(
+          `[MonitoringSessionService] Frame analysis failed: ${response.status}`,
+          errorText
+        );
         return;
       }
 
@@ -796,11 +801,14 @@ class MonitoringSessionService {
       selectedIds.add(frame.frameId);
     }
 
-    console.log(`[MonitoringSessionService] Selected ${selectedIds.size} top-K frames from ${frames.length} total`, {
-      firstFrameId: firstFrame.frameId,
-      lastFrameId: lastFrame.frameId,
-      bucketCount: buckets.size,
-    });
+    console.log(
+      `[MonitoringSessionService] Selected ${selectedIds.size} top-K frames from ${frames.length} total`,
+      {
+        firstFrameId: firstFrame.frameId,
+        lastFrameId: lastFrame.frameId,
+        bucketCount: buckets.size,
+      }
+    );
 
     return Array.from(selectedIds);
   }

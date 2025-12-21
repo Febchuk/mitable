@@ -148,7 +148,8 @@ export default function GenerateDocDialog({ open, onOpenChange }: GenerateDocDia
                       <div className="flex flex-col">
                         <span>{session.name || "Work Session"}</span>
                         <span className="text-xs text-text-secondary">
-                          {new Date(session.startedAt).toLocaleDateString()} • {session.duration?.formatted}
+                          {new Date(session.startedAt).toLocaleDateString()} •{" "}
+                          {session.duration?.formatted}
                         </span>
                       </div>
                     </SelectItem>
@@ -180,7 +181,9 @@ export default function GenerateDocDialog({ open, onOpenChange }: GenerateDocDia
                       className={isSelected ? "text-primary" : "text-text-secondary"}
                     />
                     <div>
-                      <div className={isSelected ? "text-primary font-medium" : "text-text-primary"}>
+                      <div
+                        className={isSelected ? "text-primary font-medium" : "text-text-primary"}
+                      >
                         {option.label}
                       </div>
                       <div className="text-xs text-text-secondary">{option.description}</div>

@@ -54,10 +54,7 @@ class AuthManager {
   /**
    * Make an authenticated fetch request
    */
-  async authenticatedFetch(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<Response> {
+  async authenticatedFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
     if (!this.accessToken) {
       throw new Error("No auth token available");
     }

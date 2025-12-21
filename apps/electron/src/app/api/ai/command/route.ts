@@ -1,10 +1,7 @@
-import type {
-  ChatMessage,
-  ToolName,
-} from '@/components/editor/use-chat';
-import type { NextRequest } from 'next/server';
+import type { ChatMessage, ToolName } from "@/components/editor/use-chat";
+import type { NextRequest } from "next/server";
 
-import { createGateway } from '@ai-sdk/gateway';
+import { createGateway } from "@ai-sdk/gateway";
 import {
   type LanguageModel,
   type UIMessageStreamWriter,
@@ -14,28 +11,18 @@ import {
   streamObject,
   streamText,
   tool,
-} from 'ai';
-import { NextResponse } from 'next/server';
-import { type SlateEditor, createSlateEditor, nanoid } from 'platejs';
-import { z } from 'zod';
+} from "ai";
+import { NextResponse } from "next/server";
+import { type SlateEditor, createSlateEditor, nanoid } from "platejs";
+import { z } from "zod";
 
-import { BaseEditorKit } from '@/components/editor/editor-base-kit';
-import { markdownJoinerTransform } from '@/lib/markdown-joiner-transform';
+import { BaseEditorKit } from "@/components/editor/editor-base-kit";
+import { markdownJoinerTransform } from "@/lib/markdown-joiner-transform";
 
-import {
-  getChooseToolPrompt,
-  getCommentPrompt,
-  getEditPrompt,
-  getGeneratePrompt,
-} from './prompts';
+import { getChooseToolPrompt, getCommentPrompt, getEditPrompt, getGeneratePrompt } from "./prompts";
 
 export async function POST(req: NextRequest) {
-  const {
-    apiKey: key,
-    ctx,
-    messages: messagesRaw = [],
-    model,
-  } = await req.json();
+  const { apiKey: key, ctx, messages: messagesRaw = [], model } = await req.json();
 
   const { children, selection, toolName: toolNameParam } = ctx;
 
@@ -48,10 +35,7 @@ export async function POST(req: NextRequest) {
   const apiKey = key || process.env.AI_GATEWAY_API_KEY;
 
   if (!apiKey) {
-    return NextResponse.json(
-      { error: 'Missing AI Gateway API key.' },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Missing AI Gateway API key." }, { status: 401 });
   }
 
   const isSelecting = editor.api.isExpanded();
@@ -67,17 +51,15 @@ export async function POST(req: NextRequest) {
 
         if (!toolName) {
           const { object: AIToolName } = await generateObject({
-            enum: isSelecting
-              ? ['generate', 'edit', 'comment']
-              : ['generate', 'comment'],
-            model: gatewayProvider(model || 'google/gemini-2.5-flash'),
-            output: 'enum',
+            enum: isSelecting ? ["generate", "edit", "comment"] : ["generate", "comment"],
+            model: gatewayProvider(model || "google/gemini-2.5-flash"),
+            output: "enum",
             prompt: getChooseToolPrompt(messagesRaw),
           });
 
           writer.write({
             data: AIToolName as ToolName,
-            type: 'data-toolName',
+            type: "data-toolName",
           });
 
           toolName = AIToolName;
@@ -85,25 +67,25 @@ export async function POST(req: NextRequest) {
 
         const stream = streamText({
           experimental_transform: markdownJoinerTransform(),
-          model: gatewayProvider(model || 'openai/gpt-4o-mini'),
+          model: gatewayProvider(model || "openai/gpt-4o-mini"),
           // Not used
-          prompt: '',
+          prompt: "",
           tools: {
             comment: getCommentTool(editor, {
               messagesRaw,
-              model: gatewayProvider(model || 'google/gemini-2.5-flash'),
+              model: gatewayProvider(model || "google/gemini-2.5-flash"),
               writer,
             }),
           },
           prepareStep: async (step) => {
-            if (toolName === 'comment') {
+            if (toolName === "comment") {
               return {
                 ...step,
-                toolChoice: { toolName: 'comment', type: 'tool' },
+                toolChoice: { toolName: "comment", type: "tool" },
               };
             }
 
-            if (toolName === 'edit') {
+            if (toolName === "edit") {
               const editPrompt = getEditPrompt(editor, {
                 isSelecting,
                 messages: messagesRaw,
@@ -115,13 +97,13 @@ export async function POST(req: NextRequest) {
                 messages: [
                   {
                     content: editPrompt,
-                    role: 'user',
+                    role: "user",
                   },
                 ],
               };
             }
 
-            if (toolName === 'generate') {
+            if (toolName === "generate") {
               const generatePrompt = getGeneratePrompt(editor, {
                 messages: messagesRaw,
               });
@@ -132,10 +114,10 @@ export async function POST(req: NextRequest) {
                 messages: [
                   {
                     content: generatePrompt,
-                    role: 'user',
+                    role: "user",
                   },
                 ],
-                model: gatewayProvider(model || 'openai/gpt-4o-mini'),
+                model: gatewayProvider(model || "openai/gpt-4o-mini"),
               };
             }
           },
@@ -147,10 +129,7 @@ export async function POST(req: NextRequest) {
 
     return createUIMessageStreamResponse({ stream });
   } catch {
-    return NextResponse.json(
-      { error: 'Failed to process AI request' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to process AI request" }, { status: 500 });
   }
 }
 
@@ -167,12 +146,12 @@ const getCommentTool = (
   }
 ) =>
   tool({
-    description: 'Comment on the content',
+    description: "Comment on the content",
     inputSchema: z.object({}),
     execute: async () => {
       const { elementStream } = streamObject({
         model,
-        output: 'array',
+        output: "array",
         prompt: getCommentPrompt(editor, {
           messages: messagesRaw,
         }),
@@ -181,18 +160,16 @@ const getCommentTool = (
             blockId: z
               .string()
               .describe(
-                'The id of the starting block. If the comment spans multiple blocks, use the id of the first block.'
+                "The id of the starting block. If the comment spans multiple blocks, use the id of the first block."
               ),
-            comment: z
-              .string()
-              .describe('A brief comment or explanation for this fragment.'),
+            comment: z.string().describe("A brief comment or explanation for this fragment."),
             content: z
               .string()
               .describe(
                 String.raw`The original document fragment to be commented on.It can be the entire block, a small part within a block, or span multiple blocks. If spanning multiple blocks, separate them with two \n\n.`
               ),
           })
-          .describe('A single comment'),
+          .describe("A single comment"),
       });
 
       for await (const comment of elementStream) {
@@ -202,9 +179,9 @@ const getCommentTool = (
           id: commentDataId,
           data: {
             comment,
-            status: 'streaming',
+            status: "streaming",
           },
-          type: 'data-comment',
+          type: "data-comment",
         });
       }
 
@@ -212,9 +189,9 @@ const getCommentTool = (
         id: nanoid(),
         data: {
           comment: null,
-          status: 'finished',
+          status: "finished",
         },
-        type: 'data-comment',
+        type: "data-comment",
       });
     },
   });

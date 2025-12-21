@@ -249,14 +249,15 @@ router.get("/:id", requireAuth, async (req: Request, res: Response): Promise<voi
         contributionType: c.contributionType,
         insightsUsed: c.insightsUsed,
         createdAt: c.createdAt,
-        session: c.sessionName !== undefined
-          ? {
-              id: c.sessionId,
-              name: c.sessionName,
-              startedAt: c.sessionStartedAt,
-              endedAt: c.sessionEndedAt,
-            }
-          : undefined,
+        session:
+          c.sessionName !== undefined
+            ? {
+                id: c.sessionId,
+                name: c.sessionName,
+                startedAt: c.sessionStartedAt,
+                endedAt: c.sessionEndedAt,
+              }
+            : undefined,
       })),
     });
   } catch (error) {
@@ -888,66 +889,70 @@ router.post("/:id/enhance", requireAuth, async (req: Request, res: Response): Pr
  * POST /api/documents/:id/export/notion
  * Export document to Notion
  */
-router.post("/:id/export/notion", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const userId = req.userId!;
-  const documentId = req.params.id;
-  const { parentPageId } = req.body;
+router.post(
+  "/:id/export/notion",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const documentId = req.params.id;
+    const { parentPageId } = req.body;
 
-  try {
-    // Get user's organization
-    const [user] = await db
-      .select({ organizationId: schema.users.organizationId })
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
+    try {
+      // Get user's organization
+      const [user] = await db
+        .select({ organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
 
-    if (!user?.organizationId) {
-      res.status(400).json({
-        error: "Bad Request",
-        message: "User organization not found",
-      });
-      return;
-    }
+      if (!user?.organizationId) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "User organization not found",
+        });
+        return;
+      }
 
-    // Verify document belongs to user's org
-    const [document] = await db
-      .select()
-      .from(schema.documents)
-      .where(
-        and(
-          eq(schema.documents.id, documentId),
-          eq(schema.documents.organizationId, user.organizationId)
+      // Verify document belongs to user's org
+      const [document] = await db
+        .select()
+        .from(schema.documents)
+        .where(
+          and(
+            eq(schema.documents.id, documentId),
+            eq(schema.documents.organizationId, user.organizationId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!document) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "Document not found",
+      if (!document) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Document not found",
+        });
+        return;
+      }
+
+      // Import notion export service
+      const { notionExportService } = await import("../services/notion-export.service.js");
+
+      // Export to Notion
+      const result = await notionExportService.exportDocument({
+        documentId,
+        organizationId: user.organizationId,
+        parentPageId,
       });
-      return;
+
+      res.json(result);
+    } catch (error) {
+      console.error("[Documents] Error exporting to Notion:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to export to Notion",
+      });
     }
-
-    // Import notion export service
-    const { notionExportService } = await import("../services/notion-export.service.js");
-
-    // Export to Notion
-    const result = await notionExportService.exportDocument({
-      documentId,
-      organizationId: user.organizationId,
-      parentPageId,
-    });
-
-    res.json(result);
-  } catch (error) {
-    console.error("[Documents] Error exporting to Notion:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: error instanceof Error ? error.message : "Failed to export to Notion",
-    });
   }
-});
+);
 
 /**
  * POST /api/documents/ai-command
@@ -974,36 +979,47 @@ router.post("/ai-command", requireAuth, async (req: Request, res: Response): Pro
 
     // Get the last message content
     const lastMessage = messages[messages.length - 1];
-    const userContent = lastMessage?.parts?.find((p: { type: string }) => p.type === "text")?.text ||
-                        lastMessage?.content || "";
+    const userContent =
+      lastMessage?.parts?.find((p: { type: string }) => p.type === "text")?.text ||
+      lastMessage?.content ||
+      "";
 
     // Determine the AI command type from the content
     let prompt = "";
     let systemPrompt = "";
 
     if (userContent.toLowerCase().includes("continue writing")) {
-      systemPrompt = "You are a helpful writing assistant. Continue writing the document naturally, maintaining the same style and tone.";
+      systemPrompt =
+        "You are a helpful writing assistant. Continue writing the document naturally, maintaining the same style and tone.";
       prompt = userContent;
     } else if (userContent.toLowerCase().includes("improve")) {
-      systemPrompt = "You are an expert editor. Improve the writing quality while preserving the original meaning.";
+      systemPrompt =
+        "You are an expert editor. Improve the writing quality while preserving the original meaning.";
       prompt = userContent;
     } else if (userContent.toLowerCase().includes("summarize")) {
-      systemPrompt = "You are a concise summarizer. Create a clear, comprehensive summary of the content.";
+      systemPrompt =
+        "You are a concise summarizer. Create a clear, comprehensive summary of the content.";
       prompt = userContent;
-    } else if (userContent.toLowerCase().includes("fix") || userContent.toLowerCase().includes("grammar")) {
+    } else if (
+      userContent.toLowerCase().includes("fix") ||
+      userContent.toLowerCase().includes("grammar")
+    ) {
       systemPrompt = "You are a grammar expert. Fix all spelling, grammar, and punctuation errors.";
       prompt = userContent;
     } else if (userContent.toLowerCase().includes("longer")) {
-      systemPrompt = "You are a content expander. Expand the text with more detail while maintaining quality.";
+      systemPrompt =
+        "You are a content expander. Expand the text with more detail while maintaining quality.";
       prompt = userContent;
     } else if (userContent.toLowerCase().includes("shorter")) {
-      systemPrompt = "You are a content editor. Make the text more concise while keeping key information.";
+      systemPrompt =
+        "You are a content editor. Make the text more concise while keeping key information.";
       prompt = userContent;
     } else if (userContent.toLowerCase().includes("simplify")) {
       systemPrompt = "You are a clarity expert. Simplify the language for easier understanding.";
       prompt = userContent;
     } else {
-      systemPrompt = "You are a helpful AI writing assistant for document editing. Help the user with their request.";
+      systemPrompt =
+        "You are a helpful AI writing assistant for document editing. Help the user with their request.";
       prompt = userContent;
     }
 
@@ -1060,7 +1076,7 @@ router.post("/ai-command", requireAuth, async (req: Request, res: Response): Pro
     res.write(`data: {"type":"text-end","id":"${messageId}"}\n\n`);
     res.write('data: {"type":"finish-step"}\n\n');
     res.write('data: {"type":"finish"}\n\n');
-    res.write('data: [DONE]\n\n');
+    res.write("data: [DONE]\n\n");
 
     res.end();
   } catch (error) {
@@ -1076,7 +1092,7 @@ router.post("/ai-command", requireAuth, async (req: Request, res: Response): Pro
       // If streaming already started, send error in stream format
       const errorMessage = error instanceof Error ? error.message : "AI command failed";
       res.write(`data: {"type":"error","message":"${errorMessage}"}\n\n`);
-      res.write('data: [DONE]\n\n');
+      res.write("data: [DONE]\n\n");
       res.end();
     }
   }

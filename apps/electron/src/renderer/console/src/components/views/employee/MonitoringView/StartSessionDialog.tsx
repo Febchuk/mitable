@@ -19,9 +19,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Monitor, RefreshCw } from "lucide-react";
-import { startMonitoringSession } from "@/console/src/services/monitoringService";
-import { createSession } from "@/console/src/services/monitoringService";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Monitor, RefreshCw, Link2, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  startMonitoringSession,
+  createSession,
+  fetchLinearIssues,
+  checkLinearConnection,
+  type LinearIssue,
+} from "@/console/src/services/monitoringService";
 import type { SelectedWindowInfo } from "@mitable/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { monitoringKeys } from "@/console/src/hooks/queries/monitoring";
@@ -51,12 +64,58 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load available windows when dialog opens
+  // Goal context state
+  const [sessionGoal, setSessionGoal] = useState("");
+  const [showLinearPicker, setShowLinearPicker] = useState(false);
+  const [linearIssues, setLinearIssues] = useState<LinearIssue[]>([]);
+  const [selectedLinearIssue, setSelectedLinearIssue] = useState<LinearIssue | null>(null);
+  const [isLinearConnected, setIsLinearConnected] = useState(false);
+  const [isLoadingLinear, setIsLoadingLinear] = useState(false);
+
+  // Load available windows and check Linear connection when dialog opens
   useEffect(() => {
     if (open) {
       loadAvailableWindows();
+      checkLinearStatus();
     }
   }, [open]);
+
+  const checkLinearStatus = async () => {
+    try {
+      const connected = await checkLinearConnection();
+      setIsLinearConnected(connected);
+    } catch {
+      setIsLinearConnected(false);
+    }
+  };
+
+  const loadLinearIssues = async () => {
+    if (linearIssues.length > 0) {
+      // Already loaded
+      setShowLinearPicker(true);
+      return;
+    }
+
+    setIsLoadingLinear(true);
+    try {
+      const issues = await fetchLinearIssues();
+      setLinearIssues(issues);
+      setShowLinearPicker(true);
+    } catch (err) {
+      console.error("Failed to load Linear issues:", err);
+    } finally {
+      setIsLoadingLinear(false);
+    }
+  };
+
+  const handleLinearIssueSelect = (issueId: string) => {
+    const issue = linearIssues.find((i) => i.id === issueId);
+    if (issue) {
+      setSelectedLinearIssue(issue);
+      // Pre-fill the goal with the issue title
+      setSessionGoal(`[${issue.identifier}] ${issue.title}`);
+    }
+  };
 
   const loadAvailableWindows = async () => {
     setIsLoadingWindows(true);
@@ -142,6 +201,11 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
         selectedWindows: windowsToMonitor,
         captureIntervalMs: captureInterval * 1000,
         name: sessionName || undefined,
+        // Goal context fields
+        sessionGoal: sessionGoal || undefined,
+        linearIssueId: selectedLinearIssue?.identifier,
+        linearIssueTitle: selectedLinearIssue?.title,
+        linearIssueDescription: selectedLinearIssue?.description,
       });
 
       const backendSessionId = backendResult.session.id;
@@ -171,6 +235,9 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
       setSessionName("");
       setCaptureInterval(30);
       setSelectedWindows([]);
+      setSessionGoal("");
+      setSelectedLinearIssue(null);
+      setShowLinearPicker(false);
     } catch (err) {
       console.error("Error starting session:", err);
       setError("Failed to start session. Please try again.");
@@ -221,6 +288,92 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
             />
             <p className="text-text-tertiary text-sm">
               Screenshots will be captured every {captureInterval} seconds
+            </p>
+          </div>
+
+          {/* Session Goal / Context */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="session-goal" className="text-text-primary">
+                What are you working on? (optional)
+              </Label>
+              {isLinearConnected && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={loadLinearIssues}
+                  disabled={isLoadingLinear}
+                  className="text-text-secondary hover:text-text-primary flex items-center gap-1.5"
+                >
+                  {isLoadingLinear ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Link2 size={14} />
+                  )}
+                  Link from Linear
+                  {showLinearPicker ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </Button>
+              )}
+            </div>
+
+            {/* Linear Issue Picker (shown if connected and expanded) */}
+            {showLinearPicker && linearIssues.length > 0 && (
+              <Select onValueChange={handleLinearIssueSelect}>
+                <SelectTrigger className="bg-background-elevated border-border-subtle text-text-primary">
+                  <SelectValue placeholder="Select a Linear issue..." />
+                </SelectTrigger>
+                <SelectContent className="bg-background-elevated border-border-subtle">
+                  {linearIssues.map((issue) => (
+                    <SelectItem
+                      key={issue.id}
+                      value={issue.id}
+                      className="text-text-primary hover:bg-background-tertiary"
+                    >
+                      <span className="font-mono text-text-secondary mr-2">{issue.identifier}</span>
+                      {issue.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {showLinearPicker && linearIssues.length === 0 && !isLoadingLinear && (
+              <p className="text-text-tertiary text-sm">No assigned issues found</p>
+            )}
+
+            {/* Selected Linear Issue Badge */}
+            {selectedLinearIssue && (
+              <div className="flex items-center gap-2 p-2 rounded-md bg-primary/10 border border-primary/20">
+                <span className="font-mono text-primary text-sm">
+                  {selectedLinearIssue.identifier}
+                </span>
+                <span className="text-text-primary text-sm truncate flex-1">
+                  {selectedLinearIssue.title}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedLinearIssue(null);
+                    setSessionGoal("");
+                  }}
+                  className="h-6 w-6 p-0 text-text-secondary hover:text-text-primary"
+                >
+                  ×
+                </Button>
+              </div>
+            )}
+
+            {/* Goal Textarea */}
+            <Textarea
+              id="session-goal"
+              placeholder="e.g., Fixing the payment timeout bug in checkout flow..."
+              value={sessionGoal}
+              onChange={(e) => setSessionGoal(e.target.value)}
+              className="bg-background-elevated border-border-subtle text-text-primary min-h-[80px] resize-none"
+            />
+            <p className="text-text-tertiary text-sm">
+              This helps the AI understand your work context and provide better summaries
             </p>
           </div>
 

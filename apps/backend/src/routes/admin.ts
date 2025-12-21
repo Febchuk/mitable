@@ -1190,9 +1190,8 @@ router.post(
         }
 
         case "notion": {
-          const { notionIngestionService } = await import(
-            "../services/notion-ingestion.service.js"
-          );
+          const { notionIngestionService } =
+            await import("../services/notion-ingestion.service.js");
           syncResult = await notionIngestionService.syncPages(currentUser.organizationId);
           break;
         }
@@ -2252,9 +2251,8 @@ router.post(
           itemsSynced = result.messagesEmbedded || 0;
           syncResult = result;
         } else if (integration.provider === "notion") {
-          const { notionIngestionService } = await import(
-            "../services/notion-ingestion.service.js"
-          );
+          const { notionIngestionService } =
+            await import("../services/notion-ingestion.service.js");
           const result = await notionIngestionService.syncPages(currentUser.organizationId);
           itemsSynced = result.messagesEmbedded || 0;
           syncResult = result;

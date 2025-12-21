@@ -71,7 +71,8 @@ export default function ExportNotionDialog({
           <div className="flex items-start gap-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
             <CheckCircle size={18} className="text-primary flex-shrink-0 mt-0.5" />
             <div className="text-sm text-text-secondary">
-              The document will be exported with full formatting including headings, lists, and code blocks.
+              The document will be exported with full formatting including headings, lists, and code
+              blocks.
             </div>
           </div>
         </div>

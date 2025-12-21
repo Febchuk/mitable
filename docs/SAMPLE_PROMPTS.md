@@ -98,6 +98,7 @@ Early on, you might be documenting seemingly disconnected actions: "Opened the c
 <work_context>{{who_they_work_with_and_for}}</work_context>
 <window_metadata>
 <app>{{app_name}}</app>
+
 <title>{{window_title}}</title>
 </window_metadata>
 </context_data>

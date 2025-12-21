@@ -337,13 +337,9 @@ class CheckpointService {
       totalCheckpoints: checkpoints.length,
       incompleteSessionIds: checkpoints.map((c) => c.sessionId),
       oldestCheckpoint:
-        timestamps.length > 0
-          ? new Date(Math.min(...timestamps)).toISOString()
-          : null,
+        timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : null,
       newestCheckpoint:
-        timestamps.length > 0
-          ? new Date(Math.max(...timestamps)).toISOString()
-          : null,
+        timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null,
     };
   }
 

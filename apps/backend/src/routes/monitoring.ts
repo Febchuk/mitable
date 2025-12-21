@@ -132,14 +132,19 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
     const combinedGoalText = goalParts.join("\n\n").trim();
 
     // Build session goal (human-readable summary)
-    const computedSessionGoal = sessionGoal ||
-      (linearIssueTitle ? `${linearIssueId ? `[${linearIssueId}] ` : ""}${linearIssueTitle}` : null);
+    const computedSessionGoal =
+      sessionGoal ||
+      (linearIssueTitle
+        ? `${linearIssueId ? `[${linearIssueId}] ` : ""}${linearIssueTitle}`
+        : null);
 
     // Retrieve related docs via RAG if goal context is provided
     let relatedDocsContext: string | null = null;
     if (combinedGoalText) {
       try {
-        console.log(`[Monitoring] Retrieving related docs for goal: "${combinedGoalText.substring(0, 100)}..."`);
+        console.log(
+          `[Monitoring] Retrieving related docs for goal: "${combinedGoalText.substring(0, 100)}..."`
+        );
         const searchResponse = await searchService.search({
           query: combinedGoalText,
           organizationId,
@@ -150,9 +155,10 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
           // Format retrieved docs for context injection
           relatedDocsContext = searchResponse.results
             .map((r) => {
-              const source = r.source === "slack"
-                ? `[Slack: ${r.channelName || "channel"}]`
-                : `[Notion: ${r.pageTitle || "page"}]`;
+              const source =
+                r.source === "slack"
+                  ? `[Slack: ${r.channelName || "channel"}]`
+                  : `[Notion: ${r.pageTitle || "page"}]`;
               return `${source}\n${r.text.substring(0, 400)}`;
             })
             .join("\n\n---\n\n");
@@ -161,7 +167,10 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
         }
       } catch (ragError) {
         // RAG failure shouldn't block session creation
-        console.warn("[Monitoring] RAG retrieval failed, continuing without related docs:", ragError);
+        console.warn(
+          "[Monitoring] RAG retrieval failed, continuing without related docs:",
+          ragError
+        );
       }
     }
 
@@ -186,7 +195,9 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       })
       .returning();
 
-    console.log(`[Monitoring] Session started: ${session.id}${computedSessionGoal ? ` (goal: ${computedSessionGoal.substring(0, 50)}...)` : ""}`);
+    console.log(
+      `[Monitoring] Session started: ${session.id}${computedSessionGoal ? ` (goal: ${computedSessionGoal.substring(0, 50)}...)` : ""}`
+    );
 
     res.json({
       success: true,

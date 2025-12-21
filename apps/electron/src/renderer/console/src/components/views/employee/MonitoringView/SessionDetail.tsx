@@ -567,16 +567,17 @@ export default function SessionDetail() {
             className="flex items-center gap-2 w-full text-left group"
           >
             <BookOpen size={18} className="text-primary" />
-            <h2 className="text-lg font-semibold text-text-primary flex-1">
-              Live Progress Story
-            </h2>
+            <h2 className="text-lg font-semibold text-text-primary flex-1">Live Progress Story</h2>
             <Badge variant="secondary" className="text-xs">
               v{storyData.metadata?.version || 0}
             </Badge>
             {isStoryExpanded ? (
               <ChevronUp size={18} className="text-text-secondary group-hover:text-text-primary" />
             ) : (
-              <ChevronDown size={18} className="text-text-secondary group-hover:text-text-primary" />
+              <ChevronDown
+                size={18}
+                className="text-text-secondary group-hover:text-text-primary"
+              />
             )}
           </button>
 
@@ -591,8 +592,7 @@ export default function SessionDetail() {
               </div>
               {storyData.metadata?.lastUpdated && (
                 <div className="mt-3 pt-2 border-t border-border-subtle text-xs text-text-tertiary">
-                  Last updated:{" "}
-                  {new Date(storyData.metadata.lastUpdated).toLocaleTimeString()}
+                  Last updated: {new Date(storyData.metadata.lastUpdated).toLocaleTimeString()}
                 </div>
               )}
             </div>
@@ -709,43 +709,44 @@ export default function SessionDetail() {
           <DialogHeader>
             <DialogTitle className="text-text-primary">Frame Preview</DialogTitle>
           </DialogHeader>
-          {selectedFrame && (() => {
-            const frame = session.topKFrames?.find((f: any) => f.id === selectedFrame);
-            if (!frame) return null;
-            return (
-              <div className="space-y-4">
-                {frame.imageData ? (
-                  <img
-                    src={`data:image/png;base64,${frame.imageData}`}
-                    alt={frame.activityDescription || "Session capture"}
-                    className="w-full rounded-lg"
-                  />
-                ) : (
-                  <div className="w-full aspect-video bg-background-tertiary flex items-center justify-center rounded-lg">
-                    <Camera size={48} className="text-text-tertiary" />
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <p className="text-text-primary">
-                    {frame.activityDescription || "No description available"}
-                  </p>
-                  <div className="flex items-center gap-4 text-sm text-text-secondary">
-                    <span>{frame.appName || "Unknown app"}</span>
-                    <span>•</span>
-                    <span>{new Date(frame.capturedAt).toLocaleString()}</span>
-                    {frame.importanceScore && (
-                      <>
-                        <span>•</span>
-                        <Badge variant="secondary">
-                          Importance: {(frame.importanceScore * 100).toFixed(0)}%
-                        </Badge>
-                      </>
-                    )}
+          {selectedFrame &&
+            (() => {
+              const frame = session.topKFrames?.find((f: any) => f.id === selectedFrame);
+              if (!frame) return null;
+              return (
+                <div className="space-y-4">
+                  {frame.imageData ? (
+                    <img
+                      src={`data:image/png;base64,${frame.imageData}`}
+                      alt={frame.activityDescription || "Session capture"}
+                      className="w-full rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-full aspect-video bg-background-tertiary flex items-center justify-center rounded-lg">
+                      <Camera size={48} className="text-text-tertiary" />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <p className="text-text-primary">
+                      {frame.activityDescription || "No description available"}
+                    </p>
+                    <div className="flex items-center gap-4 text-sm text-text-secondary">
+                      <span>{frame.appName || "Unknown app"}</span>
+                      <span>•</span>
+                      <span>{new Date(frame.capturedAt).toLocaleString()}</span>
+                      {frame.importanceScore && (
+                        <>
+                          <span>•</span>
+                          <Badge variant="secondary">
+                            Importance: {(frame.importanceScore * 100).toFixed(0)}%
+                          </Badge>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
         </DialogContent>
       </Dialog>
 

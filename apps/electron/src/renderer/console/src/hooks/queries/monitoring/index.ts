@@ -101,8 +101,7 @@ export function useSessionStory(sessionId: string, sessionStatus?: string) {
     queryFn: () => monitoringService.fetchSessionStory(sessionId),
     enabled: !!sessionId,
     // Poll every 5 seconds while session is active or paused
-    refetchInterval:
-      sessionStatus === "active" || sessionStatus === "paused" ? 5000 : false,
+    refetchInterval: sessionStatus === "active" || sessionStatus === "paused" ? 5000 : false,
   });
 }
 

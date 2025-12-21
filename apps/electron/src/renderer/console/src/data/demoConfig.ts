@@ -195,14 +195,6 @@ export const DEMO_CONFIG = {
       resumeButton: "Resume",
       sendUpdateButton: "Send Update",
     },
-
-    updatePrompt: {
-      readyToSendLabel: "Ready to send to",
-      reviewButton: "Review & Edit",
-      sendNowButton: "Send Now",
-      successTitle: "Update sent!",
-      successMessage: "Posted to",
-    },
   },
 } as const;
 

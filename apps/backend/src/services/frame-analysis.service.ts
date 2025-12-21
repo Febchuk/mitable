@@ -16,6 +16,7 @@ import {
   parseProgressionResponse,
   ChangeType,
   ChangeMagnitude,
+  GoalContext,
 } from "../prompts/session-prompts";
 
 // Types
@@ -30,6 +31,8 @@ export interface FrameAnalysisInput {
     windowTitle: string;
   };
   timestamp: string;
+  // Optional goal context for enhanced analysis
+  goalContext?: GoalContext;
 }
 
 export interface FrameAnalysisResult {
@@ -57,10 +60,13 @@ export interface FrameAnalysisResult {
 class FrameAnalysisService {
   /**
    * Analyze a frame using the Progression Detector
+   * @param input Frame analysis input including optional goal context
    */
   async analyzeFrame(input: FrameAnalysisInput): Promise<FrameAnalysisResult> {
-    const { system: systemPrompt, user: userPrompt } =
-      buildProgressionDetectorPrompt();
+    // Build prompt with goal context if available
+    const { system: systemPrompt, user: userPrompt } = buildProgressionDetectorPrompt(
+      input.goalContext
+    );
 
     try {
       // Call Groq Vision with two images
@@ -75,9 +81,7 @@ class FrameAnalysisService {
       const progressionResult = parseProgressionResponse(visionResult.content);
 
       if (!progressionResult) {
-        console.warn(
-          `[FrameAnalysis] Failed to parse response for frame ${input.frameId}`
-        );
+        console.warn(`[FrameAnalysis] Failed to parse response for frame ${input.frameId}`);
         return this.createFallbackResult(input, visionResult);
       }
 
@@ -114,9 +118,7 @@ class FrameAnalysisService {
    * Batch analyze multiple frames
    * Note: Processes sequentially to maintain frame order for delta comparison
    */
-  async analyzeFrameBatch(
-    frames: FrameAnalysisInput[]
-  ): Promise<FrameAnalysisResult[]> {
+  async analyzeFrameBatch(frames: FrameAnalysisInput[]): Promise<FrameAnalysisResult[]> {
     const results: FrameAnalysisResult[] = [];
 
     for (const frame of frames) {
@@ -139,15 +141,11 @@ class FrameAnalysisService {
     return {
       frameId: input.frameId,
       progressionDetected: isFirstFrame, // First frame is always considered progression
-      summaryOfAction: isFirstFrame
-        ? "Session started"
-        : "Unable to determine activity",
+      summaryOfAction: isFirstFrame ? "Session started" : "Unable to determine activity",
       deltaChanged: isFirstFrame,
       changeType: "none",
       changeMagnitude: "trivial",
-      changeDescription: isFirstFrame
-        ? "First frame in session"
-        : "Analysis inconclusive",
+      changeDescription: isFirstFrame ? "First frame in session" : "Analysis inconclusive",
       confidence: 0.5,
       analysisLatencyMs: visionResult.latencyMs,
       model: visionResult.model,

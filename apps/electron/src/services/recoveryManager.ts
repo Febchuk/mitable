@@ -114,8 +114,7 @@ class RecoveryManager {
     return checkpoints.map((checkpoint) => {
       const startedAt = new Date(checkpoint.startedAt);
       const checkpointAt = new Date(checkpoint.checkpointAt);
-      const durationMs =
-        checkpointAt.getTime() - startedAt.getTime() - checkpoint.totalPausedMs;
+      const durationMs = checkpointAt.getTime() - startedAt.getTime() - checkpoint.totalPausedMs;
 
       return {
         sessionId: checkpoint.sessionId,
@@ -305,9 +304,7 @@ class RecoveryManager {
 
     // Send event to console window to show recovery dialog
     consoleWindow.webContents.send(IPC_CHANNELS.SESSION_SHOW_RECOVERY_DIALOG, {
-      sessions: this.convertToRecoveryOptions(
-        Array.from(this.pendingRecoveries.values())
-      ),
+      sessions: this.convertToRecoveryOptions(Array.from(this.pendingRecoveries.values())),
     });
   }
 }

@@ -35,9 +35,7 @@ export interface ListDocumentsParams {
   limit?: number;
 }
 
-export async function fetchDocuments(
-  params?: ListDocumentsParams
-): Promise<ListDocumentsResponse> {
+export async function fetchDocuments(params?: ListDocumentsParams): Promise<ListDocumentsResponse> {
   const searchParams = new URLSearchParams();
 
   if (params?.docType) searchParams.set("docType", params.docType);
@@ -91,9 +89,7 @@ export async function updateDocument(
 // Delete Document
 // ===========================
 
-export async function deleteDocument(
-  id: string
-): Promise<{ success: boolean; message: string }> {
+export async function deleteDocument(id: string): Promise<{ success: boolean; message: string }> {
   return apiRequest<{ success: boolean; message: string }>(`/documents/${id}`, {
     method: "DELETE",
   });
@@ -103,9 +99,7 @@ export async function deleteDocument(
 // Get Document Versions
 // ===========================
 
-export async function fetchDocumentVersions(
-  id: string
-): Promise<{ versions: DocumentVersion[] }> {
+export async function fetchDocumentVersions(id: string): Promise<{ versions: DocumentVersion[] }> {
   return apiRequest<{ versions: DocumentVersion[] }>(`/documents/${id}/versions`);
 }
 

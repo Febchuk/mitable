@@ -68,9 +68,7 @@ export default function DocCard({ document, onClick }: DocCardProps) {
 
       {/* Description */}
       {truncatedDescription && (
-        <p className="text-text-secondary text-sm mb-4 line-clamp-2">
-          {truncatedDescription}
-        </p>
+        <p className="text-text-secondary text-sm mb-4 line-clamp-2">{truncatedDescription}</p>
       )}
 
       {/* Footer */}

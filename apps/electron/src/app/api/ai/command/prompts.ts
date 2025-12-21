@@ -1,8 +1,8 @@
-import type { ChatMessage } from '@/components/editor/use-chat';
-import type { SlateEditor } from 'platejs';
+import type { ChatMessage } from "@/components/editor/use-chat";
+import type { SlateEditor } from "platejs";
 
-import { getMarkdown } from '@platejs/ai';
-import dedent from 'dedent';
+import { getMarkdown } from "@platejs/ai";
+import dedent from "dedent";
 
 import {
   addSelection,
@@ -10,7 +10,7 @@ import {
   formatTextFromMessages,
   getMarkdownWithSelection,
   isMultiBlocks,
-} from './utils';
+} from "./utils";
 
 export function getChooseToolPrompt({ messages }: { messages: ChatMessage[] }) {
   return buildStructuredPrompt({
@@ -49,7 +49,7 @@ export function getCommentPrompt(
   }
 ) {
   const selectingMarkdown = getMarkdown(editor, {
-    type: 'blockWithBlockId',
+    type: "blockWithBlockId",
   });
 
   return buildStructuredPrompt({
@@ -172,10 +172,7 @@ export function getCommentPrompt(
   });
 }
 
-export function getGeneratePrompt(
-  editor: SlateEditor,
-  { messages }: { messages: ChatMessage[] }
-) {
+export function getGeneratePrompt(editor: SlateEditor, { messages }: { messages: ChatMessage[] }) {
   if (!isMultiBlocks(editor)) {
     addSelection(editor);
   }
@@ -186,25 +183,25 @@ export function getGeneratePrompt(
     backgroundData: selectingMarkdown,
     examples: [
       // 1) Summarize content
-      'User: Summarize the following text.\nBackground data:\nArtificial intelligence has transformed multiple industries, from healthcare to finance, improving efficiency and enabling data-driven decisions.\nOutput:\nAI improves efficiency and decision-making across many industries.',
+      "User: Summarize the following text.\nBackground data:\nArtificial intelligence has transformed multiple industries, from healthcare to finance, improving efficiency and enabling data-driven decisions.\nOutput:\nAI improves efficiency and decision-making across many industries.",
 
       // 2) Generate key takeaways
-      'User: List three key takeaways from this text.\nBackground data:\nRemote work increases flexibility but also requires better communication and time management.\nOutput:\n- Remote work enhances flexibility.\n- Communication becomes critical.\n- Time management determines success.',
+      "User: List three key takeaways from this text.\nBackground data:\nRemote work increases flexibility but also requires better communication and time management.\nOutput:\n- Remote work enhances flexibility.\n- Communication becomes critical.\n- Time management determines success.",
 
       // 3) Generate a title
-      'User: Generate a short, catchy title for this section.\nBackground data:\nThis section explains how machine learning models are trained using large datasets to recognize patterns.\nOutput:\nTraining Machines to Recognize Patterns',
+      "User: Generate a short, catchy title for this section.\nBackground data:\nThis section explains how machine learning models are trained using large datasets to recognize patterns.\nOutput:\nTraining Machines to Recognize Patterns",
 
       // 4) Generate action items
-      'User: Generate actionable next steps based on the paragraph.\nBackground data:\nThe report suggests improving documentation and conducting user interviews before the next release.\nOutput:\n- Update all technical documentation.\n- Schedule user interviews before the next release.',
+      "User: Generate actionable next steps based on the paragraph.\nBackground data:\nThe report suggests improving documentation and conducting user interviews before the next release.\nOutput:\n- Update all technical documentation.\n- Schedule user interviews before the next release.",
 
       // 5) Generate a comparison table
-      'User: Generate a comparison table of the tools mentioned.\nBackground data:\nTool A: free, simple UI\nTool B: paid, advanced analytics\nOutput:\n| Tool  | Pricing | Features         |\n|-------|----------|-----------------|\n| A     | Free     | Simple UI        |\n| B     | Paid     | Advanced analytics |',
+      "User: Generate a comparison table of the tools mentioned.\nBackground data:\nTool A: free, simple UI\nTool B: paid, advanced analytics\nOutput:\n| Tool  | Pricing | Features         |\n|-------|----------|-----------------|\n| A     | Free     | Simple UI        |\n| B     | Paid     | Advanced analytics |",
 
       // 6) Generate a summary table of statistics
-      'User: Create a summary table of the following statistics.\nBackground data:\nSales Q1: 1200 units\nSales Q2: 1500 units\nSales Q3: 900 units\nOutput:\n| Quarter | Sales (units) |\n|----------|---------------|\n| Q1       | 1200          |\n| Q2       | 1500          |\n| Q3       | 900           |',
+      "User: Create a summary table of the following statistics.\nBackground data:\nSales Q1: 1200 units\nSales Q2: 1500 units\nSales Q3: 900 units\nOutput:\n| Quarter | Sales (units) |\n|----------|---------------|\n| Q1       | 1200          |\n| Q2       | 1500          |\n| Q3       | 900           |",
 
       // 7) Generate a question list
-      'User: Generate three reflection questions based on the paragraph.\nBackground data:\nThe article discusses the role of creativity in problem-solving and how diverse perspectives enhance innovation.\nOutput:\n1. How can creativity be encouraged in structured environments?\n2. What role does diversity play in innovative teams?\n3. How can leaders balance creativity and efficiency?',
+      "User: Generate three reflection questions based on the paragraph.\nBackground data:\nThe article discusses the role of creativity in problem-solving and how diverse perspectives enhance innovation.\nOutput:\n1. How can creativity be encouraged in structured environments?\n2. What role does diversity play in innovative teams?\n3. How can leaders balance creativity and efficiency?",
 
       // 8) Explain a concept (selected phrase)
       'User: Explain the meaning of the selected phrase.\nBackground data:\nDeep learning relies on neural networks to automatically extract patterns from data, a process called <Selection>feature learning</Selection>.\nOutput:\n"Feature learning" means automatically discovering useful representations or characteristics from raw data without manual intervention.',
@@ -231,8 +228,7 @@ export function getEditPrompt(
   editor: SlateEditor,
   { isSelecting, messages }: { isSelecting: boolean; messages: ChatMessage[] }
 ) {
-  if (!isSelecting)
-    throw new Error('Edit tool is only available when selecting');
+  if (!isSelecting) throw new Error("Edit tool is only available when selecting");
   if (isMultiBlocks(editor)) {
     const selectingMarkdown = getMarkdownWithSelection(editor);
 
@@ -240,16 +236,16 @@ export function getEditPrompt(
       backgroundData: selectingMarkdown,
       examples: [
         // 1) Fix grammar
-        'User: Fix grammar.\nbackgroundData: # User Guide\nThis guide explain how to install the app.\nOutput:\n# User Guide\nThis guide explains how to install the application.',
+        "User: Fix grammar.\nbackgroundData: # User Guide\nThis guide explain how to install the app.\nOutput:\n# User Guide\nThis guide explains how to install the application.",
 
         // 2) Make the tone more formal and professional
         "User: Make the tone more formal and professional.\nbackgroundData: ## Intro\nHey, here's how you can set things up quickly.\nOutput:\n## Introduction\nThis section describes the setup procedure in a clear and professional manner.",
 
         // 3) Make it more concise without losing meaning
-        'User: Make it more concise without losing meaning.\nbackgroundData: The purpose of this document is to provide an overview that explains, in detail, all the steps required to complete the installation.\nOutput:\nThis document provides a detailed overview of the installation steps.',
+        "User: Make it more concise without losing meaning.\nbackgroundData: The purpose of this document is to provide an overview that explains, in detail, all the steps required to complete the installation.\nOutput:\nThis document provides a detailed overview of the installation steps.",
       ],
       history: formatTextFromMessages(messages),
-      outputFormatting: 'markdown',
+      outputFormatting: "markdown",
       rules: dedent`
         - Do not Write <backgroundData> tags in your response.
         - <backgroundData> represents the full blocks of text the user has selected and wants to modify or ask about.
@@ -265,38 +261,38 @@ export function getEditPrompt(
   addSelection(editor);
 
   const selectingMarkdown = getMarkdownWithSelection(editor);
-  const endIndex = selectingMarkdown.indexOf('<Selection>');
+  const endIndex = selectingMarkdown.indexOf("<Selection>");
   const prefilledResponse = selectingMarkdown.slice(0, endIndex);
 
   return buildStructuredPrompt({
     backgroundData: selectingMarkdown,
     examples: [
       // 1) Improve word choice
-      'User: Improve word choice.\nbackgroundData: This is a <Selection>nice</Selection> person.\nOutput: great',
+      "User: Improve word choice.\nbackgroundData: This is a <Selection>nice</Selection> person.\nOutput: great",
 
       // 2) Fix grammar
-      'User: Fix grammar.\nbackgroundData: He <Selection>go</Selection> to school every day.\nOutput: goes',
+      "User: Fix grammar.\nbackgroundData: He <Selection>go</Selection> to school every day.\nOutput: goes",
 
       // 3) Make tone more polite
-      'User: Make tone more polite.\nbackgroundData: <Selection>Give me</Selection> the report.\nOutput: Please provide',
+      "User: Make tone more polite.\nbackgroundData: <Selection>Give me</Selection> the report.\nOutput: Please provide",
 
       // 4) Make tone more confident
-      'User: Make tone more confident.\nbackgroundData: I <Selection>think</Selection> this might work.\nOutput: believe',
+      "User: Make tone more confident.\nbackgroundData: I <Selection>think</Selection> this might work.\nOutput: believe",
 
       // 5) Simplify language
-      'User: Simplify the language.\nbackgroundData: The results were <Selection>exceedingly</Selection> positive.\nOutput: very',
+      "User: Simplify the language.\nbackgroundData: The results were <Selection>exceedingly</Selection> positive.\nOutput: very",
 
       // 6) Translate into French
-      'User: Translate into French.\nbackgroundData: <Selection>Hello</Selection>\nOutput: Bonjour',
+      "User: Translate into French.\nbackgroundData: <Selection>Hello</Selection>\nOutput: Bonjour",
 
       // 7) Expand description
-      'User: Expand the description.\nbackgroundData: The view was <Selection>beautiful</Selection>.\nOutput: breathtaking and full of vibrant colors',
+      "User: Expand the description.\nbackgroundData: The view was <Selection>beautiful</Selection>.\nOutput: breathtaking and full of vibrant colors",
 
       // 8) Make it sound more natural
-      'User: Make it sound more natural.\nbackgroundData: She <Selection>did a party</Selection> yesterday.\nOutput: had a party',
+      "User: Make it sound more natural.\nbackgroundData: She <Selection>did a party</Selection> yesterday.\nOutput: had a party",
     ],
     history: formatTextFromMessages(messages),
-    outputFormatting: 'markdown',
+    outputFormatting: "markdown",
     prefilledResponse,
     rules: dedent`
       - <Selection> contains the text segment selected by the user and allowed to be modified.

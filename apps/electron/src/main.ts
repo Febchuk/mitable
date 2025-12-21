@@ -1785,7 +1785,10 @@ app.whenReady().then(async () => {
       // Notify console window to show recovery dialog
       setTimeout(() => {
         if (consoleWindow && !consoleWindow.isDestroyed()) {
-          consoleWindow.webContents.send(IPC_CHANNELS.SESSION_SHOW_RECOVERY_DIALOG, recoverableSessions);
+          consoleWindow.webContents.send(
+            IPC_CHANNELS.SESSION_SHOW_RECOVERY_DIALOG,
+            recoverableSessions
+          );
         }
       }, 2000); // Give console time to fully load
     }

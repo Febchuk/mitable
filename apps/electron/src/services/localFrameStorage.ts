@@ -241,9 +241,7 @@ class LocalFrameStorage {
     await this.saveManifest(sessionId, manifest);
     this.currentManifest = manifest;
 
-    console.log(
-      `[LocalStorage] Saved frame ${frameId} (${manifest.totalFrameCount} total)`
-    );
+    console.log(`[LocalStorage] Saved frame ${frameId} (${manifest.totalFrameCount} total)`);
     return frameMetadata;
   }
 
@@ -353,10 +351,7 @@ class LocalFrameStorage {
   /**
    * End session and set Top-K frame IDs
    */
-  async endSession(
-    sessionId: string,
-    topKFrameIds: string[]
-  ): Promise<void> {
+  async endSession(sessionId: string, topKFrameIds: string[]): Promise<void> {
     const manifest = await this.loadManifest(sessionId);
     if (!manifest) {
       throw new Error(`Session manifest not found: ${sessionId}`);
@@ -504,10 +499,7 @@ class LocalFrameStorage {
   /**
    * Save manifest to disk
    */
-  private async saveManifest(
-    sessionId: string,
-    manifest: SessionManifest
-  ): Promise<void> {
+  private async saveManifest(sessionId: string, manifest: SessionManifest): Promise<void> {
     const manifestPath = this.getManifestPath(sessionId);
 
     try {

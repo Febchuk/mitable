@@ -19,6 +19,7 @@ import { eq, desc, and } from "drizzle-orm";
 import {
   buildStorytellerPrompt,
   parseStorytellerResponse,
+  GoalContext,
 } from "../prompts/session-prompts";
 import { FrameAnalysisResult } from "./frame-analysis.service";
 import { withRetry } from "../utils/retry";
@@ -40,6 +41,8 @@ export interface StoryContext {
     appName: string;
     windowTitle: string;
   };
+  // Optional goal context for enhanced storytelling
+  goalContext?: GoalContext;
 }
 
 export interface StoryUpdateResult {
@@ -81,7 +84,7 @@ class MasterStoryService {
       // Get user context for the prompt
       const userContext = await this.getUserContext(context.userId);
 
-      // Build the storyteller prompt
+      // Build the storyteller prompt with goal context if available
       const { system, user } = buildStorytellerPrompt({
         userRole: userContext.role,
         userSeniority: userContext.seniority,
@@ -90,6 +93,7 @@ class MasterStoryService {
         windowTitle: context.windowInfo.windowTitle,
         currentStory: this.truncateStory(currentStory),
         latestAction: context.frameAnalysis.summaryOfAction,
+        goalContext: context.goalContext,
       });
 
       // Generate updated story
@@ -175,9 +179,7 @@ class MasterStoryService {
   /**
    * Get story metadata
    */
-  async getStoryMetadata(
-    sessionId: string
-  ): Promise<{
+  async getStoryMetadata(sessionId: string): Promise<{
     version: number;
     length: number;
     lastUpdated: Date | null;
@@ -203,14 +205,23 @@ class MasterStoryService {
 
   /**
    * Initialize a new story for a session
+   * @param sessionId The session ID
+   * @param goalContext Optional goal context including Linear issue, related docs
    */
-  async initializeStory(
-    sessionId: string,
-    sessionGoal?: string
-  ): Promise<void> {
-    const initialStory = sessionGoal
-      ? `Session started with goal: ${sessionGoal}\n\n`
-      : "";
+  async initializeStory(sessionId: string, goalContext?: GoalContext): Promise<void> {
+    let initialStory = "";
+
+    if (goalContext?.sessionGoal || goalContext?.linearIssueTitle) {
+      const goalDescription = goalContext.linearIssueTitle
+        ? `${goalContext.linearIssueId ? `[${goalContext.linearIssueId}] ` : ""}${goalContext.linearIssueTitle}`
+        : goalContext.sessionGoal;
+
+      initialStory = `Session started with goal: ${goalDescription}\n\n`;
+
+      if (goalContext.relatedDocsContext) {
+        initialStory += `Related context from knowledge base was loaded.\n\n`;
+      }
+    }
 
     await db.insert(sessionSummaries).values({
       sessionId,
@@ -222,15 +233,15 @@ class MasterStoryService {
       generationTimeMs: 0,
     });
 
-    console.log(`[MasterStory] Initialized story for session ${sessionId}`);
+    console.log(
+      `[MasterStory] Initialized story for session ${sessionId}${goalContext?.sessionGoal ? ` with goal` : ""}`
+    );
   }
 
   /**
    * Get user context for storyteller prompt
    */
-  private async getUserContext(
-    userId: string
-  ): Promise<{
+  private async getUserContext(userId: string): Promise<{
     role: string;
     seniority: string;
     workContext: string;
@@ -249,9 +260,7 @@ class MasterStoryService {
       }
 
       // Build context from user data
-      const role = user.firstName
-        ? `${user.firstName}`
-        : "Team member";
+      const role = user.firstName ? `${user.firstName}` : "Team member";
 
       return {
         role,

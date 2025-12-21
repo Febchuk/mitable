@@ -4,10 +4,10 @@
  * Converts between Plate editor JSON and Markdown strings for storage.
  */
 
-import type { Value } from 'platejs';
-import type { PlateEditor } from 'platejs/react';
+import type { Value } from "platejs";
+import type { PlateEditor } from "platejs/react";
 
-import { deserializeMd, serializeMd } from '@platejs/markdown';
+import { deserializeMd, serializeMd } from "@platejs/markdown";
 
 /**
  * Serialize Plate editor value to Markdown string
@@ -22,11 +22,11 @@ export function plateToMarkdown(editor: PlateEditor, value?: Value): string {
       value: value || editor.children,
     });
   } catch (error) {
-    console.error('Error serializing to markdown:', error);
+    console.error("Error serializing to markdown:", error);
     // Fallback: extract plain text
     return value
-      ? value.map((node) => extractText(node)).join('\n\n')
-      : editor.children.map((node) => extractText(node)).join('\n\n');
+      ? value.map((node) => extractText(node)).join("\n\n")
+      : editor.children.map((node) => extractText(node)).join("\n\n");
   }
 }
 
@@ -39,23 +39,23 @@ export function plateToMarkdown(editor: PlateEditor, value?: Value): string {
  */
 export function markdownToPlate(editor: PlateEditor, markdown: string): Value {
   try {
-    if (!markdown || markdown.trim() === '') {
-      return [{ type: 'p', children: [{ text: '' }] }];
+    if (!markdown || markdown.trim() === "") {
+      return [{ type: "p", children: [{ text: "" }] }];
     }
 
     const result = deserializeMd(editor, markdown);
 
     // Ensure we have at least one valid node
     if (!result || result.length === 0) {
-      return [{ type: 'p', children: [{ text: '' }] }];
+      return [{ type: "p", children: [{ text: "" }] }];
     }
 
     return result;
   } catch (error) {
-    console.error('Error deserializing markdown:', error);
+    console.error("Error deserializing markdown:", error);
     // Fallback: wrap in paragraph
-    return markdown.split('\n\n').map((paragraph) => ({
-      type: 'p',
+    return markdown.split("\n\n").map((paragraph) => ({
+      type: "p",
       children: [{ text: paragraph }],
     }));
   }
@@ -65,26 +65,26 @@ export function markdownToPlate(editor: PlateEditor, markdown: string): Value {
  * Extract plain text from a Plate node (recursive)
  */
 function extractText(node: unknown): string {
-  if (typeof node === 'string') return node;
+  if (typeof node === "string") return node;
 
-  if (node && typeof node === 'object') {
-    if ('text' in node && typeof (node as { text: unknown }).text === 'string') {
+  if (node && typeof node === "object") {
+    if ("text" in node && typeof (node as { text: unknown }).text === "string") {
       return (node as { text: string }).text;
     }
 
-    if ('children' in node && Array.isArray((node as { children: unknown[] }).children)) {
-      return (node as { children: unknown[] }).children.map(extractText).join('');
+    if ("children" in node && Array.isArray((node as { children: unknown[] }).children)) {
+      return (node as { children: unknown[] }).children.map(extractText).join("");
     }
   }
 
-  return '';
+  return "";
 }
 
 /**
  * Create an empty document value for the editor
  */
 export function createEmptyDocument(): Value {
-  return [{ type: 'p', children: [{ text: '' }] }];
+  return [{ type: "p", children: [{ text: "" }] }];
 }
 
 /**
@@ -95,13 +95,13 @@ export function isDocumentEmpty(value: Value): boolean {
 
   if (value.length === 1) {
     const node = value[0];
-    if (node && typeof node === 'object' && 'children' in node) {
+    if (node && typeof node === "object" && "children" in node) {
       const children = (node as { children: unknown[] }).children;
       if (children.length === 0) return true;
       if (children.length === 1) {
         const child = children[0];
-        if (child && typeof child === 'object' && 'text' in child) {
-          return (child as { text: string }).text.trim() === '';
+        if (child && typeof child === "object" && "text" in child) {
+          return (child as { text: string }).text.trim() === "";
         }
       }
     }

@@ -18,17 +18,17 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxDelayMs: 30000,
   backoffMultiplier: 2,
   retryableErrors: [
-    'ECONNRESET',
-    'ETIMEDOUT',
-    'ECONNREFUSED',
-    'ENOTFOUND',
-    'rate limit',
-    'timeout',
-    '429',
-    '500',
-    '502',
-    '503',
-    '504',
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "rate limit",
+    "timeout",
+    "429",
+    "500",
+    "502",
+    "503",
+    "504",
   ],
 };
 
@@ -48,18 +48,15 @@ function isRetryableError(error: Error, config: RetryConfig): boolean {
 
   // Check against retryable error patterns
   for (const pattern of config.retryableErrors || []) {
-    if (
-      errorMessage.includes(pattern.toLowerCase()) ||
-      errorName.includes(pattern.toLowerCase())
-    ) {
+    if (errorMessage.includes(pattern.toLowerCase()) || errorName.includes(pattern.toLowerCase())) {
       return true;
     }
   }
 
   // Check for common network errors
-  if ('code' in error) {
+  if ("code" in error) {
     const code = (error as NodeJS.ErrnoException).code;
-    if (code && ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND'].includes(code)) {
+    if (code && ["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "ENOTFOUND"].includes(code)) {
       return true;
     }
   }
@@ -92,7 +89,7 @@ export async function withRetry<T>(
   config: Partial<RetryConfig> = {}
 ): Promise<T> {
   const finalConfig: RetryConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
-  let lastError: Error = new Error('No attempts made');
+  let lastError: Error = new Error("No attempts made");
 
   for (let attempt = 1; attempt <= finalConfig.maxRetries; attempt++) {
     try {
@@ -131,11 +128,7 @@ export async function withRetry<T>(
  * Retry decorator for class methods
  */
 export function Retryable(context: string, config: Partial<RetryConfig> = {}) {
-  return function (
-    _target: unknown,
-    _propertyKey: string,
-    descriptor: PropertyDescriptor
-  ) {
+  return function (_target: unknown, _propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: unknown[]) {

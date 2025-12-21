@@ -3,7 +3,8 @@ productName: Mitable
 copyright: Copyright © 2025 Mitable
 directories:
   buildResources: build
-  output: dist
+  # Build to /tmp to avoid iCloud sync issues with code signing
+  output: /tmp/mitable-build
 
 # macOS Configuration
 mac:
@@ -18,6 +19,14 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  identity: "Febe Chukwuma (LUV3R68DAA)"
+  notarize: false
+
+# Clean extended attributes before signing (required for macOS code signing)
+afterPack: scripts/afterPack.cjs
+
+# Notarization (runs after signing)
+afterSign: scripts/notarize.cjs
 
 # DMG Configuration
 dmg:

@@ -125,19 +125,16 @@ export const documentsRelations = relations(documents, ({ one, many }) => ({
   sessionContributions: many(sessionDocumentContributions),
 }));
 
-export const documentVersionsRelations = relations(
-  documentVersions,
-  ({ one }) => ({
-    document: one(documents, {
-      fields: [documentVersions.documentId],
-      references: [documents.id],
-    }),
-    changedByUser: one(users, {
-      fields: [documentVersions.changedBy],
-      references: [users.id],
-    }),
-  })
-);
+export const documentVersionsRelations = relations(documentVersions, ({ one }) => ({
+  document: one(documents, {
+    fields: [documentVersions.documentId],
+    references: [documents.id],
+  }),
+  changedByUser: one(users, {
+    fields: [documentVersions.changedBy],
+    references: [users.id],
+  }),
+}));
 
 export const sessionDocumentContributionsRelations = relations(
   sessionDocumentContributions,
@@ -158,10 +155,8 @@ export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
 export type DocumentVersion = typeof documentVersions.$inferSelect;
 export type NewDocumentVersion = typeof documentVersions.$inferInsert;
-export type SessionDocumentContribution =
-  typeof sessionDocumentContributions.$inferSelect;
-export type NewSessionDocumentContribution =
-  typeof sessionDocumentContributions.$inferInsert;
+export type SessionDocumentContribution = typeof sessionDocumentContributions.$inferSelect;
+export type NewSessionDocumentContribution = typeof sessionDocumentContributions.$inferInsert;
 
 // Doc type enum
 export type DocType = "how-to" | "knowledge-article" | "troubleshooting";
