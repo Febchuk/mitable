@@ -11,27 +11,32 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import { slackService } from "./slack.service.js";
+import { gmailService } from "./gmail.service.js";
+import { encryptionService } from "./encryption.service.js";
 
 // ===========================
 // Types
 // ===========================
 
 export interface DeliveryTarget {
-  type: "slack";
-  channelId: string;
+  type: "slack" | "email";
+  channelId?: string;
   channelName?: string;
+  email?: string;
 }
 
 export interface MultiDeliveryTarget {
-  type: "channel" | "dm";
+  type: "channel" | "dm" | "email";
   id: string;
   name?: string;
+  email?: string;
 }
 
 export interface MultiDeliveryResult {
   id: string;
-  type: "channel" | "dm";
+  type: "channel" | "dm" | "email";
   name?: string;
+  email?: string;
   status: "delivered" | "failed";
   messageTs?: string;
   error?: string;
@@ -95,6 +100,11 @@ class SessionDeliveryService {
       switch (target.type) {
         case "slack":
           return this.deliverToSlack(session, target, summary, customMessage);
+        case "email":
+          if (!target.email) {
+            return { success: false, error: "Email address is required for email delivery" };
+          }
+          return this.deliverToEmail(session, target.email, summary, customMessage);
         default:
           return { success: false, error: `Unsupported delivery target: ${target.type}` };
       }
@@ -157,6 +167,42 @@ class SessionDeliveryService {
     // Deliver to all targets in parallel
     const deliveryPromises = targets.map(async (target): Promise<MultiDeliveryResult> => {
       try {
+        // Handle email delivery separately
+        if (target.type === "email") {
+          if (!target.email) {
+            return {
+              id: target.id,
+              type: target.type,
+              email: target.email,
+              status: "failed",
+              error: "Email address is required",
+            };
+          }
+
+          console.log(`[SessionDeliveryService] Sending email to: ${target.email}`);
+
+          const emailResult = await this.deliverToEmail(session, target.email, summary);
+
+          if (emailResult.success) {
+            return {
+              id: target.id,
+              type: target.type,
+              email: target.email,
+              status: "delivered",
+              messageTs: emailResult.messageTs,
+            };
+          }
+
+          return {
+            id: target.id,
+            type: target.type,
+            email: target.email,
+            status: "failed",
+            error: emailResult.error || "Failed to send email",
+          };
+        }
+
+        // Handle Slack delivery (channel or DM)
         let channelId: string;
 
         // For DMs, we need to open a DM channel first
@@ -228,6 +274,7 @@ class SessionDeliveryService {
           id: target.id,
           type: target.type,
           name: target.name,
+          email: target.email,
           status: "failed",
           error: error instanceof Error ? error.message : "Unknown error",
         };
@@ -255,6 +302,10 @@ class SessionDeliveryService {
     summary: string,
     customMessage?: string
   ): Promise<DeliveryResult> {
+    if (!target.channelId) {
+      return { success: false, error: "Channel ID is required for Slack delivery" };
+    }
+
     // Calculate session duration
     const duration = this.calculateDuration(session);
 
@@ -289,6 +340,154 @@ class SessionDeliveryService {
     }
 
     return { success: false, error: result.error };
+  }
+
+  /**
+   * Deliver summary via Gmail OAuth (user sends from their own account)
+   */
+  private async deliverToEmail(
+    session: SessionData,
+    email: string,
+    summary: string,
+    customMessage?: string
+  ): Promise<DeliveryResult> {
+    // Get user's Gmail tokens
+    const [user] = await db
+      .select({
+        gmailAccessTokenEncrypted: schema.users.gmailAccessTokenEncrypted,
+        gmailRefreshTokenEncrypted: schema.users.gmailRefreshTokenEncrypted,
+        gmailTokenExpiresAt: schema.users.gmailTokenExpiresAt,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, session.userId))
+      .limit(1);
+
+    if (!user?.gmailAccessTokenEncrypted) {
+      return { success: false, error: "Gmail not connected. Please connect your Gmail account first." };
+    }
+
+    // Check if token is expired and try to refresh
+    let accessToken = encryptionService.decrypt(user.gmailAccessTokenEncrypted);
+
+    if (user.gmailTokenExpiresAt && new Date(user.gmailTokenExpiresAt) < new Date()) {
+      // Token expired, try to refresh
+      if (!user.gmailRefreshTokenEncrypted) {
+        return { success: false, error: "Gmail connection expired. Please reconnect." };
+      }
+
+      try {
+        const refreshToken = encryptionService.decrypt(user.gmailRefreshTokenEncrypted);
+        const newTokenData = await gmailService.refreshToken(refreshToken);
+
+        // Update stored tokens
+        const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
+        await db
+          .update(schema.users)
+          .set({
+            gmailAccessTokenEncrypted: encryptionService.encrypt(newTokenData.access_token),
+            gmailTokenExpiresAt: tokenExpiresAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.users.id, session.userId));
+
+        accessToken = newTokenData.access_token;
+      } catch {
+        return { success: false, error: "Failed to refresh Gmail token. Please reconnect." };
+      }
+    }
+
+    // Calculate session duration
+    const duration = this.calculateDuration(session);
+
+    // Extract key activities
+    const keyActivities = session.keyActivities as unknown[] | null;
+    const activities: string[] = [];
+    if (keyActivities && Array.isArray(keyActivities)) {
+      for (const activity of keyActivities.slice(0, 5)) {
+        if (typeof activity === "string") {
+          activities.push(activity);
+        } else if (activity && typeof activity === "object" && "activity" in activity) {
+          activities.push(String((activity as { activity: unknown }).activity));
+        }
+      }
+    }
+
+    // Generate email content
+    const subject = `Work Session Summary: ${session.name || "Work Session"} (${duration})`;
+    const body = this.formatEmailBody(session, summary, duration, activities, customMessage);
+
+    // Send email via Gmail
+    try {
+      const fromName =
+        user.firstName && user.lastName
+          ? `${user.firstName} ${user.lastName}`
+          : user.firstName || undefined;
+
+      const result = await gmailService.sendEmail(accessToken, email, subject, body, fromName);
+
+      // Update session with delivery info
+      await db
+        .update(schema.monitoringSessions)
+        .set({
+          deliveryStatus: "delivered",
+          deliveryChannel: "email",
+          deliveryTarget: email,
+          deliveredAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.monitoringSessions.id, session.id));
+
+      return { success: true, messageTs: result.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Failed to send email" };
+    }
+  }
+
+  /**
+   * Format plain text email body for session summary
+   */
+  private formatEmailBody(
+    session: SessionData,
+    summary: string,
+    duration: string,
+    activities: string[],
+    customMessage?: string
+  ): string {
+    const lines: string[] = [];
+
+    lines.push(`WORK SESSION SUMMARY`);
+    lines.push(`${"=".repeat(50)}`);
+    lines.push("");
+    lines.push(`Session: ${session.name || "Work Session"}`);
+    lines.push(`Duration: ${duration}`);
+    lines.push(`Ended: ${this.formatTime(session.endedAt)}`);
+    lines.push("");
+
+    if (customMessage) {
+      lines.push(`Note: ${customMessage}`);
+      lines.push("");
+    }
+
+    lines.push(`SUMMARY`);
+    lines.push(`${"-".repeat(30)}`);
+    lines.push(summary);
+    lines.push("");
+
+    if (activities.length > 0) {
+      lines.push(`KEY ACTIVITIES`);
+      lines.push(`${"-".repeat(30)}`);
+      for (const activity of activities) {
+        lines.push(`• ${activity}`);
+      }
+      lines.push("");
+    }
+
+    lines.push(`${"-".repeat(50)}`);
+    lines.push(`Generated by Mitable`);
+
+    return lines.join("\n");
   }
 
   /**

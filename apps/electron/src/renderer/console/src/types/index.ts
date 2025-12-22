@@ -141,7 +141,7 @@ export type ButtonSize = "sm" | "md" | "lg";
 export type AvatarSize = "sm" | "md" | "lg";
 
 // Admin types
-export type IntegrationProvider = "slack" | "notion" | "github" | "google-drive" | "linear";
+export type IntegrationProvider = "slack" | "notion" | "github" | "google-drive" | "linear" | "gmail";
 export type IntegrationStatus = "connected" | "disconnected" | "pending";
 
 export interface Integration {
