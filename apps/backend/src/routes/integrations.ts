@@ -2060,4 +2060,381 @@ router.patch(
   }
 );
 
+// ============================================================================
+// GMAIL INTEGRATION ROUTES (Per-user OAuth for email sending)
+// ============================================================================
+
+/**
+ * POST /api/integrations/gmail/oauth/start
+ * Initiate Gmail OAuth flow for the current user
+ * Returns the authorization URL for the user to visit
+ */
+router.post(
+  "/gmail/oauth/start",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      // Import Gmail service
+      const { gmailService } = await import("../services/gmail.service.js");
+
+      // Validate Gmail credentials are configured
+      if (!gmailService.isConfigured()) {
+        sendError(
+          res,
+          500,
+          "GMAIL_NOT_CONFIGURED",
+          "Gmail OAuth credentials not configured. Please set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET."
+        );
+        return;
+      }
+
+      // Get auth URL with userId as state
+      const authUrl = gmailService.getAuthUrl(userId);
+
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting Gmail OAuth:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to initiate Gmail OAuth",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/integrations/gmail/callback
+ * Gmail OAuth callback endpoint
+ * Google redirects here after user approves the app
+ */
+router.get("/gmail/callback", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { code, state, error } = req.query;
+
+    // Handle OAuth error (user denied access)
+    if (error) {
+      res.status(400).send(`
+        <html>
+          <head>
+            <title>Gmail Connection Failed</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+              h1 { color: #EA4335; }
+            </style>
+          </head>
+          <body>
+            <h1>Gmail Connection Failed</h1>
+            <p>You denied access or an error occurred.</p>
+            <p>Error: ${error}</p>
+            <p>You can close this window and try again.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    if (!code || !state) {
+      res.status(400).send(`
+        <html>
+          <head>
+            <title>Invalid Request</title>
+          </head>
+          <body>
+            <h1>Invalid OAuth callback</h1>
+            <p>Missing authorization code or state parameter.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    const userId = state as string;
+
+    // Import Gmail service
+    const { gmailService } = await import("../services/gmail.service.js");
+
+    // Exchange authorization code for access token
+    const tokenData = await gmailService.exchangeCodeForToken(code as string);
+
+    // Calculate token expiration
+    const tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+
+    // Get user's Gmail email
+    const profile = await gmailService.getProfile(tokenData.access_token);
+
+    // Encrypt tokens before storing
+    const encryptedAccessToken = encryptionService.encrypt(tokenData.access_token);
+    const encryptedRefreshToken = tokenData.refresh_token
+      ? encryptionService.encrypt(tokenData.refresh_token)
+      : null;
+
+    // Store tokens on user record
+    await db
+      .update(schema.users)
+      .set({
+        gmailAccessTokenEncrypted: encryptedAccessToken,
+        gmailRefreshTokenEncrypted: encryptedRefreshToken,
+        gmailTokenExpiresAt: tokenExpiresAt,
+        gmailUserEmail: profile.emailAddress,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, userId));
+
+    console.log(`Gmail connected for user: ${userId} (${profile.emailAddress})`);
+
+    // Return success page
+    res.send(`
+      <html>
+        <head>
+          <title>Gmail Connected</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              text-align: center;
+              padding: 50px;
+              background: linear-gradient(135deg, #EA4335 0%, #FBBC05 50%, #34A853 100%);
+              color: white;
+            }
+            .container {
+              background: white;
+              color: #333;
+              border-radius: 10px;
+              padding: 40px;
+              max-width: 500px;
+              margin: 0 auto;
+              box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            }
+            h1 { color: #34A853; margin-bottom: 10px; }
+            p { font-size: 16px; line-height: 1.6; }
+            .user-email { font-weight: bold; color: #4285F4; }
+            button {
+              margin-top: 20px;
+              padding: 12px 24px;
+              background: #4285F4;
+              color: white;
+              border: none;
+              border-radius: 5px;
+              font-size: 16px;
+              cursor: pointer;
+            }
+            button:hover { background: #3367D6; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Gmail Connected Successfully!</h1>
+            <p>Connected as <span class="user-email">${profile.emailAddress}</span></p>
+            <p>You can now send session summaries via email.</p>
+            <button onclick="window.close()">Close Window</button>
+          </div>
+          <script>
+            // Auto-close after 2 seconds
+            setTimeout(() => window.close(), 2000);
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Gmail OAuth callback error:", error);
+    res.status(500).send(`
+      <html>
+        <head>
+          <title>Connection Error</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            h1 { color: #EA4335; }
+          </style>
+        </head>
+        <body>
+          <h1>Connection Error</h1>
+          <p>Failed to connect to Gmail. Please try again.</p>
+          <p>Error: ${error instanceof Error ? error.message : "Unknown error"}</p>
+        </body>
+      </html>
+    `);
+  }
+});
+
+/**
+ * GET /api/integrations/gmail/status
+ * Check if the current user has Gmail connected
+ */
+router.get("/gmail/status", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const [user] = await db
+      .select({
+        gmailAccessTokenEncrypted: schema.users.gmailAccessTokenEncrypted,
+        gmailTokenExpiresAt: schema.users.gmailTokenExpiresAt,
+        gmailUserEmail: schema.users.gmailUserEmail,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "Not Found", message: "User not found" });
+      return;
+    }
+
+    const isConnected = !!user.gmailAccessTokenEncrypted;
+    const isExpired = user.gmailTokenExpiresAt
+      ? new Date(user.gmailTokenExpiresAt) < new Date()
+      : false;
+
+    res.json({
+      connected: isConnected && !isExpired,
+      expired: isExpired,
+      email: user.gmailUserEmail || null,
+    });
+  } catch (error) {
+    console.error("Error checking Gmail status:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to check Gmail status",
+    });
+  }
+});
+
+/**
+ * DELETE /api/integrations/gmail/disconnect
+ * Disconnect Gmail for the current user
+ */
+router.delete(
+  "/gmail/disconnect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      await db
+        .update(schema.users)
+        .set({
+          gmailAccessTokenEncrypted: null,
+          gmailRefreshTokenEncrypted: null,
+          gmailTokenExpiresAt: null,
+          gmailUserEmail: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, userId));
+
+      console.log(`Gmail disconnected for user: ${userId}`);
+
+      res.json({ success: true, message: "Gmail disconnected" });
+    } catch (error) {
+      console.error("Error disconnecting Gmail:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to disconnect Gmail",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/integrations/gmail/send
+ * Send an email via the user's Gmail account
+ */
+router.post("/gmail/send", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { to, subject, body } = req.body;
+
+    // Validate required fields
+    if (!to || !subject || !body) {
+      sendError(res, 400, "MISSING_FIELDS", "Missing required fields: to, subject, body");
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to)) {
+      sendError(res, 400, "INVALID_EMAIL", "Invalid email address format");
+      return;
+    }
+
+    const [user] = await db
+      .select({
+        gmailAccessTokenEncrypted: schema.users.gmailAccessTokenEncrypted,
+        gmailRefreshTokenEncrypted: schema.users.gmailRefreshTokenEncrypted,
+        gmailTokenExpiresAt: schema.users.gmailTokenExpiresAt,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!user?.gmailAccessTokenEncrypted) {
+      sendError(res, 400, "GMAIL_NOT_CONNECTED", "Please connect your Gmail account first");
+      return;
+    }
+
+    // Import Gmail service
+    const { gmailService } = await import("../services/gmail.service.js");
+
+    // Check if token is expired and try to refresh
+    let accessToken = encryptionService.decrypt(user.gmailAccessTokenEncrypted);
+
+    if (user.gmailTokenExpiresAt && new Date(user.gmailTokenExpiresAt) < new Date()) {
+      // Token expired, try to refresh
+      if (!user.gmailRefreshTokenEncrypted) {
+        sendError(
+          res,
+          401,
+          "TOKEN_EXPIRED",
+          "Your Gmail connection has expired. Please reconnect."
+        );
+        return;
+      }
+
+      try {
+        const refreshToken = encryptionService.decrypt(user.gmailRefreshTokenEncrypted);
+        const newTokenData = await gmailService.refreshToken(refreshToken);
+
+        // Update stored tokens
+        const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
+        await db
+          .update(schema.users)
+          .set({
+            gmailAccessTokenEncrypted: encryptionService.encrypt(newTokenData.access_token),
+            gmailTokenExpiresAt: tokenExpiresAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.users.id, userId));
+
+        accessToken = newTokenData.access_token;
+      } catch {
+        sendError(res, 401, "REFRESH_FAILED", "Failed to refresh Gmail token. Please reconnect.");
+        return;
+      }
+    }
+
+    // Send email
+    const fromName =
+      user.firstName && user.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user.firstName || undefined;
+
+    const result = await gmailService.sendEmail(accessToken, to, subject, body, fromName);
+
+    console.log(`Email sent via Gmail for user ${userId} to ${to}`);
+
+    res.json({
+      success: true,
+      messageId: result.id,
+      threadId: result.threadId,
+    });
+  } catch (error) {
+    console.error("Error sending email via Gmail:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to send email",
+    });
+  }
+});
+
 export default router;

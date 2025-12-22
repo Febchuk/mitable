@@ -116,6 +116,12 @@ export const IPC_CHANNELS = {
   WATCHING_PILL_PAUSE: "watching-pill-pause",
   WATCHING_PILL_RESUME: "watching-pill-resume",
   WATCHING_PILL_SEND_UPDATE: "watching-pill-send-update",
+  WATCHING_PILL_SHOW_EYE_DROPDOWN: "watching-pill-show-eye-dropdown",
+  WATCHING_PILL_HIDE_EYE_DROPDOWN: "watching-pill-hide-eye-dropdown",
+  WATCHING_PILL_SHOW_MENU_DROPDOWN: "watching-pill-show-menu-dropdown",
+  WATCHING_PILL_HIDE_MENU_DROPDOWN: "watching-pill-hide-menu-dropdown",
+  WATCHING_PILL_DROPDOWN_DATA: "watching-pill-dropdown-data", // Send data to dropdown windows
+  WATCHING_PILL_DROPDOWN_ACTION: "watching-pill-dropdown-action", // Actions from dropdown to main
 
   // Monitoring Session system (Work Session Tracking)
   MONITORING_SESSION_START: "monitoring-session-start", // Start new monitoring session

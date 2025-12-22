@@ -3,7 +3,10 @@ import { eq, sql, desc, and, inArray } from "drizzle-orm";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { requireAuth } from "../middleware/auth.js";
-import { sessionDeliveryService } from "../services/session-delivery.service.js";
+import {
+  sessionDeliveryService,
+  type MultiDeliveryTarget,
+} from "../services/session-delivery.service.js";
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
 import { frameAnalysisService } from "../services/frame-analysis.service.js";
 import { masterStoryService } from "../services/master-story.service.js";
@@ -1368,15 +1371,9 @@ router.post(
   }
 );
 
-interface DeliveryTarget {
-  type: "channel" | "dm";
-  id: string;
-  name?: string;
-}
-
 /**
  * POST /api/monitoring/sessions/:id/deliver
- * Send summary to multiple Slack channels and/or DMs
+ * Send summary to multiple Slack channels, DMs, or email addresses
  */
 router.post(
   "/sessions/:id/deliver",
@@ -1388,8 +1385,8 @@ router.post(
       channel,
       targets,
     }: {
-      channel: "slack";
-      targets: DeliveryTarget[];
+      channel: "slack" | "email";
+      targets: MultiDeliveryTarget[];
     } = req.body;
 
     if (!channel || !targets) {
@@ -1400,10 +1397,10 @@ router.post(
       return;
     }
 
-    if (channel !== "slack") {
+    if (channel !== "slack" && channel !== "email") {
       res.status(400).json({
         error: "Bad Request",
-        message: "Only slack channel is currently supported",
+        message: "channel must be 'slack' or 'email'",
       });
       return;
     }
@@ -1416,21 +1413,42 @@ router.post(
       return;
     }
 
-    // Validate each target
+    // Validate each target based on channel type
     for (const target of targets) {
-      if (!target.id || !target.type) {
-        res.status(400).json({
-          error: "Bad Request",
-          message: "Each target must have an id and type",
-        });
-        return;
-      }
-      if (target.type !== "channel" && target.type !== "dm") {
-        res.status(400).json({
-          error: "Bad Request",
-          message: "Target type must be 'channel' or 'dm'",
-        });
-        return;
+      if (channel === "email") {
+        // Email targets need an email address
+        if (!target.email) {
+          res.status(400).json({
+            error: "Bad Request",
+            message: "Each email target must have an email address",
+          });
+          return;
+        }
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(target.email)) {
+          res.status(400).json({
+            error: "Bad Request",
+            message: `Invalid email address: ${target.email}`,
+          });
+          return;
+        }
+      } else {
+        // Slack targets need id and type
+        if (!target.id || !target.type) {
+          res.status(400).json({
+            error: "Bad Request",
+            message: "Each Slack target must have an id and type",
+          });
+          return;
+        }
+        if (target.type !== "channel" && target.type !== "dm") {
+          res.status(400).json({
+            error: "Bad Request",
+            message: "Slack target type must be 'channel' or 'dm'",
+          });
+          return;
+        }
       }
     }
 
@@ -1472,7 +1490,9 @@ router.post(
         .set({
           deliveryStatus: "pending",
           deliveryChannel: channel,
-          deliveryTarget: JSON.stringify(targets.map((t) => t.id)),
+          deliveryTarget: JSON.stringify(
+            channel === "email" ? targets.map((t) => t.email) : targets.map((t) => t.id)
+          ),
           updatedAt: new Date(),
         })
         .where(eq(schema.monitoringSessions.id, id));
@@ -1497,7 +1517,7 @@ router.post(
             ? null
             : result.results
                 .filter((r) => r.status === "failed")
-                .map((r) => `${r.name || r.id}: ${r.error}`)
+                .map((r) => `${r.email || r.name || r.id}: ${r.error}`)
                 .join("; "),
           updatedAt: new Date(),
         })

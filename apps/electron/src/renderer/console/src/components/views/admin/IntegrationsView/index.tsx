@@ -7,6 +7,7 @@ import NotionConnectDialog from "./components/NotionConnectDialog";
 import NotionConfigureDialog from "./components/NotionConfigureDialog";
 import GitHubConnectDialog from "./components/GitHubConnectDialog";
 import LinearUsersDialog from "./components/LinearUsersDialog";
+import GmailUsersDialog from "./components/GmailUsersDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +34,7 @@ export default function IntegrationsView() {
   const [notionConfigureDialogOpen, setNotionConfigureDialogOpen] = useState(false);
   const [githubDialogOpen, setGithubDialogOpen] = useState(false);
   const [linearUsersDialogOpen, setLinearUsersDialogOpen] = useState(false);
+  const [gmailUsersDialogOpen, setGmailUsersDialogOpen] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSlackConnect = () => {
@@ -73,6 +75,10 @@ export default function IntegrationsView() {
 
   const handleLinearViewUsers = () => {
     setLinearUsersDialogOpen(true);
+  };
+
+  const handleGmailViewUsers = () => {
+    setGmailUsersDialogOpen(true);
   };
 
   const handleGithubOAuthComplete = () => {
@@ -410,9 +416,15 @@ export default function IntegrationsView() {
                       ? handleSlackConfigure
                       : integration.provider === "linear"
                         ? handleLinearViewUsers
-                        : handleConfigureIntegration
+                        : integration.provider === "gmail"
+                          ? handleGmailViewUsers
+                          : handleConfigureIntegration
                   }
-                  onSync={integration.provider === "linear" ? undefined : handleSyncIntegration}
+                  onSync={
+                    integration.provider === "linear" || integration.provider === "gmail"
+                      ? undefined
+                      : handleSyncIntegration
+                  }
                   onViewDetails={handleViewDetails}
                   onCustomConnect={
                     integration.provider === "slack"
@@ -423,7 +435,9 @@ export default function IntegrationsView() {
                           ? handleGithubConnect
                           : integration.provider === "linear"
                             ? handleLinearViewUsers
-                            : undefined
+                            : integration.provider === "gmail"
+                              ? handleGmailViewUsers
+                              : undefined
                   }
                   position={getCardPosition(index, sortedIntegrations.length)}
                 />
@@ -457,9 +471,15 @@ export default function IntegrationsView() {
                           ? handleNotionConfigure
                           : integration.provider === "linear"
                             ? handleLinearViewUsers
-                            : handleConfigureIntegration
+                            : integration.provider === "gmail"
+                              ? handleGmailViewUsers
+                              : handleConfigureIntegration
                     }
-                    onSync={integration.provider === "linear" ? undefined : handleSyncIntegration}
+                    onSync={
+                      integration.provider === "linear" || integration.provider === "gmail"
+                        ? undefined
+                        : handleSyncIntegration
+                    }
                     onViewDetails={handleViewDetails}
                     onCustomConnect={
                       integration.provider === "slack"
@@ -470,7 +490,9 @@ export default function IntegrationsView() {
                             ? handleGithubConnect
                             : integration.provider === "linear"
                               ? handleLinearViewUsers
-                              : undefined
+                              : integration.provider === "gmail"
+                                ? handleGmailViewUsers
+                                : undefined
                     }
                     position={getCardPosition(index, connectedIntegrations.length)}
                   />
@@ -499,9 +521,15 @@ export default function IntegrationsView() {
                           ? handleNotionConfigure
                           : integration.provider === "linear"
                             ? handleLinearViewUsers
-                            : handleConfigureIntegration
+                            : integration.provider === "gmail"
+                              ? handleGmailViewUsers
+                              : handleConfigureIntegration
                     }
-                    onSync={integration.provider === "linear" ? undefined : handleSyncIntegration}
+                    onSync={
+                      integration.provider === "linear" || integration.provider === "gmail"
+                        ? undefined
+                        : handleSyncIntegration
+                    }
                     onViewDetails={handleViewDetails}
                     onCustomConnect={
                       integration.provider === "slack"
@@ -512,7 +540,9 @@ export default function IntegrationsView() {
                             ? handleGithubConnect
                             : integration.provider === "linear"
                               ? handleLinearViewUsers
-                              : undefined
+                              : integration.provider === "gmail"
+                                ? handleGmailViewUsers
+                                : undefined
                     }
                     position={getCardPosition(index, availableIntegrations.length)}
                   />
@@ -565,6 +595,9 @@ export default function IntegrationsView() {
 
       {/* Linear Users Dialog */}
       <LinearUsersDialog open={linearUsersDialogOpen} onOpenChange={setLinearUsersDialogOpen} />
+
+      {/* Gmail Users Dialog */}
+      <GmailUsersDialog open={gmailUsersDialogOpen} onOpenChange={setGmailUsersDialogOpen} />
     </div>
   );
 }

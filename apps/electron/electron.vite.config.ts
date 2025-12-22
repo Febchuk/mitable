@@ -42,6 +42,7 @@ export default defineConfig({
           conversation: resolve(__dirname, "src/preload/conversation.ts"),
           watchButton: resolve(__dirname, "src/preload/watchButton.ts"),
           watchingPill: resolve(__dirname, "src/preload/watchingPill.ts"),
+          watchingPillDropdown: resolve(__dirname, "src/preload/watchingPillDropdown.ts"),
         },
         output: {
           format: "cjs",
@@ -71,6 +72,11 @@ export default defineConfig({
           conversation: resolve(__dirname, "src/renderer/conversation/index.html"),
           watchButton: resolve(__dirname, "src/renderer/watchButton/index.html"),
           watchingPill: resolve(__dirname, "src/renderer/watchingPill/index.html"),
+          watchingPillDropdownEye: resolve(__dirname, "src/renderer/watchingPillDropdown/eye.html"),
+          watchingPillDropdownMenu: resolve(
+            __dirname,
+            "src/renderer/watchingPillDropdown/menu.html"
+          ),
         },
       },
     },

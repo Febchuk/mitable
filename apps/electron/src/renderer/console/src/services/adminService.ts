@@ -68,7 +68,7 @@ export interface TemplateDetail {
 
 export interface Integration {
   id: string;
-  provider: "slack" | "notion" | "github" | "google-drive" | "linear";
+  provider: "slack" | "notion" | "github" | "google-drive" | "linear" | "gmail";
   name: string;
   description: string;
   status: "connected" | "disconnected";
@@ -82,6 +82,15 @@ export interface LinearConnectedUser {
   id: string;
   name: string;
   email: string;
+  avatarUrl?: string;
+  connectedAt?: Date;
+}
+
+export interface GmailConnectedUser {
+  id: string;
+  name: string;
+  email: string;
+  gmailEmail?: string;
   avatarUrl?: string;
   connectedAt?: Date;
 }
@@ -194,6 +203,21 @@ export async function fetchLinearConnectedUsers(): Promise<LinearConnectedUser[]
     return response.users;
   } catch (error) {
     console.error("Error fetching Linear users:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch users with Gmail connected (admin only)
+ */
+export async function fetchGmailConnectedUsers(): Promise<GmailConnectedUser[]> {
+  try {
+    const response = await apiRequest<{ users: GmailConnectedUser[] }>(
+      "/admin/integrations/gmail/users"
+    );
+    return response.users;
+  } catch (error) {
+    console.error("Error fetching Gmail users:", error);
     throw error;
   }
 }

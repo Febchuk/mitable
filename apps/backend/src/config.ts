@@ -120,6 +120,15 @@ export const config = {
     ).trim(),
   },
 
+  // Gmail OAuth Configuration (per-user email sending)
+  gmail: {
+    clientId: (process.env.GMAIL_CLIENT_ID || "").trim(),
+    clientSecret: (process.env.GMAIL_CLIENT_SECRET || "").trim(),
+    redirectUri: (
+      process.env.GMAIL_REDIRECT_URI || `http://localhost:${PORT}/api/integrations/gmail/callback`
+    ).trim(),
+  },
+
   // Google Cloud DLP Configuration (for PII redaction)
   googleCloud: {
     projectId: (process.env.GOOGLE_CLOUD_PROJECT_ID || "").trim(),

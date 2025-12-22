@@ -157,7 +157,7 @@ export function useUpdateSummary() {
 }
 
 /**
- * Deliver summary to multiple Slack channels and/or DMs
+ * Deliver summary to multiple Slack channels, DMs, or email addresses
  */
 export function useDeliverSummary() {
   const queryClient = useQueryClient();
@@ -166,10 +166,17 @@ export function useDeliverSummary() {
     mutationFn: ({
       sessionId,
       targets,
+      channel = "slack",
     }: {
       sessionId: string;
-      targets: Array<{ type: "channel" | "dm"; id: string; name?: string }>;
-    }) => monitoringService.deliverSummary(sessionId, targets),
+      targets: Array<{
+        type: "channel" | "dm" | "email";
+        id: string;
+        name?: string;
+        email?: string;
+      }>;
+      channel?: "slack" | "email";
+    }) => monitoringService.deliverSummary(sessionId, targets, channel),
     onSuccess: (_, { sessionId }) => {
       queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
       queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });

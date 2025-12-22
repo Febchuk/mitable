@@ -21,6 +21,12 @@ export const users = pgTable("users", {
   linearRefreshTokenEncrypted: text("linear_refresh_token_encrypted"),
   linearTokenExpiresAt: timestamp("linear_token_expires_at"),
 
+  // Gmail OAuth tokens (per-user email sending, encrypted)
+  gmailAccessTokenEncrypted: text("gmail_access_token_encrypted"),
+  gmailRefreshTokenEncrypted: text("gmail_refresh_token_encrypted"),
+  gmailTokenExpiresAt: timestamp("gmail_token_expires_at"),
+  gmailUserEmail: varchar("gmail_user_email", { length: 255 }),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
