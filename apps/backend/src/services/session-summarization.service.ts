@@ -122,7 +122,7 @@ class SessionSummarizationService {
     console.log(`[SessionSummarization] Aggregated into ${aggregated.length} activities`);
 
     // 5. Generate narrative summary
-    const summary = await this.generateNarrative(session, aggregated, analyses);
+    const summary = await this.generateNarrative(aggregated, analyses);
 
     const generationTimeMs = Date.now() - startTime;
     console.log(`[SessionSummarization] Summary generated in ${generationTimeMs}ms`);
@@ -302,21 +302,41 @@ class SessionSummarizationService {
         }
 
         // Analyze with Gemini Vision (only for frames without existing analysis)
-        const prompt = `Analyze this screenshot and describe what the user is doing in 10-15 words.
-Focus on the ACTIVITY, not the UI elements.
+        const prompt = `<task>
+Analyze this screenshot and describe what the user is working on. Focus on WHAT they're doing and WHY (the goal or outcome), not the tools or technical details.
+</task>
 
-Examples of good responses:
-- "Editing TypeScript code in VS Code, working on a React component"
-- "Browsing GitHub pull request #42, reviewing code changes"
-- "Writing email in Gmail to team about project update"
-- "Slack conversation in #engineering channel about deployment"
+<guidelines>
+1. **Focus on the work, not the tool:** Say "Fixing the login bug" instead of "Editing authentication.ts in VS Code"
+2. **Capture specific context:** Include visible PR numbers, document names, ticket IDs, feature names - anything that makes the activity concrete
+3. **Skip technical noise:** Don't mention programming languages, file extensions, or software names unless critical
+4. **Be natural:** Describe it like you'd answer "What are you up to?" to a teammate
+</guidelines>
 
+<app_specific_knowledge>
+**Cursor (AI Code Editor):**
+- Right sidebar chat panel: User messages have a COLORED BORDER around them. AI responses have NO border.
+- Code editor (left side):
+  - BLUE vertical bar on left margin = modified existing code
+  - GREEN vertical bar on left margin = entirely new code
+</app_specific_knowledge>
+
+<examples>
+- "Fixing the navigation bug in the mobile app"
+- "Reviewing PR #42 about the search improvements"
+- "Responding to the customer support ticket about login issues"
+- "Creating mockups for the new dashboard redesign"
+- "Writing documentation for the API endpoints"
+</examples>
+
+<output_format>
 Respond with JSON:
 {
-  "activity": "Brief description of what user is doing",
-  "context": ["key item 1", "key item 2"],
+  "activity": "Brief description of what they're working on",
+  "context": ["key detail 1", "key detail 2"],
   "confidence": "high" | "medium" | "low"
-}`;
+}
+</output_format>`;
 
         const result = await this.visionModel.generateContent([
           { text: prompt },
@@ -464,7 +484,6 @@ Respond with JSON:
    * Generate narrative summary using Groq
    */
   private async generateNarrative(
-    session: any,
     aggregated: AggregatedActivity[],
     analyses: ScreenshotAnalysis[]
   ): Promise<Omit<SessionSummaryResult, "generationTimeMs">> {
@@ -481,27 +500,34 @@ Respond with JSON:
       .join("\n");
 
     // Generate summary prompt
-    const prompt = `You are summarizing a work session for an employee's status update.
-
-Session Duration: ${this.formatDuration(Date.now() - new Date(session.startedAt).getTime())}
-Session Name: ${session.name || "Work Session"}
+    const prompt = `You're writing a casual update to share with your team about what you got done in this work session.
 
 Activities detected:
 ${activityList}
 
-Generate a concise, professional summary in 2-3 sentences that:
-1. Highlights the main focus areas
-2. Mentions key accomplishments if apparent
-3. Notes any context switches between apps
+Write a brief, conversational summary (6 sentences max) that:
+1. Highlights what you accomplished and why it matters
+2. Connects activities to outcomes when possible (e.g., "Fixed X which unblocked Y")
+3. Feels human and natural - like you're messaging your team in Slack
+4. Written in first person
+
+Style guidelines:
+- Be casual and conversational (not formal or robotic)
+- Focus on impact and outcomes, not just tasks
+- Skip unnecessary details like durations or tool names
+- Mention specific artifacts when relevant (PRs, tickets, documents)
+
+Example tone:
+"Merged the auth refactor PR and cut a release today. This unblocks the team to start testing the new login flow. Also responded to a few customer support tickets about the password reset issue."
 
 Also extract:
-- Top 3 key activities (most significant things done)
-- Any accomplishments (completed items, shipped features, etc.)
-- Any potential blockers (waiting, errors, repeated attempts)
+- Top 3 key activities (what you actually accomplished)
+- Any accomplishments (completed items, shipped features, unblocked work)
+- Any blockers (waiting on something, errors, repeated attempts)
 
 Respond with JSON:
 {
-  "narrativeSummary": "Your 2-3 sentence summary here",
+  "narrativeSummary": "Your casual 2-4 sentence update here",
   "activities": ["Activity 1", "Activity 2", "Activity 3"],
   "accomplishments": ["Accomplishment 1"] or [],
   "blockers": ["Blocker 1"] or []
