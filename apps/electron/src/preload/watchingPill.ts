@@ -18,6 +18,10 @@ const IPC_CHANNELS = {
   WATCH_WINDOW_UNSELECT: "watch-window-unselect",
   WATCH_WINDOWS_UPDATED: "watch-windows-updated",
   WATCHING_PILL_HIDE: "watching-pill-hide",
+  WATCHING_PILL_SHOW_EYE_DROPDOWN: "watching-pill-show-eye-dropdown",
+  WATCHING_PILL_HIDE_EYE_DROPDOWN: "watching-pill-hide-eye-dropdown",
+  WATCHING_PILL_SHOW_MENU_DROPDOWN: "watching-pill-show-menu-dropdown",
+  WATCHING_PILL_HIDE_MENU_DROPDOWN: "watching-pill-hide-menu-dropdown",
   SHOW_CONSOLE: "show-console",
   USER_CONTEXT_GET: "user-context-get",
   CREATE_BACKEND_SESSION: "create-backend-session",
@@ -128,6 +132,32 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
     ipcRenderer.send(IPC_CHANNELS.SHOW_CONSOLE);
   },
 
+  showEyeDropdown: (): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCHING_PILL_SHOW_EYE_DROPDOWN),
+
+  hideEyeDropdown: (): void => {
+    ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE_EYE_DROPDOWN);
+  },
+
+  showMenuDropdown: (): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WATCHING_PILL_SHOW_MENU_DROPDOWN),
+
+  hideMenuDropdown: (): void => {
+    ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE_MENU_DROPDOWN);
+  },
+
+  onEyeDropdownClosed: (callback: () => void): (() => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("eye-dropdown-closed", handler);
+    return () => ipcRenderer.removeListener("eye-dropdown-closed", handler);
+  },
+
+  onMenuDropdownClosed: (callback: () => void): (() => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu-dropdown-closed", handler);
+    return () => ipcRenderer.removeListener("menu-dropdown-closed", handler);
+  },
+
   // ===========================
   // User Context
   // ===========================
@@ -215,6 +245,12 @@ declare global {
       // UI actions
       hide: () => void;
       showConsole: () => void;
+      showEyeDropdown: () => Promise<void>;
+      hideEyeDropdown: () => void;
+      showMenuDropdown: () => Promise<void>;
+      hideMenuDropdown: () => void;
+      onEyeDropdownClosed: (callback: () => void) => () => void;
+      onMenuDropdownClosed: (callback: () => void) => () => void;
 
       // User context
       getCurrentUser: () => Promise<{ userId: string; organizationId: string } | null>;

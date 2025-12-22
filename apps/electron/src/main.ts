@@ -16,6 +16,8 @@ let agentPanelWindow: BrowserWindow | null = null;
 let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let watchingPillWindow: BrowserWindow | null = null;
+let watchingPillEyeDropdown: BrowserWindow | null = null;
+let watchingPillMenuDropdown: BrowserWindow | null = null;
 
 // Watch button windows tracking (module scope for cleanup from multiple handlers)
 const watchButtonWindows: Map<string, BrowserWindow> = new Map();
@@ -314,7 +316,7 @@ function createConsoleWindow() {
 
   // Show window when ready (ensures proper Dock visibility on macOS)
   consoleWindow.once("ready-to-show", () => {
-    consoleWindow.show();
+    consoleWindow?.show();
   });
 
   // Log when preload script finishes loading
@@ -363,8 +365,8 @@ function createWatchingPillWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
 
-  const windowWidth = 280; // Wide enough for w-56 (224px) dropdown + margins
-  const windowHeight = 400; // Tall enough for pill + expanded dropdown lists
+  const windowWidth = 50; // Just the pill width
+  const windowHeight = 130; // Just the pill height
   const rightMargin = 5;
 
   watchingPillWindow = new BrowserWindow({
@@ -404,6 +406,120 @@ function createWatchingPillWindow() {
   });
 
   console.log("[WatchingPill] Window created at right edge, vertically centered");
+}
+
+function createWatchingPillEyeDropdown() {
+  if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
+
+  const pillBounds = watchingPillWindow.getBounds();
+
+  watchingPillEyeDropdown = new BrowserWindow({
+    width: 240,
+    height: 280,
+    x: pillBounds.x - 250, // Left of pill
+    y: pillBounds.y + 40, // Below eye button position
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    show: false,
+    parent: watchingPillWindow, // Child of pill window
+    webPreferences: {
+      preload: join(__dirname, "../preload/watchingPillDropdown.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top
+  if (process.platform === "darwin") {
+    watchingPillEyeDropdown.setAlwaysOnTop(true, "modal-panel");
+  } else {
+    watchingPillEyeDropdown.setAlwaysOnTop(true, "normal", 1);
+  }
+
+  // Dismiss on blur (click away)
+  watchingPillEyeDropdown.on("blur", () => {
+    if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
+      watchingPillEyeDropdown.hide();
+      // Notify pill that dropdown closed
+      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+        watchingPillWindow.webContents.send("eye-dropdown-closed");
+      }
+    }
+  });
+
+  watchingPillEyeDropdown.on("closed", () => {
+    watchingPillEyeDropdown = null;
+  });
+
+  if (!app.isPackaged) {
+    watchingPillEyeDropdown.loadURL(
+      "http://localhost:5173/watchingPillDropdown/eye.html"
+    );
+  } else {
+    watchingPillEyeDropdown.loadFile(
+      join(__dirname, "../renderer/watchingPillDropdown/eye.html")
+    );
+  }
+}
+
+function createWatchingPillMenuDropdown() {
+  if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
+
+  const pillBounds = watchingPillWindow.getBounds();
+
+  watchingPillMenuDropdown = new BrowserWindow({
+    width: 160,
+    height: 100,
+    x: pillBounds.x - 170, // Left of pill
+    y: pillBounds.y + 90, // Below menu button position
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    show: false,
+    parent: watchingPillWindow, // Child of pill window
+    webPreferences: {
+      preload: join(__dirname, "../preload/watchingPillDropdown.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top
+  if (process.platform === "darwin") {
+    watchingPillMenuDropdown.setAlwaysOnTop(true, "modal-panel");
+  } else {
+    watchingPillMenuDropdown.setAlwaysOnTop(true, "normal", 1);
+  }
+
+  // Dismiss on blur (click away)
+  watchingPillMenuDropdown.on("blur", () => {
+    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed()) {
+      watchingPillMenuDropdown.hide();
+      // Notify pill that dropdown closed
+      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+        watchingPillWindow.webContents.send("menu-dropdown-closed");
+      }
+    }
+  });
+
+  watchingPillMenuDropdown.on("closed", () => {
+    watchingPillMenuDropdown = null;
+  });
+
+  if (!app.isPackaged) {
+    watchingPillMenuDropdown.loadURL(
+      "http://localhost:5173/watchingPillDropdown/menu.html"
+    );
+  } else {
+    watchingPillMenuDropdown.loadFile(
+      join(__dirname, "../renderer/watchingPillDropdown/menu.html")
+    );
+  }
 }
 
 // IPC Handlers
@@ -1026,6 +1142,151 @@ function setupIPC() {
       watchingPillWindow.show();
     }
   });
+
+  // Show eye dropdown (window selector)
+  ipcMain.handle(IPC_CHANNELS.WATCHING_PILL_SHOW_EYE_DROPDOWN, async () => {
+    if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
+
+    // Create dropdown if it doesn't exist
+    if (!watchingPillEyeDropdown || watchingPillEyeDropdown.isDestroyed()) {
+      createWatchingPillEyeDropdown();
+    }
+
+    // Reposition relative to current pill location
+    const pillBounds = watchingPillWindow.getBounds();
+    if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
+      watchingPillEyeDropdown.setBounds({
+        x: pillBounds.x - 250,
+        y: pillBounds.y + 40,
+        width: 240,
+        height: 280,
+      });
+
+      // Get current window data and send to dropdown
+      const selectedWindows = windowDetectionService.getSelectedWindows();
+      const availableWindows = await windowDetectionService.getAllVisibleWindows();
+
+      watchingPillEyeDropdown.webContents.send(
+        IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA,
+        {
+          type: "eye",
+          selectedWindows,
+          availableWindows,
+        }
+      );
+
+      watchingPillEyeDropdown.show();
+      watchingPillEyeDropdown.focus();
+    }
+  });
+
+  // Hide eye dropdown
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_HIDE_EYE_DROPDOWN, () => {
+    if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
+      watchingPillEyeDropdown.hide();
+    }
+  });
+
+  // Show menu dropdown (session controls)
+  ipcMain.handle(IPC_CHANNELS.WATCHING_PILL_SHOW_MENU_DROPDOWN, async () => {
+    if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
+
+    // Create dropdown if it doesn't exist
+    if (!watchingPillMenuDropdown || watchingPillMenuDropdown.isDestroyed()) {
+      createWatchingPillMenuDropdown();
+    }
+
+    // Reposition relative to current pill location
+    const pillBounds = watchingPillWindow.getBounds();
+    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed()) {
+      watchingPillMenuDropdown.setBounds({
+        x: pillBounds.x - 170,
+        y: pillBounds.y + 90,
+        width: 160,
+        height: 100,
+      });
+
+      // Get session state and send to dropdown
+      const sessionState = monitoringSessionService.getSessionState();
+      const selectedWindows = windowDetectionService.getSelectedWindows();
+
+      watchingPillMenuDropdown.webContents.send(
+        IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA,
+        {
+          type: "menu",
+          sessionState,
+          selectedWindows,
+        }
+      );
+
+      watchingPillMenuDropdown.show();
+      watchingPillMenuDropdown.focus();
+    }
+  });
+
+  // Hide menu dropdown
+  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_HIDE_MENU_DROPDOWN, () => {
+    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed()) {
+      watchingPillMenuDropdown.hide();
+    }
+  });
+
+  // Handle actions from dropdown windows
+  ipcMain.handle(
+    IPC_CHANNELS.WATCHING_PILL_DROPDOWN_ACTION,
+    async (_event, action: { type: string; payload?: unknown }) => {
+      console.log("[WatchingPill] Dropdown action:", action);
+
+      switch (action.type) {
+        case "select-window": {
+          const payload = action.payload as {
+            windowId: string;
+            appName: string;
+            windowTitle: string;
+          };
+          windowDetectionService.addWindow({
+            windowId: payload.windowId,
+            appName: payload.appName,
+            windowTitle: payload.windowTitle,
+          });
+          return { success: true };
+        }
+        case "unselect-window": {
+          const windowId = action.payload as string;
+          windowDetectionService.removeWindow(windowId);
+          return { success: true };
+        }
+        case "start-session": {
+          // This needs user context - handled by the pill itself
+          return { success: false, error: "Use pill to start session" };
+        }
+        case "pause-session": {
+          return monitoringSessionService.pauseSession();
+        }
+        case "resume-session": {
+          return monitoringSessionService.resumeSession();
+        }
+        case "end-session": {
+          return monitoringSessionService.endSession();
+        }
+        case "show-console": {
+          if (consoleWindow && !consoleWindow.isDestroyed()) {
+            consoleWindow.show();
+            consoleWindow.focus();
+          }
+          return { success: true };
+        }
+        case "hide-pill": {
+          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+            watchingPillWindow.hide();
+          }
+          return { success: true };
+        }
+        default:
+          return { success: false, error: "Unknown action" };
+      }
+    }
+  );
 
   // Show console window
   ipcMain.on(IPC_CHANNELS.SHOW_CONSOLE, () => {
