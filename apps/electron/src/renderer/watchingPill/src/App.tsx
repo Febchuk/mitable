@@ -59,25 +59,13 @@ export default function App() {
     };
   }, []);
 
-  // Eye button toggles window selector dropdown
+  // Eye button toggles window selector dropdown (main process handles toggle logic)
   const handleEyeClick = async () => {
-    if (eyeDropdownOpen) {
-      window.watchingPillAPI.hideEyeDropdown();
-      setEyeDropdownOpen(false);
-      return;
-    }
-    setEyeDropdownOpen(true);
     await window.watchingPillAPI.showEyeDropdown();
   };
 
-  // Menu button toggles session controls dropdown
+  // Menu button toggles session controls dropdown (main process handles toggle logic)
   const handleMenuClick = async () => {
-    if (menuDropdownOpen) {
-      window.watchingPillAPI.hideMenuDropdown();
-      setMenuDropdownOpen(false);
-      return;
-    }
-    setMenuDropdownOpen(true);
     await window.watchingPillAPI.showMenuDropdown();
   };
 

@@ -19,6 +19,10 @@ let watchingPillWindow: BrowserWindow | null = null;
 let watchingPillEyeDropdown: BrowserWindow | null = null;
 let watchingPillMenuDropdown: BrowserWindow | null = null;
 
+// Track when dropdowns were last hidden (to prevent re-opening on button click)
+let eyeDropdownLastHidden = 0;
+let menuDropdownLastHidden = 0;
+
 // Watch button windows tracking (module scope for cleanup from multiple handlers)
 const watchButtonWindows: Map<string, BrowserWindow> = new Map();
 
@@ -443,6 +447,7 @@ function createWatchingPillEyeDropdown() {
   watchingPillEyeDropdown.on("blur", () => {
     if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
       watchingPillEyeDropdown.hide();
+      eyeDropdownLastHidden = Date.now(); // Track when hidden for toggle logic
       // Notify pill that dropdown closed
       if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
         watchingPillWindow.webContents.send("eye-dropdown-closed");
@@ -500,6 +505,7 @@ function createWatchingPillMenuDropdown() {
   watchingPillMenuDropdown.on("blur", () => {
     if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed()) {
       watchingPillMenuDropdown.hide();
+      menuDropdownLastHidden = Date.now(); // Track when hidden for toggle logic
       // Notify pill that dropdown closed
       if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
         watchingPillWindow.webContents.send("menu-dropdown-closed");
@@ -1143,9 +1149,25 @@ function setupIPC() {
     }
   });
 
-  // Show eye dropdown (window selector)
+  // Toggle eye dropdown (window selector)
   ipcMain.handle(IPC_CHANNELS.WATCHING_PILL_SHOW_EYE_DROPDOWN, async () => {
     if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
+
+    // If dropdown was just hidden by blur (within 200ms), don't re-open
+    // This handles the case where clicking the button triggers blur before click
+    if (Date.now() - eyeDropdownLastHidden < 200) {
+      return;
+    }
+
+    // Toggle: if visible, hide it
+    if (
+      watchingPillEyeDropdown &&
+      !watchingPillEyeDropdown.isDestroyed() &&
+      watchingPillEyeDropdown.isVisible()
+    ) {
+      watchingPillEyeDropdown.hide();
+      return;
+    }
 
     // Create dropdown if it doesn't exist
     if (!watchingPillEyeDropdown || watchingPillEyeDropdown.isDestroyed()) {
@@ -1187,9 +1209,25 @@ function setupIPC() {
     }
   });
 
-  // Show menu dropdown (session controls)
+  // Toggle menu dropdown (session controls)
   ipcMain.handle(IPC_CHANNELS.WATCHING_PILL_SHOW_MENU_DROPDOWN, async () => {
     if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
+
+    // If dropdown was just hidden by blur (within 200ms), don't re-open
+    // This handles the case where clicking the button triggers blur before click
+    if (Date.now() - menuDropdownLastHidden < 200) {
+      return;
+    }
+
+    // Toggle: if visible, hide it
+    if (
+      watchingPillMenuDropdown &&
+      !watchingPillMenuDropdown.isDestroyed() &&
+      watchingPillMenuDropdown.isVisible()
+    ) {
+      watchingPillMenuDropdown.hide();
+      return;
+    }
 
     // Create dropdown if it doesn't exist
     if (!watchingPillMenuDropdown || watchingPillMenuDropdown.isDestroyed()) {
