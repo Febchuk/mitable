@@ -303,11 +303,18 @@ function createConsoleWindow() {
       !isWindows && {
         backgroundColor: "#1a1a1a",
       }),
+    // Don't show until ready (ensures proper Dock visibility on macOS)
+    show: false,
     webPreferences: {
       preload: join(__dirname, "../preload/console.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // Show window when ready (ensures proper Dock visibility on macOS)
+  consoleWindow.once("ready-to-show", () => {
+    consoleWindow.show();
   });
 
   // Log when preload script finishes loading
