@@ -420,7 +420,11 @@ export default function IntegrationsView() {
                           ? handleGmailViewUsers
                           : handleConfigureIntegration
                   }
-                  onSync={integration.provider === "linear" || integration.provider === "gmail" ? undefined : handleSyncIntegration}
+                  onSync={
+                    integration.provider === "linear" || integration.provider === "gmail"
+                      ? undefined
+                      : handleSyncIntegration
+                  }
                   onViewDetails={handleViewDetails}
                   onCustomConnect={
                     integration.provider === "slack"
@@ -471,7 +475,11 @@ export default function IntegrationsView() {
                               ? handleGmailViewUsers
                               : handleConfigureIntegration
                     }
-                    onSync={integration.provider === "linear" || integration.provider === "gmail" ? undefined : handleSyncIntegration}
+                    onSync={
+                      integration.provider === "linear" || integration.provider === "gmail"
+                        ? undefined
+                        : handleSyncIntegration
+                    }
                     onViewDetails={handleViewDetails}
                     onCustomConnect={
                       integration.provider === "slack"
@@ -517,7 +525,11 @@ export default function IntegrationsView() {
                               ? handleGmailViewUsers
                               : handleConfigureIntegration
                     }
-                    onSync={integration.provider === "linear" || integration.provider === "gmail" ? undefined : handleSyncIntegration}
+                    onSync={
+                      integration.provider === "linear" || integration.provider === "gmail"
+                        ? undefined
+                        : handleSyncIntegration
+                    }
                     onViewDetails={handleViewDetails}
                     onCustomConnect={
                       integration.provider === "slack"

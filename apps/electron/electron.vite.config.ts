@@ -73,7 +73,10 @@ export default defineConfig({
           watchButton: resolve(__dirname, "src/renderer/watchButton/index.html"),
           watchingPill: resolve(__dirname, "src/renderer/watchingPill/index.html"),
           watchingPillDropdownEye: resolve(__dirname, "src/renderer/watchingPillDropdown/eye.html"),
-          watchingPillDropdownMenu: resolve(__dirname, "src/renderer/watchingPillDropdown/menu.html"),
+          watchingPillDropdownMenu: resolve(
+            __dirname,
+            "src/renderer/watchingPillDropdown/menu.html"
+          ),
         },
       },
     },

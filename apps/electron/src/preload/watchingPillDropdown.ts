@@ -1,9 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
-import type {
-  MonitoringSessionState,
-  SelectedWindowInfo,
-  WatchableWindow,
-} from "@mitable/shared";
+import type { MonitoringSessionState, SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
 
 // IPC channel constants (inlined to avoid chunking issues)
 const IPC_CHANNELS = {
@@ -31,21 +27,13 @@ type DropdownData = EyeDropdownData | MenuDropdownData;
 contextBridge.exposeInMainWorld("dropdownAPI", {
   // Receive data from main process
   onData: (callback: (data: DropdownData) => void): (() => void) => {
-    const handler = (_event: IpcRendererEvent, data: DropdownData) =>
-      callback(data);
+    const handler = (_event: IpcRendererEvent, data: DropdownData) => callback(data);
     ipcRenderer.on(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, handler);
-    return () =>
-      ipcRenderer.removeListener(
-        IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA,
-        handler
-      );
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, handler);
   },
 
   // Send actions to main process
-  action: (
-    actionType: string,
-    payload?: unknown
-  ): Promise<{ success: boolean; error?: string }> =>
+  action: (actionType: string, payload?: unknown): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_ACTION, {
       type: actionType,
       payload,

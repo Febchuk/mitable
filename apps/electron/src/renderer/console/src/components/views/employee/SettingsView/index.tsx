@@ -393,9 +393,7 @@ export default function SettingsView() {
                 Connect your Gmail to send session summaries from your email.
               </p>
               {gmailStatus?.connected && gmailStatus.email && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {gmailStatus.email}
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">{gmailStatus.email}</p>
               )}
             </div>
 

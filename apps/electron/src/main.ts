@@ -460,13 +460,9 @@ function createWatchingPillEyeDropdown() {
   });
 
   if (!app.isPackaged) {
-    watchingPillEyeDropdown.loadURL(
-      "http://localhost:5173/watchingPillDropdown/eye.html"
-    );
+    watchingPillEyeDropdown.loadURL("http://localhost:5173/watchingPillDropdown/eye.html");
   } else {
-    watchingPillEyeDropdown.loadFile(
-      join(__dirname, "../renderer/watchingPillDropdown/eye.html")
-    );
+    watchingPillEyeDropdown.loadFile(join(__dirname, "../renderer/watchingPillDropdown/eye.html"));
   }
 }
 
@@ -518,9 +514,7 @@ function createWatchingPillMenuDropdown() {
   });
 
   if (!app.isPackaged) {
-    watchingPillMenuDropdown.loadURL(
-      "http://localhost:5173/watchingPillDropdown/menu.html"
-    );
+    watchingPillMenuDropdown.loadURL("http://localhost:5173/watchingPillDropdown/menu.html");
   } else {
     watchingPillMenuDropdown.loadFile(
       join(__dirname, "../renderer/watchingPillDropdown/menu.html")
@@ -1188,14 +1182,11 @@ function setupIPC() {
       const selectedWindows = windowDetectionService.getSelectedWindows();
       const availableWindows = await windowDetectionService.getAllVisibleWindows();
 
-      watchingPillEyeDropdown.webContents.send(
-        IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA,
-        {
-          type: "eye",
-          selectedWindows,
-          availableWindows,
-        }
-      );
+      watchingPillEyeDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
+        type: "eye",
+        selectedWindows,
+        availableWindows,
+      });
 
       watchingPillEyeDropdown.show();
       watchingPillEyeDropdown.focus();
@@ -1248,14 +1239,11 @@ function setupIPC() {
       const sessionState = monitoringSessionService.getSessionState();
       const selectedWindows = windowDetectionService.getSelectedWindows();
 
-      watchingPillMenuDropdown.webContents.send(
-        IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA,
-        {
-          type: "menu",
-          sessionState,
-          selectedWindows,
-        }
-      );
+      watchingPillMenuDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
+        type: "menu",
+        sessionState,
+        selectedWindows,
+      });
 
       watchingPillMenuDropdown.show();
       watchingPillMenuDropdown.focus();

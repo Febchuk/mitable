@@ -2338,112 +2338,103 @@ router.delete(
  * POST /api/integrations/gmail/send
  * Send an email via the user's Gmail account
  */
-router.post(
-  "/gmail/send",
-  requireAuth,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const userId = req.userId!;
-      const { to, subject, body } = req.body;
+router.post("/gmail/send", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { to, subject, body } = req.body;
 
-      // Validate required fields
-      if (!to || !subject || !body) {
-        sendError(res, 400, "MISSING_FIELDS", "Missing required fields: to, subject, body");
-        return;
-      }
-
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(to)) {
-        sendError(res, 400, "INVALID_EMAIL", "Invalid email address format");
-        return;
-      }
-
-      const [user] = await db
-        .select({
-          gmailAccessTokenEncrypted: schema.users.gmailAccessTokenEncrypted,
-          gmailRefreshTokenEncrypted: schema.users.gmailRefreshTokenEncrypted,
-          gmailTokenExpiresAt: schema.users.gmailTokenExpiresAt,
-          firstName: schema.users.firstName,
-          lastName: schema.users.lastName,
-        })
-        .from(schema.users)
-        .where(eq(schema.users.id, userId))
-        .limit(1);
-
-      if (!user?.gmailAccessTokenEncrypted) {
-        sendError(res, 400, "GMAIL_NOT_CONNECTED", "Please connect your Gmail account first");
-        return;
-      }
-
-      // Import Gmail service
-      const { gmailService } = await import("../services/gmail.service.js");
-
-      // Check if token is expired and try to refresh
-      let accessToken = encryptionService.decrypt(user.gmailAccessTokenEncrypted);
-
-      if (user.gmailTokenExpiresAt && new Date(user.gmailTokenExpiresAt) < new Date()) {
-        // Token expired, try to refresh
-        if (!user.gmailRefreshTokenEncrypted) {
-          sendError(
-            res,
-            401,
-            "TOKEN_EXPIRED",
-            "Your Gmail connection has expired. Please reconnect."
-          );
-          return;
-        }
-
-        try {
-          const refreshToken = encryptionService.decrypt(user.gmailRefreshTokenEncrypted);
-          const newTokenData = await gmailService.refreshToken(refreshToken);
-
-          // Update stored tokens
-          const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
-          await db
-            .update(schema.users)
-            .set({
-              gmailAccessTokenEncrypted: encryptionService.encrypt(newTokenData.access_token),
-              gmailTokenExpiresAt: tokenExpiresAt,
-              updatedAt: new Date(),
-            })
-            .where(eq(schema.users.id, userId));
-
-          accessToken = newTokenData.access_token;
-        } catch {
-          sendError(
-            res,
-            401,
-            "REFRESH_FAILED",
-            "Failed to refresh Gmail token. Please reconnect."
-          );
-          return;
-        }
-      }
-
-      // Send email
-      const fromName =
-        user.firstName && user.lastName
-          ? `${user.firstName} ${user.lastName}`
-          : user.firstName || undefined;
-
-      const result = await gmailService.sendEmail(accessToken, to, subject, body, fromName);
-
-      console.log(`Email sent via Gmail for user ${userId} to ${to}`);
-
-      res.json({
-        success: true,
-        messageId: result.id,
-        threadId: result.threadId,
-      });
-    } catch (error) {
-      console.error("Error sending email via Gmail:", error);
-      res.status(500).json({
-        error: "Internal Server Error",
-        message: error instanceof Error ? error.message : "Failed to send email",
-      });
+    // Validate required fields
+    if (!to || !subject || !body) {
+      sendError(res, 400, "MISSING_FIELDS", "Missing required fields: to, subject, body");
+      return;
     }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to)) {
+      sendError(res, 400, "INVALID_EMAIL", "Invalid email address format");
+      return;
+    }
+
+    const [user] = await db
+      .select({
+        gmailAccessTokenEncrypted: schema.users.gmailAccessTokenEncrypted,
+        gmailRefreshTokenEncrypted: schema.users.gmailRefreshTokenEncrypted,
+        gmailTokenExpiresAt: schema.users.gmailTokenExpiresAt,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!user?.gmailAccessTokenEncrypted) {
+      sendError(res, 400, "GMAIL_NOT_CONNECTED", "Please connect your Gmail account first");
+      return;
+    }
+
+    // Import Gmail service
+    const { gmailService } = await import("../services/gmail.service.js");
+
+    // Check if token is expired and try to refresh
+    let accessToken = encryptionService.decrypt(user.gmailAccessTokenEncrypted);
+
+    if (user.gmailTokenExpiresAt && new Date(user.gmailTokenExpiresAt) < new Date()) {
+      // Token expired, try to refresh
+      if (!user.gmailRefreshTokenEncrypted) {
+        sendError(
+          res,
+          401,
+          "TOKEN_EXPIRED",
+          "Your Gmail connection has expired. Please reconnect."
+        );
+        return;
+      }
+
+      try {
+        const refreshToken = encryptionService.decrypt(user.gmailRefreshTokenEncrypted);
+        const newTokenData = await gmailService.refreshToken(refreshToken);
+
+        // Update stored tokens
+        const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
+        await db
+          .update(schema.users)
+          .set({
+            gmailAccessTokenEncrypted: encryptionService.encrypt(newTokenData.access_token),
+            gmailTokenExpiresAt: tokenExpiresAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.users.id, userId));
+
+        accessToken = newTokenData.access_token;
+      } catch {
+        sendError(res, 401, "REFRESH_FAILED", "Failed to refresh Gmail token. Please reconnect.");
+        return;
+      }
+    }
+
+    // Send email
+    const fromName =
+      user.firstName && user.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user.firstName || undefined;
+
+    const result = await gmailService.sendEmail(accessToken, to, subject, body, fromName);
+
+    console.log(`Email sent via Gmail for user ${userId} to ${to}`);
+
+    res.json({
+      success: true,
+      messageId: result.id,
+      threadId: result.threadId,
+    });
+  } catch (error) {
+    console.error("Error sending email via Gmail:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to send email",
+    });
   }
-);
+});
 
 export default router;

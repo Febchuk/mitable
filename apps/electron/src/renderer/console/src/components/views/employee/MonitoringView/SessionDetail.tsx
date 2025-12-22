@@ -22,7 +22,11 @@ import {
   useUpdateSession,
   monitoringKeys,
 } from "@/console/src/hooks/queries/monitoring";
-import { uploadCaptures } from "@/console/src/services/monitoringService";
+import {
+  uploadCaptures,
+  checkGmailConnection,
+  startGmailOAuth,
+} from "@/console/src/services/monitoringService";
 import {
   ArrowLeft,
   Clock,
@@ -40,6 +44,7 @@ import {
   BookOpen,
   ChevronUp,
   Image,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -106,9 +111,17 @@ export default function SessionDetail() {
   const [isAIEditMode, setIsAIEditMode] = useState(false);
   const [isPauseLoading, setIsPauseLoading] = useState(false);
   const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
   const [isLinearDialogOpen, setIsLinearDialogOpen] = useState(false);
   const [isStoryExpanded, setIsStoryExpanded] = useState(true);
   const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
+  const [gmailStatus, setGmailStatus] = useState<{
+    connected: boolean;
+    email: string | null;
+    loading: boolean;
+  }>({ connected: false, email: null, loading: true });
+  const [isConnectingGmail, setIsConnectingGmail] = useState(false);
 
   // Listen for session updates from watch pill (e.g., pause/resume)
   useEffect(() => {
@@ -123,6 +136,63 @@ export default function SessionDetail() {
       unsubscribe?.();
     };
   }, [sessionId, queryClient]);
+
+  // Check Gmail connection status
+  useEffect(() => {
+    const checkGmail = async () => {
+      try {
+        const status = await checkGmailConnection();
+        setGmailStatus({
+          connected: status.connected,
+          email: status.email,
+          loading: false,
+        });
+      } catch {
+        setGmailStatus({ connected: false, email: null, loading: false });
+      }
+    };
+    checkGmail();
+  }, []);
+
+  // Handle Gmail connect button
+  const handleConnectGmail = async () => {
+    setIsConnectingGmail(true);
+    try {
+      const { authUrl } = await startGmailOAuth();
+      // Open auth URL in system browser
+      window.open(authUrl, "_blank");
+      toast({
+        title: "Gmail Authorization",
+        description: "Complete the authorization in your browser, then come back here.",
+      });
+      // Poll for connection status
+      const pollInterval = setInterval(async () => {
+        const status = await checkGmailConnection();
+        if (status.connected) {
+          clearInterval(pollInterval);
+          setGmailStatus({ connected: true, email: status.email, loading: false });
+          setIsConnectingGmail(false);
+          toast({
+            title: "Gmail Connected",
+            description: `Connected as ${status.email}`,
+          });
+        }
+      }, 2000);
+      // Stop polling after 2 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setIsConnectingGmail(false);
+      }, 120000);
+    } catch (error) {
+      console.error("Error starting Gmail OAuth:", error);
+      toast({
+        title: "Error",
+        description: "Failed to start Gmail authorization. Please try again.",
+        variant: "destructive",
+      });
+      setIsConnectingGmail(false);
+    }
+  };
 
   // Handle Linear button click - check connection and open dialog or redirect to settings
   const handleLinearClick = async () => {
@@ -220,6 +290,58 @@ export default function SessionDetail() {
       toast({
         title: "Error",
         description: "Failed to deliver summary. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEmailDeliver = async () => {
+    if (!sessionId || !emailInput.trim()) return;
+
+    // Parse comma-separated emails
+    const emails = emailInput
+      .split(",")
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0);
+
+    if (emails.length === 0) return;
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = emails.filter((e) => !emailRegex.test(e));
+    if (invalidEmails.length > 0) {
+      toast({
+        title: "Invalid email",
+        description: `Invalid email address: ${invalidEmails[0]}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Build targets array for email delivery
+    const targets = emails.map((email, index) => ({
+      type: "email" as const,
+      id: `email-${index}`,
+      email,
+    }));
+
+    try {
+      await deliverSummaryMutation.mutateAsync({
+        sessionId,
+        targets,
+        channel: "email",
+      });
+      setIsEmailDialogOpen(false);
+      setEmailInput("");
+
+      toast({
+        title: "Summary sent",
+        description: `Summary has been emailed to ${emails.length} recipient${emails.length !== 1 ? "s" : ""}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send email. Please try again.",
         variant: "destructive",
       });
     }
@@ -487,6 +609,13 @@ export default function SessionDetail() {
                       <Send className="w-4 h-4 mr-2" />
                       Send to Slack
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsEmailDialogOpen(true)}
+                      disabled={!summary}
+                    >
+                      <Mail className="w-4 h-4 mr-2" />
+                      Send via Email
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -508,6 +637,15 @@ export default function SessionDetail() {
                 >
                   <Send size={16} />
                   Send to Slack
+                </Button>
+                <Button
+                  onClick={() => setIsEmailDialogOpen(true)}
+                  disabled={!summary}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Mail size={16} />
+                  Send via Email
                 </Button>
               </>
             ))}
@@ -790,6 +928,94 @@ export default function SessionDetail() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Delivery Dialog */}
+      <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+        <DialogContent className="bg-background-primary border-border-subtle max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-text-primary">Send via Email</DialogTitle>
+            <DialogDescription className="text-text-secondary">
+              {gmailStatus.connected
+                ? `Send from ${gmailStatus.email}. Enter recipient email addresses below.`
+                : "Connect your Gmail account to send session summaries via email."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {gmailStatus.loading ? (
+            <div className="py-8 flex items-center justify-center">
+              <Loader2 className="animate-spin text-text-secondary" size={24} />
+            </div>
+          ) : gmailStatus.connected ? (
+            <>
+              <div className="py-2">
+                <input
+                  type="text"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="email@example.com, another@example.com"
+                  className="w-full px-3 py-2 bg-background-secondary border border-border-subtle rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  disabled={deliverSummaryMutation.isPending}
+                />
+                <p className="text-xs text-text-tertiary mt-2">
+                  Separate multiple emails with commas
+                </p>
+              </div>
+
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsEmailDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleEmailDeliver}
+                  disabled={!emailInput.trim() || deliverSummaryMutation.isPending}
+                  className="bg-primary text-white hover:bg-primary/90"
+                >
+                  {deliverSummaryMutation.isPending ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2" size={16} />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send Email"
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <div className="py-4 space-y-4">
+              <div className="text-center p-4 bg-background-secondary rounded-lg border border-border-subtle">
+                <Mail className="mx-auto mb-3 text-text-tertiary" size={32} />
+                <p className="text-sm text-text-secondary mb-4">
+                  Connect your Gmail account to send session summaries directly from your email
+                  address.
+                </p>
+                <Button
+                  onClick={handleConnectGmail}
+                  disabled={isConnectingGmail}
+                  className="gap-2 bg-primary text-white hover:bg-primary/90"
+                >
+                  {isConnectingGmail ? (
+                    <>
+                      <Loader2 className="animate-spin" size={16} />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <Mail size={16} />
+                      Connect Gmail
+                    </>
+                  )}
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsEmailDialogOpen(false)}>
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

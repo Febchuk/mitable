@@ -3,12 +3,8 @@ import { Plus, X } from "lucide-react";
 import type { SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
 
 export default function EyeDropdownApp() {
-  const [selectedWindows, setSelectedWindows] = useState<SelectedWindowInfo[]>(
-    []
-  );
-  const [availableWindows, setAvailableWindows] = useState<WatchableWindow[]>(
-    []
-  );
+  const [selectedWindows, setSelectedWindows] = useState<SelectedWindowInfo[]>([]);
+  const [availableWindows, setAvailableWindows] = useState<WatchableWindow[]>([]);
 
   // Listen for data from main process
   useEffect(() => {
@@ -49,8 +45,7 @@ export default function EyeDropdownApp() {
 
   // Filter out already selected and blocked windows
   const unselectedWindows = availableWindows.filter(
-    (w) =>
-      !w.isBlocked && !selectedWindows.some((s) => s.windowId === w.windowId)
+    (w) => !w.isBlocked && !selectedWindows.some((s) => s.windowId === w.windowId)
   );
 
   return (
@@ -67,9 +62,7 @@ export default function EyeDropdownApp() {
                 key={win.windowId}
                 className="flex items-center gap-1 bg-primary/20 border border-primary/30 rounded-full pl-2 pr-1 py-0.5"
               >
-                <span className="text-[10px] text-white truncate max-w-[120px]">
-                  {win.appName}
-                </span>
+                <span className="text-[10px] text-white truncate max-w-[120px]">{win.appName}</span>
                 <button
                   onClick={() => handleUnselectWindow(win.windowId)}
                   className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
@@ -90,9 +83,7 @@ export default function EyeDropdownApp() {
       <div className="max-h-[180px] overflow-y-auto custom-scrollbar">
         {unselectedWindows.length === 0 ? (
           <div className="px-3 py-2 text-xs text-white/30">
-            {availableWindows.length === 0
-              ? "No windows available"
-              : "All windows added"}
+            {availableWindows.length === 0 ? "No windows available" : "All windows added"}
           </div>
         ) : (
           unselectedWindows.map((windowInfo) => (
@@ -107,10 +98,7 @@ export default function EyeDropdownApp() {
               <span className="text-xs text-white truncate flex-1">
                 {windowInfo.appName}
                 {windowInfo.windowTitle && (
-                  <span className="text-white/50">
-                    {" "}
-                    - {windowInfo.windowTitle}
-                  </span>
+                  <span className="text-white/50"> - {windowInfo.windowTitle}</span>
                 )}
               </span>
             </button>

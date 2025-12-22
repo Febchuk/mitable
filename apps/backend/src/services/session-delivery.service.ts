@@ -365,7 +365,10 @@ class SessionDeliveryService {
       .limit(1);
 
     if (!user?.gmailAccessTokenEncrypted) {
-      return { success: false, error: "Gmail not connected. Please connect your Gmail account first." };
+      return {
+        success: false,
+        error: "Gmail not connected. Please connect your Gmail account first.",
+      };
     }
 
     // Check if token is expired and try to refresh
@@ -441,7 +444,10 @@ class SessionDeliveryService {
 
       return { success: true, messageTs: result.id };
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : "Failed to send email" };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to send email",
+      };
     }
   }
 

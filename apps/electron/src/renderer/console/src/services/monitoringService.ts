@@ -267,26 +267,29 @@ export async function updateSessionSummary(
 }
 
 export interface DeliveryTarget {
-  type: "channel" | "dm";
+  type: "channel" | "dm" | "email";
   id: string;
   name?: string;
+  email?: string;
 }
 
 export interface DeliveryResult {
   id: string;
-  type: "channel" | "dm";
+  type: "channel" | "dm" | "email";
   name?: string;
+  email?: string;
   status: "delivered" | "failed";
   messageTs?: string;
   error?: string;
 }
 
 /**
- * Deliver summary to multiple Slack channels and/or direct messages
+ * Deliver summary to multiple Slack channels, direct messages, or email addresses
  */
 export async function deliverSummary(
   sessionId: string,
-  targets: DeliveryTarget[]
+  targets: DeliveryTarget[],
+  channel: "slack" | "email" = "slack"
 ): Promise<{
   success: boolean;
   results: DeliveryResult[];
@@ -295,7 +298,7 @@ export async function deliverSummary(
   return apiRequest(`/monitoring/sessions/${sessionId}/deliver`, {
     method: "POST",
     body: JSON.stringify({
-      channel: "slack",
+      channel,
       targets,
     }),
   });
@@ -438,5 +441,42 @@ export async function reviseSummary(
   return apiRequest(`/monitoring/sessions/${sessionId}/summary/revise`, {
     method: "POST",
     body: JSON.stringify({ instruction, currentSummary }),
+  });
+}
+
+/**
+ * Check if user has Gmail connected for email delivery
+ */
+export async function checkGmailConnection(): Promise<{
+  connected: boolean;
+  expired: boolean;
+  email: string | null;
+}> {
+  try {
+    return await apiRequest<{
+      connected: boolean;
+      expired: boolean;
+      email: string | null;
+    }>("/integrations/gmail/status");
+  } catch {
+    return { connected: false, expired: false, email: null };
+  }
+}
+
+/**
+ * Start Gmail OAuth flow
+ */
+export async function startGmailOAuth(): Promise<{ authUrl: string }> {
+  return apiRequest<{ authUrl: string }>("/integrations/gmail/oauth/start", {
+    method: "POST",
+  });
+}
+
+/**
+ * Disconnect Gmail
+ */
+export async function disconnectGmail(): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>("/integrations/gmail/disconnect", {
+    method: "DELETE",
   });
 }
