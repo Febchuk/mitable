@@ -30,6 +30,7 @@ afterSign: scripts/notarize.cjs
 
 # DMG Configuration
 dmg:
+  sign: true
   title: "${productName} ${version}"
   icon: build/icon.png
   iconSize: 100
