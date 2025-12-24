@@ -381,7 +381,8 @@ export default function SessionDetail() {
       // 1. End Electron-side capture loop and get captures
       const electronResult = await window.consoleAPI.endMonitoringSession();
 
-      if (electronResult.error) {
+      // If Electron session is already ended (e.g., from pill), that's OK - just proceed with backend
+      if (electronResult.error && electronResult.error !== "No active session") {
         throw new Error(electronResult.error);
       }
 
@@ -392,7 +393,9 @@ export default function SessionDetail() {
         );
         await uploadCaptures(sessionId, electronResult.captures);
       } else {
-        console.log("[SessionDetail] No captures to upload");
+        console.log(
+          "[SessionDetail] No captures to upload (session may have been ended from pill)"
+        );
       }
 
       // 3. Trigger backend summarization

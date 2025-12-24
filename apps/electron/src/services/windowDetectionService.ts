@@ -125,7 +125,12 @@ class WindowDetectionService {
       return watchableWindows;
     } catch (error) {
       console.error("[WindowDetectionService] Failed to get windows:", error);
-      return [];
+      console.error("[WindowDetectionService] Error details:", {
+        name: (error as Error)?.name,
+        message: (error as Error)?.message,
+        stack: (error as Error)?.stack,
+      });
+      throw error; // Re-throw so caller can report the actual error
     }
   }
 

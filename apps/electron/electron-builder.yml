@@ -3,8 +3,7 @@ productName: Mitable
 copyright: Copyright © 2025 Mitable
 directories:
   buildResources: build
-  # Build to /tmp to avoid iCloud sync issues with code signing
-  output: /tmp/mitable-build
+  output: dist
 
 # macOS Configuration
 mac:
@@ -46,7 +45,7 @@ dmg:
 # Windows Configuration
 win:
   target:
-    - target: squirrel
+    - target: nsis
       arch:
         - x64
   icon: build/icon.ico
@@ -54,17 +53,14 @@ win:
   sign: null
   certificateSubjectName: null
 
-# Squirrel.Windows Configuration (Modern silent installer like Slack/Discord)
-squirrelWindows:
-  # Icon URL - must be HTTPS/HTTP (Squirrel requirement)
-  # TODO: Replace with your actual hosted icon URL when deploying
-  iconUrl: "https://raw.githubusercontent.com/electron/electron/main/shell/browser/resources/win/electron.ico"
-  
-  # Optional: Custom loading animation during install
-  # loadingGif: "build/install-spinner.gif"
-  
-  # Use appId instead of name to identify package
-  useAppIdAsId: true
+# NSIS Installer Configuration
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Mitable
 
 # Extra resources (copied to app resources folder for runtime access)
 extraResources:
@@ -79,6 +75,12 @@ files:
   - "!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}"
   - "!{.env,.env.*,.editorconfig,.gitattributes,.gitignore,.yarnrc.yml,.travis.yml,appveyor.yml,circle.yml}"
   - "!{npm-debug.log,yarn.lock,.npmrc,yarn-error.log}"
+
+# Unpack native modules from ASAR (required for native bindings to work)
+asarUnpack:
+  - "node_modules/get-windows/**/*"
+  - "node_modules/active-win/**/*"
+  - "node_modules/msgpackr-extract/**/*"
 
 # Build artifact configuration
 artifactName: "${productName}-${version}-${arch}.${ext}"
