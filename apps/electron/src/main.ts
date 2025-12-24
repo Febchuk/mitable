@@ -1275,11 +1275,27 @@ function setupIPC() {
             appName: payload.appName,
             windowTitle: payload.windowTitle,
           });
+          // Notify pill to update badge count
+          const selectedWindows = windowDetectionService.getSelectedWindows();
+          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+            watchingPillWindow.webContents.send(
+              IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
+              selectedWindows
+            );
+          }
           return { success: true };
         }
         case "unselect-window": {
           const windowId = action.payload as string;
           windowDetectionService.removeWindow(windowId);
+          // Notify pill to update badge count
+          const selectedWindows = windowDetectionService.getSelectedWindows();
+          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+            watchingPillWindow.webContents.send(
+              IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
+              selectedWindows
+            );
+          }
           return { success: true };
         }
         case "start-session": {
@@ -1293,7 +1309,47 @@ function setupIPC() {
           return monitoringSessionService.resumeSession();
         }
         case "end-session": {
-          return monitoringSessionService.endSession();
+          // 1. End Electron-side capture loop and get captures
+          const result = await monitoringSessionService.endSession();
+
+          if (!result.success || !result.sessionId) {
+            return result;
+          }
+
+          // 2. Upload captures and end backend session
+          const token = authTokens.accessToken;
+          if (token && result.captures && result.captures.length > 0) {
+            const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
+            try {
+              // Upload captures
+              console.log(`[EndSession] Uploading ${result.captures.length} captures to backend`);
+              await fetch(`${API_BASE_URL}/api/monitoring/sessions/${result.sessionId}/captures`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ captures: result.captures }),
+              });
+
+              // End backend session (triggers summarization)
+              console.log(`[EndSession] Triggering backend summarization`);
+              await fetch(`${API_BASE_URL}/api/monitoring/sessions/${result.sessionId}/end`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+            } catch (error) {
+              console.error(
+                "[EndSession] Error uploading captures or ending backend session:",
+                error
+              );
+            }
+          }
+
+          return result;
         }
         case "show-console": {
           if (consoleWindow && !consoleWindow.isDestroyed()) {
