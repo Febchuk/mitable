@@ -30,6 +30,11 @@ const SUMMARIZATION_CONFIG = {
   VISION_MODEL: "gemini-2.0-flash-exp",
   TEXT_MODEL: "llama-3.1-8b-instant", // Groq's cheapest model
   TEMPERATURE: 0.3,
+  // Episode segmentation settings
+  EPISODE_TIME_GAP_MS: 120000, // 2 minutes gap starts a new episode
+  EPISODE_MIN_FRAMES: 2, // Minimum frames to form an episode
+  // Sampling settings
+  TIME_BUCKET_MS: 180000, // 3 minute buckets for temporal coverage
 };
 
 // Types
@@ -51,6 +56,26 @@ interface AggregatedActivity {
   endTime: number;
   durationMs: number;
   occurrences: number;
+}
+
+/**
+ * Episode: A contiguous segment of related work
+ * Episodes are separated by time gaps, app switches, or activity changes
+ */
+interface Episode {
+  id: string;
+  startTime: number;
+  endTime: number;
+  durationMs: number;
+  appName: string;
+  frames: ScreenshotAnalysis[];
+  // Aggregated info
+  primaryActivity: string;
+  activities: string[];
+  hasBlocker: boolean;
+  hasOutcome: boolean;
+  artifacts: Array<{ type: string; value: string }>;
+  confidence: "high" | "medium" | "low";
 }
 
 interface SessionSummaryResult {
@@ -109,7 +134,7 @@ class SessionSummarizationService {
 
     console.log(`[SessionSummarization] Found ${captures.length} captures`);
 
-    // 2. Sample captures for analysis
+    // 2. Sample captures for analysis (with temporal coverage)
     const sampled = this.sampleCaptures(captures);
     console.log(`[SessionSummarization] Sampled ${sampled.length} captures for analysis`);
 
@@ -117,12 +142,16 @@ class SessionSummarizationService {
     const analyses = await this.analyzeScreenshots(sampled);
     console.log(`[SessionSummarization] Analyzed ${analyses.length} screenshots`);
 
-    // 4. Aggregate activities
-    const aggregated = this.aggregateActivities(analyses);
+    // 4. Build episodes from analyses (time-aware segmentation)
+    const episodes = this.buildEpisodes(analyses, sampled);
+    console.log(`[SessionSummarization] Segmented into ${episodes.length} episodes`);
+
+    // 5. Convert episodes to activities for narrative generation
+    const aggregated = this.episodesToActivities(episodes);
     console.log(`[SessionSummarization] Aggregated into ${aggregated.length} activities`);
 
-    // 5. Generate narrative summary
-    const summary = await this.generateNarrative(aggregated, analyses);
+    // 6. Generate narrative summary with episode context
+    const summary = await this.generateNarrative(aggregated, analyses, episodes);
 
     const generationTimeMs = Date.now() - startTime;
     console.log(`[SessionSummarization] Summary generated in ${generationTimeMs}ms`);
@@ -138,10 +167,14 @@ class SessionSummarizationService {
 
   /**
    * Sample captures for analysis using analysis metadata
+   * Enhanced with temporal coverage to ensure narrative coherence
+   *
    * Prioritizes:
-   * 1. Frames with high importance scores
-   * 2. Frames with delta_changed = true
-   * 3. Frames marked as on_task
+   * 1. Temporal coverage - at least 1 frame per time bucket
+   * 2. Event boundaries - frames with blockers/outcomes
+   * 3. Context switches - first occurrence of new app/window
+   * 4. High importance scores
+   * 5. Frames with delta_changed = true
    */
   private sampleCaptures(captures: any[]): any[] {
     if (captures.length === 0) return [];
@@ -155,44 +188,82 @@ class SessionSummarizationService {
       return valid;
     }
 
-    // Prioritize frames that are already analyzed with high importance
-    const analyzed = valid.filter((c) => c.analysisStatus === "analyzed");
-    const pending = valid.filter((c) => c.analysisStatus === "pending");
-
-    // Sort analyzed frames by importance score (descending)
-    analyzed.sort((a, b) => (b.importanceScore || 0) - (a.importanceScore || 0));
-
-    // Select top frames with delta changes and on-task
-    const highPriority = analyzed.filter((c) => c.deltaChanged === true && c.onTask !== false);
-    const mediumPriority = analyzed.filter(
-      (c) => !highPriority.includes(c) && (c.deltaChanged === true || c.onTask !== false)
-    );
-    const lowPriority = analyzed.filter(
-      (c) => !highPriority.includes(c) && !mediumPriority.includes(c)
-    );
-
-    // Build sample: high priority first, then medium, then low, then pending
+    const maxToSample = SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE;
+    const sampledIds = new Set<string>();
     const sampled: any[] = [];
-    const addFromArray = (arr: any[], max: number) => {
-      for (const item of arr) {
-        if (sampled.length >= max) break;
-        if (!sampled.includes(item)) {
-          sampled.push(item);
-        }
+
+    const addCapture = (capture: any) => {
+      if (!sampledIds.has(capture.id) && sampled.length < maxToSample) {
+        sampledIds.add(capture.id);
+        sampled.push(capture);
+        return true;
       }
+      return false;
     };
 
-    const maxToSample = SUMMARIZATION_CONFIG.MAX_SCREENSHOTS_TO_ANALYZE;
+    // === STEP 1: Ensure temporal coverage ===
+    // Group captures into time buckets and take best from each
+    const timeBuckets = new Map<number, any[]>();
+    const sessionStart = new Date(valid[0].capturedAt).getTime();
 
-    // Take up to 60% from high priority
-    addFromArray(highPriority, Math.floor(maxToSample * 0.6));
-    // Take up to 30% from medium priority
-    addFromArray(mediumPriority, Math.floor(maxToSample * 0.9));
-    // Fill remaining with low priority and pending
-    addFromArray(lowPriority, maxToSample);
-    addFromArray(pending, maxToSample);
+    for (const capture of valid) {
+      const captureTime = new Date(capture.capturedAt).getTime();
+      const bucketKey = Math.floor(
+        (captureTime - sessionStart) / SUMMARIZATION_CONFIG.TIME_BUCKET_MS
+      );
+      if (!timeBuckets.has(bucketKey)) {
+        timeBuckets.set(bucketKey, []);
+      }
+      timeBuckets.get(bucketKey)!.push(capture);
+    }
 
-    // Always include first and last capture for context
+    // Take the highest-importance frame from each time bucket
+    const sortedBucketKeys = [...timeBuckets.keys()].sort((a, b) => a - b);
+    for (const bucketKey of sortedBucketKeys) {
+      const bucketFrames = timeBuckets.get(bucketKey)!;
+      // Sort by importance within bucket
+      bucketFrames.sort((a, b) => (b.importanceScore || 0) - (a.importanceScore || 0));
+      // Take the best frame from this bucket
+      if (bucketFrames.length > 0) {
+        addCapture(bucketFrames[0]);
+      }
+    }
+
+    console.log(
+      `[SessionSummarization] Temporal coverage: ${sampled.length} frames from ${timeBuckets.size} time buckets`
+    );
+
+    // === STEP 2: Include event boundaries (blockers/outcomes) ===
+    const eventFrames = valid.filter(
+      (c) =>
+        c.importanceReason?.includes("blocker") ||
+        c.importanceReason?.includes("outcome") ||
+        (c.importanceScore || 0) >= 0.7
+    );
+    for (const capture of eventFrames) {
+      addCapture(capture);
+    }
+
+    // === STEP 3: Include context switches (first occurrence of new app/window) ===
+    const seenApps = new Set<string>();
+    for (const capture of valid) {
+      const appKey = `${capture.appName}:${capture.windowTitle}`;
+      if (!seenApps.has(appKey)) {
+        seenApps.add(appKey);
+        addCapture(capture);
+      }
+    }
+
+    // === STEP 4: Fill remaining with high-importance frames ===
+    const remaining = valid
+      .filter((c) => !sampledIds.has(c.id))
+      .sort((a, b) => (b.importanceScore || 0) - (a.importanceScore || 0));
+
+    for (const capture of remaining) {
+      if (!addCapture(capture)) break;
+    }
+
+    // === STEP 5: Always include first and last capture for context ===
     const firstCapture = valid[0];
     const lastCapture = valid[valid.length - 1];
 
@@ -439,33 +510,152 @@ Respond with JSON:
   }
 
   /**
-   * Aggregate activities by grouping similar ones
+   * Build episodes from analyses - segments work into contiguous chunks
+   * Episodes are separated by:
+   * - Time gaps > EPISODE_TIME_GAP_MS
+   * - App/window switches
+   * - Significant activity changes
    */
-  private aggregateActivities(analyses: ScreenshotAnalysis[]): AggregatedActivity[] {
-    const grouped = new Map<string, AggregatedActivity>();
+  private buildEpisodes(analyses: ScreenshotAnalysis[], captures: any[]): Episode[] {
+    if (analyses.length === 0) return [];
+
+    const episodes: Episode[] = [];
+    let currentEpisode: Episode | null = null;
+    let episodeCounter = 0;
+
+    // Build a map of capture metadata for signal/artifact lookup
+    const captureMap = new Map<string, any>();
+    for (const c of captures) {
+      captureMap.set(c.id, c);
+    }
 
     for (const analysis of analyses) {
-      // Create a key for grouping (app + simplified activity)
-      const key = `${analysis.appName}:${this.simplifyActivity(analysis.activity)}`;
+      const capture = captureMap.get(analysis.captureId);
+      const shouldStartNewEpisode =
+        !currentEpisode ||
+        // Time gap too large
+        analysis.timestamp - currentEpisode.endTime > SUMMARIZATION_CONFIG.EPISODE_TIME_GAP_MS ||
+        // App switched
+        analysis.appName !== currentEpisode.appName;
 
-      if (grouped.has(key)) {
-        const existing = grouped.get(key)!;
-        existing.endTime = analysis.timestamp;
-        existing.durationMs = existing.endTime - existing.startTime;
-        existing.occurrences++;
-      } else {
-        grouped.set(key, {
-          activity: analysis.activity,
-          appName: analysis.appName,
+      if (shouldStartNewEpisode) {
+        // Save current episode if it has enough frames
+        if (
+          currentEpisode &&
+          currentEpisode.frames.length >= SUMMARIZATION_CONFIG.EPISODE_MIN_FRAMES
+        ) {
+          currentEpisode.durationMs = currentEpisode.endTime - currentEpisode.startTime;
+          currentEpisode.primaryActivity = this.getPrimaryActivity(currentEpisode.frames);
+          currentEpisode.confidence = this.getEpisodeConfidence(currentEpisode.frames);
+          episodes.push(currentEpisode);
+        }
+
+        // Start new episode
+        episodeCounter++;
+        currentEpisode = {
+          id: `episode-${episodeCounter}`,
           startTime: analysis.timestamp,
           endTime: analysis.timestamp,
           durationMs: 0,
-          occurrences: 1,
-        });
+          appName: analysis.appName,
+          frames: [],
+          primaryActivity: "",
+          activities: [],
+          hasBlocker: false,
+          hasOutcome: false,
+          artifacts: [],
+          confidence: "medium",
+        };
+      }
+
+      // Add frame to current episode
+      currentEpisode!.frames.push(analysis);
+      currentEpisode!.endTime = analysis.timestamp;
+      currentEpisode!.activities.push(analysis.activity);
+
+      // Aggregate signals and artifacts from capture metadata
+      if (capture) {
+        if (capture.deltaChangeType === "error" || capture.importanceReason?.includes("blocker")) {
+          currentEpisode!.hasBlocker = true;
+        }
+        if (
+          capture.importanceReason?.includes("outcome") ||
+          capture.importanceReason?.includes("success")
+        ) {
+          currentEpisode!.hasOutcome = true;
+        }
+        // Extract artifacts if stored in capture (future enhancement)
       }
     }
 
-    return Array.from(grouped.values()).sort((a, b) => a.startTime - b.startTime);
+    // Don't forget the last episode
+    if (currentEpisode && currentEpisode.frames.length >= SUMMARIZATION_CONFIG.EPISODE_MIN_FRAMES) {
+      currentEpisode.durationMs = currentEpisode.endTime - currentEpisode.startTime;
+      currentEpisode.primaryActivity = this.getPrimaryActivity(currentEpisode.frames);
+      currentEpisode.confidence = this.getEpisodeConfidence(currentEpisode.frames);
+      episodes.push(currentEpisode);
+    }
+
+    console.log(
+      `[SessionSummarization] Built ${episodes.length} episodes from ${analyses.length} frames`
+    );
+    return episodes;
+  }
+
+  /**
+   * Get the most representative activity for an episode
+   */
+  private getPrimaryActivity(frames: ScreenshotAnalysis[]): string {
+    // Count activity occurrences
+    const activityCounts = new Map<string, number>();
+    for (const frame of frames) {
+      const simplified = this.simplifyActivity(frame.activity);
+      activityCounts.set(simplified, (activityCounts.get(simplified) || 0) + 1);
+    }
+
+    // Find most common
+    let maxCount = 0;
+    let primaryKey = "";
+    for (const [key, count] of activityCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+        primaryKey = key;
+      }
+    }
+
+    // Return the full activity text from the first matching frame
+    for (const frame of frames) {
+      if (this.simplifyActivity(frame.activity) === primaryKey) {
+        return frame.activity;
+      }
+    }
+    return frames[0]?.activity || "Unknown activity";
+  }
+
+  /**
+   * Get overall confidence for an episode based on frame confidences
+   */
+  private getEpisodeConfidence(frames: ScreenshotAnalysis[]): "high" | "medium" | "low" {
+    const highCount = frames.filter((f) => f.confidence === "high").length;
+    const mediumCount = frames.filter((f) => f.confidence === "medium").length;
+
+    if (highCount >= frames.length * 0.5) return "high";
+    if (highCount + mediumCount >= frames.length * 0.5) return "medium";
+    return "low";
+  }
+
+  /**
+   * Convert episodes to aggregated activities for narrative generation
+   */
+  private episodesToActivities(episodes: Episode[]): AggregatedActivity[] {
+    return episodes.map((episode) => ({
+      activity: episode.primaryActivity,
+      appName: episode.appName,
+      startTime: episode.startTime,
+      endTime: episode.endTime,
+      durationMs: episode.durationMs,
+      occurrences: episode.frames.length,
+    }));
   }
 
   /**
@@ -482,10 +672,12 @@ Respond with JSON:
 
   /**
    * Generate narrative summary using Groq
+   * Now uses episode-aware context for better narratives
    */
   private async generateNarrative(
     aggregated: AggregatedActivity[],
-    analyses: ScreenshotAnalysis[]
+    analyses: ScreenshotAnalysis[],
+    episodes?: Episode[]
   ): Promise<Omit<SessionSummaryResult, "generationTimeMs">> {
     // Calculate time breakdown
     const timeBreakdown: Record<string, number> = {};
@@ -494,28 +686,61 @@ Respond with JSON:
       timeBreakdown[app] = (timeBreakdown[app] || 0) + activity.durationMs;
     }
 
-    // Format activities for the prompt
-    const activityList = aggregated
-      .map((a) => `- ${a.activity} (${this.formatDuration(a.durationMs)})`)
-      .join("\n");
+    // Build episode-aware activity list
+    let activityList: string;
+    let blockerContext = "";
+    let outcomeContext = "";
 
-    // Generate summary prompt
+    if (episodes && episodes.length > 0) {
+      // Use episodes for richer context
+      activityList = episodes
+        .map((ep, i) => {
+          const duration = this.formatDuration(ep.durationMs);
+          const markers: string[] = [];
+          if (ep.hasBlocker) markers.push("⚠️ blocker");
+          if (ep.hasOutcome) markers.push("✅ outcome");
+          const markerStr = markers.length > 0 ? ` [${markers.join(", ")}]` : "";
+          return `${i + 1}. ${ep.primaryActivity} (${duration}, ${ep.frames.length} frames)${markerStr}`;
+        })
+        .join("\n");
+
+      // Extract blocker/outcome episodes for explicit mention
+      const blockerEpisodes = episodes.filter((ep) => ep.hasBlocker);
+      const outcomeEpisodes = episodes.filter((ep) => ep.hasOutcome);
+
+      if (blockerEpisodes.length > 0) {
+        blockerContext = `\n\nBlockers encountered:\n${blockerEpisodes.map((ep) => `- ${ep.primaryActivity}`).join("\n")}`;
+      }
+      if (outcomeEpisodes.length > 0) {
+        outcomeContext = `\n\nOutcomes achieved:\n${outcomeEpisodes.map((ep) => `- ${ep.primaryActivity}`).join("\n")}`;
+      }
+    } else {
+      // Fallback to simple activity list
+      activityList = aggregated
+        .map((a) => `- ${a.activity} (${this.formatDuration(a.durationMs)})`)
+        .join("\n");
+    }
+
+    // Generate summary prompt with episode context
     const prompt = `You're writing a casual update to share with your team about what you got done in this work session.
 
-Activities detected:
-${activityList}
+Work episodes (in chronological order):
+${activityList}${blockerContext}${outcomeContext}
 
 Write a brief, conversational summary (6 sentences max) that:
 1. Highlights what you accomplished and why it matters
 2. Connects activities to outcomes when possible (e.g., "Fixed X which unblocked Y")
 3. Feels human and natural - like you're messaging your team in Slack
 4. Written in first person
+5. If blockers were encountered, mention them naturally
+6. If outcomes were achieved (merged, deployed, sent), highlight them
 
 Style guidelines:
 - Be casual and conversational (not formal or robotic)
 - Focus on impact and outcomes, not just tasks
 - Skip unnecessary details like durations or tool names
 - Mention specific artifacts when relevant (PRs, tickets, documents)
+- Connect the dots between episodes when there's a logical flow
 
 Example tone:
 "Merged the auth refactor PR and cut a release today. This unblocks the team to start testing the new login flow. Also responded to a few customer support tickets about the password reset issue."
@@ -543,7 +768,7 @@ Respond with JSON:
     const response = completion.choices[0]?.message?.content || "";
     const parsed = this.parseJsonResponse(response);
 
-    // Format key activities
+    // Format key activities from high-confidence frames
     const keyActivities = analyses
       .filter((a) => a.confidence === "high")
       .slice(0, 5)
@@ -553,13 +778,31 @@ Respond with JSON:
         confidence: a.confidence === "high" ? 0.9 : a.confidence === "medium" ? 0.7 : 0.5,
       }));
 
+    // Enhance blockers/accomplishments from episodes if available
+    let accomplishments = parsed.accomplishments || [];
+    let blockers = parsed.blockers || [];
+
+    if (episodes) {
+      // Add episode-detected outcomes to accomplishments
+      const episodeOutcomes = episodes
+        .filter((ep) => ep.hasOutcome)
+        .map((ep) => ep.primaryActivity);
+      accomplishments = [...new Set([...accomplishments, ...episodeOutcomes])];
+
+      // Add episode-detected blockers
+      const episodeBlockers = episodes
+        .filter((ep) => ep.hasBlocker)
+        .map((ep) => ep.primaryActivity);
+      blockers = [...new Set([...blockers, ...episodeBlockers])];
+    }
+
     return {
       narrativeSummary: parsed.narrativeSummary || "Work session completed.",
       activities: parsed.activities || aggregated.map((a) => a.activity).slice(0, 5),
       timeBreakdown,
       keyActivities,
-      accomplishments: parsed.accomplishments || [],
-      blockers: parsed.blockers || [],
+      accomplishments,
+      blockers,
       modelUsed: SUMMARIZATION_CONFIG.TEXT_MODEL,
       tokenCount: completion.usage?.total_tokens || 0,
     };

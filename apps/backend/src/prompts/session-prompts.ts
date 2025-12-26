@@ -68,7 +68,19 @@ Respond with only this JSON structure:
   "summary_of_action": "Brief description of what visually changed",
   "change_type": "content_addition" | "content_modification" | "content_deletion" | "navigation" | "scroll" | "file_switch" | "focus_change" | "ui_state_change" | "none",
   "change_magnitude": "major" | "minor" | "trivial",
-  "confidence": 0.0 to 1.0
+  "confidence": 0.0 to 1.0,
+  "artifacts": [
+    {"type": "pr" | "ticket" | "error" | "command" | "file" | "url" | "branch", "value": "extracted text"}
+  ],
+  "signals": {
+    "has_blocker": true or false,
+    "has_outcome": true or false,
+    "blocker_type": "error" | "failing_test" | "exception" | "timeout" | "blocked" | null,
+    "outcome_type": "success" | "merged" | "deployed" | "sent" | "created" | "completed" | null
+  },
+  "on_task": true or false,
+  "task_relevance": 0.0 to 1.0,
+  "off_task_reason": "reason if on_task is false, otherwise null"
 }
 
 IMPORTANT: Only classify what you can OBSERVE in the screenshots.
@@ -91,11 +103,27 @@ change_magnitude values (scope of what changed):
 - minor: Small change (one line edited, single field updated)
 - trivial: Minimal change (cursor position, text selection, hover state)
 
+artifacts extraction:
+- Extract ANY visible references: PR numbers (#123), ticket IDs (ABC-123, LIN-456), error messages, terminal commands, file paths, URLs, branch names
+- Only include what you can clearly read on screen
+- This helps build concrete, specific summaries later
+
+signals detection:
+- has_blocker: true if you see an error message, failing test, exception trace, timeout, or "blocked" status
+- has_outcome: true if you see success indicators (green checkmarks, "merged", "deployed", "sent", "created", test passed)
+- These help identify high-value moments in the work session
+
+on_task evaluation (when session goal is provided):
+- on_task: true if the current activity appears related to the stated goal
+- task_relevance: 0.0 (completely unrelated) to 1.0 (directly working on goal)
+- off_task_reason: brief explanation if on_task is false (e.g., "browsing social media", "unrelated documentation")
+- If no goal is provided, default on_task to true and task_relevance to 0.5
+
 Example responses:
-- {"progression_detected": true, "summary_of_action": "Terminal output appeared showing npm packages installed", "change_type": "content_addition", "change_magnitude": "major", "confidence": 0.95}
-- {"progression_detected": true, "summary_of_action": "Browser now showing API documentation page", "change_type": "navigation", "change_magnitude": "major", "confidence": 0.92}
-- {"progression_detected": true, "summary_of_action": "One line of code was modified in the editor", "change_type": "content_modification", "change_magnitude": "minor", "confidence": 0.88}
-- {"progression_detected": false, "summary_of_action": "No meaningful visual change", "change_type": "none", "change_magnitude": "trivial", "confidence": 0.85}
+- {"progression_detected": true, "summary_of_action": "Terminal output appeared showing npm packages installed", "change_type": "content_addition", "change_magnitude": "major", "confidence": 0.95, "artifacts": [{"type": "command", "value": "npm install"}], "signals": {"has_blocker": false, "has_outcome": true, "blocker_type": null, "outcome_type": "completed"}, "on_task": true, "task_relevance": 0.8, "off_task_reason": null}
+- {"progression_detected": true, "summary_of_action": "Test failed with OAuth error", "change_type": "content_addition", "change_magnitude": "major", "confidence": 0.92, "artifacts": [{"type": "error", "value": "ECONNRESET"}, {"type": "file", "value": "auth.test.ts"}], "signals": {"has_blocker": true, "has_outcome": false, "blocker_type": "failing_test", "outcome_type": null}, "on_task": true, "task_relevance": 0.95, "off_task_reason": null}
+- {"progression_detected": true, "summary_of_action": "PR #482 merged in GitHub", "change_type": "ui_state_change", "change_magnitude": "major", "confidence": 0.9, "artifacts": [{"type": "pr", "value": "#482"}], "signals": {"has_blocker": false, "has_outcome": true, "blocker_type": null, "outcome_type": "merged"}, "on_task": true, "task_relevance": 1.0, "off_task_reason": null}
+- {"progression_detected": false, "summary_of_action": "No meaningful visual change", "change_type": "none", "change_magnitude": "trivial", "confidence": 0.85, "artifacts": [], "signals": {"has_blocker": false, "has_outcome": false, "blocker_type": null, "outcome_type": null}, "on_task": true, "task_relevance": 0.5, "off_task_reason": null}
 </output_format>`;
 
 /**
@@ -314,6 +342,39 @@ export type ChangeType =
 export type ChangeMagnitude = "major" | "minor" | "trivial";
 
 /**
+ * Artifact types that can be extracted from screenshots
+ */
+export type ArtifactType = "pr" | "ticket" | "error" | "command" | "file" | "url" | "branch";
+
+/**
+ * Blocker types indicating something is blocking progress
+ */
+export type BlockerType = "error" | "failing_test" | "exception" | "timeout" | "blocked";
+
+/**
+ * Outcome types indicating something was completed/achieved
+ */
+export type OutcomeType = "success" | "merged" | "deployed" | "sent" | "created" | "completed";
+
+/**
+ * Extracted artifact from screenshot
+ */
+export interface ExtractedArtifact {
+  type: ArtifactType;
+  value: string;
+}
+
+/**
+ * Semantic signals detected in the frame
+ */
+export interface FrameSignals {
+  has_blocker: boolean;
+  has_outcome: boolean;
+  blocker_type: BlockerType | null;
+  outcome_type: OutcomeType | null;
+}
+
+/**
  * Expected response from the Progression Detector
  */
 export interface ProgressionDetectorResponse {
@@ -322,6 +383,12 @@ export interface ProgressionDetectorResponse {
   change_type: ChangeType;
   change_magnitude: ChangeMagnitude;
   confidence: number;
+  // New fields for enhanced analysis
+  artifacts: ExtractedArtifact[];
+  signals: FrameSignals;
+  on_task: boolean;
+  task_relevance: number;
+  off_task_reason: string | null;
 }
 
 // Valid change type values for validation
@@ -339,13 +406,49 @@ const VALID_CHANGE_TYPES: ChangeType[] = [
 
 const VALID_CHANGE_MAGNITUDES: ChangeMagnitude[] = ["major", "minor", "trivial"];
 
+const VALID_ARTIFACT_TYPES: ArtifactType[] = [
+  "pr",
+  "ticket",
+  "error",
+  "command",
+  "file",
+  "url",
+  "branch",
+];
+
+const VALID_BLOCKER_TYPES: BlockerType[] = [
+  "error",
+  "failing_test",
+  "exception",
+  "timeout",
+  "blocked",
+];
+
+const VALID_OUTCOME_TYPES: OutcomeType[] = [
+  "success",
+  "merged",
+  "deployed",
+  "sent",
+  "created",
+  "completed",
+];
+
 /**
  * Validate and parse Progression Detector response
  */
 export function parseProgressionResponse(rawResponse: string): ProgressionDetectorResponse | null {
   try {
-    // Try to extract JSON from the response
-    const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+    // Try to extract JSON from the response - handle markdown code blocks
+    let jsonStr = rawResponse;
+
+    // Strip markdown code fences if present
+    const codeBlockMatch = rawResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      jsonStr = codeBlockMatch[1].trim();
+    }
+
+    // Find the first valid JSON object
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.warn("[ProgressionDetector] No JSON found in response");
       return null;
@@ -380,15 +483,59 @@ export function parseProgressionResponse(rawResponse: string): ProgressionDetect
       confidence = Math.max(0, Math.min(1, parsed.confidence));
     }
 
+    // Parse artifacts array
+    const artifacts: ExtractedArtifact[] = [];
+    if (Array.isArray(parsed.artifacts)) {
+      for (const artifact of parsed.artifacts) {
+        if (
+          artifact &&
+          typeof artifact.value === "string" &&
+          VALID_ARTIFACT_TYPES.includes(artifact.type)
+        ) {
+          artifacts.push({
+            type: artifact.type,
+            value: artifact.value,
+          });
+        }
+      }
+    }
+
+    // Parse signals object
+    const signals: FrameSignals = {
+      has_blocker: parsed.signals?.has_blocker === true,
+      has_outcome: parsed.signals?.has_outcome === true,
+      blocker_type: VALID_BLOCKER_TYPES.includes(parsed.signals?.blocker_type)
+        ? parsed.signals.blocker_type
+        : null,
+      outcome_type: VALID_OUTCOME_TYPES.includes(parsed.signals?.outcome_type)
+        ? parsed.signals.outcome_type
+        : null,
+    };
+
+    // Parse on_task and task_relevance
+    const onTask = typeof parsed.on_task === "boolean" ? parsed.on_task : true;
+    let taskRelevance = 0.5;
+    if (typeof parsed.task_relevance === "number") {
+      taskRelevance = Math.max(0, Math.min(1, parsed.task_relevance));
+    }
+    const offTaskReason =
+      typeof parsed.off_task_reason === "string" ? parsed.off_task_reason : null;
+
     return {
       progression_detected: parsed.progression_detected,
       summary_of_action: parsed.summary_of_action,
       change_type: changeType,
       change_magnitude: changeMagnitude,
       confidence,
+      artifacts,
+      signals,
+      on_task: onTask,
+      task_relevance: taskRelevance,
+      off_task_reason: offTaskReason,
     };
   } catch (error) {
     console.error("[ProgressionDetector] Failed to parse response:", error);
+    console.error("[ProgressionDetector] Raw response:", rawResponse.substring(0, 500));
     return null;
   }
 }
