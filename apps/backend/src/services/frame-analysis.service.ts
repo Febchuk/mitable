@@ -10,7 +10,7 @@
  * - Integration with Groq Vision (Llama 4 Scout)
  */
 
-import { groqVisionService } from "./groq-vision.service";
+import { geminiVisionFrameService } from "./gemini-vision-frame.service";
 import {
   buildProgressionDetectorPrompt,
   parseProgressionResponse,
@@ -78,8 +78,8 @@ class FrameAnalysisService {
     );
 
     try {
-      // Call Groq Vision with two images
-      const visionResult = await groqVisionService.compareFrames(
+      // Call Gemini Vision with two images
+      const visionResult = await geminiVisionFrameService.compareFrames(
         input.previousFrame,
         input.currentFrame,
         systemPrompt,
@@ -189,7 +189,7 @@ class FrameAnalysisService {
    * Check if the service is available
    */
   isAvailable(): boolean {
-    return groqVisionService.isAvailable();
+    return geminiVisionFrameService.isAvailable();
   }
 }
 

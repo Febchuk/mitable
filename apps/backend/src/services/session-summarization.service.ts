@@ -22,6 +22,7 @@ import { config } from "../config";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, desc } from "drizzle-orm";
+import { masterStoryService } from "./master-story.service";
 
 // Configuration
 const SUMMARIZATION_CONFIG = {
@@ -109,12 +110,88 @@ class SessionSummarizationService {
 
   /**
    * Generate a complete summary for a monitoring session
+   * Primary path: Use master story (built in real-time)
+   * Fallback path: Batch screenshot analysis (if master story unavailable)
    */
   async generateSessionSummary(sessionId: string): Promise<SessionSummaryResult> {
     const startTime = Date.now();
 
     console.log(`[SessionSummarization] Starting summary generation for session: ${sessionId}`);
 
+    // 1. Try to use master story (primary path)
+    const masterStory = await masterStoryService.getCurrentStory(sessionId);
+
+    if (masterStory && masterStory.length >= 50) {
+      console.log(
+        `[SessionSummarization] Using master story for final summary (${masterStory.length} chars)`
+      );
+      return await this.generateSummaryFromMasterStory(sessionId, masterStory, startTime);
+    }
+
+    // 2. Fallback to batch analysis if master story unavailable
+    console.warn(
+      `[SessionSummarization] Master story unavailable or too short (${masterStory?.length || 0} chars), falling back to batch screenshot analysis`
+    );
+    return await this.generateSummaryFromScreenshots(sessionId, startTime);
+  }
+
+  /**
+   * Generate summary from master story (primary path)
+   * Much faster and cheaper than re-analyzing screenshots
+   */
+  private async generateSummaryFromMasterStory(
+    sessionId: string,
+    masterStory: string,
+    startTime: number
+  ): Promise<SessionSummaryResult> {
+    // Get session for metadata
+    const [session] = await db
+      .select()
+      .from(schema.monitoringSessions)
+      .where(eq(schema.monitoringSessions.id, sessionId))
+      .limit(1);
+
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+
+    // Get key activities from frame metadata (already analyzed)
+    const keyActivities = await this.getKeyActivitiesFromFrames(sessionId);
+
+    // Optionally refine the master story for delivery
+    const refinedSummary = await this.refineMasterStoryForDelivery(masterStory);
+
+    const generationTimeMs = Date.now() - startTime;
+    console.log(`[SessionSummarization] Summary generated from master story in ${generationTimeMs}ms`);
+
+    const summary = {
+      narrativeSummary: refinedSummary.summary,
+      activities: refinedSummary.activities,
+      timeBreakdown: {},
+      keyActivities,
+      accomplishments: refinedSummary.accomplishments,
+      blockers: refinedSummary.blockers,
+      modelUsed: SUMMARIZATION_CONFIG.TEXT_MODEL,
+      tokenCount: refinedSummary.tokenCount,
+    };
+
+    // Save summary to database
+    await this.saveSummary(sessionId, summary, generationTimeMs);
+
+    return {
+      ...summary,
+      generationTimeMs,
+    };
+  }
+
+  /**
+   * Generate summary from screenshots (fallback path)
+   * Used when master story is unavailable or incomplete
+   */
+  private async generateSummaryFromScreenshots(
+    sessionId: string,
+    startTime: number
+  ): Promise<SessionSummaryResult> {
     // 1. Get session and captures from database
     const [session] = await db
       .select()
@@ -154,7 +231,7 @@ class SessionSummarizationService {
     const summary = await this.generateNarrative(aggregated, analyses, episodes);
 
     const generationTimeMs = Date.now() - startTime;
-    console.log(`[SessionSummarization] Summary generated in ${generationTimeMs}ms`);
+    console.log(`[SessionSummarization] Summary generated from screenshots in ${generationTimeMs}ms`);
 
     // 6. Save summary to database
     await this.saveSummary(sessionId, summary, generationTimeMs);
@@ -162,6 +239,88 @@ class SessionSummarizationService {
     return {
       ...summary,
       generationTimeMs,
+    };
+  }
+
+  /**
+   * Get key activities from frame metadata (already analyzed during session)
+   */
+  private async getKeyActivitiesFromFrames(sessionId: string): Promise<
+    Array<{
+      activity: string;
+      timestamp: string;
+      confidence: number;
+    }>
+  > {
+    const captures = await db
+      .select()
+      .from(schema.sessionCaptures)
+      .where(eq(schema.sessionCaptures.sessionId, sessionId))
+      .orderBy(desc(schema.sessionCaptures.importanceScore));
+
+    // Get top 5 high-importance frames with meaningful changes
+    const keyFrames = captures
+      .filter(
+        (c) => c.deltaChanged && c.deltaChangeDescription && (c.importanceScore || 0) >= 0.5
+      )
+      .slice(0, 5);
+
+    return keyFrames.map((frame) => ({
+      activity: frame.deltaChangeDescription || "Activity detected",
+      timestamp: new Date(frame.capturedAt).toISOString(),
+      confidence: frame.importanceScore || 0.5,
+    }));
+  }
+
+  /**
+   * Refine master story for delivery
+   * Optionally formats and extracts structured data
+   */
+  private async refineMasterStoryForDelivery(masterStory: string): Promise<{
+    summary: string;
+    activities: string[];
+    accomplishments: string[];
+    blockers: string[];
+    tokenCount: number;
+  }> {
+    // Use Groq to extract structured data from the master story
+    const prompt = `You have a work session narrative written in first person. Extract structured information from it.
+
+Master Story:
+"""
+${masterStory}
+"""
+
+Extract:
+1. A refined summary (2-4 sentences, casual first person, focus on accomplishments and outcomes)
+2. Top 3-5 key activities (what was actually done)
+3. Accomplishments (completed items, shipped features, unblocked work)
+4. Blockers (waiting on something, errors, repeated attempts)
+
+Respond with JSON:
+{
+  "summary": "Refined casual summary here",
+  "activities": ["Activity 1", "Activity 2", "Activity 3"],
+  "accomplishments": ["Accomplishment 1"] or [],
+  "blockers": ["Blocker 1"] or []
+}`;
+
+    const completion = await this.groq.chat.completions.create({
+      model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 800,
+    });
+
+    const response = completion.choices[0]?.message?.content || "";
+    const parsed = this.parseJsonResponse(response);
+
+    return {
+      summary: parsed.summary || masterStory,
+      activities: parsed.activities || [],
+      accomplishments: parsed.accomplishments || [],
+      blockers: parsed.blockers || [],
+      tokenCount: completion.usage?.total_tokens || 0,
     };
   }
 
