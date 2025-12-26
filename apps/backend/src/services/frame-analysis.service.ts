@@ -17,6 +17,8 @@ import {
   ChangeType,
   ChangeMagnitude,
   GoalContext,
+  ExtractedArtifact,
+  FrameSignals,
 } from "../prompts/session-prompts";
 
 // Types
@@ -45,6 +47,13 @@ export interface FrameAnalysisResult {
   changeType: ChangeType;
   changeMagnitude: ChangeMagnitude;
   changeDescription: string;
+
+  // Enhanced analysis fields
+  artifacts: ExtractedArtifact[];
+  signals: FrameSignals;
+  onTask: boolean;
+  taskRelevance: number;
+  offTaskReason: string | null;
 
   // Metadata
   confidence: number;
@@ -99,6 +108,13 @@ class FrameAnalysisService {
         changeDescription: isFirstFrame
           ? "First frame in session"
           : progressionResult.summary_of_action,
+        // Enhanced analysis fields
+        artifacts: progressionResult.artifacts,
+        signals: progressionResult.signals,
+        onTask: progressionResult.on_task,
+        taskRelevance: progressionResult.task_relevance,
+        offTaskReason: progressionResult.off_task_reason,
+        // Metadata
         confidence: progressionResult.confidence,
         analysisLatencyMs: visionResult.latencyMs,
         model: visionResult.model,
@@ -146,6 +162,18 @@ class FrameAnalysisService {
       changeType: "none",
       changeMagnitude: "trivial",
       changeDescription: isFirstFrame ? "First frame in session" : "Analysis inconclusive",
+      // Default enhanced analysis fields for fallback
+      artifacts: [],
+      signals: {
+        has_blocker: false,
+        has_outcome: false,
+        blocker_type: null,
+        outcome_type: null,
+      },
+      onTask: true,
+      taskRelevance: 0.5,
+      offTaskReason: null,
+      // Metadata
       confidence: 0.5,
       analysisLatencyMs: visionResult.latencyMs,
       model: visionResult.model,

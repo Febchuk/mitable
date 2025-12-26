@@ -51,7 +51,7 @@ interface ActiveSession {
   pausedAt?: number;
   totalPausedMs: number;
   captureCount: number; // Track count from manifest
-  lastCaptureHash?: string; // For deduplication
+  lastCaptureHashByWindow: Map<string, string>; // Per-window deduplication
 }
 
 // ===========================
@@ -124,6 +124,7 @@ class MonitoringSessionService {
         startedAt,
         totalPausedMs: 0,
         captureCount: 0,
+        lastCaptureHashByWindow: new Map(),
       };
 
       // Start checkpoint tracking for crash recovery
@@ -457,6 +458,7 @@ class MonitoringSessionService {
         pausedAt: checkpoint.pausedAt ? new Date(checkpoint.pausedAt).getTime() : undefined,
         totalPausedMs: checkpoint.totalPausedMs,
         captureCount: checkpoint.frameCount,
+        lastCaptureHashByWindow: new Map(),
       };
 
       // Resume capture loop if session was active
@@ -596,16 +598,19 @@ class MonitoringSessionService {
     // Generate hash for deduplication
     const hash = this.hashScreenshot(screenshot.dataUrl);
 
-    // Check if duplicate
-    const isDuplicate = hash === this.activeSession.lastCaptureHash;
+    // Check if duplicate for THIS specific window (not global)
+    const lastHashForWindow = this.activeSession.lastCaptureHashByWindow.get(screenshot.windowId);
+    const isDuplicate = hash === lastHashForWindow;
 
     if (isDuplicate && trigger === "periodic") {
-      console.log("[MonitoringSessionService] Skipping duplicate capture");
+      console.log(
+        `[MonitoringSessionService] Skipping duplicate capture for window: ${screenshot.windowId}`
+      );
       return;
     }
 
-    // Update last hash
-    this.activeSession.lastCaptureHash = hash;
+    // Update last hash for this window
+    this.activeSession.lastCaptureHashByWindow.set(screenshot.windowId, hash);
 
     try {
       // Extract base64 data and convert to buffer

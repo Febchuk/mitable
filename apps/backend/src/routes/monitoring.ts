@@ -930,8 +930,12 @@ router.post(
           changeType: analysisResult.changeType,
           changeMagnitude: analysisResult.changeMagnitude,
           changeDescription: analysisResult.changeDescription,
-          onTask: true, // TODO: Implement task correlation with sessionGoal
-          taskRelevance: null, // TODO: Implement task relevance extraction
+          // Enhanced analysis fields - now using real values from LLM
+          artifacts: analysisResult.artifacts,
+          signals: analysisResult.signals,
+          onTask: analysisResult.onTask,
+          taskRelevance: analysisResult.taskRelevance,
+          offTaskReason: analysisResult.offTaskReason,
           importanceScore,
           importanceReason: getImportanceReason(analysisResult, importanceScore),
           confidence: analysisResult.confidence,
@@ -951,7 +955,7 @@ router.post(
 
 /**
  * Calculate importance score (0-1) based on frame analysis
- * Uses observable change types and magnitudes (no input method guessing)
+ * Uses observable change types, magnitudes, and semantic signals
  */
 function calculateImportanceScore(
   analysis: {
@@ -959,6 +963,16 @@ function calculateImportanceScore(
     deltaChanged: boolean;
     changeType: string;
     changeMagnitude: string;
+    // Enhanced fields
+    artifacts?: Array<{ type: string; value: string }>;
+    signals?: {
+      has_blocker?: boolean;
+      has_outcome?: boolean;
+      blocker_type?: string | null;
+      outcome_type?: string | null;
+    };
+    onTask?: boolean;
+    taskRelevance?: number;
   },
   _sessionGoal?: string
 ): number {
@@ -966,19 +980,19 @@ function calculateImportanceScore(
 
   // Progression detected is a strong signal
   if (analysis.progressionDetected) {
-    score += 0.2;
+    score += 0.15;
   }
 
   // Change magnitude affects score
   switch (analysis.changeMagnitude) {
     case "major":
-      score += 0.25;
+      score += 0.2;
       break;
     case "minor":
-      score += 0.15;
+      score += 0.1;
       break;
     case "trivial":
-      score += 0.05;
+      score += 0.03;
       break;
   }
 
@@ -986,33 +1000,60 @@ function calculateImportanceScore(
   if (analysis.deltaChanged) {
     switch (analysis.changeType) {
       case "content_addition":
-        score += 0.25; // New content is high value
+        score += 0.15; // New content is high value
         break;
       case "content_modification":
-        score += 0.2; // Edits are valuable
+        score += 0.12; // Edits are valuable
         break;
       case "content_deletion":
-        score += 0.15; // Deletions matter
+        score += 0.1; // Deletions matter
         break;
       case "navigation":
       case "file_switch":
-        score += 0.15; // Context changes
+        score += 0.1; // Context changes
         break;
       case "focus_change":
-        score += 0.1; // Window switches
+        score += 0.05; // Window switches
         break;
       case "ui_state_change":
-        score += 0.08; // UI interactions
+        score += 0.05; // UI interactions
         break;
       case "scroll":
-        score += 0.05; // Passive viewing
+        score += 0.02; // Passive viewing
         break;
       case "none":
         score += 0.0; // No change
         break;
       default:
-        score += 0.1;
+        score += 0.05;
     }
+  }
+
+  // === SEMANTIC SIGNAL BONUSES (high-value moments) ===
+
+  // Blocker detected (error, failing test, exception) - important to capture!
+  if (analysis.signals?.has_blocker) {
+    score += 0.25;
+  }
+
+  // Outcome detected (success, merged, deployed, sent) - high-value completion
+  if (analysis.signals?.has_outcome) {
+    score += 0.25;
+  }
+
+  // Artifacts extracted (PR numbers, ticket IDs, etc.) - concrete references
+  if (analysis.artifacts && analysis.artifacts.length > 0) {
+    score += 0.1 + Math.min(0.1, analysis.artifacts.length * 0.03);
+  }
+
+  // Task relevance bonus (when goal is set and activity is on-task)
+  if (analysis.onTask !== false && analysis.taskRelevance !== undefined) {
+    score += analysis.taskRelevance * 0.15; // Up to +0.15 for highly relevant work
+  }
+
+  // Off-task penalty
+  if (analysis.onTask === false) {
+    score -= 0.2;
   }
 
   // Clamp to 0-1 range
@@ -1029,13 +1070,40 @@ function getImportanceReason(
     changeType: string;
     changeMagnitude: string;
     summaryOfAction: string;
+    signals?: {
+      has_blocker?: boolean;
+      has_outcome?: boolean;
+      blocker_type?: string | null;
+      outcome_type?: string | null;
+    };
+    artifacts?: Array<{ type: string; value: string }>;
+    onTask?: boolean;
   },
   score: number
 ): string {
+  // Build reason based on what made it important
+  const reasons: string[] = [];
+
+  if (analysis.signals?.has_blocker) {
+    reasons.push(`blocker detected (${analysis.signals.blocker_type || "error"})`);
+  }
+  if (analysis.signals?.has_outcome) {
+    reasons.push(`outcome achieved (${analysis.signals.outcome_type || "success"})`);
+  }
+  if (analysis.artifacts && analysis.artifacts.length > 0) {
+    const artifactTypes = [...new Set(analysis.artifacts.map((a) => a.type))];
+    reasons.push(`artifacts: ${artifactTypes.join(", ")}`);
+  }
+  if (analysis.onTask === false) {
+    reasons.push("off-task activity");
+  }
+
   if (score >= 0.7) {
-    return `High importance: ${analysis.summaryOfAction}`;
+    const detail = reasons.length > 0 ? ` (${reasons.join("; ")})` : "";
+    return `High importance: ${analysis.summaryOfAction}${detail}`;
   } else if (score >= 0.4) {
-    return `Medium importance: ${analysis.changeType} (${analysis.changeMagnitude})`;
+    const detail = reasons.length > 0 ? ` - ${reasons.join("; ")}` : "";
+    return `Medium importance: ${analysis.changeType} (${analysis.changeMagnitude})${detail}`;
   } else {
     return `Low importance: ${analysis.deltaChanged ? "Minor change" : "No significant change"}`;
   }
