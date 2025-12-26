@@ -284,26 +284,56 @@ class SessionSummarizationService {
     tokenCount: number;
   }> {
     // Use Groq to extract structured data from the master story
-    const prompt = `You have a work session narrative written in first person. Extract structured information from it.
+    const prompt = `<task>
+Extract structured information from a work session narrative written in first person. Transform the detailed narrative into a concise, delivery-ready summary with key insights.
+</task>
 
-Master Story:
-"""
+<input>
+<master_story>
 ${masterStory}
-"""
+</master_story>
+</input>
 
-Extract:
-1. A refined summary (2-4 sentences, casual first person, focus on accomplishments and outcomes)
-2. Top 3-5 key activities (what was actually done)
-3. Accomplishments (completed items, shipped features, unblocked work)
-4. Blockers (waiting on something, errors, repeated attempts)
+<instructions>
+<summary_requirements>
+- Length: Under 10 sentences
+- Style: Casual first person (like a Slack update)
+- Focus: Accomplishments and outcomes, not process details
+- Tone: Conversational and natural
+- Content: Highlight what was achieved and why it matters
+</summary_requirements>
 
-Respond with JSON:
+<activities_requirements>
+- Count: Top 3-5 key activities
+- Format: Short phrases describing what was actually done
+- Focus: Concrete actions, not tools or technical details
+- Examples: "Fixed login bug", "Merged PR #42", "Reviewed customer tickets"
+</activities_requirements>
+
+<accomplishments_requirements>
+- Include: Completed items, shipped features, unblocked work
+- Format: Short, specific descriptions
+- Examples: "Deployed payment service fix", "Merged auth refactor PR", "Resolved production timeout issue"
+- If none: Return empty array []
+</accomplishments_requirements>
+
+<blockers_requirements>
+- Include: Waiting states, errors, repeated attempts, blocked progress
+- Format: Short descriptions of what blocked progress
+- Examples: "OAuth integration timeout", "Waiting on API credentials", "Test failures blocking merge"
+- If none: Return empty array []
+</blockers_requirements>
+</instructions>
+
+<output_format>
+Respond with valid JSON only:
 {
-  "summary": "Refined casual summary here",
+  "summary": "Refined casual summary here (under 10 sentences, first person)",
   "activities": ["Activity 1", "Activity 2", "Activity 3"],
   "accomplishments": ["Accomplishment 1"] or [],
   "blockers": ["Blocker 1"] or []
-}`;
+}
+</output_format>`;
 
     const completion = await this.groq.chat.completions.create({
       model: SUMMARIZATION_CONFIG.TEXT_MODEL,
