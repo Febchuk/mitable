@@ -44,6 +44,7 @@ function createAgentWindow() {
   const bottomMargin = 40;
 
   agentWindow = new BrowserWindow({
+    title: "Mitable Agent",
     width: windowWidth,
     height: windowHeight,
     x: Math.floor((screenWidth - windowWidth) / 2), // Center horizontally
@@ -135,6 +136,7 @@ function createConversationWindow() {
   }
 
   conversationWindow = new BrowserWindow({
+    title: "Mitable Conversation",
     width: 740,
     height: 600,
     frame: false,
@@ -198,6 +200,7 @@ function createAgentPanelWindow() {
   const panelWidth = 450;
 
   agentPanelWindow = new BrowserWindow({
+    title: "Mitable Overlay",
     width: panelWidth,
     height: screenHeight,
     x: screenWidth - panelWidth, // Right edge of screen
@@ -274,6 +277,7 @@ function createConsoleWindow() {
   const isWindows = process.platform === "win32";
 
   consoleWindow = new BrowserWindow({
+    title: "Mitable Console",
     width: windowWidth,
     height: windowHeight,
     // Center the window
@@ -374,6 +378,7 @@ function createWatchingPillWindow() {
   const rightMargin = 5;
 
   watchingPillWindow = new BrowserWindow({
+    title: "Mitable Guide",
     width: windowWidth,
     height: windowHeight,
     x: screenWidth - windowWidth - rightMargin,
@@ -418,6 +423,7 @@ function createWatchingPillEyeDropdown() {
   const pillBounds = watchingPillWindow.getBounds();
 
   watchingPillEyeDropdown = new BrowserWindow({
+    title: "Mitable Nudge",
     width: 240,
     height: 280,
     x: pillBounds.x - 250, // Left of pill
@@ -472,6 +478,7 @@ function createWatchingPillMenuDropdown() {
   const pillBounds = watchingPillWindow.getBounds();
 
   watchingPillMenuDropdown = new BrowserWindow({
+    title: "Mitable Nudge",
     width: 160,
     height: 100,
     x: pillBounds.x - 170, // Left of pill
@@ -1912,6 +1919,7 @@ function isBrowserProcess(appName: string, appPath?: string): boolean {
 // Helper function to create a watch button window
 function createWatchButtonWindow(window: any, watchButtonWindows: Map<string, BrowserWindow>) {
   const buttonWindow = new BrowserWindow({
+    title: "Watch Button",
     width: 250,
     height: 50,
     x: window.bounds.x + 10,
@@ -2094,6 +2102,24 @@ app.whenReady().then(async () => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
+  }
+});
+
+// macOS: Re-create or focus window when clicking dock icon
+app.on("activate", () => {
+  // On macOS, re-create windows if none exist, otherwise focus the Console
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createAgentWindow();
+    createConversationWindow();
+    createAgentPanelWindow();
+    createConsoleWindow();
+  } else if (consoleWindow && !consoleWindow.isDestroyed()) {
+    // Show and focus the Console window
+    if (consoleWindow.isMinimized()) {
+      consoleWindow.restore();
+    }
+    consoleWindow.show();
+    consoleWindow.focus();
   }
 });
 
