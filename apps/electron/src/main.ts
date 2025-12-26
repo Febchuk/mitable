@@ -23,6 +23,9 @@ let watchingPillMenuDropdown: BrowserWindow | null = null;
 let eyeDropdownLastHidden = 0;
 let menuDropdownLastHidden = 0;
 
+// Interval for checking if watched windows are still open
+let closedWindowCheckInterval: NodeJS.Timeout | null = null;
+
 // Watch button windows tracking (module scope for cleanup from multiple handlers)
 const watchButtonWindows: Map<string, BrowserWindow> = new Map();
 
@@ -407,9 +410,51 @@ function createWatchingPillWindow() {
 
   watchingPillWindow.on("closed", () => {
     watchingPillWindow = null;
+    stopClosedWindowCheck();
   });
 
   console.log("[WatchingPill] Window created at right edge, vertically centered");
+  
+  // Start checking for closed windows
+  startClosedWindowCheck();
+}
+
+/**
+ * Start periodic check for closed watched windows
+ */
+function startClosedWindowCheck() {
+  if (closedWindowCheckInterval) return; // Already running
+  
+  closedWindowCheckInterval = setInterval(async () => {
+    const closedWindows = await windowDetectionService.checkForClosedWindows();
+    
+    if (closedWindows.length > 0) {
+      // Notify pill and other windows about the update
+      const selectedWindows = windowDetectionService.getSelectedWindows();
+      const windows = [agentWindow, agentPanelWindow, conversationWindow, watchingPillWindow];
+      
+      for (const window of windows) {
+        if (window && !window.isDestroyed()) {
+          window.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
+        }
+      }
+      
+      console.log(`[ClosedWindowCheck] Notified windows of ${closedWindows.length} closed windows`);
+    }
+  }, 2000); // Check every 2 seconds
+  
+  console.log("[ClosedWindowCheck] Started periodic check for closed windows");
+}
+
+/**
+ * Stop the closed window check interval
+ */
+function stopClosedWindowCheck() {
+  if (closedWindowCheckInterval) {
+    clearInterval(closedWindowCheckInterval);
+    closedWindowCheckInterval = null;
+    console.log("[ClosedWindowCheck] Stopped periodic check");
+  }
 }
 
 function createWatchingPillEyeDropdown() {
