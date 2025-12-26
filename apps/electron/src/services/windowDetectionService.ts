@@ -291,13 +291,13 @@ class WindowDetectionService {
     try {
       const { openWindows } = await import("get-windows");
       const currentWindows = await openWindows();
-      
+
       // Build set of currently open window IDs
       const openWindowIds = new Set(currentWindows.map((w) => w.id.toString()));
-      
+
       // Find selected windows that are no longer open
       const closedWindows: SelectedWindowInfo[] = [];
-      
+
       for (const [windowId, windowInfo] of this.selectedWindows) {
         if (!openWindowIds.has(windowId)) {
           closedWindows.push(windowInfo);

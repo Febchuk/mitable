@@ -414,7 +414,7 @@ function createWatchingPillWindow() {
   });
 
   console.log("[WatchingPill] Window created at right edge, vertically centered");
-  
+
   // Start checking for closed windows
   startClosedWindowCheck();
 }
@@ -424,25 +424,25 @@ function createWatchingPillWindow() {
  */
 function startClosedWindowCheck() {
   if (closedWindowCheckInterval) return; // Already running
-  
+
   closedWindowCheckInterval = setInterval(async () => {
     const closedWindows = await windowDetectionService.checkForClosedWindows();
-    
+
     if (closedWindows.length > 0) {
       // Notify pill and other windows about the update
       const selectedWindows = windowDetectionService.getSelectedWindows();
       const windows = [agentWindow, agentPanelWindow, conversationWindow, watchingPillWindow];
-      
+
       for (const window of windows) {
         if (window && !window.isDestroyed()) {
           window.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
         }
       }
-      
+
       console.log(`[ClosedWindowCheck] Notified windows of ${closedWindows.length} closed windows`);
     }
   }, 2000); // Check every 2 seconds
-  
+
   console.log("[ClosedWindowCheck] Started periodic check for closed windows");
 }
 
