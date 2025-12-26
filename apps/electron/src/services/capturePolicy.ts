@@ -13,7 +13,7 @@ export type CapturePolicy = {
  * Load capture policy from environment variables
  *
  * ENV format:
- * CAPTURE_DENY_APPS=outlook,gmail,1password,slack
+ * CAPTURE_DENY_APPS=outlook,gmail,1password
  *
  * Note: Each pattern is checked against BOTH window titles AND app names
  * for maximum blocking coverage with minimal configuration.
@@ -49,7 +49,6 @@ const defaultDenyList: CapturePolicy = {
     /1password|lastpass|bitwarden|okta/i,
     /bank|financial|payroll|paystub|tax/i,
     /epic|cerner|ehr|hipaa|mychart/i,
-    /slack/i, // Add more as needed
   ],
 };
 

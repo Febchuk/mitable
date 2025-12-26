@@ -14,24 +14,56 @@ export async function getAuthToken(): Promise<string | null> {
 }
 
 /**
- * Make an authenticated API request
+ * Make an authenticated API request with automatic 401 retry
  */
 export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = await getAuthToken();
+  const makeRequest = async (token: string | null): Promise<Response> => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+    };
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    return fetch(`${API_BASE_URL}/api${endpoint}`, {
+      ...options,
+      headers,
+    });
   };
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
+  let token = await getAuthToken();
+  let response = await makeRequest(token);
 
-  const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
-    ...options,
-    headers,
-  });
+  // On 401, attempt token refresh and retry once
+  if (response.status === 401) {
+    const refreshToken = authService.getRefreshToken();
+    if (refreshToken) {
+      try {
+        console.log("[API] Token expired, attempting refresh...");
+        const refreshResponse = await authService.refreshToken(refreshToken);
+        authService.saveTokens(
+          refreshResponse.session.access_token,
+          refreshResponse.session.refresh_token
+        );
+        token = refreshResponse.session.access_token;
+        response = await makeRequest(token);
+        console.log("[API] Token refreshed, request retried successfully");
+      } catch (refreshError) {
+        console.error("[API] Token refresh failed:", refreshError);
+        // Refresh failed - clear tokens and redirect to login
+        authService.clearTokens();
+        window.location.href = "/login";
+        throw new Error("Session expired. Please log in again.");
+      }
+    } else {
+      // No refresh token available - redirect to login
+      authService.clearTokens();
+      window.location.href = "/login";
+      throw new Error("Session expired. Please log in again.");
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({

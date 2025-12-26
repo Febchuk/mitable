@@ -103,6 +103,33 @@ export function UserProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, []);
 
+  // Background token refresh - keeps sessions alive for long-running usage
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
+
+    const refreshInterval = setInterval(async () => {
+      const refreshToken = authService.getRefreshToken();
+      if (!refreshToken) return;
+
+      try {
+        console.log("[Auth] Background token refresh triggered");
+        const response = await authService.refreshToken(refreshToken);
+        authService.saveTokens(response.session.access_token, response.session.refresh_token);
+        console.log("[Auth] Token refreshed successfully");
+      } catch (error) {
+        console.error("[Auth] Background token refresh failed:", error);
+        // Silent logout on refresh failure
+        authService.clearTokens();
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    }, REFRESH_INTERVAL);
+
+    return () => clearInterval(refreshInterval);
+  }, [isAuthenticated]);
+
   const updateUser = (newUser: User) => {
     setUser(newUser);
     setIsAuthenticated(true);
