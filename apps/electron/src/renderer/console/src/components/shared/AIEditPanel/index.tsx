@@ -58,7 +58,7 @@ export default function AIEditPanel({
             variant="ghost"
             size="icon"
             onClick={onCancel}
-            className="text-text-secondary hover:text-text-primary"
+            className="text-text-secondary hover:text-text-primary hover:bg-background-elevated"
           >
             <ArrowLeft size={20} />
           </Button>
@@ -69,7 +69,12 @@ export default function AIEditPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={onCancel} disabled={isSaving} className="gap-2">
+          <Button
+            variant="ghost"
+            onClick={onCancel}
+            disabled={isSaving}
+            className="gap-2 text-text-secondary hover:text-text-primary hover:bg-background-elevated"
+          >
             <X size={16} />
             Cancel
           </Button>
@@ -120,3 +125,4 @@ export default function AIEditPanel({
 }
 
 export { TextEditor, AIChatPanel };
+export { default as RichTextEditor } from "./RichTextEditor";

@@ -162,7 +162,9 @@ class SessionSummarizationService {
     const refinedSummary = await this.refineMasterStoryForDelivery(masterStory);
 
     const generationTimeMs = Date.now() - startTime;
-    console.log(`[SessionSummarization] Summary generated from master story in ${generationTimeMs}ms`);
+    console.log(
+      `[SessionSummarization] Summary generated from master story in ${generationTimeMs}ms`
+    );
 
     const summary = {
       narrativeSummary: refinedSummary.summary,
@@ -231,7 +233,9 @@ class SessionSummarizationService {
     const summary = await this.generateNarrative(aggregated, analyses, episodes);
 
     const generationTimeMs = Date.now() - startTime;
-    console.log(`[SessionSummarization] Summary generated from screenshots in ${generationTimeMs}ms`);
+    console.log(
+      `[SessionSummarization] Summary generated from screenshots in ${generationTimeMs}ms`
+    );
 
     // 6. Save summary to database
     await this.saveSummary(sessionId, summary, generationTimeMs);
@@ -260,9 +264,7 @@ class SessionSummarizationService {
 
     // Get top 5 high-importance frames with meaningful changes
     const keyFrames = captures
-      .filter(
-        (c) => c.deltaChanged && c.deltaChangeDescription && (c.importanceScore || 0) >= 0.5
-      )
+      .filter((c) => c.deltaChanged && c.deltaChangeDescription && (c.importanceScore || 0) >= 0.5)
       .slice(0, 5);
 
     return keyFrames.map((frame) => ({

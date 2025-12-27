@@ -248,8 +248,8 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] bg-background-primary border-border-subtle">
-        <DialogHeader className="pr-10">
+      <DialogContent className="sm:max-w-[600px] bg-background-primary border-border-subtle overflow-hidden flex flex-col max-h-[85vh]">
+        <DialogHeader className="pr-8 flex-shrink-0">
           <DialogTitle className="text-text-primary">Start Monitoring Session</DialogTitle>
           <DialogDescription className="text-text-secondary whitespace-normal break-words">
             Select the windows you want to monitor. We'll capture screenshots periodically to
@@ -257,7 +257,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 py-4 overflow-y-auto flex-1 px-4">
           {/* Session Name */}
           <div className="space-y-2">
             <Label htmlFor="session-name" className="text-text-primary">
@@ -303,7 +303,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
                   size="sm"
                   onClick={loadLinearIssues}
                   disabled={isLoadingLinear}
-                  className="text-text-secondary hover:text-text-primary flex items-center gap-1.5"
+                  className="text-text-secondary hover:text-text-primary hover:bg-background-elevated flex items-center gap-1.5"
                 >
                   {isLoadingLinear ? (
                     <Loader2 size={14} className="animate-spin" />
@@ -357,7 +357,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
                     setSelectedLinearIssue(null);
                     setSessionGoal("");
                   }}
-                  className="h-6 w-6 p-0 text-text-secondary hover:text-text-primary"
+                  className="h-6 w-6 p-0 text-text-secondary hover:text-text-primary hover:bg-background-elevated"
                 >
                   ×
                 </Button>
@@ -386,7 +386,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
                   variant="ghost"
                   size="sm"
                   onClick={handleSelectAll}
-                  className="text-text-secondary hover:text-text-primary"
+                  className="text-text-secondary hover:text-text-primary hover:bg-background-elevated"
                 >
                   {selectedWindows.length === availableWindows.length
                     ? "Deselect All"
@@ -397,7 +397,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
                   size="sm"
                   onClick={loadAvailableWindows}
                   disabled={isLoadingWindows}
-                  className="text-text-secondary hover:text-text-primary"
+                  className="text-text-secondary hover:text-text-primary hover:bg-background-elevated"
                 >
                   <RefreshCw size={16} className={isLoadingWindows ? "animate-spin" : ""} />
                 </Button>
@@ -418,7 +418,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
                 </Button>
               </div>
             ) : (
-              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-3">
+              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
                 {availableWindows.map((window) => (
                   <label
                     key={window.windowId}
@@ -447,8 +447,12 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isStarting}>
+        <DialogFooter className="flex-shrink-0 pt-4">
+          <Button
+            onClick={() => onOpenChange(false)}
+            disabled={isStarting}
+            className="bg-background-elevated border border-border-subtle text-text-primary hover:bg-background-tertiary"
+          >
             Cancel
           </Button>
           <Button

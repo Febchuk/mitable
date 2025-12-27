@@ -7,18 +7,20 @@ This utility converts video recordings into monitoring sessions by extracting fr
 ## Prerequisites
 
 1. **ffmpeg** must be installed on your system:
+
    ```bash
    # macOS
    brew install ffmpeg
-   
+
    # Ubuntu/Debian
    sudo apt-get install ffmpeg
-   
+
    # Windows
    # Download from https://ffmpeg.org/download.html
    ```
 
 2. **Dependencies** installed:
+
    ```bash
    cd apps/backend
    npm install
@@ -143,8 +145,8 @@ The script will:
 ✅ Summary generated in 2.34s
 
 📝 Narrative Summary:
-   Spent the session implementing JWT authentication. Started by editing the auth 
-   service, then researched best practices online, wrote unit tests, and committed 
+   Spent the session implementing JWT authentication. Started by editing the auth
+   service, then researched best practices online, wrote unit tests, and committed
    the changes. Also responded to a few Slack messages about the feature.
 
 🎯 Accomplishments:
@@ -206,6 +208,7 @@ You must provide valid user and organization IDs. Get them from your database or
 ### Frame analysis fails
 
 If individual frames fail analysis (e.g., Groq API errors), the script will:
+
 - Log the error
 - Mark the frame as "skipped"
 - Continue processing remaining frames
@@ -215,6 +218,7 @@ This ensures one bad frame doesn't kill the entire session.
 ### No summary generated
 
 Check that:
+
 - At least some frames were successfully analyzed
 - Your Groq/Gemini API keys are configured in `.env`
 - The database connection is working
@@ -250,4 +254,3 @@ Possible improvements:
 - [ ] Comparison mode (show AI vs. human summary side-by-side)
 - [ ] Export results to JSON for analysis
 - [ ] Support for existing session IDs (append frames)
-

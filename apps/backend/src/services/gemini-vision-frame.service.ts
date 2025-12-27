@@ -189,4 +189,3 @@ class GeminiVisionFrameService {
 
 // Export singleton instance
 export const geminiVisionFrameService = new GeminiVisionFrameService();
-
