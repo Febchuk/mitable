@@ -125,7 +125,12 @@ class WindowDetectionService {
       return watchableWindows;
     } catch (error) {
       console.error("[WindowDetectionService] Failed to get windows:", error);
-      return [];
+      console.error("[WindowDetectionService] Error details:", {
+        name: (error as Error)?.name,
+        message: (error as Error)?.message,
+        stack: (error as Error)?.stack,
+      });
+      throw error; // Re-throw so caller can report the actual error
     }
   }
 
@@ -272,6 +277,48 @@ class WindowDetectionService {
       selectedCount: this.selectedWindows.size,
       selectedWindows: this.getSelectedWindows(),
     };
+  }
+
+  /**
+   * Check for closed windows and remove them from watch list
+   * Returns the list of windows that were removed (closed)
+   */
+  async checkForClosedWindows(): Promise<SelectedWindowInfo[]> {
+    if (this.selectedWindows.size === 0) {
+      return [];
+    }
+
+    try {
+      const { openWindows } = await import("get-windows");
+      const currentWindows = await openWindows();
+
+      // Build set of currently open window IDs
+      const openWindowIds = new Set(currentWindows.map((w) => w.id.toString()));
+
+      // Find selected windows that are no longer open
+      const closedWindows: SelectedWindowInfo[] = [];
+
+      for (const [windowId, windowInfo] of this.selectedWindows) {
+        if (!openWindowIds.has(windowId)) {
+          closedWindows.push(windowInfo);
+          this.selectedWindows.delete(windowId);
+          console.log(
+            `[WindowDetectionService] Window closed, removed from watch list: ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowId}]`
+          );
+        }
+      }
+
+      if (closedWindows.length > 0) {
+        console.log(
+          `[WindowDetectionService] Removed ${closedWindows.length} closed windows, now watching ${this.selectedWindows.size}`
+        );
+      }
+
+      return closedWindows;
+    } catch (error) {
+      console.error("[WindowDetectionService] Error checking for closed windows:", error);
+      return [];
+    }
   }
 }
 

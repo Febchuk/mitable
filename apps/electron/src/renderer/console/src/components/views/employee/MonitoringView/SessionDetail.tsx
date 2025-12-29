@@ -381,7 +381,8 @@ export default function SessionDetail() {
       // 1. End Electron-side capture loop and get captures
       const electronResult = await window.consoleAPI.endMonitoringSession();
 
-      if (electronResult.error) {
+      // If Electron session is already ended (e.g., from pill), that's OK - just proceed with backend
+      if (electronResult.error && electronResult.error !== "No active session") {
         throw new Error(electronResult.error);
       }
 
@@ -392,7 +393,9 @@ export default function SessionDetail() {
         );
         await uploadCaptures(sessionId, electronResult.captures);
       } else {
-        console.log("[SessionDetail] No captures to upload");
+        console.log(
+          "[SessionDetail] No captures to upload (session may have been ended from pill)"
+        );
       }
 
       // 3. Trigger backend summarization
@@ -507,7 +510,7 @@ export default function SessionDetail() {
             variant="ghost"
             size="icon"
             onClick={() => navigate("/monitoring")}
-            className="text-text-secondary hover:text-text-primary"
+            className="text-text-secondary hover:text-text-primary hover:bg-background-elevated"
           >
             <ArrowLeft size={20} />
           </Button>
@@ -624,8 +627,7 @@ export default function SessionDetail() {
                 <Button
                   onClick={handleLinearClick}
                   disabled={!summary}
-                  variant="outline"
-                  className="gap-2 border-[#5E6AD2] text-[#5E6AD2] hover:bg-[#5E6AD2]/10"
+                  className="gap-2 border border-[#5E6AD2] text-[#5E6AD2] bg-transparent hover:bg-[#5E6AD2]/10 focus-visible:outline-none focus-visible:ring-0"
                 >
                   <SiLinear size={14} />
                   Send to Linear
@@ -746,7 +748,7 @@ export default function SessionDetail() {
             <Button
               variant="ghost"
               onClick={() => setIsAIEditMode(true)}
-              className="gap-2 text-text-secondary hover:text-text-primary"
+              className="gap-2 text-text-secondary hover:text-text-primary hover:bg-background-elevated"
             >
               <Edit2 size={16} />
               Edit

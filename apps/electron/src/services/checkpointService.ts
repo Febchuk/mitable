@@ -81,13 +81,23 @@ class CheckpointService {
 
   /**
    * Setup graceful shutdown handler
+   * Auto-pauses active sessions before app exit for crash recovery
    */
   private setupShutdownHandler(): void {
     const gracefulShutdown = async () => {
       if (this.isShuttingDown) return;
       this.isShuttingDown = true;
 
-      console.log("[Checkpoint] Graceful shutdown - saving final checkpoint");
+      console.log("[Checkpoint] Graceful shutdown - auto-pausing active session");
+
+      if (this.currentCheckpoint && this.currentCheckpoint.status === "active") {
+        // Auto-pause active session so it can be resumed after restart
+        this.currentCheckpoint.status = "paused";
+        this.currentCheckpoint.pausedAt = new Date().toISOString();
+        console.log(
+          `[Checkpoint] Auto-paused session ${this.currentCheckpoint.sessionId} for recovery`
+        );
+      }
 
       if (this.currentCheckpoint) {
         await this.saveCheckpoint();

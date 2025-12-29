@@ -23,6 +23,9 @@ let watchingPillMenuDropdown: BrowserWindow | null = null;
 let eyeDropdownLastHidden = 0;
 let menuDropdownLastHidden = 0;
 
+// Interval for checking if watched windows are still open
+let closedWindowCheckInterval: NodeJS.Timeout | null = null;
+
 // Watch button windows tracking (module scope for cleanup from multiple handlers)
 const watchButtonWindows: Map<string, BrowserWindow> = new Map();
 
@@ -412,9 +415,51 @@ function createWatchingPillWindow() {
 
   watchingPillWindow.on("closed", () => {
     watchingPillWindow = null;
+    stopClosedWindowCheck();
   });
 
   console.log("[WatchingPill] Window created at right edge, vertically centered");
+
+  // Start checking for closed windows
+  startClosedWindowCheck();
+}
+
+/**
+ * Start periodic check for closed watched windows
+ */
+function startClosedWindowCheck() {
+  if (closedWindowCheckInterval) return; // Already running
+
+  closedWindowCheckInterval = setInterval(async () => {
+    const closedWindows = await windowDetectionService.checkForClosedWindows();
+
+    if (closedWindows.length > 0) {
+      // Notify pill and other windows about the update
+      const selectedWindows = windowDetectionService.getSelectedWindows();
+      const windows = [agentWindow, agentPanelWindow, conversationWindow, watchingPillWindow];
+
+      for (const window of windows) {
+        if (window && !window.isDestroyed()) {
+          window.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
+        }
+      }
+
+      console.log(`[ClosedWindowCheck] Notified windows of ${closedWindows.length} closed windows`);
+    }
+  }, 2000); // Check every 2 seconds
+
+  console.log("[ClosedWindowCheck] Started periodic check for closed windows");
+}
+
+/**
+ * Stop the closed window check interval
+ */
+function stopClosedWindowCheck() {
+  if (closedWindowCheckInterval) {
+    clearInterval(closedWindowCheckInterval);
+    closedWindowCheckInterval = null;
+    console.log("[ClosedWindowCheck] Stopped periodic check");
+  }
 }
 
 function createWatchingPillEyeDropdown() {
@@ -1282,11 +1327,27 @@ function setupIPC() {
             appName: payload.appName,
             windowTitle: payload.windowTitle,
           });
+          // Notify pill to update badge count
+          const selectedWindows = windowDetectionService.getSelectedWindows();
+          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+            watchingPillWindow.webContents.send(
+              IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
+              selectedWindows
+            );
+          }
           return { success: true };
         }
         case "unselect-window": {
           const windowId = action.payload as string;
           windowDetectionService.removeWindow(windowId);
+          // Notify pill to update badge count
+          const selectedWindows = windowDetectionService.getSelectedWindows();
+          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+            watchingPillWindow.webContents.send(
+              IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
+              selectedWindows
+            );
+          }
           return { success: true };
         }
         case "start-session": {
@@ -1300,7 +1361,47 @@ function setupIPC() {
           return monitoringSessionService.resumeSession();
         }
         case "end-session": {
-          return monitoringSessionService.endSession();
+          // 1. End Electron-side capture loop and get captures
+          const result = await monitoringSessionService.endSession();
+
+          if (!result.success || !result.sessionId) {
+            return result;
+          }
+
+          // 2. Upload captures and end backend session
+          const token = authTokens.accessToken;
+          if (token && result.captures && result.captures.length > 0) {
+            const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
+            try {
+              // Upload captures
+              console.log(`[EndSession] Uploading ${result.captures.length} captures to backend`);
+              await fetch(`${API_BASE_URL}/api/monitoring/sessions/${result.sessionId}/captures`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ captures: result.captures }),
+              });
+
+              // End backend session (triggers summarization)
+              console.log(`[EndSession] Triggering backend summarization`);
+              await fetch(`${API_BASE_URL}/api/monitoring/sessions/${result.sessionId}/end`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+            } catch (error) {
+              console.error(
+                "[EndSession] Error uploading captures or ending backend session:",
+                error
+              );
+            }
+          }
+
+          return result;
         }
         case "show-console": {
           if (consoleWindow && !consoleWindow.isDestroyed()) {
