@@ -177,14 +177,13 @@ async function extractFrames(
 
   return new Promise((resolve, reject) => {
     const frames: ExtractedFrame[] = [];
-    let frameNumber = 0;
 
     ffmpeg(videoPath)
       .outputOptions([
         `-vf fps=1/${intervalSeconds}`, // Extract 1 frame every N seconds
       ])
       .output(path.join(outputDir, "frame_%04d.png"))
-      .on("start", (commandLine) => {
+      .on("start", (_commandLine) => {
         console.log(`\n⚙️  Running ffmpeg...`);
       })
       .on("progress", (progress) => {
