@@ -92,6 +92,8 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "dedent": "^1.0.0",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2",
     "framer-motion": "^12.23.24",
     "get-windows": "^9.2.3",
     "harden-react-markdown": "^1.1.5",

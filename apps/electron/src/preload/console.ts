@@ -222,6 +222,42 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       callback();
     });
   },
+
+  // Update notifications
+  checkForUpdates: (): Promise<{ success: boolean }> => ipcRenderer.invoke("check-for-updates"),
+  downloadUpdate: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("download-update"),
+  installUpdate: (): Promise<{ success: boolean }> => ipcRenderer.invoke("install-update"),
+
+  onUpdateAvailable: (callback: (info: { version: string; releaseNotes?: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, info: { version: string; releaseNotes?: string }) =>
+      callback(info);
+    ipcRenderer.on("update-available", handler);
+    return () => {
+      ipcRenderer.removeListener("update-available", handler);
+    };
+  },
+
+  onUpdateDownloadProgress: (
+    callback: (progress: { percent: number; transferred: number; total: number }) => void
+  ) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      progress: { percent: number; transferred: number; total: number }
+    ) => callback(progress);
+    ipcRenderer.on("update-download-progress", handler);
+    return () => {
+      ipcRenderer.removeListener("update-download-progress", handler);
+    };
+  },
+
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, info: { version: string }) => callback(info);
+    ipcRenderer.on("update-downloaded", handler);
+    return () => {
+      ipcRenderer.removeListener("update-downloaded", handler);
+    };
+  },
 });
 
 console.log("[Preload] Console preload script finished - window.consoleAPI exposed");

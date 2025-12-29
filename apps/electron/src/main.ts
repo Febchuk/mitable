@@ -9,6 +9,7 @@ import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusServ
 import { windowDetectionService } from "./services/windowDetectionService";
 import { monitoringSessionService } from "./services/monitoringSessionService";
 import { authManager } from "./services/authManager";
+import { updateService } from "./services/updateService";
 
 // Window references
 let consoleWindow: BrowserWindow | null = null;
@@ -1179,6 +1180,30 @@ function setupMonitoringSessionHandlers() {
     return { success: true };
   });
 
+  // Update notification handlers
+  ipcMain.handle("check-for-updates", async () => {
+    console.log("[Update] Manual check for updates requested");
+    await updateService.checkForUpdates();
+    return { success: true };
+  });
+
+  ipcMain.handle("download-update", async () => {
+    console.log("[Update] Download update requested");
+    try {
+      await updateService.downloadUpdate();
+      return { success: true };
+    } catch (error) {
+      console.error("[Update] Download failed:", error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle("install-update", () => {
+    console.log("[Update] Install update requested");
+    updateService.quitAndInstall();
+    return { success: true };
+  });
+
   console.log("[IPC] Monitoring session handlers registered successfully");
 }
 
@@ -1313,6 +1338,9 @@ app.whenReady().then(async () => {
 
   setupIPC();
   registerGlobalShortcuts();
+
+  // Start automatic update checks (every 4 hours)
+  updateService.startPeriodicChecks(240);
 
   // Check for recoverable sessions on startup (crash recovery)
   try {
