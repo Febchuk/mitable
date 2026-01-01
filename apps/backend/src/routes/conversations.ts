@@ -6,6 +6,7 @@ import { requireAuth } from "../middleware/auth";
 import { OrchestratorService } from "../services/orchestrator.service";
 import { workflowService } from "../services/workflow.service";
 import { screenshotLimiter } from "../middleware/rateLimiter.js";
+import { trackAiUsage } from "../middleware/usage.js";
 import type { WindowScreenshot } from "@mitable/shared";
 
 // Initialize orchestrator (replaces old agentService)
@@ -740,6 +741,7 @@ router.post(
   "/:conversationId/messages/stream",
   requireAuth,
   screenshotLimiter, // Rate limit screenshot analysis to prevent AI compute abuse
+  trackAiUsage, // Track AI usage for billing (soft enforcement)
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id || req.userId;
 

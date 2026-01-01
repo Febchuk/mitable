@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/console/src/services/authService";
 import { Loader2, Check, Link2, Unlink, Mail } from "lucide-react";
 import { SiLinear, SiGmail } from "react-icons/si";
+import { BillingSection } from "@/console/src/components/billing";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -308,6 +309,12 @@ export default function SettingsView() {
       <div>
         <h1 className="text-4xl font-bold text-white">Settings</h1>
         <p className="text-text-secondary mt-2">Manage your account and integrations</p>
+      </div>
+
+      {/* Subscription Section */}
+      <div className="space-y-4 max-w-2xl">
+        <h2 className="text-2xl font-semibold text-white">Subscription</h2>
+        <BillingSection />
       </div>
 
       {/* Integrations Section */}

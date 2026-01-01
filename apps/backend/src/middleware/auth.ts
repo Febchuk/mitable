@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from "express";
+import { eq } from "drizzle-orm";
 import { supabase } from "../lib/supabase";
+import { db } from "../db/client.js";
+import { users } from "../db/schema/index.js";
 
 /**
  * Middleware to require authentication
@@ -36,6 +39,17 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     // Attach user info to request
     req.user = user;
     req.userId = user.id;
+
+    // Lookup user's organization from database
+    const userRecord = await db
+      .select({ organizationId: users.organizationId })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+
+    if (userRecord[0]) {
+      req.organizationId = userRecord[0].organizationId;
+    }
 
     next();
   } catch (error) {

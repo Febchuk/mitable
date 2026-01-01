@@ -9,15 +9,15 @@ import LoginPage from "./pages/LoginPage";
 import SignupOrganizationPage from "./pages/SignupOrganizationPage";
 import RoadmapView from "./components/views/employee/RoadmapView";
 import RoadmapTaskDetail from "./components/views/employee/RoadmapView/RoadmapTaskDetail";
-import NudgesView from "./components/views/employee/NudgesView";
-import NudgeDetail from "./components/views/employee/NudgesView/NudgeDetail";
-import CreateNudge from "./components/views/employee/NudgesView/CreateNudge";
 import ChatsView from "./components/views/employee/ChatsView";
 import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
 import SettingsView from "./components/views/employee/SettingsView";
+import DocsView from "./components/views/employee/DocsView";
+import DocDetail from "./components/views/employee/DocsView/DocDetail";
+import TodosView from "./components/views/employee/TodosView";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
@@ -154,18 +154,19 @@ function App() {
               <Route path="integrations" element={<IntegrationsView />} />
               <Route path="setup" element={<SetupView />} />
               {/* Employee Routes */}
-              <Route path="roadmap" element={<RoadmapView />} />
-              <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
-              <Route path="nudges" element={<NudgesView />} />
-              <Route path="nudges/new" element={<CreateNudge />} />
-              <Route path="nudges/:nudgeId" element={<NudgeDetail />} />
-              <Route path="chats" element={<ChatsView />} />
-              <Route path="chats/new" element={<NewChat />} />
-              <Route path="chats/:chatId" element={<ChatDetail />} />
+              <Route path="docs" element={<DocsView />} />
+              <Route path="docs/:docId" element={<DocDetail />} />
+              <Route path="todos" element={<TodosView />} />
               {/* Monitoring Routes */}
               <Route path="monitoring" element={<MonitoringView />} />
               <Route path="monitoring/:sessionId" element={<SessionDetail />} />
               <Route path="settings" element={<SettingsView />} />
+              {/* Legacy routes (hidden from nav but accessible via URL) */}
+              <Route path="roadmap" element={<RoadmapView />} />
+              <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
+              <Route path="chats" element={<ChatsView />} />
+              <Route path="chats/new" element={<NewChat />} />
+              <Route path="chats/:chatId" element={<ChatDetail />} />
             </Route>
           </Routes>
           <Toaster />

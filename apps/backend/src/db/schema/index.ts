@@ -2,7 +2,6 @@
 export * from "./organizations.schema";
 export * from "./users.schema";
 export * from "./integrations.schema";
-export * from "./experts.schema";
 export * from "./conversations.schema";
 export * from "./source-materials.schema";
 export * from "./roadmap-templates.schema";
@@ -12,6 +11,7 @@ export * from "./search-content.schema";
 export * from "./workflows.schema";
 export * from "./monitoring.schema";
 export * from "./documents.schema";
+export * from "./billing.schema";
 
 // GitHub schemas
 export * from "./github/github-repos.schema";

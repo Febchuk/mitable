@@ -1,4 +1,5 @@
-import { Layers, Users, MessageSquare, BarChart3, Plug, Activity } from "lucide-react";
+import { Layers, Users, BarChart3, Plug, Activity, FileText, CheckSquare } from "lucide-react";
+// Note: Users icon is still used in admin navigation for People
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 
@@ -21,11 +22,9 @@ export default function Nav() {
   // Employee navigation
   return (
     <nav className="space-y-1 px-2">
-      {/* <NavItem to="/home" icon={Home} label="Home" /> */}
+      <NavItem to="/docs" icon={FileText} label="Docs" />
       <NavItem to="/monitoring" icon={Activity} label="Sessions" />
-      <NavItem to="/roadmap" icon={Layers} label="Roadmap" />
-      <NavItem to="/nudges" icon={Users} label="Nudges" />
-      <NavItem to="/chats" icon={MessageSquare} label="Chats" />
+      <NavItem to="/todos" icon={CheckSquare} label="Todos" />
     </nav>
   );
 }

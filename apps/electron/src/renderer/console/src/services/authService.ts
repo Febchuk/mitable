@@ -40,11 +40,12 @@ export interface AuthError {
 }
 
 export interface OrganizationSignupData {
+  accountType?: "personal" | "team"; // Default "team" for backwards compatibility
   email: string;
   password: string;
   firstName: string;
   lastName: string;
-  organizationName: string;
+  organizationName?: string; // Required for team, auto-generated for personal
   organizationDomain?: string;
 }
 

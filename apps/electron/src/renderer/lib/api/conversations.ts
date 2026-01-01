@@ -5,8 +5,18 @@
  * Works with both Agent and Conversation windows
  */
 
-import type { Message as MessageType } from "../../conversation/src/types";
 import type { MultiWindowCaptureResult, WindowScreenshot } from "@mitable/shared";
+
+// Message type (formerly from conversation renderer)
+interface MessageType {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp?: Date;
+  messageType?: "text" | "workflow";
+  cardData?: Record<string, unknown>;
+  sources?: Array<{ title: string; url: string; snippet: string }>;
+}
 
 // Base URL for backend API (configurable via Vite env)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -27,9 +37,9 @@ export interface StreamChunk {
   content?: string;
   messageId?: string;
   error?: string;
-  messageType?: "text" | "workflow" | "experts";
-  cardData?: any;
-  sources?: any[];
+  messageType?: "text" | "workflow";
+  cardData?: Record<string, unknown>;
+  sources?: Array<{ title: string; url: string; snippet: string }>;
   // Workflow routing metadata (added by backend)
   workflowSessionId?: string | null;
   relatedStepIndex?: number | null;
@@ -41,24 +51,14 @@ export interface StreamChunk {
 }
 
 /**
- * Get auth token from main process
- * Works with agentAPI, agentPanelAPI, and conversationAPI
+ * Get auth headers for API requests
+ * Returns headers with Content-Type, token not available in this context
  */
 async function getAuthHeaders(): Promise<HeadersInit> {
-  let token: string | null = null;
-
-  // Check which window API is available
-  if ("agentPanelAPI" in window && window.agentPanelAPI?.getAuthToken) {
-    token = await window.agentPanelAPI.getAuthToken();
-  } else if ("agentAPI" in window && window.agentAPI?.getAuthToken) {
-    token = await window.agentAPI.getAuthToken();
-  } else if ("conversationAPI" in window && window.conversationAPI?.getAuthToken) {
-    token = await window.conversationAPI.getAuthToken();
-  }
-
+  // Token management is now handled at the component level via consoleAPI
+  // This function just returns base headers
   return {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 

@@ -6,7 +6,6 @@ import type { Message } from "../db/schema/conversations.schema";
 import { BaseTool, ToolContext, StreamChunk, ToolDefinition } from "../tools/base.tool";
 import { RespondTextTool } from "../tools/respond-text.tool";
 import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
-import { FindExpertTool } from "../tools/find-expert.tool";
 import { GuideNextStepTool } from "../tools/guide-next-step.tool";
 import { ClarifyIntentTool } from "../tools/clarify-intent.tool.js";
 import { StartUIGuidanceWorkflowTool } from "../tools/start-ui-guidance-workflow.tool.js";
@@ -201,9 +200,6 @@ export class AgentService {
     // Register Phase 2 tools - RAG Knowledge Search
     this.registerTool(new SearchKnowledgeTool());
 
-    // Register Phase 3 tools - Expert Matching
-    this.registerTool(new FindExpertTool());
-
     // Register Phase 4 tools - Visual Guidance
     this.registerTool(new GuideNextStepTool());
 
@@ -278,7 +274,7 @@ export class AgentService {
     let iterationCount = 0;
 
     // Track metadata from last tool execution (for including in final response)
-    let lastToolMessageType: "text" | "workflow" | "experts" | undefined;
+    let lastToolMessageType: "text" | "workflow" | undefined;
     let lastToolCardData: any | undefined;
     let lastToolSources: any[] | undefined;
 

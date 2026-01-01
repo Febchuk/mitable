@@ -5,9 +5,11 @@ import Button from "../components/ui/Button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
 import logoSvg from "../../../assets/logo.svg";
+import type { AccountType } from "@mitable/shared";
 
 export default function SignupOrganizationPage() {
   const [formData, setFormData] = useState({
+    accountType: "personal" as AccountType,
     firstName: "",
     lastName: "",
     email: "",
@@ -25,6 +27,16 @@ export default function SignupOrganizationPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleAccountTypeChange = (type: AccountType) => {
+    setFormData((prev) => ({
+      ...prev,
+      accountType: type,
+      // Clear org fields when switching to personal
+      organizationName: type === "personal" ? "" : prev.organizationName,
+      organizationDomain: type === "personal" ? "" : prev.organizationDomain,
+    }));
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
@@ -32,12 +44,17 @@ export default function SignupOrganizationPage() {
 
     try {
       const response = await authService.signupOrganization({
+        accountType: formData.accountType,
         email: formData.email,
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        organizationName: formData.organizationName,
-        organizationDomain: formData.organizationDomain || undefined,
+        // Only send org fields for team accounts
+        organizationName: formData.accountType === "team" ? formData.organizationName : undefined,
+        organizationDomain:
+          formData.accountType === "team" && formData.organizationDomain
+            ? formData.organizationDomain
+            : undefined,
       });
 
       // Save tokens
@@ -74,10 +91,44 @@ export default function SignupOrganizationPage() {
         {/* Signup form */}
         <div className="space-y-6">
           <div className="space-y-2 text-center">
-            <h1 className="text-heading-3 text-white">Create Your Organization</h1>
+            <h1 className="text-heading-3 text-white">
+              {formData.accountType === "personal"
+                ? "Create Your Account"
+                : "Create Your Organization"}
+            </h1>
             <p className="text-body-sm text-text-secondary">
-              Set up your organization and admin account
+              {formData.accountType === "personal"
+                ? "Set up your personal Mitable account"
+                : "Set up your organization and admin account"}
             </p>
+          </div>
+
+          {/* Account Type Toggle */}
+          <div className="flex justify-center">
+            <div className="inline-flex rounded-lg border border-border-subtle bg-background-elevated p-1">
+              <button
+                type="button"
+                onClick={() => handleAccountTypeChange("personal")}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  formData.accountType === "personal"
+                    ? "bg-primary text-white"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                Personal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAccountTypeChange("team")}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  formData.accountType === "team"
+                    ? "bg-primary text-white"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                Team
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -165,45 +216,62 @@ export default function SignupOrganizationPage() {
               </div>
             </div>
 
-            {/* Organization Name */}
-            <div className="space-y-2">
-              <label htmlFor="organizationName" className="text-sm font-medium text-text-primary">
-                Organization Name
-              </label>
-              <input
-                id="organizationName"
-                type="text"
-                placeholder="Acme Corp"
-                value={formData.organizationName}
-                onChange={(e) => handleChange("organizationName", e.target.value)}
-                required
-                disabled={isLoading}
-                className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-              />
-            </div>
+            {/* Organization Fields - Only shown for Team accounts */}
+            {formData.accountType === "team" && (
+              <>
+                {/* Organization Name */}
+                <div className="space-y-2">
+                  <label
+                    htmlFor="organizationName"
+                    className="text-sm font-medium text-text-primary"
+                  >
+                    Organization Name
+                  </label>
+                  <input
+                    id="organizationName"
+                    type="text"
+                    placeholder="Acme Corp"
+                    value={formData.organizationName}
+                    onChange={(e) => handleChange("organizationName", e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  />
+                </div>
 
-            {/* Organization Domain (optional) */}
-            <div className="space-y-2">
-              <label htmlFor="organizationDomain" className="text-sm font-medium text-text-primary">
-                Organization Domain{" "}
-                <span className="text-text-tertiary font-normal">(optional)</span>
-              </label>
-              <input
-                id="organizationDomain"
-                type="text"
-                placeholder="acme.com"
-                value={formData.organizationDomain}
-                onChange={(e) => handleChange("organizationDomain", e.target.value)}
-                disabled={isLoading}
-                className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-              />
-              <p className="text-xs text-text-tertiary">
-                Auto-join employees with matching email domain
-              </p>
-            </div>
+                {/* Organization Domain (optional) */}
+                <div className="space-y-2">
+                  <label
+                    htmlFor="organizationDomain"
+                    className="text-sm font-medium text-text-primary"
+                  >
+                    Organization Domain{" "}
+                    <span className="text-text-tertiary font-normal">(optional)</span>
+                  </label>
+                  <input
+                    id="organizationDomain"
+                    type="text"
+                    placeholder="acme.com"
+                    value={formData.organizationDomain}
+                    onChange={(e) => handleChange("organizationDomain", e.target.value)}
+                    disabled={isLoading}
+                    className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  />
+                  <p className="text-xs text-text-tertiary">
+                    Auto-join employees with matching email domain
+                  </p>
+                </div>
+              </>
+            )}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Creating organization..." : "Create Organization"}
+              {isLoading
+                ? formData.accountType === "personal"
+                  ? "Creating account..."
+                  : "Creating organization..."
+                : formData.accountType === "personal"
+                  ? "Create Account"
+                  : "Create Organization"}
             </Button>
           </form>
 

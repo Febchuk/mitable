@@ -4,7 +4,6 @@ import type { StreamChunk, ToolContext } from "../tools/base.tool";
 import { TextResponseAgent } from "../agents/text-response.agent";
 import { KnowledgeAgent } from "../agents/knowledge.agent";
 import { VisualGuidanceAgent } from "../agents/visual-guidance.agent";
-import { ExpertMatchingAgent } from "../agents/expert-matching.agent";
 import { BaseAgent } from "../agents/base.agent";
 import { guideGenerationService } from "./guideGeneration.service";
 
@@ -16,7 +15,6 @@ interface Intent {
     | "general_chat"
     | "knowledge_search"
     | "workflow_start"
-    | "expert_request"
     | "open_domain_qa";
   confidence: number;
   reasoning?: string;
@@ -37,28 +35,22 @@ interface Intent {
  *
  * Routing Strategy:
  * 1. Metadata-driven (deterministic):
- *    - workflowAction = "progress_step" � VisualGuidanceAgent
- *    - workflowAction = "exit_workflow" � TextResponseAgent
+ *    - workflowAction = "progress_step" -> VisualGuidanceAgent
+ *    - workflowAction = "exit_workflow" -> TextResponseAgent
  *
  * 2. Intent-based (LLM classification):
- *    - "workflow_start" + screenshot � VisualGuidanceAgent
- *    - "knowledge_search" � KnowledgeAgent
- *    - "expert_request" � ExpertMatchingAgent
- *    - "general_chat" � TextResponseAgent
- *
- * 3. Fallback handling:
- *    - Knowledge search returns no results � ExpertMatchingAgent
+ *    - "workflow_start" + screenshot -> VisualGuidanceAgent
+ *    - "knowledge_search" -> KnowledgeAgent
+ *    - "general_chat" -> TextResponseAgent
  *
  * Agents:
  * - TextResponseAgent: Simple responses (Gemini Flash)
  * - KnowledgeAgent: Search & synthesis (GPT-4)
  * - VisualGuidanceAgent: UI workflows (GPT-4 + Vision)
- * - ExpertMatchingAgent: Find colleagues (GPT-3.5)
  *
  * Cost Savings:
  * - Gemini Flash for routing: 10x cheaper than GPT-4
  * - Gemini Flash for text responses (60% of requests): 10x cheaper
- * - GPT-3.5 for expert matching (5% of requests): 3x cheaper
  * - Total estimated savings: 40-60%
  */
 export class OrchestratorService {
@@ -66,7 +58,6 @@ export class OrchestratorService {
   private textAgent: TextResponseAgent;
   private knowledgeAgent: KnowledgeAgent;
   private visualGuidanceAgent: VisualGuidanceAgent;
-  private expertMatchingAgent: ExpertMatchingAgent;
 
   constructor() {
     this.gemini = new GoogleGenerativeAI(config.gemini.apiKey);
@@ -74,7 +65,6 @@ export class OrchestratorService {
     // Initialize agents (order matters for dependencies)
     this.textAgent = new TextResponseAgent();
     this.knowledgeAgent = new KnowledgeAgent();
-    this.expertMatchingAgent = new ExpertMatchingAgent();
 
     // Visual Guidance Agent depends on Knowledge Agent and Text Response Agent
     this.visualGuidanceAgent = new VisualGuidanceAgent(this.knowledgeAgent, this.textAgent);
@@ -256,11 +246,6 @@ Return STRICT JSON only:
     // Knowledge search
     if (intent.type === "knowledge_search") {
       return this.knowledgeAgent;
-    }
-
-    // Expert request
-    if (intent.type === "expert_request") {
-      return this.expertMatchingAgent;
     }
 
     // Default: general chat

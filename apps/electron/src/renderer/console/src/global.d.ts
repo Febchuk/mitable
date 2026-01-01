@@ -8,10 +8,6 @@ import type {
 } from "@mitable/shared";
 
 interface ConsoleAPI {
-  // Help system
-  requestHelp: (data: unknown) => void;
-  onHelpResponse: (callback: (data: unknown) => void) => void;
-
   // Screenshot capture - multi-window capture with policy filtering
   captureScreenshot: () => Promise<MultiWindowCaptureResult>;
 
@@ -22,24 +18,11 @@ interface ConsoleAPI {
     error?: string;
   }>;
 
-  // Guide system
-  startGuide: (data: unknown) => void;
-  onGuideData: (callback: (data: unknown) => void) => void;
-
-  // Conversation management
-  newConversation: () => void;
-  loadConversation: (id: string) => void;
-  sendToAgent: (conversationId: string) => void; // Legacy: Send to old Agent window
-  sendToAgentPanel: (conversationId: string) => void; // NEW: Send to Agent Panel
-
   // Window management
   minimizeWindow: () => void;
 
   // Navigation
   onNavigateToChat: (callback: (conversationId: string) => void) => void;
-
-  // Nudge creator
-  onNudgeOpenCreator: (callback: (data: unknown) => void) => void;
 
   // Drafts navigation (Update Buddy)
   onDraftsNavigate: (callback: (draftId: string) => void) => void;

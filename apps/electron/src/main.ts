@@ -11,9 +11,6 @@ import { monitoringSessionService } from "./services/monitoringSessionService";
 import { authManager } from "./services/authManager";
 
 // Window references
-let agentWindow: BrowserWindow | null = null;
-let agentPanelWindow: BrowserWindow | null = null;
-let conversationWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let watchingPillWindow: BrowserWindow | null = null;
 let watchingPillEyeDropdown: BrowserWindow | null = null;
@@ -37,228 +34,6 @@ const authTokens: {
   accessToken: null,
   refreshToken: null,
 };
-
-function createAgentWindow() {
-  // Get screen dimensions for bottom-center positioning
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
-  const windowWidth = 740;
-  const windowHeight = 80;
-  const bottomMargin = 40;
-
-  agentWindow = new BrowserWindow({
-    title: "Mitable Agent",
-    width: windowWidth,
-    height: windowHeight,
-    x: Math.floor((screenWidth - windowWidth) / 2), // Center horizontally
-    y: screenHeight - windowHeight - bottomMargin, // Position at bottom with margin
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: true,
-    skipTaskbar: true,
-    show: false,
-    webPreferences: {
-      preload: join(__dirname, "../preload/agent.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  // Platform-specific always-on-top behavior
-  if (process.platform === "darwin") {
-    agentWindow.setAlwaysOnTop(true, "modal-panel");
-    agentWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  } else {
-    agentWindow.setAlwaysOnTop(true, "normal", 1);
-  }
-
-  // Handle external links - open in default browser/app instead of new window
-  agentWindow.webContents.setWindowOpenHandler(({ url }) => {
-    console.log("[Agent] External link clicked:", url);
-    shell.openExternal(url).catch((err) => {
-      console.error("[Agent] Failed to open external link:", err);
-    });
-    return { action: "deny" };
-  });
-
-  if (!app.isPackaged) {
-    agentWindow.loadURL("http://localhost:5173/agent/index.html");
-  } else {
-    agentWindow.loadFile(join(__dirname, "../renderer/agent/index.html"));
-  }
-
-  // Listen for pill movement - reposition conversation in real-time
-  agentWindow.on("move", () => {
-    if (conversationWindow && !conversationWindow.isDestroyed() && conversationWindow.isVisible()) {
-      positionConversationWindow();
-    }
-  });
-
-  agentWindow.on("closed", () => {
-    // Don't set to null - allow recreation via Cmd+H
-    agentWindow = null;
-  });
-}
-
-// Helper function to position conversation window centered above pill
-function positionConversationWindow(state: "collapsed" | "expanded" = "expanded") {
-  if (
-    !agentWindow ||
-    agentWindow.isDestroyed() ||
-    !conversationWindow ||
-    conversationWindow.isDestroyed()
-  ) {
-    return;
-  }
-
-  const pillBounds = agentWindow.getBounds();
-  const conversationWidth = 740;
-  const conversationHeight = state === "collapsed" ? 120 : 600; // NEW: Dynamic height
-  const gap = 16;
-
-  // Calculate centered position above pill
-  const x = pillBounds.x + (pillBounds.width - conversationWidth) / 2;
-  const y = pillBounds.y - conversationHeight - gap;
-
-  conversationWindow.setBounds(
-    {
-      x: Math.round(x),
-      y: Math.round(y),
-      width: conversationWidth,
-      height: conversationHeight,
-    },
-    true // animate: true for smooth transition
-  );
-}
-
-function createConversationWindow() {
-  if (!agentWindow || agentWindow.isDestroyed()) {
-    console.error("[Conversation] Cannot create conversation window - agent window not available");
-    return;
-  }
-
-  conversationWindow = new BrowserWindow({
-    title: "Mitable Conversation",
-    width: 740,
-    height: 600,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: false,
-    skipTaskbar: true,
-    show: false,
-    modal: false, // Non-modal so pill remains interactive
-    webPreferences: {
-      preload: join(__dirname, "../preload/conversation.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  // Platform-specific always-on-top behavior (same as agent)
-  if (process.platform === "darwin") {
-    conversationWindow.setAlwaysOnTop(true, "modal-panel");
-    conversationWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  } else {
-    conversationWindow.setAlwaysOnTop(true, "normal", 1);
-  }
-
-  // Position conversation window initially
-  positionConversationWindow();
-
-  // Handle external links - open in default browser
-  conversationWindow.webContents.setWindowOpenHandler(({ url }) => {
-    console.log("[Conversation] External link clicked:", url);
-    shell.openExternal(url).catch((err) => {
-      console.error("[Conversation] Failed to open external link:", err);
-    });
-    return { action: "deny" };
-  });
-
-  if (!app.isPackaged) {
-    conversationWindow.loadURL("http://localhost:5173/conversation/index.html");
-  } else {
-    conversationWindow.loadFile(join(__dirname, "../renderer/conversation/index.html"));
-  }
-
-  // Wait for renderer to be ready before allowing IPC
-  conversationWindow.webContents.on("did-finish-load", () => {
-    console.log("[Conversation] Renderer loaded and ready for IPC");
-  });
-
-  conversationWindow.webContents.on("dom-ready", () => {
-    console.log("[Conversation] DOM ready");
-  });
-
-  conversationWindow.on("closed", () => {
-    conversationWindow = null;
-  });
-}
-
-function createAgentPanelWindow() {
-  // Get screen dimensions for right-docked positioning
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
-  const panelWidth = 450;
-
-  agentPanelWindow = new BrowserWindow({
-    title: "Mitable Overlay",
-    width: panelWidth,
-    height: screenHeight,
-    x: screenWidth - panelWidth, // Right edge of screen
-    y: 0,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: true,
-    skipTaskbar: true,
-    show: false, // Hidden by default
-    // Vibrancy is controlled dynamically for animation coordination
-    // but keep active so vibrancy is available for animation
-    visualEffectState: "active" as const,
-    // Window starts transparent, vibrancy fades in after content animation
-    ...(process.platform === "win32" && {
-      backgroundMaterial: "acrylic" as const,
-    }),
-    webPreferences: {
-      preload: join(__dirname, "../preload/agentpanel.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  // Platform-specific always-on-top behavior
-  if (process.platform === "darwin") {
-    agentPanelWindow.setAlwaysOnTop(true, "modal-panel");
-    agentPanelWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  } else {
-    agentPanelWindow.setAlwaysOnTop(true, "normal", 1);
-  }
-
-  // Handle external links
-  agentPanelWindow.webContents.setWindowOpenHandler(({ url }) => {
-    console.log("[AgentPanel] External link clicked:", url);
-    shell.openExternal(url).catch((err) => {
-      console.error("[AgentPanel] Failed to open external link:", err);
-    });
-    return { action: "deny" };
-  });
-
-  if (!app.isPackaged) {
-    agentPanelWindow.loadURL("http://localhost:5173/agentpanel/index.html");
-  } else {
-    agentPanelWindow.loadFile(join(__dirname, "../renderer/agentpanel/index.html"));
-  }
-
-  agentPanelWindow.webContents.on("did-finish-load", () => {
-    console.log("[AgentPanel] Window finished loading");
-  });
-
-  agentPanelWindow.on("closed", () => {
-    agentPanelWindow = null;
-  });
-}
 
 function createConsoleWindow() {
   console.log("[Console] Creating console window...");
@@ -434,9 +209,9 @@ function startClosedWindowCheck() {
     const closedWindows = await windowDetectionService.checkForClosedWindows();
 
     if (closedWindows.length > 0) {
-      // Notify pill and other windows about the update
+      // Notify pill and console windows about the update
       const selectedWindows = windowDetectionService.getSelectedWindows();
-      const windows = [agentWindow, agentPanelWindow, conversationWindow, watchingPillWindow];
+      const windows = [consoleWindow, watchingPillWindow];
 
       for (const window of windows) {
         if (window && !window.isDestroyed()) {
@@ -578,556 +353,12 @@ function createWatchingPillMenuDropdown() {
 function setupIPC() {
   console.log("[IPC] Setting up IPC handlers...");
 
-  // Agent window toggle
-  ipcMain.on(IPC_CHANNELS.AGENT_TOGGLE, () => {
-    if (agentWindow && !agentWindow.isDestroyed()) {
-      if (agentWindow.isVisible()) {
-        agentWindow.hide();
-        // Also hide all dependent windows when agent is hidden
-        if (conversationWindow && !conversationWindow.isDestroyed()) {
-          conversationWindow.hide();
-        }
-      } else {
-        agentWindow.show();
-        // Conversation window remains hidden unless explicitly shown
-      }
-    }
-  });
-
-  // Conversation window show - position and display (legacy - shows expanded)
-  ipcMain.on(IPC_CHANNELS.CONVERSATION_SHOW, () => {
-    if (conversationWindow && !conversationWindow.isDestroyed()) {
-      positionConversationWindow("expanded");
-      conversationWindow.show();
-      // Wait for renderer to be ready before sending IPC message
-      setTimeout(() => {
-        // Notify renderer to switch to expanded state
-        conversationWindow?.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "expanded");
-      }, 50); // 50ms delay to ensure renderer has processed show event
-    }
-  });
-
-  // Conversation window hide
-  ipcMain.on(IPC_CHANNELS.CONVERSATION_HIDE, () => {
-    if (conversationWindow && !conversationWindow.isDestroyed()) {
-      conversationWindow.hide();
-    }
-  });
-
-  // Forward message from Agent to Conversation window
-  ipcMain.on(IPC_CHANNELS.CONVERSATION_SEND_MESSAGE, (_event, messageData, screenshot) => {
-    if (conversationWindow && !conversationWindow.isDestroyed()) {
-      conversationWindow.webContents.send(
-        IPC_CHANNELS.CONVERSATION_SEND_MESSAGE,
-        messageData,
-        screenshot
-      );
-    }
-
-    // Close all watch button windows when message is sent
-    // This prevents visual clutter after user submits help request
-    closeAllWatchButtonWindows(watchButtonWindows);
-  });
-
-  // NEW: Toggle conversation (collapsed combobox)
-  ipcMain.on(IPC_CHANNELS.CONVERSATION_TOGGLE, () => {
-    if (!conversationWindow || conversationWindow.isDestroyed()) return;
-
-    const isCurrentlyVisible = conversationWindow.isVisible();
-    console.log("[Main] CONVERSATION_TOGGLE called, isVisible:", isCurrentlyVisible);
-
-    if (isCurrentlyVisible) {
-      console.log("[Main] Hiding conversation window");
-      conversationWindow.hide();
-      // Notify renderer to switch to hidden state
-      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "hidden");
-    } else {
-      console.log("[Main] Showing conversation window in collapsed state");
-      positionConversationWindow("collapsed"); // 740x120
-      conversationWindow.show();
-      // Wait for renderer to be ready before sending IPC messages
-      setTimeout(() => {
-        // Notify renderer to switch to collapsed state
-        conversationWindow?.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "collapsed");
-        // Trigger conversation list fetch
-        conversationWindow?.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_REQUEST);
-      }, 50); // 50ms delay to ensure renderer has processed show event
-    }
-  });
-
-  // NEW: Set conversation state (handles window sizing)
-  ipcMain.on(
-    IPC_CHANNELS.CONVERSATION_SET_STATE,
-    (_event, state: "hidden" | "collapsed" | "expanded") => {
-      if (!conversationWindow || conversationWindow.isDestroyed()) return;
-
-      console.log("[Main] CONVERSATION_SET_STATE called from renderer, state:", state);
-
-      switch (state) {
-        case "hidden":
-          console.log("[Main] Setting state to hidden");
-          conversationWindow.hide();
-          conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "hidden");
-          break;
-        case "collapsed":
-          console.log("[Main] Setting state to collapsed");
-          positionConversationWindow("collapsed"); // 740x120
-          if (!conversationWindow.isVisible()) conversationWindow.show();
-          conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "collapsed");
-          break;
-        case "expanded":
-          console.log("[Main] Setting state to expanded");
-          positionConversationWindow("expanded"); // 740x600
-          if (!conversationWindow.isVisible()) conversationWindow.show();
-          conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_SET_STATE, "expanded");
-          break;
-      }
-    }
-  );
-
-  // NEW: Open specific conversation from Console
-  ipcMain.on(IPC_CHANNELS.AGENT_OPEN_CONVERSATION, (_event, conversationId: string) => {
-    if (!agentWindow || agentWindow.isDestroyed()) return;
-    if (!conversationWindow || conversationWindow.isDestroyed()) return;
-
-    // Show agent if hidden
-    if (!agentWindow.isVisible()) agentWindow.show();
-
-    // Position and show conversation in expanded state
-    positionConversationWindow("expanded");
-    conversationWindow.show();
-
-    // Load the specific conversation
-    conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LOAD, conversationId);
-  });
-
-  // NEW: Open specific conversation in Console (from Agent/Conversation window)
-  ipcMain.on(IPC_CHANNELS.CONSOLE_OPEN_CHAT, (_event, conversationId: string) => {
-    if (!consoleWindow || consoleWindow.isDestroyed()) return;
-
-    // Show and focus console window
-    consoleWindow.show();
-    consoleWindow.focus();
-
-    // Send navigation message to console with conversation ID
-    consoleWindow.webContents.send("navigate-to-chat", conversationId);
-
-    // Hide agent and all dependent windows
-    if (agentWindow && !agentWindow.isDestroyed()) {
-      agentWindow.hide();
-    }
-    if (conversationWindow && !conversationWindow.isDestroyed()) {
-      conversationWindow.hide();
-    }
-  });
-
-  // NEW: Open Chats tab in Console (from Agent Panel)
-  ipcMain.on(IPC_CHANNELS.CONSOLE_OPEN_CHATS, () => {
-    if (!consoleWindow || consoleWindow.isDestroyed()) return;
-
-    // Show and focus console window
-    consoleWindow.show();
-    consoleWindow.focus();
-
-    // Send navigation message to console to open chats tab
-    consoleWindow.webContents.send("navigate-to-chats");
-  });
-
-  // ==================== Agent Panel IPC Handlers ====================
-
-  // Toggle Agent Panel visibility
-  ipcMain.on(IPC_CHANNELS.AGENTPANEL_TOGGLE, () => {
-    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
-      if (agentPanelWindow.isVisible()) {
-        agentPanelWindow.hide();
-      } else {
-        // Apply vibrancy FIRST (synchronously) before showing - fixes production transparency issue
-        if (process.platform === "darwin") {
-          agentPanelWindow.setVibrancy("under-window");
-        }
-        agentPanelWindow.show();
-        // Notify renderer for entrance animation
-        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
-      }
-    }
-  });
-
-  // Show Agent Panel
-  ipcMain.on(IPC_CHANNELS.AGENTPANEL_SHOW, () => {
-    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
-      // Apply vibrancy FIRST (synchronously) before showing - fixes production transparency issue
-      if (process.platform === "darwin") {
-        agentPanelWindow.setVibrancy("under-window");
-      }
-      agentPanelWindow.show();
-      // Notify renderer for entrance animation
-      agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
-    }
-  });
-
-  // Hide Agent Panel
-  ipcMain.on(IPC_CHANNELS.AGENTPANEL_HIDE, () => {
-    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
-      agentPanelWindow.hide();
-    }
-  });
-
-  // Vibrancy control for animation coordination (macOS only)
-  ipcMain.on(IPC_CHANNELS.AGENTPANEL_VIBRANCY_ON, () => {
-    if (process.platform === "darwin" && agentPanelWindow && !agentPanelWindow.isDestroyed()) {
-      // Fade in vibrancy after content animation completes
-      agentPanelWindow.setVibrancy("under-window");
-    }
-  });
-
-  ipcMain.on(IPC_CHANNELS.AGENTPANEL_VIBRANCY_OFF, () => {
-    if (process.platform === "darwin" && agentPanelWindow && !agentPanelWindow.isDestroyed()) {
-      // Fade out vibrancy before/during exit animation
-      agentPanelWindow.setVibrancy(null);
-    }
-  });
-
-  // Resize Agent Panel width
-  ipcMain.on(IPC_CHANNELS.AGENTPANEL_RESIZE, (_event, width: number) => {
-    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
-
-      // Clamp width between 350 and 600
-      const clampedWidth = Math.max(350, Math.min(600, width));
-
-      agentPanelWindow.setBounds(
-        {
-          x: screenWidth - clampedWidth,
-          y: 0,
-          width: clampedWidth,
-          height: screenHeight,
-        },
-        true // animate
-      );
-    }
-  });
-
-  // Load conversation in Agent Panel (from Console)
-  ipcMain.on(IPC_CHANNELS.AGENTPANEL_LOAD_CONVERSATION, (_event, conversationId: string) => {
-    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
-      // Show panel if hidden
-      if (!agentPanelWindow.isVisible()) {
-        // Apply vibrancy FIRST (synchronously) before showing - fixes production transparency issue
-        if (process.platform === "darwin") {
-          agentPanelWindow.setVibrancy("under-window");
-        }
-        agentPanelWindow.show();
-        // Notify renderer for entrance animation
-        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
-      }
-
-      // Forward to renderer
-      agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_LOAD_CONVERSATION, conversationId);
-    }
-  });
-
-  // NEW: Handle conversation list request (fetch from backend)
-  ipcMain.on(IPC_CHANNELS.CONVERSATION_LIST_REQUEST, async () => {
-    if (!conversationWindow || conversationWindow.isDestroyed()) return;
-
-    try {
-      // Check if we have an auth token
-      if (!authTokens.accessToken) {
-        console.log("[Conversation] No auth token, returning empty list");
-        conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, []);
-        return;
-      }
-
-      // Fetch from backend (without messages for performance)
-      const API_BASE_URL = "http://localhost:3000"; // TODO: Move to config
-      const response = await fetch(`${API_BASE_URL}/api/conversations?includeMessages=false`, {
-        headers: { Authorization: `Bearer ${authTokens.accessToken}` },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const conversations = await response.json();
-      console.log("[Main] Fetched conversations from backend:", conversations);
-
-      // Ensure we're sending an array (handle both direct array and object wrapper)
-      const conversationList = Array.isArray(conversations)
-        ? conversations
-        : Array.isArray(conversations?.conversations)
-          ? conversations.conversations
-          : [];
-
-      console.log(
-        "[Main] Sending conversation list to renderer:",
-        conversationList.length,
-        "items"
-      );
-
-      // Send back to renderer
-      conversationWindow.webContents.send(
-        IPC_CHANNELS.CONVERSATION_LIST_RESPONSE,
-        conversationList
-      );
-    } catch (error) {
-      console.error("[Conversation] Failed to fetch conversation list:", error);
-      conversationWindow.webContents.send(IPC_CHANNELS.CONVERSATION_LIST_RESPONSE, []);
-    }
-  });
-
-  // Show console from agent
-  ipcMain.on(IPC_CHANNELS.AGENT_SHOW_CONSOLE, () => {
-    if (consoleWindow && !consoleWindow.isDestroyed()) {
-      consoleWindow.show();
-    }
-  });
-
   // Minimize console window
   ipcMain.on(IPC_CHANNELS.CONSOLE_MINIMIZE, () => {
     if (consoleWindow && !consoleWindow.isDestroyed()) {
       consoleWindow.minimize();
     }
   });
-
-  /**
-   * DEPRECATED: Guide System IPC Handlers
-   *
-   * All guide-related IPC has been replaced by WorkflowOptions metadata system.
-   * Guide window no longer exists - workflow UI is now inline in conversation messages.
-   *
-   * OLD FLOW:
-   * - GUIDE_START → show guide window + overlay
-   * - GUIDE_NEXT_STEP → call /guides/progress API → update guide window
-   * - GUIDE_COMPLETE → hide guide window + overlay
-   *
-   * NEW FLOW:
-   * - User clicks WorkflowOptions button in conversation window
-   * - Metadata sent to /conversations/:id/messages/stream
-   * - Agent service selects appropriate tool (guide_next_step, analyze_workflow_screen, etc.)
-   * - Tool response streams back to conversation window (no separate guide window)
-   *
-   * Kept for reference - can be deleted after confirming new system works.
-   */
-
-  // // Guide system
-  // ipcMain.on(IPC_CHANNELS.GUIDE_START, (_event, data) => {
-  //   // Show and position overlay window
-  //   if (overlayWindow && !overlayWindow.isDestroyed()) {
-  //     overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
-  //     overlayWindow.show();
-  //   }
-
-  //   // Position and show guide window
-  //   if (guideWindow && !guideWindow.isDestroyed()) {
-  //     // Position on left side of screen with some margin
-  //     const primaryDisplay = screen.getPrimaryDisplay();
-  //     const { height: screenHeight } = primaryDisplay.bounds;
-  //     const guideWidth = 400;
-  //     const guideHeight = 400;
-
-  //     guideWindow.setBounds({
-  //       x: 50,
-  //       y: Math.floor((screenHeight - guideHeight) / 2),
-  //       width: guideWidth,
-  //       height: guideHeight,
-  //     });
-
-  //     guideWindow.webContents.send(IPC_CHANNELS.GUIDE_DATA, data);
-  //     guideWindow.show();
-  //   }
-
-  //   // Hide nudge window if visible
-  //   if (nudgeWindow && !nudgeWindow.isDestroyed() && nudgeWindow.isVisible()) {
-  //     nudgeWindow.hide();
-  //   }
-  // });
-
-  // // Guide step update - forward to overlay
-  // ipcMain.on(IPC_CHANNELS.GUIDE_STEP_UPDATE, (_event, data) => {
-  //   if (overlayWindow && !overlayWindow.isDestroyed()) {
-  //     overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_HIGHLIGHT_UPDATE, data);
-  //   }
-  // });
-
-  // ipcMain.on(IPC_CHANNELS.GUIDE_COMPLETE, () => {
-  //   if (overlayWindow && !overlayWindow.isDestroyed()) {
-  //     overlayWindow.hide();
-  //   }
-  //   if (guideWindow && !guideWindow.isDestroyed()) {
-  //     guideWindow.hide();
-  //   }
-  // });
-
-  // // Guide next step - forward to Agent window to trigger screenshot + "Next" message
-  // ipcMain.on(IPC_CHANNELS.GUIDE_NEXT_STEP, () => {
-  //   if (agentWindow && !agentWindow.isDestroyed()) {
-  //     console.log("[Main] Guide next step requested - forwarding to Agent window");
-  //     agentWindow.webContents.send(IPC_CHANNELS.AGENT_GUIDE_NEXT_STEP);
-  //   }
-  // });
-
-  // ipcMain.handle(
-  //   IPC_CHANNELS.GUIDE_NEXT_STEP,
-  //   async (_event, data: { conversationId: string; currentStepIndex: number }) => {
-  //     console.log("[Main] Guide progress requested:", data);
-
-  //     try {
-  //       const screenshot = await captureService.capture({ mode: "full-screen" });
-  //       if (!screenshot) {
-  //         console.error("[Main] Screenshot capture failed");
-  //         return { error: "Screenshot capture failed" };
-  //       }
-
-  //       const response = await fetch("http://localhost:3000/api/guides/progress", {
-  //         method: "POST",
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //           Authorization: `Bearer ${authTokens.accessToken}`,
-  //         },
-  //         body: JSON.stringify({
-  //           conversationId: data.conversationId,
-  //           screenshot: screenshot.dataUrl,
-  //           currentStepIndex: data.currentStepIndex,
-  //         }),
-  //       });
-
-  //       const result = await response.json();
-
-  //       // Update the guide window with the new step
-  //       if (guideWindow && !guideWindow.isDestroyed()) {
-  //         guideWindow.webContents.send(IPC_CHANNELS.GUIDE_STEP_UPDATE, result);
-  //       }
-
-  //       // Forward the conversational message to the conversation window
-  //       // This displays the step guidance in the chat
-  //       if (conversationWindow && !conversationWindow.isDestroyed() && result.visualGuidance) {
-  //         conversationWindow.webContents.send(
-  //           IPC_CHANNELS.CONVERSATION_SEND_MESSAGE,
-  //           {
-  //             message: result.visualGuidance.conversationalMessage,
-  //             conversationId: data.conversationId,
-  //             messageType: "workflow",
-  //             cardData: result.adjustedSolution,
-  //           },
-  //           null  // screenshot parameter (null for step 2+)
-  //         );
-  //       }
-
-  //       console.log("[Main] Guide progress complete:", {
-  //         adjusted: result.adjustmentMade,
-  //         currentStep: result.adjustedSolution?.currentStepIndex,
-  //       });
-
-  //       return result;
-  //     } catch (error) {
-  //       console.error("[Main] Guide progress error:", error);
-  //       return { error: "Failed to progress guide" };
-  //     }
-  //   }
-  // );
-
-  // NEW: Direct nudge creation from conversation window (inline expert cards)
-  ipcMain.on(IPC_CHANNELS.OPEN_CONSOLE_NUDGE_FORM, (_event, data) => {
-    console.log("[Main] Opening Console nudge form with inline expert data:", data);
-
-    // Show and focus console window
-    if (consoleWindow && !consoleWindow.isDestroyed()) {
-      consoleWindow.show();
-      consoleWindow.focus();
-
-      // Forward nudge creation data to console
-      // Console will navigate to /nudges/new and populate the form
-      consoleWindow.webContents.send(IPC_CHANNELS.NUDGE_OPEN_CREATOR, data);
-    } else {
-      console.error("[Main] Console window not available for nudge form");
-    }
-  });
-
-  // Dynamic mouse events for agent window
-  ipcMain.on(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, (_event, ignore: boolean) => {
-    if (agentWindow && !agentWindow.isDestroyed()) {
-      agentWindow.setIgnoreMouseEvents(ignore, { forward: true });
-    }
-  });
-
-  // Agent window resize with upward expansion and centered positioning
-  ipcMain.on(
-    IPC_CHANNELS.AGENT_RESIZE,
-    (
-      _event,
-      options:
-        | { width?: number; height?: number }
-        | "pill"
-        | "conversation"
-        | "text-mode"
-        | "audio-mode"
-    ) => {
-      if (agentWindow && !agentWindow.isDestroyed()) {
-        const currentBounds = agentWindow.getBounds();
-
-        // Support both legacy mode strings and new flexible options
-        let newWidth: number;
-        let newHeight: number;
-
-        if (typeof options === "string") {
-          // Legacy mode parameter
-          switch (options) {
-            case "pill":
-              newWidth = 740;
-              newHeight = 80;
-              break;
-            case "conversation":
-              newWidth = 740;
-              newHeight = 696;
-              break;
-            case "text-mode":
-              newWidth = 740;
-              newHeight = currentBounds.height;
-              break;
-            case "audio-mode":
-              newWidth = 280;
-              newHeight = currentBounds.height;
-              break;
-            default:
-              newWidth = currentBounds.width;
-              newHeight = currentBounds.height;
-          }
-        } else {
-          // New flexible options format
-          newWidth = options.width ?? currentBounds.width;
-          newHeight = options.height ?? currentBounds.height;
-        }
-
-        // Calculate new X position to keep centered horizontally (expand/shrink from center)
-        const widthDiff = newWidth - currentBounds.width;
-        const newX = currentBounds.x - widthDiff / 2;
-
-        // Calculate new Y position to keep bottom edge fixed (expand/shrink upward)
-        const heightDiff = newHeight - currentBounds.height;
-        const newY = currentBounds.y - heightDiff;
-
-        agentWindow.setBounds(
-          {
-            x: Math.round(newX),
-            y: Math.round(newY),
-            width: newWidth,
-            height: newHeight,
-          },
-          true // animate
-        );
-
-        // Reposition conversation window if visible (maintains alignment)
-        if (
-          conversationWindow &&
-          !conversationWindow.isDestroyed() &&
-          conversationWindow.isVisible()
-        ) {
-          positionConversationWindow();
-        }
-      }
-    }
-  );
 
   // Auth Management - Cross-window token sharing
   // Console sets tokens after login
@@ -1140,7 +371,7 @@ function setupIPC() {
     authManager.setTokens(accessToken, refreshToken);
 
     // Broadcast token update to all windows
-    const allWindows = [agentWindow, agentPanelWindow, conversationWindow, consoleWindow];
+    const allWindows = [consoleWindow, watchingPillWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, accessToken);
@@ -1164,7 +395,7 @@ function setupIPC() {
     authManager.clearTokens();
 
     // Broadcast token clear to all windows
-    const allWindows = [agentWindow, agentPanelWindow, conversationWindow, consoleWindow];
+    const allWindows = [consoleWindow, watchingPillWindow];
     allWindows.forEach((win) => {
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, null);
@@ -1447,52 +678,6 @@ function setupIPC() {
     return currentUserContext;
   });
 
-  // ==================== Backend Session Creation ====================
-  // Allow windows without direct API access to create backend sessions
-  ipcMain.handle(
-    IPC_CHANNELS.CREATE_BACKEND_SESSION,
-    async (
-      _event,
-      config: {
-        selectedWindows: Array<{ windowId: string; appName: string; windowTitle?: string }>;
-        captureIntervalMs: number;
-        name?: string;
-      }
-    ) => {
-      console.log("[BackendSession] Creating session:", config);
-      try {
-        // Get auth token
-        const token = authTokens.accessToken;
-        if (!token) {
-          return { error: "No auth token available" };
-        }
-
-        const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
-        const response = await fetch(`${API_BASE_URL}/api/monitoring/sessions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(config),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("[BackendSession] Error:", errorText);
-          return { error: `Failed to create session: ${response.status}` };
-        }
-
-        const result = await response.json();
-        console.log("[BackendSession] Created:", result);
-        return result;
-      } catch (error) {
-        console.error("[BackendSession] Error:", error);
-        return { error: String(error) };
-      }
-    }
-  );
-
   // Screenshot Capture - Multi-window capture with smart caching
   ipcMain.handle(
     IPC_CHANNELS.CAPTURE_SCREENSHOT,
@@ -1732,7 +917,7 @@ function setupWatchModeHandlers() {
   // Broadcast updated window list to all windows
   function broadcastWatchWindowsUpdate() {
     const selectedWindows = windowDetectionService.getSelectedWindows();
-    const windows = [agentWindow, agentPanelWindow, conversationWindow, watchingPillWindow];
+    const windows = [consoleWindow, watchingPillWindow];
 
     for (const window of windows) {
       if (window && !window.isDestroyed()) {
@@ -1834,7 +1019,7 @@ function setupMonitoringSessionHandlers() {
 
       // Broadcast update so watch pill gets the windows immediately
       const selectedWindows = windowDetectionService.getSelectedWindows();
-      const allWindows = [agentWindow, agentPanelWindow, conversationWindow, watchingPillWindow];
+      const allWindows = [consoleWindow, watchingPillWindow];
       for (const window of allWindows) {
         if (window && !window.isDestroyed()) {
           window.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
@@ -2067,58 +1252,8 @@ function createWatchButtonWindow(window: any, watchButtonWindows: Map<string, Br
   );
 }
 
-// Helper function to close all watch button windows
-function closeAllWatchButtonWindows(watchButtonWindows: Map<string, BrowserWindow>) {
-  const count = watchButtonWindows.size;
-  console.log(`[Watch Mode] Closing ${count} watch button windows`);
-
-  for (const [windowId, buttonWindow] of watchButtonWindows.entries()) {
-    if (!buttonWindow.isDestroyed()) {
-      buttonWindow.close();
-    }
-    watchButtonWindows.delete(windowId);
-  }
-
-  console.log(`[Watch Mode] ✅ Closed ${count} watch button windows`);
-}
-
-// Global shortcut for help (Cmd+H / Ctrl+H)
+// Global shortcuts
 function registerGlobalShortcuts() {
-  // Old Agent pill (Cmd+H)
-  globalShortcut.register("CommandOrControl+H", () => {
-    if (!agentWindow || agentWindow.isDestroyed()) {
-      // Recreate window if it was closed
-      createAgentWindow();
-    }
-    if (agentWindow && !agentWindow.isDestroyed()) {
-      if (agentWindow.isVisible()) {
-        agentWindow.hide();
-      } else {
-        agentWindow.show();
-        agentWindow.focus();
-      }
-    }
-  });
-
-  // Agent Panel (Cmd+Shift+A)
-  globalShortcut.register("CommandOrControl+Shift+A", () => {
-    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
-      if (agentPanelWindow.isVisible()) {
-        // Request animated close via renderer (don't hide directly)
-        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_REQUEST_CLOSE);
-      } else {
-        // Apply vibrancy FIRST (synchronously) before showing - fixes production transparency issue
-        if (process.platform === "darwin") {
-          agentPanelWindow.setVibrancy("under-window");
-        }
-        agentPanelWindow.show();
-        agentPanelWindow.focus();
-        // Notify renderer for entrance animation
-        agentPanelWindow.webContents.send(IPC_CHANNELS.AGENTPANEL_SHOWN);
-      }
-    }
-  });
-
   // Update Prompt Trigger (Cmd+Shift+U) - Shows notification to send update
   globalShortcut.register("CommandOrControl+Shift+U", () => {
     try {
@@ -2172,10 +1307,9 @@ app.whenReady().then(async () => {
   // Initialize active window bridge for capture policy
   initActiveWindowBridge();
 
-  createAgentWindow();
-  createConversationWindow(); // Create conversation window as child of agent
-  createAgentPanelWindow(); // Create Agent Panel (right-docked chat panel)
+  // Create Console window (main dashboard)
   createConsoleWindow();
+  // WatchingPill is created on-demand when session starts
 
   setupIPC();
   registerGlobalShortcuts();
@@ -2208,11 +1342,8 @@ app.on("window-all-closed", () => {
 
 // macOS: Re-create or focus window when clicking dock icon
 app.on("activate", () => {
-  // On macOS, re-create windows if none exist, otherwise focus the Console
+  // On macOS, re-create Console if no windows exist, otherwise focus it
   if (BrowserWindow.getAllWindows().length === 0) {
-    createAgentWindow();
-    createConversationWindow();
-    createAgentPanelWindow();
     createConsoleWindow();
   } else if (consoleWindow && !consoleWindow.isDestroyed()) {
     // Show and focus the Console window
