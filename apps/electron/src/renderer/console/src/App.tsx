@@ -3,7 +3,9 @@ import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
 import { UserProvider, useUser } from "./context/UserContext";
+import { useSubscription } from "./hooks/queries/billing";
 import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
 import LoginPage from "./pages/LoginPage";
 import SignupOrganizationPage from "./pages/SignupOrganizationPage";
@@ -81,10 +83,34 @@ function MonitoringSessionHandler() {
   return null;
 }
 
-// Dynamic default route based on user role
+// Dynamic default route based on user role and subscription tier
 function DefaultRoute() {
   const { user } = useUser();
-  const defaultPath = user?.role === "admin" ? "/dashboard" : "/monitoring";
+  const { data: subscriptionData, isLoading } = useSubscription();
+
+  // Wait for subscription data to determine routing
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  const tier = subscriptionData?.subscription?.tier;
+  const isPersonalAccount = tier === "free" || tier === "pro";
+
+  // Personal accounts and team employees go to Sessions (/monitoring)
+  // Team admins go to Dashboard
+  let defaultPath: string;
+  if (isPersonalAccount) {
+    defaultPath = "/monitoring";
+  } else if (user?.role === "admin") {
+    defaultPath = "/dashboard";
+  } else {
+    defaultPath = "/monitoring";
+  }
+
   return <Navigate to={defaultPath} replace />;
 }
 
@@ -125,52 +151,54 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <HashRouter>
-        <NavigationHandler />
-        <MonitoringSessionHandler />
-        <UserProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup-organization" element={<SignupOrganizationPage />} />
+        <TooltipProvider>
+          <NavigationHandler />
+          <MonitoringSessionHandler />
+          <UserProvider>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup-organization" element={<SignupOrganizationPage />} />
 
-            {/* Protected routes */}
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <ConsoleLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<DefaultRoute />} />
-              {/* Admin Routes */}
-              <Route path="dashboard" element={<DashboardView />} />
-              <Route path="people" element={<PeopleView />} />
-              <Route path="people/new" element={<AddNewUser />} />
-              <Route path="people/:id" element={<PersonDetail />} />
-              <Route path="templates" element={<TemplatesView />} />
-              <Route path="templates/:id" element={<TemplateDetail />} />
-              <Route path="templates/new" element={<CreateTemplate />} />
-              <Route path="integrations" element={<IntegrationsView />} />
-              <Route path="setup" element={<SetupView />} />
-              {/* Employee Routes */}
-              <Route path="docs" element={<DocsView />} />
-              <Route path="docs/:docId" element={<DocDetail />} />
-              <Route path="todos" element={<TodosView />} />
-              {/* Monitoring Routes */}
-              <Route path="monitoring" element={<MonitoringView />} />
-              <Route path="monitoring/:sessionId" element={<SessionDetail />} />
-              <Route path="settings" element={<SettingsView />} />
-              {/* Legacy routes (hidden from nav but accessible via URL) */}
-              <Route path="roadmap" element={<RoadmapView />} />
-              <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
-              <Route path="chats" element={<ChatsView />} />
-              <Route path="chats/new" element={<NewChat />} />
-              <Route path="chats/:chatId" element={<ChatDetail />} />
-            </Route>
-          </Routes>
-          <Toaster />
-        </UserProvider>
+              {/* Protected routes */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <ConsoleLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<DefaultRoute />} />
+                {/* Admin Routes */}
+                <Route path="dashboard" element={<DashboardView />} />
+                <Route path="people" element={<PeopleView />} />
+                <Route path="people/new" element={<AddNewUser />} />
+                <Route path="people/:id" element={<PersonDetail />} />
+                <Route path="templates" element={<TemplatesView />} />
+                <Route path="templates/:id" element={<TemplateDetail />} />
+                <Route path="templates/new" element={<CreateTemplate />} />
+                <Route path="integrations" element={<IntegrationsView />} />
+                <Route path="setup" element={<SetupView />} />
+                {/* Employee Routes */}
+                <Route path="docs" element={<DocsView />} />
+                <Route path="docs/:docId" element={<DocDetail />} />
+                <Route path="todos" element={<TodosView />} />
+                {/* Monitoring Routes */}
+                <Route path="monitoring" element={<MonitoringView />} />
+                <Route path="monitoring/:sessionId" element={<SessionDetail />} />
+                <Route path="settings" element={<SettingsView />} />
+                {/* Legacy routes (hidden from nav but accessible via URL) */}
+                <Route path="roadmap" element={<RoadmapView />} />
+                <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
+                <Route path="chats" element={<ChatsView />} />
+                <Route path="chats/new" element={<NewChat />} />
+                <Route path="chats/:chatId" element={<ChatDetail />} />
+              </Route>
+            </Routes>
+            <Toaster />
+          </UserProvider>
+        </TooltipProvider>
       </HashRouter>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
