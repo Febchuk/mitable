@@ -102,7 +102,11 @@ class UsageService {
     const tier = (subscription?.tier || "free") as SubscriptionTier;
 
     // Get limits
-    const limitsResult = await db.select().from(usageLimits).where(eq(usageLimits.tier, tier)).limit(1);
+    const limitsResult = await db
+      .select()
+      .from(usageLimits)
+      .where(eq(usageLimits.tier, tier))
+      .limit(1);
     const limits = limitsResult[0];
 
     // Get current usage
@@ -178,9 +182,7 @@ class UsageService {
    */
   async ensureCurrentPeriod(organizationId: string): Promise<UsageTracking> {
     const now = new Date();
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString()
-      .split("T")[0];
+    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
       .toISOString()
       .split("T")[0];

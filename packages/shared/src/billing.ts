@@ -6,12 +6,7 @@
 
 // Subscription tiers
 export type SubscriptionTier = "free" | "pro" | "team";
-export type SubscriptionStatus =
-  | "active"
-  | "trialing"
-  | "past_due"
-  | "canceled"
-  | "unpaid";
+export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid";
 
 // Account types for signup flow
 export type AccountType = "personal" | "team";

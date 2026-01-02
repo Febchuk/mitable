@@ -128,7 +128,10 @@ class SubscriptionService {
   /**
    * Update organization tier
    */
-  async updateTier(organizationId: string, newTier: SubscriptionTier): Promise<Subscription | null> {
+  async updateTier(
+    organizationId: string,
+    newTier: SubscriptionTier
+  ): Promise<Subscription | null> {
     const [updated] = await db
       .update(subscriptions)
       .set({

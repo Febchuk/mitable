@@ -1421,7 +1421,6 @@ async function seedUserTasks(users: schema.User[], templates: schema.RoadmapTemp
   return result;
 }
 
-
 async function seedConversations(users: schema.User[]) {
   console.log("💬 Seeding conversations...");
 

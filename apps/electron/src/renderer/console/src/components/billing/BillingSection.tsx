@@ -38,9 +38,7 @@ export default function BillingSection() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-semibold text-white">Subscription</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Your current plan and usage
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Your current plan and usage</p>
         </div>
         <div className="flex items-center gap-2">
           {subscription?.tier && <TierBadge tier={subscription.tier} />}
@@ -62,7 +60,9 @@ export default function BillingSection() {
             <div>
               <p className="text-white font-medium">Unlimited Usage</p>
               <p className="text-sm text-muted-foreground">
-                {isInternal ? "Internal account - all limits bypassed" : "Team tier - unlimited access to all features"}
+                {isInternal
+                  ? "Internal account - all limits bypassed"
+                  : "Team tier - unlimited access to all features"}
               </p>
             </div>
           </div>

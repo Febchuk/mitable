@@ -11,11 +11,7 @@ import { guideGenerationService } from "./guideGeneration.service";
  * Intent classification types
  */
 interface Intent {
-  type:
-    | "general_chat"
-    | "knowledge_search"
-    | "workflow_start"
-    | "open_domain_qa";
+  type: "general_chat" | "knowledge_search" | "workflow_start" | "open_domain_qa";
   confidence: number;
   reasoning?: string;
 }

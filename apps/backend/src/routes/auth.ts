@@ -273,7 +273,7 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
       .values({
         name: finalOrgName,
         // Personal accounts don't have a domain
-        domain: accountType === "team" ? (organizationDomain || null) : null,
+        domain: accountType === "team" ? organizationDomain || null : null,
       })
       .returning({
         id: schema.organizations.id,

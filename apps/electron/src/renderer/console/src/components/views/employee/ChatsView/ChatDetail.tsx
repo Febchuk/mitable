@@ -70,7 +70,12 @@ export default function ChatDetail() {
             screenshots: [
               {
                 dataUrl: screenshotData,
-                metadata: { width: 0, height: 0, bounds: { x: 0, y: 0, width: 0, height: 0 }, scaleFactor: 1 },
+                metadata: {
+                  width: 0,
+                  height: 0,
+                  bounds: { x: 0, y: 0, width: 0, height: 0 },
+                  scaleFactor: 1,
+                },
                 windowId: "manual",
                 windowTitle: "Screenshot",
                 appName: "Manual",

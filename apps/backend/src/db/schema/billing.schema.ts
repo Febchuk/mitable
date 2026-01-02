@@ -13,12 +13,7 @@ import { organizations } from "./organizations.schema";
 
 // Subscription tiers
 export type SubscriptionTier = "free" | "pro" | "team";
-export type SubscriptionStatus =
-  | "active"
-  | "trialing"
-  | "past_due"
-  | "canceled"
-  | "unpaid";
+export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid";
 
 // Subscriptions - Organization-level subscription state
 export const subscriptions = pgTable("subscriptions", {

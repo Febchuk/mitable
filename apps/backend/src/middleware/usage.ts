@@ -13,11 +13,7 @@ import { subscriptionService } from "../services/subscription.service.js";
  * Track AI query usage
  * Increments counter after successful AI responses
  */
-export async function trackAiUsage(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+export async function trackAiUsage(req: Request, res: Response, next: NextFunction): Promise<void> {
   const organizationId = req.organizationId;
 
   // No org ID - skip tracking
