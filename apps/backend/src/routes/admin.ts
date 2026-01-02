@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, sql, count, desc, and, gte, lte, ne, asc } from "drizzle-orm";
+import { eq, sql, count, desc, and, ne, asc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { supabaseAdmin } from "../lib/supabase";
 import { extractNotionPageId } from "../utils/notion-url-parser.js";
@@ -265,84 +265,13 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
       .orderBy(desc(schema.conversations.createdAt))
       .limit(5);
 
-    // For each conversation, check if it resulted in a nudge
-    const conversationsWithStatus = await Promise.all(
-      recentConversations.map(async (conv) => {
-        // Check if this conversation led to a nudge (within 1 hour)
-        const oneHourLater = new Date(conv.createdAt.getTime() + 60 * 60 * 1000);
-        const [nudgeCount] = await db
-          .select({ count: count() })
-          .from(schema.nudges)
-          .where(
-            and(
-              eq(schema.nudges.userId, targetUserId),
-              gte(schema.nudges.createdAt, conv.createdAt),
-              lte(schema.nudges.createdAt, oneHourLater)
-            )
-          );
-
-        const hasNudge = Number(nudgeCount?.count || 0) > 0;
-
-        return {
-          id: conv.id,
-          timestamp: formatTimestamp(conv.createdAt),
-          question: conv.title || "Untitled conversation",
-          status: hasNudge ? ("nudge" as const) : ("resolved" as const),
-        };
-      })
-    );
-
-    // Get common nudge themes (group by question topics)
-    const userNudges = await db
-      .select({
-        question: schema.nudges.question,
-        expertId: schema.nudges.expertId,
-        expertFirstName: schema.users.firstName,
-        expertLastName: schema.users.lastName,
-        createdAt: schema.nudges.createdAt,
-      })
-      .from(schema.nudges)
-      .leftJoin(schema.users, eq(schema.nudges.expertId, schema.users.id))
-      .where(eq(schema.nudges.userId, targetUserId))
-      .orderBy(desc(schema.nudges.createdAt));
-
-    // Group nudges by theme (simplified - just use question as theme for now)
-    const nudgeThemeMap = new Map<
-      string,
-      { count: number; nudges: Map<string, { name: string; count: number }> }
-    >();
-
-    userNudges.forEach((nudge) => {
-      const theme = nudge.question || "General question";
-      const expertName =
-        nudge.expertFirstName && nudge.expertLastName
-          ? `${nudge.expertFirstName} ${nudge.expertLastName}`
-          : "Unknown Expert";
-
-      if (!nudgeThemeMap.has(theme)) {
-        nudgeThemeMap.set(theme, {
-          count: 0,
-          nudges: new Map(),
-        });
-      }
-
-      const themeData = nudgeThemeMap.get(theme)!;
-      themeData.count++;
-
-      if (!themeData.nudges.has(expertName)) {
-        themeData.nudges.set(expertName, { name: expertName, count: 0 });
-      }
-      themeData.nudges.get(expertName)!.count++;
-    });
-
-    // Convert to array format
-    const nudgeThemes = Array.from(nudgeThemeMap.entries())
-      .map(([theme, data]) => ({
-        theme,
-        count: data.count,
-        nudges: Array.from(data.nudges.values()),
-      }))
-      .slice(0, 5); // Top 5 themes
+    // Map conversations to status format
+    const conversationsWithStatus = recentConversations.map((conv) => ({
+      id: conv.id,
+      timestamp: formatTimestamp(conv.createdAt),
+      question: conv.title || "Untitled conversation",
+      status: "resolved" as const,
+    }));
 
     // Calculate task metrics
     const [taskMetrics] = await db
@@ -382,7 +311,6 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
       },
       assignedRoadmaps: roadmapsWithStats,
       conversations: conversationsWithStatus,
-      nudgeThemes,
       activityData,
     };
 

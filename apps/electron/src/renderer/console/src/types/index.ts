@@ -49,13 +49,13 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  type?: "text" | "workflow" | "experts";
+  type?: "text" | "workflow";
   workflowSessionId?: string | null; // Links to workflow session
   relatedStepIndex?: number | null; // Which step this message relates to
   cardData?: {
     title: string;
     subtitle: string;
-    iconType: "workflow" | "experts";
+    iconType: "workflow";
   };
 }
 

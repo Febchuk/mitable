@@ -36,10 +36,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          agent: resolve(__dirname, "src/preload/agent.ts"),
-          agentpanel: resolve(__dirname, "src/preload/agentpanel.ts"),
           console: resolve(__dirname, "src/preload/console.ts"),
-          conversation: resolve(__dirname, "src/preload/conversation.ts"),
           watchButton: resolve(__dirname, "src/preload/watchButton.ts"),
           watchingPill: resolve(__dirname, "src/preload/watchingPill.ts"),
           watchingPillDropdown: resolve(__dirname, "src/preload/watchingPillDropdown.ts"),
@@ -66,10 +63,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          agent: resolve(__dirname, "src/renderer/agent/index.html"),
-          agentpanel: resolve(__dirname, "src/renderer/agentpanel/index.html"),
           console: resolve(__dirname, "src/renderer/console/index.html"),
-          conversation: resolve(__dirname, "src/renderer/conversation/index.html"),
           watchButton: resolve(__dirname, "src/renderer/watchButton/index.html"),
           watchingPill: resolve(__dirname, "src/renderer/watchingPill/index.html"),
           watchingPillDropdownEye: resolve(__dirname, "src/renderer/watchingPillDropdown/eye.html"),

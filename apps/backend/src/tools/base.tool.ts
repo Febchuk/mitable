@@ -6,7 +6,6 @@ import type {
   AdjustmentRecord,
   WindowScreenshot,
 } from "@mitable/shared";
-import type { ExpertMatch } from "../services/expertMatching.service";
 
 // ============================================================================
 // TOOL DEFINITION TYPES
@@ -134,28 +133,9 @@ export interface WorkflowMessage extends BaseMessage {
 }
 
 /**
- * Suggested nudge content generated from conversation
- */
-export interface SuggestedNudge {
-  context: string; // 300-word summary of what user needs help with
-  question: string; // 1-2 sentence actionable question
-}
-
-/**
- * Experts message with colleague recommendations
- */
-export interface ExpertsMessage extends BaseMessage {
-  messageType: "experts";
-  cardData: {
-    experts: ExpertMatch[];
-    suggestedNudge?: SuggestedNudge; // Auto-generated when from conversation
-  };
-}
-
-/**
  * Result returned by tool execution (discriminated union)
  */
-export type ToolResult = TextMessage | WorkflowMessage | ExpertsMessage;
+export type ToolResult = TextMessage | WorkflowMessage;
 
 /**
  * Streaming chunk for real-time responses
@@ -164,7 +144,7 @@ export interface StreamChunk {
   type: "chunk" | "complete" | "error" | "window_trigger" | "progress";
   content?: string;
   messageId?: string;
-  messageType?: "text" | "workflow" | "experts";
+  messageType?: "text" | "workflow";
   cardData?: Record<string, any>;
   sources?: Array<{
     title: string;
@@ -192,7 +172,6 @@ export interface StreamChunk {
  * Example tools:
  * - RespondTextTool: Answer general questions with text
  * - SearchKnowledgeTool: Search documentation with RAG
- * - FindExpertTool: Match user with best colleague expert
  * - GuideNextStepTool: Provide visual UI guidance
  */
 export abstract class BaseTool {

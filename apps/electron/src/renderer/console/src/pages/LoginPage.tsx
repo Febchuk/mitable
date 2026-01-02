@@ -141,12 +141,12 @@ export default function LoginPage() {
 
           <div className="text-center pt-2 border-t border-border-subtle">
             <p className="text-sm text-text-tertiary">
-              Setting up Mitable?{" "}
+              New to Mitable?{" "}
               <a
                 href="#/signup-organization"
                 className="text-primary-light hover:text-primary-hover transition-colors font-medium"
               >
-                Create Organization →
+                Sign up now →
               </a>
             </p>
           </div>

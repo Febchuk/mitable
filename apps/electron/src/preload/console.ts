@@ -10,15 +10,8 @@ console.log("[Preload] Console preload script starting...");
 
 // IPC channel constants (inlined to avoid chunking issues)
 const IPC_CHANNELS = {
-  HELP_REQUEST: "help-request",
-  HELP_RESPONSE: "help-response",
   CAPTURE_SCREENSHOT: "capture-screenshot",
-  CONVERSATION_NEW: "conversation-new",
-  CONVERSATION_LOAD: "conversation-load",
-  AGENT_OPEN_CONVERSATION: "agent-open-conversation", // Legacy: Send conversation to Agent
-  AGENTPANEL_LOAD_CONVERSATION: "agentpanel-load-conversation", // NEW: Send to Agent Panel
   CONSOLE_MINIMIZE: "console-minimize",
-  NUDGE_OPEN_CREATOR: "nudge-open-creator",
   AUTH_SET_TOKENS: "auth-set-tokens",
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
@@ -45,14 +38,6 @@ const IPC_CHANNELS = {
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
-  // Help system
-  requestHelp: (data: unknown) => ipcRenderer.send(IPC_CHANNELS.HELP_REQUEST, data),
-  onHelpResponse: (callback: (data: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.HELP_RESPONSE, (_event: IpcRendererEvent, data: unknown) =>
-      callback(data)
-    );
-  },
-
   // Screenshot capture - multi-window capture with policy filtering
   captureScreenshot: async (): Promise<MultiWindowCaptureResult> => {
     console.log("[Console Preload] Multi-window captureScreenshot() called from renderer");
@@ -86,14 +71,6 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     return result;
   },
 
-  // Conversation management
-  newConversation: () => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_NEW),
-  loadConversation: (id: string) => ipcRenderer.send(IPC_CHANNELS.CONVERSATION_LOAD, id),
-  sendToAgent: (conversationId: string) =>
-    ipcRenderer.send(IPC_CHANNELS.AGENT_OPEN_CONVERSATION, conversationId), // Legacy: Send to old Agent window
-  sendToAgentPanel: (conversationId: string) =>
-    ipcRenderer.send(IPC_CHANNELS.AGENTPANEL_LOAD_CONVERSATION, conversationId), // NEW: Send to Agent Panel
-
   // Window management
   minimizeWindow: () => ipcRenderer.send(IPC_CHANNELS.CONSOLE_MINIMIZE),
 
@@ -101,13 +78,6 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   onNavigateToChat: (callback: (conversationId: string) => void) => {
     ipcRenderer.on("navigate-to-chat", (_event: IpcRendererEvent, conversationId: string) =>
       callback(conversationId)
-    );
-  },
-
-  // Nudge creator
-  onNudgeOpenCreator: (callback: (data: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.NUDGE_OPEN_CREATOR, (_event: IpcRendererEvent, data: unknown) =>
-      callback(data)
     );
   },
 

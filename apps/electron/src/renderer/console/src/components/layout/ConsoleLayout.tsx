@@ -11,24 +11,6 @@ const isMac = navigator.platform.toLowerCase().includes("mac");
 export default function ConsoleLayout() {
   const navigate = useNavigate();
 
-  // Listen for nudge creation requests from IPC
-  useEffect(() => {
-    const handleNudgeOpenCreator = (data: unknown) => {
-      console.log("[ConsoleLayout] Received nudge creation request:", data);
-
-      // Navigate to create nudge page with expert data in state
-      navigate("/nudges/new", {
-        state: data,
-        replace: false,
-      });
-    };
-
-    // Register IPC listener
-    if (window.consoleAPI?.onNudgeOpenCreator) {
-      window.consoleAPI.onNudgeOpenCreator(handleNudgeOpenCreator);
-    }
-  }, [navigate]);
-
   // Listen for drafts navigation requests from IPC (Update Buddy)
   useEffect(() => {
     const handleDraftsNavigate = (draftId: string) => {

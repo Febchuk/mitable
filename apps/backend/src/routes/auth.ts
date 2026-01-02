@@ -4,6 +4,8 @@ import { requireAuth } from "../middleware/auth.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
+import { subscriptionService } from "../services/subscription.service.js";
+import { usageService } from "../services/usage.service.js";
 
 export const authRouter = Router();
 
@@ -147,7 +149,15 @@ export const authRouter = Router();
  */
 authRouter.post("/signup-organization", async (req: Request, res: Response) => {
   try {
-    const { email, password, firstName, lastName, organizationName, organizationDomain } = req.body;
+    const {
+      accountType = "team", // Default to team for backwards compatibility
+      email,
+      password,
+      firstName,
+      lastName,
+      organizationName,
+      organizationDomain,
+    } = req.body;
 
     // Validate input
     if (!email || !password) {
@@ -172,15 +182,24 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
       return;
     }
 
-    if (!organizationName) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Organization name is required",
-        },
-      });
-      return;
+    // Determine organization name based on account type
+    let finalOrgName: string;
+    if (accountType === "personal") {
+      // Auto-generate org name for personal accounts
+      finalOrgName = `${firstName}'s Workspace`;
+    } else {
+      // Team accounts require organization name
+      if (!organizationName) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Organization name is required for team accounts",
+          },
+        });
+        return;
+      }
+      finalOrgName = organizationName;
     }
 
     // Check if user already exists in database
@@ -228,8 +247,8 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
       console.log(`Successfully cleaned up orphaned user: ${email}`);
     }
 
-    // Check if organization with same domain already exists
-    if (organizationDomain) {
+    // Check if organization with same domain already exists (Team accounts only)
+    if (accountType === "team" && organizationDomain) {
       const [existingOrg] = await db
         .select()
         .from(schema.organizations)
@@ -252,8 +271,9 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
     const [organization] = await db
       .insert(schema.organizations)
       .values({
-        name: organizationName,
-        domain: organizationDomain || null,
+        name: finalOrgName,
+        // Personal accounts don't have a domain
+        domain: accountType === "team" ? organizationDomain || null : null,
       })
       .returning({
         id: schema.organizations.id,
@@ -270,6 +290,18 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
         },
       });
       return;
+    }
+
+    // Create subscription for new organization
+    // Personal accounts get "free" tier, Team accounts get "team" tier
+    try {
+      const tier = accountType === "personal" ? "free" : "team";
+      await subscriptionService.createSubscription(organization.id, tier);
+      await usageService.ensureCurrentPeriod(organization.id);
+    } catch (subError) {
+      console.error("Failed to create subscription:", subError);
+      // Non-fatal: continue with signup even if subscription creation fails
+      // Subscription can be created later or fixed manually
     }
 
     // Create admin user in Supabase Auth using admin API (bypasses email confirmation)

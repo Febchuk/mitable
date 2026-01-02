@@ -135,6 +135,30 @@ export const config = {
     keyPath: (process.env.GOOGLE_CLOUD_KEY_PATH || "").trim(),
   },
 
+  // Billing Configuration
+  billing: {
+    // Internal domains that bypass quota limits (test accounts)
+    internalDomains: ["lorikeet.ai", "mitable.ai", "mitable.dev"],
+    // Default tier for new organizations during beta
+    defaultTier: "team" as const,
+    // Feature flags by tier
+    tierFeatures: {
+      free: ["basic_ai", "basic_search"],
+      pro: ["basic_ai", "basic_search", "export_data", "priority_support"],
+      team: [
+        "basic_ai",
+        "basic_search",
+        "export_data",
+        "priority_support",
+        "sso",
+        "api_access",
+        "audit_logs",
+        "unlimited_ai",
+        "unlimited_storage",
+      ],
+    },
+  },
+
   // Security
   jwtSecret: process.env.JWT_SECRET || "",
 

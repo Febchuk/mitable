@@ -1,4 +1,4 @@
-import type { ToolResult, TextMessage, WorkflowMessage, ExpertsMessage } from "../base.tool";
+import type { ToolResult, TextMessage, WorkflowMessage } from "../base.tool";
 
 /**
  * Type guard functions for discriminated union pattern.
@@ -15,9 +15,6 @@ import type { ToolResult, TextMessage, WorkflowMessage, ExpertsMessage } from ".
  * } else if (isTextMessage(result)) {
  *   // TypeScript knows: result.cardData is undefined
  *   console.log("Regular text response");
- * } else if (isExpertsMessage(result)) {
- *   // TypeScript knows: result.cardData.experts exists
- *   console.log(`Found ${result.cardData.experts.length} experts`);
  * }
  */
 
@@ -33,11 +30,4 @@ export function isTextMessage(msg: ToolResult): msg is TextMessage {
  */
 export function isWorkflowMessage(msg: ToolResult): msg is WorkflowMessage {
   return msg.messageType === "workflow" && msg.cardData?.workflowActive === true;
-}
-
-/**
- * Check if result is an experts message with colleague recommendations
- */
-export function isExpertsMessage(msg: ToolResult): msg is ExpertsMessage {
-  return msg.messageType === "experts";
 }
