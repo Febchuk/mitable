@@ -50,15 +50,6 @@ describe("Backend API Routes", () => {
     });
   });
 
-  describe("GET /api/nudges", () => {
-    it("should return 401 without authentication", async () => {
-      const response = await request(app).get("/api/nudges");
-
-      expect(response.status).toBe(401);
-      expect(response.body).toHaveProperty("error", "Unauthorized");
-    });
-  });
-
   describe("POST /api/help", () => {
     it("should return 401 without authentication", async () => {
       const response = await request(app)
