@@ -3,6 +3,7 @@ import { config } from "../config";
 import { z } from "zod";
 import { toGeminiSchema } from "../utils/gemini-schema.js";
 import { InterpretationOptionSchema, VisualGuidanceSchema, StepSchema } from "@mitable/shared";
+import { logger } from "../lib/logger.js";
 import type {
   SolutionObject,
   Step,
@@ -158,8 +159,7 @@ class GeminiVisionService {
    */
   async clarifyTargetElement(stepDescription: string): Promise<string> {
     const startTime = Date.now();
-    console.log("[GeminiVision] Phase 1: Clarifying target element");
-    console.log("[GeminiVision] Step description:", stepDescription);
+    logger.info({ stepDescription }, "[GeminiVision] Phase 1: Clarifying target element");
 
     const prompt = `You are helping identify the specific UI element a user needs to interact with.
 
@@ -197,14 +197,15 @@ Return ONLY the detailed description, no JSON, no extra formatting, no preamble.
 
       const elapsedMs = Date.now() - startTime;
 
-      console.log("[GeminiVision] Clarified element description:", clarifiedDescription);
-      console.log("[GeminiVision] Clarification took:", elapsedMs, "ms");
+      logger.debug(
+        { clarifiedDescription, elapsedMs },
+        "[GeminiVision] Clarification complete"
+      );
 
       return clarifiedDescription;
     } catch (error) {
-      console.error("[GeminiVision] Clarification failed:", error);
-      // Fallback: return original step description
-      console.warn("[GeminiVision] Using fallback - original step description");
+      logger.error({ err: error }, "[GeminiVision] Clarification failed");
+      logger.warn("[GeminiVision] Using fallback - original step description");
       return stepDescription;
     }
   }
@@ -214,12 +215,13 @@ Return ONLY the detailed description, no JSON, no extra formatting, no preamble.
     currentStep: Step,
     solutionObject: SolutionObject
   ): Promise<ScreenshotFilterResult> {
-    console.log("[GeminiVision] ========================================");
-    console.log("[GeminiVision] Filtering relevant screenshots");
-    console.log("[GeminiVision] ========================================");
+    logger.info(
+      { screenshotCount: screenshots.length },
+      "[GeminiVision] Filtering relevant screenshots"
+    );
 
     if (!screenshots.length) {
-      console.log("[GeminiVision] No screenshots supplied to filter");
+      logger.debug("[GeminiVision] No screenshots supplied to filter");
       return { relevantScreenshots: [] };
     }
 
@@ -267,17 +269,20 @@ Rules:
       const result = await this.screenshotFilterModel.generateContent(contentParts);
       const parsed = ScreenshotFilterResultSchema.parse(JSON.parse(result.response.text()));
 
-      console.log(
-        "[GeminiVision] Relevant screenshots identified:",
-        parsed.relevantScreenshots.length
+      logger.info(
+        {
+          relevantCount: parsed.relevantScreenshots.length,
+          screenshots: parsed.relevantScreenshots.map((e) => ({
+            name: e.imageName,
+            reason: e.inclusionReason,
+          })),
+        },
+        "[GeminiVision] Relevant screenshots identified"
       );
-      parsed.relevantScreenshots.forEach((entry) => {
-        console.log(`[GeminiVision]   - ${entry.imageName}: ${entry.inclusionReason}`);
-      });
 
       return parsed;
     } catch (error) {
-      console.error("[GeminiVision] Screenshot filtering failed:", error);
+      logger.error({ err: error }, "[GeminiVision] Screenshot filtering failed");
       // Fallback to including all screenshots so user still gets guidance
       return {
         relevantScreenshots: screenshots.map((_, index) => ({
@@ -305,10 +310,10 @@ Rules:
     completedSteps?: string[],
     remainingPlan?: any[]
   ): Promise<VisionAnalysisResult | TaskFocusedVisionResult | MultiStepGuidanceResult> {
-    console.log("[GeminiVision] Starting screenshot analysis", {
-      hasTask: !!task,
-      dataLength: screenshotData.length,
-    });
+    logger.info(
+      { hasTask: !!task, mode, dataLength: screenshotData.length },
+      "[GeminiVision] Starting screenshot analysis"
+    );
 
     try {
       // Remove data URL prefix if present
@@ -447,7 +452,7 @@ Return ONLY raw JSON (no markdown code blocks):
       const response = result.response;
       const text = response.text();
 
-      console.log("[GeminiVision] Raw response:", text.substring(0, 200));
+      logger.debug({ preview: text.substring(0, 200) }, "[GeminiVision] Raw response");
 
       // Parse JSON response
       // Gemini sometimes wraps JSON in markdown code blocks
@@ -461,22 +466,20 @@ Return ONLY raw JSON (no markdown code blocks):
         // Multi-step guidance result
         const result: MultiStepGuidanceResult = parsed;
 
-        console.log("[GeminiVision] Multi-step analysis complete:", {
-          applicationContext: result.applicationContext,
-          taskUnderstanding: result.taskUnderstanding,
-          currentScreenAnalysis: result.currentScreenAnalysis?.substring(0, 100),
-          totalSteps: result.steps.length,
-          estimatedTotal: result.totalEstimatedSteps,
-        });
-
-        console.log(
-          "[GeminiVision] Step plan:",
-          result.steps.map((s) => ({
-            stepNumber: s.stepNumber,
-            instruction: s.instruction,
-            hasElement: !!s.element,
-            confidence: s.confidence,
-          }))
+        logger.info(
+          {
+            applicationContext: result.applicationContext,
+            taskUnderstanding: result.taskUnderstanding,
+            totalSteps: result.steps.length,
+            estimatedTotal: result.totalEstimatedSteps,
+            stepPlan: result.steps.map((s) => ({
+              stepNumber: s.stepNumber,
+              instruction: s.instruction,
+              hasElement: !!s.element,
+              confidence: s.confidence,
+            })),
+          },
+          "[GeminiVision] Multi-step analysis complete"
         );
 
         return result;
@@ -484,47 +487,46 @@ Return ONLY raw JSON (no markdown code blocks):
         // Task-focused result (single step)
         const result: TaskFocusedVisionResult = parsed;
 
-        console.log("[GeminiVision] Task-focused analysis complete:", {
-          applicationContext: result.applicationContext,
-          taskUnderstanding: result.taskUnderstanding,
-          recommendedElement: result.recommendedAction.element.label,
-          reasoning: result.recommendedAction.reasoning,
-          hasAlternatives: !!result.alternatives?.length,
-        });
-
-        console.log("[GeminiVision] Recommended element:", {
-          label: result.recommendedAction.element.label,
-          type: result.recommendedAction.element.type,
-          bbox: result.recommendedAction.element.boundingBox,
-          confidence: result.recommendedAction.element.confidence,
-        });
+        logger.info(
+          {
+            applicationContext: result.applicationContext,
+            taskUnderstanding: result.taskUnderstanding,
+            recommendedElement: {
+              label: result.recommendedAction.element.label,
+              type: result.recommendedAction.element.type,
+              bbox: result.recommendedAction.element.boundingBox,
+              confidence: result.recommendedAction.element.confidence,
+            },
+            reasoning: result.recommendedAction.reasoning,
+            hasAlternatives: !!result.alternatives?.length,
+          },
+          "[GeminiVision] Task-focused analysis complete"
+        );
 
         return result;
       } else {
         // Generic result with all elements
         const result: VisionAnalysisResult = parsed;
 
-        console.log("[GeminiVision] Generic analysis complete:", {
-          applicationContext: result.applicationContext,
-          elementCount: result.elements.length,
-          screenDescription: result.screenDescription.substring(0, 100),
-        });
-
-        // Log detected elements with their bounding boxes
-        console.log(
-          "[GeminiVision] Detected elements with bounding boxes:",
-          result.elements.map((e) => ({
-            label: e.label,
-            type: e.type,
-            bbox: e.boundingBox,
-            confidence: e.confidence,
-          }))
+        logger.info(
+          {
+            applicationContext: result.applicationContext,
+            elementCount: result.elements.length,
+            screenDescription: result.screenDescription?.substring(0, 100),
+            elements: result.elements.map((e) => ({
+              label: e.label,
+              type: e.type,
+              bbox: e.boundingBox,
+              confidence: e.confidence,
+            })),
+          },
+          "[GeminiVision] Generic analysis complete"
         );
 
         return result;
       }
     } catch (error) {
-      console.error("[GeminiVision] Analysis failed:", error);
+      logger.error({ err: error }, "[GeminiVision] Analysis failed");
 
       // Return empty result on error
       return {
@@ -539,7 +541,7 @@ Return ONLY raw JSON (no markdown code blocks):
     screenshots: WindowScreenshot[],
     vaguePrompt: string
   ): Promise<{ interpretations: InterpretationOption[] }> {
-    console.log("[GeminiVision] Interpreting vague prompt:", vaguePrompt);
+    logger.info({ vaguePrompt }, "[GeminiVision] Interpreting vague prompt");
 
     try {
       if (!screenshots.length) {
@@ -575,10 +577,13 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
       const text = result.response.text();
       const parsed = InterpretResponseSchema.parse(JSON.parse(text));
 
-      console.log("[GeminiVision] Interpretations:", parsed.interpretations.length);
+      logger.info(
+        { interpretationCount: parsed.interpretations.length },
+        "[GeminiVision] Interpretations generated"
+      );
       return parsed;
     } catch (error) {
-      console.error("[GeminiVision] Interpretation failed:", error);
+      logger.error({ err: error }, "[GeminiVision] Interpretation failed");
       return {
         interpretations: [
           {
@@ -598,11 +603,14 @@ Provide 3-5 most likely interpretations with confidence levels and reasoning.`;
     conversationHistory: DbMessage[]
   ): Promise<VisualGuidance> {
     const phaseStartTime = Date.now();
-    console.log("[GeminiVision] ========================================");
-    console.log("[GeminiVision] PHASE 2: Conversational guidance");
-    console.log("[GeminiVision] Step:", currentStep.stepNumber, "-", currentStep.description);
-    console.log("[GeminiVision] Total screenshots:", screenshots.length);
-    console.log("[GeminiVision] ========================================");
+    logger.info(
+      {
+        stepNumber: currentStep.stepNumber,
+        stepDescription: currentStep.description,
+        screenshotCount: screenshots.length,
+      },
+      "[GeminiVision] PHASE 2: Conversational guidance"
+    );
 
     if (!screenshots.length) {
       return {
@@ -715,11 +723,10 @@ Guidelines:
       const parsed = VisualGuidanceSchema.parse(JSON.parse(result.response.text()));
 
       const totalTimeMs = Date.now() - phaseStartTime;
-      console.log("[GeminiVision] ========================================");
-      console.log("[GeminiVision] Conversational guidance complete");
-      console.log("[GeminiVision] Confidence:", parsed.confidence);
-      console.log("[GeminiVision] Total processing time:", totalTimeMs, "ms");
-      console.log("[GeminiVision] ========================================");
+      logger.info(
+        { confidence: parsed.confidence, totalTimeMs },
+        "[GeminiVision] Conversational guidance complete"
+      );
 
       if (!parsed.conversationalMessage || parsed.conversationalMessage.trim().length < 10) {
         parsed.conversationalMessage = `Let's focus on step ${currentStep.stepNumber}: ${currentStep.description}. Follow the instructions I outlined for the captured windows.`;
@@ -727,7 +734,7 @@ Guidelines:
 
       return parsed;
     } catch (error) {
-      console.error("[GeminiVision] Step analysis failed:", error);
+      logger.error({ err: error }, "[GeminiVision] Step analysis failed");
       return {
         elementDescription: `Look for elements related to: ${currentStep.description}`,
         visualContext: "Unable to analyze screenshots",
@@ -747,11 +754,11 @@ Guidelines:
     adjustedStepList?: Step[];
     adjustmentReason?: string;
   }> {
-    console.log("[GeminiVision] Evaluating progress to step:", nextStepIndex + 1);
+    logger.info({ nextStep: nextStepIndex + 1 }, "[GeminiVision] Evaluating progress");
 
     try {
       if (!screenshots.length) {
-        console.warn("[GeminiVision] evaluateProgress called without screenshots");
+        logger.warn("[GeminiVision] evaluateProgress called without screenshots");
         return { needsAdjustment: false };
       }
 
@@ -795,10 +802,13 @@ Analyze screenshot to determine if plan needs adjustment. Consider:
       const text = result.response.text();
       const parsed = EvaluateProgressResponseSchema.parse(JSON.parse(text));
 
-      console.log("[GeminiVision] Needs adjustment:", parsed.needsAdjustment);
+      logger.info(
+        { needsAdjustment: parsed.needsAdjustment },
+        "[GeminiVision] Progress evaluation complete"
+      );
       return parsed;
     } catch (error) {
-      console.error("[GeminiVision] Evaluation failed:", error);
+      logger.error({ err: error }, "[GeminiVision] Evaluation failed");
       return { needsAdjustment: false };
     }
   }

@@ -6,6 +6,10 @@ import { router } from "./routes.js";
 import { swaggerSpec } from "./swagger.js";
 import { config } from "./config.js";
 import { generalLimiter } from "./middleware/rateLimiter.js";
+import { correlationIdMiddleware } from "./middleware/correlationId.js";
+import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
+import { errorHandler } from "./middleware/errorHandler.js";
+import { setupSentryErrorHandler } from "./lib/sentry.js";
 
 export const app = express();
 
@@ -13,7 +17,20 @@ export const app = express();
 // This allows express-rate-limit to correctly identify client IPs via X-Forwarded-For
 app.set("trust proxy", 1);
 
-// Middleware
+// =============================================================================
+// OBSERVABILITY MIDDLEWARE (order matters!)
+// =============================================================================
+
+// 1. Correlation ID - generates/propagates request IDs for tracing
+app.use(correlationIdMiddleware);
+
+// 2. Request logger - logs all HTTP requests with correlation IDs
+app.use(requestLoggerMiddleware);
+
+// =============================================================================
+// SECURITY & PARSING MIDDLEWARE
+// =============================================================================
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -95,3 +112,13 @@ app.get("/health", (_req, res) => {
 
 // API routes with rate limiting
 app.use("/api", generalLimiter, router);
+
+// =============================================================================
+// ERROR HANDLING MIDDLEWARE (must be last)
+// =============================================================================
+
+// Sentry error handler - captures errors for tracking (Sentry v8+ API)
+setupSentryErrorHandler(app);
+
+// Custom error handler - formats error responses
+app.use(errorHandler);
