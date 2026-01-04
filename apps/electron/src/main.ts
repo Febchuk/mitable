@@ -1410,6 +1410,41 @@ app.on("activate", () => {
   }
 });
 
+// Graceful shutdown: end active session on backend before exit
+let isQuitting = false;
+app.on("before-quit", async (event) => {
+  // Prevent infinite loop
+  if (isQuitting) return;
+
+  // Check if there's an active session
+  const sessionState = monitoringSessionService.getSessionState();
+  if (sessionState && (sessionState.status === "active" || sessionState.status === "paused")) {
+    event.preventDefault(); // Prevent immediate quit
+    isQuitting = true;
+
+    console.log("[Shutdown] Ending active session before quit...");
+
+    try {
+      // End local session and get captures
+      const result = await monitoringSessionService.endSession();
+
+      if (result.success && result.sessionId) {
+        // End on backend (triggers summarization)
+        await authManager.authenticatedFetch(
+          `/api/monitoring/sessions/${result.sessionId}/end`,
+          { method: "POST" }
+        );
+        console.log("[Shutdown] Session ended successfully on backend");
+      }
+    } catch (error) {
+      console.error("[Shutdown] Error ending session:", error);
+    }
+
+    // Now quit for real
+    app.quit();
+  }
+});
+
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
 });

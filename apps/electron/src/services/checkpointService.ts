@@ -61,7 +61,6 @@ class CheckpointService {
   private checkpointTimer: NodeJS.Timeout | null = null;
   private currentCheckpoint: SessionCheckpoint | null = null;
   private framesSinceCheckpoint = 0;
-  private isShuttingDown = false;
 
   constructor() {
     const userDataPath = app.getPath("userData");
@@ -81,22 +80,13 @@ class CheckpointService {
 
   /**
    * Setup graceful shutdown handler
-   * Ends active sessions on app exit (no recovery on restart)
+   * Note: Backend notification is handled by main.ts before-quit handler.
+   * This handler only cleans up local state as a fallback.
    */
   private setupShutdownHandler(): void {
-    const gracefulShutdown = async () => {
-      if (this.isShuttingDown) return;
-      this.isShuttingDown = true;
-
-      console.log("[Checkpoint] Graceful shutdown - ending active session");
-
-      // End session and remove checkpoint (no recovery on restart)
-      await this.endSession();
-    };
-
-    app.on("before-quit", gracefulShutdown);
-    process.on("SIGINT", gracefulShutdown);
-    process.on("SIGTERM", gracefulShutdown);
+    // Graceful shutdown with backend notification is handled in main.ts
+    // This service only handles local checkpoint cleanup as a fallback
+    // (e.g., if main.ts handler fails or for SIGINT/SIGTERM signals)
   }
 
   /**
