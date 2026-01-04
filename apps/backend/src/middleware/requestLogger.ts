@@ -20,12 +20,19 @@ export const requestLoggerMiddleware = pinoHttp({
   customLogLevel: (_req, res, err) => {
     if (res.statusCode >= 500 || err) return "error";
     if (res.statusCode >= 400) return "warn";
+    if (res.statusCode === 304) return "debug"; // Cache hits → debug level
     return "info";
   },
 
-  // Skip health checks to reduce noise
+  // Skip noisy requests to reduce log clutter
   autoLogging: {
-    ignore: (req) => req.url === "/health",
+    ignore: (req) => {
+      // Skip health checks
+      if (req.url === "/health") return true;
+      // Skip OPTIONS (CORS preflight) requests
+      if (req.method === "OPTIONS") return true;
+      return false;
+    },
   },
 
   // Custom success message

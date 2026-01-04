@@ -81,6 +81,14 @@ class MonitoringSessionService {
       };
     }
 
+    // Require authentication before starting session (prevents 401 errors on analyze-frame)
+    if (!authManager.getAccessToken()) {
+      return {
+        sessionId: "",
+        error: "Authentication required. Please log in before starting a monitoring session.",
+      };
+    }
+
     // Validate config
     if (!config.selectedWindows || config.selectedWindows.length === 0) {
       return {
