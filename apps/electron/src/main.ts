@@ -9,6 +9,7 @@ import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusServ
 import { windowDetectionService } from "./services/windowDetectionService";
 import { monitoringSessionService } from "./services/monitoringSessionService";
 import { authManager } from "./services/authManager";
+import { preferencesService } from "./services/preferencesService";
 import { updateService } from "./services/updateService";
 
 // Window references
@@ -1184,6 +1185,19 @@ function setupMonitoringSessionHandlers() {
     console.log("[Session Recovery] Discarding session:", sessionId);
     await monitoringSessionService.discardRecoverableSession(sessionId);
     return { success: true };
+  });
+
+  // Preferences IPC handlers
+  ipcMain.handle(IPC_CHANNELS.PREFERENCES_GET, (_, key: string) => {
+    return preferencesService.getPreference(key);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PREFERENCES_SET, (_, key: string, value: boolean) => {
+    return preferencesService.setPreference(key, value);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PREFERENCES_GET_ALL, () => {
+    return preferencesService.getAllPreferences();
   });
 
   console.log("[IPC] Monitoring session handlers registered successfully");

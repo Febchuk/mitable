@@ -113,6 +113,19 @@ interface ConsoleAPI {
   ) => () => void;
   onUpdateDownloaded: (callback: (info: { version: string }) => void) => () => void;
   onUpdateError: (callback: (error: { message: string }) => void) => () => void;
+
+  // Preferences API
+  getPreference: (key: string) => Promise<boolean | null>;
+  setPreference: (key: string, value: boolean) => Promise<{ success: boolean; error?: string }>;
+  getAllPreferences: () => Promise<{
+    session: {
+      hidePillOnSessionEnd: boolean;
+      dontAskHidePillAgain: boolean;
+    };
+  }>;
+
+  // Hide watching pill
+  hidePill: () => void;
 }
 
 declare global {
