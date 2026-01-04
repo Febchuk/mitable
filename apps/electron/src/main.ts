@@ -1070,8 +1070,9 @@ function setupMonitoringSessionHandlers() {
     console.log("[Monitoring Session] Ending session");
     const result = await monitoringSessionService.endSession();
 
-    // Hide watching pill after session ends
-    if (result.success && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+    // Only hide watching pill if preference is enabled
+    const shouldHide = preferencesService.getHidePillOnSessionEnd();
+    if (shouldHide && result.success && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
       watchingPillWindow.hide();
     }
 

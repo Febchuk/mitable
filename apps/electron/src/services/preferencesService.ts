@@ -45,7 +45,6 @@ class PreferencesService {
         },
       },
     });
-
     console.log("[PreferencesService] Initialized with store path:", this.store.path);
   }
 
