@@ -108,9 +108,12 @@ class UpdateService {
     }, 60 * 1000);
 
     // Then check periodically
-    this.updateCheckInterval = setInterval(() => {
-      this.checkForUpdates();
-    }, intervalMinutes * 60 * 1000);
+    this.updateCheckInterval = setInterval(
+      () => {
+        this.checkForUpdates();
+      },
+      intervalMinutes * 60 * 1000
+    );
 
     log.info(`[UpdateService] Started periodic update checks (every ${intervalMinutes} minutes)`);
   }
