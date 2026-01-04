@@ -16,6 +16,7 @@
 
 import type { SelectedWindowInfo, WatchableWindow, WatchState } from "@mitable/shared";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
+import { isBrowserApp, parseBrowserTitle } from "../utils/browserTitleParser";
 // Dynamic import for get-windows (ESM-only package) - see getAllVisibleWindows()
 
 // Type declaration for get-windows package
@@ -100,10 +101,16 @@ class WindowDetectionService {
         // Check capture policy
         const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
 
+        // Parse browser title for better display
+        const isBrowser = isBrowserApp(appName);
+        const parsed = parseBrowserTitle(windowTitle, appName);
+
         const watchableWindow: WatchableWindow = {
           windowId,
           appName,
           windowTitle,
+          displayName: parsed.formattedDisplay,
+          isBrowser,
           bounds: window.bounds,
           isBlocked: policyDecision.blocked,
           blockReason: policyDecision.reason,

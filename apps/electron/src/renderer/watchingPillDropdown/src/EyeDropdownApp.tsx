@@ -23,6 +23,8 @@ export default function EyeDropdownApp() {
       windowId: windowInfo.windowId,
       appName: windowInfo.appName,
       windowTitle: windowInfo.windowTitle,
+      displayName: windowInfo.displayName,
+      isBrowser: windowInfo.isBrowser,
     });
 
     // Update local state optimistically
@@ -32,6 +34,8 @@ export default function EyeDropdownApp() {
         windowId: windowInfo.windowId,
         appName: windowInfo.appName,
         windowTitle: windowInfo.windowTitle,
+        displayName: windowInfo.displayName,
+        isBrowser: windowInfo.isBrowser,
       },
     ]);
   };
@@ -62,7 +66,9 @@ export default function EyeDropdownApp() {
                 key={win.windowId}
                 className="flex items-center gap-1 bg-primary/20 border border-primary/30 rounded-full pl-2 pr-1 py-0.5"
               >
-                <span className="text-[10px] text-white truncate max-w-[120px]">{win.appName}</span>
+                <span className="text-[10px] text-white truncate max-w-[120px]">
+                  {win.displayName || win.appName}
+                </span>
                 <button
                   onClick={() => handleUnselectWindow(win.windowId)}
                   className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
@@ -96,10 +102,7 @@ export default function EyeDropdownApp() {
                 <Plus size={10} className="text-white/50" />
               </div>
               <span className="text-xs text-white truncate flex-1">
-                {windowInfo.appName}
-                {windowInfo.windowTitle && (
-                  <span className="text-white/50"> - {windowInfo.windowTitle}</span>
-                )}
+                {windowInfo.displayName || windowInfo.appName}
               </span>
             </button>
           ))

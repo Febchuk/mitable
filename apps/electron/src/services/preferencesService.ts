@@ -5,7 +5,8 @@
  * Preferences are stored locally on the user's machine.
  */
 
-import Store from "electron-store";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Store = require("electron-store").default;
 
 // Preferences schema
 interface PreferencesSchema {
