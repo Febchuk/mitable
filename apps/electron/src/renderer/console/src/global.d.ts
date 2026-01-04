@@ -121,6 +121,7 @@ interface ConsoleAPI {
     session: {
       hidePillOnSessionEnd: boolean;
       dontAskHidePillAgain: boolean;
+      showPillOnSessionStart: boolean;
     };
   }>;
 

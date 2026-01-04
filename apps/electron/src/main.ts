@@ -1036,13 +1036,16 @@ function setupMonitoringSessionHandlers() {
         organizationId: config.organizationId,
       });
 
-      // After session starts successfully, show the watching pill
+      // After session starts successfully, show the watching pill if preference allows
       if (!result.error) {
-        if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
-          createWatchingPillWindow();
-        }
-        if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-          watchingPillWindow.show();
+        const shouldShowPill = preferencesService.getShowPillOnSessionStart();
+        if (shouldShowPill) {
+          if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+            createWatchingPillWindow();
+          }
+          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+            watchingPillWindow.show();
+          }
         }
       }
 

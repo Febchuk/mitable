@@ -291,6 +291,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     session: {
       hidePillOnSessionEnd: boolean;
       dontAskHidePillAgain: boolean;
+      showPillOnSessionStart: boolean;
     };
   }> => ipcRenderer.invoke(IPC_CHANNELS.PREFERENCES_GET_ALL),
 

@@ -45,6 +45,7 @@ export default function SettingsView() {
   // Preferences
   const {
     hidePillOnSessionEnd,
+    showPillOnSessionStart,
     isLoading: isPreferencesLoading,
     updatePreference,
   } = usePreferences();
@@ -337,6 +338,47 @@ export default function SettingsView() {
               <div className="flex items-center gap-2">
                 <Settings size={18} className="text-text-secondary" />
                 <h3 className="text-lg font-semibold text-white">Session</h3>
+              </div>
+
+              {/* Show Pill on Session Start Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="show-pill-toggle"
+                    className="text-sm font-medium text-white cursor-pointer"
+                  >
+                    Show Watching Pill on Session Start
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically show the watching pill when a monitoring session starts
+                  </p>
+                </div>
+
+                {isPreferencesLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                ) : (
+                  <Switch
+                    id="show-pill-toggle"
+                    checked={showPillOnSessionStart}
+                    onCheckedChange={async (checked) => {
+                      const result = await updatePreference("showPillOnSessionStart", checked);
+                      if (result.success) {
+                        toast({
+                          title: "Preference saved",
+                          description: checked
+                            ? "Watching pill will show when sessions start"
+                            : "Watching pill will not auto-show when sessions start",
+                        });
+                      } else {
+                        toast({
+                          title: "Error",
+                          description: "Failed to save preference",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  />
+                )}
               </div>
 
               {/* Hide Pill on Session End Toggle */}

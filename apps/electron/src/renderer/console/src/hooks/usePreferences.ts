@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 interface SessionPreferences {
   hidePillOnSessionEnd: boolean;
   dontAskHidePillAgain: boolean;
+  showPillOnSessionStart: boolean;
 }
 
 interface Preferences {
@@ -51,5 +52,6 @@ export function usePreferences() {
     // Convenience getters
     hidePillOnSessionEnd: preferences?.session.hidePillOnSessionEnd ?? false,
     dontAskHidePillAgain: preferences?.session.dontAskHidePillAgain ?? false,
+    showPillOnSessionStart: preferences?.session.showPillOnSessionStart ?? true,
   };
 }

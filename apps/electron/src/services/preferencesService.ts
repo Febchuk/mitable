@@ -13,6 +13,7 @@ interface PreferencesSchema {
   session: {
     hidePillOnSessionEnd: boolean;
     dontAskHidePillAgain: boolean;
+    showPillOnSessionStart: boolean;
   };
 }
 
@@ -21,14 +22,16 @@ const defaults: PreferencesSchema = {
   session: {
     hidePillOnSessionEnd: false,
     dontAskHidePillAgain: false,
+    showPillOnSessionStart: true,
   },
 };
 
 class PreferencesService {
-  private store: Store<PreferencesSchema>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private store: any;
 
   constructor() {
-    this.store = new Store<PreferencesSchema>({
+    this.store = new Store({
       name: "mitable-preferences",
       defaults,
       schema: {
@@ -37,6 +40,7 @@ class PreferencesService {
           properties: {
             hidePillOnSessionEnd: { type: "boolean" },
             dontAskHidePillAgain: { type: "boolean" },
+            showPillOnSessionStart: { type: "boolean" },
           },
         },
       },
@@ -47,7 +51,7 @@ class PreferencesService {
 
   // Session preferences
   getHidePillOnSessionEnd(): boolean {
-    return this.store.get("session.hidePillOnSessionEnd");
+    return this.store.get("session.hidePillOnSessionEnd") as boolean;
   }
 
   setHidePillOnSessionEnd(value: boolean): void {
@@ -56,12 +60,21 @@ class PreferencesService {
   }
 
   getDontAskHidePillAgain(): boolean {
-    return this.store.get("session.dontAskHidePillAgain");
+    return this.store.get("session.dontAskHidePillAgain") as boolean;
   }
 
   setDontAskHidePillAgain(value: boolean): void {
     this.store.set("session.dontAskHidePillAgain", value);
     console.log("[PreferencesService] dontAskHidePillAgain set to:", value);
+  }
+
+  getShowPillOnSessionStart(): boolean {
+    return this.store.get("session.showPillOnSessionStart") as boolean;
+  }
+
+  setShowPillOnSessionStart(value: boolean): void {
+    this.store.set("session.showPillOnSessionStart", value);
+    console.log("[PreferencesService] showPillOnSessionStart set to:", value);
   }
 
   // Generic get/set by key
@@ -71,6 +84,8 @@ class PreferencesService {
         return this.getHidePillOnSessionEnd();
       case "dontAskHidePillAgain":
         return this.getDontAskHidePillAgain();
+      case "showPillOnSessionStart":
+        return this.getShowPillOnSessionStart();
       default:
         console.warn("[PreferencesService] Unknown preference key:", key);
         return null;
@@ -85,6 +100,9 @@ class PreferencesService {
       case "dontAskHidePillAgain":
         this.setDontAskHidePillAgain(value);
         return { success: true };
+      case "showPillOnSessionStart":
+        this.setShowPillOnSessionStart(value);
+        return { success: true };
       default:
         console.warn("[PreferencesService] Unknown preference key:", key);
         return { success: false, error: "Unknown preference key" };
@@ -93,7 +111,7 @@ class PreferencesService {
 
   // Bulk operations
   getAllPreferences(): PreferencesSchema {
-    return this.store.store;
+    return this.store.store as PreferencesSchema;
   }
 
   resetToDefaults(): void {
