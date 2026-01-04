@@ -222,6 +222,54 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       callback();
     });
   },
+
+  // Update notifications
+  checkForUpdates: (): Promise<{ success: boolean }> => ipcRenderer.invoke("check-for-updates"),
+  downloadUpdate: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("download-update"),
+  installUpdate: (): Promise<{ success: boolean }> => ipcRenderer.invoke("install-update"),
+
+  onUpdateAvailable: (
+    callback: (info: { version: string; releaseNotes?: string; releaseDate?: string }) => void
+  ) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      info: { version: string; releaseNotes?: string; releaseDate?: string }
+    ) => callback(info);
+    ipcRenderer.on("update-available", handler);
+    return () => {
+      ipcRenderer.removeListener("update-available", handler);
+    };
+  },
+
+  onUpdateDownloadProgress: (
+    callback: (progress: { percent: number; transferred: number; total: number }) => void
+  ) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      progress: { percent: number; transferred: number; total: number }
+    ) => callback(progress);
+    ipcRenderer.on("update-download-progress", handler);
+    return () => {
+      ipcRenderer.removeListener("update-download-progress", handler);
+    };
+  },
+
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, info: { version: string }) => callback(info);
+    ipcRenderer.on("update-downloaded", handler);
+    return () => {
+      ipcRenderer.removeListener("update-downloaded", handler);
+    };
+  },
+
+  onUpdateError: (callback: (error: { message: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, error: { message: string }) => callback(error);
+    ipcRenderer.on("update-error", handler);
+    return () => {
+      ipcRenderer.removeListener("update-error", handler);
+    };
+  },
 });
 
 console.log("[Preload] Console preload script finished - window.consoleAPI exposed");

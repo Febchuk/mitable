@@ -5,6 +5,13 @@ directories:
   buildResources: build
   output: dist
 
+# Publish configuration for auto-updates
+publish:
+  provider: github
+  owner: Febchuk
+  repo: mitable
+  releaseType: release
+
 # macOS Configuration
 mac:
   target:

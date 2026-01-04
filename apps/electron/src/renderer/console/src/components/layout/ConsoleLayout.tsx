@@ -4,6 +4,7 @@ import { SidebarProvider } from "../../context/SidebarContext";
 import { ScrollArea } from "../ui/scroll-area";
 import Sidebar from "./Sidebar";
 import TitleBar from "./TitleBar";
+import { UpdateBanner } from "../shared/UpdateBanner";
 
 // Detect platform for styling
 const isMac = navigator.platform.toLowerCase().includes("mac");
@@ -39,7 +40,8 @@ export default function ConsoleLayout() {
 
           {/* Main Content Area - Floating Card Style */}
           <div className="flex-1 flex flex-col h-full pb-3 pr-3 overflow-hidden">
-            <div className="flex-1 overflow-hidden rounded-2xl shadow-2xl border border-white/5 bg-background-primary backdrop-blur-sm relative">
+            <div className="flex-1 overflow-hidden rounded-2xl shadow-2xl border border-white/5 bg-background-primary backdrop-blur-sm relative flex flex-col">
+              <UpdateBanner />
               <ScrollArea className="h-full w-full">
                 <Outlet />
               </ScrollArea>

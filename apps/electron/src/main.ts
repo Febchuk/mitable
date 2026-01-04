@@ -9,6 +9,7 @@ import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusServ
 import { windowDetectionService } from "./services/windowDetectionService";
 import { monitoringSessionService } from "./services/monitoringSessionService";
 import { authManager } from "./services/authManager";
+import { updateService } from "./services/updateService";
 
 // Window references
 let consoleWindow: BrowserWindow | null = null;
@@ -758,6 +759,9 @@ function setupIPC() {
 
   // Monitoring Session IPC Handlers
   setupMonitoringSessionHandlers();
+
+  // Update notification handlers
+  setupUpdateHandlers();
 }
 
 // Watch mode handlers for selective screenshot capture
@@ -1182,6 +1186,34 @@ function setupMonitoringSessionHandlers() {
   console.log("[IPC] Monitoring session handlers registered successfully");
 }
 
+// Update notification handlers
+function setupUpdateHandlers() {
+  ipcMain.handle("check-for-updates", async () => {
+    console.log("[Update] Manual check for updates requested");
+    await updateService.checkForUpdates();
+    return { success: true };
+  });
+
+  ipcMain.handle("download-update", async () => {
+    console.log("[Update] Download update requested");
+    try {
+      await updateService.downloadUpdate();
+      return { success: true };
+    } catch (error) {
+      console.error("[Update] Download failed:", error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle("install-update", () => {
+    console.log("[Update] Install update requested");
+    updateService.quitAndInstall();
+    return { success: true };
+  });
+
+  console.log("[IPC] Update handlers registered successfully");
+}
+
 function isBrowserProcess(appName: string, appPath?: string): boolean {
   const haystack = `${appName || ""} ${appPath || ""}`.toLowerCase();
 
@@ -1314,6 +1346,9 @@ app.whenReady().then(async () => {
   setupIPC();
   registerGlobalShortcuts();
 
+  // Start automatic update checks (every 4 hours)
+  updateService.startPeriodicChecks(240);
+
   // Check for recoverable sessions on startup (crash recovery)
   try {
     const recoverableSessions = await monitoringSessionService.getRecoverableSessions();
@@ -1357,4 +1392,8 @@ app.on("activate", () => {
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+});
+
+app.on("before-quit", () => {
+  updateService.stopPeriodicChecks();
 });

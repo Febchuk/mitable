@@ -78,6 +78,41 @@ interface ConsoleAPI {
       latestCapture: unknown;
     }) => void
   ) => () => void;
+
+  // Session Recovery
+  getRecoverableSessions: () => Promise<
+    Array<{
+      sessionId: string;
+      frameCount: number;
+      lastCheckpoint: string;
+      status: string;
+    }>
+  >;
+  recoverSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+  discardRecoverableSession: (sessionId: string) => Promise<{ success: boolean }>;
+  onShowRecoveryDialog: (
+    callback: (
+      sessions: Array<{
+        sessionId: string;
+        frameCount: number;
+        lastCheckpoint: string;
+        status: string;
+      }>
+    ) => void
+  ) => void;
+
+  // Update notifications
+  checkForUpdates: () => Promise<{ success: boolean }>;
+  downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
+  installUpdate: () => Promise<{ success: boolean }>;
+  onUpdateAvailable: (
+    callback: (info: { version: string; releaseNotes?: string; releaseDate?: string }) => void
+  ) => () => void;
+  onUpdateDownloadProgress: (
+    callback: (progress: { percent: number; transferred: number; total: number }) => void
+  ) => () => void;
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => () => void;
+  onUpdateError: (callback: (error: { message: string }) => void) => () => void;
 }
 
 declare global {
