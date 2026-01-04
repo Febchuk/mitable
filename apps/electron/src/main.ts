@@ -601,36 +601,32 @@ function setupIPC() {
           }
 
           // 2. Upload captures and end backend session
-          const token = authTokens.accessToken;
-          if (token && result.captures && result.captures.length > 0) {
-            const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
-            try {
-              // Upload captures
+          try {
+            // Upload captures if any exist
+            if (result.captures && result.captures.length > 0) {
               console.log(`[EndSession] Uploading ${result.captures.length} captures to backend`);
-              await fetch(`${API_BASE_URL}/api/monitoring/sessions/${result.sessionId}/captures`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ captures: result.captures }),
-              });
-
-              // End backend session (triggers summarization)
-              console.log(`[EndSession] Triggering backend summarization`);
-              await fetch(`${API_BASE_URL}/api/monitoring/sessions/${result.sessionId}/end`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
-            } catch (error) {
-              console.error(
-                "[EndSession] Error uploading captures or ending backend session:",
-                error
+              await authManager.authenticatedFetch(
+                `/api/monitoring/sessions/${result.sessionId}/captures`,
+                {
+                  method: "POST",
+                  body: JSON.stringify({ captures: result.captures }),
+                }
               );
             }
+
+            // ALWAYS end backend session (triggers summarization)
+            console.log(`[EndSession] Triggering backend summarization`);
+            await authManager.authenticatedFetch(
+              `/api/monitoring/sessions/${result.sessionId}/end`,
+              { method: "POST" }
+            );
+          } catch (error) {
+            console.error("[EndSession] Error:", error);
+          }
+
+          // Hide watching pill after successful end
+          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+            watchingPillWindow.hide();
           }
 
           return result;
@@ -1068,7 +1064,14 @@ function setupMonitoringSessionHandlers() {
   // End the active session
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_END, async () => {
     console.log("[Monitoring Session] Ending session");
-    return monitoringSessionService.endSession();
+    const result = await monitoringSessionService.endSession();
+
+    // Hide watching pill after session ends
+    if (result.success && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.hide();
+    }
+
+    return result;
   });
 
   // Finalize session: upload captures to backend + trigger summarization
