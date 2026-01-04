@@ -112,6 +112,7 @@ interface ConsoleAPI {
     callback: (progress: { percent: number; transferred: number; total: number }) => void
   ) => () => void;
   onUpdateDownloaded: (callback: (info: { version: string }) => void) => () => void;
+  onUpdateError: (callback: (error: { message: string }) => void) => () => void;
 }
 
 declare global {

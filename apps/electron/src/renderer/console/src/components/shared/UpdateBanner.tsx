@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Download, X, Loader2, RefreshCw } from "lucide-react";
+import { Download, X, Loader2, RefreshCw, AlertCircle } from "lucide-react";
 
 interface UpdateInfo {
   version: string;
   releaseNotes?: string;
+  releaseDate?: string;
 }
 
 interface DownloadProgress {
@@ -18,6 +19,7 @@ export function UpdateBanner() {
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [isReadyToInstall, setIsReadyToInstall] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Listen for update available
@@ -25,6 +27,7 @@ export function UpdateBanner() {
       console.log("[UpdateBanner] Update available:", info);
       setUpdateInfo(info);
       setIsDismissed(false);
+      setError(null);
     });
 
     // Listen for download progress
@@ -39,24 +42,41 @@ export function UpdateBanner() {
       setIsDownloading(false);
       setDownloadProgress(null);
       setIsReadyToInstall(true);
+      setError(null);
+    });
+
+    // Listen for errors
+    const unsubscribeError = window.consoleAPI?.onUpdateError((err) => {
+      console.error("[UpdateBanner] Update error:", err);
+      setError(err.message);
+      setIsDownloading(false);
+      setDownloadProgress(null);
     });
 
     return () => {
       unsubscribeAvailable?.();
       unsubscribeProgress?.();
       unsubscribeDownloaded?.();
+      unsubscribeError?.();
     };
   }, []);
 
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
+      setError(null);
       await window.consoleAPI?.downloadUpdate();
-    } catch (error) {
-      console.error("[UpdateBanner] Download failed:", error);
+    } catch (err) {
+      console.error("[UpdateBanner] Download failed:", err);
       setIsDownloading(false);
       setDownloadProgress(null);
+      setError(err instanceof Error ? err.message : "Download failed");
     }
+  };
+
+  const handleRetry = () => {
+    setError(null);
+    handleDownload();
   };
 
   const handleInstall = async () => {
@@ -78,11 +98,15 @@ export function UpdateBanner() {
   }
 
   return (
-    <div className="bg-primary/10 border-b border-primary/20 px-4 py-3">
+    <div
+      className={`border-b px-4 py-3 ${error ? "bg-red-500/10 border-red-500/20" : "bg-primary/10 border-primary/20"}`}
+    >
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         <div className="flex items-center gap-3 flex-1">
           <div className="flex-shrink-0">
-            {isReadyToInstall ? (
+            {error ? (
+              <AlertCircle className="h-5 w-5 text-red-500" />
+            ) : isReadyToInstall ? (
               <RefreshCw className="h-5 w-5 text-primary" />
             ) : isDownloading ? (
               <Loader2 className="h-5 w-5 text-primary animate-spin" />
@@ -93,15 +117,20 @@ export function UpdateBanner() {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-text-primary">
-                {isReadyToInstall
-                  ? "Update ready to install"
-                  : isDownloading
-                    ? "Downloading update..."
-                    : "Update available"}
+              <span
+                className={`text-sm font-medium ${error ? "text-red-500" : "text-text-primary"}`}
+              >
+                {error
+                  ? "Update failed"
+                  : isReadyToInstall
+                    ? "Update ready to install"
+                    : isDownloading
+                      ? "Downloading update..."
+                      : "Update available"}
               </span>
               <span className="text-sm text-text-secondary">v{updateInfo.version}</span>
             </div>
+            {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
 
             {isDownloading && downloadProgress && (
               <div className="mt-2">
@@ -125,7 +154,14 @@ export function UpdateBanner() {
         </div>
 
         <div className="flex items-center gap-2 ml-4">
-          {isReadyToInstall ? (
+          {error ? (
+            <button
+              onClick={handleRetry}
+              className="px-4 py-1.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors"
+            >
+              Retry
+            </button>
+          ) : isReadyToInstall ? (
             <button
               onClick={handleInstall}
               className="px-4 py-1.5 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-md transition-colors"

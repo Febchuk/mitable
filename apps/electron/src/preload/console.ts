@@ -229,9 +229,13 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.invoke("download-update"),
   installUpdate: (): Promise<{ success: boolean }> => ipcRenderer.invoke("install-update"),
 
-  onUpdateAvailable: (callback: (info: { version: string; releaseNotes?: string }) => void) => {
-    const handler = (_event: IpcRendererEvent, info: { version: string; releaseNotes?: string }) =>
-      callback(info);
+  onUpdateAvailable: (
+    callback: (info: { version: string; releaseNotes?: string; releaseDate?: string }) => void
+  ) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      info: { version: string; releaseNotes?: string; releaseDate?: string }
+    ) => callback(info);
     ipcRenderer.on("update-available", handler);
     return () => {
       ipcRenderer.removeListener("update-available", handler);
@@ -256,6 +260,14 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.on("update-downloaded", handler);
     return () => {
       ipcRenderer.removeListener("update-downloaded", handler);
+    };
+  },
+
+  onUpdateError: (callback: (error: { message: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, error: { message: string }) => callback(error);
+    ipcRenderer.on("update-error", handler);
+    return () => {
+      ipcRenderer.removeListener("update-error", handler);
     };
   },
 });

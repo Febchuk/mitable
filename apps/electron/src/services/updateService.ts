@@ -44,6 +44,9 @@ class UpdateService {
     autoUpdater.on("error", (err) => {
       log.error("[UpdateService] Error checking for updates:", err);
       this.isCheckingForUpdates = false;
+      this.notifyRenderers("update-error", {
+        message: err.message || "An error occurred while checking for updates",
+      });
     });
 
     autoUpdater.on("download-progress", (progressObj) => {

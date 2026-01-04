@@ -759,6 +759,9 @@ function setupIPC() {
 
   // Monitoring Session IPC Handlers
   setupMonitoringSessionHandlers();
+
+  // Update notification handlers
+  setupUpdateHandlers();
 }
 
 // Watch mode handlers for selective screenshot capture
@@ -1180,7 +1183,11 @@ function setupMonitoringSessionHandlers() {
     return { success: true };
   });
 
-  // Update notification handlers
+  console.log("[IPC] Monitoring session handlers registered successfully");
+}
+
+// Update notification handlers
+function setupUpdateHandlers() {
   ipcMain.handle("check-for-updates", async () => {
     console.log("[Update] Manual check for updates requested");
     await updateService.checkForUpdates();
@@ -1204,7 +1211,7 @@ function setupMonitoringSessionHandlers() {
     return { success: true };
   });
 
-  console.log("[IPC] Monitoring session handlers registered successfully");
+  console.log("[IPC] Update handlers registered successfully");
 }
 
 function isBrowserProcess(appName: string, appPath?: string): boolean {
@@ -1385,4 +1392,8 @@ app.on("activate", () => {
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+});
+
+app.on("before-quit", () => {
+  updateService.stopPeriodicChecks();
 });
