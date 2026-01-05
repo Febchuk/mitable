@@ -165,7 +165,9 @@ export function parseBrowserTitle(windowTitle: string, appName: string): ParsedB
   // Truncate long tab titles
   const maxTabTitleLength = 40;
   const truncatedTabTitle =
-    tabTitle.length > maxTabTitleLength ? tabTitle.substring(0, maxTabTitleLength - 3) + "..." : tabTitle;
+    tabTitle.length > maxTabTitleLength
+      ? tabTitle.substring(0, maxTabTitleLength - 3) + "..."
+      : tabTitle;
 
   // Handle edge case where tab title is empty or same as browser name
   const finalTabTitle = truncatedTabTitle.trim() || "New Tab";

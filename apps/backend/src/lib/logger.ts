@@ -33,5 +33,4 @@ export const logger = pino({
   },
 });
 
-export const createLogger = (context: Record<string, unknown>) =>
-  logger.child(context);
+export const createLogger = (context: Record<string, unknown>) => logger.child(context);

@@ -11,12 +11,7 @@ interface AppError extends Error {
  * Global error handler middleware.
  * Logs errors, sends to Sentry for 5xx errors, and returns consistent error responses.
  */
-export function errorHandler(
-  err: AppError,
-  req: Request,
-  res: Response,
-  _next: NextFunction
-) {
+export function errorHandler(err: AppError, req: Request, res: Response, _next: NextFunction) {
   const correlationId = req.correlationId || "unknown";
   const statusCode = err.statusCode || 500;
 

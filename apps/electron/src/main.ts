@@ -1431,10 +1431,9 @@ app.on("before-quit", async (event) => {
 
       if (result.success && result.sessionId) {
         // End on backend (triggers summarization)
-        await authManager.authenticatedFetch(
-          `/api/monitoring/sessions/${result.sessionId}/end`,
-          { method: "POST" }
-        );
+        await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
+          method: "POST",
+        });
         console.log("[Shutdown] Session ended successfully on backend");
       }
     } catch (error) {

@@ -62,9 +62,7 @@ export default function TitleBar() {
             <PanelLeft className="w-3.5 h-3.5" />
           </Button>
         </div>
-        <div className="app-no-drag">
-          {tier && <TierBadge tier={tier} className="my-1" />}
-        </div>
+        <div className="app-no-drag">{tier && <TierBadge tier={tier} className="my-1" />}</div>
       </div>
     );
   }

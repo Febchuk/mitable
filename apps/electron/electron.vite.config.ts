@@ -18,7 +18,7 @@ const VITE_PORT = getVitePort();
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ['electron-store'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ["electron-store"] })],
     build: {
       rollupOptions: {
         input: {

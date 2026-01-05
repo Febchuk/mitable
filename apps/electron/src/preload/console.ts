@@ -281,10 +281,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   getPreference: (key: string): Promise<boolean | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.PREFERENCES_GET, key),
 
-  setPreference: (
-    key: string,
-    value: boolean
-  ): Promise<{ success: boolean; error?: string }> =>
+  setPreference: (key: string, value: boolean): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.PREFERENCES_SET, key, value),
 
   getAllPreferences: (): Promise<{

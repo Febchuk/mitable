@@ -757,13 +757,16 @@ router.post(
       metadata?: any;
     } = req.body;
 
-    logger.info({
-      conversationId,
-      userId,
-      contentLength: content?.length || 0,
-      screenshotCount: screenshots?.length || 0,
-      metadata,
-    }, "[Conversations] Request received");
+    logger.info(
+      {
+        conversationId,
+        userId,
+        contentLength: content?.length || 0,
+        screenshotCount: screenshots?.length || 0,
+        metadata,
+      },
+      "[Conversations] Request received"
+    );
 
     if (!userId) {
       res.status(401).json({
@@ -859,7 +862,10 @@ router.post(
           currentStepIndex,
           { screenshots }
         );
-        logger.debug({ workflowSessionId }, "[Stream] Workflow interaction saved for user question");
+        logger.debug(
+          { workflowSessionId },
+          "[Stream] Workflow interaction saved for user question"
+        );
       }
 
       // Get recent conversation history (last 20 messages for context)
@@ -886,17 +892,23 @@ router.post(
       // Reuse user data from earlier query (no need to fetch again!)
       const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
 
-      logger.debug({
-        organizationId: user.organizationId,
-        name: fullName,
-      }, "[Conversations] User profile (from cache)");
+      logger.debug(
+        {
+          organizationId: user.organizationId,
+          name: fullName,
+        },
+        "[Conversations] User profile (from cache)"
+      );
 
-      logger.debug({
-        conversationId,
-        userId,
-        historyLength: conversationHistory.length,
-        organizationId: user.organizationId,
-      }, "[Conversations] ToolContext created");
+      logger.debug(
+        {
+          conversationId,
+          userId,
+          historyLength: conversationHistory.length,
+          organizationId: user.organizationId,
+        },
+        "[Conversations] ToolContext created"
+      );
 
       // Set up Server-Sent Events (SSE)
       res.setHeader("Content-Type", "text/event-stream");
@@ -947,12 +959,15 @@ router.post(
         for await (const chunk of stream) {
           // Log chunk details (only for non-text chunks to avoid spam)
           if (chunk.type !== "chunk") {
-            logger.debug({
-              type: chunk.type,
-              hasContent: !!chunk.content,
-              hasWindowTrigger: !!(chunk as any).windowTrigger,
-              windowType: (chunk as any).windowTrigger?.window,
-            }, "[Conversations] Streaming chunk sent");
+            logger.debug(
+              {
+                type: chunk.type,
+                hasContent: !!chunk.content,
+                hasWindowTrigger: !!(chunk as any).windowTrigger,
+                windowType: (chunk as any).windowTrigger?.window,
+              },
+              "[Conversations] Streaming chunk sent"
+            );
           }
 
           // Inject workflow metadata into every chunk so frontend knows where to route it
@@ -973,10 +988,13 @@ router.post(
               windowTrigger: (chunk as any).windowTrigger,
             };
 
-            logger.debug({
-              window: (chunk as any).windowTrigger.window,
-              hasData: !!(chunk as any).windowTrigger.data,
-            }, "[Conversations] Emitting window_trigger event");
+            logger.debug(
+              {
+                window: (chunk as any).windowTrigger.window,
+                hasData: !!(chunk as any).windowTrigger.data,
+              },
+              "[Conversations] Emitting window_trigger event"
+            );
 
             res.write(`data: ${JSON.stringify(windowTriggerEvent)}\n\n`);
           }
@@ -1052,7 +1070,10 @@ router.post(
               workflowAction: metadata?.workflowAction,
             }
           );
-          logger.debug({ workflowSessionId: assistantWorkflowSessionId, interactionType }, "[Stream] Workflow interaction saved for assistant response");
+          logger.debug(
+            { workflowSessionId: assistantWorkflowSessionId, interactionType },
+            "[Stream] Workflow interaction saved for assistant response"
+          );
         }
 
         // Note: We only persist the first screenshot for PII debugging to minimize disk usage.
@@ -1067,9 +1088,12 @@ router.post(
           typeof primaryScreenshot.dataUrl === "string"
         ) {
           try {
-            logger.debug({
-              hasMetadata: !!primaryScreenshot.metadata,
-            }, "[DEBUG PII] Saving PII test screenshots...");
+            logger.debug(
+              {
+                hasMetadata: !!primaryScreenshot.metadata,
+              },
+              "[DEBUG PII] Saving PII test screenshots..."
+            );
             const fs = await import("fs/promises");
             const path = await import("path");
 
@@ -1080,12 +1104,15 @@ router.post(
             const defaultDir = path.join(monorepoRoot, "temp", "pii-debug-screenshots");
             const outputDir = process.env.DEBUG_SCREENSHOTS_DIR || defaultDir;
             const sessionDir = path.join(outputDir, timestamp);
-            logger.debug({
-              processCwd: process.cwd(),
-              monorepoRoot,
-              defaultDir,
-              sessionDir,
-            }, "[DEBUG PII] Path resolution");
+            logger.debug(
+              {
+                processCwd: process.cwd(),
+                monorepoRoot,
+                defaultDir,
+                sessionDir,
+              },
+              "[DEBUG PII] Path resolution"
+            );
             await fs.mkdir(sessionDir, { recursive: true });
 
             // Save original (after redaction)
@@ -1114,11 +1141,14 @@ router.post(
               )
             );
 
-            logger.debug({
-              sessionDir,
-              redactedPath: originalPath,
-              metadataPath,
-            }, "[DEBUG PII] Screenshots saved");
+            logger.debug(
+              {
+                sessionDir,
+                redactedPath: originalPath,
+                metadataPath,
+              },
+              "[DEBUG PII] Screenshots saved"
+            );
           } catch (error) {
             logger.error({ err: error }, "[DEBUG PII] Failed to save PII test screenshots");
           }
@@ -1126,7 +1156,9 @@ router.post(
 
         // Debug: previously saved annotated screenshots, but bounding boxes are no longer produced.
         if (process.env.DEBUG_SAVE_SCREENSHOTS === "true") {
-          logger.warn("[DEBUG SCREENSHOT] Annotated screenshot saving is disabled for conversational-only guidance output (no bounding boxes available).");
+          logger.warn(
+            "[DEBUG SCREENSHOT] Annotated screenshot saving is disabled for conversational-only guidance output (no bounding boxes available)."
+          );
         }
 
         // Generate conversation title if this is the first exchange
@@ -1179,10 +1211,13 @@ router.post(
           })}\n\n`
         );
 
-        logger.info({
-          messageId: assistantMessage.id,
-          contentLength: assistantContent.length,
-        }, "[Conversations] Streaming completed successfully");
+        logger.info(
+          {
+            messageId: assistantMessage.id,
+            contentLength: assistantContent.length,
+          },
+          "[Conversations] Streaming completed successfully"
+        );
       } catch (streamError) {
         logger.error({ err: streamError }, "[Stream] Error during streaming");
         res.write(

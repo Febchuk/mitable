@@ -63,6 +63,7 @@ npm run build:mac:x64
 ### Output Location
 
 DMGs are output to `/tmp/mitable-dist/`:
+
 - `Mitable-{version}-arm64.dmg` - Apple Silicon
 - `Mitable-{version}-x64.dmg` - Intel
 
@@ -103,7 +104,7 @@ mac:
     teamId: LUV3R68DAA
 
 directories:
-  output: /tmp/mitable-dist  # Outside iCloud!
+  output: /tmp/mitable-dist # Outside iCloud!
 
 files:
   - "out/**/*"
@@ -118,6 +119,7 @@ files:
 ### Entitlements (build/entitlements.mac.plist)
 
 Required for Electron apps with hardened runtime:
+
 - `com.apple.security.cs.allow-jit`
 - `com.apple.security.cs.allow-unsigned-executable-memory`
 - `com.apple.security.cs.disable-library-validation`
@@ -129,12 +131,14 @@ Required for Electron apps with hardened runtime:
 **Cause**: Project is in iCloud Drive synced folder (Documents).
 
 **Solution**:
+
 1. Set output directory outside iCloud: `output: /tmp/mitable-dist`
 2. Use custom electron cache: `export ELECTRON_CACHE=~/.electron-cache`
 
 ### "The teamId property is required"
 
 **Solution**: Add teamId to notarize config:
+
 ```yaml
 notarize:
   teamId: LUV3R68DAA
@@ -145,11 +149,12 @@ notarize:
 **Cause**: node_modules being bundled.
 
 **Solution**: Update `files` config to only include necessary files:
+
 ```yaml
 files:
   - "out/**/*"
   - "package.json"
-  - "!node_modules"  # Exclude all
+  - "!node_modules" # Exclude all
   # Then include specific native modules
 ```
 
@@ -178,6 +183,7 @@ gh release create v0.1.7 \
 ## CI/CD Considerations
 
 For GitHub Actions, store credentials as secrets:
+
 - `APPLE_ID`
 - `APPLE_ID_PASSWORD`
 - `APPLE_TEAM_ID`
@@ -186,11 +192,11 @@ The signing certificate needs to be exported as .p12 and imported into the CI ru
 
 ## Quick Reference
 
-| Task | Command |
-|------|---------|
-| Build both | `source .env.signing && npm run build:mac` |
-| Build arm64 | `source .env.signing && npm run build:mac:arm64` |
-| Build x64 | `source .env.signing && npm run build:mac:x64` |
-| Verify signature | `codesign --verify --deep --strict /path/to/Mitable.app` |
-| Verify notarization | `spctl --assess --type execute --verbose /path/to/Mitable.app` |
-| Check history | `xcrun notarytool history --apple-id ... --password ... --team-id ...` |
+| Task                | Command                                                                |
+| ------------------- | ---------------------------------------------------------------------- |
+| Build both          | `source .env.signing && npm run build:mac`                             |
+| Build arm64         | `source .env.signing && npm run build:mac:arm64`                       |
+| Build x64           | `source .env.signing && npm run build:mac:x64`                         |
+| Verify signature    | `codesign --verify --deep --strict /path/to/Mitable.app`               |
+| Verify notarization | `spctl --assess --type execute --verbose /path/to/Mitable.app`         |
+| Check history       | `xcrun notarytool history --apple-id ... --password ... --team-id ...` |

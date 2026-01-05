@@ -5,7 +5,12 @@
  * for cleaner display in the watch list.
  */
 
-import { isBrowserApp, parseBrowserTitle, formatWindowDisplayName, isSystemApp } from "../browserTitleParser";
+import {
+  isBrowserApp,
+  parseBrowserTitle,
+  formatWindowDisplayName,
+  isSystemApp,
+} from "../browserTitleParser";
 
 describe("browserTitleParser", () => {
   describe("isBrowserApp", () => {

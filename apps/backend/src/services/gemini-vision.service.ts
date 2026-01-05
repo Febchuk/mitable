@@ -197,10 +197,7 @@ Return ONLY the detailed description, no JSON, no extra formatting, no preamble.
 
       const elapsedMs = Date.now() - startTime;
 
-      logger.debug(
-        { clarifiedDescription, elapsedMs },
-        "[GeminiVision] Clarification complete"
-      );
+      logger.debug({ clarifiedDescription, elapsedMs }, "[GeminiVision] Clarification complete");
 
       return clarifiedDescription;
     } catch (error) {

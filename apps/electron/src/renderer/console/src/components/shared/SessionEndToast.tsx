@@ -9,11 +9,7 @@ interface SessionEndToastProps {
   onHidePill: () => void;
 }
 
-export function SessionEndToast({
-  onDismiss,
-  onDontAskAgain,
-  onHidePill,
-}: SessionEndToastProps) {
+export function SessionEndToast({ onDismiss, onDontAskAgain, onHidePill }: SessionEndToastProps) {
   const [dontAskChecked, setDontAskChecked] = useState(false);
 
   const handleDontAskChange = (checked: boolean) => {
@@ -50,10 +46,7 @@ export function SessionEndToast({
             checked={dontAskChecked}
             onCheckedChange={(checked) => handleDontAskChange(checked === true)}
           />
-          <label
-            htmlFor="dont-ask-again"
-            className="text-xs text-muted-foreground cursor-pointer"
-          >
+          <label htmlFor="dont-ask-again" className="text-xs text-muted-foreground cursor-pointer">
             Don't ask again
           </label>
         </div>
