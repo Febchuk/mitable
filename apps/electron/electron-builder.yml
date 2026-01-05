@@ -3,7 +3,7 @@ productName: Mitable
 copyright: Copyright © 2025 Mitable
 directories:
   buildResources: build
-  output: dist
+  output: /tmp/mitable-dist
 
 # Publish configuration for auto-updates
 publish:
@@ -26,13 +26,8 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   identity: "Febe Chukwuma (LUV3R68DAA)"
-  notarize: false
-
-# Clean extended attributes before signing (required for macOS code signing)
-afterPack: scripts/afterPack.cjs
-
-# Notarization (runs after signing)
-afterSign: scripts/notarize.cjs
+  notarize:
+    teamId: LUV3R68DAA
 
 # DMG Configuration
 dmg:
@@ -74,14 +69,22 @@ extraResources:
   - from: "build/icon.png"
     to: "assets/icon.png"
 
-# File associations and metadata
+# Files to include (electron-vite bundles everything to out/)
 files:
-  - "!**/.vscode/*"
-  - "!src/*"
-  - "!electron.vite.config.{js,ts,mjs,cjs}"
-  - "!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}"
-  - "!{.env,.env.*,.editorconfig,.gitattributes,.gitignore,.yarnrc.yml,.travis.yml,appveyor.yml,circle.yml}"
-  - "!{npm-debug.log,yarn.lock,.npmrc,yarn-error.log}"
+  - "out/**/*"
+  - "package.json"
+  # Native modules required at runtime
+  - "node_modules/get-windows/**/*"
+  - "node_modules/active-win/**/*"
+  - "node_modules/msgpackr-extract/**/*"
+  - "node_modules/electron-log/**/*"
+  # Exclude everything else
+  - "!src"
+  - "!**/*.{ts,tsx,map}"
+  - "!**/.vscode"
+  - "!**/electron.vite.config.*"
+  - "!**/*.md"
+  - "!**/.*"
 
 # Unpack native modules from ASAR (required for native bindings to work)
 asarUnpack:
