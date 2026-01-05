@@ -16,7 +16,7 @@
 
 import type { SelectedWindowInfo, WatchableWindow, WatchState } from "@mitable/shared";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
-import { isBrowserApp, parseBrowserTitle } from "../utils/browserTitleParser";
+import { isBrowserApp, parseBrowserTitle, isSystemApp } from "../utils/browserTitleParser";
 // Dynamic import for get-windows (ESM-only package) - see getAllVisibleWindows()
 
 // Type declaration for get-windows package
@@ -98,6 +98,12 @@ class WindowDetectionService {
         const appName = window.owner.name;
         const windowTitle = window.title;
 
+        // Skip system apps (Finder, Notification Center, etc.)
+        if (isSystemApp(appName)) {
+          console.log(`[WindowDetectionService] Skipping system app: ${appName}`);
+          continue;
+        }
+
         // Check capture policy
         const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
 
@@ -109,7 +115,8 @@ class WindowDetectionService {
           windowId,
           appName,
           windowTitle,
-          displayName: parsed.formattedDisplay,
+          displayName: parsed.browserDisplayName, // Short app name (e.g., "Chrome")
+          tabTitle: isBrowser ? parsed.tabTitle : undefined, // Tab title for browsers only
           isBrowser,
           bounds: window.bounds,
           isBlocked: policyDecision.blocked,

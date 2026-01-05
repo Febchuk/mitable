@@ -24,6 +24,7 @@ export default function EyeDropdownApp() {
       appName: windowInfo.appName,
       windowTitle: windowInfo.windowTitle,
       displayName: windowInfo.displayName,
+      tabTitle: windowInfo.tabTitle,
       isBrowser: windowInfo.isBrowser,
     });
 
@@ -35,6 +36,7 @@ export default function EyeDropdownApp() {
         appName: windowInfo.appName,
         windowTitle: windowInfo.windowTitle,
         displayName: windowInfo.displayName,
+        tabTitle: windowInfo.tabTitle,
         isBrowser: windowInfo.isBrowser,
       },
     ]);
@@ -101,9 +103,16 @@ export default function EyeDropdownApp() {
               <div className="w-4 h-4 rounded-full border border-white/30 flex items-center justify-center flex-shrink-0 hover:border-primary hover:bg-primary/10">
                 <Plus size={10} className="text-white/50" />
               </div>
-              <span className="text-xs text-white truncate flex-1">
-                {windowInfo.displayName || windowInfo.appName}
-              </span>
+              <div className="flex-1 min-w-0">
+                <span className="text-xs text-white truncate block">
+                  {windowInfo.displayName || windowInfo.appName}
+                </span>
+                {(windowInfo.isBrowser ? windowInfo.tabTitle : windowInfo.windowTitle) && (
+                  <span className="text-[10px] text-white/50 truncate block">
+                    {windowInfo.isBrowser ? windowInfo.tabTitle : windowInfo.windowTitle}
+                  </span>
+                )}
+              </div>
             </button>
           ))
         )}

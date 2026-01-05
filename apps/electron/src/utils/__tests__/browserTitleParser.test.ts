@@ -5,7 +5,7 @@
  * for cleaner display in the watch list.
  */
 
-import { isBrowserApp, parseBrowserTitle, formatWindowDisplayName } from "../browserTitleParser";
+import { isBrowserApp, parseBrowserTitle, formatWindowDisplayName, isSystemApp } from "../browserTitleParser";
 
 describe("browserTitleParser", () => {
   describe("isBrowserApp", () => {
@@ -191,6 +191,60 @@ describe("browserTitleParser", () => {
     it("should return app name for non-browsers", () => {
       const displayName = formatWindowDisplayName("Document.txt - TextEdit", "TextEdit");
       expect(displayName).toBe("TextEdit");
+    });
+  });
+
+  describe("isSystemApp", () => {
+    it("should identify Finder as system app", () => {
+      expect(isSystemApp("Finder")).toBe(true);
+    });
+
+    it("should identify Notification Center as system app", () => {
+      expect(isSystemApp("Notification Center")).toBe(true);
+    });
+
+    it("should identify System Preferences as system app", () => {
+      expect(isSystemApp("System Preferences")).toBe(true);
+      expect(isSystemApp("System Settings")).toBe(true);
+    });
+
+    it("should identify Control Center as system app", () => {
+      expect(isSystemApp("Control Center")).toBe(true);
+    });
+
+    it("should identify Spotlight as system app", () => {
+      expect(isSystemApp("Spotlight")).toBe(true);
+    });
+
+    it("should identify Launchpad as system app", () => {
+      expect(isSystemApp("Launchpad")).toBe(true);
+    });
+
+    it("should identify Mission Control as system app", () => {
+      expect(isSystemApp("Mission Control")).toBe(true);
+    });
+
+    it("should identify Dock as system app", () => {
+      expect(isSystemApp("Dock")).toBe(true);
+    });
+
+    it("should identify loginwindow as system app", () => {
+      expect(isSystemApp("loginwindow")).toBe(true);
+    });
+
+    it("should NOT identify regular apps as system apps", () => {
+      expect(isSystemApp("Google Chrome")).toBe(false);
+      expect(isSystemApp("Visual Studio Code")).toBe(false);
+      expect(isSystemApp("Slack")).toBe(false);
+      expect(isSystemApp("Terminal")).toBe(false);
+      expect(isSystemApp("Notes")).toBe(false);
+      expect(isSystemApp("Safari")).toBe(false);
+    });
+
+    it("should be case insensitive", () => {
+      expect(isSystemApp("FINDER")).toBe(true);
+      expect(isSystemApp("finder")).toBe(true);
+      expect(isSystemApp("Finder")).toBe(true);
     });
   });
 });

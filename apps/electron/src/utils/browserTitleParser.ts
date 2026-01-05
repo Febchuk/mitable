@@ -57,6 +57,32 @@ const BROWSER_PATTERNS = [
   "arc",
 ];
 
+/**
+ * System apps that should be hidden from the watch list by default
+ * These are macOS system utilities that users typically don't want to monitor
+ */
+const SYSTEM_APPS = [
+  "finder",
+  "notification center",
+  "system preferences",
+  "system settings",
+  "control center",
+  "spotlight",
+  "launchpad",
+  "mission control",
+  "dock",
+  "loginwindow",
+  "screencaptureui",
+  "securityagent",
+  "universalcontrol",
+  "coreservicesuiagent",
+  "usereventsagent",
+  "airplayuiagent",
+  "textinputmenuagent",
+  "talagent",
+  "wallpaper",
+];
+
 export interface ParsedBrowserTitle {
   tabTitle: string; // The extracted page/tab title
   browserDisplayName: string; // Short browser name (e.g., "Chrome")
@@ -70,6 +96,14 @@ export interface ParsedBrowserTitle {
 export function isBrowserApp(appName: string): boolean {
   const normalized = appName.toLowerCase();
   return BROWSER_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
+/**
+ * Check if an app name is a system utility that should be hidden from watch list
+ */
+export function isSystemApp(appName: string): boolean {
+  const normalized = appName.toLowerCase();
+  return SYSTEM_APPS.some((pattern) => normalized.includes(pattern));
 }
 
 /**
