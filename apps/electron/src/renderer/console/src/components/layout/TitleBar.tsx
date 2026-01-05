@@ -8,6 +8,8 @@ import {
 import { ChevronDown, Monitor, PanelLeft, Shield } from "lucide-react";
 import { useSidebar } from "../../context/SidebarContext";
 import { useUser } from "../../context/UserContext";
+import { useSubscription } from "@/console/src/hooks/queries/billing";
+import TierBadge from "@/console/src/components/billing/TierBadge";
 
 import { useNavigate } from "react-router-dom";
 
@@ -18,9 +20,11 @@ export default function TitleBar() {
   const { user, updateUser } = useUser();
   const { toggle } = useSidebar();
   const navigate = useNavigate();
+  const { data: subscriptionData } = useSubscription();
 
   // Only show switcher if user is actually an admin
   const canSwitchRoles = user?.role === "admin" || user?.originalRole === "admin";
+  const tier = subscriptionData?.subscription?.tier;
 
   const handleRoleChange = (role: "admin" | "employee") => {
     if (user) {
@@ -58,6 +62,9 @@ export default function TitleBar() {
             <PanelLeft className="w-3.5 h-3.5" />
           </Button>
         </div>
+        <div className="app-no-drag">
+          {tier && <TierBadge tier={tier} className="my-1" />}
+        </div>
       </div>
     );
   }
@@ -77,7 +84,8 @@ export default function TitleBar() {
         </Button>
       </div>
 
-      <div className="app-no-drag">
+      <div className="app-no-drag flex items-center gap-2">
+        {tier && <TierBadge tier={tier} className="my-1" />}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
