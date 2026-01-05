@@ -28,7 +28,8 @@ jobs:
           npm ci || npm install
           # Ensure native binaries are present (npm optional deps bug workaround)
           npm ls @rollup/rollup-linux-x64-gnu 2>/dev/null || npm install @rollup/rollup-linux-x64-gnu --save-optional
-          npm ls sharp 2>/dev/null || npm install --os=linux --cpu=x64 sharp
+          # Rebuild sharp to ensure native binaries are present
+          npm rebuild sharp || npm install sharp --force
 
       - name: Build shared package
         run: npm run build --workspace=packages/shared
