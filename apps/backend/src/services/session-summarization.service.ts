@@ -1052,8 +1052,13 @@ Style guidelines:
 - Mention specific artifacts when relevant (PRs, tickets, documents)
 - Connect the dots between episodes when there's a logical flow
 
-Example tone:
-"Merged the auth refactor PR and cut a release today. This unblocks the team to start testing the new login flow. Also responded to a few customer support tickets about the password reset issue."
+Example summaries (match this tone and structure):
+
+"Wrapped up the dashboard redesign and pushed it to staging. Design team can now review before next sprint. Also knocked out a few bug fixes from the backlog."
+
+"Spent most of the session debugging the payment flow - found the issue was a missing null check. Shipped the fix and verified in production."
+
+"Deep work on the API documentation today. Got through the auth endpoints and started on webhooks. Should finish tomorrow."
 
 Also extract:
 - Top 3 key activities (what you actually accomplished)
@@ -1107,7 +1112,8 @@ Respond with JSON:
     }
 
     return {
-      narrativeSummary: parsed.narrativeSummary || "Work session completed.",
+      narrativeSummary:
+        parsed.narrativeSummary || this.generateFallbackSummary(aggregated, timeBreakdown),
       activities: parsed.activities || aggregated.map((a) => a.activity).slice(0, 5),
       timeBreakdown,
       keyActivities,
@@ -1116,6 +1122,21 @@ Respond with JSON:
       modelUsed: SUMMARIZATION_CONFIG.TEXT_MODEL,
       tokenCount: completion.usage?.total_tokens || 0,
     };
+  }
+
+  /**
+   * Generate a fallback summary from actual session data when AI generation fails
+   */
+  private generateFallbackSummary(
+    activities: AggregatedActivity[],
+    timeBreakdown: Record<string, number>
+  ): string {
+    const topApp = Object.entries(timeBreakdown)
+      .sort((a, b) => b[1] - a[1])[0]?.[0];
+
+    const topActivity = activities[0]?.activity || "various tasks";
+
+    return `Work session focused on ${topActivity}${topApp ? ` in ${topApp}` : ""}.`;
   }
 
   /**
