@@ -38,6 +38,7 @@ out/
 !package-lock.json
 !tsconfig.json
 !**/tsconfig*.json
+!railway.json
 
 # Logs
 logs
