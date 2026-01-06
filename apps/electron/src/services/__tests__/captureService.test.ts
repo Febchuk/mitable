@@ -391,23 +391,15 @@ describe("CaptureService", () => {
     it("should handle desktopCapturer errors gracefully", async () => {
       mockDesktopCapturer.getSources.mockRejectedValue(new Error("Permission denied"));
 
-      try {
-        await mockDesktopCapturer.getSources({ types: ["screen"] });
-        expect.fail("Should have thrown error");
-      } catch (error: any) {
-        expect(error.message).toBe("Permission denied");
-      }
+      await expect(mockDesktopCapturer.getSources({ types: ["screen"] })).rejects.toThrow(
+        "Permission denied"
+      );
     });
 
     it("should handle file system errors during cleanup", async () => {
       mockFs.unlink.mockRejectedValue(new Error("File not found"));
 
-      try {
-        await mockFs.unlink("/tmp/nonexistent.png");
-        expect.fail("Should have thrown error");
-      } catch (error: any) {
-        expect(error.message).toBe("File not found");
-      }
+      await expect(mockFs.unlink("/tmp/nonexistent.png")).rejects.toThrow("File not found");
     });
   });
 

@@ -50,7 +50,7 @@ class RecoveryManager {
    */
   private setupIpcHandlers(): void {
     // Get incomplete sessions for recovery dialog
-    ipcMain.handle(IPC_CHANNELS.SESSION_GET_INCOMPLETE, async () => {
+    ipcMain.handle(IPC_CHANNELS.SESSION_GET_RECOVERABLE, async () => {
       return this.getRecoveryOptions();
     });
 
@@ -62,16 +62,6 @@ class RecoveryManager {
     // Discard a session
     ipcMain.handle(IPC_CHANNELS.SESSION_DISCARD, async (_event, sessionId: string) => {
       return this.discardSession(sessionId);
-    });
-
-    // Recover all sessions
-    ipcMain.handle(IPC_CHANNELS.SESSION_RECOVER_ALL, async () => {
-      return this.recoverAllSessions();
-    });
-
-    // Discard all sessions
-    ipcMain.handle(IPC_CHANNELS.SESSION_DISCARD_ALL, async () => {
-      return this.discardAllSessions();
     });
   }
 
