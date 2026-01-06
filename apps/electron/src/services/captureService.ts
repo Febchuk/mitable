@@ -14,6 +14,9 @@ import { join } from "path";
 import { tmpdir } from "os";
 import crypto from "crypto";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger("CaptureService");
 import type {
   MultiWindowCaptureResult,
   WindowScreenshot,
@@ -108,7 +111,7 @@ class CaptureService {
 
   constructor() {
     this.startCleanupInterval();
-    console.log("[CaptureService] Initialized");
+    logger.info(" Initialized");
   }
 
   /**
@@ -140,7 +143,7 @@ class CaptureService {
       });
 
       if (allSources.length === 0) {
-        console.log("[CaptureService] No window sources found");
+        logger.info(" No window sources found");
         return {
           success: false,
           error: "No windows detected on your desktop",
@@ -148,7 +151,7 @@ class CaptureService {
         };
       }
 
-      console.log(`[CaptureService] Detected ${allSources.length} visible windows`);
+      logger.info(` Detected ${allSources.length} visible windows`);
 
       // STEP 2: Filter by capture policy IMMEDIATELY (discard blocked thumbnails)
       const policy = getCapturePolicy();
@@ -170,17 +173,17 @@ class CaptureService {
             reason: policyDecision.reason || "Blocked by capture policy",
           });
 
-          console.log(`[CaptureService] 🚫 Blocked: ${source.name} (${policyDecision.reason})`);
+          logger.info(` 🚫 Blocked: ${source.name} (${policyDecision.reason})`);
           // Thumbnail is not stored - will be garbage collected
         } else {
           // Keep allowed window
           allowedWindows.push(source);
-          console.log(`[CaptureService] ✅ Allowed: ${source.name}`);
+          logger.info(` ✅ Allowed: ${source.name}`);
         }
       }
 
       if (allowedWindows.length === 0) {
-        console.log("[CaptureService] All windows blocked by policy");
+        logger.info(" All windows blocked by policy");
         return {
           success: false,
           error: `All ${allSources.length} detected windows are blocked by your organization's capture policy`,
@@ -204,14 +207,14 @@ class CaptureService {
           );
         });
 
-        console.log(
-          `[CaptureService] Filtered to ${windowsToCapture.length} windows matching allowed IDs: ${allowedWindowIds.join(
+        logger.info(
+          `Filtered to ${windowsToCapture.length} windows matching allowed IDs: ${allowedWindowIds.join(
             ", "
           )}`
         );
       }
 
-      console.log(`[CaptureService] Capturing ${windowsToCapture.length} windows`);
+      logger.info(` Capturing ${windowsToCapture.length} windows`);
 
       // STEP 4: Process each window into WindowScreenshot format
       const screenshots: WindowScreenshot[] = [];
@@ -263,7 +266,7 @@ class CaptureService {
         captureTimestamp: Date.now(),
       };
     } catch (error) {
-      console.error("[CaptureService] Multi-window capture failed:", error);
+      logger.error(" Multi-window capture failed:", error);
       return {
         success: false,
         error: `Failed to capture windows: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -324,7 +327,7 @@ class CaptureService {
       newWidth = Math.round(newHeight * aspectRatio);
     }
 
-    console.log("[CaptureService] Resizing image:", {
+    logger.info(" Resizing image:", {
       original: { width, height },
       resized: { width: newWidth, height: newHeight },
     });
@@ -365,7 +368,7 @@ class CaptureService {
       await this.cleanupOldestFile();
     }
 
-    console.log("[CaptureService] Saved to temp:", {
+    logger.info(" Saved to temp:", {
       fileId,
       filePath,
       size: pngBuffer.length,
@@ -434,9 +437,9 @@ class CaptureService {
     try {
       await fs.unlink(fileInfo.filePath);
       this.tempFiles.delete(fileId);
-      console.log("[CaptureService] Cleaned up temp file:", fileId);
+      logger.info(" Cleaned up temp file:", fileId);
     } catch (error) {
-      console.error("[CaptureService] Failed to cleanup temp file:", fileId, error);
+      logger.error(" Failed to cleanup temp file:", fileId, error);
     }
   }
 
@@ -473,7 +476,7 @@ class CaptureService {
     }
 
     if (expiredFiles.length > 0) {
-      console.log(`[CaptureService] Cleaning up ${expiredFiles.length} expired temp file(s)`);
+      logger.info(` Cleaning up ${expiredFiles.length} expired temp file(s)`);
       await Promise.all(expiredFiles.map((fileId) => this.cleanupTemp(fileId)));
     }
   }
@@ -482,7 +485,7 @@ class CaptureService {
    * Clean up all temp files (for graceful shutdown)
    */
   async cleanupAll(): Promise<void> {
-    console.log(`[CaptureService] Cleaning up all ${this.tempFiles.size} temp file(s)`);
+    logger.info(` Cleaning up all ${this.tempFiles.size} temp file(s)`);
     const fileIds = Array.from(this.tempFiles.keys());
     await Promise.all(fileIds.map((fileId) => this.cleanupTemp(fileId)));
   }
@@ -495,7 +498,7 @@ class CaptureService {
       await this.cleanupExpiredFiles();
     }, this.CLEANUP_INTERVAL_MS);
 
-    console.log("[CaptureService] Started cleanup interval");
+    logger.info(" Started cleanup interval");
   }
 
   /**
@@ -505,7 +508,7 @@ class CaptureService {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
-      console.log("[CaptureService] Stopped cleanup interval");
+      logger.info(" Stopped cleanup interval");
     }
   }
 
@@ -542,7 +545,7 @@ class CaptureService {
    */
   cacheScreenshot(appName: string, screenshot: CachedScreenshot): void {
     this.screenshotCache.set(appName.toLowerCase(), screenshot);
-    console.log(`[CaptureService] Cached screenshot for ${appName}`);
+    logger.info(` Cached screenshot for ${appName}`);
   }
 
   /**
@@ -563,7 +566,7 @@ class CaptureService {
   clearCachedScreenshot(appName: string): void {
     const deleted = this.screenshotCache.delete(appName.toLowerCase());
     if (deleted) {
-      console.log(`[CaptureService] Cleared cached screenshot for ${appName}`);
+      logger.info(` Cleared cached screenshot for ${appName}`);
     }
   }
 
@@ -573,7 +576,7 @@ class CaptureService {
   clearAllCachedScreenshots(): void {
     const count = this.screenshotCache.size;
     this.screenshotCache.clear();
-    console.log(`[CaptureService] Cleared all ${count} cached screenshots`);
+    logger.info(` Cleared all ${count} cached screenshots`);
   }
 
   /**
@@ -624,7 +627,7 @@ class CaptureService {
           },
         });
 
-        console.log(`[CaptureService] Fresh screenshot for ${screenshot.windowTitle}`);
+        logger.info(` Fresh screenshot for ${screenshot.windowTitle}`);
       }
     }
 
@@ -650,9 +653,9 @@ class CaptureService {
               },
             },
           });
-          console.log(`[CaptureService] Using cached screenshot for ${app.windowTitle}`);
+          logger.info(` Using cached screenshot for ${app.windowTitle}`);
         } else {
-          console.log(`[CaptureService] No fresh or cached screenshot for ${app.windowTitle}`);
+          logger.info(` No fresh or cached screenshot for ${app.windowTitle}`);
         }
       }
     }
@@ -707,8 +710,8 @@ class CaptureService {
             },
           },
         });
-        console.log(
-          `[CaptureService] Using cached screenshot for ${app.windowTitle} (fresh failed)`
+        logger.info(
+          `Using cached screenshot for ${app.windowTitle} (fresh failed)`
         );
       }
     }
@@ -745,13 +748,13 @@ export const captureService = new CaptureService();
  * Clean up on graceful shutdown
  */
 process.on("SIGINT", async () => {
-  console.log("[CaptureService] Received SIGINT, cleaning up...");
+  logger.info(" Received SIGINT, cleaning up...");
   captureService.stopCleanup();
   await captureService.cleanupAll();
 });
 
 process.on("SIGTERM", async () => {
-  console.log("[CaptureService] Received SIGTERM, cleaning up...");
+  logger.info(" Received SIGTERM, cleaning up...");
   captureService.stopCleanup();
   await captureService.cleanupAll();
 });

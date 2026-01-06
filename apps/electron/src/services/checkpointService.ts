@@ -12,6 +12,9 @@
 import { app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger("CheckpointService");
 
 export interface SessionCheckpoint {
   sessionId: string;
@@ -112,7 +115,7 @@ class CheckpointService {
     // Start auto-checkpoint timer
     this.startAutoCheckpoint();
 
-    console.log(`[Checkpoint] Session ${checkpoint.sessionId} started`);
+    logger.info(` Session ${checkpoint.sessionId} started`);
   }
 
   /**
@@ -145,7 +148,7 @@ class CheckpointService {
     await this.saveCheckpoint();
     this.stopAutoCheckpoint();
 
-    console.log(`[Checkpoint] Session ${this.currentCheckpoint.sessionId} paused`);
+    logger.info(` Session ${this.currentCheckpoint.sessionId} paused`);
   }
 
   /**
@@ -161,7 +164,7 @@ class CheckpointService {
     await this.saveCheckpoint();
     this.startAutoCheckpoint();
 
-    console.log(`[Checkpoint] Session ${this.currentCheckpoint.sessionId} resumed`);
+    logger.info(` Session ${this.currentCheckpoint.sessionId} resumed`);
   }
 
   /**
@@ -179,14 +182,14 @@ class CheckpointService {
         await fs.promises.unlink(checkpointPath);
       }
     } catch (error) {
-      console.error(`[Checkpoint] Failed to remove checkpoint for ${sessionId}:`, error);
+      logger.error(` Failed to remove checkpoint for ${sessionId}:`, error);
     }
 
     this.currentCheckpoint = null;
     this.framesSinceCheckpoint = 0;
     this.stopAutoCheckpoint();
 
-    console.log(`[Checkpoint] Session ${sessionId} ended, checkpoint removed`);
+    logger.info(` Session ${sessionId} ended, checkpoint removed`);
   }
 
   /**
@@ -202,12 +205,12 @@ class CheckpointService {
     try {
       const data = JSON.stringify(this.currentCheckpoint, null, 2);
       await fs.promises.writeFile(checkpointPath, data, "utf-8");
-      console.log(
+      logger.info(
         `[Checkpoint] Saved checkpoint for session ${this.currentCheckpoint.sessionId} ` +
           `(frame ${this.currentCheckpoint.frameCount})`
       );
     } catch (error) {
-      console.error("[Checkpoint] Failed to save checkpoint:", error);
+      logger.error(" Failed to save checkpoint:", error);
     }
   }
 
@@ -225,7 +228,7 @@ class CheckpointService {
       const data = await fs.promises.readFile(checkpointPath, "utf-8");
       return JSON.parse(data) as SessionCheckpoint;
     } catch (error) {
-      console.error(`[Checkpoint] Failed to load checkpoint for ${sessionId}:`, error);
+      logger.error(` Failed to load checkpoint for ${sessionId}:`, error);
       return null;
     }
   }
@@ -247,12 +250,12 @@ class CheckpointService {
             const checkpoint = JSON.parse(data) as SessionCheckpoint;
             checkpoints.push(checkpoint);
           } catch (err) {
-            console.warn(`[Checkpoint] Failed to read ${file}:`, err);
+            logger.warn(` Failed to read ${file}:`, err);
           }
         }
       }
     } catch (error) {
-      console.error("[Checkpoint] Failed to read checkpoints directory:", error);
+      logger.error(" Failed to read checkpoints directory:", error);
     }
 
     return checkpoints;
@@ -267,10 +270,10 @@ class CheckpointService {
     try {
       if (fs.existsSync(checkpointPath)) {
         await fs.promises.unlink(checkpointPath);
-        console.log(`[Checkpoint] Discarded checkpoint for session ${sessionId}`);
+        logger.info(` Discarded checkpoint for session ${sessionId}`);
       }
     } catch (error) {
-      console.error(`[Checkpoint] Failed to discard checkpoint for ${sessionId}:`, error);
+      logger.error(` Failed to discard checkpoint for ${sessionId}:`, error);
     }
   }
 
@@ -284,7 +287,7 @@ class CheckpointService {
       this.currentCheckpoint = checkpoint;
       this.framesSinceCheckpoint = 0;
       this.startAutoCheckpoint();
-      console.log(`[Checkpoint] Restored session ${sessionId} from checkpoint`);
+      logger.info(` Restored session ${sessionId} from checkpoint`);
     }
 
     return checkpoint;

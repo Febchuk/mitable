@@ -1,6 +1,9 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { authService } from "../services/authService";
 import type { User } from "../types";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger("UserContext");
 
 interface UserContextType {
   user: User | null;
@@ -57,7 +60,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
           authService.saveTokens(token, refreshToken);
         }
       } catch (error) {
-        console.error("Failed to load user:", error);
+        logger.error("Failed to load user:", error);
         // Token might be expired, try to refresh
         const refreshToken = authService.getRefreshToken();
         if (refreshToken) {
@@ -89,7 +92,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
               });
             }
           } catch (refreshError) {
-            console.error("Failed to refresh token:", refreshError);
+            logger.error("Failed to refresh token:", refreshError);
             authService.clearTokens();
           }
         } else {
@@ -114,12 +117,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (!refreshToken) return;
 
       try {
-        console.log("[Auth] Background token refresh triggered");
+        logger.info("Background token refresh triggered");
         const response = await authService.refreshToken(refreshToken);
         authService.saveTokens(response.session.access_token, response.session.refresh_token);
-        console.log("[Auth] Token refreshed successfully");
+        logger.info("Token refreshed successfully");
       } catch (error) {
-        console.error("[Auth] Background token refresh failed:", error);
+        logger.error("Background token refresh failed:", error);
         // Silent logout on refresh failure
         authService.clearTokens();
         setUser(null);
@@ -141,7 +144,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       try {
         await authService.logout(token);
       } catch (error) {
-        console.error("Logout error:", error);
+        logger.error("Logout error:", error);
       }
     }
     authService.clearTokens();

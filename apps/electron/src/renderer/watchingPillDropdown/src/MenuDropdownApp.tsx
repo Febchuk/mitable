@@ -15,6 +15,12 @@ export default function MenuDropdownApp() {
 
   // Listen for data from main process
   useEffect(() => {
+    // Skip if preload API not ready
+    if (!window.dropdownAPI) {
+      console.warn("[MenuDropdownApp] dropdownAPI not available");
+      return;
+    }
+
     const unsubscribe = window.dropdownAPI.onData((data) => {
       if (data.type === "menu") {
         setSessionState(data.sessionState);
@@ -26,8 +32,8 @@ export default function MenuDropdownApp() {
   }, []);
 
   const handleAction = async (actionType: string) => {
-    await window.dropdownAPI.action(actionType);
-    window.dropdownAPI.closeMenuDropdown();
+    await window.dropdownAPI?.action(actionType);
+    window.dropdownAPI?.closeMenuDropdown();
   };
 
   return (

@@ -14,6 +14,9 @@
 import * as React from "react";
 
 import type { Value } from "platejs";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger("DocEditor");
 import type { PlateEditor } from "platejs/react";
 
 import { normalizeNodeId } from "platejs";
@@ -83,7 +86,7 @@ export function DocEditor({
         editor.tf.reset();
         editor.tf.setValue(normalizeNodeId(value as Value));
       } catch (error) {
-        console.error("Error loading markdown content:", error);
+        logger.error("Error loading markdown content:", error);
       }
     }
   }, []); // Only run once on mount
@@ -109,7 +112,7 @@ export function DocEditor({
             onChange(markdown);
           }
         } catch (error) {
-          console.error("Error converting to markdown:", error);
+          logger.error("Error converting to markdown:", error);
         }
       }, autosaveDelay);
     },
@@ -128,7 +131,7 @@ export function DocEditor({
             lastSavedContentRef.current = markdown;
             onSave(markdown);
           } catch (error) {
-            console.error("Error saving markdown:", error);
+            logger.error("Error saving markdown:", error);
           }
         }
       }

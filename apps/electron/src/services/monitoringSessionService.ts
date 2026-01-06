@@ -18,7 +18,10 @@
 
 import { BrowserWindow } from "electron";
 import crypto from "crypto";
+import { createLogger } from "../lib/logger";
 import { captureService } from "./captureService";
+
+const logger = createLogger("MonitoringSession");
 import { localFrameStorage, type FrameMetadata } from "./localFrameStorage";
 import { checkpointService } from "./checkpointService";
 import { authManager } from "./authManager";
@@ -63,7 +66,7 @@ class MonitoringSessionService {
   private captureTimer: NodeJS.Timeout | null = null;
 
   constructor() {
-    console.log(
+    logger.info(
       "[MonitoringSessionService] Initialized with LocalFrameStorage + CheckpointService"
     );
   }
@@ -121,7 +124,7 @@ class MonitoringSessionService {
         })),
       });
 
-      console.log(`[MonitoringSessionService] Session folder created: ${localPath}`);
+      logger.info(` Session folder created: ${localPath}`);
 
       // Initialize active session
       const startedAt = Date.now();
@@ -163,14 +166,14 @@ class MonitoringSessionService {
       // Broadcast session started
       this.broadcastSessionUpdate();
 
-      console.log(`[MonitoringSessionService] Session started: ${sessionId}`, {
+      logger.info(` Session started: ${sessionId}`, {
         windowCount: config.selectedWindows.length,
         intervalMs: config.captureIntervalMs,
       });
 
       return { sessionId };
     } catch (error) {
-      console.error("[MonitoringSessionService] Failed to start session:", error);
+      logger.error(" Failed to start session:", error);
       return {
         sessionId: "",
         error: `Failed to start session: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -209,7 +212,7 @@ class MonitoringSessionService {
     // Broadcast update
     this.broadcastSessionUpdate();
 
-    console.log(`[MonitoringSessionService] Session paused: ${this.activeSession.id}`);
+    logger.info(` Session paused: ${this.activeSession.id}`);
 
     return { success: true };
   }
@@ -253,7 +256,7 @@ class MonitoringSessionService {
     // Broadcast update
     this.broadcastSessionUpdate();
 
-    console.log(`[MonitoringSessionService] Session resumed: ${this.activeSession.id}`);
+    logger.info(` Session resumed: ${this.activeSession.id}`);
 
     return { success: true };
   }
@@ -352,7 +355,7 @@ class MonitoringSessionService {
       // Broadcast update
       this.broadcastSessionUpdate();
 
-      console.log(`[MonitoringSessionService] Session ended: ${sessionId}`, {
+      logger.info(` Session ended: ${sessionId}`, {
         totalCaptureCount: captureCount,
         uploadCount: captures.length,
         duration: Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs,
@@ -371,7 +374,7 @@ class MonitoringSessionService {
 
       return { success: true, sessionId, captureCount, captures };
     } catch (error) {
-      console.error("[MonitoringSessionService] Failed to end session:", error);
+      logger.error(" Failed to end session:", error);
       return {
         success: false,
         error: `Failed to end session: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -387,7 +390,7 @@ class MonitoringSessionService {
     this.stopCaptureLoop();
     this.activeSession = null;
     this.broadcastSessionUpdate();
-    console.log("[MonitoringSessionService] Session reset (external deletion)");
+    logger.info(" Session reset (external deletion)");
   }
 
   /**
@@ -477,14 +480,14 @@ class MonitoringSessionService {
       // Broadcast update
       this.broadcastSessionUpdate();
 
-      console.log(`[MonitoringSessionService] Session recovered: ${sessionId}`, {
+      logger.info(` Session recovered: ${sessionId}`, {
         frameCount: checkpoint.frameCount,
         status: checkpoint.status,
       });
 
       return { success: true };
     } catch (error) {
-      console.error("[MonitoringSessionService] Failed to recover session:", error);
+      logger.error(" Failed to recover session:", error);
       return {
         success: false,
         error: `Failed to recover session: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -498,7 +501,7 @@ class MonitoringSessionService {
   async discardRecoverableSession(sessionId: string): Promise<void> {
     await checkpointService.discardCheckpoint(sessionId);
     await localFrameStorage.deleteSession(sessionId);
-    console.log(`[MonitoringSessionService] Discarded recoverable session: ${sessionId}`);
+    logger.info(` Discarded recoverable session: ${sessionId}`);
   }
 
   /**
@@ -545,7 +548,7 @@ class MonitoringSessionService {
       }
     }, intervalMs);
 
-    console.log(`[MonitoringSessionService] Capture loop started (interval: ${intervalMs}ms)`);
+    logger.info(` Capture loop started (interval: ${intervalMs}ms)`);
   }
 
   /**
@@ -556,7 +559,7 @@ class MonitoringSessionService {
       clearInterval(this.captureTimer);
       this.captureTimer = null;
     }
-    console.log("[MonitoringSessionService] Capture loop stopped");
+    logger.info(" Capture loop stopped");
   }
 
   /**
@@ -576,7 +579,7 @@ class MonitoringSessionService {
       const result = await captureService.captureVisibleWindows(false, selectedWindowIds);
 
       if (!result.success) {
-        console.warn("[MonitoringSessionService] Capture failed:", result.error);
+        logger.warn(" Capture failed:", result.error);
         return;
       }
 
@@ -588,7 +591,7 @@ class MonitoringSessionService {
       // Broadcast capture progress
       this.broadcastCaptureProgress();
     } catch (error) {
-      console.error("[MonitoringSessionService] Error capturing windows:", error);
+      logger.error(" Error capturing windows:", error);
     }
   }
 
@@ -611,7 +614,7 @@ class MonitoringSessionService {
     const isDuplicate = hash === lastHashForWindow;
 
     if (isDuplicate && trigger === "periodic") {
-      console.log(
+      logger.info(
         `[MonitoringSessionService] Skipping duplicate capture for window: ${screenshot.windowId}`
       );
       return;
@@ -645,7 +648,7 @@ class MonitoringSessionService {
       // Update checkpoint
       await checkpointService.onFrameCaptured(frameMetadata.frameId, frameMetadata.timestamp);
 
-      console.log(`[MonitoringSessionService] Capture saved: ${frameMetadata.frameId}`, {
+      logger.info(` Capture saved: ${frameMetadata.frameId}`, {
         sequenceNumber: frameMetadata.sequenceNumber,
         trigger,
         app: screenshot.appName,
@@ -664,7 +667,7 @@ class MonitoringSessionService {
         }
       );
     } catch (error) {
-      console.error("[MonitoringSessionService] Error saving capture:", error);
+      logger.error(" Error saving capture:", error);
     }
   }
 
@@ -680,7 +683,7 @@ class MonitoringSessionService {
   ): Promise<void> {
     // Don't attempt analysis if no auth token
     if (!authManager.getAccessToken()) {
-      console.log("[MonitoringSessionService] Skipping analysis - no auth token");
+      logger.info(" Skipping analysis - no auth token");
       return;
     }
 
@@ -701,7 +704,7 @@ class MonitoringSessionService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.warn(
+        logger.warn(
           `[MonitoringSessionService] Frame analysis failed: ${response.status}`,
           errorText
         );
@@ -723,14 +726,14 @@ class MonitoringSessionService {
           importanceReason: result.analysis.importanceReason,
         });
 
-        console.log(`[MonitoringSessionService] Frame analyzed: ${frameId}`, {
+        logger.info(` Frame analyzed: ${frameId}`, {
           deltaChangeType: result.analysis.deltaChangeType,
           importanceScore: result.analysis.importanceScore,
         });
       }
     } catch (error) {
       // Log but don't throw - analysis failure shouldn't stop session
-      console.error("[MonitoringSessionService] Error analyzing frame:", error);
+      logger.error(" Error analyzing frame:", error);
     }
   }
 
@@ -814,7 +817,7 @@ class MonitoringSessionService {
       selectedIds.add(frame.frameId);
     }
 
-    console.log(
+    logger.info(
       `[MonitoringSessionService] Selected ${selectedIds.size} top-K frames from ${frames.length} total`,
       {
         firstFrameId: firstFrame.frameId,
@@ -840,9 +843,9 @@ class MonitoringSessionService {
   private async cleanupSessionFiles(sessionId: string): Promise<void> {
     try {
       await localFrameStorage.deleteSession(sessionId);
-      console.log(`[MonitoringSessionService] Cleaned up session: ${sessionId}`);
+      logger.info(` Cleaned up session: ${sessionId}`);
     } catch (error) {
-      console.error("[MonitoringSessionService] Error cleaning up session:", error);
+      logger.error(" Error cleaning up session:", error);
     }
   }
 

@@ -6,6 +6,9 @@
  */
 
 import type { MultiWindowCaptureResult, WindowScreenshot } from "@mitable/shared";
+import { createLogger } from "../logger";
+
+const logger = createLogger("ConversationsAPI");
 
 // Message type (formerly from conversation renderer)
 interface MessageType {
@@ -69,10 +72,10 @@ export async function createConversation(
   title: string = "New Conversation",
   initialMessage?: string
 ): Promise<Conversation> {
-  console.log("[API] Creating conversation:", { title, initialMessage });
+  logger.info(" Creating conversation:", { title, initialMessage });
 
   const headers = await getAuthHeaders();
-  console.log("[API] Auth headers obtained");
+  logger.info(" Auth headers obtained");
 
   const response = await fetch(`${API_BASE_URL}/api/conversations`, {
     method: "POST",
@@ -84,14 +87,14 @@ export async function createConversation(
     }),
   });
 
-  console.log("[API] Conversation creation response:", {
+  logger.info(" Conversation creation response:", {
     status: response.status,
     ok: response.ok,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("[API] ❌ Failed to create conversation:", {
+    logger.error(" ❌ Failed to create conversation:", {
       status: response.status,
       statusText: response.statusText,
       error: errorText,
@@ -100,7 +103,7 @@ export async function createConversation(
   }
 
   const data = await response.json();
-  console.log("[API] ✅ Conversation created:", data.conversation);
+  logger.info(" ✅ Conversation created:", data.conversation);
   return data.conversation;
 }
 
@@ -233,24 +236,24 @@ export async function sendMessageStream(
   if (multiWindowCapture && multiWindowCapture.success && multiWindowCapture.screenshots.length) {
     screenshotsPayload = multiWindowCapture.screenshots;
 
-    console.log("[API] Sending multi-window capture payload:", {
+    logger.info(" Sending multi-window capture payload:", {
       screenshotCount: screenshotsPayload.length,
       apps: screenshotsPayload.map((s) => s.appName).join(", "),
     });
   } else if (multiWindowCapture && !multiWindowCapture.success) {
-    console.log("[API] Screenshot capture blocked or failed:", multiWindowCapture.error);
+    logger.info(" Screenshot capture blocked or failed:", multiWindowCapture.error);
   } else {
-    console.log("[API] Sending message without screenshots");
+    logger.info(" Sending message without screenshots");
   }
 
-  console.log("[API] 📨 Starting message stream:", {
+  logger.info(" 📨 Starting message stream:", {
     conversationId,
     contentLength: content.length,
     screenshotCount: screenshotsPayload?.length || 0,
   });
 
   const headers = await getAuthHeaders();
-  console.log("[API] Auth headers obtained for streaming");
+  logger.info(" Auth headers obtained for streaming");
 
   // Build request body with optional screenshots and metadata
   const requestBody: {
@@ -265,7 +268,7 @@ export async function sendMessageStream(
 
   if (metadata) {
     requestBody.metadata = metadata;
-    console.log("[API] Sending message with metadata:", metadata);
+    logger.info(" Sending message with metadata:", metadata);
   }
 
   const response = await fetch(
@@ -389,18 +392,18 @@ export async function sendMessageStream(
               }
 
               default: {
-                console.warn("[API] Unknown chunk type received:", chunk.type, chunk);
+                logger.warn(" Unknown chunk type received:", chunk.type, chunk);
               }
             }
           } catch (parseError) {
-            console.error("[API] Failed to parse SSE data:", parseError, data);
+            logger.error(" Failed to parse SSE data:", parseError, data);
           }
         }
       }
     }
 
     if (!fullContent) {
-      console.error("[API] ❌ No content received from backend");
+      logger.error(" ❌ No content received from backend");
       callbacks.onError?.("No content received from backend");
       return;
     }
@@ -417,7 +420,7 @@ export async function sendMessageStream(
       );
     }
   } catch (error) {
-    console.error("Stream reading error:", error);
+    logger.error("Stream reading error:", error);
     callbacks.onError?.(error instanceof Error ? error.message : "Stream reading error");
   }
 }

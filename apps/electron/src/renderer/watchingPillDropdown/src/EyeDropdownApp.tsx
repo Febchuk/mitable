@@ -8,6 +8,12 @@ export default function EyeDropdownApp() {
 
   // Listen for data from main process
   useEffect(() => {
+    // Skip if preload API not ready
+    if (!window.dropdownAPI) {
+      console.warn("[EyeDropdownApp] dropdownAPI not available");
+      return;
+    }
+
     const unsubscribe = window.dropdownAPI.onData((data) => {
       if (data.type === "eye") {
         setSelectedWindows(data.selectedWindows);
@@ -19,7 +25,7 @@ export default function EyeDropdownApp() {
   }, []);
 
   const handleSelectWindow = async (windowInfo: WatchableWindow) => {
-    await window.dropdownAPI.action("select-window", {
+    await window.dropdownAPI?.action("select-window", {
       windowId: windowInfo.windowId,
       appName: windowInfo.appName,
       windowTitle: windowInfo.windowTitle,
@@ -43,7 +49,7 @@ export default function EyeDropdownApp() {
   };
 
   const handleUnselectWindow = async (windowId: string) => {
-    await window.dropdownAPI.action("unselect-window", windowId);
+    await window.dropdownAPI?.action("unselect-window", windowId);
 
     // Update local state optimistically
     setSelectedWindows((prev) => prev.filter((w) => w.windowId !== windowId));

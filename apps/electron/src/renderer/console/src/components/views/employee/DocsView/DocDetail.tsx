@@ -11,6 +11,9 @@
 
 import { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("DocDetail");
 import {
   useDocument,
   useDeleteDocument,
@@ -85,7 +88,7 @@ export default function DocDetail() {
         });
         setHasUnsavedChanges(false);
       } catch (error) {
-        console.error("Autosave failed:", error);
+        logger.error("Autosave failed:", error);
         // Don't show error toast for autosave - just keep hasUnsavedChanges true
       }
     },

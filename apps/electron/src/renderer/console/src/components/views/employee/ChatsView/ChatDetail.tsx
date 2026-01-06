@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowUp, Camera } from "lucide-react";
 import { useConversationMessages, useSendMessage } from "@/console/src/hooks/queries/chats";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("ChatDetail");
 import UserMessage from "../../../../../../components/domain/messages/UserMessage";
 import AIMessage from "../../../../../../components/domain/messages/AIMessage";
 import { Button } from "@/components/ui/button";
@@ -40,7 +43,7 @@ export default function ChatDetail() {
       setStreamingContent("");
     },
     onError: (error: string) => {
-      console.error("[ChatDetail] Stream error:", error);
+      logger.error(" Stream error:", error);
       setIsStreaming(false);
       setStreamingContent("");
     },
@@ -95,17 +98,17 @@ export default function ChatDetail() {
   // Screenshot capture for testing
   const handleTestScreenshot = async () => {
     try {
-      console.log("[ChatDetail] Capturing screenshot...");
+      logger.info(" Capturing screenshot...");
       const result = await window.consoleAPI.captureScreenshot();
       if (result?.success && result.screenshots.length > 0) {
-        console.log("[ChatDetail] Screenshot captured:", {
+        logger.info(" Screenshot captured:", {
           count: result.screenshots.length,
           firstSize: result.screenshots[0].dataUrl?.substring(0, 50) + "...",
         });
         setScreenshotData(result.screenshots[0].dataUrl);
       }
     } catch (error) {
-      console.error("[ChatDetail] Screenshot error:", error);
+      logger.error(" Screenshot error:", error);
     }
   };
 

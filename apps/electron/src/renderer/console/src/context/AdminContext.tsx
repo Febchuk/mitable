@@ -10,6 +10,9 @@ import {
 } from "../services/adminService";
 import { authService } from "../services/authService";
 import { useUser } from "./UserContext";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger("AdminContext");
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -89,7 +92,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       setUsers(usersData);
       setTemplates(templatesData);
     } catch (err) {
-      console.error("Error fetching admin data:", err);
+      logger.error("Error fetching admin data:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch admin data");
     } finally {
       setLoading(false);
@@ -109,7 +112,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const connectIntegration = (id: string, token?: string) => {
     if (token) {
-      console.log(`Connecting integration ${id} with token:`, token);
+      logger.info(`Connecting integration ${id} with token:`, token);
       // TODO: Send token to backend API for validation and storage
     }
     // Don't update local state - let backend be source of truth
@@ -119,14 +122,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const disconnectIntegration = async (id: string) => {
     // Call backend disconnect endpoint (already implemented for Slack)
     // Status will be updated when we refetch
-    console.log(`Disconnect integration: ${id}`);
+    logger.info(`Disconnect integration: ${id}`);
     // Trigger refetch to get actual status from backend
     await fetchAdminData();
   };
 
   const configureIntegration = (id: string) => {
     // Placeholder for configuration modal/flow
-    console.log("Configure integration:", id);
+    logger.info("Configure integration:", id);
     // TODO: Open configuration modal or settings panel
   };
 
@@ -134,18 +137,18 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     const integration = integrations.find((i) => i.id === id);
 
     if (!integration) {
-      console.error("Integration not found:", id);
+      logger.error("Integration not found:", id);
       return;
     }
 
     // Only Slack sync is implemented for now
     if (integration.provider !== "slack") {
-      console.log("Sync not yet implemented for:", integration.provider);
+      logger.info("Sync not yet implemented for:", integration.provider);
       return;
     }
 
     try {
-      console.log("🔄 Starting Slack sync...");
+      logger.info("Starting Slack sync...");
 
       const token = authService.getAccessToken();
       if (!token) {
@@ -166,7 +169,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       }
 
       const result = await response.json();
-      console.log("✅ Sync completed:", result);
+      logger.info("Sync completed:", result);
 
       // Refresh integrations to update lastSyncedAt
       await fetchAdminData();
@@ -179,14 +182,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           `Duration: ${(result.duration / 1000).toFixed(2)}s`
       );
     } catch (error) {
-      console.error("❌ Sync failed:", error);
+      logger.error("Sync failed:", error);
       alert(`❌ Sync Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
   const viewIntegrationDetails = (id: string) => {
     // Placeholder for details view
-    console.log("View integration details:", id);
+    logger.info("View integration details:", id);
     // TODO: Open details panel or modal
   };
 

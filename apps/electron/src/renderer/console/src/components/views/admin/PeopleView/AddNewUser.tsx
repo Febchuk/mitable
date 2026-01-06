@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("AddNewUser");
 import { ArrowLeft, CalendarIcon, Check, ChevronsUpDown, Clipboard, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,7 +89,7 @@ export default function AddNewUser() {
       setPasswordCopied(true);
       setTimeout(() => setPasswordCopied(false), 2000);
     } catch (error) {
-      console.error("Failed to copy password:", error);
+      logger.error("Failed to copy password:", error);
       toast({
         title: "Error",
         description: "Failed to copy password to clipboard",
@@ -160,7 +163,7 @@ export default function AddNewUser() {
 
       // React Query auto-invalidates the users list via useCreateUser hook
     } catch (error) {
-      console.error("Error creating user:", error);
+      logger.error("Error creating user:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create user",

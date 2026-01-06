@@ -6,6 +6,9 @@
  */
 
 import { ipcMain } from "electron";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger("ActiveWindowBridge");
 // Dynamic import for active-win (ESM-only package) - used in IPC handler
 
 export type ActiveWindowInfo = {
@@ -39,7 +42,7 @@ export function registerActiveWindowIPC(): void {
         processId: activeWindow.owner?.processId,
       } as ActiveWindowInfo;
     } catch (error) {
-      console.error("[ActiveWindowBridge] Failed to get active window:", error);
+      logger.error("Failed to get active window:", error);
       return {
         title: "",
         appName: "",
@@ -47,7 +50,7 @@ export function registerActiveWindowIPC(): void {
     }
   });
 
-  console.log(`[ActiveWindowBridge] IPC handler registered on channel: ${IPC_CHANNEL}`);
+  logger.info(`IPC handler registered on channel: ${IPC_CHANNEL}`);
 }
 
 /**

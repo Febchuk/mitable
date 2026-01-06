@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger("WatchButton");
 
 interface ButtonData {
   windowId: string;
@@ -22,12 +25,12 @@ export default function App() {
 
     if (windowId && appName && windowTitle) {
       setData({ windowId, appName, windowTitle });
-      console.log("[WatchButton] Initialized with:", {
+      logger.info(" Initialized with:", {
         windowId,
         appName,
       });
     } else {
-      console.error("[WatchButton] Missing required query params");
+      logger.error(" Missing required query params");
       setStatus("error");
       setBlockMessage("Unable to identify this window. Please try again.");
     }
@@ -46,7 +49,7 @@ export default function App() {
     setBlockMessage(undefined);
 
     try {
-      console.log("[WatchButton] Button clicked - selecting window:", {
+      logger.info(" Button clicked - selecting window:", {
         windowId: data.windowId,
         appName: data.appName,
       });
@@ -67,7 +70,7 @@ export default function App() {
         );
       }
     } catch (error) {
-      console.error("[WatchButton] Failed to select window", error);
+      logger.error(" Failed to select window", error);
       setStatus("error");
       setBlockMessage(
         "Something went wrong while checking this window. Please try again or contact your admin."

@@ -1,5 +1,8 @@
 import { apiRequest } from "./api";
 import type { MultiWindowCaptureResult, WindowScreenshot } from "@mitable/shared";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger("ChatsService");
 
 export interface Message {
   id: string;
@@ -176,15 +179,15 @@ export async function sendStreamingMessage(
       if (multiWindowCapture.screenshots.length > 0) {
         screenshotsPayload = multiWindowCapture.screenshots;
 
-        console.log("[chatsService] Sending multi-window capture payload:", {
+        logger.info(" Sending multi-window capture payload:", {
           screenshotCount: screenshotsPayload.length,
           apps: screenshotsPayload.map((s) => s.appName).join(", "),
         });
       } else {
-        console.log("[chatsService] Multi-window capture had no screenshots");
+        logger.info(" Multi-window capture had no screenshots");
       }
     } else if (multiWindowCapture && !multiWindowCapture.success) {
-      console.log("[chatsService] Screenshot capture blocked or failed:", multiWindowCapture.error);
+      logger.info(" Screenshot capture blocked or failed:", multiWindowCapture.error);
     }
 
     // Build request body aligned with backend (main) contract
@@ -317,7 +320,7 @@ export async function sendStreamingMessage(
           } catch (e) {
             // Only log actual parse errors, not re-thrown errors
             if (e instanceof SyntaxError) {
-              console.warn("[chatsService] Failed to parse SSE data:", data);
+              logger.warn(" Failed to parse SSE data:", data);
             } else {
               throw e;
             }
@@ -342,7 +345,7 @@ export async function sendStreamingMessage(
       );
     }
   } catch (error) {
-    console.error("Message send error:", error);
+    logger.error("Message send error:", error);
     callbacks.onError?.(error instanceof Error ? error.message : "Failed to send message");
     throw error;
   }

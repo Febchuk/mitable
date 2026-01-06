@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from "@mitable/shared";
 import { app, BrowserWindow, globalShortcut, ipcMain, Notification, screen, shell } from "electron";
 import { join } from "path";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
+import { createLogger, initializeLogger } from "./lib/logger";
 import { isBlockedByPolicy } from "./services/capturePolicy";
 import { captureService } from "./services/captureService";
 import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
@@ -11,6 +12,21 @@ import { monitoringSessionService } from "./services/monitoringSessionService";
 import { authManager } from "./services/authManager";
 import { preferencesService } from "./services/preferencesService";
 import { updateService } from "./services/updateService";
+
+// Initialize logger before any other code runs
+initializeLogger();
+
+// Create loggers for different modules in main process
+const consoleLogger = createLogger("Console");
+const watchingPillLogger = createLogger("WatchingPill");
+const ipcLogger = createLogger("IPC");
+const authLogger = createLogger("Auth");
+const screenshotLogger = createLogger("Screenshot");
+const watchModeLogger = createLogger("WatchMode");
+const monitoringLogger = createLogger("MonitoringSession");
+const recoveryLogger = createLogger("SessionRecovery");
+const updateLogger = createLogger("Update");
+const shutdownLogger = createLogger("Shutdown");
 
 // Window references
 let consoleWindow: BrowserWindow | null = null;
@@ -38,8 +54,8 @@ const authTokens: {
 };
 
 function createConsoleWindow() {
-  console.log("[Console] Creating console window...");
-  console.log("[Console] Preload script path:", join(__dirname, "../preload/console.cjs"));
+  consoleLogger.info(" Creating console window...");
+  consoleLogger.info(" Preload script path:", join(__dirname, "../preload/console.cjs"));
 
   // Get screen dimensions for responsive window sizing
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -109,21 +125,21 @@ function createConsoleWindow() {
 
   // Log when preload script finishes loading
   consoleWindow.webContents.on("did-finish-load", () => {
-    console.log("[Console] Window finished loading - preload script should be ready");
+    consoleLogger.info(" Window finished loading - preload script should be ready");
   });
 
   // Log when DOM is ready
   consoleWindow.webContents.on("dom-ready", () => {
-    console.log("[Console] DOM ready - window.consoleAPI should be available now");
+    consoleLogger.info(" DOM ready - window.consoleAPI should be available now");
   });
 
   // Handle external links - open in default browser/app instead of new window
   consoleWindow.webContents.setWindowOpenHandler(({ url }) => {
-    console.log("[Console] External link clicked:", url);
+    consoleLogger.info(" External link clicked:", url);
 
     // Open in default browser/app (e.g., Slack links open in Slack)
     shell.openExternal(url).catch((err) => {
-      console.error("[Console] Failed to open external link:", err);
+      consoleLogger.error(" Failed to open external link:", err);
     });
 
     // Prevent Electron from creating a new window
@@ -136,7 +152,7 @@ function createConsoleWindow() {
   }
 
   if (!app.isPackaged) {
-    console.log("[Console] Loading dev URL: http://localhost:5173/console/index.html");
+    consoleLogger.info(" Loading dev URL: http://localhost:5173/console/index.html");
     consoleWindow.loadURL("http://localhost:5173/console/index.html");
     consoleWindow.webContents.openDevTools();
   } else {
@@ -195,7 +211,7 @@ function createWatchingPillWindow() {
     stopClosedWindowCheck();
   });
 
-  console.log("[WatchingPill] Window created at right edge, vertically centered");
+  watchingPillLogger.info(" Window created at right edge, vertically centered");
 
   // Start checking for closed windows
   startClosedWindowCheck();
@@ -221,11 +237,11 @@ function startClosedWindowCheck() {
         }
       }
 
-      console.log(`[ClosedWindowCheck] Notified windows of ${closedWindows.length} closed windows`);
+      watchModeLogger.info(` Notified windows of ${closedWindows.length} closed windows`);
     }
   }, 2000); // Check every 2 seconds
 
-  console.log("[ClosedWindowCheck] Started periodic check for closed windows");
+  watchModeLogger.info(" Started periodic check for closed windows");
 }
 
 /**
@@ -235,7 +251,7 @@ function stopClosedWindowCheck() {
   if (closedWindowCheckInterval) {
     clearInterval(closedWindowCheckInterval);
     closedWindowCheckInterval = null;
-    console.log("[ClosedWindowCheck] Stopped periodic check");
+    watchModeLogger.info(" Stopped periodic check");
   }
 }
 
@@ -353,7 +369,7 @@ function createWatchingPillMenuDropdown() {
 
 // IPC Handlers
 function setupIPC() {
-  console.log("[IPC] Setting up IPC handlers...");
+  ipcLogger.info(" Setting up IPC handlers...");
 
   // Minimize console window
   ipcMain.on(IPC_CHANNELS.CONSOLE_MINIMIZE, () => {
@@ -365,7 +381,7 @@ function setupIPC() {
   // Auth Management - Cross-window token sharing
   // Console sets tokens after login
   ipcMain.on(IPC_CHANNELS.AUTH_SET_TOKENS, (_event, accessToken: string, refreshToken: string) => {
-    console.log("[Auth] Tokens set from Console window");
+    authLogger.info(" Tokens set from Console window");
     authTokens.accessToken = accessToken;
     authTokens.refreshToken = refreshToken;
 
@@ -383,13 +399,13 @@ function setupIPC() {
 
   // Any window can request current auth token
   ipcMain.handle(IPC_CHANNELS.AUTH_GET_TOKEN, () => {
-    console.log("[Auth] Token requested, returning:", authTokens.accessToken ? "present" : "null");
+    authLogger.info(" Token requested, returning:", authTokens.accessToken ? "present" : "null");
     return authTokens.accessToken;
   });
 
   // Console clears tokens on logout
   ipcMain.on(IPC_CHANNELS.AUTH_CLEAR, () => {
-    console.log("[Auth] Tokens cleared");
+    authLogger.info(" Tokens cleared");
     authTokens.accessToken = null;
     authTokens.refreshToken = null;
 
@@ -411,7 +427,7 @@ function setupIPC() {
 
   // Hide watching pill
   ipcMain.on(IPC_CHANNELS.WATCHING_PILL_HIDE, () => {
-    console.log("[WatchingPill] Hide requested");
+    watchingPillLogger.info(" Hide requested");
     if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
       watchingPillWindow.hide();
     }
@@ -419,7 +435,7 @@ function setupIPC() {
 
   // Show watching pill
   ipcMain.on(IPC_CHANNELS.WATCHING_PILL_SHOW, () => {
-    console.log("[WatchingPill] Show requested");
+    watchingPillLogger.info(" Show requested");
     if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
       createWatchingPillWindow();
     }
@@ -546,7 +562,7 @@ function setupIPC() {
   ipcMain.handle(
     IPC_CHANNELS.WATCHING_PILL_DROPDOWN_ACTION,
     async (_event, action: { type: string; payload?: unknown }) => {
-      console.log("[WatchingPill] Dropdown action:", action);
+      watchingPillLogger.info(" Dropdown action:", action);
 
       switch (action.type) {
         case "select-window": {
@@ -605,7 +621,7 @@ function setupIPC() {
           try {
             // Upload captures if any exist
             if (result.captures && result.captures.length > 0) {
-              console.log(`[EndSession] Uploading ${result.captures.length} captures to backend`);
+              monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
               await authManager.authenticatedFetch(
                 `/api/monitoring/sessions/${result.sessionId}/captures`,
                 {
@@ -616,13 +632,13 @@ function setupIPC() {
             }
 
             // ALWAYS end backend session (triggers summarization)
-            console.log(`[EndSession] Triggering backend summarization`);
+            monitoringLogger.info(` Triggering backend summarization`);
             await authManager.authenticatedFetch(
               `/api/monitoring/sessions/${result.sessionId}/end`,
               { method: "POST" }
             );
           } catch (error) {
-            console.error("[EndSession] Error:", error);
+            monitoringLogger.error(" Error:", error);
           }
 
           // Hide watching pill after successful end
@@ -653,7 +669,7 @@ function setupIPC() {
 
   // Show console window
   ipcMain.on(IPC_CHANNELS.SHOW_CONSOLE, () => {
-    console.log("[Console] Show requested");
+    consoleLogger.info(" Show requested");
     if (consoleWindow && !consoleWindow.isDestroyed()) {
       consoleWindow.show();
       consoleWindow.focus();
@@ -667,7 +683,7 @@ function setupIPC() {
   ipcMain.on(
     IPC_CHANNELS.USER_CONTEXT_SET,
     (_event, user: { userId: string; organizationId: string }) => {
-      console.log("[UserContext] Set:", user);
+      consoleLogger.info(" Set:", user);
       currentUserContext = user;
     }
   );
@@ -685,7 +701,7 @@ function setupIPC() {
         message?: string;
       }
     ): Promise<MultiWindowCaptureResult> => {
-      console.log("[Screenshot] Multi-window capture requested", {
+      screenshotLogger.info(" Multi-window capture requested", {
         hasMessage: !!payload?.message,
       });
 
@@ -694,7 +710,7 @@ function setupIPC() {
         const selectedWindows = windowDetectionService.getSelectedWindows();
         const hasSelectedWindows = selectedWindows.length > 0;
 
-        console.log("[Screenshot] Capture with filters:", {
+        screenshotLogger.info(" Capture with filters:", {
           hasSelectedWindows,
           selectedWindows:
             selectedWindows
@@ -704,7 +720,7 @@ function setupIPC() {
 
         // Return early if no windows selected (watch mode OFF)
         if (!hasSelectedWindows) {
-          console.log("[Screenshot] No windows selected, skipping capture");
+          screenshotLogger.info(" No windows selected, skipping capture");
           return {
             success: false,
             error: "No windows selected for capture",
@@ -721,7 +737,7 @@ function setupIPC() {
         // Use smart capture with cache fallback (matches by appName, not windowId)
         const result = await captureService.captureWithCacheFallback(selectedApps);
 
-        console.log("[Screenshot] Multi-window capture result:", {
+        screenshotLogger.info(" Multi-window capture result:", {
           success: result.success,
           screenshotCount: result.success ? result.screenshots.length : 0,
           blockedCount: result.success ? result.blockedWindows.length : 0,
@@ -730,7 +746,7 @@ function setupIPC() {
 
         return result;
       } catch (error) {
-        console.error("[Screenshot] Capture failed with error:", error);
+        screenshotLogger.error(" Capture failed with error:", error);
         return {
           success: false,
           error: `Failed to capture windows: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -749,7 +765,7 @@ function setupIPC() {
     }));
   });
 
-  console.log("[IPC] Screenshot capture and display metadata handlers registered successfully");
+  ipcLogger.info(" Screenshot capture and display metadata handlers registered successfully");
 
   // Watch Mode IPC Handlers
   setupWatchModeHandlers();
@@ -765,14 +781,14 @@ function setupIPC() {
 function setupWatchModeHandlers() {
   // Toggle watch mode on/off
   ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_TOGGLE, async (_event, enabled: boolean) => {
-    console.log(`[Watch Mode] Toggling watch mode: ${enabled}`);
+    watchModeLogger.info(` Toggling watch mode: ${enabled}`);
 
     windowDetectionService.setWatchingMode(enabled);
 
     if (enabled) {
       // Get all visible windows
       const windows = await windowDetectionService.getAllVisibleWindows();
-      console.log(`[Watch Mode] Found ${windows.length} watchable windows`);
+      watchModeLogger.info(` Found ${windows.length} watchable windows`);
 
       // Create overlay buttons for ALL windows (including blocked ones to show policy)
       for (const window of windows) {
@@ -780,7 +796,7 @@ function setupWatchModeHandlers() {
       }
     } else {
       // Close all watch button windows (but preserve selected windows state)
-      console.log("[Watch Mode] Closing all watch button windows");
+      watchModeLogger.info(" Closing all watch button windows");
       for (const [windowId, buttonWindow] of watchButtonWindows.entries()) {
         if (!buttonWindow.isDestroyed()) {
           buttonWindow.close();
@@ -795,10 +811,10 @@ function setupWatchModeHandlers() {
   ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_GET_ALL, async () => {
     try {
       const windows = await windowDetectionService.getAllVisibleWindows();
-      console.log(`[Watch Mode] Returning ${windows.length} visible windows`);
+      watchModeLogger.info(` Returning ${windows.length} visible windows`);
       return { success: true, windows };
     } catch (error) {
-      console.error("[Watch Mode] Error getting visible windows:", error);
+      watchModeLogger.error(" Error getting visible windows:", error);
       return { success: false, windows: [], error: String(error) };
     }
   });
@@ -807,14 +823,14 @@ function setupWatchModeHandlers() {
   ipcMain.handle(
     IPC_CHANNELS.WATCH_WINDOW_SELECT,
     async (_event, windowInfo: SelectedWindowInfo) => {
-      console.log(
-        `[Watch Mode] Selecting window: ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowInfo.windowId}]`
+      watchModeLogger.info(
+        `Selecting window: ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowInfo.windowId}]`
       );
 
       const windowDetails = windowDetectionService.getWindowDetails(windowInfo.windowId);
 
       if (!windowDetails) {
-        console.warn(
+        watchModeLogger.warn(
           "[Watch Mode] Window details not found for selection, likely closed or stale",
           {
             windowId: windowInfo.windowId,
@@ -832,7 +848,7 @@ function setupWatchModeHandlers() {
       if (process.platform !== "darwin") {
         const isBrowser = isBrowserProcess(windowDetails.appName, windowDetails.path);
         if (isBrowser) {
-          console.log("[Watch Mode] Blocking browser window selection on non-macOS platform", {
+          watchModeLogger.info(" Blocking browser window selection on non-macOS platform", {
             appName: windowDetails.appName,
             path: windowDetails.path,
           });
@@ -872,7 +888,7 @@ function setupWatchModeHandlers() {
       );
 
       if (policyDecision.blocked) {
-        console.log("[Watch Mode] Selection blocked by capture policy", {
+        watchModeLogger.info(" Selection blocked by capture policy", {
           title: resolvedTitle,
           appName: resolvedAppName,
           reason: policyDecision.reason,
@@ -890,7 +906,7 @@ function setupWatchModeHandlers() {
 
   // Unselect a window
   ipcMain.handle(IPC_CHANNELS.WATCH_WINDOW_UNSELECT, async (_event, windowId: string) => {
-    console.log(`[Watch Mode] Unselecting window: ${windowId}`);
+    watchModeLogger.info(` Unselecting window: ${windowId}`);
 
     // Get the window info before removing to clear the cache
     const selectedWindows = windowDetectionService.getSelectedWindows();
@@ -902,7 +918,7 @@ function setupWatchModeHandlers() {
       // Clear the cached screenshot for this window (keyed by windowTitle)
       if (windowToRemove) {
         captureService.clearCachedScreenshot(windowToRemove.windowTitle);
-        console.log(`[Watch Mode] Cleared cache for ${windowToRemove.windowTitle}`);
+        watchModeLogger.info(` Cleared cache for ${windowToRemove.windowTitle}`);
       }
       broadcastWatchWindowsUpdate();
     }
@@ -911,7 +927,7 @@ function setupWatchModeHandlers() {
   // Get currently selected windows
   ipcMain.handle(IPC_CHANNELS.WATCH_WINDOWS_GET_SELECTED, async () => {
     const selectedWindows = windowDetectionService.getSelectedWindows();
-    console.log(`[Watch Mode] Returning ${selectedWindows.length} selected windows`);
+    watchModeLogger.info(` Returning ${selectedWindows.length} selected windows`);
     return selectedWindows;
   });
 
@@ -926,8 +942,8 @@ function setupWatchModeHandlers() {
       }
     }
 
-    console.log(
-      `[Watch Mode] Broadcasted update to windows. Selected windows: ${
+    watchModeLogger.info(
+      `Broadcasted update to windows. Selected windows: ${
         selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
         "none"
       }`
@@ -943,8 +959,8 @@ function setupWatchModeHandlers() {
       const buttonWindow = watchButtonWindows.get(windowInfo.windowId);
 
       if (buttonWindow && !buttonWindow.isDestroyed()) {
-        console.log(
-          `[Watch Mode] Closing button for selected window: ${windowInfo.appName} (windowId: ${windowInfo.windowId})`
+        watchModeLogger.info(
+          `Closing button for selected window: ${windowInfo.appName} (windowId: ${windowInfo.windowId})`
         );
         buttonWindow.close();
       }
@@ -968,20 +984,20 @@ function setupWatchModeHandlers() {
               capturedAt: Date.now(),
               metadata: screenshot.metadata,
             });
-            console.log(
-              `[Watch Mode] Cached screenshot for ${windowInfo.windowTitle} at selection time`
+            watchModeLogger.info(
+              `Cached screenshot for ${windowInfo.windowTitle} at selection time`
             );
           }
         }
       } catch (error) {
-        console.warn("[Watch Mode] Failed to cache screenshot at selection time:", error);
+        watchModeLogger.warn(" Failed to cache screenshot at selection time:", error);
       }
     }
 
     return { allowed: true };
   }
 
-  console.log("[IPC] Watch mode handlers registered successfully");
+  ipcLogger.info(" Watch mode handlers registered successfully");
 }
 
 // Monitoring Session handlers for work session tracking
@@ -1000,7 +1016,7 @@ function setupMonitoringSessionHandlers() {
         organizationId: string;
       }
     ) => {
-      console.log("[Monitoring Session] Starting session:", {
+      monitoringLogger.info(" Starting session:", {
         sessionId: config.sessionId,
         windowCount: config.selectedWindows.length,
         intervalMs: config.captureIntervalMs,
@@ -1055,19 +1071,19 @@ function setupMonitoringSessionHandlers() {
 
   // Pause the active session
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_PAUSE, async () => {
-    console.log("[Monitoring Session] Pausing session");
+    monitoringLogger.info(" Pausing session");
     return monitoringSessionService.pauseSession();
   });
 
   // Resume the paused session
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESUME, async () => {
-    console.log("[Monitoring Session] Resuming session");
+    monitoringLogger.info(" Resuming session");
     return monitoringSessionService.resumeSession();
   });
 
   // End the active session
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_END, async () => {
-    console.log("[Monitoring Session] Ending session");
+    monitoringLogger.info(" Ending session");
     const result = await monitoringSessionService.endSession();
 
     // Only hide watching pill if preference is enabled
@@ -1096,8 +1112,8 @@ function setupMonitoringSessionHandlers() {
         screenshotHash?: string;
       }>
     ) => {
-      console.log(
-        "[Monitoring Session] Finalizing session:",
+      monitoringLogger.info(
+        "Finalizing session:",
         sessionId,
         "captures:",
         captures.length
@@ -1113,7 +1129,7 @@ function setupMonitoringSessionHandlers() {
 
         // Step 1: Upload captures to backend
         if (captures.length > 0) {
-          console.log("[Monitoring Session] Uploading", captures.length, "captures to backend");
+          monitoringLogger.info(" Uploading", captures.length, "captures to backend");
           const uploadResponse = await fetch(
             `${API_BASE_URL}/api/monitoring/sessions/${sessionId}/captures`,
             {
@@ -1128,14 +1144,14 @@ function setupMonitoringSessionHandlers() {
 
           if (!uploadResponse.ok) {
             const errorText = await uploadResponse.text();
-            console.error("[Monitoring Session] Upload captures error:", errorText);
+            monitoringLogger.error(" Upload captures error:", errorText);
             return { success: false, error: `Failed to upload captures: ${uploadResponse.status}` };
           }
-          console.log("[Monitoring Session] Captures uploaded successfully");
+          monitoringLogger.info(" Captures uploaded successfully");
         }
 
         // Step 2: Call /end endpoint to trigger summarization
-        console.log("[Monitoring Session] Triggering summarization");
+        monitoringLogger.info(" Triggering summarization");
         const endResponse = await fetch(
           `${API_BASE_URL}/api/monitoring/sessions/${sessionId}/end`,
           {
@@ -1149,14 +1165,14 @@ function setupMonitoringSessionHandlers() {
 
         if (!endResponse.ok) {
           const errorText = await endResponse.text();
-          console.error("[Monitoring Session] End session error:", errorText);
+          monitoringLogger.error(" End session error:", errorText);
           return { success: false, error: `Failed to end session: ${endResponse.status}` };
         }
 
-        console.log("[Monitoring Session] Session finalized successfully");
+        monitoringLogger.info(" Session finalized successfully");
         return { success: true };
       } catch (error) {
-        console.error("[Monitoring Session] Finalize error:", error);
+        monitoringLogger.error(" Finalize error:", error);
         return { success: false, error: String(error) };
       }
     }
@@ -1164,7 +1180,7 @@ function setupMonitoringSessionHandlers() {
 
   // Reset/clear session state (used when session is deleted externally)
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESET, async () => {
-    console.log("[Monitoring Session] Resetting session state");
+    monitoringLogger.info(" Resetting session state");
     monitoringSessionService.resetSession();
     return { success: true };
   });
@@ -1176,17 +1192,17 @@ function setupMonitoringSessionHandlers() {
 
   // Session Recovery handlers
   ipcMain.handle(IPC_CHANNELS.SESSION_GET_RECOVERABLE, async () => {
-    console.log("[Session Recovery] Getting recoverable sessions");
+    recoveryLogger.info(" Getting recoverable sessions");
     return monitoringSessionService.getRecoverableSessions();
   });
 
   ipcMain.handle(IPC_CHANNELS.SESSION_RECOVER, async (_, sessionId: string) => {
-    console.log("[Session Recovery] Recovering session:", sessionId);
+    recoveryLogger.info(" Recovering session:", sessionId);
     return monitoringSessionService.recoverSession(sessionId);
   });
 
   ipcMain.handle(IPC_CHANNELS.SESSION_DISCARD, async (_, sessionId: string) => {
-    console.log("[Session Recovery] Discarding session:", sessionId);
+    recoveryLogger.info(" Discarding session:", sessionId);
     await monitoringSessionService.discardRecoverableSession(sessionId);
     return { success: true };
   });
@@ -1204,35 +1220,35 @@ function setupMonitoringSessionHandlers() {
     return preferencesService.getAllPreferences();
   });
 
-  console.log("[IPC] Monitoring session handlers registered successfully");
+  ipcLogger.info(" Monitoring session handlers registered successfully");
 }
 
 // Update notification handlers
 function setupUpdateHandlers() {
   ipcMain.handle("check-for-updates", async () => {
-    console.log("[Update] Manual check for updates requested");
+    updateLogger.info(" Manual check for updates requested");
     await updateService.checkForUpdates();
     return { success: true };
   });
 
   ipcMain.handle("download-update", async () => {
-    console.log("[Update] Download update requested");
+    updateLogger.info(" Download update requested");
     try {
       await updateService.downloadUpdate();
       return { success: true };
     } catch (error) {
-      console.error("[Update] Download failed:", error);
+      updateLogger.error(" Download failed:", error);
       return { success: false, error: String(error) };
     }
   });
 
   ipcMain.handle("install-update", () => {
-    console.log("[Update] Install update requested");
+    updateLogger.info(" Install update requested");
     updateService.quitAndInstall();
     return { success: true };
   });
 
-  console.log("[IPC] Update handlers registered successfully");
+  ipcLogger.info(" Update handlers registered successfully");
 }
 
 function isBrowserProcess(appName: string, appPath?: string): boolean {
@@ -1294,14 +1310,14 @@ function createWatchButtonWindow(window: any, watchButtonWindows: Map<string, Br
 
   // Cleanup on close
   buttonWindow.on("closed", () => {
-    console.log(`[Watch Mode] Button window closed for: ${window.appName}`);
+    watchModeLogger.info(` Button window closed for: ${window.appName}`);
     watchButtonWindows.delete(window.windowId);
   });
 
   watchButtonWindows.set(window.windowId, buttonWindow);
 
-  console.log(
-    `[Watch Mode] Created button for ${window.appName} at (${window.bounds.x + 10}, ${window.bounds.y + 10})`
+  watchModeLogger.info(
+    `Created button for ${window.appName} at (${window.bounds.x + 10}, ${window.bounds.y + 10})`
   );
 }
 
@@ -1374,7 +1390,7 @@ app.whenReady().then(async () => {
   try {
     const recoverableSessions = await monitoringSessionService.getRecoverableSessions();
     if (recoverableSessions.length > 0) {
-      console.log(`[Session Recovery] Found ${recoverableSessions.length} recoverable session(s)`);
+      recoveryLogger.info(` Found ${recoverableSessions.length} recoverable session(s)`);
       // Notify console window to show recovery dialog
       setTimeout(() => {
         if (consoleWindow && !consoleWindow.isDestroyed()) {
@@ -1386,7 +1402,7 @@ app.whenReady().then(async () => {
       }, 2000); // Give console time to fully load
     }
   } catch (error) {
-    console.error("[Session Recovery] Error checking for recoverable sessions:", error);
+    recoveryLogger.error(" Error checking for recoverable sessions:", error);
   }
 });
 
@@ -1423,7 +1439,7 @@ app.on("before-quit", async (event) => {
     event.preventDefault(); // Prevent immediate quit
     isQuitting = true;
 
-    console.log("[Shutdown] Ending active session before quit...");
+    shutdownLogger.info(" Ending active session before quit...");
 
     try {
       // End local session and get captures
@@ -1434,10 +1450,10 @@ app.on("before-quit", async (event) => {
         await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
           method: "POST",
         });
-        console.log("[Shutdown] Session ended successfully on backend");
+        shutdownLogger.info(" Session ended successfully on backend");
       }
     } catch (error) {
-      console.error("[Shutdown] Error ending session:", error);
+      shutdownLogger.error(" Error ending session:", error);
     }
 
     // Now quit for real

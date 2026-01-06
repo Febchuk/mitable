@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { createLogger } from "../../../../../../../lib/logger";
+
+const logger = createLogger("SlackConnectDialog");
 import {
   Dialog,
   DialogContent,
@@ -62,7 +65,7 @@ export default function SlackConnectDialog({
       // Call onConnect callback to trigger polling
       onConnect();
     } catch (err) {
-      console.error("Error starting Slack OAuth:", err);
+      logger.error("Error starting Slack OAuth:", err);
       setError(err instanceof Error ? err.message : "Failed to connect to Slack");
     } finally {
       setIsConnecting(false);

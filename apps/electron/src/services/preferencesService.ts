@@ -6,6 +6,9 @@
  */
 
 import Store from "electron-store";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger("Preferences");
 
 // Preferences schema
 interface PreferencesSchema {
@@ -44,7 +47,7 @@ class PreferencesService {
         },
       },
     });
-    console.log("[PreferencesService] Initialized with store path:", this.store.path);
+    logger.info(" Initialized with store path:", this.store.path);
   }
 
   // Session preferences
@@ -54,7 +57,7 @@ class PreferencesService {
 
   setHidePillOnSessionEnd(value: boolean): void {
     this.store.set("session.hidePillOnSessionEnd", value);
-    console.log("[PreferencesService] hidePillOnSessionEnd set to:", value);
+    logger.info(" hidePillOnSessionEnd set to:", value);
   }
 
   getDontAskHidePillAgain(): boolean {
@@ -63,7 +66,7 @@ class PreferencesService {
 
   setDontAskHidePillAgain(value: boolean): void {
     this.store.set("session.dontAskHidePillAgain", value);
-    console.log("[PreferencesService] dontAskHidePillAgain set to:", value);
+    logger.info(" dontAskHidePillAgain set to:", value);
   }
 
   getShowPillOnSessionStart(): boolean {
@@ -72,7 +75,7 @@ class PreferencesService {
 
   setShowPillOnSessionStart(value: boolean): void {
     this.store.set("session.showPillOnSessionStart", value);
-    console.log("[PreferencesService] showPillOnSessionStart set to:", value);
+    logger.info(" showPillOnSessionStart set to:", value);
   }
 
   // Generic get/set by key
@@ -85,7 +88,7 @@ class PreferencesService {
       case "showPillOnSessionStart":
         return this.getShowPillOnSessionStart();
       default:
-        console.warn("[PreferencesService] Unknown preference key:", key);
+        logger.warn(" Unknown preference key:", key);
         return null;
     }
   }
@@ -102,7 +105,7 @@ class PreferencesService {
         this.setShowPillOnSessionStart(value);
         return { success: true };
       default:
-        console.warn("[PreferencesService] Unknown preference key:", key);
+        logger.warn(" Unknown preference key:", key);
         return { success: false, error: "Unknown preference key" };
     }
   }
@@ -114,7 +117,7 @@ class PreferencesService {
 
   resetToDefaults(): void {
     this.store.clear();
-    console.log("[PreferencesService] Reset to defaults");
+    logger.info(" Reset to defaults");
   }
 }
 

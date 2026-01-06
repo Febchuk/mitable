@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { createLogger } from "../../../../../../../lib/logger";
+
+const logger = createLogger("NotionConfigureDialog");
 import {
   Dialog,
   DialogContent,
@@ -71,7 +74,7 @@ export default function NotionConfigureDialog({
       const data = await response.json();
       setPages(data.pages || []);
     } catch (err) {
-      console.error("Error fetching pages:", err);
+      logger.error("Error fetching pages:", err);
       setError(err instanceof Error ? err.message : "Failed to load pages");
     } finally {
       setLoading(false);
@@ -111,7 +114,7 @@ export default function NotionConfigureDialog({
         throw new Error("Sync request failed");
       }
     } catch (err) {
-      console.error("Error during sync:", err);
+      logger.error("Error during sync:", err);
       setSyncing(false);
       setError(err instanceof Error ? err.message : "Failed to sync");
     }

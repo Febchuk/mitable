@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useIntegrations, useSyncIntegration } from "@/console/src/hooks/queries/admin";
 import IntegrationCard from "./components/IntegrationCard";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("IntegrationsView");
 import SlackConnectDialog from "./components/SlackConnectDialog";
 import SlackConfigureDialog from "./components/SlackConfigureDialog";
 import NotionConnectDialog from "./components/NotionConnectDialog";
@@ -83,7 +86,7 @@ export default function IntegrationsView() {
 
   const handleGithubOAuthComplete = () => {
     // Start polling for GitHub installation completion
-    console.log("[IntegrationsView] GitHub OAuth complete, starting polling...");
+    logger.info(" GitHub OAuth complete, starting polling...");
 
     let pollCount = 0;
     const pollInterval = setInterval(async () => {
@@ -91,7 +94,7 @@ export default function IntegrationsView() {
 
       if (pollCount > POLLING_CONFIG.MAX_POLLS) {
         clearInterval(pollInterval);
-        console.log("[IntegrationsView] Polling timeout - stopping");
+        logger.info(" Polling timeout - stopping");
         toast({
           title: "Timeout",
           description: "GitHub installation check timed out. Please refresh the page.",
@@ -106,7 +109,7 @@ export default function IntegrationsView() {
 
         if (githubIntegration) {
           clearInterval(pollInterval);
-          console.log("[IntegrationsView] GitHub integration detected!");
+          logger.info(" GitHub integration detected!");
 
           toast({
             title: "Connected",
@@ -114,7 +117,7 @@ export default function IntegrationsView() {
           });
         }
       } catch (error) {
-        console.error("[IntegrationsView] Polling error:", error);
+        logger.error(" Polling error:", error);
       }
     }, POLLING_CONFIG.INTERVAL_MS);
 
@@ -124,12 +127,12 @@ export default function IntegrationsView() {
   // Stub handlers for IntegrationCard (not used for Slack, but required by component)
   const handleConnectIntegration = async (id: string) => {
     // Generic connect - not used for Slack (uses custom OAuth flow)
-    console.log("Connect integration:", id);
+    logger.info("Connect integration:", id);
   };
 
   const handleConfigureIntegration = (id: string) => {
     // Generic configure - not used for Slack (uses custom dialog)
-    console.log("Configure integration:", id);
+    logger.info("Configure integration:", id);
   };
 
   const handleSyncIntegration = async (id: string) => {
@@ -150,7 +153,7 @@ export default function IntegrationsView() {
 
   const handleViewDetails = (id: string) => {
     // View details - not implemented yet
-    console.log("View details:", id);
+    logger.info("View details:", id);
   };
 
   const handleDisconnect = async (id: string) => {
@@ -206,7 +209,7 @@ export default function IntegrationsView() {
       // Refresh to show updated status
       await refetch();
     } catch (error) {
-      console.error("Error disconnecting:", error);
+      logger.error("Error disconnecting:", error);
       toast({
         title: "Error",
         description: `Failed to disconnect ${integration.name}. Please try again.`,
@@ -297,7 +300,7 @@ export default function IntegrationsView() {
               });
             }
           } catch (error) {
-            console.error("Auto-sync failed:", error);
+            logger.error("Auto-sync failed:", error);
           }
         }, 1000);
       } else if (pollCount >= maxPolls) {

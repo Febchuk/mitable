@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { createLogger } from "../../../../../../../lib/logger";
+
+const logger = createLogger("SlackConfigureDialog");
 import {
   Dialog,
   DialogContent,
@@ -88,7 +91,7 @@ export default function SlackConfigureDialog({
         );
       }
     } catch (err) {
-      console.error("Error fetching channels:", err);
+      logger.error("Error fetching channels:", err);
       setError(err instanceof Error ? err.message : "Failed to load channels");
     } finally {
       setLoading(false);
@@ -165,7 +168,7 @@ export default function SlackConfigureDialog({
           throw new Error("Sync request failed");
         }
       } catch (syncError) {
-        console.error("Error during initial sync:", syncError);
+        logger.error("Error during initial sync:", syncError);
         setSyncing(false);
 
         // Show toast first
@@ -181,7 +184,7 @@ export default function SlackConfigureDialog({
 
       onSave();
     } catch (err) {
-      console.error("Error saving configuration:", err);
+      logger.error("Error saving configuration:", err);
       setError(err instanceof Error ? err.message : "Failed to save configuration");
       setSaving(false);
     }

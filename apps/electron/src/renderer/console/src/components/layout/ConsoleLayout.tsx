@@ -5,6 +5,9 @@ import { ScrollArea } from "../ui/scroll-area";
 import Sidebar from "./Sidebar";
 import TitleBar from "./TitleBar";
 import { UpdateBanner } from "../shared/UpdateBanner";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger("ConsoleLayout");
 
 // Detect platform for styling
 const isMac = navigator.platform.toLowerCase().includes("mac");
@@ -15,7 +18,7 @@ export default function ConsoleLayout() {
   // Listen for drafts navigation requests from IPC (Update Buddy)
   useEffect(() => {
     const handleDraftsNavigate = (draftId: string) => {
-      console.log("[ConsoleLayout] Navigating to draft:", draftId);
+      logger.info("Navigating to draft:", draftId);
       navigate(`/drafts/${draftId}`);
     };
 

@@ -1,4 +1,7 @@
 import { apiRequest } from "./api";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger("AdminService");
 
 export interface User {
   id: string;
@@ -148,7 +151,7 @@ export async function fetchUsers(): Promise<User[]> {
     const response = await apiRequest<{ users: User[] }>("/admin/users");
     return response.users;
   } catch (error) {
-    console.error("Error fetching users:", error);
+    logger.error("Error fetching users:", error);
     throw error;
   }
 }
@@ -161,7 +164,7 @@ export async function fetchTemplates(): Promise<Template[]> {
     const response = await apiRequest<{ templates: Template[] }>("/admin/templates");
     return response.templates;
   } catch (error) {
-    console.error("Error fetching templates:", error);
+    logger.error("Error fetching templates:", error);
     throw error;
   }
 }
@@ -174,7 +177,7 @@ export async function fetchTemplateDetail(id: string): Promise<TemplateDetail> {
     const response = await apiRequest<{ template: TemplateDetail }>(`/admin/templates/${id}`);
     return response.template;
   } catch (error) {
-    console.error("Error fetching template detail:", error);
+    logger.error("Error fetching template detail:", error);
     throw error;
   }
 }
@@ -187,7 +190,7 @@ export async function fetchIntegrations(): Promise<Integration[]> {
     const response = await apiRequest<{ integrations: Integration[] }>("/admin/integrations");
     return response.integrations;
   } catch (error) {
-    console.error("Error fetching integrations:", error);
+    logger.error("Error fetching integrations:", error);
     throw error;
   }
 }
@@ -202,7 +205,7 @@ export async function fetchLinearConnectedUsers(): Promise<LinearConnectedUser[]
     );
     return response.users;
   } catch (error) {
-    console.error("Error fetching Linear users:", error);
+    logger.error("Error fetching Linear users:", error);
     throw error;
   }
 }
@@ -217,7 +220,7 @@ export async function fetchGmailConnectedUsers(): Promise<GmailConnectedUser[]> 
     );
     return response.users;
   } catch (error) {
-    console.error("Error fetching Gmail users:", error);
+    logger.error("Error fetching Gmail users:", error);
     throw error;
   }
 }
@@ -230,7 +233,7 @@ export async function fetchUserDetail(userId: string): Promise<UserDetail> {
     const response = await apiRequest<{ user: UserDetail }>(`/admin/users/${userId}`);
     return response.user;
   } catch (error) {
-    console.error("Error fetching user detail:", error);
+    logger.error("Error fetching user detail:", error);
     throw error;
   }
 }
@@ -271,7 +274,7 @@ export async function createUser(payload: CreateUserPayload): Promise<CreateUser
     });
     return response;
   } catch (error) {
-    console.error("Error creating user:", error);
+    logger.error("Error creating user:", error);
     throw error;
   }
 }
@@ -315,7 +318,7 @@ export async function connectIntegration(
     );
     return response;
   } catch (error) {
-    console.error("Error connecting integration:", error);
+    logger.error("Error connecting integration:", error);
     throw error;
   }
 }
@@ -333,7 +336,7 @@ export async function disconnectIntegration(integrationId: string): Promise<Inte
     );
     return response;
   } catch (error) {
-    console.error("Error disconnecting integration:", error);
+    logger.error("Error disconnecting integration:", error);
     throw error;
   }
 }
@@ -348,7 +351,7 @@ export async function syncIntegration(integrationId: string): Promise<SyncRespon
     });
     return response;
   } catch (error) {
-    console.error("Error syncing integration:", error);
+    logger.error("Error syncing integration:", error);
     throw error;
   }
 }
@@ -367,7 +370,7 @@ export async function updateIntegrationSettings(
     });
     return response;
   } catch (error) {
-    console.error("Error updating integration settings:", error);
+    logger.error("Error updating integration settings:", error);
     throw error;
   }
 }
@@ -410,7 +413,7 @@ export async function createTemplate(
     });
     return response;
   } catch (error) {
-    console.error("Error creating template:", error);
+    logger.error("Error creating template:", error);
     throw error;
   }
 }

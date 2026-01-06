@@ -10,6 +10,9 @@
 import * as React from "react";
 
 import { useChat as useBaseChat } from "@ai-sdk/react";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger("useDocChat");
 import { AIChatPlugin } from "@platejs/ai/react";
 import { DefaultChatTransport } from "ai";
 import { useEditorRef, usePluginOption } from "platejs/react";
@@ -56,13 +59,13 @@ export const useDocChat = (documentId?: string) => {
 
           if (!res.ok) {
             // If backend not available, use a helpful error response
-            console.warn("AI command API not available, using fallback");
+            logger.warn("AI command API not available, using fallback");
             return createFallbackResponse();
           }
 
           return res;
         } catch (error) {
-          console.error("AI command request failed:", error);
+          logger.error("AI command request failed:", error);
           return createFallbackResponse();
         }
       },
