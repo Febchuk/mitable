@@ -600,8 +600,75 @@ function setupIPC() {
           return { success: true };
         }
         case "start-session": {
-          // This needs user context - handled by the pill itself
-          return { success: false, error: "Use pill to start session" };
+          // 1. Get user context (set when user logs in via Console)
+          if (!currentUserContext) {
+            monitoringLogger.warn(" Start session failed: User not logged in. Opening Console...");
+            // Show Console so user can log in
+            if (consoleWindow && !consoleWindow.isDestroyed()) {
+              consoleWindow.show();
+              consoleWindow.focus();
+            }
+            return { success: false, error: "Please log in through the Console first" };
+          }
+
+          // 2. Get selected windows
+          const selectedWindows = windowDetectionService.getSelectedWindows();
+          if (selectedWindows.length === 0) {
+            monitoringLogger.warn(" Start session failed: No windows selected");
+            return { success: false, error: "No windows selected" };
+          }
+
+          // 3. Create backend session
+          try {
+            const sessionName = `Session ${new Date().toLocaleDateString()}`;
+            const captureIntervalMs = 3000;
+
+            monitoringLogger.info(` Creating backend session: ${sessionName}`);
+            const response = await authManager.authenticatedFetch("/api/monitoring/sessions", {
+              method: "POST",
+              body: JSON.stringify({
+                name: sessionName,
+                selectedWindows: selectedWindows.map((w) => ({
+                  windowId: w.windowId,
+                  appName: w.appName,
+                  windowTitle: w.windowTitle,
+                })),
+                captureIntervalMs,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              monitoringLogger.error(" Backend session creation failed:", errorText);
+              return { success: false, error: "Failed to create session" };
+            }
+
+            const backendResult = await response.json();
+            if (!backendResult.session?.id) {
+              monitoringLogger.error(" Backend returned no session ID");
+              return { success: false, error: "Failed to create session" };
+            }
+
+            // 4. Start Electron-side capture
+            monitoringLogger.info(` Starting Electron capture for session: ${backendResult.session.id}`);
+            const startResult = await monitoringSessionService.startSession({
+              sessionId: backendResult.session.id,
+              selectedWindows,
+              captureIntervalMs,
+              userId: currentUserContext.userId,
+              organizationId: currentUserContext.organizationId,
+            });
+
+            if (!startResult.error) {
+              monitoringLogger.info(" Session started successfully from pill");
+              return { success: true, sessionId: startResult.sessionId };
+            }
+
+            return { success: false, error: startResult.error };
+          } catch (error) {
+            monitoringLogger.error(" Start session error:", error);
+            return { success: false, error: "Failed to start session" };
+          }
         }
         case "pause-session": {
           return monitoringSessionService.pauseSession();

@@ -19,6 +19,7 @@ import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
+import { monitoringKeys } from "./hooks/queries/monitoring";
 import SettingsView from "./components/views/employee/SettingsView";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
@@ -88,8 +89,8 @@ function MonitoringSessionHandler() {
 
       // Invalidate session queries on any status change (paused, active, ended)
       if (state?.id) {
-        queryClient.invalidateQueries({ queryKey: ["monitoring", "session", state.id] });
-        queryClient.invalidateQueries({ queryKey: ["monitoring", "sessions"] });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.session(state.id) });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
       }
     });
 
