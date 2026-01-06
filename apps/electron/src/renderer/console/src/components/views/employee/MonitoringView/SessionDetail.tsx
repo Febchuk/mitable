@@ -397,14 +397,10 @@ export default function SessionDetail() {
 
       // 2. Upload captures to backend (so summarization can use them)
       if (electronResult.captures && electronResult.captures.length > 0) {
-        logger.info(
-          `Uploading ${electronResult.captures.length} captures to backend`
-        );
+        logger.info(`Uploading ${electronResult.captures.length} captures to backend`);
         await uploadCaptures(sessionId, electronResult.captures);
       } else {
-        logger.info(
-          "No captures to upload (session may have been ended from pill)"
-        );
+        logger.info("No captures to upload (session may have been ended from pill)");
       }
 
       // 3. Trigger backend summarization
