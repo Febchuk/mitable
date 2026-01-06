@@ -86,3 +86,4 @@ startServer().catch((error) => {
   logger.error({ err: error }, "Failed to start server");
   process.exit(1);
 });
+// Railway deploy trigger Mon Jan  5 18:02:04 PST 2026
