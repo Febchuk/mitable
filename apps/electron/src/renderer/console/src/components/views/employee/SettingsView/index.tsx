@@ -7,9 +7,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/console/src/services/authService";
-import { Loader2, Check, Link2, Unlink, Mail } from "lucide-react";
+import { usePreferences } from "@/console/src/hooks/usePreferences";
+import { Loader2, Check, Link2, Unlink, Mail, Settings } from "lucide-react";
 import { SiLinear, SiGmail } from "react-icons/si";
 import { BillingSection } from "@/console/src/components/billing";
 
@@ -38,6 +41,14 @@ export default function SettingsView() {
   const [isGmailLoading, setIsGmailLoading] = useState(true);
   const [isGmailConnecting, setIsGmailConnecting] = useState(false);
   const [isGmailDisconnecting, setIsGmailDisconnecting] = useState(false);
+
+  // Preferences
+  const {
+    hidePillOnSessionEnd,
+    showPillOnSessionStart,
+    isLoading: isPreferencesLoading,
+    updatePreference,
+  } = usePreferences();
 
   useEffect(() => {
     loadLinearStatus();
@@ -315,6 +326,104 @@ export default function SettingsView() {
       <div className="space-y-4 max-w-2xl">
         <h2 className="text-2xl font-semibold text-white">Subscription</h2>
         <BillingSection />
+      </div>
+
+      {/* Preferences Section */}
+      <div className="space-y-4 max-w-2xl">
+        <h2 className="text-2xl font-semibold text-white">Preferences</h2>
+        <Card className="p-6 bg-background-elevated border-border-subtle">
+          <div className="space-y-6">
+            {/* Session Preferences */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Settings size={18} className="text-text-secondary" />
+                <h3 className="text-lg font-semibold text-white">Session</h3>
+              </div>
+
+              {/* Show Pill on Session Start Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="show-pill-toggle"
+                    className="text-sm font-medium text-white cursor-pointer"
+                  >
+                    Show Watching Pill on Session Start
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically show the watching pill when a monitoring session starts
+                  </p>
+                </div>
+
+                {isPreferencesLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                ) : (
+                  <Switch
+                    id="show-pill-toggle"
+                    checked={showPillOnSessionStart}
+                    onCheckedChange={async (checked) => {
+                      const result = await updatePreference("showPillOnSessionStart", checked);
+                      if (result.success) {
+                        toast({
+                          title: "Preference saved",
+                          description: checked
+                            ? "Watching pill will show when sessions start"
+                            : "Watching pill will not auto-show when sessions start",
+                        });
+                      } else {
+                        toast({
+                          title: "Error",
+                          description: "Failed to save preference",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Hide Pill on Session End Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="hide-pill-toggle"
+                    className="text-sm font-medium text-white cursor-pointer"
+                  >
+                    Hide Watching Pill on Session End
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically hide the watching pill when a monitoring session ends
+                  </p>
+                </div>
+
+                {isPreferencesLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                ) : (
+                  <Switch
+                    id="hide-pill-toggle"
+                    checked={hidePillOnSessionEnd}
+                    onCheckedChange={async (checked) => {
+                      const result = await updatePreference("hidePillOnSessionEnd", checked);
+                      if (result.success) {
+                        toast({
+                          title: "Preference saved",
+                          description: checked
+                            ? "Watching pill will be hidden when sessions end"
+                            : "Watching pill will remain visible when sessions end",
+                        });
+                      } else {
+                        toast({
+                          title: "Error",
+                          description: "Failed to save preference",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* Integrations Section */}

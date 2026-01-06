@@ -64,6 +64,11 @@ export const IPC_CHANNELS = {
 
   // Drafts system (Console)
   DRAFTS_NAVIGATE: "drafts-navigate",
+
+  // Preferences
+  PREFERENCES_GET: "preferences-get",
+  PREFERENCES_SET: "preferences-set",
+  PREFERENCES_GET_ALL: "preferences-get-all",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

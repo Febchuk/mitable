@@ -65,6 +65,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import AIEditPanel from "@/console/src/components/shared/AIEditPanel";
 import RecipientSelector from "@/console/src/components/shared/RecipientSelector";
+import { SessionEndToast } from "@/console/src/components/shared/SessionEndToast";
+import { usePreferences } from "@/console/src/hooks/usePreferences";
 import LinearUpdateDialog from "./LinearUpdateDialog";
 import { SiLinear } from "react-icons/si";
 
@@ -122,6 +124,10 @@ export default function SessionDetail() {
     loading: boolean;
   }>({ connected: false, email: null, loading: true });
   const [isConnectingGmail, setIsConnectingGmail] = useState(false);
+  const [showSessionEndToast, setShowSessionEndToast] = useState(false);
+
+  // Preferences for hide pill on session end
+  const { hidePillOnSessionEnd, dontAskHidePillAgain, updatePreference } = usePreferences();
 
   // Listen for session updates from watch pill (e.g., pause/resume)
   useEffect(() => {
@@ -401,10 +407,18 @@ export default function SessionDetail() {
       // 3. Trigger backend summarization
       await endSessionMutation.mutateAsync(sessionId);
 
-      toast({
-        title: "Session ended",
-        description: "Summary is being generated...",
-      });
+      // 4. Handle pill visibility based on preferences
+      if (hidePillOnSessionEnd || dontAskHidePillAgain) {
+        // Auto-hide pill
+        window.consoleAPI.hidePill();
+        toast({
+          title: "Session ended",
+          description: "Summary is being generated...",
+        });
+      } else {
+        // Show toast with "don't ask again" option
+        setShowSessionEndToast(true);
+      }
     } catch (error) {
       console.error("[SessionDetail] Error ending session:", error);
       toast({
@@ -413,6 +427,30 @@ export default function SessionDetail() {
         variant: "destructive",
       });
     }
+  };
+
+  // Handlers for session end toast
+  const handleDontAskAgain = async (checked: boolean) => {
+    if (checked) {
+      await updatePreference("dontAskHidePillAgain", true);
+    }
+  };
+
+  const handleHidePillFromToast = () => {
+    window.consoleAPI.hidePill();
+    setShowSessionEndToast(false);
+    toast({
+      title: "Session ended",
+      description: "Summary is being generated...",
+    });
+  };
+
+  const handleDismissSessionEndToast = () => {
+    setShowSessionEndToast(false);
+    toast({
+      title: "Session ended",
+      description: "Summary is being generated...",
+    });
   };
 
   const handlePauseSession = async () => {
@@ -1065,6 +1103,17 @@ export default function SessionDetail() {
           queryClient.invalidateQueries({ queryKey: ["monitoring", "sessions"] });
         }}
       />
+
+      {/* Session End Toast */}
+      {showSessionEndToast && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <SessionEndToast
+            onDismiss={handleDismissSessionEndToast}
+            onDontAskAgain={handleDontAskAgain}
+            onHidePill={handleHidePillFromToast}
+          />
+        </div>
+      )}
     </div>
   );
 }

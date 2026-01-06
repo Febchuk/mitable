@@ -48,6 +48,9 @@ interface DetectedWindow {
   windowId: string;
   appName: string;
   windowTitle: string;
+  displayName?: string;
+  tabTitle?: string;
+  isBrowser?: boolean;
   isVisible: boolean;
   bounds?: { x: number; y: number; width: number; height: number };
 }
@@ -133,6 +136,9 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
             windowId: w.windowId,
             appName: w.appName,
             windowTitle: w.windowTitle,
+            displayName: w.displayName,
+            tabTitle: w.tabTitle,
+            isBrowser: w.isBrowser,
             isVisible: true,
             bounds: w.bounds,
           }));
@@ -190,6 +196,9 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
                 windowId: window.windowId,
                 appName: window.appName,
                 windowTitle: window.windowTitle,
+                displayName: window.displayName,
+                tabTitle: window.tabTitle,
+                isBrowser: window.isBrowser,
               }
             : null;
         })
@@ -430,8 +439,14 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
                       className="flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-text-primary font-medium truncate">{window.appName}</p>
-                      <p className="text-text-secondary text-sm truncate">{window.windowTitle}</p>
+                      <p className="text-text-primary font-medium truncate">
+                        {window.displayName || window.appName}
+                      </p>
+                      {(window.isBrowser ? window.tabTitle : window.windowTitle) && (
+                        <p className="text-text-secondary text-sm truncate">
+                          {window.isBrowser ? window.tabTitle : window.windowTitle}
+                        </p>
+                      )}
                     </div>
                   </label>
                 ))}

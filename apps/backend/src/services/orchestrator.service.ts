@@ -6,6 +6,7 @@ import { KnowledgeAgent } from "../agents/knowledge.agent";
 import { VisualGuidanceAgent } from "../agents/visual-guidance.agent";
 import { BaseAgent } from "../agents/base.agent";
 import { guideGenerationService } from "./guideGeneration.service";
+import { logger } from "../lib/logger.js";
 
 /**
  * Intent classification types
@@ -79,35 +80,38 @@ export class OrchestratorService {
         );
       } catch (error) {
         // Workflow state retrieval failed - not critical, continue without it
-        console.log(
-          "[Orchestrator] Workflow state retrieval failed (non-critical):",
-          error instanceof Error ? error.message : "Unknown error"
+        logger.warn(
+          { err: error instanceof Error ? error : new Error(String(error)) },
+          "[Orchestrator] Workflow state retrieval failed (non-critical)"
         );
       }
       context.workflowState = workflowState || undefined;
 
-      console.log("[Orchestrator] Processing message:", {
-        conversationId: context.conversationId,
-        screenshotCount: context.screenshots?.length || 0,
-        hasWorkflowState: !!workflowState,
-        workflowAction: context.metadata?.workflowAction,
-      });
+      logger.info(
+        {
+          conversationId: context.conversationId,
+          screenshotCount: context.screenshots?.length || 0,
+          hasWorkflowState: !!workflowState,
+          workflowAction: context.metadata?.workflowAction,
+        },
+        "[Orchestrator] Processing message"
+      );
 
       // Step 2: Metadata-driven routing (deterministic)
       if (context.metadata?.workflowAction === "progress_step") {
-        console.log("[Orchestrator] Routing: metadata � VisualGuidanceAgent (progress_step)");
+        logger.info("[Orchestrator] Routing: metadata → VisualGuidanceAgent (progress_step)");
         yield* this.visualGuidanceAgent.execute(context);
         return;
       }
 
       if (context.metadata?.workflowAction === "custom_question") {
-        console.log("[Orchestrator] Routing: metadata � VisualGuidanceAgent (custom_question)");
+        logger.info("[Orchestrator] Routing: metadata → VisualGuidanceAgent (custom_question)");
         yield* this.visualGuidanceAgent.execute(context);
         return;
       }
 
       if (context.metadata?.workflowAction === "exit_workflow") {
-        console.log("[Orchestrator] Routing: metadata � TextResponseAgent (exit_workflow)");
+        logger.info("[Orchestrator] Routing: metadata → TextResponseAgent (exit_workflow)");
         yield* this.textAgent.execute(context);
         return;
       }
@@ -115,20 +119,20 @@ export class OrchestratorService {
       // Step 3: Intent classification (LLM-based)
       const intent = await this.classifyIntent(context);
 
-      console.log("[Orchestrator] Intent classified:", {
-        type: intent.type,
-        confidence: intent.confidence,
-      });
+      logger.info(
+        { type: intent.type, confidence: intent.confidence },
+        "[Orchestrator] Intent classified"
+      );
 
       // Step 4: Route based on intent
       const agent = await this.routeByIntent(intent, context);
 
-      console.log("[Orchestrator] Routing: intent � Agent:", agent.name);
+      logger.info({ agent: agent.name }, "[Orchestrator] Routing: intent → Agent");
 
       // Step 6: Execute agent and forward responses
       yield* agent.execute(context);
     } catch (error) {
-      console.error("[Orchestrator] Error:", error);
+      logger.error({ err: error }, "[Orchestrator] Error");
       yield {
         type: "error",
         error: error instanceof Error ? error.message : "Unknown orchestration error",
@@ -163,7 +167,7 @@ export class OrchestratorService {
         confidence: Math.max(0, Math.min(1, Number(json.confidence) || 0.5)),
       } as Intent;
     } catch (error) {
-      console.warn("[Orchestrator] JSON parse failed, defaulting to general_chat:", error);
+      logger.warn({ err: error }, "[Orchestrator] JSON parse failed, defaulting to general_chat");
       // Safe fallback to general chat on parse error
       return { type: "general_chat", confidence: 0.55 };
     }
@@ -208,7 +212,7 @@ Return STRICT JSON only:
       const result = await model.generateContent(prompt);
       let intent = this.parseIntentJSON(result.response.text().trim());
 
-      console.log("[Orchestrator] Gemini classified:", intent);
+      logger.debug({ intent }, "[Orchestrator] Gemini classified");
 
       // Safety: prefer RAG if "workflow_start" without screenshot and low confidence
       if (
@@ -216,7 +220,8 @@ Return STRICT JSON only:
         (!context.screenshots || context.screenshots.length === 0) &&
         intent.confidence < 0.8
       ) {
-        console.log(
+        logger.info(
+          { originalIntent: intent.type, newIntent: "knowledge_search" },
           "[Orchestrator] Downgrading workflow_start → knowledge_search (no screenshot + low confidence)"
         );
         intent = { type: "knowledge_search", confidence: 0.6 };
@@ -224,7 +229,7 @@ Return STRICT JSON only:
 
       return intent;
     } catch (error) {
-      console.error("[Orchestrator] Intent classification error:", error);
+      logger.error({ err: error }, "[Orchestrator] Intent classification error");
       // Safe fallback to general chat on error
       return { type: "general_chat", confidence: 0.5 };
     }

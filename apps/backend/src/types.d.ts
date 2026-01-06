@@ -6,6 +6,7 @@ declare global {
       user?: User;
       userId?: string;
       organizationId?: string;
+      correlationId?: string;
     }
   }
 }

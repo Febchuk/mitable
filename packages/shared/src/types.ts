@@ -155,6 +155,9 @@ export interface WatchableWindow {
   windowId: string;
   appName: string;
   windowTitle: string;
+  displayName?: string; // Short app name (e.g., "Chrome", "Firefox")
+  tabTitle?: string; // For browsers: extracted tab title (e.g., "Gmail - Inbox")
+  isBrowser?: boolean; // Flag to indicate browser app
   bounds: {
     x: number;
     y: number;
@@ -169,6 +172,9 @@ export interface SelectedWindowInfo {
   windowId: string;
   appName: string;
   windowTitle: string;
+  displayName?: string; // Short app name (e.g., "Chrome", "Firefox")
+  tabTitle?: string; // For browsers: extracted tab title (e.g., "Gmail - Inbox")
+  isBrowser?: boolean; // Flag to indicate browser app
 }
 
 export interface WatchState {

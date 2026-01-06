@@ -9,6 +9,7 @@ import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusServ
 import { windowDetectionService } from "./services/windowDetectionService";
 import { monitoringSessionService } from "./services/monitoringSessionService";
 import { authManager } from "./services/authManager";
+import { preferencesService } from "./services/preferencesService";
 import { updateService } from "./services/updateService";
 
 // Window references
@@ -601,36 +602,32 @@ function setupIPC() {
           }
 
           // 2. Upload captures and end backend session
-          const token = authTokens.accessToken;
-          if (token && result.captures && result.captures.length > 0) {
-            const API_BASE_URL = process.env.VITE_API_URL || "http://localhost:3000";
-            try {
-              // Upload captures
+          try {
+            // Upload captures if any exist
+            if (result.captures && result.captures.length > 0) {
               console.log(`[EndSession] Uploading ${result.captures.length} captures to backend`);
-              await fetch(`${API_BASE_URL}/api/monitoring/sessions/${result.sessionId}/captures`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ captures: result.captures }),
-              });
-
-              // End backend session (triggers summarization)
-              console.log(`[EndSession] Triggering backend summarization`);
-              await fetch(`${API_BASE_URL}/api/monitoring/sessions/${result.sessionId}/end`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
-            } catch (error) {
-              console.error(
-                "[EndSession] Error uploading captures or ending backend session:",
-                error
+              await authManager.authenticatedFetch(
+                `/api/monitoring/sessions/${result.sessionId}/captures`,
+                {
+                  method: "POST",
+                  body: JSON.stringify({ captures: result.captures }),
+                }
               );
             }
+
+            // ALWAYS end backend session (triggers summarization)
+            console.log(`[EndSession] Triggering backend summarization`);
+            await authManager.authenticatedFetch(
+              `/api/monitoring/sessions/${result.sessionId}/end`,
+              { method: "POST" }
+            );
+          } catch (error) {
+            console.error("[EndSession] Error:", error);
+          }
+
+          // Hide watching pill after successful end
+          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+            watchingPillWindow.hide();
           }
 
           return result;
@@ -1039,13 +1036,16 @@ function setupMonitoringSessionHandlers() {
         organizationId: config.organizationId,
       });
 
-      // After session starts successfully, show the watching pill
+      // After session starts successfully, show the watching pill if preference allows
       if (!result.error) {
-        if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
-          createWatchingPillWindow();
-        }
-        if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-          watchingPillWindow.show();
+        const shouldShowPill = preferencesService.getShowPillOnSessionStart();
+        if (shouldShowPill) {
+          if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+            createWatchingPillWindow();
+          }
+          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+            watchingPillWindow.show();
+          }
         }
       }
 
@@ -1068,7 +1068,15 @@ function setupMonitoringSessionHandlers() {
   // End the active session
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_END, async () => {
     console.log("[Monitoring Session] Ending session");
-    return monitoringSessionService.endSession();
+    const result = await monitoringSessionService.endSession();
+
+    // Only hide watching pill if preference is enabled
+    const shouldHide = preferencesService.getHidePillOnSessionEnd();
+    if (shouldHide && result.success && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.hide();
+    }
+
+    return result;
   });
 
   // Finalize session: upload captures to backend + trigger summarization
@@ -1181,6 +1189,19 @@ function setupMonitoringSessionHandlers() {
     console.log("[Session Recovery] Discarding session:", sessionId);
     await monitoringSessionService.discardRecoverableSession(sessionId);
     return { success: true };
+  });
+
+  // Preferences IPC handlers
+  ipcMain.handle(IPC_CHANNELS.PREFERENCES_GET, (_, key: string) => {
+    return preferencesService.getPreference(key);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PREFERENCES_SET, (_, key: string, value: boolean) => {
+    return preferencesService.setPreference(key, value);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PREFERENCES_GET_ALL, () => {
+    return preferencesService.getAllPreferences();
   });
 
   console.log("[IPC] Monitoring session handlers registered successfully");
@@ -1387,6 +1408,40 @@ app.on("activate", () => {
     }
     consoleWindow.show();
     consoleWindow.focus();
+  }
+});
+
+// Graceful shutdown: end active session on backend before exit
+let isQuitting = false;
+app.on("before-quit", async (event) => {
+  // Prevent infinite loop
+  if (isQuitting) return;
+
+  // Check if there's an active session
+  const sessionState = monitoringSessionService.getSessionState();
+  if (sessionState && (sessionState.status === "active" || sessionState.status === "paused")) {
+    event.preventDefault(); // Prevent immediate quit
+    isQuitting = true;
+
+    console.log("[Shutdown] Ending active session before quit...");
+
+    try {
+      // End local session and get captures
+      const result = await monitoringSessionService.endSession();
+
+      if (result.success && result.sessionId) {
+        // End on backend (triggers summarization)
+        await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
+          method: "POST",
+        });
+        console.log("[Shutdown] Session ended successfully on backend");
+      }
+    } catch (error) {
+      console.error("[Shutdown] Error ending session:", error);
+    }
+
+    // Now quit for real
+    app.quit();
   }
 });
 

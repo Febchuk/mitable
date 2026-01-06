@@ -7,6 +7,7 @@ import { OrchestratorService } from "../services/orchestrator.service";
 import { workflowService } from "../services/workflow.service";
 import { screenshotLimiter } from "../middleware/rateLimiter.js";
 import { trackAiUsage } from "../middleware/usage.js";
+import { logger } from "../lib/logger.js";
 import type { WindowScreenshot } from "@mitable/shared";
 
 // Initialize orchestrator (replaces old agentService)
@@ -222,7 +223,7 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
       },
     });
   } catch (error) {
-    console.error("Error fetching conversations:", error);
+    logger.error({ err: error }, "Error fetching conversations");
     res.status(500).json({
       error: "Internal Server Error",
       message: error instanceof Error ? error.message : "Failed to fetch conversations",
@@ -352,7 +353,7 @@ router.get(
 
       res.json({ messages });
     } catch (error) {
-      console.error("Error fetching messages:", error);
+      logger.error({ err: error }, "Error fetching messages");
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to fetch messages",
@@ -451,7 +452,7 @@ router.post("/", requireAuth, async (req: Request, res: Response): Promise<void>
       conversation,
     });
   } catch (error) {
-    console.error("Error creating conversation:", error);
+    logger.error({ err: error }, "Error creating conversation");
     res.status(500).json({
       error: "Internal Server Error",
       message: error instanceof Error ? error.message : "Failed to create conversation",
@@ -635,7 +636,7 @@ router.post(
         },
       });
     } catch (error) {
-      console.error("Error sending message:", error);
+      logger.error({ err: error }, "Error sending message");
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to send message",
@@ -756,13 +757,16 @@ router.post(
       metadata?: any;
     } = req.body;
 
-    console.log("[Conversations] Request received:", {
-      conversationId,
-      userId,
-      contentLength: content?.length || 0,
-      screenshotCount: screenshots?.length || 0,
-      metadata,
-    });
+    logger.info(
+      {
+        conversationId,
+        userId,
+        contentLength: content?.length || 0,
+        screenshotCount: screenshots?.length || 0,
+        metadata,
+      },
+      "[Conversations] Request received"
+    );
 
     if (!userId) {
       res.status(401).json({
@@ -846,7 +850,7 @@ router.post(
           createdAt: schema.messages.createdAt,
         });
 
-      console.log(`[Stream] User message saved: ${userMessage.id}`);
+      logger.debug({ messageId: userMessage.id }, "[Stream] User message saved");
 
       // Dual-write to workflow_interactions if this is a workflow question
       if (workflowSessionId && metadata?.workflowAction === "custom_question") {
@@ -858,7 +862,10 @@ router.post(
           currentStepIndex,
           { screenshots }
         );
-        console.log(`[Stream] Workflow interaction saved for user question`);
+        logger.debug(
+          { workflowSessionId },
+          "[Stream] Workflow interaction saved for user question"
+        );
       }
 
       // Get recent conversation history (last 20 messages for context)
@@ -885,19 +892,23 @@ router.post(
       // Reuse user data from earlier query (no need to fetch again!)
       const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
 
-      console.log("[Conversations] User profile (from cache):", {
-        organizationId: user.organizationId,
-        name: fullName,
-        email: user.email,
-      });
+      logger.debug(
+        {
+          organizationId: user.organizationId,
+          name: fullName,
+        },
+        "[Conversations] User profile (from cache)"
+      );
 
-      console.log("[Conversations] ToolContext created:", {
-        conversationId,
-        userId,
-        historyLength: conversationHistory.length,
-        hasUserProfile: !!user,
-        userProfileOrg: user.organizationId,
-      });
+      logger.debug(
+        {
+          conversationId,
+          userId,
+          historyLength: conversationHistory.length,
+          organizationId: user.organizationId,
+        },
+        "[Conversations] ToolContext created"
+      );
 
       // Set up Server-Sent Events (SSE)
       res.setHeader("Content-Type", "text/event-stream");
@@ -917,7 +928,7 @@ router.post(
       let assistantWindowTrigger: any = undefined;
 
       try {
-        console.log("[Conversations] Starting OrchestratorService.processMessage");
+        logger.debug("[Conversations] Starting OrchestratorService.processMessage");
 
         // Stream AI response using multi-agent orchestrator
         const stream = orchestrator.processMessage({
@@ -948,12 +959,15 @@ router.post(
         for await (const chunk of stream) {
           // Log chunk details (only for non-text chunks to avoid spam)
           if (chunk.type !== "chunk") {
-            console.log("[Conversations] Streaming chunk sent:", {
-              type: chunk.type,
-              hasContent: !!chunk.content,
-              hasWindowTrigger: !!(chunk as any).windowTrigger,
-              windowType: (chunk as any).windowTrigger?.window,
-            });
+            logger.debug(
+              {
+                type: chunk.type,
+                hasContent: !!chunk.content,
+                hasWindowTrigger: !!(chunk as any).windowTrigger,
+                windowType: (chunk as any).windowTrigger?.window,
+              },
+              "[Conversations] Streaming chunk sent"
+            );
           }
 
           // Inject workflow metadata into every chunk so frontend knows where to route it
@@ -974,10 +988,13 @@ router.post(
               windowTrigger: (chunk as any).windowTrigger,
             };
 
-            console.log("[Conversations] Emitting window_trigger event:", {
-              window: (chunk as any).windowTrigger.window,
-              hasData: !!(chunk as any).windowTrigger.data,
-            });
+            logger.debug(
+              {
+                window: (chunk as any).windowTrigger.window,
+                hasData: !!(chunk as any).windowTrigger.data,
+              },
+              "[Conversations] Emitting window_trigger event"
+            );
 
             res.write(`data: ${JSON.stringify(windowTriggerEvent)}\n\n`);
           }
@@ -1034,7 +1051,7 @@ router.post(
             id: schema.messages.id,
           });
 
-        console.log(`[Stream] Assistant message saved: ${assistantMessage.id}`);
+        logger.debug({ messageId: assistantMessage.id }, "[Stream] Assistant message saved");
 
         // Dual-write to workflow_interactions if this is a workflow response
         if (assistantWorkflowSessionId) {
@@ -1053,8 +1070,9 @@ router.post(
               workflowAction: metadata?.workflowAction,
             }
           );
-          console.log(
-            `[Stream] Workflow interaction saved for assistant response (${interactionType})`
+          logger.debug(
+            { workflowSessionId: assistantWorkflowSessionId, interactionType },
+            "[Stream] Workflow interaction saved for assistant response"
           );
         }
 
@@ -1070,10 +1088,12 @@ router.post(
           typeof primaryScreenshot.dataUrl === "string"
         ) {
           try {
-            console.log("[DEBUG PII] Saving PII test screenshots...", {
-              screenshotPreview: primaryScreenshot.dataUrl.substring(0, 50),
-              hasMetadata: !!primaryScreenshot.metadata,
-            });
+            logger.debug(
+              {
+                hasMetadata: !!primaryScreenshot.metadata,
+              },
+              "[DEBUG PII] Saving PII test screenshots..."
+            );
             const fs = await import("fs/promises");
             const path = await import("path");
 
@@ -1084,12 +1104,15 @@ router.post(
             const defaultDir = path.join(monorepoRoot, "temp", "pii-debug-screenshots");
             const outputDir = process.env.DEBUG_SCREENSHOTS_DIR || defaultDir;
             const sessionDir = path.join(outputDir, timestamp);
-            console.log("[DEBUG PII] Path resolution:", {
-              processCwd: process.cwd(),
-              monorepoRoot,
-              defaultDir,
-              sessionDir,
-            });
+            logger.debug(
+              {
+                processCwd: process.cwd(),
+                monorepoRoot,
+                defaultDir,
+                sessionDir,
+              },
+              "[DEBUG PII] Path resolution"
+            );
             await fs.mkdir(sessionDir, { recursive: true });
 
             // Save original (after redaction)
@@ -1118,19 +1141,22 @@ router.post(
               )
             );
 
-            console.log("[DEBUG PII] Screenshots saved:", {
-              sessionDir,
-              redactedPath: originalPath,
-              metadataPath,
-            });
+            logger.debug(
+              {
+                sessionDir,
+                redactedPath: originalPath,
+                metadataPath,
+              },
+              "[DEBUG PII] Screenshots saved"
+            );
           } catch (error) {
-            console.error("[DEBUG PII] Failed to save PII test screenshots:", error);
+            logger.error({ err: error }, "[DEBUG PII] Failed to save PII test screenshots");
           }
         }
 
         // Debug: previously saved annotated screenshots, but bounding boxes are no longer produced.
         if (process.env.DEBUG_SAVE_SCREENSHOTS === "true") {
-          console.warn(
+          logger.warn(
             "[DEBUG SCREENSHOT] Annotated screenshot saving is disabled for conversational-only guidance output (no bounding boxes available)."
           );
         }
@@ -1138,7 +1164,7 @@ router.post(
         // Generate conversation title if this is the first exchange
         // conversationHistory includes the just-saved user message, so length <= 2 means first exchange
         if (conversationHistory.length <= 2) {
-          console.log("[Stream] First exchange detected - generating conversation title");
+          logger.debug("[Stream] First exchange detected - generating conversation title");
 
           try {
             const { titleGenerationService } = await import("../services/titleGeneration.service");
@@ -1147,7 +1173,7 @@ router.post(
               assistantContent
             );
 
-            console.log("[Stream] Generated title:", generatedTitle);
+            logger.debug({ title: generatedTitle }, "[Stream] Generated title");
 
             // Update conversation with generated title and timestamp
             await db
@@ -1158,9 +1184,9 @@ router.post(
               })
               .where(eq(schema.conversations.id, conversationId));
 
-            console.log("[Stream] Conversation title updated successfully");
+            logger.debug("[Stream] Conversation title updated successfully");
           } catch (titleError) {
-            console.error("[Stream] Error generating title:", titleError);
+            logger.error({ err: titleError }, "[Stream] Error generating title");
             // Continue even if title generation fails - just update timestamp
             await db
               .update(schema.conversations)
@@ -1185,12 +1211,15 @@ router.post(
           })}\n\n`
         );
 
-        console.log("[Conversations] Streaming completed successfully:", {
-          messageId: assistantMessage.id,
-          contentLength: assistantContent.length,
-        });
+        logger.info(
+          {
+            messageId: assistantMessage.id,
+            contentLength: assistantContent.length,
+          },
+          "[Conversations] Streaming completed successfully"
+        );
       } catch (streamError) {
-        console.error("[Stream] Error during streaming:", streamError);
+        logger.error({ err: streamError }, "[Stream] Error during streaming");
         res.write(
           `data: ${JSON.stringify({
             type: "error",
@@ -1205,7 +1234,7 @@ router.post(
         res.end();
       }
     } catch (error) {
-      console.error("[Stream] Error:", error);
+      logger.error({ err: error }, "[Stream] Error");
       // If headers haven't been sent yet, send JSON error
       if (!res.headersSent) {
         res.status(500).json({
@@ -1255,7 +1284,7 @@ router.post(
       // Pause the workflow
       const pausedWorkflow = await workflowService.pauseWorkflow(activeWorkflow.id);
 
-      console.log("[Conversations] Workflow paused:", activeWorkflow.id);
+      logger.info({ workflowSessionId: activeWorkflow.id }, "[Conversations] Workflow paused");
 
       // Return the updated workflow state (SolutionObject + metadata)
       // Frontend will use this to update WorkflowAccordion's cardData
@@ -1267,7 +1296,7 @@ router.post(
         currentStepIndex: pausedWorkflow.currentStepIndex,
       });
     } catch (error) {
-      console.error("[Conversations] Error pausing workflow:", error);
+      logger.error({ err: error }, "[Conversations] Error pausing workflow");
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to pause workflow",

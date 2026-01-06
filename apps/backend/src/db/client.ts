@@ -18,7 +18,7 @@ export const pool = new Pool({
 // Create Drizzle instance
 export const db = drizzle(pool, { schema });
 
-// Connection pool event listeners for monitoring
+// Connection pool error handler (keep only error logging)
 pool.on("error", (err) => {
   console.error("❌ Unexpected database pool error:", err);
   console.error("Pool stats:", {
@@ -28,45 +28,12 @@ pool.on("error", (err) => {
   });
 });
 
-pool.on("connect", () => {
-  if (config.nodeEnv === "development") {
-    console.log("🔌 New database connection established");
-  }
-});
-
-// Throttle pool stats logging to reduce noise (max once per second)
-let lastPoolLogTime = 0;
-const POOL_LOG_THROTTLE_MS = 1000;
-
-pool.on("acquire", () => {
-  if (config.nodeEnv === "development") {
-    const now = Date.now();
-    if (now - lastPoolLogTime > POOL_LOG_THROTTLE_MS) {
-      console.log(
-        `📊 Pool stats - Total: ${pool.totalCount}, Idle: ${pool.idleCount}, Waiting: ${pool.waitingCount}`
-      );
-      lastPoolLogTime = now;
-    }
-  }
-});
-
-pool.on("remove", () => {
-  if (config.nodeEnv === "development") {
-    console.log("🔌 Database connection removed from pool");
-  }
-});
-
 // Test database connection
 export async function testConnection() {
   try {
     const client = await pool.connect();
     const result = await client.query("SELECT NOW()");
     console.log("✅ Database connected:", result.rows[0].now);
-    console.log("📊 Initial pool stats:", {
-      total: pool.totalCount,
-      idle: pool.idleCount,
-      waiting: pool.waitingCount,
-    });
     client.release();
     return true;
   } catch (error) {

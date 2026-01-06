@@ -35,6 +35,12 @@ const IPC_CHANNELS = {
   SESSION_SHOW_RECOVERY_DIALOG: "session-show-recovery-dialog",
   // Navigation
   NAVIGATE_TO_ACTIVE_SESSION: "navigate-to-active-session",
+  // Preferences
+  PREFERENCES_GET: "preferences-get",
+  PREFERENCES_SET: "preferences-set",
+  PREFERENCES_GET_ALL: "preferences-get-all",
+  // Watching pill
+  WATCHING_PILL_HIDE: "watching-pill-hide",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -270,6 +276,24 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       ipcRenderer.removeListener("update-error", handler);
     };
   },
+
+  // Preferences API
+  getPreference: (key: string): Promise<boolean | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PREFERENCES_GET, key),
+
+  setPreference: (key: string, value: boolean): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PREFERENCES_SET, key, value),
+
+  getAllPreferences: (): Promise<{
+    session: {
+      hidePillOnSessionEnd: boolean;
+      dontAskHidePillAgain: boolean;
+      showPillOnSessionStart: boolean;
+    };
+  }> => ipcRenderer.invoke(IPC_CHANNELS.PREFERENCES_GET_ALL),
+
+  // Hide watching pill
+  hidePill: () => ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE),
 });
 
 console.log("[Preload] Console preload script finished - window.consoleAPI exposed");
