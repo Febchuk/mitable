@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { createLogger } from "../../../../../../../lib/logger";
+
+const logger = createLogger("GitHubConnectDialog");
 import {
   Dialog,
   DialogContent,
@@ -56,7 +59,7 @@ export default function GitHubConnectDialog({
       onOpenChange(false);
       onConnect();
     } catch (err) {
-      console.error("Error starting GitHub install:", err);
+      logger.error("Error starting GitHub install:", err);
       setError(err instanceof Error ? err.message : "Failed to connect to GitHub");
     } finally {
       setIsConnecting(false);

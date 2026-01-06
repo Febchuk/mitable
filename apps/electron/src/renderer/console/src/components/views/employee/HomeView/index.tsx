@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useUser } from "../../../../context/UserContext";
 import { ArrowUp } from "lucide-react";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("HomeView");
 
 export default function HomeView() {
   const { user } = useUser();
@@ -10,7 +13,7 @@ export default function HomeView() {
     e.preventDefault();
     if (!inputValue.trim()) return;
     // TODO: Handle help request submission
-    console.log("Help request:", inputValue);
+    logger.info("Help request:", inputValue);
     setInputValue("");
   };
 

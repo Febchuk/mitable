@@ -17,6 +17,9 @@
 import type { SelectedWindowInfo, WatchableWindow, WatchState } from "@mitable/shared";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
 import { isBrowserApp, parseBrowserTitle, isSystemApp } from "../utils/browserTitleParser";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger("WindowDetection");
 // Dynamic import for get-windows (ESM-only package) - see getAllVisibleWindows()
 
 // Type declaration for get-windows package
@@ -46,6 +49,9 @@ class WindowDetectionService {
   // Last detected OS windows keyed by windowId (stringified)
   private lastDetectedWindows: Map<string, GetWindowsResult> = new Map();
 
+  // Track if we've logged the permission warning to avoid spam
+  private permissionWarningLogged = false;
+
   // Exact window titles of our own Electron renderers to exclude
   private readonly MITABLE_WINDOW_TITLES: Set<string> = new Set([
     "Mitable Agent",
@@ -58,7 +64,7 @@ class WindowDetectionService {
   ]);
 
   constructor() {
-    console.log("[WindowDetectionService] Initialized");
+    logger.info(" Initialized");
   }
 
   /**
@@ -74,7 +80,7 @@ class WindowDetectionService {
       // Get all windows using get-windows library
       const allWindows = await openWindows();
 
-      console.log(`[WindowDetectionService] Detected ${allWindows.length} total windows`);
+      logger.info(` Detected ${allWindows.length} total windows`);
 
       const policy = getCapturePolicy();
       const watchableWindows: WatchableWindow[] = [];
@@ -86,7 +92,7 @@ class WindowDetectionService {
         this.lastDetectedWindows.set(windowId, window);
         // Skip Mitable's own windows
         if (this.isMitableWindow(window.title)) {
-          console.log(`[WindowDetectionService] Skipping Mitable window: ${window.title}`);
+          logger.info(` Skipping Mitable window: ${window.title}`);
           continue;
         }
 
@@ -100,7 +106,7 @@ class WindowDetectionService {
 
         // Skip system apps (Finder, Notification Center, etc.)
         if (isSystemApp(appName)) {
-          console.log(`[WindowDetectionService] Skipping system app: ${appName}`);
+          logger.info(` Skipping system app: ${appName}`);
           continue;
         }
 
@@ -125,7 +131,7 @@ class WindowDetectionService {
 
         watchableWindows.push(watchableWindow);
 
-        console.log(`[WindowDetectionService] Window detected:`, {
+        logger.info(` Window detected:`, {
           app: appName,
           title: windowTitle.substring(0, 50) + (windowTitle.length > 50 ? "..." : ""),
           blocked: policyDecision.blocked,
@@ -133,13 +139,13 @@ class WindowDetectionService {
         });
       }
 
-      console.log(
+      logger.info(
         `[WindowDetectionService] Returning ${watchableWindows.length} watchable windows`
       );
       return watchableWindows;
     } catch (error) {
-      console.error("[WindowDetectionService] Failed to get windows:", error);
-      console.error("[WindowDetectionService] Error details:", {
+      logger.error(" Failed to get windows:", error);
+      logger.error(" Error details:", {
         name: (error as Error)?.name,
         message: (error as Error)?.message,
         stack: (error as Error)?.stack,
@@ -167,10 +173,10 @@ class WindowDetectionService {
       return false;
     }
     this.selectedWindows.set(window.windowId, window);
-    console.log(
+    logger.info(
       `[WindowDetectionService] Added window to watch list: ${window.appName} (${window.windowTitle}) [${window.windowId}]`
     );
-    console.log(`[WindowDetectionService] Now watching ${this.selectedWindows.size} windows`);
+    logger.info(` Now watching ${this.selectedWindows.size} windows`);
     return true;
   }
 
@@ -183,8 +189,8 @@ class WindowDetectionService {
   removeWindow(windowId: string): boolean {
     const removed = this.selectedWindows.delete(windowId);
     if (removed) {
-      console.log(`[WindowDetectionService] Removed window from watch list: ${windowId}`);
-      console.log(`[WindowDetectionService] Now watching ${this.selectedWindows.size} windows`);
+      logger.info(` Removed window from watch list: ${windowId}`);
+      logger.info(` Now watching ${this.selectedWindows.size} windows`);
     }
     return removed;
   }
@@ -241,12 +247,12 @@ class WindowDetectionService {
   clearAll(): void {
     const count = this.selectedWindows.size;
     this.selectedWindows.clear();
-    console.log(`[WindowDetectionService] Cleared all ${count} windows from watch list`);
+    logger.info(` Cleared all ${count} windows from watch list`);
 
     // Also clear last detected OS windows when we stop watching
     const lastDetectedCount = this.lastDetectedWindows.size;
     this.lastDetectedWindows.clear();
-    console.log(
+    logger.info(
       `[WindowDetectionService] Cleared ${lastDetectedCount} entries from lastDetectedWindows`
     );
   }
@@ -273,7 +279,7 @@ class WindowDetectionService {
   setWatchingMode(watching: boolean): void {
     // isWatching is derived from selectedWindows.size > 0
     // No separate flag to set
-    console.log(
+    logger.info(
       `[WindowDetectionService] Watch mode toggle: ${watching} (actual: ${this.selectedWindows.size > 0})`
     );
   }
@@ -316,21 +322,27 @@ class WindowDetectionService {
         if (!openWindowIds.has(windowId)) {
           closedWindows.push(windowInfo);
           this.selectedWindows.delete(windowId);
-          console.log(
+          logger.info(
             `[WindowDetectionService] Window closed, removed from watch list: ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowId}]`
           );
         }
       }
 
       if (closedWindows.length > 0) {
-        console.log(
+        logger.info(
           `[WindowDetectionService] Removed ${closedWindows.length} closed windows, now watching ${this.selectedWindows.size}`
         );
       }
 
       return closedWindows;
     } catch (error) {
-      console.error("[WindowDetectionService] Error checking for closed windows:", error);
+      // Only log once to avoid spam (permission issues will persist)
+      if (!this.permissionWarningLogged) {
+        logger.warn(
+          " Screen Recording permission may not be granted. Closed window detection disabled. Grant permission in System Settings > Privacy & Security > Screen Recording."
+        );
+        this.permissionWarningLogged = true;
+      }
       return [];
     }
   }

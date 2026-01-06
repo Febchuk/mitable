@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger("usePreferences");
 
 interface SessionPreferences {
   hidePillOnSessionEnd: boolean;
@@ -21,7 +24,7 @@ export function usePreferences() {
         const prefs = await window.consoleAPI.getAllPreferences();
         setPreferences(prefs);
       } catch (error) {
-        console.error("[usePreferences] Failed to load:", error);
+        logger.error(" Failed to load:", error);
       } finally {
         setIsLoading(false);
       }
@@ -40,7 +43,7 @@ export function usePreferences() {
       }
       return result;
     } catch (error) {
-      console.error("[usePreferences] Failed to update:", error);
+      logger.error(" Failed to update:", error);
       return { success: false, error: String(error) };
     }
   }, []);

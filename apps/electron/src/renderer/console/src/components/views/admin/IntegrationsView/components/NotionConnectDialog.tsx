@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { createLogger } from "../../../../../../../lib/logger";
+
+const logger = createLogger("NotionConnectDialog");
 import {
   Dialog,
   DialogContent,
@@ -62,7 +65,7 @@ export default function NotionConnectDialog({
       // Call onConnect callback to trigger polling
       onConnect();
     } catch (err) {
-      console.error("Error starting Notion OAuth:", err);
+      logger.error("Error starting Notion OAuth:", err);
       setError(err instanceof Error ? err.message : "Failed to connect to Notion");
     } finally {
       setIsConnecting(false);

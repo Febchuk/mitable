@@ -23,6 +23,13 @@ import {
 } from "../prompts/session-prompts";
 import { FrameAnalysisResult } from "./frame-analysis.service";
 import { withRetry } from "../utils/retry";
+import {
+  createSessionLogger,
+  createContentHash,
+  createTimer,
+  CHECKPOINTS,
+  SESSION_EVENTS,
+} from "../lib/sessionLogger";
 
 // Configuration
 const STORY_CONFIG = {
@@ -66,7 +73,17 @@ class MasterStoryService {
    * Only call this when progression_detected === true
    */
   async extendStory(context: StoryContext): Promise<StoryUpdateResult> {
-    const startTime = Date.now();
+    const timer = createTimer("MasterStory.extendStory");
+    const log = createSessionLogger({
+      sessionId: context.sessionId,
+      userId: context.userId,
+    });
+
+    log.debug("Starting story extension", {
+      action: context.frameAnalysis.summaryOfAction,
+      app: context.windowInfo.appName,
+      hasGoalContext: !!context.goalContext,
+    });
 
     try {
       // Get current story from database
@@ -80,6 +97,20 @@ class MasterStoryService {
 
       const currentStory = currentSummary?.narrativeSummary || "";
       const currentVersion = currentSummary?.version || 0;
+      const currentStoryHash = createContentHash(currentStory);
+
+      // CHECKPOINT: Log current story retrieval for debugging duplicate bug
+      log.checkpoint(CHECKPOINTS.MASTER_STORY_EXTEND, {
+        stage: "current_story_retrieved",
+        currentVersion,
+        currentStoryLength: currentStory.length,
+        currentStoryHash,
+        currentStoryPrefix: currentStory.slice(0, 150),
+        queryParams: {
+          sessionId: context.sessionId,
+          summaryType: "master_story",
+        },
+      });
 
       // Get user context for the prompt
       const userContext = await this.getUserContext(context.userId);
@@ -94,6 +125,12 @@ class MasterStoryService {
         currentStory: this.truncateStory(currentStory),
         latestAction: context.frameAnalysis.summaryOfAction,
         goalContext: context.goalContext,
+      });
+
+      // Log the AI prompt for debugging
+      log.logAIInteraction("storyteller_prompt", `${system}\n\n${user}`, undefined, {
+        model: STORY_CONFIG.MODEL,
+        inputStoryHash: currentStoryHash,
       });
 
       // Generate updated story
@@ -120,6 +157,16 @@ class MasterStoryService {
         throw new Error("Empty story generated");
       }
 
+      const updatedStoryHash = createContentHash(updatedStory);
+
+      // Log the AI response
+      log.logAIInteraction("storyteller_response", "", rawStory, {
+        model: STORY_CONFIG.MODEL,
+        inputStoryHash: currentStoryHash,
+        outputStoryHash: updatedStoryHash,
+        tokensUsed: response.usage?.total_tokens,
+      });
+
       // Save to database
       const newVersion = currentVersion + 1;
       await db.insert(sessionSummaries).values({
@@ -129,33 +176,53 @@ class MasterStoryService {
         narrativeSummary: updatedStory,
         modelUsed: STORY_CONFIG.MODEL,
         tokenCount: response.usage?.total_tokens || 0,
-        generationTimeMs: Date.now() - startTime,
+        generationTimeMs: timer.elapsed(),
       });
 
-      console.log(
-        `[MasterStory] Updated story for session ${context.sessionId} ` +
-          `(v${newVersion}, ${updatedStory.length} chars)`
-      );
+      // CHECKPOINT: Log story save for debugging
+      log.checkpoint(CHECKPOINTS.MASTER_STORY_EXTEND, {
+        stage: "story_saved",
+        newVersion,
+        newStoryLength: updatedStory.length,
+        newStoryHash: updatedStoryHash,
+        newStoryPrefix: updatedStory.slice(0, 150),
+        tokensUsed: response.usage?.total_tokens || 0,
+        durationMs: timer.elapsed(),
+      });
+
+      log.info("Story extended successfully", {
+        version: newVersion,
+        storyLength: updatedStory.length,
+        durationMs: timer.elapsed(),
+      });
+
+      // Track analytics event
+      log.trackEvent(SESSION_EVENTS.MASTER_STORY_EXTENDED, {
+        version: newVersion,
+        storyLength: updatedStory.length,
+        tokensUsed: response.usage?.total_tokens || 0,
+        durationMs: timer.elapsed(),
+      });
 
       return {
         success: true,
         version: newVersion,
         storyLength: updatedStory.length,
         tokensUsed: response.usage?.total_tokens || 0,
-        latencyMs: Date.now() - startTime,
+        latencyMs: timer.elapsed(),
       };
     } catch (error) {
-      console.error(
-        `[MasterStory] Failed to extend story for session ${context.sessionId}:`,
-        error
-      );
+      log.error("Failed to extend story", {
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: timer.elapsed(),
+      });
 
       return {
         success: false,
         version: 0,
         storyLength: 0,
         tokensUsed: 0,
-        latencyMs: Date.now() - startTime,
+        latencyMs: timer.elapsed(),
         error: error instanceof Error ? error.message : String(error),
       };
     }
@@ -163,8 +230,14 @@ class MasterStoryService {
 
   /**
    * Get the current master story for a session
+   * CRITICAL: This is a key debugging point for the duplicate summary bug.
+   * We log exactly what query is executed and what is returned.
    */
   async getCurrentStory(sessionId: string): Promise<string | null> {
+    const log = createSessionLogger({ sessionId });
+
+    log.debug("Retrieving current master story", { sessionId });
+
     const summary = await db.query.sessionSummaries.findFirst({
       where: and(
         eq(sessionSummaries.sessionId, sessionId),
@@ -173,7 +246,32 @@ class MasterStoryService {
       orderBy: desc(sessionSummaries.version),
     });
 
-    return summary?.narrativeSummary || null;
+    const story = summary?.narrativeSummary || null;
+
+    // CHECKPOINT: Critical for debugging duplicate bug
+    // Log exactly what was retrieved for which session
+    log.checkpoint(CHECKPOINTS.MASTER_STORY_RETRIEVAL, {
+      querySessionId: sessionId,
+      resultFound: !!summary,
+      resultVersion: summary?.version ?? null,
+      resultStoryLength: story?.length ?? 0,
+      resultStoryHash: story ? createContentHash(story) : null,
+      resultStoryPrefix: story ? story.slice(0, 150) : null,
+      resultSessionIdFromDb: summary?.sessionId ?? null,
+      // CRITICAL: Check if the returned sessionId matches the query
+      sessionIdMatch: summary?.sessionId === sessionId,
+    });
+
+    // Alert if there's a mismatch (this would indicate a serious bug)
+    if (summary && summary.sessionId !== sessionId) {
+      log.error("CRITICAL: Session ID mismatch in getCurrentStory!", {
+        querySessionId: sessionId,
+        returnedSessionId: summary.sessionId,
+        version: summary.version,
+      });
+    }
+
+    return story;
   }
 
   /**
@@ -209,6 +307,14 @@ class MasterStoryService {
    * @param goalContext Optional goal context including Linear issue, related docs
    */
   async initializeStory(sessionId: string, goalContext?: GoalContext): Promise<void> {
+    const log = createSessionLogger({ sessionId });
+
+    log.debug("Initializing master story", {
+      hasGoalContext: !!goalContext,
+      hasLinearIssue: !!goalContext?.linearIssueId,
+      hasRelatedDocs: !!goalContext?.relatedDocsContext,
+    });
+
     let initialStory = "";
 
     if (goalContext?.sessionGoal || goalContext?.linearIssueTitle) {
@@ -223,6 +329,8 @@ class MasterStoryService {
       }
     }
 
+    const initialStoryHash = createContentHash(initialStory);
+
     await db.insert(sessionSummaries).values({
       sessionId,
       version: 0,
@@ -233,9 +341,19 @@ class MasterStoryService {
       generationTimeMs: 0,
     });
 
-    console.log(
-      `[MasterStory] Initialized story for session ${sessionId}${goalContext?.sessionGoal ? ` with goal` : ""}`
-    );
+    // CHECKPOINT: Log story initialization
+    log.checkpoint(CHECKPOINTS.MASTER_STORY_INIT, {
+      version: 0,
+      initialStoryLength: initialStory.length,
+      initialStoryHash,
+      hasGoal: !!goalContext?.sessionGoal,
+      hasLinearIssue: !!goalContext?.linearIssueId,
+      goalPreview: goalContext?.sessionGoal?.slice(0, 100) ?? null,
+    });
+
+    log.info("Story initialized", {
+      hasGoal: !!goalContext?.sessionGoal,
+    });
   }
 
   /**
@@ -246,12 +364,15 @@ class MasterStoryService {
     seniority: string;
     workContext: string;
   }> {
+    const log = createSessionLogger({ sessionId: "system", userId });
+
     try {
       const user = await db.query.users.findFirst({
         where: eq(users.id, userId),
       });
 
       if (!user) {
+        log.debug("User not found, using default context", { userId });
         return {
           role: "Team member",
           seniority: "",
@@ -268,7 +389,10 @@ class MasterStoryService {
         workContext: "Working on their tasks", // Could be enhanced with team/project data
       };
     } catch (error) {
-      console.warn("[MasterStory] Failed to get user context:", error);
+      log.warn("Failed to get user context", {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         role: "Team member",
         seniority: "",

@@ -2,6 +2,9 @@ import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-d
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger("ConsoleApp");
 import { UserProvider, useUser } from "./context/UserContext";
 import { useSubscription } from "./hooks/queries/billing";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,6 +19,7 @@ import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
+import { monitoringKeys } from "./hooks/queries/monitoring";
 import SettingsView from "./components/views/employee/SettingsView";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
@@ -36,26 +40,32 @@ function NavigationHandler() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Skip if not running in Electron or preload script not ready
+    if (!window.consoleAPI) {
+      logger.warn(" window.consoleAPI not available - IPC navigation disabled");
+      return;
+    }
+
     // Listen for navigation requests from main process (e.g., from Agent window)
-    window.consoleAPI.onNavigateToChat((conversationId: string) => {
-      console.log("[Console] Navigating to chat:", conversationId);
+    window.consoleAPI.onNavigateToChat?.((conversationId: string) => {
+      logger.info(" Navigating to chat:", conversationId);
       navigate(`/chats/${conversationId}`);
     });
 
     // Listen for active session navigation (from native notification click)
-    window.consoleAPI.onNavigateToActiveSession(async () => {
-      console.log("[Console] Navigate to active session requested");
+    window.consoleAPI.onNavigateToActiveSession?.(async () => {
+      logger.info(" Navigate to active session requested");
       try {
-        const sessionState = await window.consoleAPI.getMonitoringSessionState();
+        const sessionState = await window.consoleAPI?.getMonitoringSessionState();
         if (sessionState?.id) {
-          console.log("[Console] Navigating to active session:", sessionState.id);
+          logger.info(" Navigating to active session:", sessionState.id);
           navigate(`/monitoring/${sessionState.id}`);
         } else {
-          console.log("[Console] No active session found, navigating to monitoring view");
+          logger.info(" No active session found, navigating to monitoring view");
           navigate("/monitoring");
         }
       } catch (error) {
-        console.error("[Console] Error getting session state:", error);
+        logger.error(" Error getting session state:", error);
         navigate("/monitoring");
       }
     });
@@ -69,15 +79,22 @@ function MonitoringSessionHandler() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    window.consoleAPI.onMonitoringSessionUpdate((state) => {
-      console.log("[Console] Monitoring session update:", state?.status, state?.id);
+    // Skip if not running in Electron or preload script not ready
+    if (!window.consoleAPI) {
+      return;
+    }
+
+    const unsubscribe = window.consoleAPI.onMonitoringSessionUpdate?.((state) => {
+      logger.info(" Monitoring session update:", state?.status, state?.id);
 
       // Invalidate session queries on any status change (paused, active, ended)
       if (state?.id) {
-        queryClient.invalidateQueries({ queryKey: ["monitoring", "session", state.id] });
-        queryClient.invalidateQueries({ queryKey: ["monitoring", "sessions"] });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.session(state.id) });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
       }
     });
+
+    return () => unsubscribe?.();
   }, [queryClient]);
 
   return null;
@@ -139,7 +156,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   // Log startup configuration
   useEffect(() => {
-    console.log("[CONFIG] Console App Environment:", {
+    logger.info(" Console App Environment:", {
       apiUrl: import.meta.env.VITE_API_URL || "undefined (will use localhost:3000)",
       supabaseUrl: import.meta.env.VITE_SUPABASE_URL || "undefined",
       mode: import.meta.env.MODE,

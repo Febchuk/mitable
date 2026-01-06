@@ -8,6 +8,9 @@ import type { Value } from "platejs";
 import type { PlateEditor } from "platejs/react";
 
 import { deserializeMd, serializeMd } from "@platejs/markdown";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger("MarkdownUtils");
 
 /**
  * Serialize Plate editor value to Markdown string
@@ -22,7 +25,7 @@ export function plateToMarkdown(editor: PlateEditor, value?: Value): string {
       value: value || editor.children,
     });
   } catch (error) {
-    console.error("Error serializing to markdown:", error);
+    logger.error("Error serializing to markdown:", error);
     // Fallback: extract plain text
     return value
       ? value.map((node) => extractText(node)).join("\n\n")
@@ -52,7 +55,7 @@ export function markdownToPlate(editor: PlateEditor, markdown: string): Value {
 
     return result;
   } catch (error) {
-    console.error("Error deserializing markdown:", error);
+    logger.error("Error deserializing markdown:", error);
     // Fallback: wrap in paragraph
     return markdown.split("\n\n").map((paragraph) => ({
       type: "p",

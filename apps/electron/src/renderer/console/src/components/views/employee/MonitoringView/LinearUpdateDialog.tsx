@@ -6,6 +6,10 @@
  */
 
 import { useState, useEffect } from "react";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("LinearUpdateDialog");
+
 import {
   Dialog,
   DialogContent,
@@ -136,7 +140,7 @@ export default function LinearUpdateDialog({
         setIssues(data.issues || []);
       }
     } catch (error) {
-      console.error("Error loading issues:", error);
+      logger.error("Error loading issues:", error);
     } finally {
       setIsLoadingIssues(false);
     }
@@ -156,7 +160,7 @@ export default function LinearUpdateDialog({
         setTeams(data.teams || []);
       }
     } catch (error) {
-      console.error("Error loading teams:", error);
+      logger.error("Error loading teams:", error);
     }
   };
 
@@ -235,7 +239,7 @@ export default function LinearUpdateDialog({
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      console.error("Error sending to Linear:", error);
+      logger.error("Error sending to Linear:", error);
       toast({
         title: "Failed to Send",
         description: error instanceof Error ? error.message : "Unknown error",

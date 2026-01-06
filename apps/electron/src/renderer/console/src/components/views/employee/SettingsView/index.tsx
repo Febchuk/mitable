@@ -6,6 +6,9 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("SettingsView");
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -72,7 +75,7 @@ export default function SettingsView() {
         setLinearStatus(data);
       }
     } catch (error) {
-      console.error("Error loading Linear status:", error);
+      logger.error("Error loading Linear status:", error);
     } finally {
       setIsLoading(false);
     }
@@ -95,7 +98,7 @@ export default function SettingsView() {
         setGmailStatus(data);
       }
     } catch (error) {
-      console.error("Error loading Gmail status:", error);
+      logger.error("Error loading Gmail status:", error);
     } finally {
       setIsGmailLoading(false);
     }
@@ -158,14 +161,14 @@ export default function SettingsView() {
             }
           }
         } catch (err) {
-          console.error("Polling error:", err);
+          logger.error("Polling error:", err);
         }
       }, 2000);
 
       // Stop polling after 2 minutes
       setTimeout(() => clearInterval(pollInterval), 120000);
     } catch (error) {
-      console.error("Error connecting Linear:", error);
+      logger.error("Error connecting Linear:", error);
       toast({
         title: "Connection Failed",
         description: "Failed to connect to Linear. Please try again.",
@@ -197,7 +200,7 @@ export default function SettingsView() {
         });
       }
     } catch (error) {
-      console.error("Error disconnecting Linear:", error);
+      logger.error("Error disconnecting Linear:", error);
       toast({
         title: "Error",
         description: "Failed to disconnect Linear. Please try again.",
@@ -265,14 +268,14 @@ export default function SettingsView() {
             }
           }
         } catch (err) {
-          console.error("Polling error:", err);
+          logger.error("Polling error:", err);
         }
       }, 2000);
 
       // Stop polling after 2 minutes
       setTimeout(() => clearInterval(pollInterval), 120000);
     } catch (error) {
-      console.error("Error connecting Gmail:", error);
+      logger.error("Error connecting Gmail:", error);
       toast({
         title: "Connection Failed",
         description: "Failed to connect to Gmail. Please try again.",
@@ -304,7 +307,7 @@ export default function SettingsView() {
         });
       }
     } catch (error) {
-      console.error("Error disconnecting Gmail:", error);
+      logger.error("Error disconnecting Gmail:", error);
       toast({
         title: "Error",
         description: "Failed to disconnect Gmail. Please try again.",

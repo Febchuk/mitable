@@ -13,6 +13,9 @@
 import { BrowserWindow, ipcMain } from "electron";
 import * as fs from "fs";
 import { IPC_CHANNELS } from "@mitable/shared";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger("RecoveryManager");
 import { checkpointService, SessionCheckpoint } from "./checkpointService";
 
 export interface RecoveryOption {
@@ -47,7 +50,7 @@ class RecoveryManager {
    */
   private setupIpcHandlers(): void {
     // Get incomplete sessions for recovery dialog
-    ipcMain.handle(IPC_CHANNELS.SESSION_GET_INCOMPLETE, async () => {
+    ipcMain.handle(IPC_CHANNELS.SESSION_GET_RECOVERABLE, async () => {
       return this.getRecoveryOptions();
     });
 
@@ -60,16 +63,6 @@ class RecoveryManager {
     ipcMain.handle(IPC_CHANNELS.SESSION_DISCARD, async (_event, sessionId: string) => {
       return this.discardSession(sessionId);
     });
-
-    // Recover all sessions
-    ipcMain.handle(IPC_CHANNELS.SESSION_RECOVER_ALL, async () => {
-      return this.recoverAllSessions();
-    });
-
-    // Discard all sessions
-    ipcMain.handle(IPC_CHANNELS.SESSION_DISCARD_ALL, async () => {
-      return this.discardAllSessions();
-    });
   }
 
   /**
@@ -80,11 +73,11 @@ class RecoveryManager {
     const checkpoints = await checkpointService.getIncompleteCheckpoints();
 
     if (checkpoints.length === 0) {
-      console.log("[Recovery] No incomplete sessions found");
+      logger.info(" No incomplete sessions found");
       return false;
     }
 
-    console.log(`[Recovery] Found ${checkpoints.length} incomplete session(s)`);
+    logger.info(` Found ${checkpoints.length} incomplete session(s)`);
 
     // Store for recovery
     this.pendingRecoveries.clear();
@@ -167,7 +160,7 @@ class RecoveryManager {
       // Mark as recovered in pending (will be removed when fully recovered)
       this.pendingRecoveries.delete(sessionId);
 
-      console.log(`[Recovery] Session ${sessionId} recovered successfully`);
+      logger.info(` Session ${sessionId} recovered successfully`);
 
       return {
         sessionId,
@@ -175,7 +168,7 @@ class RecoveryManager {
         success: true,
       };
     } catch (error) {
-      console.error(`[Recovery] Failed to recover session ${sessionId}:`, error);
+      logger.error(` Failed to recover session ${sessionId}:`, error);
 
       return {
         sessionId,
@@ -203,7 +196,7 @@ class RecoveryManager {
 
       this.pendingRecoveries.delete(sessionId);
 
-      console.log(`[Recovery] Session ${sessionId} discarded`);
+      logger.info(` Session ${sessionId} discarded`);
 
       return {
         sessionId,
@@ -211,7 +204,7 @@ class RecoveryManager {
         success: true,
       };
     } catch (error) {
-      console.error(`[Recovery] Failed to discard session ${sessionId}:`, error);
+      logger.error(` Failed to discard session ${sessionId}:`, error);
 
       return {
         sessionId,
@@ -259,10 +252,10 @@ class RecoveryManager {
     try {
       if (fs.existsSync(localPath)) {
         await fs.promises.rm(localPath, { recursive: true, force: true });
-        console.log(`[Recovery] Deleted local frames at ${localPath}`);
+        logger.info(` Deleted local frames at ${localPath}`);
       }
     } catch (error) {
-      console.warn(`[Recovery] Failed to delete local frames at ${localPath}:`, error);
+      logger.warn(` Failed to delete local frames at ${localPath}:`, error);
     }
   }
 

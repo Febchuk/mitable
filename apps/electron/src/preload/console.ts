@@ -6,7 +6,15 @@ import type {
   WatchableWindow,
 } from "@mitable/shared";
 
-console.log("[Preload] Console preload script starting...");
+// Simple logger for preload - console.log outputs to DevTools
+// Note: electron-log/preload doesn't work well when bundled, so using plain console
+const logger = {
+  info: (msg: string, ...args: unknown[]) => console.log(`[ConsolePreload]${msg}`, ...args),
+  warn: (msg: string, ...args: unknown[]) => console.warn(`[ConsolePreload]${msg}`, ...args),
+  error: (msg: string, ...args: unknown[]) => console.error(`[ConsolePreload]${msg}`, ...args),
+};
+
+logger.info(" Preload script starting...");
 
 // IPC channel constants (inlined to avoid chunking issues)
 const IPC_CHANNELS = {
@@ -46,17 +54,17 @@ const IPC_CHANNELS = {
 contextBridge.exposeInMainWorld("consoleAPI", {
   // Screenshot capture - multi-window capture with policy filtering
   captureScreenshot: async (): Promise<MultiWindowCaptureResult> => {
-    console.log("[Console Preload] Multi-window captureScreenshot() called from renderer");
+    logger.info(" Multi-window captureScreenshot() called from renderer");
     const result = await ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREENSHOT);
 
     if (result && result.success) {
-      console.log("[Console Preload] Multi-window capture successful:", {
+      logger.info(" Multi-window capture successful:", {
         screenshotCount: result.screenshots.length,
         blockedCount: result.blockedWindows.length,
         totalDetected: result.totalWindowsDetected,
       });
     } else if (result && !result.success) {
-      console.warn("[Console Preload] Capture blocked or failed:", result.error);
+      logger.warn(" Capture blocked or failed:", result.error);
     }
 
     return result;
@@ -68,9 +76,9 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     windows: WatchableWindow[];
     error?: string;
   }> => {
-    console.log("[Console Preload] getVisibleWindows() called");
+    logger.info(" getVisibleWindows() called");
     const result = await ipcRenderer.invoke(IPC_CHANNELS.WATCH_WINDOWS_GET_ALL);
-    console.log("[Console Preload] getVisibleWindows result:", {
+    logger.info(" getVisibleWindows result:", {
       success: result?.success,
       windowCount: result?.windows?.length ?? 0,
     });
@@ -90,7 +98,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   // Drafts navigation (Update Buddy)
   onDraftsNavigate: (callback: (draftId: string) => void) => {
     ipcRenderer.on(IPC_CHANNELS.DRAFTS_NAVIGATE, (_event: IpcRendererEvent, draftId: string) => {
-      console.log("[Console Preload] Drafts navigate received:", draftId);
+      logger.info(" Drafts navigate received:", draftId);
       callback(draftId);
     });
   },
@@ -224,7 +232,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   // Navigation - Navigate to active monitoring session
   onNavigateToActiveSession: (callback: () => void) => {
     ipcRenderer.on(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION, () => {
-      console.log("[Console Preload] Navigate to active session received");
+      logger.info(" Navigate to active session received");
       callback();
     });
   },
@@ -296,4 +304,4 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   hidePill: () => ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE),
 });
 
-console.log("[Preload] Console preload script finished - window.consoleAPI exposed");
+logger.info(" Console preload script finished - window.consoleAPI exposed");

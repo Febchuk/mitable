@@ -20,6 +20,12 @@ import {
   ExtractedArtifact,
   FrameSignals,
 } from "../prompts/session-prompts";
+import {
+  createSessionLogger,
+  createTimer,
+  CHECKPOINTS,
+  SESSION_EVENTS,
+} from "../lib/sessionLogger";
 
 // Types
 export interface FrameAnalysisInput {
@@ -72,6 +78,25 @@ class FrameAnalysisService {
    * @param input Frame analysis input including optional goal context
    */
   async analyzeFrame(input: FrameAnalysisInput): Promise<FrameAnalysisResult> {
+    const timer = createTimer("FrameAnalysis.analyzeFrame");
+    const log = createSessionLogger({ sessionId: input.sessionId });
+
+    log.debug("Starting frame analysis", {
+      frameId: input.frameId,
+      isFirstFrame: input.previousFrame === null,
+      appName: input.windowInfo.appName,
+      hasGoalContext: !!input.goalContext,
+    });
+
+    // CHECKPOINT: Frame analysis start
+    log.checkpoint(CHECKPOINTS.FRAME_ANALYSIS_START, {
+      frameId: input.frameId,
+      isFirstFrame: input.previousFrame === null,
+      appName: input.windowInfo.appName,
+      windowTitle: input.windowInfo.windowTitle,
+      hasGoalContext: !!input.goalContext,
+    });
+
     // Build prompt with goal context if available
     const { system: systemPrompt, user: userPrompt } = buildProgressionDetectorPrompt(
       input.goalContext
@@ -90,7 +115,10 @@ class FrameAnalysisService {
       const progressionResult = parseProgressionResponse(visionResult.content);
 
       if (!progressionResult) {
-        console.warn(`[FrameAnalysis] Failed to parse response for frame ${input.frameId}`);
+        log.warn("Failed to parse progression response", {
+          frameId: input.frameId,
+          responsePreview: visionResult.content.slice(0, 200),
+        });
         return this.createFallbackResult(input, visionResult);
       }
 
@@ -98,7 +126,7 @@ class FrameAnalysisService {
       const isFirstFrame = input.previousFrame === null;
       const deltaChanged = isFirstFrame || progressionResult.progression_detected;
 
-      return {
+      const result: FrameAnalysisResult = {
         frameId: input.frameId,
         progressionDetected: progressionResult.progression_detected,
         summaryOfAction: progressionResult.summary_of_action,
@@ -124,8 +152,46 @@ class FrameAnalysisService {
           total: visionResult.usage.totalTokens,
         },
       };
+
+      // CHECKPOINT: Frame analysis complete
+      log.checkpoint(CHECKPOINTS.FRAME_ANALYSIS_COMPLETE, {
+        frameId: input.frameId,
+        progressionDetected: result.progressionDetected,
+        deltaChanged: result.deltaChanged,
+        changeType: result.changeType,
+        changeMagnitude: result.changeMagnitude,
+        hasBlocker: result.signals.has_blocker,
+        hasOutcome: result.signals.has_outcome,
+        onTask: result.onTask,
+        confidence: result.confidence,
+        durationMs: timer.elapsed(),
+        tokensUsed: result.tokenUsage.total,
+      });
+
+      log.debug("Frame analysis completed", {
+        frameId: input.frameId,
+        progressionDetected: result.progressionDetected,
+        durationMs: timer.elapsed(),
+      });
+
+      // Track analytics event
+      log.trackEvent(SESSION_EVENTS.FRAME_ANALYZED, {
+        frameId: input.frameId,
+        progressionDetected: result.progressionDetected,
+        deltaChanged: result.deltaChanged,
+        hasBlocker: result.signals.has_blocker,
+        hasOutcome: result.signals.has_outcome,
+        confidence: result.confidence,
+        durationMs: timer.elapsed(),
+      });
+
+      return result;
     } catch (error) {
-      console.error(`[FrameAnalysis] Error analyzing frame ${input.frameId}:`, error);
+      log.error("Error analyzing frame", {
+        frameId: input.frameId,
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: timer.elapsed(),
+      });
       throw error;
     }
   }

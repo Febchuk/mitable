@@ -19,6 +19,9 @@ import { app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger("LocalFrameStorage");
 
 export interface FrameMetadata {
   frameId: string;
@@ -185,7 +188,7 @@ class LocalFrameStorage {
     await this.saveManifest(config.sessionId, manifest);
     this.currentManifest = manifest;
 
-    console.log(`[LocalStorage] Initialized session folder: ${sessionPath}`);
+    logger.info(` Initialized session folder: ${sessionPath}`);
     return sessionPath;
   }
 
@@ -241,7 +244,7 @@ class LocalFrameStorage {
     await this.saveManifest(sessionId, manifest);
     this.currentManifest = manifest;
 
-    console.log(`[LocalStorage] Saved frame ${frameId} (${manifest.totalFrameCount} total)`);
+    logger.info(` Saved frame ${frameId} (${manifest.totalFrameCount} total)`);
     return frameMetadata;
   }
 
@@ -254,7 +257,7 @@ class LocalFrameStorage {
     try {
       return await fs.promises.readFile(framePath);
     } catch (error) {
-      console.error(`[LocalStorage] Failed to read frame ${filename}:`, error);
+      logger.error(` Failed to read frame ${filename}:`, error);
       return null;
     }
   }
@@ -366,7 +369,7 @@ class LocalFrameStorage {
     await this.saveManifest(sessionId, manifest);
     this.currentManifest = manifest;
 
-    console.log(
+    logger.info(
       `[LocalStorage] Session ${sessionId} ended with ${topKFrameIds.length} top-K frames`
     );
   }
@@ -491,7 +494,7 @@ class LocalFrameStorage {
       const data = await fs.promises.readFile(manifestPath, "utf-8");
       return JSON.parse(data) as SessionManifest;
     } catch (error) {
-      console.error(`[LocalStorage] Failed to load manifest for ${sessionId}:`, error);
+      logger.error(` Failed to load manifest for ${sessionId}:`, error);
       return null;
     }
   }
@@ -506,7 +509,7 @@ class LocalFrameStorage {
       const data = JSON.stringify(manifest, null, 2);
       await fs.promises.writeFile(manifestPath, data, "utf-8");
     } catch (error) {
-      console.error(`[LocalStorage] Failed to save manifest for ${sessionId}:`, error);
+      logger.error(` Failed to save manifest for ${sessionId}:`, error);
       throw error;
     }
   }
@@ -527,14 +530,14 @@ class LocalFrameStorage {
     try {
       if (fs.existsSync(sessionPath)) {
         await fs.promises.rm(sessionPath, { recursive: true, force: true });
-        console.log(`[LocalStorage] Deleted session folder: ${sessionPath}`);
+        logger.info(` Deleted session folder: ${sessionPath}`);
       }
 
       if (this.currentManifest?.sessionId === sessionId) {
         this.currentManifest = null;
       }
     } catch (error) {
-      console.error(`[LocalStorage] Failed to delete session ${sessionId}:`, error);
+      logger.error(` Failed to delete session ${sessionId}:`, error);
       throw error;
     }
   }
@@ -549,7 +552,7 @@ class LocalFrameStorage {
       });
       return entries.filter((e) => e.isDirectory()).map((e) => e.name);
     } catch (error) {
-      console.error("[LocalStorage] Failed to list sessions:", error);
+      logger.error(" Failed to list sessions:", error);
       return [];
     }
   }
@@ -613,7 +616,7 @@ class LocalFrameStorage {
       }
     }
 
-    console.log(`[LocalStorage] Cleaned up ${deletedCount} old sessions`);
+    logger.info(` Cleaned up ${deletedCount} old sessions`);
     return deletedCount;
   }
 }

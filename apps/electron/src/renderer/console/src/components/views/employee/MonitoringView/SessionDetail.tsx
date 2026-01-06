@@ -7,6 +7,9 @@
 
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("SessionDetail");
 import { useParams, useNavigate } from "react-router-dom";
 import {
   useSession,
@@ -190,7 +193,7 @@ export default function SessionDetail() {
         setIsConnectingGmail(false);
       }, 120000);
     } catch (error) {
-      console.error("Error starting Gmail OAuth:", error);
+      logger.error("Error starting Gmail OAuth:", error);
       toast({
         title: "Error",
         description: "Failed to start Gmail authorization. Please try again.",
@@ -227,7 +230,7 @@ export default function SessionDetail() {
         navigate("/settings");
       }
     } catch (error) {
-      console.error("Error checking Linear status:", error);
+      logger.error("Error checking Linear status:", error);
       navigate("/settings");
     }
   };
@@ -394,14 +397,10 @@ export default function SessionDetail() {
 
       // 2. Upload captures to backend (so summarization can use them)
       if (electronResult.captures && electronResult.captures.length > 0) {
-        console.log(
-          `[SessionDetail] Uploading ${electronResult.captures.length} captures to backend`
-        );
+        logger.info(`Uploading ${electronResult.captures.length} captures to backend`);
         await uploadCaptures(sessionId, electronResult.captures);
       } else {
-        console.log(
-          "[SessionDetail] No captures to upload (session may have been ended from pill)"
-        );
+        logger.info("No captures to upload (session may have been ended from pill)");
       }
 
       // 3. Trigger backend summarization
@@ -420,7 +419,7 @@ export default function SessionDetail() {
         setShowSessionEndToast(true);
       }
     } catch (error) {
-      console.error("[SessionDetail] Error ending session:", error);
+      logger.error("Error ending session:", error);
       toast({
         title: "Error",
         description: "Failed to end session. Please try again.",
@@ -466,7 +465,7 @@ export default function SessionDetail() {
         description: "Screenshot capture has been paused.",
       });
     } catch (error) {
-      console.error("[SessionDetail] Error pausing session:", error);
+      logger.error("Error pausing session:", error);
       toast({
         title: "Error",
         description: "Failed to pause session.",
@@ -490,7 +489,7 @@ export default function SessionDetail() {
         description: "Screenshot capture has resumed.",
       });
     } catch (error) {
-      console.error("[SessionDetail] Error resuming session:", error);
+      logger.error("Error resuming session:", error);
       toast({
         title: "Error",
         description: "Failed to resume session.",

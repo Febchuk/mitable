@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowUp } from "lucide-react";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("NewChat");
 import { useCreateConversation } from "@/console/src/hooks/queries/chats";
 
 export default function NewChat() {
@@ -23,7 +26,7 @@ export default function NewChat() {
       // Navigate to the new chat detail page
       navigate(`/chats/${result.conversation.id}`);
     } catch (error) {
-      console.error("Failed to create conversation:", error);
+      logger.error("Failed to create conversation:", error);
       // TODO: Show error toast
     }
   };

@@ -7,6 +7,9 @@
 
 import { useState, useEffect } from "react";
 import { useUser } from "@/console/src/context/UserContext";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("StartSessionDialog");
 import {
   Dialog,
   DialogContent,
@@ -105,7 +108,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
       setLinearIssues(issues);
       setShowLinearPicker(true);
     } catch (err) {
-      console.error("Failed to load Linear issues:", err);
+      logger.error("Failed to load Linear issues:", err);
     } finally {
       setIsLoadingLinear(false);
     }
@@ -151,7 +154,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
         setError(result?.error || "Failed to detect windows. Please try again.");
       }
     } catch (err) {
-      console.error("Error loading windows:", err);
+      logger.error("Error loading windows:", err);
       setError("Failed to detect windows. Please try again.");
     } finally {
       setIsLoadingWindows(false);
@@ -248,7 +251,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
       setSelectedLinearIssue(null);
       setShowLinearPicker(false);
     } catch (err) {
-      console.error("Error starting session:", err);
+      logger.error("Error starting session:", err);
       setError("Failed to start session. Please try again.");
     } finally {
       setIsStarting(false);

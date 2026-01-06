@@ -6,6 +6,9 @@
 import { app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger("FrameQueue");
 
 export interface QueuedFrame {
   id: string;
@@ -58,12 +61,12 @@ class FrameQueueService {
         const parsed = JSON.parse(data);
         this.queue = parsed.queue || [];
         this.failedFrames = parsed.failed || [];
-        console.log(
+        logger.info(
           `[FrameQueue] Loaded ${this.queue.length} pending, ${this.failedFrames.length} failed frames from disk`
         );
       }
     } catch (error) {
-      console.error("[FrameQueue] Failed to load queue from disk:", error);
+      logger.error(" Failed to load queue from disk:", error);
       this.queue = [];
       this.failedFrames = [];
     }
@@ -85,7 +88,7 @@ class FrameQueueService {
       );
       await fs.promises.writeFile(this.queueFilePath, data, "utf-8");
     } catch (error) {
-      console.error("[FrameQueue] Failed to save queue to disk:", error);
+      logger.error(" Failed to save queue to disk:", error);
     }
   }
 
@@ -103,7 +106,7 @@ class FrameQueueService {
     await this.saveQueue();
     this.emit("frame_queued", queuedFrame);
 
-    console.log(`[FrameQueue] Frame ${frame.frameId} queued (total: ${this.queue.length})`);
+    logger.info(` Frame ${frame.frameId} queued (total: ${this.queue.length})`);
 
     // Try to process immediately if online and not already processing
     if (this.isOnline && !this.isProcessing) {
@@ -135,14 +138,14 @@ class FrameQueueService {
           if (frame.retryCount < this.maxRetries) {
             // Re-queue for retry
             this.queue.push(frame);
-            console.warn(
+            logger.warn(
               `[FrameQueue] Frame ${frame.frameId} failed (attempt ${frame.retryCount}/${this.maxRetries}): ${frame.lastError}`
             );
           } else {
             // Move to failed queue
             this.failedFrames.push(frame);
             this.emit("frame_failed", frame);
-            console.error(
+            logger.error(
               `[FrameQueue] Frame ${frame.frameId} permanently failed after ${this.maxRetries} attempts`
             );
           }
@@ -194,7 +197,7 @@ class FrameQueueService {
       this.processQueue();
     }
 
-    console.log("[FrameQueue] Started automatic processing");
+    logger.info("[FrameQueue] Started automatic processing");
   }
 
   /**
@@ -205,7 +208,7 @@ class FrameQueueService {
       clearInterval(this.processingTimer);
       this.processingTimer = null;
     }
-    console.log("[FrameQueue] Stopped automatic processing");
+    logger.info("[FrameQueue] Stopped automatic processing");
   }
 
   /**
@@ -216,7 +219,7 @@ class FrameQueueService {
     this.isOnline = online;
 
     if (online && wasOffline && this.queue.length > 0) {
-      console.log("[FrameQueue] Back online, processing queue...");
+      logger.info("[FrameQueue] Back online, processing queue...");
       this.processQueue();
     }
   }

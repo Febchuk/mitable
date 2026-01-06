@@ -3,6 +3,9 @@
  */
 
 import { authService } from "./authService";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger("API");
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -41,7 +44,7 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     const refreshToken = authService.getRefreshToken();
     if (refreshToken) {
       try {
-        console.log("[API] Token expired, attempting refresh...");
+        logger.info(" Token expired, attempting refresh...");
         const refreshResponse = await authService.refreshToken(refreshToken);
         authService.saveTokens(
           refreshResponse.session.access_token,
@@ -49,9 +52,9 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
         );
         token = refreshResponse.session.access_token;
         response = await makeRequest(token);
-        console.log("[API] Token refreshed, request retried successfully");
+        logger.info(" Token refreshed, request retried successfully");
       } catch (refreshError) {
-        console.error("[API] Token refresh failed:", refreshError);
+        logger.error(" Token refresh failed:", refreshError);
         // Refresh failed - clear tokens and redirect to login
         authService.clearTokens();
         window.location.href = "/login";

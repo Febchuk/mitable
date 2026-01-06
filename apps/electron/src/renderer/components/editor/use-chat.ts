@@ -3,6 +3,9 @@
 import * as React from "react";
 
 import { type UseChatHelpers, useChat as useBaseChat } from "@ai-sdk/react";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger("EditorChat");
 import { faker } from "@faker-js/faker";
 import { AIChatPlugin, aiCommentToRange } from "@platejs/ai/react";
 import { getCommentKey, getTransientCommentKey } from "@platejs/comment";
@@ -126,7 +129,7 @@ export const useChat = () => {
         const aiComment = data.data.comment!;
         const range = aiCommentToRange(editor, aiComment);
 
-        if (!range) return console.warn("No range found for AI comment");
+        if (!range) return logger.warn("No range found for AI comment");
 
         const discussions = editor.getOption(discussionPlugin, "discussions") || [];
 

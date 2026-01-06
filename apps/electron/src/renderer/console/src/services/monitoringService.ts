@@ -6,6 +6,9 @@
 
 import { apiRequest } from "./api";
 import type { MonitoringSessionState, SelectedWindowInfo } from "@mitable/shared";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger("MonitoringService");
 
 // ===========================
 // Types
@@ -330,7 +333,7 @@ export async function fetchLinearIssues(): Promise<LinearIssue[]> {
     return response.issues;
   } catch (error) {
     // Return empty array if Linear is not connected or request fails
-    console.warn("[MonitoringService] Failed to fetch Linear issues:", error);
+    logger.warn(" Failed to fetch Linear issues:", error);
     return [];
   }
 }

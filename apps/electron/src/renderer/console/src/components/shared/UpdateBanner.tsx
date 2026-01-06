@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { Download, X, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger("UpdateBanner");
 
 interface UpdateInfo {
   version: string;
@@ -24,7 +27,7 @@ export function UpdateBanner() {
   useEffect(() => {
     // Listen for update available
     const unsubscribeAvailable = window.consoleAPI?.onUpdateAvailable((info) => {
-      console.log("[UpdateBanner] Update available:", info);
+      logger.info(" Update available:", info);
       setUpdateInfo(info);
       setIsDismissed(false);
       setError(null);
@@ -32,13 +35,13 @@ export function UpdateBanner() {
 
     // Listen for download progress
     const unsubscribeProgress = window.consoleAPI?.onUpdateDownloadProgress((progress) => {
-      console.log("[UpdateBanner] Download progress:", progress);
+      logger.info(" Download progress:", progress);
       setDownloadProgress(progress);
     });
 
     // Listen for download complete
     const unsubscribeDownloaded = window.consoleAPI?.onUpdateDownloaded((info) => {
-      console.log("[UpdateBanner] Update downloaded:", info);
+      logger.info(" Update downloaded:", info);
       setIsDownloading(false);
       setDownloadProgress(null);
       setIsReadyToInstall(true);
@@ -47,7 +50,7 @@ export function UpdateBanner() {
 
     // Listen for errors
     const unsubscribeError = window.consoleAPI?.onUpdateError((err) => {
-      console.error("[UpdateBanner] Update error:", err);
+      logger.error(" Update error:", err);
       setError(err.message);
       setIsDownloading(false);
       setDownloadProgress(null);
@@ -67,7 +70,7 @@ export function UpdateBanner() {
       setError(null);
       await window.consoleAPI?.downloadUpdate();
     } catch (err) {
-      console.error("[UpdateBanner] Download failed:", err);
+      logger.error(" Download failed:", err);
       setIsDownloading(false);
       setDownloadProgress(null);
       setError(err instanceof Error ? err.message : "Download failed");
@@ -84,7 +87,7 @@ export function UpdateBanner() {
       await window.consoleAPI?.installUpdate();
       // App will quit and install
     } catch (error) {
-      console.error("[UpdateBanner] Install failed:", error);
+      logger.error(" Install failed:", error);
     }
   };
 

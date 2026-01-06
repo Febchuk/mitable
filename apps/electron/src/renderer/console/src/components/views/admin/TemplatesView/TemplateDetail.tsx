@@ -1,4 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("TemplateDetail");
+
 import {
   ArrowLeft,
   Edit,
@@ -55,7 +59,7 @@ export default function TemplateDetail() {
         });
         setExpandedWeeks(expanded);
       } catch (err) {
-        console.error("Failed to load template detail:", err);
+        logger.error("Failed to load template detail:", err);
         setError(err instanceof Error ? err.message : "Failed to load template details");
       } finally {
         setLoading(false);

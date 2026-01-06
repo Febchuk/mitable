@@ -1,6 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createLogger } from "../../../../../../lib/logger";
+
+const logger = createLogger("PersonDetail");
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -36,7 +39,7 @@ export default function PersonDetail() {
         const userData = await fetchUserDetail(id);
         setPerson(userData);
       } catch (err) {
-        console.error("Failed to load user detail:", err);
+        logger.error("Failed to load user detail:", err);
         setError(err instanceof Error ? err.message : "Failed to load user details");
       } finally {
         setLoading(false);

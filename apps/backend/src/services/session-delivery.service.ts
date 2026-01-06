@@ -13,6 +13,13 @@ import { eq } from "drizzle-orm";
 import { slackService } from "./slack.service.js";
 import { gmailService } from "./gmail.service.js";
 import { encryptionService } from "./encryption.service.js";
+import {
+  createSessionLogger,
+  createTimer,
+  CHECKPOINTS,
+  SESSION_EVENTS,
+  createContentHash,
+} from "../lib/sessionLogger";
 
 // ===========================
 // Types
@@ -77,6 +84,16 @@ class SessionDeliveryService {
    */
   async deliverSummary(options: DeliveryOptions): Promise<DeliveryResult> {
     const { sessionId, target, customMessage } = options;
+    const timer = createTimer("SessionDelivery.deliverSummary");
+    const log = createSessionLogger({ sessionId });
+
+    // CHECKPOINT: Delivery start
+    log.checkpoint(CHECKPOINTS.DELIVERY_START, {
+      targetType: target.type,
+      targetChannel: target.channelId,
+      targetEmail: target.email,
+      hasCustomMessage: !!customMessage,
+    });
 
     try {
       // Fetch session data
@@ -87,29 +104,97 @@ class SessionDeliveryService {
         .limit(1);
 
       if (!session) {
+        log.warn("Delivery failed: session not found", { sessionId });
+        log.checkpoint(CHECKPOINTS.DELIVERY_FAILED, {
+          reason: "session_not_found",
+          durationMs: timer.elapsed(),
+        });
         return { success: false, error: "Session not found" };
       }
 
       // Ensure we have a summary to deliver
       const summary = session.finalSummary || session.rawActivitySummary;
       if (!summary) {
+        log.warn("Delivery failed: no summary available", { sessionId });
+        log.checkpoint(CHECKPOINTS.DELIVERY_FAILED, {
+          reason: "no_summary",
+          durationMs: timer.elapsed(),
+        });
         return { success: false, error: "No summary available for this session" };
       }
 
+      const summaryHash = createContentHash(summary);
+      log.debug("Delivering summary", {
+        summaryType: session.finalSummary ? "final" : "raw",
+        summaryLength: summary.length,
+        summaryHash,
+      });
+
       // Deliver based on target type
+      let result: DeliveryResult;
       switch (target.type) {
         case "slack":
-          return this.deliverToSlack(session, target, summary, customMessage);
+          result = await this.deliverToSlack(session, target, summary, customMessage);
+          break;
         case "email":
           if (!target.email) {
+            log.checkpoint(CHECKPOINTS.DELIVERY_FAILED, {
+              reason: "missing_email",
+              durationMs: timer.elapsed(),
+            });
             return { success: false, error: "Email address is required for email delivery" };
           }
-          return this.deliverToEmail(session, target.email, summary, customMessage);
+          result = await this.deliverToEmail(session, target.email, summary, customMessage);
+          break;
         default:
+          log.checkpoint(CHECKPOINTS.DELIVERY_FAILED, {
+            reason: "unsupported_target",
+            targetType: target.type,
+            durationMs: timer.elapsed(),
+          });
           return { success: false, error: `Unsupported delivery target: ${target.type}` };
       }
+
+      // Log completion
+      if (result.success) {
+        log.checkpoint(CHECKPOINTS.DELIVERY_COMPLETE, {
+          targetType: target.type,
+          messageTs: result.messageTs,
+          summaryHash,
+          durationMs: timer.elapsed(),
+        });
+        log.trackEvent(SESSION_EVENTS.DELIVERY_SUCCEEDED, {
+          targetType: target.type,
+          durationMs: timer.elapsed(),
+        });
+      } else {
+        log.checkpoint(CHECKPOINTS.DELIVERY_FAILED, {
+          targetType: target.type,
+          error: result.error,
+          durationMs: timer.elapsed(),
+        });
+        log.trackEvent(SESSION_EVENTS.DELIVERY_FAILED, {
+          targetType: target.type,
+          error: result.error,
+          durationMs: timer.elapsed(),
+        });
+      }
+
+      return result;
     } catch (error) {
-      console.error("[SessionDeliveryService] Delivery failed:", error);
+      log.error("Delivery failed with exception", {
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: timer.elapsed(),
+      });
+      log.checkpoint(CHECKPOINTS.DELIVERY_FAILED, {
+        reason: "exception",
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: timer.elapsed(),
+      });
+      log.trackEvent(SESSION_EVENTS.DELIVERY_FAILED, {
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: timer.elapsed(),
+      });
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -125,6 +210,13 @@ class SessionDeliveryService {
     targets: MultiDeliveryTarget[];
   }): Promise<{ results: MultiDeliveryResult[] }> {
     const { sessionId, targets } = options;
+    const timer = createTimer("SessionDelivery.deliverToMultipleTargets");
+    const log = createSessionLogger({ sessionId });
+
+    log.info("Starting multi-target delivery", {
+      targetCount: targets.length,
+      targetTypes: targets.map((t) => t.type),
+    });
 
     // Fetch session data once
     const [session] = await db
@@ -134,6 +226,7 @@ class SessionDeliveryService {
       .limit(1);
 
     if (!session) {
+      log.warn("Multi-target delivery failed: session not found");
       // Return failed for all targets
       return {
         results: targets.map((t) => ({
@@ -148,6 +241,7 @@ class SessionDeliveryService {
 
     const summary = session.finalSummary || session.rawActivitySummary;
     if (!summary) {
+      log.warn("Multi-target delivery failed: no summary available");
       return {
         results: targets.map((t) => ({
           id: t.id,
@@ -158,6 +252,12 @@ class SessionDeliveryService {
         })),
       };
     }
+
+    const summaryHash = createContentHash(summary);
+    log.debug("Preparing multi-target delivery", {
+      summaryHash,
+      summaryLength: summary.length,
+    });
 
     // Calculate duration and format blocks once
     const duration = this.calculateDuration(session);
@@ -179,7 +279,7 @@ class SessionDeliveryService {
             };
           }
 
-          console.log(`[SessionDeliveryService] Sending email to: ${target.email}`);
+          log.debug("Sending email", { email: target.email });
 
           const emailResult = await this.deliverToEmail(session, target.email, summary);
 
@@ -207,14 +307,15 @@ class SessionDeliveryService {
 
         // For DMs, we need to open a DM channel first
         if (target.type === "dm") {
-          console.log(
-            `[SessionDeliveryService] Opening DM with user: ${target.id} (${target.name})`
-          );
+          log.debug("Opening DM channel", { userId: target.id, userName: target.name });
           try {
             channelId = await slackService.openDM(session.organizationId, target.id);
-            console.log(`[SessionDeliveryService] DM channel opened successfully: ${channelId}`);
+            log.debug("DM channel opened", { channelId, userId: target.id });
           } catch (error) {
-            console.error(`[SessionDeliveryService] Failed to open DM with ${target.id}:`, error);
+            log.error("Failed to open DM", {
+              userId: target.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
             return {
               id: target.id,
               type: target.type,
@@ -226,7 +327,7 @@ class SessionDeliveryService {
         } else {
           // For channels, the id is already the channel ID
           channelId = target.id;
-          console.log(`[SessionDeliveryService] Sending to channel: ${channelId} (${target.name})`);
+          log.debug("Sending to Slack channel", { channelId, channelName: target.name });
         }
 
         // Send the message
@@ -235,14 +336,13 @@ class SessionDeliveryService {
           blocks,
         });
 
-        console.log(
-          `[SessionDeliveryService] Message send result for ${target.type} ${target.name}:`,
-          {
-            ok: result.ok,
-            ts: result.ts,
-            error: result.error,
-          }
-        );
+        log.debug("Slack message send result", {
+          targetType: target.type,
+          targetName: target.name,
+          ok: result.ok,
+          ts: result.ts,
+          error: result.error,
+        });
 
         if (result.ok && result.ts) {
           // Upload sampled screenshots as thread replies
@@ -284,11 +384,13 @@ class SessionDeliveryService {
     // Wait for all deliveries to complete
     const results = await Promise.all(deliveryPromises);
 
-    console.log(
-      `[SessionDeliveryService] Multi-target delivery complete: ${
-        results.filter((r) => r.status === "delivered").length
-      }/${results.length} succeeded`
-    );
+    const successCount = results.filter((r) => r.status === "delivered").length;
+    log.info("Multi-target delivery complete", {
+      successCount,
+      totalCount: results.length,
+      failedCount: results.length - successCount,
+      durationMs: timer.elapsed(),
+    });
 
     return { results };
   }
@@ -657,7 +759,11 @@ class SessionDeliveryService {
    * Update an already-delivered message (e.g., when summary is edited)
    */
   async updateDeliveredMessage(sessionId: string, messageTs: string): Promise<DeliveryResult> {
+    const log = createSessionLogger({ sessionId });
+
     try {
+      log.debug("Updating delivered message", { messageTs });
+
       // Fetch session data
       const [session] = await db
         .select()
@@ -666,15 +772,18 @@ class SessionDeliveryService {
         .limit(1);
 
       if (!session) {
+        log.warn("Update failed: session not found");
         return { success: false, error: "Session not found" };
       }
 
       if (!session.deliveryTarget) {
+        log.warn("Update failed: no delivery target recorded");
         return { success: false, error: "No delivery target recorded" };
       }
 
       const summary = session.finalSummary || session.rawActivitySummary;
       if (!summary) {
+        log.warn("Update failed: no summary available");
         return { success: false, error: "No summary available" };
       }
 
@@ -699,9 +808,18 @@ class SessionDeliveryService {
         }
       );
 
+      if (result.ok) {
+        log.info("Delivered message updated successfully", { messageTs, channelId });
+      } else {
+        log.warn("Failed to update delivered message", { messageTs, error: result.error });
+      }
+
       return { success: result.ok, error: result.error };
     } catch (error) {
-      console.error("[SessionDeliveryService] Update failed:", error);
+      log.error("Update failed with exception", {
+        messageTs,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -757,6 +875,8 @@ class SessionDeliveryService {
     channelId: string,
     threadTs: string
   ): Promise<void> {
+    const log = createSessionLogger({ sessionId });
+
     try {
       // Fetch captures with image data
       const captures = await db
@@ -775,14 +895,18 @@ class SessionDeliveryService {
       const capturesWithImages = captures.filter((c) => c.imageData);
 
       if (capturesWithImages.length === 0) {
-        console.log("[SessionDeliveryService] No screenshots to attach");
+        log.debug("No screenshots to attach to thread");
         return;
       }
 
       // Sample 3-5 key screenshots
       const sampled = this.sampleScreenshots(capturesWithImages, 4);
 
-      console.log(`[SessionDeliveryService] Uploading ${sampled.length} screenshots to thread`);
+      log.debug("Uploading screenshots to thread", {
+        totalCaptures: capturesWithImages.length,
+        sampledCount: sampled.length,
+        threadTs,
+      });
 
       // Upload each screenshot as a thread reply
       for (const capture of sampled) {
@@ -800,10 +924,13 @@ class SessionDeliveryService {
         });
       }
 
-      console.log("[SessionDeliveryService] Screenshots uploaded successfully");
+      log.debug("Screenshots uploaded successfully", { count: sampled.length });
     } catch (error) {
       // Non-critical - log but don't fail delivery
-      console.error("[SessionDeliveryService] Failed to upload screenshots:", error);
+      log.error("Failed to upload screenshots to thread", {
+        error: error instanceof Error ? error.message : String(error),
+        threadTs,
+      });
     }
   }
 

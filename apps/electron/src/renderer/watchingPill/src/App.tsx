@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { MoreVertical, Eye, EyeOff } from "lucide-react";
 import LogoIcon from "@/assets/logo-icon.svg";
 import type { MonitoringSessionState, SelectedWindowInfo } from "@mitable/shared";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger("WatchingPill");
 
 export default function App() {
   // Session state
@@ -20,25 +23,31 @@ export default function App() {
 
   // Subscribe to session and window updates
   useEffect(() => {
+    // Skip if preload API not ready
+    if (!window.watchingPillAPI) {
+      logger.warn(" watchingPillAPI not available - IPC disabled");
+      return;
+    }
+
     // Get initial state
     window.watchingPillAPI.getSessionState().then((state) => {
-      console.log("[WatchingPill] Initial session state:", state);
+      logger.info(" Initial session state:", state);
       setSessionState(state);
     });
 
     window.watchingPillAPI.getSelectedWindows().then((windows) => {
-      console.log("[WatchingPill] Initial selected windows:", windows);
+      logger.info(" Initial selected windows:", windows);
       setSelectedWindows(windows);
     });
 
     // Subscribe to updates
     const unsubSession = window.watchingPillAPI.onSessionUpdate((state) => {
-      console.log("[WatchingPill] Session update:", state);
+      logger.info(" Session update:", state);
       setSessionState(state);
     });
 
     const unsubWindows = window.watchingPillAPI.onWindowsUpdated((windows) => {
-      console.log("[WatchingPill] Windows updated:", windows);
+      logger.info(" Windows updated:", windows);
       setSelectedWindows(windows);
     });
 
@@ -61,12 +70,12 @@ export default function App() {
 
   // Eye button toggles window selector dropdown (main process handles toggle logic)
   const handleEyeClick = async () => {
-    await window.watchingPillAPI.showEyeDropdown();
+    await window.watchingPillAPI?.showEyeDropdown();
   };
 
   // Menu button toggles session controls dropdown (main process handles toggle logic)
   const handleMenuClick = async () => {
-    await window.watchingPillAPI.showMenuDropdown();
+    await window.watchingPillAPI?.showMenuDropdown();
   };
 
   return (

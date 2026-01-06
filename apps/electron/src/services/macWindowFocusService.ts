@@ -1,8 +1,10 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { createLogger } from "../lib/logger";
 // Dynamic import for active-win (ESM-only package) - used in resolveWindowUrlForWatchSelection()
 
 const execFileAsync = promisify(execFile);
+const logger = createLogger("MacWindowFocus");
 
 export interface WindowProcessInfo {
   processId?: number;
@@ -29,9 +31,9 @@ end tell
 
   try {
     await execFileAsync("/usr/bin/osascript", ["-e", script]);
-    console.log("[MacWindowFocusService] Focused app by processId:", processId);
+    logger.info(" Focused app by processId:", processId);
   } catch (error) {
-    console.error("[MacWindowFocusService] Failed to focus app by processId:", processId, error);
+    logger.error(" Failed to focus app by processId:", processId, error);
   }
 }
 
@@ -55,7 +57,7 @@ export async function resolveWindowUrlForWatchSelection(
   }
 
   if (!windowInfo.processId) {
-    console.warn(
+    logger.warn(
       "[MacWindowFocusService] Missing processId for window, falling back to title/app only"
     );
     return fallback;
@@ -72,7 +74,7 @@ export async function resolveWindowUrlForWatchSelection(
     const activeWindow = await activeWin();
 
     if (!activeWindow) {
-      console.warn("[MacWindowFocusService] active-win returned null after focusing app");
+      logger.warn(" active-win returned null after focusing app");
       return fallback;
     }
 
@@ -85,7 +87,7 @@ export async function resolveWindowUrlForWatchSelection(
       typeof activeProcessId === "number" && activeProcessId === windowInfo.processId;
 
     if (!sameProcess) {
-      console.warn("[MacWindowFocusService] Active window processId mismatch after focus attempt", {
+      logger.warn(" Active window processId mismatch after focus attempt", {
         expectedProcessId: windowInfo.processId,
         activeProcessId,
         title,
@@ -98,7 +100,7 @@ export async function resolveWindowUrlForWatchSelection(
       };
     }
 
-    console.log("[MacWindowFocusService] Resolved active window for watch selection", {
+    logger.info(" Resolved active window for watch selection", {
       title,
       appName,
       hasUrl: !!url,
@@ -110,10 +112,7 @@ export async function resolveWindowUrlForWatchSelection(
       url,
     };
   } catch (error) {
-    console.error(
-      "[MacWindowFocusService] Failed to resolve window URL for watch selection",
-      error
-    );
+    logger.error("[MacWindowFocusService] Failed to resolve window URL for watch selection", error);
     return fallback;
   }
 }

@@ -4,6 +4,9 @@ import { useUser } from "../../../context/UserContext";
 import { authService } from "../../../services/authService";
 import type { Message } from "../../../types";
 import type { MultiWindowCaptureResult } from "@mitable/shared";
+import { createLogger } from "../../../../../lib/logger";
+
+const logger = createLogger("useSendMessage");
 
 export interface SendMessageOptions {
   onChunk?: (
@@ -48,7 +51,7 @@ export function useSendMessage(options?: SendMessageOptions) {
     }) => {
       const token = authService.getAccessToken();
 
-      console.log("[useSendMessage] Starting mutation", {
+      logger.info(" Starting mutation", {
         chatId,
         contentLength: content.length,
         hasMetadata: !!metadata,
@@ -68,29 +71,29 @@ export function useSendMessage(options?: SendMessageOptions) {
 
       // Only auto-capture if no capture provided and option is set
       if (!multiWindowCapture && options?.captureScreenshot) {
-        console.log("[useSendMessage] Multi-window screenshot capture requested");
+        logger.info(" Multi-window screenshot capture requested");
 
         if (!window.consoleAPI) {
-          console.error("[useSendMessage] window.consoleAPI is not available!");
+          logger.error(" window.consoleAPI is not available!");
         } else if (!window.consoleAPI.captureScreenshot) {
-          console.error("[useSendMessage] window.consoleAPI.captureScreenshot is not available!");
+          logger.error(" window.consoleAPI.captureScreenshot is not available!");
         } else {
           try {
-            console.log("[useSendMessage] Calling captureScreenshot...");
+            logger.info(" Calling captureScreenshot...");
             multiWindowCapture = await window.consoleAPI.captureScreenshot();
             if (multiWindowCapture?.success) {
-              console.log("[useSendMessage] Multi-window capture successful:", {
+              logger.info(" Multi-window capture successful:", {
                 screenshotCount: multiWindowCapture.screenshots.length,
                 blockedCount: multiWindowCapture.blockedWindows.length,
               });
             } else {
-              console.log(
-                "[useSendMessage] Capture blocked or failed:",
+              logger.info(
+                "Capture blocked or failed:",
                 multiWindowCapture?.success === false ? multiWindowCapture.error : "Unknown"
               );
             }
           } catch (error) {
-            console.error("[useSendMessage] Screenshot capture failed:", error);
+            logger.error(" Screenshot capture failed:", error);
             // Continue without screenshot
           }
         }
