@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { Play } from "lucide-react";
 import type { MonitoringSessionState, SelectedWindowInfo } from "@mitable/shared";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger("MenuDropdownApp");
 
 export default function MenuDropdownApp() {
   const [sessionState, setSessionState] = useState<MonitoringSessionState | null>(null);
@@ -17,7 +20,7 @@ export default function MenuDropdownApp() {
   useEffect(() => {
     // Skip if preload API not ready
     if (!window.dropdownAPI) {
-      console.warn("[MenuDropdownApp] dropdownAPI not available");
+      logger.warn("dropdownAPI not available");
       return;
     }
 

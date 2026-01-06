@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import type { SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger("EyeDropdownApp");
 
 export default function EyeDropdownApp() {
   const [selectedWindows, setSelectedWindows] = useState<SelectedWindowInfo[]>([]);
@@ -10,7 +13,7 @@ export default function EyeDropdownApp() {
   useEffect(() => {
     // Skip if preload API not ready
     if (!window.dropdownAPI) {
-      console.warn("[EyeDropdownApp] dropdownAPI not available");
+      logger.warn("dropdownAPI not available");
       return;
     }
 

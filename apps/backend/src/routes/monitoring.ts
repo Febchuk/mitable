@@ -13,6 +13,12 @@ import { masterStoryService } from "../services/master-story.service.js";
 import { searchService } from "../services/search.service.js";
 import type { GoalContext } from "../prompts/session-prompts.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
+import {
+  createSessionLogger,
+  CHECKPOINTS,
+  SESSION_EVENTS,
+} from "../lib/sessionLogger";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -145,9 +151,6 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
     let relatedDocsContext: string | null = null;
     if (combinedGoalText) {
       try {
-        console.log(
-          `[Monitoring] Retrieving related docs for goal: "${combinedGoalText.substring(0, 100)}..."`
-        );
         const searchResponse = await searchService.search({
           query: combinedGoalText,
           organizationId,
@@ -165,15 +168,9 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
               return `${source}\n${r.text.substring(0, 400)}`;
             })
             .join("\n\n---\n\n");
-
-          console.log(`[Monitoring] Retrieved ${searchResponse.results.length} related docs`);
         }
       } catch (ragError) {
-        // RAG failure shouldn't block session creation
-        console.warn(
-          "[Monitoring] RAG retrieval failed, continuing without related docs:",
-          ragError
-        );
+        // RAG failure shouldn't block session creation - will log after session is created
       }
     }
 
@@ -198,9 +195,33 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       })
       .returning();
 
-    console.log(
-      `[Monitoring] Session started: ${session.id}${computedSessionGoal ? ` (goal: ${computedSessionGoal.substring(0, 50)}...)` : ""}`
-    );
+    // Now we have sessionId, create logger and log checkpoint
+    const log = createSessionLogger({
+      sessionId: session.id,
+      userId,
+      organizationId,
+    });
+
+    log.checkpoint(CHECKPOINTS.SESSION_START, {
+      sessionName: session.name,
+      hasGoal: !!computedSessionGoal,
+      goalPreview: computedSessionGoal?.substring(0, 100),
+      hasLinearIssue: !!linearIssueId,
+      linearIssueId,
+      windowCount: selectedWindows.length,
+      hasRelatedDocs: !!relatedDocsContext,
+      relatedDocsCount: relatedDocsContext
+        ? relatedDocsContext.split("---").length
+        : 0,
+      captureIntervalMs,
+    });
+
+    log.trackEvent(SESSION_EVENTS.SESSION_STARTED, {
+      hasGoal: !!computedSessionGoal,
+      hasLinearIssue: !!linearIssueId,
+      windowCount: selectedWindows.length,
+      hasRelatedDocs: !!relatedDocsContext,
+    });
 
     res.json({
       success: true,
@@ -217,7 +238,10 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       },
     });
   } catch (error) {
-    console.error("[Monitoring] Error starting session:", error);
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error starting session"
+    );
     res.status(500).json({
       error: "Internal Server Error",
       message: error instanceof Error ? error.message : "Failed to start session",
@@ -315,7 +339,10 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
       },
     });
   } catch (error) {
-    console.error("[Monitoring] Error fetching sessions:", error);
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error fetching sessions"
+    );
     res.status(500).json({
       error: "Internal Server Error",
       message: error instanceof Error ? error.message : "Failed to fetch sessions",
@@ -373,7 +400,10 @@ router.get("/sessions/active", requireAuth, async (req: Request, res: Response):
 
     res.json({ session: sessionState });
   } catch (error) {
-    console.error("[Monitoring] Error fetching active session:", error);
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error fetching active session"
+    );
     res.status(500).json({
       error: "Internal Server Error",
       message: error instanceof Error ? error.message : "Failed to fetch active session",
@@ -447,7 +477,10 @@ router.get("/sessions/:id", requireAuth, async (req: Request, res: Response): Pr
       topKFrames,
     });
   } catch (error) {
-    console.error("[Monitoring] Error fetching session:", error);
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId, sessionId: id },
+      "[Monitoring] Error fetching session"
+    );
     res.status(500).json({
       error: "Internal Server Error",
       message: error instanceof Error ? error.message : "Failed to fetch session",
@@ -515,14 +548,30 @@ router.patch("/sessions/:id", requireAuth, async (req: Request, res: Response): 
       .where(eq(schema.monitoringSessions.id, id))
       .returning();
 
-    console.log(`[Monitoring] Session updated: ${id}`, { action, name });
+    // Log session state changes
+    const log = createSessionLogger({ sessionId: id, userId });
+    if (action === "pause") {
+      log.checkpoint(CHECKPOINTS.SESSION_PAUSE, { name: updated.name });
+      log.trackEvent(SESSION_EVENTS.SESSION_PAUSED, {});
+    } else if (action === "resume") {
+      log.checkpoint(CHECKPOINTS.SESSION_RESUME, {
+        name: updated.name,
+        totalPausedMs: updated.totalPausedMs,
+      });
+      log.trackEvent(SESSION_EVENTS.SESSION_RESUMED, {});
+    }
+    log.debug("Session updated", { action, name });
 
     res.json({
       success: true,
       session: updated,
     });
   } catch (error) {
-    console.error("[Monitoring] Error updating session:", error);
+    const log = createSessionLogger({ sessionId: id, userId });
+    log.error("Error updating session", {
+      action,
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json({
       error: "Internal Server Error",
       message: error instanceof Error ? error.message : "Failed to update session",
@@ -573,6 +622,13 @@ router.post(
         return;
       }
 
+      // Create session logger
+      const log = createSessionLogger({
+        sessionId: id,
+        userId,
+        organizationId: session.organizationId,
+      });
+
       // Calculate final duration
       const endTime = new Date();
       const startTime = new Date(session.startedAt).getTime();
@@ -603,19 +659,33 @@ router.post(
         .from(schema.sessionCaptures)
         .where(eq(schema.sessionCaptures.sessionId, id));
 
-      console.log(`[Monitoring] Session ended: ${id}`, {
+      // CHECKPOINT: Session end
+      log.checkpoint(CHECKPOINTS.SESSION_END, {
         captureCount,
         activeDurationMs,
+        totalPausedMs,
+        sessionGoal: session.sessionGoal,
+        linearIssueId: session.linearIssueId,
+        previousStatus: session.status,
+      });
+
+      log.trackEvent(SESSION_EVENTS.SESSION_ENDED, {
+        captureCount,
+        activeDurationMs,
+        totalPausedMs,
+        hasGoal: !!session.sessionGoal,
       });
 
       // Trigger async summary generation (don't await - let it run in background)
       sessionSummarizationService
         .generateSessionSummary(id)
         .then(() => {
-          console.log(`[Monitoring] Summary generated for session ${id}`);
+          log.info("Summary generation completed", { sessionId: id });
         })
         .catch((error) => {
-          console.error(`[Monitoring] Summary generation failed for session ${id}:`, error);
+          log.error("Summary generation failed", {
+            error: error instanceof Error ? error.message : String(error),
+          });
           // Update status to indicate completion (even without summary)
           db.update(schema.monitoringSessions)
             .set({ status: "ready" })
@@ -631,12 +701,12 @@ router.post(
               .update(schema.sessionCaptures)
               .set({ imageData: null })
               .where(eq(schema.sessionCaptures.sessionId, id));
-            console.log(`[Monitoring] Cleared imageData for session ${id} (1 hour cleanup)`);
+            log.debug("Cleared imageData (1 hour cleanup)", { sessionId: id });
           } catch (cleanupError) {
-            console.error(
-              `[Monitoring] Failed to clear imageData for session ${id}:`,
-              cleanupError
-            );
+            log.error("Failed to clear imageData", {
+              error:
+                cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            });
           }
         },
         60 * 60 * 1000
@@ -658,7 +728,11 @@ router.post(
         },
       });
     } catch (error) {
-      console.error("[Monitoring] Error ending session:", error);
+      // Log error with session context if available
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.error("Error ending session", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to end session",
@@ -764,14 +838,21 @@ router.post(
         )
         .returning({ id: schema.sessionCaptures.id });
 
-      console.log(`[Monitoring] ${insertedCaptures.length} captures added to session ${id}`);
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.debug("Captures added", {
+        insertedCount: insertedCaptures.length,
+        hasAnalyzedFrames: captures.some((c: any) => c.deltaChanged !== undefined),
+      });
 
       res.json({
         success: true,
         insertedCount: insertedCaptures.length,
       });
     } catch (error) {
-      console.error("[Monitoring] Error adding captures:", error);
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.error("Error adding captures", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to add captures",
@@ -852,9 +933,16 @@ router.post(
             }
           : undefined;
 
+      // Create session logger for frame analysis
+      const log = createSessionLogger({
+        sessionId: id,
+        userId,
+        organizationId: session.organizationId,
+      });
+
       // Check if frame analysis service is available
       if (!frameAnalysisService.isAvailable()) {
-        console.warn("[Monitoring] Frame analysis service not available (no GROQ_API_KEY)");
+        log.warn("Frame analysis service not available (no GEMINI_API_KEY)", { frameId });
         // Return default analysis when service unavailable
         res.json({
           success: true,
@@ -905,19 +993,21 @@ router.post(
         });
 
         if (!storyUpdateResult.success) {
-          console.warn(
-            `[Monitoring] Master story update failed for frame ${frameId}:`,
-            storyUpdateResult.error
-          );
+          log.warn("Master story update failed", {
+            frameId,
+            error: storyUpdateResult.error,
+          });
         }
       }
 
-      console.log(`[Monitoring] Frame analyzed: ${frameId}`, {
+      log.debug("Frame analyzed", {
+        frameId,
         progressionDetected: analysisResult.progressionDetected,
         changeType: analysisResult.changeType,
         changeMagnitude: analysisResult.changeMagnitude,
         importanceScore,
         storyUpdated: storyUpdateResult?.success ?? false,
+        latencyMs: analysisResult.analysisLatencyMs,
       });
 
       res.json({
@@ -944,7 +1034,11 @@ router.post(
         },
       });
     } catch (error) {
-      console.error("[Monitoring] Error analyzing frame:", error);
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.error("Error analyzing frame", {
+        frameId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to analyze frame",
@@ -1163,7 +1257,10 @@ router.get(
 
       res.json({ captures });
     } catch (error) {
-      console.error("[Monitoring] Error fetching captures:", error);
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error fetching captures"
+      );
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to fetch captures",
@@ -1221,7 +1318,10 @@ router.get(
         finalSummary: session.finalSummary,
       });
     } catch (error) {
-      console.error("[Monitoring] Error fetching summary:", error);
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error fetching summary"
+      );
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to fetch summary",
@@ -1280,7 +1380,10 @@ router.get(
         },
       });
     } catch (error) {
-      console.error("[Monitoring] Error fetching story:", error);
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error fetching story"
+      );
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to fetch story",
@@ -1359,14 +1462,18 @@ router.patch(
         })
         .returning();
 
-      console.log(`[Monitoring] Summary updated for session ${id}`);
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.info("Summary updated by user", { version: newSummary.version });
 
       res.json({
         success: true,
         summary: newSummary,
       });
     } catch (error) {
-      console.error("[Monitoring] Error updating summary:", error);
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.error("Error updating summary", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to update summary",
@@ -1426,11 +1533,15 @@ router.post(
         instruction
       );
 
-      console.log(`[Monitoring] Summary revision generated for session ${id}`);
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.info("Summary revision generated", { instructionLength: instruction.length });
 
       res.json({ suggestion });
     } catch (error) {
-      console.error("[Monitoring] Error revising summary:", error);
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.error("Error revising summary", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to revise summary",
@@ -1592,7 +1703,12 @@ router.post(
         .where(eq(schema.monitoringSessions.id, id));
 
       const successCount = result.results.filter((r) => r.status === "delivered").length;
-      console.log(`[Monitoring] Summary delivered to ${successCount}/${targets.length} targets`);
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.info("Summary delivered", {
+        successCount,
+        totalCount: targets.length,
+        failedCount: targets.length - successCount,
+      });
 
       res.json({
         success: allSucceeded,
@@ -1600,7 +1716,10 @@ router.post(
         deliveredAt: new Date().toISOString(),
       });
     } catch (error) {
-      console.error("[Monitoring] Error delivering summary:", error);
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.error("Error delivering summary", {
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       // Update as failed
       await db
@@ -1661,7 +1780,10 @@ router.post(
 
       res.json({ success: true, deliveredAt: new Date().toISOString() });
     } catch (error) {
-      console.error("[Monitoring] Error marking session as delivered:", error);
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error marking session as delivered"
+      );
       res.status(500).json({
         error: "Internal Server Error",
         message: "Failed to mark session as delivered",
@@ -1705,11 +1827,15 @@ router.delete("/sessions/:id", requireAuth, async (req: Request, res: Response):
     // Cascading delete will remove captures and summaries
     await db.delete(schema.monitoringSessions).where(eq(schema.monitoringSessions.id, id));
 
-    console.log(`[Monitoring] Session deleted: ${id}`);
+    const log = createSessionLogger({ sessionId: id, userId });
+    log.info("Session deleted");
 
     res.json({ success: true });
   } catch (error) {
-    console.error("[Monitoring] Error deleting session:", error);
+    const log = createSessionLogger({ sessionId: id, userId });
+    log.error("Error deleting session", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json({
       error: "Internal Server Error",
       message: error instanceof Error ? error.message : "Failed to delete session",

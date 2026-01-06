@@ -23,6 +23,15 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, desc } from "drizzle-orm";
 import { masterStoryService } from "./master-story.service";
+import {
+  createSessionLogger,
+  createContentHash,
+  createTimer,
+  checkDuplicateSummary,
+  CHECKPOINTS,
+  SESSION_EVENTS,
+} from "../lib/sessionLogger";
+import { logger } from "../lib/logger";
 
 // Configuration
 const SUMMARIZATION_CONFIG = {
@@ -114,25 +123,57 @@ class SessionSummarizationService {
    * Fallback path: Batch screenshot analysis (if master story unavailable)
    */
   async generateSessionSummary(sessionId: string): Promise<SessionSummaryResult> {
-    const startTime = Date.now();
+    const timer = createTimer("SessionSummarization.generateSessionSummary");
+    const log = createSessionLogger({ sessionId });
 
-    console.log(`[SessionSummarization] Starting summary generation for session: ${sessionId}`);
+    log.info("Starting summary generation");
+
+    // CHECKPOINT: Log start of summary generation
+    log.checkpoint(CHECKPOINTS.SUMMARY_GENERATION_START, {
+      stage: "started",
+    });
 
     // 1. Try to use master story (primary path)
     const masterStory = await masterStoryService.getCurrentStory(sessionId);
+    const masterStoryHash = masterStory ? createContentHash(masterStory) : null;
+
+    // CHECKPOINT: Log path decision
+    log.checkpoint(CHECKPOINTS.SUMMARY_PATH_DECISION, {
+      hasMasterStory: !!masterStory,
+      masterStoryLength: masterStory?.length || 0,
+      masterStoryHash,
+      masterStoryPrefix: masterStory?.slice(0, 150) ?? null,
+      pathChosen: masterStory && masterStory.length >= 50 ? "master_story" : "screenshot_fallback",
+    });
 
     if (masterStory && masterStory.length >= 50) {
-      console.log(
-        `[SessionSummarization] Using master story for final summary (${masterStory.length} chars)`
-      );
-      return await this.generateSummaryFromMasterStory(sessionId, masterStory, startTime);
+      log.info("Using master story path for summary", {
+        masterStoryLength: masterStory.length,
+        masterStoryHash,
+      });
+
+      // Track path decision
+      log.trackEvent(SESSION_EVENTS.SUMMARY_PATH_USED, {
+        path: "master_story",
+        masterStoryLength: masterStory.length,
+      });
+
+      return await this.generateSummaryFromMasterStory(sessionId, masterStory, timer);
     }
 
     // 2. Fallback to batch analysis if master story unavailable
-    console.warn(
-      `[SessionSummarization] Master story unavailable or too short (${masterStory?.length || 0} chars), falling back to batch screenshot analysis`
-    );
-    return await this.generateSummaryFromScreenshots(sessionId, startTime);
+    log.warn("Master story unavailable or too short, falling back to screenshot analysis", {
+      masterStoryLength: masterStory?.length || 0,
+    });
+
+    // Track path decision
+    log.trackEvent(SESSION_EVENTS.SUMMARY_PATH_USED, {
+      path: "screenshot_fallback",
+      masterStoryLength: masterStory?.length || 0,
+      reason: !masterStory ? "no_master_story" : "master_story_too_short",
+    });
+
+    return await this.generateSummaryFromScreenshots(sessionId, timer);
   }
 
   /**
@@ -142,8 +183,16 @@ class SessionSummarizationService {
   private async generateSummaryFromMasterStory(
     sessionId: string,
     masterStory: string,
-    startTime: number
+    timer: ReturnType<typeof createTimer>
   ): Promise<SessionSummaryResult> {
+    const log = createSessionLogger({ sessionId });
+    const masterStoryHash = createContentHash(masterStory);
+
+    log.debug("Generating summary from master story", {
+      masterStoryLength: masterStory.length,
+      masterStoryHash,
+    });
+
     // Get session for metadata
     const [session] = await db
       .select()
@@ -152,19 +201,44 @@ class SessionSummarizationService {
       .limit(1);
 
     if (!session) {
+      log.error("Session not found", { sessionId });
       throw new Error(`Session not found: ${sessionId}`);
     }
 
     // Get key activities from frame metadata (already analyzed)
     const keyActivities = await this.getKeyActivitiesFromFrames(sessionId);
 
-    // Optionally refine the master story for delivery
-    const refinedSummary = await this.refineMasterStoryForDelivery(masterStory);
+    // CHECKPOINT: Log input to AI refinement
+    log.checkpoint(CHECKPOINTS.SUMMARY_GENERATION_INPUT, {
+      masterStoryLength: masterStory.length,
+      masterStoryHash,
+      masterStoryPrefix: masterStory.slice(0, 200),
+      keyActivitiesCount: keyActivities.length,
+    });
 
-    const generationTimeMs = Date.now() - startTime;
-    console.log(
-      `[SessionSummarization] Summary generated from master story in ${generationTimeMs}ms`
-    );
+    // Optionally refine the master story for delivery
+    const refinedSummary = await this.refineMasterStoryForDelivery(masterStory, sessionId);
+
+    const generationTimeMs = timer.elapsed();
+    const outputHash = createContentHash(refinedSummary.summary);
+
+    // CHECKPOINT: Log AI refinement output
+    log.checkpoint(CHECKPOINTS.AI_REFINEMENT_OUTPUT, {
+      inputHash: masterStoryHash,
+      outputHash,
+      outputLength: refinedSummary.summary.length,
+      outputPrefix: refinedSummary.summary.slice(0, 200),
+      activitiesCount: refinedSummary.activities.length,
+      accomplishmentsCount: refinedSummary.accomplishments.length,
+      blockersCount: refinedSummary.blockers.length,
+      tokensUsed: refinedSummary.tokenCount,
+      durationMs: generationTimeMs,
+    });
+
+    log.info("Summary generated from master story", {
+      durationMs: generationTimeMs,
+      outputLength: refinedSummary.summary.length,
+    });
 
     const summary = {
       narrativeSummary: refinedSummary.summary,
@@ -192,8 +266,12 @@ class SessionSummarizationService {
    */
   private async generateSummaryFromScreenshots(
     sessionId: string,
-    startTime: number
+    timer: ReturnType<typeof createTimer>
   ): Promise<SessionSummaryResult> {
+    const log = createSessionLogger({ sessionId });
+
+    log.info("Generating summary from screenshots (fallback path)");
+
     // 1. Get session and captures from database
     const [session] = await db
       .select()
@@ -202,6 +280,7 @@ class SessionSummarizationService {
       .limit(1);
 
     if (!session) {
+      log.error("Session not found", { sessionId });
       throw new Error(`Session not found: ${sessionId}`);
     }
 
@@ -211,33 +290,38 @@ class SessionSummarizationService {
       .where(eq(schema.sessionCaptures.sessionId, sessionId))
       .orderBy(schema.sessionCaptures.sequenceNumber);
 
-    console.log(`[SessionSummarization] Found ${captures.length} captures`);
+    log.debug("Found captures for analysis", { captureCount: captures.length });
 
     // 2. Sample captures for analysis (with temporal coverage)
     const sampled = this.sampleCaptures(captures);
-    console.log(`[SessionSummarization] Sampled ${sampled.length} captures for analysis`);
+    log.debug("Sampled captures for analysis", {
+      originalCount: captures.length,
+      sampledCount: sampled.length,
+    });
 
     // 3. Analyze screenshots with Gemini Vision
     const analyses = await this.analyzeScreenshots(sampled);
-    console.log(`[SessionSummarization] Analyzed ${analyses.length} screenshots`);
+    log.debug("Analyzed screenshots", { analysisCount: analyses.length });
 
     // 4. Build episodes from analyses (time-aware segmentation)
     const episodes = this.buildEpisodes(analyses, sampled);
-    console.log(`[SessionSummarization] Segmented into ${episodes.length} episodes`);
+    log.debug("Segmented into episodes", { episodeCount: episodes.length });
 
     // 5. Convert episodes to activities for narrative generation
     const aggregated = this.episodesToActivities(episodes);
-    console.log(`[SessionSummarization] Aggregated into ${aggregated.length} activities`);
+    log.debug("Aggregated activities", { activityCount: aggregated.length });
 
     // 6. Generate narrative summary with episode context
     const summary = await this.generateNarrative(aggregated, analyses, episodes);
 
-    const generationTimeMs = Date.now() - startTime;
-    console.log(
-      `[SessionSummarization] Summary generated from screenshots in ${generationTimeMs}ms`
-    );
+    const generationTimeMs = timer.elapsed();
+    log.info("Summary generated from screenshots", {
+      durationMs: generationTimeMs,
+      captureCount: captures.length,
+      episodeCount: episodes.length,
+    });
 
-    // 6. Save summary to database
+    // 7. Save summary to database
     await this.saveSummary(sessionId, summary, generationTimeMs);
 
     return {
@@ -278,13 +362,24 @@ class SessionSummarizationService {
    * Refine master story for delivery
    * Optionally formats and extracts structured data
    */
-  private async refineMasterStoryForDelivery(masterStory: string): Promise<{
+  private async refineMasterStoryForDelivery(
+    masterStory: string,
+    sessionId: string
+  ): Promise<{
     summary: string;
     activities: string[];
     accomplishments: string[];
     blockers: string[];
     tokenCount: number;
   }> {
+    const log = createSessionLogger({ sessionId });
+    const inputHash = createContentHash(masterStory);
+
+    log.debug("Refining master story for delivery", {
+      inputLength: masterStory.length,
+      inputHash,
+    });
+
     // Use Groq to extract structured data from the master story
     const prompt = `<task>
 Extract structured information from a work session narrative written in first person. Transform the detailed narrative into a concise, delivery-ready summary with key insights.
@@ -337,6 +432,12 @@ Respond with valid JSON only:
 }
 </output_format>`;
 
+    // Log AI prompt for debugging
+    log.logAIInteraction("refinement_prompt", prompt, undefined, {
+      model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+      inputHash,
+    });
+
     const completion = await this.groq.chat.completions.create({
       model: SUMMARIZATION_CONFIG.TEXT_MODEL,
       messages: [{ role: "user", content: prompt }],
@@ -347,8 +448,27 @@ Respond with valid JSON only:
     const response = completion.choices[0]?.message?.content || "";
     const parsed = this.parseJsonResponse(response);
 
+    const outputSummary = parsed.summary || masterStory;
+    const outputHash = createContentHash(outputSummary);
+
+    // Log AI response for debugging
+    log.logAIInteraction("refinement_response", "", response, {
+      model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+      inputHash,
+      outputHash,
+      tokensUsed: completion.usage?.total_tokens,
+      parsedSuccessfully: !!parsed.summary,
+    });
+
+    log.debug("Master story refined", {
+      inputHash,
+      outputHash,
+      outputLength: outputSummary.length,
+      activitiesCount: (parsed.activities || []).length,
+    });
+
     return {
-      summary: parsed.summary || masterStory,
+      summary: outputSummary,
       activities: parsed.activities || [],
       accomplishments: parsed.accomplishments || [],
       blockers: parsed.blockers || [],
@@ -420,9 +540,7 @@ Respond with valid JSON only:
       }
     }
 
-    console.log(
-      `[SessionSummarization] Temporal coverage: ${sampled.length} frames from ${timeBuckets.size} time buckets`
-    );
+    // Note: logging moved to caller for session context
 
     // === STEP 2: Include event boundaries (blockers/outcomes) ===
     const eventFrames = valid.filter(
@@ -487,8 +605,9 @@ Respond with valid JSON only:
         const batchAnalyses = await this.analyzeBatch(batch);
         analyses.push(...batchAnalyses);
       } catch (error) {
-        console.error("[SessionSummarization] Batch analysis failed:", error);
-        // Continue with other batches
+        // Log error but continue with other batches
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error({ error: errorMessage }, "Batch analysis failed");
       }
 
       // Small delay between batches to avoid rate limits
@@ -635,7 +754,9 @@ Respond with JSON:
           })
           .where(eq(schema.sessionCaptures.id, capture.id));
       } catch (error) {
-        console.error(`[SessionSummarization] Failed to analyze capture ${capture.id}:`, error);
+        // Log error and add fallback analysis
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error({ error: errorMessage, captureId: capture.id }, "Failed to analyze capture");
         // Add fallback analysis
         analyses.push({
           captureId: capture.id,
@@ -787,9 +908,7 @@ Respond with JSON:
       episodes.push(currentEpisode);
     }
 
-    console.log(
-      `[SessionSummarization] Built ${episodes.length} episodes from ${analyses.length} frames`
-    );
+    // Note: episode count logged by caller with session context
     return episodes;
   }
 
@@ -1007,6 +1126,31 @@ Respond with JSON:
     summary: Omit<SessionSummaryResult, "generationTimeMs">,
     generationTimeMs: number
   ): Promise<void> {
+    const log = createSessionLogger({ sessionId });
+    const summaryHash = createContentHash(summary.narrativeSummary);
+
+    log.debug("Saving summary to database", {
+      summaryLength: summary.narrativeSummary.length,
+      summaryHash,
+    });
+
+    // CRITICAL: Check for duplicate summary
+    const duplicateCheck = checkDuplicateSummary(sessionId, summary.narrativeSummary);
+    if (duplicateCheck.isDuplicate) {
+      log.error("DUPLICATE SUMMARY DETECTED - same summary hash as another session", {
+        currentSessionId: sessionId,
+        previousSessionId: duplicateCheck.previousSessionId,
+        summaryHash: duplicateCheck.hash,
+        summaryPrefix: summary.narrativeSummary.slice(0, 150),
+      });
+
+      // Track duplicate event
+      log.trackEvent(SESSION_EVENTS.DUPLICATE_DETECTED, {
+        previousSessionId: duplicateCheck.previousSessionId,
+        summaryHash: duplicateCheck.hash,
+      });
+    }
+
     // Get current max version
     const [latestSummary] = await db
       .select({ version: schema.sessionSummaries.version })
@@ -1044,7 +1188,34 @@ Respond with JSON:
       })
       .where(eq(schema.monitoringSessions.id, sessionId));
 
-    console.log(`[SessionSummarization] Summary saved (version ${nextVersion})`);
+    // CHECKPOINT: Log summary save
+    log.checkpoint(CHECKPOINTS.SUMMARY_SAVE, {
+      version: nextVersion,
+      summaryLength: summary.narrativeSummary.length,
+      summaryHash,
+      summaryPrefix: summary.narrativeSummary.slice(0, 150),
+      activitiesCount: summary.activities.length,
+      keyActivitiesCount: summary.keyActivities.length,
+      accomplishmentsCount: summary.accomplishments.length,
+      blockersCount: summary.blockers.length,
+      tokensUsed: summary.tokenCount,
+      generationTimeMs,
+      isDuplicate: duplicateCheck.isDuplicate,
+    });
+
+    log.info("Summary saved", {
+      version: nextVersion,
+      isDuplicate: duplicateCheck.isDuplicate,
+    });
+
+    // Track analytics event
+    log.trackEvent(SESSION_EVENTS.SUMMARY_GENERATED, {
+      version: nextVersion,
+      summaryLength: summary.narrativeSummary.length,
+      activitiesCount: summary.activities.length,
+      tokensUsed: summary.tokenCount,
+      generationTimeMs,
+    });
   }
 
   // Utility methods
@@ -1066,7 +1237,10 @@ Respond with JSON:
       }
       return {};
     } catch (error) {
-      console.error("[SessionSummarization] Failed to parse JSON response:", response);
+      logger.warn(
+        { responsePreview: response.slice(0, 200) },
+        "Failed to parse JSON response from AI"
+      );
       return {};
     }
   }
