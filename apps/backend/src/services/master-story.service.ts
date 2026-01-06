@@ -128,12 +128,10 @@ class MasterStoryService {
       });
 
       // Log the AI prompt for debugging
-      log.logAIInteraction(
-        "storyteller_prompt",
-        `${system}\n\n${user}`,
-        undefined,
-        { model: STORY_CONFIG.MODEL, inputStoryHash: currentStoryHash }
-      );
+      log.logAIInteraction("storyteller_prompt", `${system}\n\n${user}`, undefined, {
+        model: STORY_CONFIG.MODEL,
+        inputStoryHash: currentStoryHash,
+      });
 
       // Generate updated story
       const response = await withRetry(

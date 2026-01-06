@@ -1131,8 +1131,7 @@ Respond with JSON:
     activities: AggregatedActivity[],
     timeBreakdown: Record<string, number>
   ): string {
-    const topApp = Object.entries(timeBreakdown)
-      .sort((a, b) => b[1] - a[1])[0]?.[0];
+    const topApp = Object.entries(timeBreakdown).sort((a, b) => b[1] - a[1])[0]?.[0];
 
     const topActivity = activities[0]?.activity || "various tasks";
 

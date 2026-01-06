@@ -112,10 +112,7 @@ export async function resolveWindowUrlForWatchSelection(
       url,
     };
   } catch (error) {
-    logger.error(
-      "[MacWindowFocusService] Failed to resolve window URL for watch selection",
-      error
-    );
+    logger.error("[MacWindowFocusService] Failed to resolve window URL for watch selection", error);
     return fallback;
   }
 }

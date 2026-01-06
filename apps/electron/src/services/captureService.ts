@@ -710,9 +710,7 @@ class CaptureService {
             },
           },
         });
-        logger.info(
-          `Using cached screenshot for ${app.windowTitle} (fresh failed)`
-        );
+        logger.info(`Using cached screenshot for ${app.windowTitle} (fresh failed)`);
       }
     }
 

@@ -35,14 +35,10 @@ if (typeof window !== "undefined") {
  */
 export function createLogger(scope: string) {
   return {
-    debug: (msg: string, ...args: unknown[]) =>
-      log.debug(`[${scope}]`, msg, ...args),
-    info: (msg: string, ...args: unknown[]) =>
-      log.info(`[${scope}]`, msg, ...args),
-    warn: (msg: string, ...args: unknown[]) =>
-      log.warn(`[${scope}]`, msg, ...args),
-    error: (msg: string, ...args: unknown[]) =>
-      log.error(`[${scope}]`, msg, ...args),
+    debug: (msg: string, ...args: unknown[]) => log.debug(`[${scope}]`, msg, ...args),
+    info: (msg: string, ...args: unknown[]) => log.info(`[${scope}]`, msg, ...args),
+    warn: (msg: string, ...args: unknown[]) => log.warn(`[${scope}]`, msg, ...args),
+    error: (msg: string, ...args: unknown[]) => log.error(`[${scope}]`, msg, ...args),
   };
 }
 

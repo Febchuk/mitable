@@ -650,7 +650,9 @@ function setupIPC() {
             }
 
             // 4. Start Electron-side capture
-            monitoringLogger.info(` Starting Electron capture for session: ${backendResult.session.id}`);
+            monitoringLogger.info(
+              ` Starting Electron capture for session: ${backendResult.session.id}`
+            );
             const startResult = await monitoringSessionService.startSession({
               sessionId: backendResult.session.id,
               selectedWindows,
@@ -1179,12 +1181,7 @@ function setupMonitoringSessionHandlers() {
         screenshotHash?: string;
       }>
     ) => {
-      monitoringLogger.info(
-        "Finalizing session:",
-        sessionId,
-        "captures:",
-        captures.length
-      );
+      monitoringLogger.info("Finalizing session:", sessionId, "captures:", captures.length);
 
       try {
         const token = authTokens.accessToken;

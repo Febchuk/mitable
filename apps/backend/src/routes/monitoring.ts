@@ -13,11 +13,7 @@ import { masterStoryService } from "../services/master-story.service.js";
 import { searchService } from "../services/search.service.js";
 import type { GoalContext } from "../prompts/session-prompts.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
-import {
-  createSessionLogger,
-  CHECKPOINTS,
-  SESSION_EVENTS,
-} from "../lib/sessionLogger";
+import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -210,9 +206,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       linearIssueId,
       windowCount: selectedWindows.length,
       hasRelatedDocs: !!relatedDocsContext,
-      relatedDocsCount: relatedDocsContext
-        ? relatedDocsContext.split("---").length
-        : 0,
+      relatedDocsCount: relatedDocsContext ? relatedDocsContext.split("---").length : 0,
       captureIntervalMs,
     });
 
@@ -704,8 +698,7 @@ router.post(
             log.debug("Cleared imageData (1 hour cleanup)", { sessionId: id });
           } catch (cleanupError) {
             log.error("Failed to clear imageData", {
-              error:
-                cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
             });
           }
         },

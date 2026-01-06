@@ -11,10 +11,7 @@ const VERBOSE = process.env.VERBOSE_SESSION_LOGGING === "true";
 const LOG_AI_PROMPTS = process.env.SESSION_LOG_AI_PROMPTS === "true";
 
 // In-memory tracking for duplicate detection (development/debugging)
-const recentSummaries = new Map<
-  string,
-  { sessionId: string; timestamp: number; prefix: string }
->();
+const recentSummaries = new Map<string, { sessionId: string; timestamp: number; prefix: string }>();
 const DUPLICATE_CHECK_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
 // ============================================================================
