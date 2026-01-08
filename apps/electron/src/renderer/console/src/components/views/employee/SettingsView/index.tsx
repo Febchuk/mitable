@@ -25,6 +25,7 @@ import {
   RefreshCw,
   ExternalLink,
   Info,
+  Download,
 } from "lucide-react";
 import { SiLinear, SiGmail } from "react-icons/si";
 import { BillingSection } from "@/console/src/components/billing";
@@ -59,10 +60,15 @@ export default function SettingsView() {
   const [appVersion, setAppVersion] = useState<string>("");
   const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<
-    "idle" | "checking" | "up-to-date" | "available" | "error"
+    "idle" | "checking" | "up-to-date" | "available" | "downloading" | "downloaded" | "error"
   >("idle");
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [availableVersion, setAvailableVersion] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<{
+    percent: number;
+    transferred: number;
+    total: number;
+  } | null>(null);
 
   // Preferences
   const {
@@ -100,12 +106,30 @@ export default function SettingsView() {
       setIsCheckingForUpdates(false);
       setUpdateStatus("error");
       setUpdateError(error.message);
+      setDownloadProgress(null);
+    });
+
+    const unsubscribeProgress = window.consoleAPI?.onUpdateDownloadProgress((progress) => {
+      logger.info("Download progress:", progress.percent.toFixed(1) + "%");
+      setDownloadProgress({
+        percent: progress.percent,
+        transferred: progress.transferred,
+        total: progress.total,
+      });
+    });
+
+    const unsubscribeDownloaded = window.consoleAPI?.onUpdateDownloaded(() => {
+      logger.info("Update downloaded, ready to install");
+      setUpdateStatus("downloaded");
+      setDownloadProgress(null);
     });
 
     return () => {
       unsubscribeAvailable?.();
       unsubscribeNotAvailable?.();
       unsubscribeError?.();
+      unsubscribeProgress?.();
+      unsubscribeDownloaded?.();
     };
   }, []);
 
@@ -178,6 +202,32 @@ export default function SettingsView() {
       setIsCheckingForUpdates(false);
       setUpdateStatus("error");
       setUpdateError("Failed to check for updates");
+    }
+  };
+
+  const handleDownloadUpdate = async () => {
+    setUpdateStatus("downloading");
+    setUpdateError(null);
+    setDownloadProgress({ percent: 0, transferred: 0, total: 0 });
+    try {
+      await window.consoleAPI?.downloadUpdate();
+      // Progress updates come through event listeners
+    } catch (error) {
+      logger.error("Error downloading update:", error);
+      setUpdateStatus("error");
+      setUpdateError("Failed to download update");
+      setDownloadProgress(null);
+    }
+  };
+
+  const handleInstallUpdate = () => {
+    try {
+      window.consoleAPI?.installUpdate();
+      // App will quit and install
+    } catch (error) {
+      logger.error("Error installing update:", error);
+      setUpdateStatus("error");
+      setUpdateError("Failed to install update");
     }
   };
 
@@ -658,12 +708,22 @@ export default function SettingsView() {
               <p className="text-sm text-muted-foreground">Version {appVersion || "..."}</p>
             </div>
 
-            {/* Check for Updates Button */}
+            {/* Update Button - changes based on state */}
             <Button
-              onClick={handleCheckForUpdates}
-              disabled={isCheckingForUpdates}
-              variant="outline"
-              className="gap-2 border-border-subtle bg-background-elevated text-text-primary hover:bg-background-tertiary hover:text-white"
+              onClick={
+                updateStatus === "available"
+                  ? handleDownloadUpdate
+                  : updateStatus === "downloaded"
+                    ? handleInstallUpdate
+                    : handleCheckForUpdates
+              }
+              disabled={isCheckingForUpdates || updateStatus === "downloading"}
+              variant={updateStatus === "downloaded" ? "default" : "outline"}
+              className={
+                updateStatus === "downloaded"
+                  ? "gap-2 bg-primary hover:bg-primary/90 text-white"
+                  : "gap-2 border-border-subtle bg-background-elevated text-text-primary hover:bg-background-tertiary hover:text-white"
+              }
             >
               {isCheckingForUpdates ? (
                 <>
@@ -677,7 +737,18 @@ export default function SettingsView() {
                 </>
               ) : updateStatus === "available" ? (
                 <>
-                  <RefreshCw className="w-4 h-4" />v{availableVersion} available
+                  <Download className="w-4 h-4" />
+                  Download v{availableVersion}
+                </>
+              ) : updateStatus === "downloading" ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Downloading...
+                </>
+              ) : updateStatus === "downloaded" ? (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Install & Restart
                 </>
               ) : (
                 <>
@@ -687,6 +758,23 @@ export default function SettingsView() {
               )}
             </Button>
           </div>
+
+          {/* Download Progress Bar */}
+          {updateStatus === "downloading" && downloadProgress && (
+            <div className="mt-4 space-y-2">
+              <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300 ease-out"
+                  style={{ width: `${downloadProgress.percent}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {downloadProgress.percent.toFixed(0)}% —{" "}
+                {(downloadProgress.transferred / 1024 / 1024).toFixed(1)} MB /{" "}
+                {(downloadProgress.total / 1024 / 1024).toFixed(1)} MB
+              </p>
+            </div>
+          )}
 
           {/* Error State */}
           {updateStatus === "error" && updateError && (
