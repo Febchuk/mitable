@@ -655,9 +655,7 @@ export default function SettingsView() {
             {/* Content */}
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-semibold text-white">Mitable</h3>
-              <p className="text-sm text-muted-foreground">
-                Version {appVersion || "..."}
-              </p>
+              <p className="text-sm text-muted-foreground">Version {appVersion || "..."}</p>
             </div>
 
             {/* Check for Updates Button */}
@@ -679,8 +677,7 @@ export default function SettingsView() {
                 </>
               ) : updateStatus === "available" ? (
                 <>
-                  <RefreshCw className="w-4 h-4" />
-                  v{availableVersion} available
+                  <RefreshCw className="w-4 h-4" />v{availableVersion} available
                 </>
               ) : (
                 <>
