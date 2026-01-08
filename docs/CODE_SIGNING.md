@@ -173,12 +173,15 @@ xcrun notarytool wait <submission-id> --apple-id "$APPLE_ID" --password "$APPLE_
 ## Creating a Release
 
 ```bash
-gh release create v0.1.7 \
-  /tmp/mitable-dist/Mitable-0.1.7-arm64.dmg \
-  /tmp/mitable-dist/Mitable-0.1.7-x64.dmg \
-  --title "Mitable v0.1.7" \
+gh release create v0.1.9 \
+  /tmp/mitable-dist/Mitable-0.1.9-arm64.dmg \
+  /tmp/mitable-dist/Mitable-0.1.9-x64.dmg \
+  /tmp/mitable-dist/latest-mac.yml \
+  --title "Mitable v0.1.9" \
   --notes "Release notes here"
 ```
+
+> **Important**: Always include `latest-mac.yml` in the release. This file is required for auto-updates to work. It contains version info and checksums that `electron-updater` uses to detect and verify updates.
 
 ## Auto-Updates (Private Repo)
 
