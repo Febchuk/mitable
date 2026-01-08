@@ -238,6 +238,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   },
 
   // Update notifications
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke("get-app-version"),
   checkForUpdates: (): Promise<{ success: boolean }> => ipcRenderer.invoke("check-for-updates"),
   downloadUpdate: (): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke("download-update"),
@@ -282,6 +283,14 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.on("update-error", handler);
     return () => {
       ipcRenderer.removeListener("update-error", handler);
+    };
+  },
+
+  onUpdateNotAvailable: (callback: (info: { version: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, info: { version: string }) => callback(info);
+    ipcRenderer.on("update-not-available", handler);
+    return () => {
+      ipcRenderer.removeListener("update-not-available", handler);
     };
   },
 

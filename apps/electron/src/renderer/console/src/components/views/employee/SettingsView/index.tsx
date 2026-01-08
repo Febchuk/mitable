@@ -15,7 +15,17 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/console/src/services/authService";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
-import { Loader2, Check, Link2, Unlink, Mail, Settings } from "lucide-react";
+import {
+  Loader2,
+  Check,
+  Link2,
+  Unlink,
+  Mail,
+  Settings,
+  RefreshCw,
+  ExternalLink,
+  Info,
+} from "lucide-react";
 import { SiLinear, SiGmail } from "react-icons/si";
 import { BillingSection } from "@/console/src/components/billing";
 
@@ -45,6 +55,15 @@ export default function SettingsView() {
   const [isGmailConnecting, setIsGmailConnecting] = useState(false);
   const [isGmailDisconnecting, setIsGmailDisconnecting] = useState(false);
 
+  // About / Version state
+  const [appVersion, setAppVersion] = useState<string>("");
+  const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<
+    "idle" | "checking" | "up-to-date" | "available" | "error"
+  >("idle");
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [availableVersion, setAvailableVersion] = useState<string | null>(null);
+
   // Preferences
   const {
     hidePillOnSessionEnd,
@@ -56,6 +75,38 @@ export default function SettingsView() {
   useEffect(() => {
     loadLinearStatus();
     loadGmailStatus();
+    loadAppVersion();
+  }, []);
+
+  // Listen for update events
+  useEffect(() => {
+    const unsubscribeAvailable = window.consoleAPI?.onUpdateAvailable((info) => {
+      logger.info("Update available:", info.version);
+      setIsCheckingForUpdates(false);
+      setUpdateStatus("available");
+      setAvailableVersion(info.version);
+    });
+
+    const unsubscribeNotAvailable = window.consoleAPI?.onUpdateNotAvailable(() => {
+      logger.info("No update available - app is up to date");
+      setIsCheckingForUpdates(false);
+      setUpdateStatus("up-to-date");
+      // Reset to idle after 5 seconds
+      setTimeout(() => setUpdateStatus("idle"), 5000);
+    });
+
+    const unsubscribeError = window.consoleAPI?.onUpdateError((error) => {
+      logger.error("Update check error:", error.message);
+      setIsCheckingForUpdates(false);
+      setUpdateStatus("error");
+      setUpdateError(error.message);
+    });
+
+    return () => {
+      unsubscribeAvailable?.();
+      unsubscribeNotAvailable?.();
+      unsubscribeError?.();
+    };
   }, []);
 
   const loadLinearStatus = async () => {
@@ -101,6 +152,32 @@ export default function SettingsView() {
       logger.error("Error loading Gmail status:", error);
     } finally {
       setIsGmailLoading(false);
+    }
+  };
+
+  const loadAppVersion = async () => {
+    try {
+      const version = await window.consoleAPI?.getAppVersion();
+      if (version) {
+        setAppVersion(version);
+      }
+    } catch (error) {
+      logger.error("Error loading app version:", error);
+    }
+  };
+
+  const handleCheckForUpdates = async () => {
+    setIsCheckingForUpdates(true);
+    setUpdateStatus("checking");
+    setUpdateError(null);
+    try {
+      await window.consoleAPI?.checkForUpdates();
+      // The result will come through the event listeners
+    } catch (error) {
+      logger.error("Error checking for updates:", error);
+      setIsCheckingForUpdates(false);
+      setUpdateStatus("error");
+      setUpdateError("Failed to check for updates");
     }
   };
 
@@ -562,6 +639,77 @@ export default function SettingsView() {
               </p>
             </div>
           )}
+        </Card>
+      </div>
+
+      {/* About Section */}
+      <div className="space-y-4 max-w-2xl">
+        <h2 className="text-2xl font-semibold text-white">About</h2>
+        <Card className="p-6 bg-background-elevated border-border-subtle">
+          <div className="flex items-center gap-4">
+            {/* App Icon */}
+            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Info className="w-6 h-6 text-primary" />
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-semibold text-white">Mitable</h3>
+              <p className="text-sm text-muted-foreground">
+                Version {appVersion || "..."}
+              </p>
+            </div>
+
+            {/* Check for Updates Button */}
+            <Button
+              onClick={handleCheckForUpdates}
+              disabled={isCheckingForUpdates}
+              variant="outline"
+              className="gap-2"
+            >
+              {isCheckingForUpdates ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking...
+                </>
+              ) : updateStatus === "up-to-date" ? (
+                <>
+                  <Check className="w-4 h-4 text-status-success" />
+                  Up to date
+                </>
+              ) : updateStatus === "available" ? (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  v{availableVersion} available
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Check for Updates
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Error State */}
+          {updateStatus === "error" && updateError && (
+            <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+              <p className="text-sm text-red-400">{updateError}</p>
+            </div>
+          )}
+
+          {/* Release Notes Link */}
+          <div className="mt-4 pt-4 border-t border-border-subtle">
+            <a
+              href="https://github.com/Febchuk/mitable/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              View release notes
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
         </Card>
       </div>
     </div>

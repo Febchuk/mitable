@@ -1496,6 +1496,10 @@ function setupMonitoringSessionHandlers() {
 
 // Update notification handlers
 function setupUpdateHandlers() {
+  ipcMain.handle("get-app-version", () => {
+    return app.getVersion();
+  });
+
   ipcMain.handle("check-for-updates", async () => {
     updateLogger.info(" Manual check for updates requested");
     await updateService.checkForUpdates();

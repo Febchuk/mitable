@@ -102,6 +102,7 @@ interface ConsoleAPI {
   ) => void;
 
   // Update notifications
+  getAppVersion: () => Promise<string>;
   checkForUpdates: () => Promise<{ success: boolean }>;
   downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
   installUpdate: () => Promise<{ success: boolean }>;
@@ -113,6 +114,7 @@ interface ConsoleAPI {
   ) => () => void;
   onUpdateDownloaded: (callback: (info: { version: string }) => void) => () => void;
   onUpdateError: (callback: (error: { message: string }) => void) => () => void;
+  onUpdateNotAvailable: (callback: (info: { version: string }) => void) => () => void;
 
   // Preferences API
   getPreference: (key: string) => Promise<boolean | null>;

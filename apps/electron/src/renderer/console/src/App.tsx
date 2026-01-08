@@ -6,7 +6,6 @@ import { createLogger } from "../../lib/logger";
 
 const logger = createLogger("ConsoleApp");
 import { UserProvider, useUser } from "./context/UserContext";
-import { useSubscription } from "./hooks/queries/billing";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
@@ -100,35 +99,9 @@ function MonitoringSessionHandler() {
   return null;
 }
 
-// Dynamic default route based on user role and subscription tier
+// Default route - all users start at Sessions (/monitoring)
 function DefaultRoute() {
-  const { user } = useUser();
-  const { data: subscriptionData, isLoading } = useSubscription();
-
-  // Wait for subscription data to determine routing
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  const tier = subscriptionData?.subscription?.tier;
-  const isPersonalAccount = tier === "free" || tier === "pro";
-
-  // Personal accounts and team employees go to Sessions (/monitoring)
-  // Team admins go to Dashboard
-  let defaultPath: string;
-  if (isPersonalAccount) {
-    defaultPath = "/monitoring";
-  } else if (user?.role === "admin") {
-    defaultPath = "/dashboard";
-  } else {
-    defaultPath = "/monitoring";
-  }
-
-  return <Navigate to={defaultPath} replace />;
+  return <Navigate to="/monitoring" replace />;
 }
 
 // Protected route wrapper - redirects to login if not authenticated

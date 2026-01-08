@@ -39,6 +39,9 @@ class UpdateService {
     autoUpdater.on("update-not-available", (info) => {
       log.info("[UpdateService] Update not available. Current version:", info.version);
       this.isCheckingForUpdates = false;
+      this.notifyRenderers("update-not-available", {
+        version: info.version,
+      });
     });
 
     autoUpdater.on("error", (err) => {
