@@ -65,12 +65,19 @@
     "posthog-node": "^5.18.1",
     "resend": "^6.6.0",
     "sharp": "^0.33.5",
+    "color": "^4.2.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "tesseract.js": "^6.0.1",
     "tiktoken": "^1.0.22",
     "zod": "^3.22.4",
     "zod-to-json-schema": "^3.24.6"
+  },
+  "optionalDependencies": {
+    "@img/sharp-win32-x64": "^0.33.5",
+    "@img/sharp-darwin-x64": "^0.33.5",
+    "@img/sharp-darwin-arm64": "^0.33.5",
+    "@img/sharp-linux-x64": "^0.33.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

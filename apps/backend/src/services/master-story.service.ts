@@ -33,9 +33,9 @@ import {
 
 // Configuration
 const STORY_CONFIG = {
-  MODEL: "llama-3.1-8b-instant", // Fast and cheap for text generation
+  MODEL: "openai/gpt-oss-120b", // Larger model for better narrative quality and less hallucination
   MAX_TOKENS: 2048,
-  TEMPERATURE: 0.5, // Slightly creative for narrative writing
+  TEMPERATURE: 0.4, // Slightly lower for more grounded outputs
   MAX_STORY_LENGTH: 50000, // Truncate if story gets too long
 };
 
@@ -115,7 +115,7 @@ class MasterStoryService {
       // Get user context for the prompt
       const userContext = await this.getUserContext(context.userId);
 
-      // Build the storyteller prompt with goal context if available
+      // Build the storyteller prompt with goal context and grounding data
       const { system, user } = buildStorytellerPrompt({
         userRole: userContext.role,
         userSeniority: userContext.seniority,
@@ -125,6 +125,11 @@ class MasterStoryService {
         currentStory: this.truncateStory(currentStory),
         latestAction: context.frameAnalysis.summaryOfAction,
         goalContext: context.goalContext,
+        // Grounding data from frame analysis (prevents hallucination)
+        extractedArtifacts: context.frameAnalysis.artifacts,
+        detectedSignals: context.frameAnalysis.signals,
+        changeType: context.frameAnalysis.changeType,
+        changeMagnitude: context.frameAnalysis.changeMagnitude,
       });
 
       // Log the AI prompt for debugging

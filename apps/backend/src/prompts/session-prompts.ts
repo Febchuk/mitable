@@ -215,6 +215,11 @@ export interface StorytellerContext {
   latestAction: string;
   // Goal context (optional)
   goalContext?: GoalContext;
+  // Grounding data from frame analysis (prevents hallucination)
+  extractedArtifacts?: ExtractedArtifact[];
+  detectedSignals?: FrameSignals;
+  changeType?: string;
+  changeMagnitude?: string;
 }
 
 /**
@@ -256,6 +261,46 @@ This context helps understand the significance of the change, but still focus on
     system: systemPrompt,
     user: PROGRESSION_DETECTOR_USER,
   };
+}
+
+/**
+ * Build the grounding section with extracted artifacts and signals
+ * This prevents the model from hallucinating details not in the frame analysis
+ */
+function buildGroundingSection(context: StorytellerContext): string {
+  const parts: string[] = [];
+
+  // Add extracted artifacts if present
+  if (context.extractedArtifacts && context.extractedArtifacts.length > 0) {
+    const artifactsList = context.extractedArtifacts
+      .map((a) => `- ${a.type}: ${a.value}`)
+      .join("\n");
+    parts.push(`<extracted_artifacts>\n${artifactsList}\n</extracted_artifacts>`);
+  }
+
+  // Add detected signals if present
+  if (context.detectedSignals) {
+    const signals: string[] = [];
+    if (context.detectedSignals.has_blocker) {
+      signals.push(`blocker_detected: ${context.detectedSignals.blocker_type || "yes"}`);
+    }
+    if (context.detectedSignals.has_outcome) {
+      signals.push(`outcome_detected: ${context.detectedSignals.outcome_type || "yes"}`);
+    }
+    if (signals.length > 0) {
+      parts.push(`<detected_signals>\n${signals.join("\n")}\n</detected_signals>`);
+    }
+  }
+
+  // Add change metadata
+  if (context.changeType && context.changeType !== "none") {
+    parts.push(`<change_metadata>
+type: ${context.changeType}
+magnitude: ${context.changeMagnitude || "unknown"}
+</change_metadata>`);
+  }
+
+  return parts.length > 0 ? "\n" + parts.join("\n") + "\n" : "";
 }
 
 /**
@@ -303,12 +348,14 @@ ${context.currentStory || "(Session just started - no story yet)"}
 <latest_action>
 ${context.latestAction}
 </latest_action>
-
+${buildGroundingSection(context)}
 <task>
 You're seeing the latest meaningful action from your workspace. Add to your work log to document this next step. Write as a natural continuation of what's already there, capturing what just happened with enough context that someone reading this later will understand not just what you did, but why.
 ${context.goalContext?.sessionGoal ? `\nKeep in mind your goal: "${context.goalContext.sessionGoal}". Note if this action seems to advance toward that goal.` : ""}
 
 Write in first person ("I started...", "Found...", "Tried...") and keep it conversational. Return ONLY the updated story (including the previous content plus your additions). Do not include any JSON formatting or metadata - just the narrative text.
+
+**CRITICAL**: Only reference specific details (file names, PR numbers, error messages, etc.) if they appear in the extracted_artifacts or latest_action above. Do NOT invent or hallucinate specific details that weren't explicitly detected.
 </task>`;
 
   return {

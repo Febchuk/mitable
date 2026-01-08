@@ -38,7 +38,7 @@ const SUMMARIZATION_CONFIG = {
   MAX_SCREENSHOTS_TO_ANALYZE: 50, // Sample at most 50 screenshots
   VISION_BATCH_SIZE: 5, // Analyze 5 screenshots per API call
   VISION_MODEL: "gemini-2.0-flash-exp",
-  TEXT_MODEL: "llama-3.1-8b-instant", // Groq's cheapest model
+  TEXT_MODEL: "openai/gpt-oss-120b", // Larger model for better accuracy, less hallucination
   TEMPERATURE: 0.3,
   // Episode segmentation settings
   EPISODE_TIME_GAP_MS: 120000, // 2 minutes gap starts a new episode
