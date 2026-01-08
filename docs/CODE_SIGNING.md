@@ -180,6 +180,84 @@ gh release create v0.1.7 \
   --notes "Release notes here"
 ```
 
+## Auto-Updates (Private Repo)
+
+Since `Febchuk/mitable` is a private repository, `electron-updater` requires a GitHub Personal Access Token (PAT) to access releases. The token is embedded at **build time**.
+
+### 1. Create GitHub PAT
+
+1. Go to GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens**
+2. Create new token:
+   - **Name**: `mitable-auto-update`
+   - **Repository access**: Select `Febchuk/mitable`
+   - **Permissions**: Contents (Read), Metadata (Read)
+3. Copy the token (starts with `github_pat_...`)
+
+### 2. Add to `.env.signing`
+
+Update `apps/electron/.env.signing` to include the GitHub token:
+
+```bash
+# Apple Developer Signing Credentials
+export APPLE_ID=your-apple-id@email.com
+export APPLE_ID_PASSWORD=xxxx-xxxx-xxxx-xxxx
+export APPLE_TEAM_ID=XXXXXXXXXX
+
+# GitHub Token for Auto-Updates (private repo)
+export GH_TOKEN=github_pat_xxxxxxxxx
+```
+
+### 3. Build with Token
+
+The token is automatically picked up when building:
+
+```bash
+cd apps/electron
+source .env.signing
+npm run build:mac
+```
+
+electron-builder embeds the token into `app-update.yml` inside the built app.
+
+### 4. Verify Token is Embedded
+
+After building, check the token is present:
+
+```bash
+cat /tmp/mitable-dist/mac-arm64/Mitable.app/Contents/Resources/app-update.yml
+```
+
+Should contain a `token:` field with your PAT.
+
+### Configuration
+
+The `electron-builder.yml` publish config includes `private: true` and `token`:
+
+```yaml
+publish:
+  provider: github
+  owner: Febchuk
+  repo: mitable
+  releaseType: release
+  private: true
+  token: ${env.GH_TOKEN} # Reads from environment at build time
+```
+
+### How Auto-Updates Work
+
+1. App checks GitHub releases every 4 hours (or manually via Settings → About)
+2. `electron-updater` uses the embedded token to authenticate
+3. If update found, user sees "Download Update" banner
+4. Download happens in-app with progress bar
+5. User clicks "Install & Restart" to apply update
+
+### Security Notes
+
+- Token has **read-only** access to releases
+- Token is embedded in distributed app binary (acceptable for private distribution)
+- **Never commit** `.env.signing` to the repo
+- Rotate token periodically if distributing to external users
+
 ## CI/CD Considerations
 
 For GitHub Actions, store credentials as secrets:
@@ -187,6 +265,7 @@ For GitHub Actions, store credentials as secrets:
 - `APPLE_ID`
 - `APPLE_ID_PASSWORD`
 - `APPLE_TEAM_ID`
+- `GH_TOKEN` - GitHub PAT for auto-updates (or use `secrets.GITHUB_TOKEN` for same-repo releases)
 
 The signing certificate needs to be exported as .p12 and imported into the CI runner's keychain.
 
