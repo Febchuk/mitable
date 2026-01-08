@@ -663,7 +663,7 @@ export default function SettingsView() {
               onClick={handleCheckForUpdates}
               disabled={isCheckingForUpdates}
               variant="outline"
-              className="gap-2"
+              className="gap-2 border-border-subtle bg-background-elevated text-text-primary hover:bg-background-tertiary hover:text-white"
             >
               {isCheckingForUpdates ? (
                 <>

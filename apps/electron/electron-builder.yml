@@ -11,6 +11,8 @@ publish:
   owner: Febchuk
   repo: mitable
   releaseType: release
+  private: true
+  token: ${env.GH_TOKEN}
 
 # macOS Configuration
 mac:
