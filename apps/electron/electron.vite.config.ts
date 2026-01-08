@@ -40,6 +40,7 @@ export default defineConfig({
           watchButton: resolve(__dirname, "src/preload/watchButton.ts"),
           watchingPill: resolve(__dirname, "src/preload/watchingPill.ts"),
           watchingPillDropdown: resolve(__dirname, "src/preload/watchingPillDropdown.ts"),
+          notification: resolve(__dirname, "src/preload/notification.ts"),
         },
         output: {
           format: "cjs",
@@ -71,6 +72,7 @@ export default defineConfig({
             __dirname,
             "src/renderer/watchingPillDropdown/menu.html"
           ),
+          notifications: resolve(__dirname, "src/renderer/notifications/index.html"),
         },
       },
     },
