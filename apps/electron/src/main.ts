@@ -1,6 +1,15 @@
 import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
 import { IPC_CHANNELS } from "@mitable/shared";
-import { app, BrowserWindow, globalShortcut, ipcMain, Notification, screen, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  nativeTheme,
+  Notification,
+  screen,
+  shell,
+} from "electron";
 import { join } from "path";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
 import { createLogger, initializeLogger } from "./lib/logger";
@@ -15,6 +24,9 @@ import { updateService } from "./services/updateService";
 
 // Initialize logger before any other code runs
 initializeLogger();
+
+// Force dark theme for consistent vibrancy effect regardless of system settings
+nativeTheme.themeSource = "dark";
 
 // Create loggers for different modules in main process
 const consoleLogger = createLogger("Console");
@@ -480,8 +492,8 @@ function hideNotification() {
 // Start periodic notification timer (prompts user to turn on monitoring)
 function startNotificationTimer() {
   // Check every 30 minutes
-  // const NOTIFICATION_INTERVAL = 30 * 60 * 1000; // 30 minutes
-  const NOTIFICATION_INTERVAL = 0.5 * 60 * 1000; // 0.5 minutes for testing
+  const NOTIFICATION_INTERVAL = 30 * 60 * 1000; // 30 minutes
+  // const NOTIFICATION_INTERVAL = 0.5 * 60 * 1000; // 0.5 minutes for testing
 
   if (notificationTimer) {
     clearInterval(notificationTimer);
