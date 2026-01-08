@@ -69,6 +69,12 @@ export const IPC_CHANNELS = {
   PREFERENCES_GET: "preferences-get",
   PREFERENCES_SET: "preferences-set",
   PREFERENCES_GET_ALL: "preferences-get-all",
+
+  // Custom Notifications (Granola-style prompts)
+  NOTIFICATION_SHOW: "notification-show", // Show notification with config
+  NOTIFICATION_HIDE: "notification-hide", // Hide/dismiss notification
+  NOTIFICATION_ACTION: "notification-action", // User clicked action button
+  NOTIFICATION_DATA: "notification-data", // Send notification config to renderer
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

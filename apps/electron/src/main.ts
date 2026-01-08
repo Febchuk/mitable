@@ -27,12 +27,18 @@ const monitoringLogger = createLogger("MonitoringSession");
 const recoveryLogger = createLogger("SessionRecovery");
 const updateLogger = createLogger("Update");
 const shutdownLogger = createLogger("Shutdown");
+const notificationLogger = createLogger("Notification");
 
 // Window references
 let consoleWindow: BrowserWindow | null = null;
 let watchingPillWindow: BrowserWindow | null = null;
 let watchingPillEyeDropdown: BrowserWindow | null = null;
 let watchingPillMenuDropdown: BrowserWindow | null = null;
+let notificationWindow: BrowserWindow | null = null;
+
+// Notification timer for periodic prompts
+let notificationTimer: NodeJS.Timeout | null = null;
+let notificationAutoHideTimer: NodeJS.Timeout | null = null;
 
 // Track when dropdowns were last hidden (to prevent re-opening on button click)
 let eyeDropdownLastHidden = 0;
@@ -364,6 +370,154 @@ function createWatchingPillMenuDropdown() {
     watchingPillMenuDropdown.loadFile(
       join(__dirname, "../renderer/watchingPillDropdown/menu.html")
     );
+  }
+}
+
+// Notification configuration type
+interface NotificationConfig {
+  title: string;
+  message: string;
+  icon?: string;
+  actions: Array<{ id: string; label: string; primary?: boolean }>;
+  timeout?: number;
+}
+
+function createNotificationWindow() {
+  // Get screen dimensions for bottom-right positioning
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+
+  const windowWidth = 340;
+  const windowHeight = 150;
+  const padding = 20;
+  const dockHeight = 80; // Account for macOS dock
+
+  notificationWindow = new BrowserWindow({
+    title: "Mitable Notification",
+    width: windowWidth,
+    height: windowHeight,
+    x: screenWidth - windowWidth - padding,
+    y: screenHeight - windowHeight - padding - dockHeight,
+    frame: false,
+    transparent: true,
+    hasShadow: false, // Disable macOS window shadow for clean transparent look
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    focusable: false, // Don't steal focus when notification appears
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, "../preload/notification.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Platform-specific always-on-top (below modal-panel so it doesn't cover pill)
+  if (process.platform === "darwin") {
+    notificationWindow.setAlwaysOnTop(true, "floating");
+    notificationWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    notificationWindow.setAlwaysOnTop(true, "normal", 1);
+  }
+
+  // Dismiss on blur (click away)
+  notificationWindow.on("blur", () => {
+    hideNotification();
+  });
+
+  notificationWindow.on("closed", () => {
+    notificationWindow = null;
+  });
+
+  if (!app.isPackaged) {
+    notificationWindow.loadURL("http://localhost:5173/notifications/index.html");
+  } else {
+    notificationWindow.loadFile(join(__dirname, "../renderer/notifications/index.html"));
+  }
+
+  notificationLogger.info(" Notification window created");
+}
+
+function showNotification(config: NotificationConfig) {
+  // Create window if it doesn't exist
+  if (!notificationWindow || notificationWindow.isDestroyed()) {
+    createNotificationWindow();
+  }
+
+  // Wait for window to be ready before sending data
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    // Send config data to renderer
+    notificationWindow.webContents.send(IPC_CHANNELS.NOTIFICATION_DATA, config);
+    notificationWindow.showInactive(); // Don't steal focus or affect other windows
+
+    notificationLogger.info(" Showing notification:", config.title);
+
+    // Set up auto-hide timer (as backup, renderer also handles this)
+    if (config.timeout && config.timeout > 0) {
+      if (notificationAutoHideTimer) {
+        clearTimeout(notificationAutoHideTimer);
+      }
+      notificationAutoHideTimer = setTimeout(() => {
+        hideNotification();
+      }, config.timeout + 500); // Slightly longer than renderer timeout
+    }
+  }
+}
+
+function hideNotification() {
+  if (notificationAutoHideTimer) {
+    clearTimeout(notificationAutoHideTimer);
+    notificationAutoHideTimer = null;
+  }
+
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.hide();
+    notificationLogger.info(" Notification hidden");
+  }
+}
+
+// Start periodic notification timer (prompts user to turn on monitoring)
+function startNotificationTimer() {
+  // Check every 30 minutes
+  // const NOTIFICATION_INTERVAL = 30 * 60 * 1000; // 30 minutes
+  const NOTIFICATION_INTERVAL = 0.5 * 60 * 1000; // 0.5 minutes for testing
+
+  if (notificationTimer) {
+    clearInterval(notificationTimer);
+  }
+
+  notificationTimer = setInterval(() => {
+    // Only show if:
+    // 1. No active monitoring session
+    // 2. User is logged in (has auth token)
+    const sessionState = monitoringSessionService.getSessionState();
+    const isMonitoringActive =
+      sessionState?.status === "active" || sessionState?.status === "paused";
+    const isLoggedIn = authTokens.accessToken !== null;
+
+    if (!isMonitoringActive && isLoggedIn) {
+      notificationLogger.info(" Triggering periodic notification (monitoring is off)");
+      showNotification({
+        title: "Ready to track your work?",
+        message: "Turn on Mitable to log your activity and get better insights.",
+        actions: [
+          { id: "turn-on", label: "Turn On", primary: true },
+          { id: "dismiss", label: "Later" },
+        ],
+        timeout: 10000, // 10 seconds auto-dismiss
+      });
+    }
+  }, NOTIFICATION_INTERVAL);
+
+  notificationLogger.info(" Notification timer started (30 min interval)");
+}
+
+function stopNotificationTimer() {
+  if (notificationTimer) {
+    clearInterval(notificationTimer);
+    notificationTimer = null;
+    notificationLogger.info(" Notification timer stopped");
   }
 }
 
@@ -844,6 +998,47 @@ function setupIPC() {
 
   // Update notification handlers
   setupUpdateHandlers();
+
+  // Custom notification handlers
+  setupNotificationHandlers();
+}
+
+// Custom notification handlers (Granola-style prompts)
+function setupNotificationHandlers() {
+  // Show notification (from renderer or internal)
+  ipcMain.handle(IPC_CHANNELS.NOTIFICATION_SHOW, async (_, config: NotificationConfig) => {
+    showNotification(config);
+    return { success: true };
+  });
+
+  // Hide notification
+  ipcMain.on(IPC_CHANNELS.NOTIFICATION_HIDE, () => {
+    hideNotification();
+  });
+
+  // Handle notification action button clicks
+  ipcMain.on(IPC_CHANNELS.NOTIFICATION_ACTION, async (_, actionId: string) => {
+    notificationLogger.info(" Notification action:", actionId);
+    hideNotification();
+
+    switch (actionId) {
+      case "turn-on":
+        // Show console and navigate to start session
+        if (consoleWindow && !consoleWindow.isDestroyed()) {
+          consoleWindow.show();
+          consoleWindow.focus();
+          // Optionally: send navigation event to go to session start
+        }
+        break;
+      case "dismiss":
+        // Just hide - already handled above
+        break;
+      default:
+        notificationLogger.warn(" Unknown notification action:", actionId);
+    }
+  });
+
+  ipcLogger.info(" Notification handlers registered successfully");
 }
 
 // Watch mode handlers for selective screenshot capture
@@ -1450,6 +1645,9 @@ app.whenReady().then(async () => {
   // Start automatic update checks (every 4 hours)
   updateService.startPeriodicChecks(240);
 
+  // Start periodic notification timer (prompts user to turn on monitoring)
+  startNotificationTimer();
+
   // Check for recoverable sessions on startup (crash recovery)
   try {
     const recoverableSessions = await monitoringSessionService.getRecoverableSessions();
@@ -1531,4 +1729,5 @@ app.on("will-quit", () => {
 
 app.on("before-quit", () => {
   updateService.stopPeriodicChecks();
+  stopNotificationTimer();
 });
