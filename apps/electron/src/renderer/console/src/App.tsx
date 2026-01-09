@@ -23,6 +23,7 @@ import SettingsView from "./components/views/employee/SettingsView";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
 import TodosView from "./components/views/employee/TodosView";
+import UploadView from "./components/views/employee/UploadView";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
@@ -174,6 +175,7 @@ function App() {
                 <Route path="docs" element={<DocsView />} />
                 <Route path="docs/:docId" element={<DocDetail />} />
                 <Route path="todos" element={<TodosView />} />
+                <Route path="upload" element={<UploadView />} />
                 {/* Monitoring Routes */}
                 <Route path="monitoring" element={<MonitoringView />} />
                 <Route path="monitoring/:sessionId" element={<SessionDetail />} />

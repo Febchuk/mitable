@@ -9,6 +9,7 @@ import piiRouter from "./routes/pii.js";
 import monitoringRouter from "./routes/monitoring.js";
 import documentsRouter from "./routes/documents.js";
 import billingRouter from "./routes/billing.js";
+import artifactsRouter from "./routes/artifacts.routes.js";
 import { authLimiter } from "./middleware/rateLimiter.js";
 // DEPRECATED: Guide routes replaced by WorkflowOptions metadata system
 // import guidesRouter from "./routes/guides.routes.js";
@@ -27,6 +28,7 @@ router.use("/pii", piiRouter);
 router.use("/monitoring", monitoringRouter);
 router.use("/documents", documentsRouter);
 router.use("/billing", billingRouter);
+router.use("/artifacts", artifactsRouter);
 
 /**
  * DEPRECATED: /guides routes

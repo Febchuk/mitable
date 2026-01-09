@@ -1,4 +1,4 @@
-import { Layers, Users, BarChart3, Plug, Activity, FileText, CheckSquare } from "lucide-react";
+import { Layers, Users, BarChart3, Plug, Activity, FileText, CheckSquare, Upload } from "lucide-react";
 // Note: Users icon is still used in admin navigation for People
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
@@ -23,6 +23,7 @@ export default function Nav() {
         <NavItem to="/monitoring" icon={Activity} label="Sessions" />
         <NavItem to="/todos" icon={CheckSquare} label="Todos" />
         <NavItem to="/docs" icon={FileText} label="Docs" />
+        <NavItem to="/upload" icon={Upload} label="Upload" />
       </nav>
     );
   }
@@ -45,6 +46,7 @@ export default function Nav() {
       <NavItem to="/docs" icon={FileText} label="Docs" />
       <NavItem to="/monitoring" icon={Activity} label="Sessions" />
       <NavItem to="/todos" icon={CheckSquare} label="Todos" />
+      <NavItem to="/upload" icon={Upload} label="Upload" />
     </nav>
   );
 }
