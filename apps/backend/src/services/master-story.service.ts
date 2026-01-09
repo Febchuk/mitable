@@ -140,6 +140,30 @@ class MasterStoryService {
         inputStoryHash: currentStoryHash,
       });
 
+      // Log full prompt for deep debugging (when SESSION_LOG_FULL_AI=true)
+      log.logFullAIInteraction(
+        "storyteller_prompt_full",
+        system,
+        user,
+        "", // Response comes later
+        {
+          model: STORY_CONFIG.MODEL,
+          currentStoryLength: currentStory.length,
+          inputStoryHash: currentStoryHash,
+          hasGoalContext: !!context.goalContext,
+          goalContext: context.goalContext
+            ? {
+                sessionGoal: context.goalContext.sessionGoal,
+                linearIssueId: context.goalContext.linearIssueId,
+                linearIssueTitle: context.goalContext.linearIssueTitle,
+                hasRelatedDocs: !!context.goalContext.relatedDocsContext,
+              }
+            : null,
+          windowInfo: context.windowInfo,
+          frameAction: context.frameAnalysis.summaryOfAction,
+        }
+      );
+
       // Generate updated story
       const response = await withRetry(
         async () => {
@@ -196,6 +220,22 @@ class MasterStoryService {
         outputStoryHash: updatedStoryHash,
         tokensUsed: response.usage?.total_tokens,
       });
+
+      // Log full response for deep debugging (when SESSION_LOG_FULL_AI=true)
+      log.logFullAIInteraction(
+        "storyteller_response_full",
+        "", // System prompt already logged
+        "", // User prompt already logged
+        rawStory,
+        {
+          model: STORY_CONFIG.MODEL,
+          inputStoryHash: currentStoryHash,
+          outputStoryHash: updatedStoryHash,
+          tokensUsed: response.usage?.total_tokens,
+          promptTokens: response.usage?.prompt_tokens,
+          completionTokens: response.usage?.completion_tokens,
+        }
+      );
 
       // Save to database
       const newVersion = currentVersion + 1;
