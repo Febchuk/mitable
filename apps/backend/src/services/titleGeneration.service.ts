@@ -16,7 +16,7 @@ class TitleGenerationService {
   constructor() {
     this.genai = new GoogleGenerativeAI(config.gemini.apiKey);
     this.model = this.genai.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
     });
   }
 

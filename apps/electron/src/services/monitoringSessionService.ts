@@ -717,9 +717,9 @@ class MonitoringSessionService {
         // Update frame metadata with analysis results
         await localFrameStorage.updateFrameAnalysis(sessionId, frameId, {
           deltaChanged: result.analysis.deltaChanged,
-          deltaChangeType: result.analysis.deltaChangeType,
-          deltaChangeDescription: result.analysis.deltaChangeDescription,
-          deltaUserAction: result.analysis.deltaUserAction,
+          deltaChangeType: result.analysis.changeType, // Backend uses 'changeType'
+          deltaChangeDescription: result.analysis.changeDescription, // Backend uses 'changeDescription'
+          deltaUserAction: result.analysis.userAction,
           onTask: result.analysis.onTask,
           taskRelevance: result.analysis.taskRelevance,
           importanceScore: result.analysis.importanceScore,
@@ -727,7 +727,7 @@ class MonitoringSessionService {
         });
 
         logger.info(` Frame analyzed: ${frameId}`, {
-          deltaChangeType: result.analysis.deltaChangeType,
+          changeType: result.analysis.changeType,
           importanceScore: result.analysis.importanceScore,
         });
       }

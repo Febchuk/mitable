@@ -37,9 +37,9 @@ import { logger } from "../lib/logger";
 const SUMMARIZATION_CONFIG = {
   MAX_SCREENSHOTS_TO_ANALYZE: 50, // Sample at most 50 screenshots
   VISION_BATCH_SIZE: 5, // Analyze 5 screenshots per API call
-  VISION_MODEL: "gemini-2.0-flash-exp",
+  VISION_MODEL: "gemini-2.5-flash",
   TEXT_MODEL: "openai/gpt-oss-120b", // Larger model for better accuracy, less hallucination
-  TEMPERATURE: 0.3,
+  TEMPERATURE: 0.2, // Low temp for factual, grounded outputs
   // Episode segmentation settings
   EPISODE_TIME_GAP_MS: 120000, // 2 minutes gap starts a new episode
   EPISODE_MIN_FRAMES: 2, // Minimum frames to form an episode
@@ -1031,46 +1031,38 @@ Respond with JSON:
         .join("\n");
     }
 
-    // Generate summary prompt with episode context
-    const prompt = `You're writing a casual update to share with your team about what you got done in this work session.
+    // Generate summary prompt with episode context - GROUNDED PARAGRAPH VERSION
+    const prompt = `You are writing a brief work session summary. Convert the activities below into a short, conversational paragraph (2-4 sentences) that a teammate would understand.
 
-Work episodes (in chronological order):
+<work_episodes>
 ${activityList}${blockerContext}${outcomeContext}
+</work_episodes>
 
-Write a brief, conversational summary (6 sentences max) that:
-1. Highlights what you accomplished and why it matters
-2. Connects activities to outcomes when possible (e.g., "Fixed X which unblocked Y")
-3. Feels human and natural - like you're messaging your team in Slack
-4. Written in first person
-5. If blockers were encountered, mention them naturally
-6. If outcomes were achieved (merged, deployed, sent), highlight them
+<rules>
+1. Write a natural paragraph summarizing the main activities - NOT bullet points
+2. ONLY mention things that appear in the work_episodes above
+3. Do NOT invent specific file names, PR numbers, or technical details unless they appear in the data
+4. Group similar activities together (e.g., "worked in the terminal and chat panel")
+5. Write in first person ("I worked on...", "I tested...")
+6. Keep it conversational but factual
+</rules>
 
-Style guidelines:
-- Be casual and conversational (not formal or robotic)
-- Focus on impact and outcomes, not just tasks
-- Skip unnecessary details like durations or tool names
-- Mention specific artifacts when relevant (PRs, tickets, documents)
-- Connect the dots between episodes when there's a logical flow
-
-Example summaries (match this tone and structure):
-
-"Wrapped up the dashboard redesign and pushed it to staging. Design team can now review before next sprint. Also knocked out a few bug fixes from the backlog."
-
-"Spent most of the session debugging the payment flow - found the issue was a missing null check. Shipped the fix and verified in production."
-
-"Deep work on the API documentation today. Got through the auth endpoints and started on webhooks. Should finish tomorrow."
-
-Also extract:
-- Top 3 key activities (what you actually accomplished)
-- Any accomplishments (completed items, shipped features, unblocked work)
-- Any blockers (waiting on something, errors, repeated attempts)
-
-Respond with JSON:
+<format>
+Respond with JSON only:
 {
-  "narrativeSummary": "Your casual 2-4 sentence update here",
-  "activities": ["Activity 1", "Activity 2", "Activity 3"],
-  "accomplishments": ["Accomplishment 1"] or [],
-  "blockers": ["Blocker 1"] or []
+  "narrativeSummary": "A conversational 2-4 sentence paragraph summarizing the session",
+  "activities": ["Top activity 1", "Top activity 2", "Top activity 3", "Top activity 4", "Top activity 5"],
+  "accomplishments": [] or ["Only if explicitly mentioned as completed/shipped/merged"],
+  "blockers": [] or ["Only if explicitly mentioned as error/blocked/failed"]
+}
+</format>
+
+Example good output:
+{
+  "narrativeSummary": "I spent the session working on monitoring session improvements, updating prompt rules and testing the summarization flow. I used the terminal to run API requests and checked the responses in the chat panel. Also made some UI tweaks along the way.",
+  "activities": ["Updated prompt rules", "Tested summarization", "Ran API requests", "Checked chat responses", "Made UI tweaks"],
+  "accomplishments": [],
+  "blockers": []
 }`;
 
     const completion = await this.groq.chat.completions.create({

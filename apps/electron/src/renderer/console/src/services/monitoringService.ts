@@ -483,3 +483,15 @@ export async function disconnectGmail(): Promise<{ success: boolean }> {
     method: "DELETE",
   });
 }
+
+/**
+ * DEV ONLY: Regenerate session summary
+ */
+export async function regenerateSummary(
+  sessionId: string
+): Promise<{ success: boolean; message: string }> {
+  return apiRequest<{ success: boolean; message: string }>(
+    `/monitoring/sessions/${sessionId}/regenerate-summary`,
+    { method: "POST" }
+  );
+}

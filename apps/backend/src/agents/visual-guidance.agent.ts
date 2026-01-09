@@ -240,7 +240,7 @@ export class VisualGuidanceAgent extends BaseAgent {
       let visibleApp = "Unknown";
       try {
         const visionModel = this.gemini.getGenerativeModel({
-          model: "gemini-2.0-flash-exp",
+          model: "gemini-2.5-flash",
         });
 
         const base64Data = context.screenshots[0].dataUrl.replace(/^data:image\/\w+;base64,/, "");
@@ -671,7 +671,7 @@ Generate the complete JSON object now with ALL required fields.`;
   private async isVaguePrompt(message: string): Promise<boolean> {
     try {
       const model = this.gemini.getGenerativeModel({
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-2.5-flash",
       });
 
       const prompt = `Analyze if this user prompt is VAGUE or SPECIFIC.
@@ -762,7 +762,7 @@ Nothing else.`;
   ): Promise<"visual" | "knowledge_search" | "directly_answerable"> {
     try {
       const model = this.gemini.getGenerativeModel({
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-2.5-flash",
       });
 
       const prompt = `Classify this user question during an active UI workflow.

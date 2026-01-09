@@ -66,7 +66,7 @@ export class TextResponseAgent extends BaseAgent {
       }
 
       // Use Gemini Flash for cost-effective generation
-      const model = this.gemini.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+      const model = this.gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       // Simple system context
       const systemPrompt = `You are an experienced employee assistant helping new hires ramp up quickly at their company.

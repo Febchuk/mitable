@@ -141,52 +141,59 @@ export const PROGRESSION_DETECTOR_USER = `Analyze these two screenshots (before 
  * Used to build the continuous "Master Story" narrative during a session
  */
 export const STORYTELLER_SYSTEM = `<role>
-You're building a living document that captures what you're working on as it happens. Write in first person, as if you're narrating your own work session to share with your team later.
+You are a factual work log extractor. You output ONLY structured JSON entries based on observed frame data. No prose, no narrative, no speculation.
 </role>
 
-<what_you_are_creating>
-A "Master Story" - a casual, chronological narrative of your work session written in first person. This is your ongoing log of what you're actually doing. Later, this can be transformed into specific outputs (status updates, documentation), but right now you're simply capturing what's happening as you work.
+<output_format>
+You MUST output valid JSON in this exact format:
+{
+  "entry": {
+    "action": "Brief description of what happened (max 20 words)",
+    "evidence": "Direct quote or paraphrase from latest_action field"
+  }
+}
 
-This story grows with each update. You're not summarizing—you're extending a continuous record.
-</what_you_are_creating>
+RULES:
+1. "action" must be a simple statement of what was observed (no interpretation)
+2. "evidence" must contain text that appears in the latest_action or extracted_artifacts
+3. Do NOT add context, speculation, or future actions
+4. Do NOT mention specific files, URLs, commands, or names unless they appear in extracted_artifacts
+5. Keep "action" under 20 words
+</output_format>
 
-<how_to_document>
-**You're discovering the story as it happens**: You don't know where you're headed when the session starts. As you work, patterns emerge. The direction becomes clear. Document what you observe, and let the narrative reveal its own shape.
+<examples>
+GOOD output (grounded):
+{
+  "entry": {
+    "action": "Asked a question in the chat panel about type errors",
+    "evidence": "user asked about the doctype and docstatus errors"
+  }
+}
 
-**Connect the dots between activities**: When you move from your browser to your terminal, from Slack to your IDE—show why. Not just "switched to Chrome," but "found the error message format in the docs, now checking if it matches what I'm seeing in the terminal."
+GOOD output (grounded):
+{
+  "entry": {
+    "action": "Terminal showed API request completed with success response",
+    "evidence": "POST request returned 200 status code"
+  }
+}
 
-**Capture the texture of the work**: The false starts matter. The "wait, that's weird" moments matter. The three different Stack Overflow tabs you opened before finding the right one—that's the story. This is where the undocumented knowledge lives.
+BAD output (hallucinated - mentions "npm install" not in evidence):
+{
+  "entry": {
+    "action": "Ran npm install to set up dependencies",
+    "evidence": "terminal output appeared"
+  }
+}
 
-**Write naturally**: Use first person ("I started debugging...", "Found the issue in...", "Tried a few approaches..."). Write like you're explaining to a teammate what you've been up to—casual and conversational, but informative.
-</how_to_document>
-
-<understanding_context>
-You have context about:
-- The user's role and work environment
-- The applications and windows being watched
-- Everything that's happened so far in this session
-- The goal they're working toward (if specified)
-
-Use this context to interpret what you're seeing and write the narrative accordingly. Connect actions to their purpose when it's clear.
-</understanding_context>
-
-<as_the_story_develops>
-Early on, you might be documenting seemingly disconnected actions: "Opened the codebase. Pulled latest changes. Started reading through error logs."
-
-As the session progresses, the through-line emerges: "I'm debugging a production issue with the payment service. Traced it to a timeout in the third-party integration. Now I'm looking for where retry logic should be added."
-
-Let the story tell you what it's about. Document what's happening, and the meaning will surface.
-</as_the_story_develops>
-
-<writing_style>
-- Write in first person ("I reviewed...", "Started working on...", "Fixed the bug in...")
-- Keep it casual and conversational (like a Slack update, not a formal report)
-- Maintain a flowing narrative, not a list of events
-- When actions connect, show the connection
-- Focus on what matters—skip unnecessary technical details (don't mention programming languages unless relevant)
-- When something significant happens (an error, a discovery, a pivot), give it proper attention
-- Stay in the present/past tense documenting what's unfolding
-</writing_style>`;
+BAD output (speculating about future):
+{
+  "entry": {
+    "action": "Preparing to run stress tests on the API",
+    "evidence": "request completed"
+  }
+}
+</examples>`;
 
 // ============================================================================
 // PROMPT BUILDERS
@@ -350,12 +357,9 @@ ${context.latestAction}
 </latest_action>
 ${buildGroundingSection(context)}
 <task>
-You're seeing the latest meaningful action from your workspace. Add to your work log to document this next step. Write as a natural continuation of what's already there, capturing what just happened with enough context that someone reading this later will understand not just what you did, but why.
-${context.goalContext?.sessionGoal ? `\nKeep in mind your goal: "${context.goalContext.sessionGoal}". Note if this action seems to advance toward that goal.` : ""}
+Output a single JSON entry for this frame. The "evidence" field MUST contain words/phrases that appear in the latest_action above.
 
-Write in first person ("I started...", "Found...", "Tried...") and keep it conversational. Return ONLY the updated story (including the previous content plus your additions). Do not include any JSON formatting or metadata - just the narrative text.
-
-**CRITICAL**: Only reference specific details (file names, PR numbers, error messages, etc.) if they appear in the extracted_artifacts or latest_action above. Do NOT invent or hallucinate specific details that weren't explicitly detected.
+Output ONLY valid JSON, nothing else.
 </task>`;
 
   return {
@@ -588,14 +592,123 @@ export function parseProgressionResponse(rawResponse: string): ProgressionDetect
 }
 
 /**
- * Validate storyteller response (should be plain narrative text)
+ * Parsed entry from storyteller JSON response
  */
-export function parseStorytellerResponse(rawResponse: string): string {
-  // Remove any accidental JSON formatting or markdown code blocks
-  const cleaned = rawResponse
-    .replace(/```[\s\S]*?```/g, "") // Remove code blocks
-    .replace(/^[\s\n]*/, "") // Remove leading whitespace
-    .replace(/[\s\n]*$/, ""); // Remove trailing whitespace
+export interface StorytellerEntry {
+  action: string;
+  evidence: string;
+}
 
-  return cleaned;
+/**
+ * Parse storyteller JSON response
+ */
+export function parseStorytellerResponse(rawResponse: string): StorytellerEntry | null {
+  try {
+    // Clean up the response - remove markdown code blocks if present
+    const cleaned = rawResponse
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/g, "")
+      .trim();
+
+    // Try to parse as JSON
+    const parsed = JSON.parse(cleaned);
+
+    // Extract the entry
+    const entry = parsed.entry || parsed;
+
+    if (entry && typeof entry.action === "string" && typeof entry.evidence === "string") {
+      return {
+        action: entry.action.trim(),
+        evidence: entry.evidence.trim(),
+      };
+    }
+
+    return null;
+  } catch {
+    // If JSON parsing fails, try to extract action from prose (fallback)
+    const actionMatch = rawResponse.match(/"action"\s*:\s*"([^"]+)"/);
+    const evidenceMatch = rawResponse.match(/"evidence"\s*:\s*"([^"]+)"/);
+
+    if (actionMatch && evidenceMatch) {
+      return {
+        action: actionMatch[1].trim(),
+        evidence: evidenceMatch[1].trim(),
+      };
+    }
+
+    return null;
+  }
+}
+
+/**
+ * Validate that the entry doesn't contain hallucinated content
+ * Returns true if valid, false if hallucination detected
+ */
+export function validateStorytellerEntry(
+  entry: StorytellerEntry,
+  latestAction: string,
+  extractedArtifacts: Array<{ type: string; value: string }> = []
+): { valid: boolean; reason?: string } {
+  const latestActionLower = latestAction.toLowerCase();
+  const evidenceLower = entry.evidence.toLowerCase();
+
+  // Build allowed tokens from latestAction and artifacts
+  const allowedTokens = new Set<string>();
+
+  // Extract significant words from latestAction (3+ chars)
+  latestAction.split(/\s+/).forEach((word) => {
+    const clean = word.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+    if (clean.length >= 3) allowedTokens.add(clean);
+  });
+
+  // Add artifact values
+  extractedArtifacts.forEach((a) => {
+    a.value.split(/\s+/).forEach((word) => {
+      const clean = word.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+      if (clean.length >= 3) allowedTokens.add(clean);
+    });
+  });
+
+  // Check for common hallucination patterns
+  const hallucationPatterns = [
+    /youtube\.com/i,
+    /stackoverflow\.com/i,
+    /github\.com\/[a-z]/i,
+    /real madrid/i,
+    /atletico/i,
+    /preparing to|ready to|about to|going to/i, // Future speculation
+    /npm install|yarn add|pnpm add/i, // Common hallucinated commands
+  ];
+
+  for (const pattern of hallucationPatterns) {
+    if (pattern.test(entry.action) && !pattern.test(latestAction)) {
+      return { valid: false, reason: `Hallucination detected: ${pattern}` };
+    }
+  }
+
+  // Check that evidence has some overlap with latestAction
+  const evidenceWords = evidenceLower.split(/\s+/).filter((w) => w.length >= 3);
+  const hasOverlap = evidenceWords.some((word) => latestActionLower.includes(word));
+
+  if (!hasOverlap && evidenceWords.length > 0) {
+    return { valid: false, reason: "Evidence doesn't match latestAction" };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Build narrative from validated entries
+ */
+export function buildNarrativeFromEntries(
+  existingNarrative: string,
+  newEntry: StorytellerEntry
+): string {
+  const newLine = `• ${newEntry.action}`;
+
+  if (!existingNarrative || existingNarrative === "(Session just started - no story yet)") {
+    return newLine;
+  }
+
+  return `${existingNarrative}\n${newLine}`;
 }

@@ -64,7 +64,11 @@ export default function DocsView() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsGenerateDialogOpen(true)} className="gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsGenerateDialogOpen(true)}
+            className="gap-2 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary"
+          >
             <Sparkles size={18} />
             Generate from Session
           </Button>
@@ -145,7 +149,7 @@ export default function DocsView() {
               <Button
                 variant="outline"
                 onClick={() => setIsGenerateDialogOpen(true)}
-                className="gap-2"
+                className="gap-2 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary"
               >
                 <Sparkles size={18} />
                 Generate from Session

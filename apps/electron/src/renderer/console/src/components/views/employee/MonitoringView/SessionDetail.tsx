@@ -781,16 +781,47 @@ export default function SessionDetail() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-text-primary">Session Summary</h2>
-          {!isDelivered && summary && (
-            <Button
-              variant="ghost"
-              onClick={() => setIsAIEditMode(true)}
-              className="gap-2 text-text-secondary hover:text-text-primary hover:bg-background-elevated"
-            >
-              <Edit2 size={16} />
-              Edit
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* DEV ONLY: Regenerate button */}
+            {session.status === "ready" && (
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  try {
+                    const { regenerateSummary } =
+                      await import("@/console/src/services/monitoringService");
+                    await regenerateSummary(sessionId!);
+                    toast({
+                      title: "Regenerating summary...",
+                      description: "This may take a few seconds.",
+                      duration: 3000,
+                    });
+                    queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId!) });
+                  } catch (err) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to regenerate",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                className="gap-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+              >
+                <RefreshCw size={16} />
+                Regenerate (Dev)
+              </Button>
+            )}
+            {!isDelivered && summary && (
+              <Button
+                variant="ghost"
+                onClick={() => setIsAIEditMode(true)}
+                className="gap-2 text-text-secondary hover:text-text-primary hover:bg-background-elevated"
+              >
+                <Edit2 size={16} />
+                Edit
+              </Button>
+            )}
+          </div>
         </div>
 
         {summary ? (

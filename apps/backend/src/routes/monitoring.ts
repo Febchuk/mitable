@@ -735,6 +735,56 @@ router.post(
 );
 
 /**
+ * POST /api/monitoring/sessions/:id/regenerate-summary
+ * DEV ONLY: Regenerate the session summary without re-running the session
+ */
+router.post(
+  "/sessions/:id/regenerate-summary",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({ error: "Not Found", message: "Session not found" });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({ error: "Forbidden", message: "Not your session" });
+        return;
+      }
+
+      // Set status to summarizing
+      await db
+        .update(schema.monitoringSessions)
+        .set({ status: "summarizing" })
+        .where(eq(schema.monitoringSessions.id, id));
+
+      // Trigger regeneration in background
+      sessionSummarizationService.generateSessionSummary(id).catch((err) => {
+        console.error("[DEV] Regenerate summary failed:", err);
+      });
+
+      res.json({ success: true, message: "Summary regeneration started" });
+    } catch (error) {
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to regenerate",
+      });
+    }
+  }
+);
+
+/**
  * POST /api/monitoring/sessions/:id/captures
  * Upload captures batch (from Electron)
  */
