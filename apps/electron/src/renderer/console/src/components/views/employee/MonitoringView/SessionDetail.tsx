@@ -782,8 +782,8 @@ export default function SessionDetail() {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-text-primary">Session Summary</h2>
           <div className="flex items-center gap-2">
-            {/* DEV ONLY: Regenerate button */}
-            {session.status === "ready" && (
+            {/* DEV ONLY: Regenerate button - hidden in production */}
+            {import.meta.env.DEV && session.status === "ready" && (
               <Button
                 variant="ghost"
                 onClick={async () => {
