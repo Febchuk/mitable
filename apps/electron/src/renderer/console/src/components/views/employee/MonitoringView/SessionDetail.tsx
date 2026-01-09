@@ -71,6 +71,7 @@ import RecipientSelector from "@/console/src/components/shared/RecipientSelector
 import { SessionEndToast } from "@/console/src/components/shared/SessionEndToast";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import LinearUpdateDialog from "./LinearUpdateDialog";
+import ActivityTimeline from "./ActivityTimeline";
 import { SiLinear } from "react-icons/si";
 
 function formatDateTime(dateString: string | null): string {
@@ -868,6 +869,9 @@ export default function SessionDetail() {
             </ul>
           </div>
         )}
+
+      {/* Activity Timeline */}
+      <ActivityTimeline sessionId={sessionId || ""} />
 
       {/* Top-K Frames Gallery - Shows after session ends */}
       {session.topKFrames && session.topKFrames.length > 0 && (
