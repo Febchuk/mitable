@@ -195,9 +195,16 @@ Since `Febchuk/mitable` is a private repository, `electron-updater` requires a G
 
 ### 1. Create GitHub PAT
 
+> ⚠️ **Important: Token Type**
+>
+> - **DO NOT** use `gh auth token` - this produces short-lived OAuth tokens (`gho_...`) that expire
+> - **DO** create a Fine-grained PAT from GitHub settings (`github_pat_...`) - these are long-lived
+> - Using OAuth tokens will cause 404 errors for other users when checking for updates
+
 1. Go to GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens**
 2. Create new token:
    - **Name**: `mitable-auto-update`
+   - **Expiration**: 1 year (or maximum available)
    - **Repository access**: Select `Febchuk/mitable`
    - **Permissions**: Contents (Read), Metadata (Read)
 3. Copy the token (starts with `github_pat_...`)
