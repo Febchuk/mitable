@@ -107,10 +107,10 @@ class GeminiVisionService {
   constructor() {
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
 
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     this.interpretModel = this.genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: toGeminiSchema(InterpretResponseSchema) as any,
@@ -118,7 +118,7 @@ class GeminiVisionService {
     });
 
     this.stepGuidanceModel = this.genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: toGeminiSchema(VisualGuidanceSchema) as any,
@@ -126,7 +126,7 @@ class GeminiVisionService {
     });
 
     this.evaluateModel = this.genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: toGeminiSchema(EvaluateProgressResponseSchema) as any,
@@ -135,11 +135,11 @@ class GeminiVisionService {
 
     // Clarification model (Phase 1): Returns plain text description
     this.clarificationModel = this.genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
     });
 
     this.screenshotFilterModel = this.genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: toGeminiSchema(ScreenshotFilterResultSchema) as any,

@@ -238,7 +238,7 @@ export default function DocDetail() {
           <Button
             variant="outline"
             onClick={() => setIsExportDialogOpen(true)}
-            className="gap-2"
+            className="gap-2 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary"
             disabled={exportMutation.isPending}
           >
             {exportMutation.isPending ? (
@@ -299,7 +299,7 @@ export default function DocDetail() {
       </div>
 
       {/* Editor */}
-      <div className="flex-1 overflow-hidden bg-background-primary">
+      <div className="flex-1 overflow-hidden bg-background-primary pl-3 pr-5 pt-3">
         <DocEditor
           key={docId} // Reset editor when document changes
           initialContent={document.content}

@@ -189,7 +189,7 @@ export class OrchestratorService {
 
       const userMessage = lastUserMessage.content;
 
-      const model = this.gemini.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+      const model = this.gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       const prompt = `Classify into ONE intent:
 - "general_chat": Simple conversation, greetings, thanks, acknowledgments, clarifications

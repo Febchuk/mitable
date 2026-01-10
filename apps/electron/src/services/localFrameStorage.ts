@@ -97,6 +97,7 @@ export interface SessionManifest {
 class LocalFrameStorage {
   private readonly sessionsDir: string;
   private currentManifest: SessionManifest | null = null;
+  private manifestWriteLock: Promise<void> = Promise.resolve();
 
   constructor() {
     const userDataPath = app.getPath("userData");
@@ -500,17 +501,26 @@ class LocalFrameStorage {
   }
 
   /**
-   * Save manifest to disk
+   * Save manifest to disk with write lock to prevent concurrent writes
    */
   private async saveManifest(sessionId: string, manifest: SessionManifest): Promise<void> {
-    const manifestPath = this.getManifestPath(sessionId);
+    // Queue this write after any pending write completes (prevents race condition)
+    const previousWrite = this.manifestWriteLock;
+    let resolve: () => void;
+    this.manifestWriteLock = new Promise<void>((r) => {
+      resolve = r;
+    });
 
     try {
+      await previousWrite; // Wait for previous write to complete
+      const manifestPath = this.getManifestPath(sessionId);
       const data = JSON.stringify(manifest, null, 2);
       await fs.promises.writeFile(manifestPath, data, "utf-8");
     } catch (error) {
       logger.error(` Failed to save manifest for ${sessionId}:`, error);
       throw error;
+    } finally {
+      resolve!(); // Release lock for next write
     }
   }
 

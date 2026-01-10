@@ -19,6 +19,8 @@ import { eq, desc, and } from "drizzle-orm";
 import {
   buildStorytellerPrompt,
   parseStorytellerResponse,
+  validateStorytellerEntry,
+  buildNarrativeFromEntries,
   GoalContext,
 } from "../prompts/session-prompts";
 import { FrameAnalysisResult } from "./frame-analysis.service";
@@ -33,9 +35,9 @@ import {
 
 // Configuration
 const STORY_CONFIG = {
-  MODEL: "llama-3.1-8b-instant", // Fast and cheap for text generation
+  MODEL: "openai/gpt-oss-120b", // Larger model for better narrative quality and less hallucination
   MAX_TOKENS: 2048,
-  TEMPERATURE: 0.5, // Slightly creative for narrative writing
+  TEMPERATURE: 0.2, // Low temperature for factual, grounded outputs (reduced from 0.4)
   MAX_STORY_LENGTH: 50000, // Truncate if story gets too long
 };
 
@@ -115,7 +117,7 @@ class MasterStoryService {
       // Get user context for the prompt
       const userContext = await this.getUserContext(context.userId);
 
-      // Build the storyteller prompt with goal context if available
+      // Build the storyteller prompt with goal context and grounding data
       const { system, user } = buildStorytellerPrompt({
         userRole: userContext.role,
         userSeniority: userContext.seniority,
@@ -125,6 +127,11 @@ class MasterStoryService {
         currentStory: this.truncateStory(currentStory),
         latestAction: context.frameAnalysis.summaryOfAction,
         goalContext: context.goalContext,
+        // Grounding data from frame analysis (prevents hallucination)
+        extractedArtifacts: context.frameAnalysis.artifacts,
+        detectedSignals: context.frameAnalysis.signals,
+        changeType: context.frameAnalysis.changeType,
+        changeMagnitude: context.frameAnalysis.changeMagnitude,
       });
 
       // Log the AI prompt for debugging
@@ -150,17 +157,40 @@ class MasterStoryService {
         { maxRetries: 2 }
       );
 
-      const rawStory = response.choices[0]?.message?.content || "";
-      const updatedStory = parseStorytellerResponse(rawStory);
+      const rawResponse = response.choices[0]?.message?.content || "";
+      const entry = parseStorytellerResponse(rawResponse);
 
-      if (!updatedStory || updatedStory.length === 0) {
-        throw new Error("Empty story generated");
+      if (!entry) {
+        log.warn("Failed to parse storyteller JSON response", {
+          rawResponse: rawResponse.substring(0, 200),
+        });
+        throw new Error("Failed to parse storyteller response as JSON");
       }
 
+      // Validate entry against input data (hallucination check)
+      const validation = validateStorytellerEntry(
+        entry,
+        context.frameAnalysis.summaryOfAction,
+        context.frameAnalysis.artifacts || []
+      );
+
+      if (!validation.valid) {
+        log.warn("Storyteller entry failed validation", {
+          reason: validation.reason,
+          entry,
+          latestAction: context.frameAnalysis.summaryOfAction,
+        });
+        // Use a sanitized fallback instead of the hallucinated content
+        entry.action = context.frameAnalysis.summaryOfAction;
+        entry.evidence = "Fallback: used raw frame analysis";
+      }
+
+      // Build narrative from validated entry
+      const updatedStory = buildNarrativeFromEntries(currentStory, entry);
       const updatedStoryHash = createContentHash(updatedStory);
 
       // Log the AI response
-      log.logAIInteraction("storyteller_response", "", rawStory, {
+      log.logAIInteraction("storyteller_response", "", rawResponse, {
         model: STORY_CONFIG.MODEL,
         inputStoryHash: currentStoryHash,
         outputStoryHash: updatedStoryHash,
