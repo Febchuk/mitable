@@ -16,6 +16,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Python (for native modules)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install setuptools (required for native modules)
+        run: pip install setuptools
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -72,6 +80,9 @@ jobs:
   build-windows:
     name: Build Windows
     runs-on: windows-latest
+    env:
+      # Use a Windows-compatible temp directory
+      ELECTRON_BUILDER_OUTPUT: ${{ github.workspace }}/dist-output
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -95,27 +106,37 @@ jobs:
           # Cloudflare R2 public URL for electron-builder generic provider
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
 
-      - name: Find output directory
+      - name: Find and list build artifacts
         id: find_output
-        shell: bash
+        shell: pwsh
         run: |
-          # Try common paths for electron-builder output on Windows
-          if [ -d "/tmp/mitable-dist" ]; then
-            echo "output_dir=/tmp/mitable-dist" >> $GITHUB_OUTPUT
-          elif [ -d "C:/tmp/mitable-dist" ]; then
-            echo "output_dir=C:/tmp/mitable-dist" >> $GITHUB_OUTPUT
-          elif [ -d "$RUNNER_TEMP/mitable-dist" ]; then
-            echo "output_dir=$RUNNER_TEMP/mitable-dist" >> $GITHUB_OUTPUT
-          else
-            echo "output_dir=apps/electron/dist" >> $GITHUB_OUTPUT
-          fi
-          echo "Found output directory: $(cat $GITHUB_OUTPUT)"
+          # Check multiple possible output locations
+          $possiblePaths = @(
+            "C:\tmp\mitable-dist",
+            "$env:TEMP\mitable-dist",
+            "$env:RUNNER_TEMP\mitable-dist",
+            "${{ github.workspace }}\apps\electron\dist"
+          )
 
-      - name: List build artifacts
-        shell: bash
-        run: |
-          echo "Listing files in output directory:"
-          ls -la "${{ steps.find_output.outputs.output_dir }}" || echo "Directory not found"
+          $outputDir = $null
+          foreach ($path in $possiblePaths) {
+            Write-Host "Checking: $path"
+            if (Test-Path $path) {
+              Write-Host "Found output at: $path"
+              Get-ChildItem -Path $path
+              $outputDir = $path
+              break
+            }
+          }
+
+          if ($outputDir) {
+            echo "output_dir=$outputDir" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Host "No output directory found!"
+            # Try to find any .exe files
+            Get-ChildItem -Path "${{ github.workspace }}" -Recurse -Filter "*.exe" | Select-Object -First 10
+            exit 1
+          }
 
       - name: Upload to Cloudflare R2
         uses: ryand56/r2-upload-action@latest
