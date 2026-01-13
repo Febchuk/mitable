@@ -59,6 +59,15 @@ jobs:
           echo "Listing files in output directory:"
           ls -la apps/electron/dist/ || echo "Directory not found"
 
+      - name: Prepare release artifacts for R2
+        run: |
+          mkdir -p release-artifacts
+          cp apps/electron/dist/*.dmg release-artifacts/ || true
+          cp apps/electron/dist/*.zip release-artifacts/ || true
+          cp apps/electron/dist/*.blockmap release-artifacts/ || true
+          cp apps/electron/dist/latest-mac.yml release-artifacts/ || true
+          ls -la release-artifacts/
+
       - name: Upload to Cloudflare R2
         uses: ryand56/r2-upload-action@latest
         with:
@@ -66,7 +75,7 @@ jobs:
           r2-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           r2-bucket: mitable-releases
-          source-dir: apps/electron/dist
+          source-dir: release-artifacts
           destination-dir: ./
 
       - name: Create GitHub Release
@@ -113,6 +122,15 @@ jobs:
           echo "Listing files in output directory:"
           ls -la apps/electron/dist/ || echo "Directory not found"
 
+      - name: Prepare release artifacts for R2
+        shell: bash
+        run: |
+          mkdir -p release-artifacts
+          cp apps/electron/dist/*.exe release-artifacts/ || true
+          cp apps/electron/dist/*.blockmap release-artifacts/ || true
+          cp apps/electron/dist/latest.yml release-artifacts/ || true
+          ls -la release-artifacts/
+
       - name: Upload to Cloudflare R2
         uses: ryand56/r2-upload-action@latest
         with:
@@ -120,7 +138,7 @@ jobs:
           r2-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           r2-bucket: mitable-releases
-          source-dir: apps/electron/dist
+          source-dir: release-artifacts
           destination-dir: ./
 
       - name: Append to GitHub Release
