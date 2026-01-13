@@ -6,13 +6,19 @@ directories:
   output: /tmp/mitable-dist
 
 # Publish configuration for auto-updates
+# Cloudflare R2 (primary) - uses Cloudflare CDN with Lagos edge node for fast African downloads
+# GitHub Releases (fallback) - slower in some regions but reliable
+# Note: R2_PUBLIC_URL must be set as environment variable during build (e.g., https://pub-xxx.r2.dev)
 publish:
-  provider: github
-  owner: Febchuk
-  repo: mitable
-  releaseType: release
-  private: true
-  token: ${env.GH_TOKEN}
+  - provider: generic
+    url: ${env.R2_PUBLIC_URL}
+    useMultipleRangeRequest: false
+  - provider: github
+    owner: Febchuk
+    repo: mitable
+    releaseType: release
+    private: true
+    token: ${env.GH_TOKEN}
 
 # macOS Configuration
 mac:

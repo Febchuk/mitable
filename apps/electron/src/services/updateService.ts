@@ -5,6 +5,8 @@ import log from "electron-log";
 class UpdateService {
   private updateCheckInterval: NodeJS.Timeout | null = null;
   private isCheckingForUpdates = false;
+  private maxRetries = 3;
+  private currentRetry = 0;
 
   constructor() {
     // Configure logger
@@ -16,6 +18,11 @@ class UpdateService {
 
     // Disable auto-install on app quit
     autoUpdater.autoInstallOnAppQuit = false;
+
+    // Set request headers for better cache handling
+    autoUpdater.requestHeaders = {
+      "Cache-Control": "no-cache",
+    };
 
     this.setupEventListeners();
   }
@@ -136,15 +143,48 @@ class UpdateService {
   }
 
   /**
-   * Download the available update
+   * Download the available update with retry logic for slow connections
    */
   async downloadUpdate(): Promise<void> {
+    this.currentRetry = 0;
+    await this.attemptDownload();
+  }
+
+  /**
+   * Attempt to download update with exponential backoff retry
+   */
+  private async attemptDownload(): Promise<void> {
     try {
-      log.info("[UpdateService] Starting update download...");
+      log.info(
+        `[UpdateService] Download attempt ${this.currentRetry + 1}/${this.maxRetries}...`
+      );
       await autoUpdater.downloadUpdate();
     } catch (error) {
-      log.error("[UpdateService] Failed to download update:", error);
-      throw error;
+      this.currentRetry++;
+      if (this.currentRetry < this.maxRetries) {
+        const delay = Math.pow(2, this.currentRetry) * 1000; // Exponential backoff: 2s, 4s, 8s
+        log.warn(
+          `[UpdateService] Download failed, retrying in ${delay / 1000}s...`,
+          error
+        );
+
+        // Notify renderers about retry
+        this.notifyRenderers("update-download-retry", {
+          attempt: this.currentRetry + 1,
+          maxRetries: this.maxRetries,
+          delaySeconds: delay / 1000,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        await this.attemptDownload();
+      } else {
+        log.error(
+          "[UpdateService] All download attempts failed after",
+          this.maxRetries,
+          "retries"
+        );
+        throw error;
+      }
     }
   }
 
