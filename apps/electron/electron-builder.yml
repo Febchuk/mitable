@@ -3,7 +3,7 @@ productName: Mitable
 copyright: Copyright © 2025 Mitable
 directories:
   buildResources: build
-  output: /tmp/mitable-dist
+  output: dist
 
 # Publish configuration for auto-updates
 # Cloudflare R2 (primary) - uses Cloudflare CDN with Lagos edge node for fast African downloads

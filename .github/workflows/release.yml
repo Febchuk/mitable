@@ -54,7 +54,7 @@ jobs:
       - name: List build artifacts
         run: |
           echo "Listing files in output directory:"
-          ls -la /tmp/mitable-dist/ || echo "Directory not found"
+          ls -la apps/electron/dist/ || echo "Directory not found"
 
       - name: Upload to Cloudflare R2
         uses: ryand56/r2-upload-action@latest
@@ -63,16 +63,16 @@ jobs:
           r2-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           r2-bucket: mitable-releases
-          source-dir: /tmp/mitable-dist
+          source-dir: apps/electron/dist
           destination-dir: ./
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            /tmp/mitable-dist/*.dmg
-            /tmp/mitable-dist/*.zip
-            /tmp/mitable-dist/latest-mac.yml
+            apps/electron/dist/*.dmg
+            apps/electron/dist/*.zip
+            apps/electron/dist/latest-mac.yml
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -80,9 +80,6 @@ jobs:
   build-windows:
     name: Build Windows
     runs-on: windows-latest
-    env:
-      # Use a Windows-compatible temp directory
-      ELECTRON_BUILDER_OUTPUT: ${{ github.workspace }}/dist-output
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -106,37 +103,11 @@ jobs:
           # Cloudflare R2 public URL for electron-builder generic provider
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
 
-      - name: Find and list build artifacts
-        id: find_output
-        shell: pwsh
+      - name: List build artifacts
+        shell: bash
         run: |
-          # Check multiple possible output locations
-          $possiblePaths = @(
-            "C:\tmp\mitable-dist",
-            "$env:TEMP\mitable-dist",
-            "$env:RUNNER_TEMP\mitable-dist",
-            "${{ github.workspace }}\apps\electron\dist"
-          )
-
-          $outputDir = $null
-          foreach ($path in $possiblePaths) {
-            Write-Host "Checking: $path"
-            if (Test-Path $path) {
-              Write-Host "Found output at: $path"
-              Get-ChildItem -Path $path
-              $outputDir = $path
-              break
-            }
-          }
-
-          if ($outputDir) {
-            echo "output_dir=$outputDir" >> $env:GITHUB_OUTPUT
-          } else {
-            Write-Host "No output directory found!"
-            # Try to find any .exe files
-            Get-ChildItem -Path "${{ github.workspace }}" -Recurse -Filter "*.exe" | Select-Object -First 10
-            exit 1
-          }
+          echo "Listing files in output directory:"
+          ls -la apps/electron/dist/ || echo "Directory not found"
 
       - name: Upload to Cloudflare R2
         uses: ryand56/r2-upload-action@latest
@@ -145,14 +116,14 @@ jobs:
           r2-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           r2-bucket: mitable-releases
-          source-dir: ${{ steps.find_output.outputs.output_dir }}
+          source-dir: apps/electron/dist
           destination-dir: ./
 
       - name: Append to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ${{ steps.find_output.outputs.output_dir }}/*.exe
-            ${{ steps.find_output.outputs.output_dir }}/latest.yml
+            apps/electron/dist/*.exe
+            apps/electron/dist/latest.yml
           draft: false
           prerelease: false
