@@ -81,7 +81,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          token: ${{ secrets.GH_TOKEN }}
           files: |
             apps/electron/dist/*.dmg
             apps/electron/dist/*.zip
@@ -144,7 +143,6 @@ jobs:
       - name: Append to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          token: ${{ secrets.GH_TOKEN }}
           files: |
             apps/electron/dist/*.exe
             apps/electron/dist/latest.yml
