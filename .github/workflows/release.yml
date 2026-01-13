@@ -42,6 +42,8 @@ jobs:
       - name: Build Electron app for macOS
         run: npm run build:mac --workspace=apps/electron
         env:
+          # Production API URL (baked into the build)
+          VITE_API_URL: https://mitablebackend-production.up.railway.app
           # Apple code signing and notarization
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -111,6 +113,8 @@ jobs:
       - name: Build Electron app for Windows
         run: npm run build:win --workspace=apps/electron
         env:
+          # Production API URL (baked into the build)
+          VITE_API_URL: https://mitablebackend-production.up.railway.app
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           # Cloudflare R2 public URL for electron-builder generic provider
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
