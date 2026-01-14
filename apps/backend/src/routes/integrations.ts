@@ -2437,4 +2437,297 @@ router.post("/gmail/send", requireAuth, async (req: Request, res: Response): Pro
   }
 });
 
+// ============================================================================
+// NOTION USER INTEGRATION ROUTES (Per-user OAuth for document exports)
+// ============================================================================
+
+/**
+ * POST /api/integrations/notion/user/oauth/start
+ * Initiate Notion OAuth flow for the current user
+ * Returns the authorization URL for the user to visit
+ */
+router.post(
+  "/notion/user/oauth/start",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      // Validate Notion credentials are configured
+      if (!config.notion.clientId || !config.notion.clientSecret) {
+        sendError(
+          res,
+          500,
+          "NOTION_NOT_CONFIGURED",
+          "Notion OAuth credentials not configured. Please set NOTION_CLIENT_ID and NOTION_CLIENT_SECRET."
+        );
+        return;
+      }
+
+      // Build Notion OAuth URL
+      // owner=user allows user to select pages from their workspace
+      const state = userId; // Use userId as state to identify user after redirect
+
+      console.log(`[Notion User OAuth] Starting OAuth for user ${userId}`);
+      console.log(`[Notion User OAuth] Using redirect URI: ${config.notion.userRedirectUri}`);
+
+      const authUrl =
+        `https://api.notion.com/v1/oauth/authorize?` +
+        `client_id=${config.notion.clientId}&` +
+        `redirect_uri=${encodeURIComponent(config.notion.userRedirectUri)}&` +
+        `response_type=code&` +
+        `owner=user&` +
+        `state=${state}`;
+
+      console.log(`[Notion User OAuth] Generated auth URL: ${authUrl}`);
+
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting Notion user OAuth:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to initiate Notion OAuth",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/integrations/notion/user/callback
+ * Notion OAuth callback endpoint
+ * Notion redirects here after user approves the app
+ */
+router.get("/notion/user/callback", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { code, state, error } = req.query;
+
+    // Handle OAuth error (user denied access)
+    if (error) {
+      res.status(400).send(`
+        <html>
+          <head>
+            <title>Notion Connection Failed</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+              h1 { color: #000; }
+            </style>
+          </head>
+          <body>
+            <h1>❌ Notion Connection Failed</h1>
+            <p>You denied access or an error occurred.</p>
+            <p>Error: ${error}</p>
+            <p>You can close this window and try again.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    if (!code || !state) {
+      res.status(400).send(`
+        <html>
+          <head>
+            <title>Invalid Request</title>
+          </head>
+          <body>
+            <h1>Invalid OAuth callback</h1>
+            <p>Missing authorization code or state parameter.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    const userId = state as string;
+
+    // Import Notion user OAuth service
+    const { notionUserOAuthService } = await import("../services/notion-user-oauth.service.js");
+
+    // Exchange authorization code for access token
+    const tokenData = await notionUserOAuthService.exchangeCodeForToken(code as string);
+
+    // Notion tokens don't have expiration in response, but they can be refreshed
+    // We'll set a reasonable expiration time (90 days as per Notion docs)
+    const tokenExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+    // Encrypt tokens before storing
+    const encryptedAccessToken = encryptionService.encrypt(tokenData.access_token);
+
+    // Note: Notion doesn't return refresh_token in initial exchange, only on refresh
+    // We'll store null initially and it will be populated on first refresh
+    const encryptedRefreshToken = null;
+
+    // Store tokens on user record
+    await db
+      .update(schema.users)
+      .set({
+        notionAccessTokenEncrypted: encryptedAccessToken,
+        notionRefreshTokenEncrypted: encryptedRefreshToken,
+        notionTokenExpiresAt: tokenExpiresAt,
+        notionWorkspaceId: tokenData.workspace_id,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, userId));
+
+    // Get user info for logging
+    const userName = tokenData.owner.user?.person.email || tokenData.owner.user?.name || "User";
+
+    console.log(
+      `✅ Notion connected for user: ${userId} (${userName}) - Workspace: ${tokenData.workspace_name}`
+    );
+
+    // Return success page
+    res.send(`
+      <html>
+        <head>
+          <title>Notion Connected</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              text-align: center;
+              padding: 50px;
+              background: linear-gradient(135deg, #000 0%, #37352F 100%);
+              color: white;
+            }
+            .container {
+              background: white;
+              color: #333;
+              border-radius: 10px;
+              padding: 40px;
+              max-width: 500px;
+              margin: 0 auto;
+              box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            }
+            h1 { color: #000; margin-bottom: 10px; }
+            p { font-size: 16px; line-height: 1.6; }
+            .workspace-name { font-weight: bold; color: #000; }
+            button {
+              margin-top: 20px;
+              padding: 12px 24px;
+              background: #000;
+              color: white;
+              border: none;
+              border-radius: 5px;
+              font-size: 16px;
+              cursor: pointer;
+            }
+            button:hover { background: #37352F; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>✅ Notion Connected Successfully!</h1>
+            <p>Connected to workspace: <span class="workspace-name">${tokenData.workspace_name}</span></p>
+            <p>You can now export documents to your Notion workspace.</p>
+            <button onclick="window.close()">Close Window</button>
+          </div>
+          <script>
+            // Auto-close after 2 seconds
+            setTimeout(() => window.close(), 2000);
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Notion user OAuth callback error:", error);
+    res.status(500).send(`
+      <html>
+        <head>
+          <title>Connection Error</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            h1 { color: #e01e5a; }
+          </style>
+        </head>
+        <body>
+          <h1>❌ Connection Error</h1>
+          <p>Failed to connect to Notion. Please try again.</p>
+          <p>Error: ${error instanceof Error ? error.message : "Unknown error"}</p>
+        </body>
+      </html>
+    `);
+  }
+});
+
+/**
+ * GET /api/integrations/notion/user/status
+ * Check if the current user has Notion connected
+ */
+router.get(
+  "/notion/user/status",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      const [user] = await db
+        .select({
+          notionAccessTokenEncrypted: schema.users.notionAccessTokenEncrypted,
+          notionTokenExpiresAt: schema.users.notionTokenExpiresAt,
+          notionWorkspaceId: schema.users.notionWorkspaceId,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!user) {
+        res.status(404).json({ error: "Not Found", message: "User not found" });
+        return;
+      }
+
+      const isConnected = !!user.notionAccessTokenEncrypted;
+      const isExpired = user.notionTokenExpiresAt
+        ? new Date(user.notionTokenExpiresAt) < new Date()
+        : false;
+
+      res.json({
+        connected: isConnected && !isExpired,
+        expired: isExpired,
+        workspaceId: user.notionWorkspaceId,
+      });
+    } catch (error) {
+      console.error("Error checking Notion user status:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to check Notion status",
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/integrations/notion/user/disconnect
+ * Disconnect Notion for the current user
+ */
+router.delete(
+  "/notion/user/disconnect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      await db
+        .update(schema.users)
+        .set({
+          notionAccessTokenEncrypted: null,
+          notionRefreshTokenEncrypted: null,
+          notionTokenExpiresAt: null,
+          notionWorkspaceId: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, userId));
+
+      console.log(`✅ Notion disconnected for user: ${userId}`);
+
+      res.json({ success: true, message: "Notion disconnected" });
+    } catch (error) {
+      console.error("Error disconnecting Notion user:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to disconnect Notion",
+      });
+    }
+  }
+);
+
 export default router;

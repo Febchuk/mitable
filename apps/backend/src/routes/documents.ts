@@ -936,10 +936,10 @@ router.post(
       // Import notion export service
       const { notionExportService } = await import("../services/notion-export.service.js");
 
-      // Export to Notion
+      // Export to Notion using user's personal token
       const result = await notionExportService.exportDocument({
         documentId,
-        organizationId: user.organizationId,
+        userId,
         parentPageId,
       });
 

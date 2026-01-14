@@ -27,6 +27,12 @@ export const users = pgTable("users", {
   gmailTokenExpiresAt: timestamp("gmail_token_expires_at"),
   gmailUserEmail: varchar("gmail_user_email", { length: 255 }),
 
+  // Notion OAuth tokens (per-user document exports, encrypted)
+  notionAccessTokenEncrypted: text("notion_access_token_encrypted"),
+  notionRefreshTokenEncrypted: text("notion_refresh_token_encrypted"),
+  notionTokenExpiresAt: timestamp("notion_token_expires_at"),
+  notionWorkspaceId: varchar("notion_workspace_id", { length: 100 }),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

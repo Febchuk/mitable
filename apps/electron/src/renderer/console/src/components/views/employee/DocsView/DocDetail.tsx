@@ -9,7 +9,7 @@
  * - Export to Notion
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { createLogger } from "../../../../../../lib/logger";
 
@@ -30,7 +30,6 @@ import {
   ExternalLink,
   CheckCircle,
   Clock,
-  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,56 +71,111 @@ export default function DocDetail() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [title, setTitle] = useState("");
 
-  // Handle autosave (debounced content changes)
-  const handleContentChange = useCallback(
-    async (content: string) => {
-      if (!docId) return;
+  // Debounce timers
+  const titleSaveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const contentSaveTimeout = useRef<NodeJS.Timeout | null>(null);
 
-      setHasUnsavedChanges(true);
+  // Initialize title when document loads
+  useEffect(() => {
+    if (document) {
+      setTitle(document.title);
+      setLastSaved(new Date(document.updatedAt));
+    }
+  }, [document]);
 
-      try {
-        await updateMutation.mutateAsync({
-          id: docId,
-          data: { content },
-        });
-        setHasUnsavedChanges(false);
-      } catch (error) {
-        logger.error("Autosave failed:", error);
-        // Don't show error toast for autosave - just keep hasUnsavedChanges true
-      }
-    },
-    [docId, updateMutation]
-  );
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (titleSaveTimeout.current) clearTimeout(titleSaveTimeout.current);
+      if (contentSaveTimeout.current) clearTimeout(contentSaveTimeout.current);
+    };
+  }, []);
 
-  // Handle explicit save (⌘+S)
-  const handleSave = useCallback(
-    async (content: string) => {
+  // Debounced save function
+  const debouncedSave = useCallback(
+    async (field: "title" | "content", value: string) => {
       if (!docId) return;
 
       setIsSaving(true);
       try {
         await updateMutation.mutateAsync({
           id: docId,
-          data: { content },
+          data: { [field]: value },
         });
-        setHasUnsavedChanges(false);
-        toast({
-          title: "Document saved",
-          description: "Your changes have been saved.",
-        });
+        setLastSaved(new Date());
       } catch (error) {
-        toast({
-          title: "Save failed",
-          description: "Failed to save document. Please try again.",
-          variant: "destructive",
-        });
+        logger.error(`${field} autosave failed:`, error);
       } finally {
         setIsSaving(false);
       }
     },
-    [docId, updateMutation, toast]
+    [docId, updateMutation]
+  );
+
+  // Handle title change with debounced autosave
+  const handleTitleChange = useCallback(
+    (newTitle: string) => {
+      // Update local state immediately (no lag)
+      setTitle(newTitle);
+
+      // Clear existing timeout
+      if (titleSaveTimeout.current) {
+        clearTimeout(titleSaveTimeout.current);
+      }
+
+      // Debounce the API call (wait 1 second after typing stops)
+      titleSaveTimeout.current = setTimeout(() => {
+        debouncedSave("title", newTitle);
+      }, 1000);
+    },
+    [debouncedSave]
+  );
+
+  // Handle content change with debounced autosave
+  const handleContentChange = useCallback(
+    (newContent: string) => {
+      // Clear existing timeout
+      if (contentSaveTimeout.current) {
+        clearTimeout(contentSaveTimeout.current);
+      }
+
+      // Debounce the API call (wait 2 seconds after typing stops)
+      contentSaveTimeout.current = setTimeout(() => {
+        debouncedSave("content", newContent);
+      }, 2000);
+    },
+    [debouncedSave]
+  );
+
+  // Handle explicit save from editor (⌘+S)
+  const handleSave = useCallback(
+    async (contentToSave: string) => {
+      if (!docId) return;
+
+      // Clear pending timeouts and save immediately
+      if (titleSaveTimeout.current) clearTimeout(titleSaveTimeout.current);
+      if (contentSaveTimeout.current) clearTimeout(contentSaveTimeout.current);
+
+      setIsSaving(true);
+      try {
+        await updateMutation.mutateAsync({
+          id: docId,
+          data: {
+            title,
+            content: contentToSave,
+          },
+        });
+        setLastSaved(new Date());
+      } catch (error) {
+        logger.error("Manual save failed:", error);
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [docId, title, updateMutation]
   );
 
   const handleDelete = async () => {
@@ -205,8 +259,14 @@ export default function DocDetail() {
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <Icon size={20} className="text-primary" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-text-primary">{document.title}</h1>
+            <div className="flex-1">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                className="text-xl font-bold text-text-primary bg-transparent border-none outline-none focus:outline-none w-full max-w-2xl"
+                placeholder="Document title..."
+              />
               <div className="flex items-center gap-3 mt-0.5">
                 <span className="text-text-secondary text-sm">
                   {DOC_TYPE_LABELS[document.docType as DocType]}
@@ -218,28 +278,26 @@ export default function DocDetail() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Save status indicator */}
-          {(isSaving || hasUnsavedChanges) && (
-            <span className="text-xs text-text-secondary flex items-center gap-1 mr-2">
-              {isSaving ? (
-                <>
-                  <Loader2 className="animate-spin" size={12} />
-                  Saving...
-                </>
-              ) : hasUnsavedChanges ? (
-                <>
-                  <Save size={12} />
-                  Unsaved changes
-                </>
-              ) : null}
-            </span>
-          )}
+          {/* Google Docs-style save indicator */}
+          <span className="text-xs text-text-secondary flex items-center gap-1.5 mr-2">
+            {isSaving ? (
+              <>
+                <Loader2 className="animate-spin" size={14} />
+                <span>Saving...</span>
+              </>
+            ) : lastSaved ? (
+              <>
+                <CheckCircle size={14} className="text-status-success" />
+                <span>All changes saved</span>
+              </>
+            ) : null}
+          </span>
 
           <Button
             variant="outline"
             onClick={() => setIsExportDialogOpen(true)}
             className="gap-2 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary"
-            disabled={exportMutation.isPending}
+            disabled={exportMutation.isPending || isSaving}
           >
             {exportMutation.isPending ? (
               <Loader2 className="animate-spin" size={16} />

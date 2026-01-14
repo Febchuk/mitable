@@ -8,69 +8,109 @@
 import { Client } from "@notionhq/client";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { encryptionService } from "./encryption.service.js";
 import type { ExportNotionResponse } from "@mitable/shared";
 import type { BlockObjectRequest } from "@notionhq/client/build/src/api-endpoints.js";
 
 interface ExportParams {
   documentId: string;
-  organizationId: string;
+  userId: string;
   parentPageId?: string;
 }
 
 class NotionExportService {
   /**
-   * Get Notion Client for an organization
+   * Get Notion Client for a user
+   * Uses the user's personal Notion OAuth token for exports
    */
-  private async getClient(organizationId: string): Promise<Client> {
-    const [integration] = await db
-      .select()
-      .from(schema.integrations)
-      .where(
-        and(
-          eq(schema.integrations.organizationId, organizationId),
-          eq(schema.integrations.provider, "notion")
-        )
-      )
+  private async getClient(userId: string): Promise<Client> {
+    const [user] = await db
+      .select({
+        notionAccessTokenEncrypted: schema.users.notionAccessTokenEncrypted,
+        notionTokenExpiresAt: schema.users.notionTokenExpiresAt,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
       .limit(1);
 
-    if (!integration) {
-      throw new Error("Notion integration not found. Please connect Notion first.");
+    if (!user) {
+      throw new Error("User not found");
     }
 
-    if (!integration.accessTokenEncrypted) {
-      throw new Error("No encrypted access token found");
+    if (!user.notionAccessTokenEncrypted) {
+      throw new Error(
+        "Notion not connected. Please connect your Notion account in settings before exporting."
+      );
     }
 
-    const accessToken = encryptionService.decrypt(integration.accessTokenEncrypted);
+    // Check if token is expired
+    if (user.notionTokenExpiresAt && new Date(user.notionTokenExpiresAt) < new Date()) {
+      throw new Error("Notion token expired. Please reconnect your Notion account in settings.");
+    }
+
+    const accessToken = encryptionService.decrypt(user.notionAccessTokenEncrypted);
     return new Client({ auth: accessToken });
   }
 
   /**
-   * Export a document to Notion
+   * Export a document to Notion using user's personal workspace
    */
   async exportDocument(params: ExportParams): Promise<ExportNotionResponse> {
-    const { documentId, organizationId, parentPageId } = params;
+    const { documentId, userId, parentPageId } = params;
 
     console.log(`[NotionExport] Exporting document ${documentId} to Notion`);
 
-    // Get document
-    const [document] = await db
-      .select()
+    // Get document with author info
+    const [documentWithAuthor] = await db
+      .select({
+        document: schema.documents,
+        authorName: schema.users.firstName,
+        authorLastName: schema.users.lastName,
+        authorEmail: schema.users.email,
+      })
       .from(schema.documents)
+      .leftJoin(schema.users, eq(schema.documents.createdBy, schema.users.id))
       .where(eq(schema.documents.id, documentId))
       .limit(1);
 
-    if (!document) {
+    if (!documentWithAuthor) {
       throw new Error("Document not found");
     }
 
-    // Get Notion client
-    const client = await this.getClient(organizationId);
+    const document = documentWithAuthor.document;
+    const authorDisplayName =
+      [documentWithAuthor.authorName, documentWithAuthor.authorLastName]
+        .filter(Boolean)
+        .join(" ") ||
+      documentWithAuthor.authorEmail ||
+      "Unknown";
+
+    // Get Notion client using user's token
+    const client = await this.getClient(userId);
 
     // Convert markdown to Notion blocks
     const blocks = this.markdownToNotionBlocks(document.content);
+
+    // Add metadata callout at the top
+    const metadataBlock: BlockObjectRequest = {
+      type: "callout",
+      callout: {
+        rich_text: [
+          {
+            type: "text",
+            text: {
+              content: `📝 Author: ${authorDisplayName}\n⏰ Last Updated: ${new Date(document.updatedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}\n📅 Created: ${new Date(document.createdAt).toLocaleString("en-US", { dateStyle: "medium" })}`,
+            },
+          },
+        ],
+        icon: { type: "emoji", emoji: "ℹ️" },
+        color: "gray_background",
+      },
+    };
+
+    // Prepend metadata block to content
+    const blocksWithMetadata = [metadataBlock, ...blocks];
 
     // Create page properties
     const pageProperties: any = {
@@ -84,57 +124,63 @@ class NotionExportService {
       },
     };
 
-    // Build page request
-    const pageRequest: any = {
-      properties: pageProperties,
-      children: blocks,
-    };
+    let page: any;
+    let pageUrl = "";
 
-    // Set parent - either specific page or workspace root
-    if (parentPageId) {
-      pageRequest.parent = { page_id: parentPageId };
-    } else {
-      // Get workspace ID from integration
-      const [integration] = await db
-        .select({ metadata: schema.integrations.metadata })
-        .from(schema.integrations)
-        .where(
-          and(
-            eq(schema.integrations.organizationId, organizationId),
-            eq(schema.integrations.provider, "notion")
-          )
-        )
-        .limit(1);
+    // Check if document is already synced to Notion
+    if (document.notionPageId) {
+      console.log(`[NotionExport] Re-exporting - archiving old page: ${document.notionPageId}`);
 
-      const workspaceId = (integration?.metadata as any)?.workspace_id;
-      if (!workspaceId) {
-        throw new Error("Notion workspace not found. Please reconnect Notion integration.");
-      }
+      try {
+        // Archive the old page (much faster than deleting blocks one by one)
+        await client.pages.update({
+          page_id: document.notionPageId,
+          archived: true,
+        });
 
-      // Use first accessible page as parent (Notion API limitation)
-      // Try to search for any page we have access to
-      const searchResponse = await client.search({
-        filter: { property: "object", value: "page" },
-        page_size: 1,
-      });
-
-      if (searchResponse.results.length > 0) {
-        const firstPage = searchResponse.results[0] as any;
-        pageRequest.parent = { page_id: firstPage.id };
-      } else {
-        throw new Error(
-          "No accessible Notion pages found. Please share at least one page with the Mitable integration."
-        );
+        console.log(`[NotionExport] Old page archived, creating new page with latest content`);
+        // Clear the page ID so we create a new page
+        document.notionPageId = null;
+      } catch (error) {
+        console.error(`[NotionExport] Failed to archive old page:`, error);
+        // If archive fails, just create new page anyway
+        document.notionPageId = null;
       }
     }
 
-    // Create page
-    const page = await client.pages.create(pageRequest);
+    // Create new page if no existing page or update failed
+    if (!document.notionPageId) {
+      const pageRequest: any = {
+        properties: pageProperties,
+        children: blocksWithMetadata,
+      };
 
-    // Get page URL
-    const pageUrl = (page as any).url || `https://notion.so/${page.id.replace(/-/g, "")}`;
+      // Set parent - either specific page or search for accessible page
+      if (parentPageId) {
+        pageRequest.parent = { page_id: parentPageId };
+      } else {
+        // User selected pages during OAuth - search for any accessible page
+        const searchResponse = await client.search({
+          filter: { property: "object", value: "page" },
+          page_size: 1,
+        });
 
-    // Update document with Notion sync info
+        if (searchResponse.results.length > 0) {
+          const firstPage = searchResponse.results[0] as any;
+          pageRequest.parent = { page_id: firstPage.id };
+        } else {
+          throw new Error(
+            "No accessible Notion pages found. Please reconnect your Notion account and select pages to share."
+          );
+        }
+      }
+
+      console.log(`[NotionExport] Creating new Notion page`);
+      page = await client.pages.create(pageRequest);
+      pageUrl = (page as any).url || `https://notion.so/${page.id.replace(/-/g, "")}`;
+    }
+
+    // Update document with Notion sync info and set status to published
     await db
       .update(schema.documents)
       .set({
@@ -142,6 +188,7 @@ class NotionExportService {
         notionSyncStatus: "synced",
         notionSyncedAt: new Date(),
         notionSyncError: null,
+        status: "published", // Auto-publish when exported
         updatedAt: new Date(),
       })
       .where(eq(schema.documents.id, documentId));
@@ -156,11 +203,32 @@ class NotionExportService {
   }
 
   /**
+   * Strip HTML tags and convert to plain text
+   */
+  private stripHtml(html: string): string {
+    // Remove HTML tags but preserve content
+    return html
+      .replace(/<style[^>]*>.*?<\/style>/gi, "") // Remove style tags and content
+      .replace(/<script[^>]*>.*?<\/script>/gi, "") // Remove script tags and content
+      .replace(/<[^>]+>/g, "") // Remove all HTML tags
+      .replace(/&nbsp;/g, " ") // Convert HTML entities
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim();
+  }
+
+  /**
    * Convert Markdown content to Notion blocks
    */
   private markdownToNotionBlocks(markdown: string): BlockObjectRequest[] {
+    // Strip HTML tags first (Plate editor stores content as HTML)
+    const cleanContent = this.stripHtml(markdown);
+
     const blocks: BlockObjectRequest[] = [];
-    const lines = markdown.split("\n");
+    const lines = cleanContent.split("\n");
 
     let i = 0;
     while (i < lines.length) {
