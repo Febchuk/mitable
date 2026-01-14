@@ -226,7 +226,7 @@ class MasterStoryService {
         "storyteller_response_full",
         "", // System prompt already logged
         "", // User prompt already logged
-        rawStory,
+        rawResponse,
         {
           model: STORY_CONFIG.MODEL,
           inputStoryHash: currentStoryHash,
