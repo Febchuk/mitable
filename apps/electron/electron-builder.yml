@@ -8,10 +8,9 @@ directories:
 # Publish configuration for auto-updates
 # Cloudflare R2 (primary) - uses Cloudflare CDN with Lagos edge node for fast African downloads
 # GitHub Releases (fallback) - slower in some regions but reliable
-# Note: R2_PUBLIC_URL must be set as environment variable during build (e.g., https://pub-xxx.r2.dev)
 publish:
   - provider: generic
-    url: ${env.R2_PUBLIC_URL}
+    url: https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev
     useMultipleRangeRequest: false
   - provider: github
     owner: Febchuk
