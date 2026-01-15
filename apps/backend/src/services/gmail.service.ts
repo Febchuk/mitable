@@ -1,10 +1,12 @@
 /**
- * Gmail Service
+ * Google Workspace Service
  *
- * Handles Gmail API interactions for per-user OAuth:
+ * Handles Google Workspace API interactions for per-user OAuth:
  * - OAuth token exchange and refresh
- * - Sending emails from user's Gmail account
+ * - Sending emails via Gmail
  * - Getting user's Gmail profile
+ * - Creating and managing Google Docs documents
+ * - Managing Drive files and folders
  */
 
 import { config } from "../config.js";
@@ -12,10 +14,12 @@ import { config } from "../config.js";
 const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_API_URL = "https://gmail.googleapis.com/gmail/v1";
 
-// Scopes for sending emails and reading profile (email address)
+// Scopes for sending emails, reading profile, creating docs, and managing Drive files
 const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/documents", // Create and edit Google Docs
+  "https://www.googleapis.com/auth/drive.file", // Access files created by this app
 ];
 
 interface GmailOAuthTokenResponse {

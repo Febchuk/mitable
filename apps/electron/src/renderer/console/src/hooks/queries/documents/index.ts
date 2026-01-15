@@ -181,3 +181,34 @@ export function useExportToNotion() {
     },
   });
 }
+
+// ===========================
+// Export to Google Docs
+// ===========================
+
+export function useExportToGoogleDocs() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, folderId }: { id: string; folderId?: string }) =>
+      documentsService.exportToGoogleDocs(id, folderId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: documentsKeys.detail(variables.id) });
+    },
+  });
+}
+
+// ===========================
+// List Google Drive Folders
+// ===========================
+
+export function useGoogleDriveFolders() {
+  const { user } = useUser();
+
+  return useQuery({
+    queryKey: ["google-drive-folders"],
+    queryFn: () => documentsService.fetchGoogleDriveFolders(),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+}

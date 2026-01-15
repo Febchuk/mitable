@@ -29,6 +29,7 @@
     "migrate:0018": "tsx src/scripts/run-migration-0018.ts",
     "migrate:0019": "tsx src/scripts/run-migration-0019.ts",
     "migrate:0022": "tsx src/scripts/run-migration-0022.ts",
+    "migrate:0023": "tsx src/scripts/run-migration-0023.ts",
     "test-search": "tsx src/scripts/test-search.ts",
     "sync-slack": "tsx src/scripts/sync-slack.ts",
     "sync-notion": "tsx src/scripts/sync-notion.ts",

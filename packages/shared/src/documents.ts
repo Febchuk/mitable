@@ -36,6 +36,11 @@ export interface Document {
   notionSyncStatus: NotionSyncStatus;
   notionSyncedAt: string | null;
   notionSyncError: string | null;
+  googleDocsId: string | null;
+  googleDocsFolderId: string | null;
+  googleDocsSyncStatus: NotionSyncStatus; // Reuse same status type
+  googleDocsSyncedAt: string | null;
+  googleDocsSyncError: string | null;
   generationModel: string | null;
   generationPromptVersion: number | null;
   createdAt: string;

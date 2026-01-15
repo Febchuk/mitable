@@ -19,6 +19,8 @@ import {
   useDeleteDocument,
   useUpdateDocument,
   useExportToNotion,
+  useExportToGoogleDocs,
+  useGoogleDriveFolders,
 } from "@/console/src/hooks/queries/documents";
 import {
   ArrowLeft,
@@ -27,7 +29,6 @@ import {
   FileText,
   BookOpen,
   AlertCircle,
-  ExternalLink,
   CheckCircle,
   Clock,
 } from "lucide-react";
@@ -44,6 +45,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { DocEditor } from "@/console/src/components/editor";
 import ExportNotionDialog from "./dialogs/ExportNotionDialog";
+import ExportGoogleDocsDialog from "./dialogs/ExportGoogleDocsDialog";
+import ExportPopover from "./components/ExportPopover";
 import type { DocType, DocStatus } from "@mitable/shared";
 
 const DOC_TYPE_LABELS: Record<DocType, string> = {
@@ -66,10 +69,13 @@ export default function DocDetail() {
   const { data: document, isLoading } = useDocument(docId || "");
   const updateMutation = useUpdateDocument();
   const deleteMutation = useDeleteDocument();
-  const exportMutation = useExportToNotion();
+  const exportNotionMutation = useExportToNotion();
+  const exportGoogleDocsMutation = useExportToGoogleDocs();
+  const { data: driveFolders, isLoading: isLoadingFolders } = useGoogleDriveFolders();
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isExportNotionDialogOpen, setIsExportNotionDialogOpen] = useState(false);
+  const [isExportGoogleDocsDialogOpen, setIsExportGoogleDocsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [title, setTitle] = useState("");
@@ -201,13 +207,12 @@ export default function DocDetail() {
     if (!docId) return;
 
     try {
-      const result = await exportMutation.mutateAsync({ id: docId });
-      setIsExportDialogOpen(false);
+      const result = await exportNotionMutation.mutateAsync({ id: docId });
+      setIsExportNotionDialogOpen(false);
       toast({
         title: "Exported to Notion",
         description: "Document has been exported successfully.",
       });
-      // Open Notion page in browser
       if (result.notionPageUrl) {
         window.open(result.notionPageUrl, "_blank");
       }
@@ -218,6 +223,47 @@ export default function DocDetail() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleExportToGoogleDocs = async (folderId?: string) => {
+    if (!docId) return;
+
+    try {
+      const result = await exportGoogleDocsMutation.mutateAsync({ id: docId, folderId });
+      setIsExportGoogleDocsDialogOpen(false);
+      toast({
+        title: "Exported to Google Docs",
+        description: "Document has been exported successfully.",
+      });
+      if (result.documentUrl) {
+        window.open(result.documentUrl, "_blank");
+      }
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Failed to export to Google Docs.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReExportToNotion = async () => {
+    if (!docId) return;
+    await handleExportToNotion();
+  };
+
+  const handleReExportToGoogleDocs = async () => {
+    if (!docId) return;
+    await handleExportToGoogleDocs();
+  };
+
+  const handleExportToAll = async () => {
+    if (!docId) return;
+    await Promise.all([handleExportToNotion(), handleExportToGoogleDocs()]);
+    toast({
+      title: "Exported to all destinations",
+      description: "Document has been synced to Notion and Google Docs.",
+    });
   };
 
   if (isLoading) {
@@ -293,19 +339,38 @@ export default function DocDetail() {
             ) : null}
           </span>
 
-          <Button
-            variant="outline"
-            onClick={() => setIsExportDialogOpen(true)}
-            className="gap-2 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary"
-            disabled={exportMutation.isPending || isSaving}
-          >
-            {exportMutation.isPending ? (
-              <Loader2 className="animate-spin" size={16} />
-            ) : (
-              <ExternalLink size={16} />
-            )}
-            {document.notionPageId ? "Re-export" : "Export to Notion"}
-          </Button>
+          <ExportPopover
+            destinations={[
+              {
+                id: "notion",
+                name: "Notion",
+                isExported: !!document.notionPageId,
+                lastSyncedAt: document.notionSyncedAt ? new Date(document.notionSyncedAt) : null,
+                documentUrl: document.notionPageId
+                  ? `https://notion.so/${document.notionPageId}`
+                  : null,
+                onExport: () => setIsExportNotionDialogOpen(true),
+                onReExport: handleReExportToNotion,
+              },
+              {
+                id: "google-docs",
+                name: "Google Docs",
+                isExported: !!document.googleDocsId,
+                lastSyncedAt: document.googleDocsSyncedAt
+                  ? new Date(document.googleDocsSyncedAt)
+                  : null,
+                documentUrl: document.googleDocsId
+                  ? `https://docs.google.com/document/d/${document.googleDocsId}/edit`
+                  : null,
+                onExport: () => setIsExportGoogleDocsDialogOpen(true),
+                onReExport: handleReExportToGoogleDocs,
+              },
+            ]}
+            onExportAll={
+              document.notionPageId && document.googleDocsId ? handleExportToAll : undefined
+            }
+            isExporting={exportNotionMutation.isPending || exportGoogleDocsMutation.isPending}
+          />
           <Button
             variant="ghost"
             size="icon"
@@ -402,6 +467,27 @@ export default function DocDetail() {
         </div>
       )}
 
+      {/* Export Dialogs */}
+      <ExportNotionDialog
+        open={isExportNotionDialogOpen}
+        onOpenChange={setIsExportNotionDialogOpen}
+        documentTitle={document.title}
+        onExport={handleExportToNotion}
+        isExporting={exportNotionMutation.isPending}
+        existingNotionPageId={document.notionPageId}
+      />
+
+      <ExportGoogleDocsDialog
+        open={isExportGoogleDocsDialogOpen}
+        onOpenChange={setIsExportGoogleDocsDialogOpen}
+        documentTitle={document.title}
+        onExport={handleExportToGoogleDocs}
+        isExporting={exportGoogleDocsMutation.isPending}
+        existingGoogleDocsId={document.googleDocsId}
+        folders={driveFolders?.folders || []}
+        isLoadingFolders={isLoadingFolders}
+      />
+
       {/* Delete Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="bg-background-primary border-border-subtle">
@@ -433,16 +519,6 @@ export default function DocDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Export Dialog */}
-      <ExportNotionDialog
-        open={isExportDialogOpen}
-        onOpenChange={setIsExportDialogOpen}
-        documentTitle={document.title}
-        onExport={handleExportToNotion}
-        isExporting={exportMutation.isPending}
-        existingNotionPageId={document.notionPageId}
-      />
     </div>
   );
 }
