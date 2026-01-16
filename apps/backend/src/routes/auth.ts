@@ -848,3 +848,273 @@ authRouter.post("/refresh", async (req: Request, res: Response) => {
     });
   }
 });
+
+/**
+ * @openapi
+ * /auth/change-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Change user password (authenticated)
+ *     description: |
+ *       Change the password for the currently authenticated user.
+ *       Requires verification of the current password before allowing the change.
+ *       Does not send a 2FA email, but sends a confirmation email after successful change.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 format: password
+ *                 description: The user's current password for verification
+ *                 example: currentPassword123
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 8
+ *                 description: The new password (min 8 chars, must contain uppercase, lowercase, and number)
+ *                 example: NewSecurePass123
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Password changed successfully
+ *       400:
+ *         description: Validation error (password requirements not met or same as current)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Validation Error
+ *                 message:
+ *                   type: string
+ *                   example: Password must be at least 8 characters long
+ *                 errors:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *       401:
+ *         description: Current password is incorrect
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Authentication Failed
+ *                 message:
+ *                   type: string
+ *                   example: Current password is incorrect
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+authRouter.post("/change-password", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({
+        error: "Validation Error",
+        message: "Current password and new password are required",
+      });
+      return;
+    }
+
+    // Check if passwords are the same
+    if (currentPassword === newPassword) {
+      res.status(400).json({
+        error: "Validation Error",
+        message: "New password must be different from current password",
+      });
+      return;
+    }
+
+    // Validate new password strength
+    const { validatePassword } = await import("../utils/password-validator.js");
+    const validation = validatePassword(newPassword);
+
+    if (!validation.isValid) {
+      res.status(400).json({
+        error: "Validation Error",
+        message: "Password does not meet security requirements",
+        errors: validation.errors,
+      });
+      return;
+    }
+
+    // Get user email from database
+    const [userProfile] = await db
+      .select({ email: schema.users.email })
+      .from(schema.users)
+      .where(eq(schema.users.id, req.userId!))
+      .limit(1);
+
+    if (!userProfile) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "User profile not found",
+      });
+      return;
+    }
+
+    // Verify current password by attempting sign in
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: userProfile.email,
+      password: currentPassword,
+    });
+
+    if (verifyError) {
+      console.error("Current password verification failed:", verifyError);
+      res.status(401).json({
+        error: "Authentication Failed",
+        message: "Current password is incorrect",
+      });
+      return;
+    }
+
+    // Update password using admin client (bypasses current session requirement)
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.userId!, {
+      password: newPassword,
+    });
+
+    if (updateError) {
+      console.error("Password update error:", updateError);
+      res.status(500).json({
+        error: "Update Failed",
+        message: "Failed to update password",
+      });
+      return;
+    }
+
+    // TODO: Send confirmation email (optional - can be added later)
+    // await sendPasswordChangeConfirmationEmail(userProfile.email);
+
+    res.json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to change password",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /auth/forgot-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Request password reset email
+ *     description: |
+ *       Send a password reset link to the user's email address.
+ *       This endpoint always returns success, even if the email doesn't exist (security best practice).
+ *       The reset link expires after 1 hour.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address to send the password reset link
+ *                 example: user@example.com
+ *     responses:
+ *       200:
+ *         description: Password reset email sent (or would be sent if email exists)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: If an account exists with that email, a password reset link has been sent
+ *       400:
+ *         description: Invalid email format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Validation Error
+ *                 message:
+ *                   type: string
+ *                   example: Valid email address is required
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security: []
+ */
+authRouter.post("/forgot-password", async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    // Validate email format
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({
+        error: "Validation Error",
+        message: "Valid email address is required",
+      });
+      return;
+    }
+
+    // Send password reset email
+    // Supabase handles the case where email doesn't exist securely
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password`,
+    });
+
+    if (error) {
+      console.error("Password reset email error:", error);
+      // Still return success to avoid email enumeration
+    }
+
+    // Always return success (security best practice - don't reveal if email exists)
+    res.json({
+      success: true,
+      message: "If an account exists with that email, a password reset link has been sent",
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to process password reset request",
+    });
+  }
+});

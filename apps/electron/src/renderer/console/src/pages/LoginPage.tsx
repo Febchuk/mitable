@@ -119,13 +119,13 @@ export default function LoginPage() {
                   </button>
                 </div>
                 <div className="flex justify-end">
-                  <a
-                    href="#"
-                    onClick={(e) => e.preventDefault()}
+                  <button
+                    type="button"
+                    onClick={() => navigate("/forgot-password")}
                     className="text-xs text-primary-light hover:text-primary-hover transition-colors"
                   >
                     Forgot password?
-                  </a>
+                  </button>
                 </div>
               </div>
             </div>

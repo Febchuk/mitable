@@ -221,6 +221,55 @@ class AuthService {
   isAuthenticated(): boolean {
     return !!this.getAccessToken();
   }
+
+  /**
+   * Request password reset email
+   */
+  async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok) {
+      const error: AuthError = await response.json();
+      throw new Error(error.message || "Failed to send reset email");
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Change password (authenticated user)
+   */
+  async changePassword(
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ success: boolean; message: string }> {
+    const accessToken = this.getAccessToken();
+    if (!accessToken) {
+      throw new Error("Not authenticated");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to change password");
+    }
+
+    return response.json();
+  }
 }
 
 export const authService = new AuthService();

@@ -7,6 +7,8 @@
 
 import { useState, useEffect } from "react";
 import { useUser } from "@/console/src/context/UserContext";
+import { usePreferences } from "@/console/src/hooks/usePreferences";
+import { useToast } from "@/hooks/use-toast";
 import { createLogger } from "../../../../../../lib/logger";
 
 const logger = createLogger("StartSessionDialog");
@@ -23,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -61,6 +64,13 @@ interface DetectedWindow {
 export default function StartSessionDialog({ open, onOpenChange }: StartSessionDialogProps) {
   const { user } = useUser();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const {
+    hidePillOnSessionEnd,
+    showPillOnSessionStart,
+    isLoading: isPreferencesLoading,
+    updatePreference,
+  } = usePreferences();
 
   const [sessionName, setSessionName] = useState("");
   const [captureInterval, setCaptureInterval] = useState(30); // seconds
@@ -301,6 +311,93 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
             <p className="text-text-tertiary text-sm">
               Screenshots will be captured every {captureInterval} seconds
             </p>
+          </div>
+
+          {/* Session Preferences */}
+          <div className="space-y-4 p-4 bg-background-elevated/50 rounded-lg border border-border-subtle">
+            <h4 className="text-sm font-medium text-text-primary">Session Preferences</h4>
+            
+            {/* Show Pill on Session Start Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 flex-1 pr-4">
+                <Label
+                  htmlFor="show-pill-toggle"
+                  className="text-sm font-medium text-text-primary cursor-pointer"
+                >
+                  Show Watching Pill on Session Start
+                </Label>
+                <p className="text-xs text-text-tertiary">
+                  Automatically show the watching pill when a monitoring session starts
+                </p>
+              </div>
+              {isPreferencesLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+              ) : (
+                <Switch
+                  id="show-pill-toggle"
+                  checked={showPillOnSessionStart}
+                  onCheckedChange={async (checked) => {
+                    const result = await updatePreference("showPillOnSessionStart", checked);
+                    if (result.success) {
+                      toast({
+                        title: "Preference saved",
+                        description: checked
+                          ? "Watching pill will show when sessions start"
+                          : "Watching pill will not auto-show when sessions start",
+                      });
+                    } else {
+                      toast({
+                        title: "Error",
+                        description: "Failed to save preference",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  className="flex-shrink-0"
+                />
+              )}
+            </div>
+
+            {/* Hide Pill on Session End Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 flex-1 pr-4">
+                <Label
+                  htmlFor="hide-pill-toggle"
+                  className="text-sm font-medium text-text-primary cursor-pointer"
+                >
+                  Hide Watching Pill on Session End
+                </Label>
+                <p className="text-xs text-text-tertiary">
+                  Automatically hide the watching pill when a monitoring session ends
+                </p>
+              </div>
+              {isPreferencesLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+              ) : (
+                <Switch
+                  id="hide-pill-toggle"
+                  checked={hidePillOnSessionEnd}
+                  onCheckedChange={async (checked) => {
+                    const result = await updatePreference("hidePillOnSessionEnd", checked);
+                    if (result.success) {
+                      toast({
+                        title: "Preference saved",
+                        description: checked
+                          ? "Watching pill will be hidden when sessions end"
+                          : "Watching pill will remain visible when sessions end",
+                      });
+                    } else {
+                      toast({
+                        title: "Error",
+                        description: "Failed to save preference",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  className="flex-shrink-0"
+                />
+              )}
+            </div>
           </div>
 
           {/* Session Goal / Context */}
