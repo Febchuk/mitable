@@ -2334,7 +2334,6 @@ router.delete(
   }
 );
 
-
 /**
  * POST /api/integrations/gmail/send
  * Send an email via the user's Gmail account
