@@ -316,7 +316,7 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
           {/* Session Preferences */}
           <div className="space-y-4 p-4 bg-background-elevated/50 rounded-lg border border-border-subtle">
             <h4 className="text-sm font-medium text-text-primary">Session Preferences</h4>
-            
+
             {/* Show Pill on Session Start Toggle */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5 flex-1 pr-4">

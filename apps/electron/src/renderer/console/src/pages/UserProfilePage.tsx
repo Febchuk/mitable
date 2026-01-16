@@ -509,7 +509,9 @@ export default function UserProfilePage() {
   };
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<"account" | "security" | "integrations" | "about">("account");
+  const [activeTab, setActiveTab] = useState<"account" | "security" | "integrations" | "about">(
+    "account"
+  );
 
   const tabs = [
     { id: "account" as const, label: "Account", icon: User },
@@ -555,47 +557,49 @@ export default function UserProfilePage() {
               <div className="space-y-6">
                 {/* Account Information Section */}
                 <div className="bg-background-secondary rounded-xl border border-border-subtle p-6 space-y-6">
-          <div className="flex items-center gap-3 pb-4 border-b border-border-subtle">
-            <div className="w-10 h-10 bg-primary-light/20 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-primary-light" />
-            </div>
-            <div>
-              <h2 className="text-heading-4 text-white">Account Information</h2>
-              <p className="text-body-sm text-text-tertiary">Your profile details</p>
-            </div>
-          </div>
+                  <div className="flex items-center gap-3 pb-4 border-b border-border-subtle">
+                    <div className="w-10 h-10 bg-primary-light/20 rounded-full flex items-center justify-center">
+                      <User className="w-5 h-5 text-primary-light" />
+                    </div>
+                    <div>
+                      <h2 className="text-heading-4 text-white">Account Information</h2>
+                      <p className="text-body-sm text-text-tertiary">Your profile details</p>
+                    </div>
+                  </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-text-secondary">Name</label>
-              <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white">
-                {user?.name || "Not set"}
-              </div>
-            </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-text-secondary">Name</label>
+                      <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white">
+                        {user?.name || "Not set"}
+                      </div>
+                    </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-text-secondary">Email</label>
-              <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white">
-                {user?.email || "Not available"}
-              </div>
-            </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-text-secondary">Email</label>
+                      <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white">
+                        {user?.email || "Not available"}
+                      </div>
+                    </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-text-secondary">Role</label>
-              <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm">
-                <span className="capitalize text-primary-light font-medium">
-                  {user?.role || "Employee"}
-                </span>
-              </div>
-            </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-text-secondary">Role</label>
+                      <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm">
+                        <span className="capitalize text-primary-light font-medium">
+                          {user?.role || "Employee"}
+                        </span>
+                      </div>
+                    </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-text-secondary">Organization ID</label>
-              <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-text-tertiary font-mono text-xs">
-                {user?.organizationId || "Not available"}
-              </div>
-            </div>
-          </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-text-secondary">
+                        Organization ID
+                      </label>
+                      <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-text-tertiary font-mono text-xs">
+                        {user?.organizationId || "Not available"}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Subscription Section */}
@@ -609,162 +613,175 @@ export default function UserProfilePage() {
             {/* Security Tab */}
             {activeTab === "security" && (
               <div className="bg-background-secondary rounded-xl border border-border-subtle p-6">
-          <div className="space-y-6">
-            <div className="pb-4 border-b border-border-subtle">
-              <h2 className="text-heading-4 text-white">Security</h2>
-              <p className="text-body-sm text-text-tertiary mt-1">
-                Update your password to keep your account secure
-              </p>
-            </div>
+                <div className="space-y-6">
+                  <div className="pb-4 border-b border-border-subtle">
+                    <h2 className="text-heading-4 text-white">Security</h2>
+                    <p className="text-body-sm text-text-tertiary mt-1">
+                      Update your password to keep your account secure
+                    </p>
+                  </div>
 
-            <form onSubmit={handlePasswordChange} className="space-y-6">
-              {/* Current Password */}
-              <div className="space-y-2">
-                <label htmlFor="currentPassword" className="text-sm font-medium text-text-primary">
-                  Current Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="currentPassword"
-                    type={showCurrentPassword ? "text" : "password"}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    required
-                    disabled={isChangingPassword}
-                    placeholder="Enter your current password"
-                    className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    disabled={isChangingPassword}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
-                  >
-                    {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* New Password */}
-              <div className="space-y-2">
-                <label htmlFor="newPassword" className="text-sm font-medium text-text-primary">
-                  New Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="newPassword"
-                    type={showNewPassword ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                    disabled={isChangingPassword}
-                    placeholder="Enter your new password"
-                    className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    disabled={isChangingPassword}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
-                  >
-                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-
-                {/* Password strength indicator */}
-                {newPassword && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-background-elevated rounded-full overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-300 ${strengthColors[passwordStrength]} ${strengthWidth[passwordStrength]}`}
+                  <form onSubmit={handlePasswordChange} className="space-y-6">
+                    {/* Current Password */}
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="currentPassword"
+                        className="text-sm font-medium text-text-primary"
+                      >
+                        Current Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="currentPassword"
+                          type={showCurrentPassword ? "text" : "password"}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          required
+                          disabled={isChangingPassword}
+                          placeholder="Enter your current password"
+                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          disabled={isChangingPassword}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
+                        >
+                          {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
                       </div>
-                      <span className="text-xs text-text-secondary capitalize min-w-[60px]">
-                        {passwordStrength}
-                      </span>
                     </div>
-                  </div>
-                )}
-              </div>
 
-              {/* Confirm Password */}
-              <div className="space-y-2">
-                <label htmlFor="confirmPassword" className="text-sm font-medium text-text-primary">
-                  Confirm New Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    disabled={isChangingPassword}
-                    placeholder="Confirm your new password"
-                    className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    disabled={isChangingPassword}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
-                  >
-                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+                    {/* New Password */}
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="newPassword"
+                        className="text-sm font-medium text-text-primary"
+                      >
+                        New Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="newPassword"
+                          type={showNewPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          required
+                          disabled={isChangingPassword}
+                          placeholder="Enter your new password"
+                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          disabled={isChangingPassword}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
+                        >
+                          {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
 
-                {/* Password Match Indicator */}
-                {confirmPassword && newPassword && (
-                  <div className="flex items-center gap-2 text-xs">
-                    {confirmPassword === newPassword ? (
-                      <>
-                        <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
-                        <span className="text-green-400">Passwords match</span>
-                      </>
-                    ) : (
-                      <>
-                        <X className="w-4 h-4 text-red-400 flex-shrink-0" />
-                        <span className="text-red-400">Passwords don't match</span>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Password requirements */}
-              {newPassword && (
-                <div className="space-y-2 p-4 bg-background-elevated/50 rounded-lg border border-border-subtle">
-                  <p className="text-xs font-medium text-text-secondary mb-3">
-                    Password must contain:
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {requirements.map((req, idx) => {
-                      const isMet = req.test(newPassword);
-                      return (
-                        <div key={idx} className="flex items-center gap-2 text-xs">
-                          {isMet ? (
-                            <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
-                          ) : (
-                            <X className="w-4 h-4 text-text-tertiary flex-shrink-0" />
-                          )}
-                          <span className={isMet ? "text-green-400" : "text-text-tertiary"}>
-                            {req.label}
-                          </span>
+                      {/* Password strength indicator */}
+                      {newPassword && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-background-elevated rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${strengthColors[passwordStrength]} ${strengthWidth[passwordStrength]}`}
+                              />
+                            </div>
+                            <span className="text-xs text-text-secondary capitalize min-w-[60px]">
+                              {passwordStrength}
+                            </span>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                      )}
+                    </div>
 
-              <div className="pt-4">
-                <Button type="submit" disabled={isChangingPassword} className="w-full md:w-auto">
-                  {isChangingPassword ? "Changing Password..." : "Change Password"}
-                </Button>
-              </div>
-            </form>
-          </div>
+                    {/* Confirm Password */}
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="confirmPassword"
+                        className="text-sm font-medium text-text-primary"
+                      >
+                        Confirm New Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          required
+                          disabled={isChangingPassword}
+                          placeholder="Confirm your new password"
+                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          disabled={isChangingPassword}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
+                        >
+                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+
+                      {/* Password Match Indicator */}
+                      {confirmPassword && newPassword && (
+                        <div className="flex items-center gap-2 text-xs">
+                          {confirmPassword === newPassword ? (
+                            <>
+                              <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                              <span className="text-green-400">Passwords match</span>
+                            </>
+                          ) : (
+                            <>
+                              <X className="w-4 h-4 text-red-400 flex-shrink-0" />
+                              <span className="text-red-400">Passwords don't match</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Password requirements */}
+                    {newPassword && (
+                      <div className="space-y-2 p-4 bg-background-elevated/50 rounded-lg border border-border-subtle">
+                        <p className="text-xs font-medium text-text-secondary mb-3">
+                          Password must contain:
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {requirements.map((req, idx) => {
+                            const isMet = req.test(newPassword);
+                            return (
+                              <div key={idx} className="flex items-center gap-2 text-xs">
+                                {isMet ? (
+                                  <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                                ) : (
+                                  <X className="w-4 h-4 text-text-tertiary flex-shrink-0" />
+                                )}
+                                <span className={isMet ? "text-green-400" : "text-text-tertiary"}>
+                                  {req.label}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-4">
+                      <Button
+                        type="submit"
+                        disabled={isChangingPassword}
+                        className="w-full md:w-auto"
+                      >
+                        {isChangingPassword ? "Changing Password..." : "Change Password"}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
               </div>
             )}
 
@@ -800,7 +817,11 @@ export default function UserProfilePage() {
                           disabled={isDisconnecting}
                           className="text-text-tertiary hover:text-red-400"
                         >
-                          {isDisconnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlink className="w-4 h-4" />}
+                          {isDisconnecting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Unlink className="w-4 h-4" />
+                          )}
                         </ShadcnButton>
                       </div>
                     ) : (
@@ -809,7 +830,11 @@ export default function UserProfilePage() {
                         disabled={isConnecting}
                         className="bg-[#5E6AD2] hover:bg-[#4F5ABF] text-white gap-2"
                       >
-                        {isConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                        {isConnecting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Link2 className="w-4 h-4" />
+                        )}
                         Connect
                       </ShadcnButton>
                     )}
@@ -818,7 +843,8 @@ export default function UserProfilePage() {
                   {linearStatus?.expired && (
                     <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                       <p className="text-sm text-yellow-400">
-                        Your Linear connection has expired. Please reconnect to continue sending updates.
+                        Your Linear connection has expired. Please reconnect to continue sending
+                        updates.
                       </p>
                     </div>
                   )}
@@ -856,7 +882,11 @@ export default function UserProfilePage() {
                           disabled={isGmailDisconnecting}
                           className="text-text-tertiary hover:text-red-400"
                         >
-                          {isGmailDisconnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlink className="w-4 h-4" />}
+                          {isGmailDisconnecting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Unlink className="w-4 h-4" />
+                          )}
                         </ShadcnButton>
                       </div>
                     ) : (
@@ -865,7 +895,11 @@ export default function UserProfilePage() {
                         disabled={isGmailConnecting}
                         className="bg-[#EA4335] hover:bg-[#D33426] text-white gap-2"
                       >
-                        {isGmailConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                        {isGmailConnecting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Mail className="w-4 h-4" />
+                        )}
                         Connect
                       </ShadcnButton>
                     )}
@@ -874,7 +908,8 @@ export default function UserProfilePage() {
                   {gmailStatus?.expired && (
                     <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                       <p className="text-sm text-yellow-400">
-                        Your Gmail connection has expired. Please reconnect to continue sending emails.
+                        Your Gmail connection has expired. Please reconnect to continue sending
+                        emails.
                       </p>
                     </div>
                   )}
@@ -886,100 +921,100 @@ export default function UserProfilePage() {
             {activeTab === "about" && (
               <Card className="p-6 bg-background-elevated border-border-subtle">
                 <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Info className="w-6 h-6 text-primary" />
-              </div>
+                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Info className="w-6 h-6 text-primary" />
+                  </div>
 
-              <div className="flex-1 min-w-0">
-                <h3 className="text-lg font-semibold text-white">Mitable</h3>
-                <p className="text-sm text-text-tertiary">Version {appVersion || "..."}</p>
-              </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-white">Mitable</h3>
+                    <p className="text-sm text-text-tertiary">Version {appVersion || "..."}</p>
+                  </div>
 
-              <ShadcnButton
-                onClick={
-                  updateStatus === "available"
-                    ? handleDownloadUpdate
-                    : updateStatus === "downloaded"
-                      ? handleInstallUpdate
-                      : handleCheckForUpdates
-                }
-                disabled={isCheckingForUpdates || updateStatus === "downloading"}
-                variant={updateStatus === "downloaded" ? "default" : "outline"}
-                className={
-                  updateStatus === "downloaded"
-                    ? "gap-2 bg-primary hover:bg-primary/90 text-white"
-                    : "gap-2 border-border-subtle bg-background-elevated text-text-primary hover:bg-background-tertiary hover:text-white"
-                }
-              >
-                {isCheckingForUpdates ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Checking...
-                  </>
-                ) : updateStatus === "up-to-date" ? (
-                  <>
-                    <Check className="w-4 h-4 text-green-400" />
-                    Up to date
-                  </>
-                ) : updateStatus === "available" ? (
-                  <>
-                    <Download className="w-4 h-4" />
-                    Download v{availableVersion}
-                  </>
-                ) : updateStatus === "downloading" ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Downloading...
-                  </>
-                ) : updateStatus === "downloaded" ? (
-                  <>
-                    <RefreshCw className="w-4 h-4" />
-                    Install & Restart
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4" />
-                    Check for Updates
-                  </>
-                )}
-              </ShadcnButton>
-            </div>
-
-            {/* Download Progress Bar */}
-            {updateStatus === "downloading" && downloadProgress && (
-              <div className="mt-4 space-y-2">
-                <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-300 ease-out"
-                    style={{ width: `${downloadProgress.percent}%` }}
-                  />
+                  <ShadcnButton
+                    onClick={
+                      updateStatus === "available"
+                        ? handleDownloadUpdate
+                        : updateStatus === "downloaded"
+                          ? handleInstallUpdate
+                          : handleCheckForUpdates
+                    }
+                    disabled={isCheckingForUpdates || updateStatus === "downloading"}
+                    variant={updateStatus === "downloaded" ? "default" : "outline"}
+                    className={
+                      updateStatus === "downloaded"
+                        ? "gap-2 bg-primary hover:bg-primary/90 text-white"
+                        : "gap-2 border-border-subtle bg-background-elevated text-text-primary hover:bg-background-tertiary hover:text-white"
+                    }
+                  >
+                    {isCheckingForUpdates ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Checking...
+                      </>
+                    ) : updateStatus === "up-to-date" ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-400" />
+                        Up to date
+                      </>
+                    ) : updateStatus === "available" ? (
+                      <>
+                        <Download className="w-4 h-4" />
+                        Download v{availableVersion}
+                      </>
+                    ) : updateStatus === "downloading" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Downloading...
+                      </>
+                    ) : updateStatus === "downloaded" ? (
+                      <>
+                        <RefreshCw className="w-4 h-4" />
+                        Install & Restart
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4" />
+                        Check for Updates
+                      </>
+                    )}
+                  </ShadcnButton>
                 </div>
-                <p className="text-xs text-text-tertiary">
-                  {downloadProgress.percent.toFixed(0)}% —{" "}
-                  {(downloadProgress.transferred / 1024 / 1024).toFixed(1)} MB /{" "}
-                  {(downloadProgress.total / 1024 / 1024).toFixed(1)} MB
-                </p>
-              </div>
-            )}
 
-            {/* Error State */}
-            {updateStatus === "error" && updateError && (
-              <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                <p className="text-sm text-red-400">{updateError}</p>
-              </div>
-            )}
+                {/* Download Progress Bar */}
+                {updateStatus === "downloading" && downloadProgress && (
+                  <div className="mt-4 space-y-2">
+                    <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-300 ease-out"
+                        style={{ width: `${downloadProgress.percent}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-text-tertiary">
+                      {downloadProgress.percent.toFixed(0)}% —{" "}
+                      {(downloadProgress.transferred / 1024 / 1024).toFixed(1)} MB /{" "}
+                      {(downloadProgress.total / 1024 / 1024).toFixed(1)} MB
+                    </p>
+                  </div>
+                )}
 
-            {/* Release Notes Link */}
-            <div className="mt-4 pt-4 border-t border-border-subtle">
-              <a
-                href="https://github.com/Febchuk/mitable/releases"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                View release notes
-                <ExternalLink className="w-3 h-3" />
-              </a>
+                {/* Error State */}
+                {updateStatus === "error" && updateError && (
+                  <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                    <p className="text-sm text-red-400">{updateError}</p>
+                  </div>
+                )}
+
+                {/* Release Notes Link */}
+                <div className="mt-4 pt-4 border-t border-border-subtle">
+                  <a
+                    href="https://github.com/Febchuk/mitable/releases"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    View release notes
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               </Card>
             )}

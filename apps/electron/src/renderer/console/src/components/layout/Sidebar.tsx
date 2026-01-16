@@ -71,10 +71,10 @@ export default function Sidebar() {
 
         {/* Dropdown Menu */}
         {dropdownOpen && (
-          <div 
+          <div
             className="absolute bottom-full left-2 right-2 mb-2 bg-background-elevated border border-border-subtle rounded-lg shadow-xl overflow-hidden origin-bottom animate-in fade-in slide-in-from-bottom-2 duration-200"
             style={{
-              animation: 'slideUp 0.2s ease-out'
+              animation: "slideUp 0.2s ease-out",
             }}
           >
             <button

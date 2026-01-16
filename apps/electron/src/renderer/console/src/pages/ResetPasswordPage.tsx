@@ -203,7 +203,9 @@ export default function ResetPasswordPage() {
                           className={`h-full transition-all duration-300 ${strengthColors[passwordStrength]} ${strengthWidth[passwordStrength]}`}
                         />
                       </div>
-                      <span className="text-xs text-text-secondary capitalize">{passwordStrength}</span>
+                      <span className="text-xs text-text-secondary capitalize">
+                        {passwordStrength}
+                      </span>
                     </div>
                   </div>
                 )}
