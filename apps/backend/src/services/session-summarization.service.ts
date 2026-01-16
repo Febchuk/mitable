@@ -438,6 +438,19 @@ Respond with valid JSON only:
       inputHash,
     });
 
+    // Log full prompt for deep debugging (when SESSION_LOG_FULL_AI=true)
+    log.logFullAIInteraction(
+      "refinement_prompt_full",
+      "", // No separate system prompt for this call
+      prompt,
+      "", // Response comes later
+      {
+        model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+        masterStoryLength: masterStory.length,
+        inputHash,
+      }
+    );
+
     const completion = await this.groq.chat.completions.create({
       model: SUMMARIZATION_CONFIG.TEXT_MODEL,
       messages: [{ role: "user", content: prompt }],
@@ -459,6 +472,27 @@ Respond with valid JSON only:
       tokensUsed: completion.usage?.total_tokens,
       parsedSuccessfully: !!parsed.summary,
     });
+
+    // Log full response for deep debugging (when SESSION_LOG_FULL_AI=true)
+    log.logFullAIInteraction(
+      "refinement_response_full",
+      "", // Prompt already logged
+      "", // Prompt already logged
+      response,
+      {
+        model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+        inputHash,
+        outputHash,
+        tokensUsed: completion.usage?.total_tokens,
+        promptTokens: completion.usage?.prompt_tokens,
+        completionTokens: completion.usage?.completion_tokens,
+        parsedSuccessfully: !!parsed.summary,
+        parsedSummaryLength: parsed.summary?.length || 0,
+        parsedActivitiesCount: parsed.activities?.length || 0,
+        parsedAccomplishmentsCount: parsed.accomplishments?.length || 0,
+        parsedBlockersCount: parsed.blockers?.length || 0,
+      }
+    );
 
     log.debug("Master story refined", {
       inputHash,

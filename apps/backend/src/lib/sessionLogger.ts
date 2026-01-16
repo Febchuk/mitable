@@ -9,6 +9,7 @@ import * as Sentry from "@sentry/node";
 
 const VERBOSE = process.env.VERBOSE_SESSION_LOGGING === "true";
 const LOG_AI_PROMPTS = process.env.SESSION_LOG_AI_PROMPTS === "true";
+const LOG_FULL_AI = process.env.SESSION_LOG_FULL_AI === "true";
 
 // In-memory tracking for duplicate detection (development/debugging)
 const recentSummaries = new Map<string, { sessionId: string; timestamp: number; prefix: string }>();
@@ -186,6 +187,35 @@ export function createSessionLogger(context: SessionContext) {
             ...metadata,
           },
           `[AI] ${stage}`
+        );
+      }
+    },
+
+    /**
+     * Log full AI prompt and response without truncation (only when SESSION_LOG_FULL_AI=true)
+     * Use for deep debugging when you need to see complete prompts and responses.
+     * WARNING: This generates large log entries. Use sparingly and disable in production.
+     */
+    logFullAIInteraction(
+      stage: string,
+      systemPrompt: string,
+      userPrompt: string,
+      response: string,
+      metadata?: Record<string, unknown>
+    ) {
+      if (LOG_FULL_AI) {
+        sessionLogger.info(
+          {
+            stage,
+            systemPrompt: systemPrompt || undefined, // Full text, no truncation
+            userPrompt: userPrompt || undefined, // Full text, no truncation
+            response: response || undefined, // Full text, no truncation
+            systemPromptLength: systemPrompt?.length || 0,
+            userPromptLength: userPrompt?.length || 0,
+            responseLength: response?.length || 0,
+            ...metadata,
+          },
+          `[AI_FULL] ${stage}`
         );
       }
     },

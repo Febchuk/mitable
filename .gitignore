@@ -13,6 +13,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+!apps/electron/build/
 out/
 .next/
 

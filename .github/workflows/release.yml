@@ -1,0 +1,154 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS (arm64 + x64)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python (for native modules)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install setuptools (required for native modules)
+        run: pip install setuptools
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=packages/shared
+
+      - name: Build Electron app for macOS
+        run: npm run build:mac --workspace=apps/electron
+        env:
+          # Production API URL (baked into the build)
+          VITE_API_URL: https://mitablebackend-production.up.railway.app
+          # Apple code signing and notarization
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: LUV3R68DAA
+          # GitHub token for private repo access during build
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Code signing identity (stored in macOS keychain on runner)
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Cloudflare R2 public URL for electron-builder generic provider
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+
+      - name: List build artifacts
+        run: |
+          echo "Listing files in output directory:"
+          ls -la apps/electron/dist/ || echo "Directory not found"
+
+      - name: Prepare release artifacts for R2
+        run: |
+          mkdir -p release-artifacts
+          cp apps/electron/dist/*.dmg release-artifacts/ || true
+          cp apps/electron/dist/*.zip release-artifacts/ || true
+          cp apps/electron/dist/*.blockmap release-artifacts/ || true
+          cp apps/electron/dist/latest-mac.yml release-artifacts/ || true
+          ls -la release-artifacts/
+
+      - name: Upload to Cloudflare R2
+        uses: ryand56/r2-upload-action@latest
+        with:
+          r2-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          r2-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          r2-bucket: mitable-releases
+          source-dir: release-artifacts
+          destination-dir: ./
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            apps/electron/dist/*.dmg
+            apps/electron/dist/*.zip
+            apps/electron/dist/latest-mac.yml
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=packages/shared
+
+      - name: Build Electron app for Windows
+        run: npm run build:win --workspace=apps/electron
+        env:
+          # Production API URL (baked into the build)
+          VITE_API_URL: https://mitablebackend-production.up.railway.app
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Cloudflare R2 public URL for electron-builder generic provider
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+
+      - name: List build artifacts
+        shell: bash
+        run: |
+          echo "Listing files in output directory:"
+          ls -la apps/electron/dist/ || echo "Directory not found"
+
+      - name: Prepare release artifacts for R2
+        shell: bash
+        run: |
+          mkdir -p release-artifacts
+          cp apps/electron/dist/*.exe release-artifacts/ || true
+          cp apps/electron/dist/*.blockmap release-artifacts/ || true
+          cp apps/electron/dist/latest.yml release-artifacts/ || true
+          ls -la release-artifacts/
+
+      - name: Upload to Cloudflare R2
+        uses: ryand56/r2-upload-action@latest
+        with:
+          r2-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          r2-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          r2-bucket: mitable-releases
+          source-dir: release-artifacts
+          destination-dir: ./
+
+      - name: Append to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            apps/electron/dist/*.exe
+            apps/electron/dist/latest.yml
+          draft: false
+          prerelease: false

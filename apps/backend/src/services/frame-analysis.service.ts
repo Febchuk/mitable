@@ -102,6 +102,29 @@ class FrameAnalysisService {
       input.goalContext
     );
 
+    // Log full prompt for deep debugging (when SESSION_LOG_FULL_AI=true)
+    log.logFullAIInteraction(
+      "progression_detector_prompt_full",
+      systemPrompt,
+      userPrompt,
+      "", // Response comes later
+      {
+        frameId: input.frameId,
+        isFirstFrame: input.previousFrame === null,
+        appName: input.windowInfo.appName,
+        windowTitle: input.windowInfo.windowTitle,
+        hasGoalContext: !!input.goalContext,
+        goalContext: input.goalContext
+          ? {
+              sessionGoal: input.goalContext.sessionGoal,
+              linearIssueId: input.goalContext.linearIssueId,
+              linearIssueTitle: input.goalContext.linearIssueTitle,
+              hasRelatedDocs: !!input.goalContext.relatedDocsContext,
+            }
+          : null,
+      }
+    );
+
     try {
       // Call Gemini Vision with two images
       const visionResult = await geminiVisionFrameService.compareFrames(
@@ -109,6 +132,22 @@ class FrameAnalysisService {
         input.currentFrame,
         systemPrompt,
         userPrompt
+      );
+
+      // Log full response for deep debugging (when SESSION_LOG_FULL_AI=true)
+      log.logFullAIInteraction(
+        "progression_detector_response_full",
+        "", // Prompt already logged
+        "", // Prompt already logged
+        visionResult.content,
+        {
+          frameId: input.frameId,
+          model: visionResult.model,
+          latencyMs: visionResult.latencyMs,
+          tokensUsed: visionResult.usage.totalTokens,
+          promptTokens: visionResult.usage.promptTokens,
+          completionTokens: visionResult.usage.completionTokens,
+        }
       );
 
       // Parse the structured response

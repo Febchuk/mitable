@@ -3,16 +3,21 @@ productName: Mitable
 copyright: Copyright © 2025 Mitable
 directories:
   buildResources: build
-  output: /tmp/mitable-dist
+  output: dist
 
 # Publish configuration for auto-updates
+# Cloudflare R2 (primary) - uses Cloudflare CDN with Lagos edge node for fast African downloads
+# GitHub Releases (fallback) - slower in some regions but reliable
 publish:
-  provider: github
-  owner: Febchuk
-  repo: mitable
-  releaseType: release
-  private: true
-  token: ${env.GH_TOKEN}
+  - provider: generic
+    url: https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev
+    useMultipleRangeRequest: false
+  - provider: github
+    owner: Febchuk
+    repo: mitable
+    releaseType: release
+    private: true
+    token: ${env.GH_TOKEN}
 
 # macOS Configuration
 mac:

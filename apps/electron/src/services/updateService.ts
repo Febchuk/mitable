@@ -5,6 +5,9 @@ import log from "electron-log";
 class UpdateService {
   private updateCheckInterval: NodeJS.Timeout | null = null;
   private isCheckingForUpdates = false;
+  private maxRetries = 3;
+  private currentRetry = 0;
+  private usingGitHubFallback = false;
 
   constructor() {
     // Configure logger
@@ -16,6 +19,14 @@ class UpdateService {
 
     // Disable auto-install on app quit
     autoUpdater.autoInstallOnAppQuit = false;
+
+    // Set request headers for better cache handling
+    autoUpdater.requestHeaders = {
+      "Cache-Control": "no-cache",
+    };
+
+    // Allow pre-release updates if user is on a pre-release version
+    autoUpdater.allowPrerelease = false;
 
     this.setupEventListeners();
   }
@@ -44,11 +55,28 @@ class UpdateService {
       });
     });
 
-    autoUpdater.on("error", (err) => {
-      log.error("[UpdateService] Error checking for updates:", err);
+    autoUpdater.on("error", async (err) => {
+      const errorMessage = err?.message || String(err);
+      log.error("[UpdateService] Error checking for updates:", errorMessage);
       this.isCheckingForUpdates = false;
+
+      // If the error is about invalid URL, try GitHub fallback
+      if (errorMessage.includes("Invalid URL") && !this.usingGitHubFallback) {
+        log.warn("[UpdateService] Primary update URL invalid, switching to GitHub fallback...");
+        this.useGitHubProvider();
+        try {
+          this.isCheckingForUpdates = true;
+          await autoUpdater.checkForUpdates();
+          return; // Success with fallback, don't notify error
+        } catch (fallbackError: any) {
+          log.error("[UpdateService] GitHub fallback also failed:", fallbackError?.message);
+        }
+      }
+
       this.notifyRenderers("update-error", {
-        message: err.message || "An error occurred while checking for updates",
+        message: errorMessage.includes("Invalid URL")
+          ? "Update server configuration error. Please update manually from GitHub."
+          : errorMessage || "An error occurred while checking for updates",
       });
     });
 
@@ -81,6 +109,21 @@ class UpdateService {
   }
 
   /**
+   * Configure GitHub as the update provider (fallback when R2 URL is invalid)
+   */
+  private useGitHubProvider(): void {
+    log.info("[UpdateService] Switching to GitHub provider for updates");
+    autoUpdater.setFeedURL({
+      provider: "github",
+      owner: "Febchuk",
+      repo: "mitable",
+      private: true,
+      token: process.env.GH_TOKEN,
+    });
+    this.usingGitHubFallback = true;
+  }
+
+  /**
    * Check for updates manually
    */
   async checkForUpdates(): Promise<void> {
@@ -92,14 +135,36 @@ class UpdateService {
     // Don't check for updates in development
     if (!app.isPackaged) {
       log.info("[UpdateService] Skipping update check in development mode");
+      this.notifyRenderers("update-error", {
+        message: "Updates are only available in production builds",
+      });
       return;
     }
 
     try {
       log.info("[UpdateService] Manually checking for updates...");
+      log.info(
+        `[UpdateService] Using ${this.usingGitHubFallback ? "GitHub (fallback)" : "primary"} provider`
+      );
       await autoUpdater.checkForUpdates();
-    } catch (error) {
-      log.error("[UpdateService] Failed to check for updates:", error);
+    } catch (error: any) {
+      const errorMessage = error?.message || String(error);
+      log.error("[UpdateService] Failed to check for updates:", errorMessage);
+
+      // If the error is about invalid URL, try GitHub fallback
+      if (errorMessage.includes("Invalid URL") && !this.usingGitHubFallback) {
+        log.warn("[UpdateService] Primary update URL invalid, trying GitHub fallback...");
+        this.useGitHubProvider();
+        try {
+          await autoUpdater.checkForUpdates();
+          return; // Success with fallback
+        } catch (fallbackError: any) {
+          log.error("[UpdateService] GitHub fallback also failed:", fallbackError?.message);
+          this.notifyRenderers("update-error", {
+            message: "Unable to check for updates. Please try again later.",
+          });
+        }
+      }
     }
   }
 
@@ -136,15 +201,39 @@ class UpdateService {
   }
 
   /**
-   * Download the available update
+   * Download the available update with retry logic for slow connections
    */
   async downloadUpdate(): Promise<void> {
+    this.currentRetry = 0;
+    await this.attemptDownload();
+  }
+
+  /**
+   * Attempt to download update with exponential backoff retry
+   */
+  private async attemptDownload(): Promise<void> {
     try {
-      log.info("[UpdateService] Starting update download...");
+      log.info(`[UpdateService] Download attempt ${this.currentRetry + 1}/${this.maxRetries}...`);
       await autoUpdater.downloadUpdate();
     } catch (error) {
-      log.error("[UpdateService] Failed to download update:", error);
-      throw error;
+      this.currentRetry++;
+      if (this.currentRetry < this.maxRetries) {
+        const delay = Math.pow(2, this.currentRetry) * 1000; // Exponential backoff: 2s, 4s, 8s
+        log.warn(`[UpdateService] Download failed, retrying in ${delay / 1000}s...`, error);
+
+        // Notify renderers about retry
+        this.notifyRenderers("update-download-retry", {
+          attempt: this.currentRetry + 1,
+          maxRetries: this.maxRetries,
+          delaySeconds: delay / 1000,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        await this.attemptDownload();
+      } else {
+        log.error("[UpdateService] All download attempts failed after", this.maxRetries, "retries");
+        throw error;
+      }
     }
   }
 
