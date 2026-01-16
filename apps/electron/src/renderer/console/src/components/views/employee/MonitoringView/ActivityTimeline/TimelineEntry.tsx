@@ -41,9 +41,7 @@ export default function TimelineEntry({ capture, isLast = false }: TimelineEntry
   return (
     <div ref={entryRef} className={`relative ${!isLast ? "pb-3" : ""}`}>
       {/* Timeline connector line */}
-      {!isLast && (
-        <div className="absolute left-[7px] top-6 bottom-0 w-[2px] bg-border-subtle" />
-      )}
+      {!isLast && <div className="absolute left-[7px] top-6 bottom-0 w-[2px] bg-border-subtle" />}
 
       {/* Entry row */}
       <div
@@ -55,13 +53,12 @@ export default function TimelineEntry({ capture, isLast = false }: TimelineEntry
         {/* Timeline dot */}
         <div className="relative flex-shrink-0 mt-1.5">
           <div className="w-4 h-4 rounded-full border-2 border-border-default bg-background-primary flex items-center justify-center">
-            {hasImage && (
-              isExpanded ? (
+            {hasImage &&
+              (isExpanded ? (
                 <ChevronDown className="w-2.5 h-2.5 text-text-tertiary" />
               ) : (
                 <ChevronRight className="w-2.5 h-2.5 text-text-tertiary" />
-              )
-            )}
+              ))}
           </div>
         </div>
 
@@ -85,11 +82,11 @@ export default function TimelineEntry({ capture, isLast = false }: TimelineEntry
           <p className="text-text-secondary text-sm mt-0.5 line-clamp-2">{activityText}</p>
 
           {/* Window title if different from activity */}
-          {capture.windowTitle && capture.activityDescription && capture.windowTitle !== capture.activityDescription && (
-            <p className="text-text-tertiary text-xs mt-0.5 truncate">
-              {capture.windowTitle}
-            </p>
-          )}
+          {capture.windowTitle &&
+            capture.activityDescription &&
+            capture.windowTitle !== capture.activityDescription && (
+              <p className="text-text-tertiary text-xs mt-0.5 truncate">{capture.windowTitle}</p>
+            )}
         </div>
       </div>
 

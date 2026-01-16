@@ -143,7 +143,9 @@ class UpdateService {
 
     try {
       log.info("[UpdateService] Manually checking for updates...");
-      log.info(`[UpdateService] Using ${this.usingGitHubFallback ? "GitHub (fallback)" : "primary"} provider`);
+      log.info(
+        `[UpdateService] Using ${this.usingGitHubFallback ? "GitHub (fallback)" : "primary"} provider`
+      );
       await autoUpdater.checkForUpdates();
     } catch (error: any) {
       const errorMessage = error?.message || String(error);
@@ -211,18 +213,13 @@ class UpdateService {
    */
   private async attemptDownload(): Promise<void> {
     try {
-      log.info(
-        `[UpdateService] Download attempt ${this.currentRetry + 1}/${this.maxRetries}...`
-      );
+      log.info(`[UpdateService] Download attempt ${this.currentRetry + 1}/${this.maxRetries}...`);
       await autoUpdater.downloadUpdate();
     } catch (error) {
       this.currentRetry++;
       if (this.currentRetry < this.maxRetries) {
         const delay = Math.pow(2, this.currentRetry) * 1000; // Exponential backoff: 2s, 4s, 8s
-        log.warn(
-          `[UpdateService] Download failed, retrying in ${delay / 1000}s...`,
-          error
-        );
+        log.warn(`[UpdateService] Download failed, retrying in ${delay / 1000}s...`, error);
 
         // Notify renderers about retry
         this.notifyRenderers("update-download-retry", {
@@ -234,11 +231,7 @@ class UpdateService {
         await new Promise((resolve) => setTimeout(resolve, delay));
         await this.attemptDownload();
       } else {
-        log.error(
-          "[UpdateService] All download attempts failed after",
-          this.maxRetries,
-          "retries"
-        );
+        log.error("[UpdateService] All download attempts failed after", this.maxRetries, "retries");
         throw error;
       }
     }

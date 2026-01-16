@@ -20,6 +20,7 @@ git push origin main --tags
 ```
 
 That's it! The GitHub Action automatically:
+
 - Builds macOS (arm64 + x64) with code signing and notarization
 - Builds Windows (x64)
 - Uploads artifacts to Cloudflare R2 (fast CDN with Lagos edge node)
@@ -27,10 +28,10 @@ That's it! The GitHub Action automatically:
 
 ## What Gets Built
 
-| Platform | Artifacts |
-|----------|-----------|
-| macOS | `Mitable-{version}-arm64.dmg`, `Mitable-{version}-x64.dmg`, `.zip` variants |
-| Windows | `Mitable-{version}-x64.exe` |
+| Platform | Artifacts                                                                   |
+| -------- | --------------------------------------------------------------------------- |
+| macOS    | `Mitable-{version}-arm64.dmg`, `Mitable-{version}-x64.dmg`, `.zip` variants |
+| Windows  | `Mitable-{version}-x64.exe`                                                 |
 
 ## Auto-Update Files
 
@@ -44,6 +45,7 @@ The workflow also uploads `latest-mac.yml` and `latest.yml` to R2, which `electr
 ## Monitoring
 
 Watch build progress:
+
 ```bash
 gh run list --workflow=release.yml --limit=3
 gh run view <run-id>
@@ -52,9 +54,11 @@ gh run view <run-id>
 ## Troubleshooting
 
 ### Build failed?
+
 Check logs: `gh run view <run-id> --log-failed`
 
 ### Need to re-release same version?
+
 ```bash
 # Delete and recreate tag
 git tag -d v0.1.12

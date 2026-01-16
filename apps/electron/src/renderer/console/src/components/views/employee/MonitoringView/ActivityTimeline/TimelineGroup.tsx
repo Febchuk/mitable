@@ -84,23 +84,15 @@ export default function TimelineGroup({ group, isLast = false }: TimelineGroupPr
           </div>
 
           {/* Time range */}
-          <span className="text-text-tertiary text-xs font-mono mt-0.5 block">
-            {timeRange}
-          </span>
+          <span className="text-text-tertiary text-xs font-mono mt-0.5 block">{timeRange}</span>
 
           {/* Dominant activity */}
-          <p className="text-text-secondary text-sm mt-1 line-clamp-2">
-            {group.dominantActivity}
-          </p>
+          <p className="text-text-secondary text-sm mt-1 line-clamp-2">{group.dominantActivity}</p>
         </div>
 
         {/* Expand/collapse chevron */}
         <div className="flex-shrink-0 text-text-tertiary">
-          {isExpanded ? (
-            <ChevronUp className="w-5 h-5" />
-          ) : (
-            <ChevronDown className="w-5 h-5" />
-          )}
+          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
         </div>
       </button>
 

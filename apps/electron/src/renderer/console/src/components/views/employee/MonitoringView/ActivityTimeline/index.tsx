@@ -41,17 +41,11 @@ export default function ActivityTimeline({ sessionId, className = "" }: Activity
           <History className="w-5 h-5 text-text-secondary" />
           <h3 className="text-lg font-semibold text-text-primary">Activity Timeline</h3>
           {timeline && (
-            <span className="text-sm text-text-tertiary">
-              ({timeline.totalCaptures} captures)
-            </span>
+            <span className="text-sm text-text-tertiary">({timeline.totalCaptures} captures)</span>
           )}
         </div>
         <div className="text-text-tertiary">
-          {isCollapsed ? (
-            <ChevronDown className="w-5 h-5" />
-          ) : (
-            <ChevronUp className="w-5 h-5" />
-          )}
+          {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
         </div>
       </button>
 
