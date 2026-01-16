@@ -19,7 +19,7 @@ const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/documents", // Create and edit Google Docs
-  "https://www.googleapis.com/auth/drive.file", // Access files created by this app
+  "https://www.googleapis.com/auth/drive", // Full Drive access (needed to list folders and create docs)
 ];
 
 interface GmailOAuthTokenResponse {

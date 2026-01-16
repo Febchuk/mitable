@@ -339,8 +339,27 @@ class GoogleDocsExportService {
   }
 
   /**
+   * Delete existing Google Doc from Drive
+   */
+  private async deleteDocument(accessToken: string, googleDocsId: string): Promise<void> {
+    try {
+      await fetch(`${GOOGLE_DRIVE_API_URL}/files/${googleDocsId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      console.log(`Deleted old Google Doc: ${googleDocsId}`);
+    } catch (error) {
+      console.error("Error deleting Google Doc (continuing anyway):", error);
+      // Don't throw - if delete fails, we'll just create a new doc
+    }
+  }
+
+  /**
    * Export document to Google Docs
-   * Creates new doc or updates existing one in place
+   * Strategy: Delete old doc (if exists) and create fresh one with latest content
+   * This matches Notion's behavior and ensures title/content are always in sync
    */
   async exportDocument(
     documentId: string,
@@ -374,22 +393,13 @@ class GoogleDocsExportService {
       documentWithAuthor.authorEmail ||
       "Unknown";
 
-    let googleDocsId = document.googleDocsId || undefined;
-
-    // Create new doc if doesn't exist
-    if (!googleDocsId) {
-      googleDocsId = await this.createDocument(accessToken, document.title, folderId);
-
-      // Save Google Docs ID to database
-      await db
-        .update(schema.documents)
-        .set({
-          googleDocsId,
-          googleDocsFolderId: folderId || null,
-          googleDocsSyncStatus: "pending",
-        })
-        .where(eq(schema.documents.id, documentId));
+    // Delete old doc if it exists (like Notion strategy)
+    if (document.googleDocsId) {
+      await this.deleteDocument(accessToken, document.googleDocsId);
     }
+
+    // Always create fresh document with current title and content
+    const googleDocsId = await this.createDocument(accessToken, document.title, folderId);
 
     // Prepare metadata section
     const metadata = [
@@ -401,8 +411,18 @@ class GoogleDocsExportService {
       "", // Empty line after separator
     ].join("\n");
 
-    // Update existing doc in place with metadata + content
+    // Add content to fresh document
     await this.updateDocumentContent(accessToken, googleDocsId, metadata + document.content);
+
+    // Save new Google Docs ID to database
+    await db
+      .update(schema.documents)
+      .set({
+        googleDocsId,
+        googleDocsFolderId: folderId || null,
+        googleDocsSyncStatus: "pending",
+      })
+      .where(eq(schema.documents.id, documentId));
 
     // Update sync status
     await db
@@ -414,6 +434,8 @@ class GoogleDocsExportService {
         status: "published", // Auto-publish on export
       })
       .where(eq(schema.documents.id, documentId));
+
+    console.log(`✅ [Google Docs Export] Document ${documentId} exported with ID: ${googleDocsId}`);
 
     const documentUrl = `https://docs.google.com/document/d/${googleDocsId}/edit`;
     return { documentUrl, googleDocsId };

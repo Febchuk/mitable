@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, ExternalLink, CheckCircle, FolderOpen } from "lucide-react";
+import { Loader2, ExternalLink, CheckCircle, FolderOpen, RefreshCw } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -38,6 +38,7 @@ interface ExportGoogleDocsDialogProps {
   existingGoogleDocsId?: string | null;
   folders: DriveFolder[];
   isLoadingFolders: boolean;
+  onRefreshFolders?: () => void;
 }
 
 export default function ExportGoogleDocsDialog({
@@ -49,15 +50,16 @@ export default function ExportGoogleDocsDialog({
   existingGoogleDocsId,
   folders,
   isLoadingFolders,
+  onRefreshFolders,
 }: ExportGoogleDocsDialogProps) {
   const [selectedFolderId, setSelectedFolderId] = useState<string | undefined>();
 
-  // Reset folder selection when dialog opens
+  // Auto-select first folder when dialog opens
   useEffect(() => {
     if (open && !existingGoogleDocsId) {
-      setSelectedFolderId(undefined);
+      setSelectedFolderId(folders[0]?.id || undefined);
     }
-  }, [open, existingGoogleDocsId]);
+  }, [open, existingGoogleDocsId, folders]);
 
   const handleExport = () => {
     onExport(selectedFolderId);
@@ -88,32 +90,48 @@ export default function ExportGoogleDocsDialog({
           {/* Folder Selection (only for new exports) */}
           {!existingGoogleDocsId && (
             <div className="space-y-2">
-              <label className="text-sm text-text-secondary flex items-center gap-2">
-                <FolderOpen size={16} />
-                Destination Folder (Optional)
-              </label>
-              <Select value={selectedFolderId} onValueChange={setSelectedFolderId}>
-                <SelectTrigger className="bg-background-elevated border-border-subtle text-text-primary">
-                  <SelectValue placeholder="My Drive (Root)" />
-                </SelectTrigger>
-                <SelectContent className="bg-background-elevated border-border-subtle">
-                  <SelectItem value="root" className="text-text-primary">
-                    My Drive (Root)
-                  </SelectItem>
-                  {isLoadingFolders ? (
-                    <div className="flex items-center gap-2 p-2 text-text-secondary">
-                      <Loader2 className="animate-spin" size={14} />
-                      Loading folders...
-                    </div>
-                  ) : (
-                    folders.map((folder) => (
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                  <FolderOpen size={16} />
+                  Destination Folder
+                </label>
+                {onRefreshFolders && folders.length > 0 && (
+                  <button
+                    onClick={onRefreshFolders}
+                    disabled={isLoadingFolders}
+                    className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <RefreshCw size={12} className={isLoadingFolders ? "animate-spin" : ""} />
+                    Refresh
+                  </button>
+                )}
+              </div>
+
+              {isLoadingFolders ? (
+                <div className="flex items-center gap-2 p-3 bg-background-elevated border border-border-subtle rounded-lg">
+                  <Loader2 className="animate-spin" size={14} />
+                  <span className="text-sm text-text-secondary">Loading folders...</span>
+                </div>
+              ) : folders.length > 0 ? (
+                <Select value={selectedFolderId} onValueChange={setSelectedFolderId}>
+                  <SelectTrigger className="bg-background-elevated border-border-subtle text-text-primary">
+                    <SelectValue placeholder="Select destination folder" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background-elevated border-border-subtle">
+                    {folders.map((folder) => (
                       <SelectItem key={folder.id} value={folder.id} className="text-text-primary">
                         {folder.name}
                       </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <p className="text-sm text-text-secondary">
+                    No folders found in your Google Drive. Create a folder first.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -146,7 +164,7 @@ export default function ExportGoogleDocsDialog({
           </Button>
           <Button
             onClick={handleExport}
-            disabled={isExporting}
+            disabled={isExporting || (!existingGoogleDocsId && !selectedFolderId)}
             className="bg-primary text-white hover:bg-primary/90 gap-2"
           >
             {isExporting ? (

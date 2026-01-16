@@ -66,12 +66,16 @@ export default function DocDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const { data: document, isLoading } = useDocument(docId || "");
+  const { data: document, isLoading, refetch: refetchDocument } = useDocument(docId || "");
   const updateMutation = useUpdateDocument();
   const deleteMutation = useDeleteDocument();
   const exportNotionMutation = useExportToNotion();
   const exportGoogleDocsMutation = useExportToGoogleDocs();
-  const { data: driveFolders, isLoading: isLoadingFolders } = useGoogleDriveFolders();
+  const {
+    data: driveFolders,
+    isLoading: isLoadingFolders,
+    refetch: refetchFolders,
+  } = useGoogleDriveFolders();
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isExportNotionDialogOpen, setIsExportNotionDialogOpen] = useState(false);
@@ -209,6 +213,10 @@ export default function DocDetail() {
     try {
       const result = await exportNotionMutation.mutateAsync({ id: docId });
       setIsExportNotionDialogOpen(false);
+
+      // Force immediate UI update
+      await refetchDocument();
+
       toast({
         title: "Exported to Notion",
         description: "Document has been exported successfully.",
@@ -230,7 +238,13 @@ export default function DocDetail() {
 
     try {
       const result = await exportGoogleDocsMutation.mutateAsync({ id: docId, folderId });
+      console.log("✅ [Export] Google Docs export result:", result);
       setIsExportGoogleDocsDialogOpen(false);
+
+      // Force immediate UI update
+      const refetchResult = await refetchDocument();
+      console.log("✅ [Export] Refetched document data:", refetchResult.data);
+
       toast({
         title: "Exported to Google Docs",
         description: "Document has been exported successfully.",
@@ -239,6 +253,7 @@ export default function DocDetail() {
         window.open(result.documentUrl, "_blank");
       }
     } catch (error) {
+      console.error("❌ [Export] Failed:", error);
       toast({
         title: "Export failed",
         description: error instanceof Error ? error.message : "Failed to export to Google Docs.",
@@ -409,7 +424,7 @@ export default function DocDetail() {
         {document.notionPageId && (
           <div className="flex items-center gap-1 text-status-success">
             <CheckCircle size={14} />
-            <span>Synced to Notion</span>
+            <span>Synced</span>
           </div>
         )}
         <div className="ml-auto text-text-tertiary text-xs">
@@ -486,6 +501,7 @@ export default function DocDetail() {
         existingGoogleDocsId={document.googleDocsId}
         folders={driveFolders?.folders || []}
         isLoadingFolders={isLoadingFolders}
+        onRefreshFolders={() => refetchFolders()}
       />
 
       {/* Delete Dialog */}

@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, timestamp, date, text } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, integer, timestamp, date, text, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./organizations.schema";
 
@@ -26,6 +26,7 @@ export const users = pgTable("users", {
   gmailRefreshTokenEncrypted: text("gmail_refresh_token_encrypted"),
   gmailTokenExpiresAt: timestamp("gmail_token_expires_at"),
   gmailUserEmail: varchar("gmail_user_email", { length: 255 }),
+  gmailSelectedFolders: jsonb("gmail_selected_folders").$type<string[]>().default([]),
 
   // Notion OAuth tokens (per-user document exports, encrypted)
   notionAccessTokenEncrypted: text("notion_access_token_encrypted"),

@@ -147,6 +147,32 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 /**
+ * GET /api/documents/google-drive-folders
+ * List user's Google Drive folders for document export selection
+ * Requires user to have connected Gmail/Google Workspace
+ */
+router.get(
+  "/google-drive-folders",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+
+    try {
+      const { googleDocsExportService } = await import("../services/google-docs-export.service.js");
+
+      const folders = await googleDocsExportService.listFolders(userId);
+      res.json({ folders });
+    } catch (error) {
+      console.error("[Documents] Error listing Drive folders:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to list Google Drive folders",
+      });
+    }
+  }
+);
+
+/**
  * GET /api/documents/:id
  * Get a single document with full content
  */
@@ -186,6 +212,11 @@ router.get("/:id", requireAuth, async (req: Request, res: Response): Promise<voi
         notionSyncStatus: schema.documents.notionSyncStatus,
         notionSyncedAt: schema.documents.notionSyncedAt,
         notionSyncError: schema.documents.notionSyncError,
+        googleDocsId: schema.documents.googleDocsId,
+        googleDocsFolderId: schema.documents.googleDocsFolderId,
+        googleDocsSyncStatus: schema.documents.googleDocsSyncStatus,
+        googleDocsSyncedAt: schema.documents.googleDocsSyncedAt,
+        googleDocsSyncError: schema.documents.googleDocsSyncError,
         generationModel: schema.documents.generationModel,
         generationPromptVersion: schema.documents.generationPromptVersion,
         createdAt: schema.documents.createdAt,
@@ -232,6 +263,11 @@ router.get("/:id", requireAuth, async (req: Request, res: Response): Promise<voi
       )
       .where(eq(schema.sessionDocumentContributions.documentId, documentId))
       .orderBy(desc(schema.sessionDocumentContributions.createdAt));
+
+    // Prevent caching to ensure fresh data after exports
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
 
     res.json({
       ...document,
@@ -1015,32 +1051,6 @@ router.post(
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to export to Google Docs",
-      });
-    }
-  }
-);
-
-/**
- * GET /api/documents/google-drive-folders
- * List user's Google Drive folders for document export selection
- * Requires user to have connected Gmail/Google Workspace
- */
-router.get(
-  "/google-drive-folders",
-  requireAuth,
-  async (req: Request, res: Response): Promise<void> => {
-    const userId = req.userId!;
-
-    try {
-      const { googleDocsExportService } = await import("../services/google-docs-export.service.js");
-
-      const folders = await googleDocsExportService.listFolders(userId);
-      res.json({ folders });
-    } catch (error) {
-      console.error("[Documents] Error listing Drive folders:", error);
-      res.status(500).json({
-        error: "Internal Server Error",
-        message: error instanceof Error ? error.message : "Failed to list Google Drive folders",
       });
     }
   }

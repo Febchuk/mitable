@@ -35,22 +35,18 @@ export default function ExportPopover({
   const [open, setOpen] = useState(false);
 
   const exportedCount = destinations.filter((d) => d.isExported).length;
-  const hasAnyExport = exportedCount > 0;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="bg-background-elevated border-border-subtle text-text-primary hover:bg-background-hover gap-2 relative"
+          className="bg-background-elevated border-border-subtle text-text-primary hover:bg-background-hover gap-2"
           disabled={isExporting}
         >
           <ExternalLink size={16} />
           Export
           <ChevronDown size={14} />
-          {hasAnyExport && (
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background-primary" />
-          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="bg-background-elevated border-border-subtle w-80 p-0" align="end">
@@ -90,34 +86,19 @@ export default function ExportPopover({
 
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {dest.isExported ? (
-                    <>
-                      {dest.documentUrl && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-text-secondary hover:text-text-primary"
-                          onClick={() => {
-                            window.open(dest.documentUrl!, "_blank");
-                            setOpen(false);
-                          }}
-                        >
-                          View
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-primary hover:text-primary/80 gap-1"
-                        onClick={() => {
-                          dest.onReExport();
-                          setOpen(false);
-                        }}
-                        disabled={isExporting}
-                      >
-                        <RefreshCw size={12} />
-                        Re-export
-                      </Button>
-                    </>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-primary hover:text-primary/80 gap-1"
+                      onClick={() => {
+                        dest.onReExport();
+                        setOpen(false);
+                      }}
+                      disabled={isExporting}
+                    >
+                      <RefreshCw size={12} />
+                      Re-export
+                    </Button>
                   ) : (
                     <Button
                       variant="ghost"

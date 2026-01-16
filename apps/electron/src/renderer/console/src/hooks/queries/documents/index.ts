@@ -192,8 +192,9 @@ export function useExportToGoogleDocs() {
   return useMutation({
     mutationFn: ({ id, folderId }: { id: string; folderId?: string }) =>
       documentsService.exportToGoogleDocs(id, folderId),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: documentsKeys.detail(variables.id) });
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: documentsKeys.detail(variables.id) });
+      await queryClient.invalidateQueries({ queryKey: documentsKeys.all });
     },
   });
 }
@@ -208,6 +209,17 @@ export function useGoogleDriveFolders() {
   return useQuery({
     queryKey: ["google-drive-folders"],
     queryFn: () => documentsService.fetchGoogleDriveFolders(),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+}
+
+export function useGmailSelectedFolders() {
+  const { user } = useUser();
+
+  return useQuery({
+    queryKey: ["gmail-selected-folders"],
+    queryFn: () => documentsService.fetchGmailSelectedFolders(),
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
