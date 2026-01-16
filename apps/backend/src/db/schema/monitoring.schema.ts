@@ -151,6 +151,31 @@ export const sessionCaptures = pgTable(
     // Flag for Top-K selected frames (uploaded to cloud)
     selectedForExport: boolean("selected_for_export").default(false),
 
+    // === NEW: Key Activity Tracking (Relational State-Anchor) ===
+
+    // Link to key activity (null during CONTEXT_SWITCH or before activity established)
+    keyActivityId: uuid("key_activity_id").references(() => keyActivities.id, {
+      onDelete: "set null",
+    }),
+
+    // Progress state from Perceiver
+    progress: varchar("progress", { length: 20 }),
+    // Values: 'IN_PROGRESS' | 'COMPLETE' | 'CONTEXT_SWITCH'
+
+    // Structural break detection (triggers new visual anchor)
+    structuralBreakDetected: boolean("structural_break_detected").default(false),
+
+    // Milestone detection
+    milestoneDetected: boolean("milestone_detected").default(false),
+    milestoneDescription: text("milestone_description"),
+    milestoneConfidence: varchar("milestone_confidence", { length: 10 }),
+    // Values: 'high' | 'medium' | 'low'
+    milestoneInferredFrom: varchar("milestone_inferred_from", { length: 30 }),
+    // Values: 'state_transition' | 'cumulative_pattern' | 'content_change'
+
+    // Evidence reference (what visual element determined the progress status)
+    evidenceReference: text("evidence_reference"),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
@@ -158,6 +183,64 @@ export const sessionCaptures = pgTable(
     importanceIdx: index("idx_captures_importance").on(table.sessionId, table.importanceScore),
     onTaskIdx: index("idx_captures_on_task").on(table.sessionId, table.onTask),
     deltaIdx: index("idx_captures_delta").on(table.sessionId, table.deltaChanged),
+    // NEW: Index for key activity lookups
+    keyActivityIdx: index("idx_captures_key_activity").on(table.keyActivityId),
+    // NEW: Index for milestone queries
+    milestoneIdx: index("idx_captures_milestone").on(table.sessionId, table.milestoneDetected),
+  })
+);
+
+/**
+ * Key Activities (Activity Registry)
+ *
+ * The source of truth for tracking distinct work activities within a session.
+ * Each key activity has a stable ID and name that persists across intervals,
+ * enabling the "Database of Work" concept where activities are perfectly queryable.
+ *
+ * Key features:
+ * - Status tracking: IN_PROGRESS or COMPLETE
+ * - Consecutive intervals: For materiality filtering (3+ = update Master Story)
+ * - Milestone tracking: Count of detected milestones for this activity
+ *
+ * Resumption detection: Uses behavioral/semantic matching via Master Story + sliding
+ * timeline (last 15-20 entries) rather than visual anchors. This is more accurate
+ * because the same app/page can be used for multiple different activities.
+ */
+export const keyActivities = pgTable(
+  "key_activities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => monitoringSessions.id, { onDelete: "cascade" }),
+
+    // Activity identification
+    keyActivityName: varchar("key_activity_name", { length: 255 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("IN_PROGRESS"),
+    // Values: 'IN_PROGRESS' | 'COMPLETE'
+
+    // Timing
+    firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+
+    // Interval tracking for materiality filtering
+    consecutiveIntervals: integer("consecutive_intervals").notNull().default(1),
+    totalIntervals: integer("total_intervals").notNull().default(1),
+
+    // Milestone tracking
+    milestoneCount: integer("milestone_count").notNull().default(0),
+    lastMilestoneAt: timestamp("last_milestone_at"),
+    lastMilestoneDescription: text("last_milestone_description"),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    // Index for looking up activities by session
+    sessionIdx: index("idx_key_activities_session").on(table.sessionId),
+    // Index for finding active/complete activities
+    statusIdx: index("idx_key_activities_status").on(table.sessionId, table.status),
   })
 );
 
@@ -205,12 +288,25 @@ export const monitoringSessionsRelations = relations(monitoringSessions, ({ one,
   }),
   captures: many(sessionCaptures),
   summaries: many(sessionSummaries),
+  keyActivitiesRegistry: many(keyActivities),
+}));
+
+export const keyActivitiesRelations = relations(keyActivities, ({ one, many }) => ({
+  session: one(monitoringSessions, {
+    fields: [keyActivities.sessionId],
+    references: [monitoringSessions.id],
+  }),
+  captures: many(sessionCaptures),
 }));
 
 export const sessionCapturesRelations = relations(sessionCaptures, ({ one }) => ({
   session: one(monitoringSessions, {
     fields: [sessionCaptures.sessionId],
     references: [monitoringSessions.id],
+  }),
+  keyActivity: one(keyActivities, {
+    fields: [sessionCaptures.keyActivityId],
+    references: [keyActivities.id],
   }),
 }));
 
@@ -228,6 +324,8 @@ export type SessionCapture = typeof sessionCaptures.$inferSelect;
 export type NewSessionCapture = typeof sessionCaptures.$inferInsert;
 export type SessionSummary = typeof sessionSummaries.$inferSelect;
 export type NewSessionSummary = typeof sessionSummaries.$inferInsert;
+export type KeyActivity = typeof keyActivities.$inferSelect;
+export type NewKeyActivity = typeof keyActivities.$inferInsert;
 
 // Helper types for JSONB fields
 export interface SelectedWindow {
@@ -236,7 +334,9 @@ export interface SelectedWindow {
   windowTitle: string;
 }
 
-export interface KeyActivity {
+// Legacy JSONB field on monitoringSessions - kept for backwards compatibility
+// The new keyActivities TABLE is the source of truth
+export interface KeyActivitySummary {
   activity: string;
   timestamp: string;
   confidence: number;
@@ -277,3 +377,38 @@ export interface FrameAnalysisResult {
   importanceScore: number;
   importanceReason: string | null;
 }
+
+// === NEW: Activity Registry Types (Relational State-Anchor) ===
+
+// Progress states for the Perceiver output
+export type ProgressState = "IN_PROGRESS" | "COMPLETE" | "CONTEXT_SWITCH";
+
+// Key activity status in the registry
+export type KeyActivityStatus = "IN_PROGRESS" | "COMPLETE";
+
+// Milestone confidence levels
+export type MilestoneConfidence = "high" | "medium" | "low";
+
+// How the milestone was inferred
+export type MilestoneInferredFrom = "state_transition" | "cumulative_pattern" | "content_change";
+
+// Milestone detection result from Perceiver
+export interface ProgressMilestone {
+  detected: boolean;
+  description: string | null;
+  confidence: MilestoneConfidence | null;
+  inferredFrom: MilestoneInferredFrom | null;
+}
+
+// Full Perceiver output (new schema)
+export interface PerceiverOutput {
+  time: string;
+  analysisResult: string;
+  keyActivityName: string | null;
+  keyActivityId: string | null;
+  progress: ProgressState;
+  progressMilestone: ProgressMilestone;
+  structuralBreakDetected: boolean;
+  evidenceReference: string;
+}
+
