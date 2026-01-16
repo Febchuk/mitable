@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Info,
   Download,
+  Settings,
 } from "lucide-react";
 import { SiLinear, SiGmail } from "react-icons/si";
 import Button from "../components/ui/Button";
@@ -23,6 +24,9 @@ import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import { BillingSection } from "@/console/src/components/billing";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { usePreferences } from "@/console/src/hooks/usePreferences";
 import { createLogger } from "../../../lib/logger";
 
 const logger = createLogger("UserProfilePage");
@@ -76,6 +80,14 @@ export default function UserProfilePage() {
     transferred: number;
     total: number;
   } | null>(null);
+
+  // Preferences hook
+  const {
+    showPillOnSessionStart,
+    hidePillOnSessionEnd,
+    isLoading: isPreferencesLoading,
+    updatePreference,
+  } = usePreferences();
 
   useEffect(() => {
     loadLinearStatus();
@@ -509,13 +521,14 @@ export default function UserProfilePage() {
   };
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<"account" | "security" | "integrations" | "about">(
-    "account"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "account" | "security" | "preferences" | "integrations" | "about"
+  >("account");
 
   const tabs = [
     { id: "account" as const, label: "Account", icon: User },
     { id: "security" as const, label: "Security", icon: Lock },
+    { id: "preferences" as const, label: "Preferences", icon: Settings },
     { id: "integrations" as const, label: "Integrations", icon: Link2 },
     { id: "about" as const, label: "About", icon: Info },
   ];
@@ -781,6 +794,102 @@ export default function UserProfilePage() {
                       </Button>
                     </div>
                   </form>
+                </div>
+              </div>
+            )}
+
+            {/* Preferences Tab */}
+            {activeTab === "preferences" && (
+              <div className="bg-background-secondary rounded-xl border border-border-subtle p-6">
+                <div className="space-y-6">
+                  <div className="pb-4 border-b border-border-subtle">
+                    <h2 className="text-heading-4 text-white">Session Preferences</h2>
+                    <p className="text-body-sm text-text-tertiary mt-1">
+                      Customize how monitoring sessions behave
+                    </p>
+                  </div>
+
+                  {/* Show Pill on Session Start Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label
+                        htmlFor="show-pill-toggle-profile"
+                        className="text-sm font-medium text-text-primary cursor-pointer"
+                      >
+                        Show Watching Pill on Session Start
+                      </Label>
+                      <p className="text-xs text-text-tertiary">
+                        Automatically show the watching pill when a monitoring session starts
+                      </p>
+                    </div>
+                    {isPreferencesLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                    ) : (
+                      <Switch
+                        id="show-pill-toggle-profile"
+                        checked={showPillOnSessionStart}
+                        onCheckedChange={async (checked) => {
+                          const result = await updatePreference("showPillOnSessionStart", checked);
+                          if (result.success) {
+                            toast({
+                              title: "Preference saved",
+                              description: checked
+                                ? "Watching pill will show when sessions start"
+                                : "Watching pill will not auto-show when sessions start",
+                            });
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: "Failed to save preference",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        className="flex-shrink-0"
+                      />
+                    )}
+                  </div>
+
+                  {/* Hide Pill on Session End Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label
+                        htmlFor="hide-pill-toggle-profile"
+                        className="text-sm font-medium text-text-primary cursor-pointer"
+                      >
+                        Hide Watching Pill on Session End
+                      </Label>
+                      <p className="text-xs text-text-tertiary">
+                        Automatically hide the watching pill when a monitoring session ends
+                      </p>
+                    </div>
+                    {isPreferencesLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                    ) : (
+                      <Switch
+                        id="hide-pill-toggle-profile"
+                        checked={hidePillOnSessionEnd}
+                        onCheckedChange={async (checked) => {
+                          const result = await updatePreference("hidePillOnSessionEnd", checked);
+                          if (result.success) {
+                            toast({
+                              title: "Preference saved",
+                              description: checked
+                                ? "Watching pill will be hidden when sessions end"
+                                : "Watching pill will remain visible when sessions end",
+                            });
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: "Failed to save preference",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        className="flex-shrink-0"
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             )}
