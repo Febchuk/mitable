@@ -214,13 +214,3 @@ export function useGoogleDriveFolders() {
   });
 }
 
-export function useGmailSelectedFolders() {
-  const { user } = useUser();
-
-  return useQuery({
-    queryKey: ["gmail-selected-folders"],
-    queryFn: () => documentsService.fetchGmailSelectedFolders(),
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-  });
-}

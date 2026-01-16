@@ -189,8 +189,3 @@ export async function fetchGoogleDriveFolders(): Promise<{
   );
 }
 
-export async function fetchGmailSelectedFolders(): Promise<{
-  selectedFolderIds: string[];
-}> {
-  return apiRequest<{ selectedFolderIds: string[] }>("/integrations/gmail/folders");
-}
