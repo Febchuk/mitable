@@ -38,6 +38,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
           id: response.profile.id,
           name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
           firstName: response.profile.firstName || "",
+          email: response.profile.email || undefined,
           avatarUrl: response.profile.avatarUrl || undefined,
           currentWeek: response.profile.currentWeek || 1,
           role: response.profile.role,

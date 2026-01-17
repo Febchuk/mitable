@@ -1,5 +1,4 @@
 import { Layers, Users, BarChart3, Plug, Activity, FileText, CheckSquare } from "lucide-react";
-// Note: Users icon is still used in admin navigation for People
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 import { useSubscription } from "../../hooks/queries/billing";
@@ -17,7 +16,6 @@ export default function Nav() {
 
   if (isPersonalAccount) {
     // Personal account navigation - unified view
-    // Note: Settings is accessible via footer button in Sidebar.tsx
     return (
       <nav className="space-y-1 px-2">
         <NavItem to="/monitoring" icon={Activity} label="Sessions" />

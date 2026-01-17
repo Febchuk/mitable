@@ -1,19 +1,34 @@
-import { Bell, LogOut, Settings } from "lucide-react";
+import { User, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSidebar } from "../../context/SidebarContext";
 import { useUser } from "../../context/UserContext";
 import Logo from "../navigation/Logo";
 import Nav from "../navigation/Nav";
+import { useState, useRef, useEffect } from "react";
 
 export default function Sidebar() {
   const { open } = useSidebar();
-  const { logout } = useUser();
+  const { user, logout } = useUser();
   const navigate = useNavigate();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <aside
@@ -29,41 +44,62 @@ export default function Sidebar() {
       </div>
 
       {/* Main Navigation */}
-      <div className="flex-1 overflow-y-auto py-4">
+      <div className="overflow-y-auto py-4">
         <Nav />
       </div>
 
-      {/* Footer - Notifications, Settings & Logout */}
-      <div className="flex-shrink-0 p-2 space-y-1">
+      {/* Spacer to push profile to middle-lower area */}
+      <div className="flex-1"></div>
+
+      {/* Profile Avatar with Dropdown */}
+      <div className="flex-shrink-0 px-2 pb-8 relative" ref={dropdownRef}>
         <button
-          className="group flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-white/10 transition-all duration-200"
-          title="Notifications"
+          onClick={() => setDropdownOpen(!dropdownOpen)}
+          className="group flex items-center justify-start p-2"
+          title="Profile"
         >
-          <Bell className="w-5 h-5 flex-shrink-0 text-text-secondary group-hover:text-white group-hover:scale-110 transition-transform" />
-          {open && (
-            <span className="text-nav-item group-hover:text-white transition-colors">
-              Notifications
-            </span>
-          )}
+          {/* Circular Avatar */}
+          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-semibold text-base hover:bg-primary-hover transition-colors duration-200 cursor-pointer">
+            {(() => {
+              const nameParts = user?.name?.split(" ") || [];
+              const firstInitial = nameParts[0]?.[0]?.toUpperCase() || "U";
+              const lastInitial = nameParts[nameParts.length - 1]?.[0]?.toUpperCase() || "";
+              return nameParts.length > 1 ? `${firstInitial}${lastInitial}` : firstInitial;
+            })()}
+          </div>
         </button>
-        <button
-          onClick={() => navigate("/settings")}
-          className="group flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-white/10 transition-all duration-200"
-          title="Settings"
-        >
-          <Settings className="w-5 h-5 flex-shrink-0 text-text-secondary group-hover:text-white group-hover:scale-110 transition-all" />
-          {open && (
-            <span className="text-nav-item group-hover:text-white transition-colors">Settings</span>
-          )}
-        </button>
-        <button
-          onClick={handleLogout}
-          className="group flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-red-500/10 transition-all duration-200 text-red-400 hover:text-red-300"
-          title="Logout"
-        >
-          <LogOut className="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
-          {open && <span className="text-nav-item">Logout</span>}
-        </button>
+
+        {/* Dropdown Menu */}
+        {dropdownOpen && (
+          <div
+            className="absolute bottom-full left-2 right-2 mb-2 bg-background-elevated border border-border-subtle rounded-lg shadow-xl overflow-hidden origin-bottom animate-in fade-in slide-in-from-bottom-2 duration-200"
+            style={{
+              animation: "slideUp 0.2s ease-out",
+            }}
+          >
+            <button
+              onClick={() => {
+                navigate("/profile");
+                setDropdownOpen(false);
+              }}
+              className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-white/5 transition-colors text-text-primary hover:text-white"
+            >
+              <User className="w-4 h-4" />
+              <span className="text-sm font-medium">Profile & Settings</span>
+            </button>
+            <div className="h-px bg-border-subtle" />
+            <button
+              onClick={() => {
+                handleLogout();
+                setDropdownOpen(false);
+              }}
+              className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-red-500/10 transition-colors text-red-400 hover:text-red-300"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-sm font-medium">Logout</span>
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );

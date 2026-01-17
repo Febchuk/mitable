@@ -11,6 +11,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
 import LoginPage from "./pages/LoginPage";
 import SignupOrganizationPage from "./pages/SignupOrganizationPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import RoadmapView from "./components/views/employee/RoadmapView";
 import RoadmapTaskDetail from "./components/views/employee/RoadmapView/RoadmapTaskDetail";
 import ChatsView from "./components/views/employee/ChatsView";
@@ -19,10 +21,10 @@ import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
 import { monitoringKeys } from "./hooks/queries/monitoring";
-import SettingsView from "./components/views/employee/SettingsView";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
 import TodosView from "./components/views/employee/TodosView";
+import UserProfilePage from "./pages/UserProfilePage";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
@@ -149,6 +151,8 @@ function App() {
               {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup-organization" element={<SignupOrganizationPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
 
               {/* Protected routes */}
               <Route
@@ -177,7 +181,7 @@ function App() {
                 {/* Monitoring Routes */}
                 <Route path="monitoring" element={<MonitoringView />} />
                 <Route path="monitoring/:sessionId" element={<SessionDetail />} />
-                <Route path="settings" element={<SettingsView />} />
+                <Route path="profile" element={<UserProfilePage />} />
                 {/* Legacy routes (hidden from nav but accessible via URL) */}
                 <Route path="roadmap" element={<RoadmapView />} />
                 <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
