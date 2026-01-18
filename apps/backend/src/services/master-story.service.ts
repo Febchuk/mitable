@@ -1,66 +1,34 @@
 /**
  * Master Story Service
  *
- * Builds and maintains the "living document" narrative for a session.
- * Only extends the story when progression is detected (meaningful actions).
+ * Implements the "Storyteller" (Step 3) of the Screen Understanding Pipeline.
  *
- * Key features:
- * - Continuous narrative building using Storyteller prompt
- * - Stored in session_summaries table for persistence
- * - User context injection (role, team, watched windows)
- * - Versioned updates for crash recovery
+ * Responsibility:
+ * - Generate a final narrative summary from the categorized Activity Timeline.
+ * - Applies the "Materiality Filter" (summarizing 10 small actions into 1 meaningful update).
+ * - Respects user formatting preferences (Verbose/Concise, Bullets/Paragraphs).
+ *
+ * Key changes from v1:
+ * - Consumes `activityDescription` from `session_captures` (Classifier Output).
+ * - Triggered ON DEMAND at session end (via `generateStory`), not incrementally.
  */
 
 import Groq from "groq-sdk";
 import { config } from "../config";
 import { db } from "../db/client";
-import { sessionSummaries, users } from "../db/schema/index";
-import { eq, desc, and } from "drizzle-orm";
-import {
-  buildStorytellerPrompt,
-  parseStorytellerResponse,
-  validateStorytellerEntry,
-  buildNarrativeFromEntries,
-  GoalContext,
-} from "../prompts/session-prompts";
-import { FrameAnalysisResult } from "./frame-analysis.service";
-import { withRetry } from "../utils/retry";
-import {
-  createSessionLogger,
-  createContentHash,
-  createTimer,
-  CHECKPOINTS,
-  SESSION_EVENTS,
-} from "../lib/sessionLogger";
+import { sessionCaptures, sessionSummaries } from "../db/schema/index";
+import { eq, desc, and, isNotNull, asc } from "drizzle-orm";
+import { STORYTELLER_SYSTEM_PROMPT } from "../prompts/session-prompts";
+import { createSessionLogger, createTimer, CHECKPOINTS } from "../lib/sessionLogger";
 
-// Configuration
-const STORY_CONFIG = {
-  MODEL: "openai/gpt-oss-120b", // Larger model for better narrative quality and less hallucination
-  MAX_TOKENS: 2048,
-  TEMPERATURE: 0.2, // Low temperature for factual, grounded outputs (reduced from 0.4)
-  MAX_STORY_LENGTH: 50000, // Truncate if story gets too long
-};
-
-// Types
-export interface StoryContext {
+export interface GenerateStoryOptions {
   sessionId: string;
   userId: string;
-  frameAnalysis: FrameAnalysisResult;
-  windowInfo: {
-    appName: string;
-    windowTitle: string;
+  formatPreference: {
+    style: "verbose" | "concise";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
   };
-  // Optional goal context for enhanced storytelling
-  goalContext?: GoalContext;
-}
-
-export interface StoryUpdateResult {
-  success: boolean;
-  version: number;
-  storyLength: number;
-  tokensUsed: number;
-  latencyMs: number;
-  error?: string;
 }
 
 class MasterStoryService {
@@ -71,281 +39,104 @@ class MasterStoryService {
   }
 
   /**
-   * Extend the master story with a new progression
-   * Only call this when progression_detected === true
+   * Generate the Master Story from the Activity Timeline
    */
-  async extendStory(context: StoryContext): Promise<StoryUpdateResult> {
-    const timer = createTimer("MasterStory.extendStory");
-    const log = createSessionLogger({
-      sessionId: context.sessionId,
-      userId: context.userId,
-    });
+  async generateStory(options: GenerateStoryOptions): Promise<string> {
+    const log = createSessionLogger({ sessionId: options.sessionId });
+    const timer = createTimer("MasterStory.generateStory");
 
-    log.debug("Starting story extension", {
-      action: context.frameAnalysis.summaryOfAction,
-      app: context.windowInfo.appName,
-      hasGoalContext: !!context.goalContext,
-    });
+    log.info("Starting Master Story generation", { options });
 
     try {
-      // Get current story from database
-      const currentSummary = await db.query.sessionSummaries.findFirst({
+      // 1. Fetch Activity Timeline (Classifier Output)
+      const activities = await db.query.sessionCaptures.findMany({
         where: and(
-          eq(sessionSummaries.sessionId, context.sessionId),
-          eq(sessionSummaries.summaryType, "master_story")
+          eq(sessionCaptures.sessionId, options.sessionId),
+          isNotNull(sessionCaptures.activityDescription)
         ),
-        orderBy: desc(sessionSummaries.version),
-      });
-
-      const currentStory = currentSummary?.narrativeSummary || "";
-      const currentVersion = currentSummary?.version || 0;
-      const currentStoryHash = createContentHash(currentStory);
-
-      // CHECKPOINT: Log current story retrieval for debugging duplicate bug
-      log.checkpoint(CHECKPOINTS.MASTER_STORY_EXTEND, {
-        stage: "current_story_retrieved",
-        currentVersion,
-        currentStoryLength: currentStory.length,
-        currentStoryHash,
-        currentStoryPrefix: currentStory.slice(0, 150),
-        queryParams: {
-          sessionId: context.sessionId,
-          summaryType: "master_story",
+        orderBy: [asc(sessionCaptures.sequenceNumber)],
+        columns: {
+          activityDescription: true,
+          capturedAt: true,
         },
       });
 
-      // Get user context for the prompt
-      const userContext = await this.getUserContext(context.userId);
-
-      // Build the storyteller prompt with goal context and grounding data
-      const { system, user } = buildStorytellerPrompt({
-        userRole: userContext.role,
-        userSeniority: userContext.seniority,
-        workContext: userContext.workContext,
-        appName: context.windowInfo.appName,
-        windowTitle: context.windowInfo.windowTitle,
-        currentStory: this.truncateStory(currentStory),
-        latestAction: context.frameAnalysis.summaryOfAction,
-        goalContext: context.goalContext,
-        // Grounding data from frame analysis (prevents hallucination)
-        extractedArtifacts: context.frameAnalysis.artifacts,
-        detectedSignals: context.frameAnalysis.signals,
-        changeType: context.frameAnalysis.changeType,
-        changeMagnitude: context.frameAnalysis.changeMagnitude,
-      });
-
-      // Log the AI prompt for debugging
-      log.logAIInteraction("storyteller_prompt", `${system}\n\n${user}`, undefined, {
-        model: STORY_CONFIG.MODEL,
-        inputStoryHash: currentStoryHash,
-      });
-
-      // Log full prompt for deep debugging (when SESSION_LOG_FULL_AI=true)
-      log.logFullAIInteraction(
-        "storyteller_prompt_full",
-        system,
-        user,
-        "", // Response comes later
-        {
-          model: STORY_CONFIG.MODEL,
-          currentStoryLength: currentStory.length,
-          inputStoryHash: currentStoryHash,
-          hasGoalContext: !!context.goalContext,
-          goalContext: context.goalContext
-            ? {
-                sessionGoal: context.goalContext.sessionGoal,
-                linearIssueId: context.goalContext.linearIssueId,
-                linearIssueTitle: context.goalContext.linearIssueTitle,
-                hasRelatedDocs: !!context.goalContext.relatedDocsContext,
-              }
-            : null,
-          windowInfo: context.windowInfo,
-          frameAction: context.frameAnalysis.summaryOfAction,
-        }
-      );
-
-      // Generate updated story
-      const response = await withRetry(
-        async () => {
-          return await this.groq.chat.completions.create({
-            model: STORY_CONFIG.MODEL,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: user },
-            ],
-            max_tokens: STORY_CONFIG.MAX_TOKENS,
-            temperature: STORY_CONFIG.TEMPERATURE,
-          });
-        },
-        "MasterStory.extendStory",
-        { maxRetries: 2 }
-      );
-
-      const rawResponse = response.choices[0]?.message?.content || "";
-      const entry = parseStorytellerResponse(rawResponse);
-
-      if (!entry) {
-        log.warn("Failed to parse storyteller JSON response", {
-          rawResponse: rawResponse.substring(0, 200),
-        });
-        throw new Error("Failed to parse storyteller response as JSON");
+      if (activities.length === 0) {
+        log.warn("No activities found for story generation");
+        return "No activity recorded in this session.";
       }
 
-      // Validate entry against input data (hallucination check)
-      const validation = validateStorytellerEntry(
-        entry,
-        context.frameAnalysis.summaryOfAction,
-        context.frameAnalysis.artifacts || []
-      );
+      // 2. Format Timeline for Prompt
+      const timelineText = activities
+        .map((a, i) => `${i + 1}. [${a.capturedAt.toISOString()}] ${a.activityDescription}`)
+        .join("\n");
 
-      if (!validation.valid) {
-        log.warn("Storyteller entry failed validation", {
-          reason: validation.reason,
-          entry,
-          latestAction: context.frameAnalysis.summaryOfAction,
-        });
-        // Use a sanitized fallback instead of the hallucinated content
-        entry.action = context.frameAnalysis.summaryOfAction;
-        entry.evidence = "Fallback: used raw frame analysis";
-      }
+      // 3. Build Prompt
+      const userPrompt = `
+TIMELINE:
+${timelineText}
 
-      // Build narrative from validated entry
-      const updatedStory = buildNarrativeFromEntries(currentStory, entry);
-      const updatedStoryHash = createContentHash(updatedStory);
+PREFERENCES:
+Style: ${options.formatPreference.style}
+Format: ${options.formatPreference.format}
 
-      // Log the AI response
-      log.logAIInteraction("storyteller_response", "", rawResponse, {
-        model: STORY_CONFIG.MODEL,
-        inputStoryHash: currentStoryHash,
-        outputStoryHash: updatedStoryHash,
-        tokensUsed: response.usage?.total_tokens,
+Generate the Master Story update:`;
+
+      // 4. Call LLM (Llama 3 70b or 8b)
+      const completion = await this.groq.chat.completions.create({
+        messages: [
+          { role: "system", content: STORYTELLER_SYSTEM_PROMPT },
+          { role: "user", content: userPrompt },
+        ],
+        model: "llama3-70b-8192", // High capacity for summarization
+        temperature: 0.2,
       });
 
-      // Log full response for deep debugging (when SESSION_LOG_FULL_AI=true)
-      log.logFullAIInteraction(
-        "storyteller_response_full",
-        "", // System prompt already logged
-        "", // User prompt already logged
-        rawResponse,
-        {
-          model: STORY_CONFIG.MODEL,
-          inputStoryHash: currentStoryHash,
-          outputStoryHash: updatedStoryHash,
-          tokensUsed: response.usage?.total_tokens,
-          promptTokens: response.usage?.prompt_tokens,
-          completionTokens: response.usage?.completion_tokens,
-        }
-      );
+      const story = completion.choices[0]?.message?.content || "Failed to generate story.";
 
-      // Save to database
-      const newVersion = currentVersion + 1;
+      // 5. Save Summary to DB
       await db.insert(sessionSummaries).values({
-        sessionId: context.sessionId,
-        version: newVersion,
-        summaryType: "master_story",
-        narrativeSummary: updatedStory,
-        modelUsed: STORY_CONFIG.MODEL,
-        tokenCount: response.usage?.total_tokens || 0,
+        sessionId: options.sessionId,
+        version: 1, // Reset versioning for this new flow
+        summaryType: "master_story", // or 'final_summary'
+        narrativeSummary: story,
+        modelUsed: "llama3-70b-8192",
+        tokenCount: completion.usage?.total_tokens || 0,
         generationTimeMs: timer.elapsed(),
       });
 
-      // CHECKPOINT: Log story save for debugging
-      log.checkpoint(CHECKPOINTS.MASTER_STORY_EXTEND, {
-        stage: "story_saved",
-        newVersion,
-        newStoryLength: updatedStory.length,
-        newStoryHash: updatedStoryHash,
-        newStoryPrefix: updatedStory.slice(0, 150),
-        tokensUsed: response.usage?.total_tokens || 0,
+      log.checkpoint(CHECKPOINTS.SUMMARY_SAVE, {
+        length: story.length,
         durationMs: timer.elapsed(),
       });
 
-      log.info("Story extended successfully", {
-        version: newVersion,
-        storyLength: updatedStory.length,
-        durationMs: timer.elapsed(),
-      });
+      return story;
 
-      // Track analytics event
-      log.trackEvent(SESSION_EVENTS.MASTER_STORY_EXTENDED, {
-        version: newVersion,
-        storyLength: updatedStory.length,
-        tokensUsed: response.usage?.total_tokens || 0,
-        durationMs: timer.elapsed(),
-      });
-
-      return {
-        success: true,
-        version: newVersion,
-        storyLength: updatedStory.length,
-        tokensUsed: response.usage?.total_tokens || 0,
-        latencyMs: timer.elapsed(),
-      };
     } catch (error) {
-      log.error("Failed to extend story", {
+      log.error("Failed to generate master story", {
         error: error instanceof Error ? error.message : String(error),
-        durationMs: timer.elapsed(),
       });
-
-      return {
-        success: false,
-        version: 0,
-        storyLength: 0,
-        tokensUsed: 0,
-        latencyMs: timer.elapsed(),
-        error: error instanceof Error ? error.message : String(error),
-      };
+      throw error;
     }
   }
 
   /**
-   * Get the current master story for a session
-   * CRITICAL: This is a key debugging point for the duplicate summary bug.
-   * We log exactly what query is executed and what is returned.
+   * Get the latest generated story (for UI display)
    */
   async getCurrentStory(sessionId: string): Promise<string | null> {
-    const log = createSessionLogger({ sessionId });
-
-    log.debug("Retrieving current master story", { sessionId });
-
     const summary = await db.query.sessionSummaries.findFirst({
       where: and(
         eq(sessionSummaries.sessionId, sessionId),
         eq(sessionSummaries.summaryType, "master_story")
       ),
-      orderBy: desc(sessionSummaries.version),
+      orderBy: desc(sessionSummaries.createdAt),
     });
 
-    const story = summary?.narrativeSummary || null;
-
-    // CHECKPOINT: Critical for debugging duplicate bug
-    // Log exactly what was retrieved for which session
-    log.checkpoint(CHECKPOINTS.MASTER_STORY_RETRIEVAL, {
-      querySessionId: sessionId,
-      resultFound: !!summary,
-      resultVersion: summary?.version ?? null,
-      resultStoryLength: story?.length ?? 0,
-      resultStoryHash: story ? createContentHash(story) : null,
-      resultStoryPrefix: story ? story.slice(0, 150) : null,
-      resultSessionIdFromDb: summary?.sessionId ?? null,
-      // CRITICAL: Check if the returned sessionId matches the query
-      sessionIdMatch: summary?.sessionId === sessionId,
-    });
-
-    // Alert if there's a mismatch (this would indicate a serious bug)
-    if (summary && summary.sessionId !== sessionId) {
-      log.error("CRITICAL: Session ID mismatch in getCurrentStory!", {
-        querySessionId: sessionId,
-        returnedSessionId: summary.sessionId,
-        version: summary.version,
-      });
-    }
-
-    return story;
+    return summary?.narrativeSummary || null;
   }
 
   /**
-   * Get story metadata
+   * Get metadata about the generated story
    */
   async getStoryMetadata(sessionId: string): Promise<{
     version: number;
@@ -358,7 +149,7 @@ class MasterStoryService {
         eq(sessionSummaries.sessionId, sessionId),
         eq(sessionSummaries.summaryType, "master_story")
       ),
-      orderBy: desc(sessionSummaries.version),
+      orderBy: desc(sessionSummaries.createdAt),
     });
 
     if (!summary) return null;
@@ -370,134 +161,6 @@ class MasterStoryService {
       totalTokens: summary.tokenCount || 0,
     };
   }
-
-  /**
-   * Initialize a new story for a session
-   * @param sessionId The session ID
-   * @param goalContext Optional goal context including Linear issue, related docs
-   */
-  async initializeStory(sessionId: string, goalContext?: GoalContext): Promise<void> {
-    const log = createSessionLogger({ sessionId });
-
-    log.debug("Initializing master story", {
-      hasGoalContext: !!goalContext,
-      hasLinearIssue: !!goalContext?.linearIssueId,
-      hasRelatedDocs: !!goalContext?.relatedDocsContext,
-    });
-
-    let initialStory = "";
-
-    if (goalContext?.sessionGoal || goalContext?.linearIssueTitle) {
-      const goalDescription = goalContext.linearIssueTitle
-        ? `${goalContext.linearIssueId ? `[${goalContext.linearIssueId}] ` : ""}${goalContext.linearIssueTitle}`
-        : goalContext.sessionGoal;
-
-      initialStory = `Session started with goal: ${goalDescription}\n\n`;
-
-      if (goalContext.relatedDocsContext) {
-        initialStory += `Related context from knowledge base was loaded.\n\n`;
-      }
-    }
-
-    const initialStoryHash = createContentHash(initialStory);
-
-    await db.insert(sessionSummaries).values({
-      sessionId,
-      version: 0,
-      summaryType: "master_story",
-      narrativeSummary: initialStory,
-      modelUsed: "system",
-      tokenCount: 0,
-      generationTimeMs: 0,
-    });
-
-    // CHECKPOINT: Log story initialization
-    log.checkpoint(CHECKPOINTS.MASTER_STORY_INIT, {
-      version: 0,
-      initialStoryLength: initialStory.length,
-      initialStoryHash,
-      hasGoal: !!goalContext?.sessionGoal,
-      hasLinearIssue: !!goalContext?.linearIssueId,
-      goalPreview: goalContext?.sessionGoal?.slice(0, 100) ?? null,
-    });
-
-    log.info("Story initialized", {
-      hasGoal: !!goalContext?.sessionGoal,
-    });
-  }
-
-  /**
-   * Get user context for storyteller prompt
-   */
-  private async getUserContext(userId: string): Promise<{
-    role: string;
-    seniority: string;
-    workContext: string;
-  }> {
-    const log = createSessionLogger({ sessionId: "system", userId });
-
-    try {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
-
-      if (!user) {
-        log.debug("User not found, using default context", { userId });
-        return {
-          role: "Team member",
-          seniority: "",
-          workContext: "Working on their tasks",
-        };
-      }
-
-      // Build context from user data
-      const role = user.firstName ? `${user.firstName}` : "Team member";
-
-      return {
-        role,
-        seniority: "", // Could be enhanced with user profile data
-        workContext: "Working on their tasks", // Could be enhanced with team/project data
-      };
-    } catch (error) {
-      log.warn("Failed to get user context", {
-        userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return {
-        role: "Team member",
-        seniority: "",
-        workContext: "Working on their tasks",
-      };
-    }
-  }
-
-  /**
-   * Truncate story if it exceeds max length
-   */
-  private truncateStory(story: string): string {
-    if (story.length <= STORY_CONFIG.MAX_STORY_LENGTH) {
-      return story;
-    }
-
-    // Keep the last portion of the story to maintain context
-    const truncated = story.slice(-STORY_CONFIG.MAX_STORY_LENGTH);
-
-    // Find the first complete sentence/paragraph
-    const firstBreak = truncated.indexOf("\n\n");
-    if (firstBreak > 0 && firstBreak < 1000) {
-      return "... " + truncated.slice(firstBreak + 2);
-    }
-
-    return "... " + truncated;
-  }
-
-  /**
-   * Check if the service is available
-   */
-  isAvailable(): boolean {
-    return !!config.groq.apiKey;
-  }
 }
 
-// Export singleton instance
 export const masterStoryService = new MasterStoryService();

@@ -2,7 +2,7 @@
  * useTimelineTransform
  *
  * Hook for transforming raw session captures into grouped timeline entries.
- * Groups consecutive captures by application and time proximity.
+ * Groups consecutive captures by activity description (from Classifier) and app name.
  */
 
 import { useMemo } from "react";
@@ -10,8 +10,8 @@ import type { SessionCapture } from "../services/monitoringService";
 
 // Configuration for grouping algorithm
 const GROUPING_CONFIG = {
-  maxGapMinutes: 5, // Max gap between captures to stay in same group
-  minCapturesPerGroup: 1, // Min captures to form a group
+  maxGapMinutes: 10, // Increased gap allowance since we have semantic grouping now
+  minCapturesPerGroup: 1, 
 };
 
 export interface TimelineGroup {
@@ -31,42 +31,52 @@ export interface TransformedTimeline {
   totalDurationMinutes: number;
 }
 
-/**
- * Calculate time difference in minutes between two ISO date strings
- */
 function timeDiffMinutes(time1: string, time2: string): number {
   const date1 = new Date(time1);
   const date2 = new Date(time2);
   return Math.abs(date1.getTime() - date2.getTime()) / (1000 * 60);
 }
 
-/**
- * Generate a unique ID for groups
- */
 function generateId(): string {
   return `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
  * Compute the dominant activity description for a group.
- * Uses the capture with highest confidence, or falls back to first activity.
+ * Prioritizes the most frequent non-null activityDescription.
  */
 function computeDominantActivity(captures: SessionCapture[], appName: string | null): string {
-  // Find capture with highest confidence that has an activity description
-  const withActivity = captures.filter((c) => c.activityDescription);
+  // Count frequency of each activity description
+  const counts: Record<string, number> = {};
+  
+  captures.forEach(c => {
+    if (c.activityDescription) {
+      counts[c.activityDescription] = (counts[c.activityDescription] || 0) + 1;
+    }
+  });
 
-  if (withActivity.length === 0) {
-    return appName ? `Working in ${appName}` : "Activity";
+  // Find most frequent
+  let bestActivity = "";
+  let maxCount = 0;
+
+  for (const [activity, count] of Object.entries(counts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      bestActivity = activity;
+    }
   }
 
-  // Sort by confidence (descending) and pick the best one
-  const sorted = [...withActivity].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+  if (bestActivity) return bestActivity;
 
-  return sorted[0].activityDescription || `Working in ${appName || "unknown app"}`;
+  // Fallback to first non-null activity
+  const firstActivity = captures.find(c => c.activityDescription)?.activityDescription;
+  if (firstActivity) return firstActivity;
+
+  return appName ? `Working in ${appName}` : "Activity";
 }
 
 /**
- * Group captures by application and time proximity
+ * Group captures by Activity/App and time proximity
  */
 function groupCaptures(
   captures: SessionCapture[],
@@ -76,7 +86,7 @@ function groupCaptures(
     return [];
   }
 
-  // Sort captures by captured time (ascending)
+  // Filter out captures with no useful info if needed, but we keep them for completeness
   const sorted = [...captures].sort(
     (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime()
   );
@@ -84,19 +94,30 @@ function groupCaptures(
   const groups: TimelineGroup[] = [];
   let currentGroup: {
     appName: string | null;
+    activity: string | null; // Track the "theme" of the group
     startTime: string;
     endTime: string;
     captures: SessionCapture[];
   } | null = null;
 
   for (const capture of sorted) {
+    // Determine if this capture belongs to the current group
+    // Criteria: Same App AND (Same Activity OR Time gap is small)
+    
+    // We treat "activityDescription" as a strong grouper. 
+    // If activity changes significantly, we break group.
+    
+    const activity = capture.activityDescription || null;
+    
     const shouldStartNewGroup =
       currentGroup === null ||
       capture.appName !== currentGroup.appName ||
+      // If activity description changes significantly and isn't just a continuation
+      (activity && currentGroup.activity && activity !== currentGroup.activity) ||
       timeDiffMinutes(capture.capturedAt, currentGroup.endTime) > maxGapMinutes;
 
     if (shouldStartNewGroup) {
-      // Finalize previous group if exists
+      // Finalize previous group
       if (currentGroup && currentGroup.captures.length >= GROUPING_CONFIG.minCapturesPerGroup) {
         const durationMinutes = timeDiffMinutes(currentGroup.endTime, currentGroup.startTime);
         groups.push({
@@ -104,7 +125,7 @@ function groupCaptures(
           appName: currentGroup.appName,
           startTime: currentGroup.startTime,
           endTime: currentGroup.endTime,
-          durationMinutes: Math.max(1, Math.round(durationMinutes)), // At least 1 minute
+          durationMinutes: Math.max(1, Math.round(durationMinutes)),
           captures: currentGroup.captures,
           dominantActivity: computeDominantActivity(currentGroup.captures, currentGroup.appName),
           captureCount: currentGroup.captures.length,
@@ -114,6 +135,7 @@ function groupCaptures(
       // Start new group
       currentGroup = {
         appName: capture.appName,
+        activity: activity,
         startTime: capture.capturedAt,
         endTime: capture.capturedAt,
         captures: [capture],
@@ -122,6 +144,10 @@ function groupCaptures(
       // Add to current group
       currentGroup.captures.push(capture);
       currentGroup.endTime = capture.capturedAt;
+      // Update group activity if it was null
+      if (!currentGroup.activity && activity) {
+        currentGroup.activity = activity;
+      }
     }
   }
 
@@ -143,25 +169,16 @@ function groupCaptures(
   return groups;
 }
 
-/**
- * Calculate total duration from captures
- */
 function calculateTotalDuration(captures: SessionCapture[]): number {
   if (captures.length < 2) return 0;
-
   const sorted = [...captures].sort(
     (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime()
   );
-
   const first = new Date(sorted[0].capturedAt);
   const last = new Date(sorted[sorted.length - 1].capturedAt);
-
   return Math.round((last.getTime() - first.getTime()) / (1000 * 60));
 }
 
-/**
- * Hook to transform raw captures into grouped timeline
- */
 export function useTimelineTransform(
   captures: SessionCapture[] | undefined,
   options: { maxGapMinutes?: number } = {}

@@ -289,13 +289,13 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
     const captureCounts =
       sessionIds.length > 0
         ? await db
-            .select({
-              sessionId: schema.sessionCaptures.sessionId,
-              count: sql<number>`count(*)::int`,
-            })
-            .from(schema.sessionCaptures)
-            .where(inArray(schema.sessionCaptures.sessionId, sessionIds))
-            .groupBy(schema.sessionCaptures.sessionId)
+          .select({
+            sessionId: schema.sessionCaptures.sessionId,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(schema.sessionCaptures)
+          .where(inArray(schema.sessionCaptures.sessionId, sessionIds))
+          .groupBy(schema.sessionCaptures.sessionId)
         : [];
 
     // Build response with duration and captureCount
@@ -583,6 +583,13 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.userId!;
     const { id } = req.params;
+    const { preferences } = req.body as {
+      preferences?: {
+        detailLevel: 'concise' | 'verbose';
+        format: 'bullets' | 'paragraphs';
+        includeScreenshots: boolean;
+      };
+    };
 
     try {
       // Verify ownership
@@ -670,17 +677,34 @@ router.post(
         hasGoal: !!session.sessionGoal,
       });
 
-      // Trigger async summary generation (don't await - let it run in background)
-      sessionSummarizationService
-        .generateSessionSummary(id)
+      // Trigger async story generation using the new 3-step pipeline (don't await - let it run in background)
+      // Transform frontend preferences (detailLevel) to service format (style)
+      const formatPreference = preferences
+        ? {
+          style: preferences.detailLevel,
+          format: preferences.format,
+          includeScreenshots: preferences.includeScreenshots,
+        }
+        : {
+          style: 'concise' as const,
+          format: 'bullets' as const,
+          includeScreenshots: false,
+        };
+
+      masterStoryService
+        .generateStory({
+          sessionId: id,
+          userId,
+          formatPreference,
+        })
         .then(() => {
-          log.info("Summary generation completed", { sessionId: id });
+          log.info("Master story generation completed", { sessionId: id });
         })
         .catch((error) => {
-          log.error("Summary generation failed", {
+          log.error("Master story generation failed", {
             error: error instanceof Error ? error.message : String(error),
           });
-          // Update status to indicate completion (even without summary)
+          // Update status to indicate completion (even without story)
           db.update(schema.monitoringSessions)
             .set({ status: "ready" })
             .where(eq(schema.monitoringSessions.id, id));
@@ -733,7 +757,6 @@ router.post(
     }
   }
 );
-
 /**
  * POST /api/monitoring/sessions/:id/regenerate-summary
  * DEV ONLY: Regenerate the session summary without re-running the session
@@ -969,11 +992,11 @@ router.post(
       const goalContext: GoalContext | undefined =
         session.sessionGoal || session.linearIssueTitle
           ? {
-              sessionGoal: session.sessionGoal || undefined,
-              linearIssueId: session.linearIssueId || undefined,
-              linearIssueTitle: session.linearIssueTitle || undefined,
-              relatedDocsContext: session.relatedDocsContext || undefined,
-            }
+            sessionGoal: session.sessionGoal || undefined,
+            linearIssueId: session.linearIssueId || undefined,
+            linearIssueTitle: session.linearIssueTitle || undefined,
+            relatedDocsContext: session.relatedDocsContext || undefined,
+          }
           : undefined;
 
       // Create session logger for frame analysis
@@ -1021,27 +1044,7 @@ router.post(
       // Calculate importance score based on analysis
       const importanceScore = calculateImportanceScore(analysisResult, sessionGoal);
 
-      // Extend master story if progression was detected
-      let storyUpdateResult = null;
-      if (analysisResult.progressionDetected && masterStoryService.isAvailable()) {
-        storyUpdateResult = await masterStoryService.extendStory({
-          sessionId: id,
-          userId,
-          frameAnalysis: analysisResult,
-          windowInfo: {
-            appName: windowInfo.appName,
-            windowTitle: windowInfo.windowTitle,
-          },
-          goalContext, // Pass goal context for enhanced storytelling
-        });
-
-        if (!storyUpdateResult.success) {
-          log.warn("Master story update failed", {
-            frameId,
-            error: storyUpdateResult.error,
-          });
-        }
-      }
+      // Note: Master story is now generated at session end, not during each frame capture
 
       log.debug("Frame analyzed", {
         frameId,
@@ -1049,7 +1052,6 @@ router.post(
         changeType: analysisResult.changeType,
         changeMagnitude: analysisResult.changeMagnitude,
         importanceScore,
-        storyUpdated: storyUpdateResult?.success ?? false,
         latencyMs: analysisResult.analysisLatencyMs,
       });
 
@@ -1738,9 +1740,9 @@ router.post(
           deliveryError: allSucceeded
             ? null
             : result.results
-                .filter((r) => r.status === "failed")
-                .map((r) => `${r.email || r.name || r.id}: ${r.error}`)
-                .join("; "),
+              .filter((r) => r.status === "failed")
+              .map((r) => `${r.email || r.name || r.id}: ${r.error}`)
+              .join("; "),
           updatedAt: new Date(),
         })
         .where(eq(schema.monitoringSessions.id, id));
@@ -1887,3 +1889,4 @@ router.delete("/sessions/:id", requireAuth, async (req: Request, res: Response):
 });
 
 export default router;
+

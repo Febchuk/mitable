@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, timestamp, date, text } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, integer, timestamp, date, text, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./organizations.schema";
 
@@ -15,6 +15,12 @@ export const users = pgTable("users", {
   currentWeek: integer("current_week").default(1),
   startDate: date("start_date"),
   status: varchar("status", { length: 50 }).default("active"), // 'active' | 'inactive' | 'archived'
+
+  // Persona fields
+  jobTitle: varchar("job_title", { length: 100 }),
+  regularTasks: jsonb("regular_tasks").default("[]"), // Array of strings
+  regularApps: jsonb("regular_apps").default("[]"), // Array of strings
+  additionalContext: text("additional_context"),
 
   // Linear OAuth tokens (per-user, encrypted)
   linearAccessTokenEncrypted: text("linear_access_token_encrypted"),
