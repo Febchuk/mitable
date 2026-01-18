@@ -17,20 +17,37 @@ import { geminiVisionFrameService } from "./gemini-vision-frame.service";
 import {
   SENSOR_SYSTEM_PROMPT,
   SENSOR_USER_PROMPT,
-  ChangeType,
-  ChangeMagnitude,
-  GoalContext,
-  ExtractedArtifact,
-  FrameSignals,
 } from "../prompts/session-prompts";
 import {
   createSessionLogger,
   createTimer,
   CHECKPOINTS,
-  SESSION_EVENTS,
 } from "../lib/sessionLogger";
 
 // Types
+export type ChangeType =
+  | "text_input"
+  | "scroll"
+  | "window_switch"
+  | "click"
+  | "navigation"
+  | "none";
+
+export type ChangeMagnitude = "major" | "minor" | "trivial";
+
+export interface ExtractedArtifact {
+  type: string;
+  value: string;
+}
+
+export interface FrameSignals {
+  has_blocker?: boolean;
+  has_outcome?: boolean;
+  blocker_type?: string | null;
+  outcome_type?: string | null;
+}
+
+// Input/Output Types
 export interface FrameAnalysisInput {
   sessionId: string;
   frameId: string;
@@ -42,8 +59,6 @@ export interface FrameAnalysisInput {
     windowTitle: string;
   };
   timestamp: string;
-  // Optional goal context (kept for compatibility, though Sensor is objective)
-  goalContext?: GoalContext;
 }
 
 export interface FrameAnalysisResult {

@@ -29,7 +29,6 @@ export interface DeltaDetectionResult {
 }
 
 export interface DeltaDetectionConfig {
-  sessionGoal?: string;
   minChangeThreshold: number; // Minimum change score to consider "changed"
   focusChangeWeight: number; // Weight for window focus changes
   contentChangeWeight: number; // Weight for content changes
@@ -207,201 +206,16 @@ function calculateSimilarity(text1: string, text2: string): number {
 }
 
 /**
- * Determine if frame is on-task based on session goal
+ * Determine if frame is on-task - always returns true now that goal context is removed
  */
 export function determineOnTask(
-  frame: FrameForDelta,
-  sessionGoal?: string
+  _frame: FrameForDelta
 ): { onTask: boolean; taskRelevance?: string } {
-  // No goal = always on-task (user didn't specify what they're working on)
-  if (!sessionGoal) {
-    return {
-      onTask: true,
-      taskRelevance: "No session goal specified - all activity considered on-task",
-    };
-  }
-
-  const goalLower = sessionGoal.toLowerCase();
-  const appNameLower = frame.appName.toLowerCase();
-  const titleLower = frame.windowTitle.toLowerCase();
-  const descLower = (frame.activityDescription || "").toLowerCase();
-
-  // Extract keywords from goal
-  const goalKeywords = extractKeywords(goalLower);
-
-  // Check for direct matches in app name, title, or description
-  const matchingKeywords = goalKeywords.filter(
-    (kw) => appNameLower.includes(kw) || titleLower.includes(kw) || descLower.includes(kw)
-  );
-
-  if (matchingKeywords.length > 0) {
-    return {
-      onTask: true,
-      taskRelevance: `Matches goal keywords: ${matchingKeywords.join(", ")}`,
-    };
-  }
-
-  // Common productive apps
-  const productiveApps = [
-    "code",
-    "vscode",
-    "visual studio",
-    "terminal",
-    "iterm",
-    "xcode",
-    "android studio",
-    "intellij",
-    "webstorm",
-    "sublime",
-    "atom",
-    "vim",
-    "nvim",
-    "github",
-    "gitlab",
-    "bitbucket",
-    "jira",
-    "linear",
-    "notion",
-    "confluence",
-    "slack",
-    "teams",
-    "zoom",
-    "meet",
-    "figma",
-    "sketch",
-    "chrome",
-    "firefox",
-    "safari",
-    "arc",
-    "brave",
-  ];
-
-  const isProductiveApp = productiveApps.some((app) => appNameLower.includes(app));
-
-  if (isProductiveApp) {
-    return {
-      onTask: true,
-      taskRelevance: "Using productive application",
-    };
-  }
-
-  // Distracting apps
-  const distractingApps = [
-    "twitter",
-    "x.com",
-    "facebook",
-    "instagram",
-    "tiktok",
-    "youtube",
-    "netflix",
-    "spotify",
-    "discord",
-    "reddit",
-    "hacker news",
-  ];
-
-  const isDistractingApp = distractingApps.some((app) => appNameLower.includes(app));
-
-  if (isDistractingApp) {
-    return {
-      onTask: false,
-      taskRelevance: "Potentially non-work-related application",
-    };
-  }
-
-  // Default: assume on-task if we can't determine
+  // All activity is considered on-task (goal context removed)
   return {
     onTask: true,
-    taskRelevance: "Could not determine relevance - assuming on-task",
+    taskRelevance: "All activity considered on-task",
   };
-}
-
-/**
- * Extract meaningful keywords from text
- */
-function extractKeywords(text: string): string[] {
-  // Remove common stop words
-  const stopWords = new Set([
-    "the",
-    "a",
-    "an",
-    "is",
-    "are",
-    "was",
-    "were",
-    "be",
-    "been",
-    "being",
-    "have",
-    "has",
-    "had",
-    "do",
-    "does",
-    "did",
-    "will",
-    "would",
-    "could",
-    "should",
-    "may",
-    "might",
-    "must",
-    "shall",
-    "can",
-    "need",
-    "dare",
-    "ought",
-    "used",
-    "to",
-    "of",
-    "in",
-    "for",
-    "on",
-    "with",
-    "at",
-    "by",
-    "from",
-    "as",
-    "into",
-    "through",
-    "during",
-    "before",
-    "after",
-    "above",
-    "below",
-    "between",
-    "under",
-    "again",
-    "further",
-    "then",
-    "once",
-    "and",
-    "but",
-    "or",
-    "nor",
-    "so",
-    "yet",
-    "both",
-    "either",
-    "neither",
-    "not",
-    "only",
-    "own",
-    "same",
-    "than",
-    "too",
-    "very",
-    "just",
-    "working",
-    "work",
-    "on",
-  ]);
-
-  const words = text.split(/\s+/).filter((word) => {
-    const cleaned = word.replace(/[^a-z0-9]/g, "");
-    return cleaned.length > 2 && !stopWords.has(cleaned);
-  });
-
-  return [...new Set(words)];
 }
 
 /**
@@ -533,8 +347,7 @@ export function selectTopKFrames(
  * Process a batch of frames for delta detection
  */
 export function processBatchDelta(
-  frames: FrameForDelta[],
-  sessionGoal?: string
+  frames: FrameForDelta[]
 ): DeltaDetectionResult[] {
   const results: DeltaDetectionResult[] = [];
 
@@ -543,7 +356,7 @@ export function processBatchDelta(
     const previousFrame = i > 0 ? frames[i - 1] : null;
 
     const delta = detectDelta(currentFrame, previousFrame);
-    const { onTask, taskRelevance } = determineOnTask(currentFrame, sessionGoal);
+    const { onTask, taskRelevance } = determineOnTask(currentFrame);
     const { score, reason } = calculateImportanceScore(currentFrame, delta, onTask, {
       isFirstFrame: i === 0,
       isLastFrame: i === frames.length - 1,

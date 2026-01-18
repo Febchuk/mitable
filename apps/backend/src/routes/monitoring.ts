@@ -11,7 +11,6 @@ import { sessionSummarizationService } from "../services/session-summarization.s
 import { frameAnalysisService } from "../services/frame-analysis.service.js";
 import { masterStoryService } from "../services/master-story.service.js";
 import { searchService } from "../services/search.service.js";
-import type { GoalContext } from "../prompts/session-prompts.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { logger } from "../lib/logger";
@@ -665,7 +664,6 @@ router.post(
         captureCount,
         activeDurationMs,
         totalPausedMs,
-        sessionGoal: session.sessionGoal,
         linearIssueId: session.linearIssueId,
         previousStatus: session.status,
       });
@@ -674,7 +672,6 @@ router.post(
         captureCount,
         activeDurationMs,
         totalPausedMs,
-        hasGoal: !!session.sessionGoal,
       });
 
       // Trigger async story generation using the new 3-step pipeline (don't await - let it run in background)
@@ -691,17 +688,40 @@ router.post(
           includeScreenshots: false,
         };
 
-      masterStoryService
-        .generateStory({
+      // Generate AI title and story in parallel (async, don't block response)
+      Promise.all([
+        // Generate session title from activity timeline
+        (async () => {
+          try {
+            const { sessionTitleService } = await import("../services/session-title.service.js");
+            const aiTitle = await sessionTitleService.generateTitle(id);
+
+            // Update session name if AI generated a valid title
+            if (aiTitle && aiTitle !== "Work session") {
+              await db
+                .update(schema.monitoringSessions)
+                .set({ name: aiTitle })
+                .where(eq(schema.monitoringSessions.id, id));
+              log.info("Session title generated", { sessionId: id, title: aiTitle });
+            }
+          } catch (error) {
+            log.error("Session title generation failed", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })(),
+        // Generate master story
+        masterStoryService.generateStory({
           sessionId: id,
           userId,
           formatPreference,
-        })
+        }),
+      ])
         .then(() => {
-          log.info("Master story generation completed", { sessionId: id });
+          log.info("Session end processing completed", { sessionId: id });
         })
         .catch((error) => {
-          log.error("Master story generation failed", {
+          log.error("Session end processing failed", {
             error: error instanceof Error ? error.message : String(error),
           });
           // Update status to indicate completion (even without story)
@@ -943,7 +963,6 @@ router.post(
       currentImage,
       previousImage,
       windowInfo,
-      sessionGoal,
     }: {
       frameId: string;
       currentImage: string; // Base64 image data
@@ -953,7 +972,6 @@ router.post(
         appName: string;
         windowTitle: string;
       };
-      sessionGoal?: string;
     } = req.body;
 
     if (!frameId || !currentImage || !windowInfo) {
@@ -988,17 +1006,6 @@ router.post(
         return;
       }
 
-      // Build goal context from session data (stored at session creation via RAG)
-      const goalContext: GoalContext | undefined =
-        session.sessionGoal || session.linearIssueTitle
-          ? {
-            sessionGoal: session.sessionGoal || undefined,
-            linearIssueId: session.linearIssueId || undefined,
-            linearIssueTitle: session.linearIssueTitle || undefined,
-            relatedDocsContext: session.relatedDocsContext || undefined,
-          }
-          : undefined;
-
       // Create session logger for frame analysis
       const log = createSessionLogger({
         sessionId: id,
@@ -1030,7 +1037,7 @@ router.post(
         return;
       }
 
-      // Analyze frame with goal context for enhanced analysis
+      // Analyze frame
       const analysisResult = await frameAnalysisService.analyzeFrame({
         sessionId: id,
         frameId,
@@ -1038,11 +1045,10 @@ router.post(
         previousFrame: previousImage,
         windowInfo,
         timestamp: new Date().toISOString(),
-        goalContext, // Pass goal context to prompt builder
       });
 
       // Calculate importance score based on analysis
-      const importanceScore = calculateImportanceScore(analysisResult, sessionGoal);
+      const importanceScore = calculateImportanceScore(analysisResult);
 
       // Note: Master story is now generated at session end, not during each frame capture
 

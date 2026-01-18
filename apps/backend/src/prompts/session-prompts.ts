@@ -10,13 +10,6 @@
 // TYPES
 // ============================================================================
 
-export interface GoalContext {
-  sessionGoal?: string;
-  linearIssueId?: string;
-  linearIssueTitle?: string;
-  relatedDocsContext?: string;
-}
-
 // ============================================================================
 // SENSOR (VISUAL DELTA DETECTOR)
 // ============================================================================

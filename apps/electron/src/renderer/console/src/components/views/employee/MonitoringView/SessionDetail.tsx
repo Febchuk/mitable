@@ -576,7 +576,14 @@ export default function SessionDetail() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-text-primary">
-              {session.name || "Work Session"}
+              {session.name === "Work session" && session.status === "summarizing" ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="animate-spin" size={24} />
+                  Generating title...
+                </span>
+              ) : (
+                session.name || "Untitled Session"
+              )}
             </h1>
             <p className="text-text-secondary mt-1">{formatDateTime(session.startedAt)}</p>
           </div>

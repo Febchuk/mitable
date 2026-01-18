@@ -90,7 +90,9 @@ export default function SessionCard({ session, onClick }: SessionCardProps) {
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <h3 className="text-text-primary font-semibold text-lg truncate">
-            {session.name || "Work Session"}
+            {session.name === "Work session" && session.status === "summarizing"
+              ? "Generating title..."
+              : session.name || "Untitled Session"}
           </h3>
           <p className="text-text-secondary text-sm">
             {formatDate(session.startedAt)} at {formatTime(session.startedAt)}

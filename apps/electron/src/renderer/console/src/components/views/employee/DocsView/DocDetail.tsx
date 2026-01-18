@@ -465,7 +465,7 @@ export default function DocDetail() {
                   className="flex items-center justify-between text-sm py-1"
                 >
                   <span className="text-text-primary">
-                    {contribution.session?.name || "Work Session"}
+                    {contribution.session?.name || "Untitled Session"}
                     <span className="text-text-tertiary ml-2">
                       ({contribution.contributionType})
                     </span>
