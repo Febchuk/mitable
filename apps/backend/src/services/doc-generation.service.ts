@@ -12,8 +12,14 @@ import Groq from "groq-sdk";
 import { config } from "../config.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, desc } from "drizzle-orm";
-import type { DocType, GenerateDocumentResponse, EnhanceDocumentResponse } from "@mitable/shared";
+import { eq, desc, inArray, and } from "drizzle-orm";
+import type {
+  DocType,
+  GenerateDocumentResponse,
+  EnhanceDocumentResponse,
+  MultiSessionGenerateDocumentResponse,
+} from "@mitable/shared";
+import { documentExtractionService } from "./document-extraction.service.js";
 
 // Configuration
 const DOC_GEN_CONFIG = {
@@ -182,12 +188,32 @@ interface EnhanceParams {
 }
 
 interface SessionData {
+  id?: string;
+  name?: string;
+  date?: string;
   summary: string;
   keyActivities: string[];
   accomplishments: string[];
   blockers: string[];
   timeBreakdown: Record<string, number>;
   duration: string;
+}
+
+interface MultiSessionGenerateParams {
+  sessionIds: string[];
+  artifactIds?: string[];
+  docType: DocType;
+  title?: string;
+  additionalContext?: string;
+  mergeStrategy: "chronological" | "thematic";
+  organizationId: string;
+  userId: string;
+}
+
+interface ArtifactData {
+  id: string;
+  filename: string;
+  extractedText: string | null;
 }
 
 class DocGenerationService {
@@ -268,6 +294,153 @@ class DocGenerationService {
         model: DOC_GEN_CONFIG.TEXT_MODEL,
         tokenCount,
         generationTimeMs,
+      },
+    };
+  }
+
+  /**
+   * Generate a document from multiple monitoring sessions with optional artifacts
+   */
+  async generateFromMultipleSessions(
+    params: MultiSessionGenerateParams
+  ): Promise<MultiSessionGenerateDocumentResponse> {
+    const startTime = Date.now();
+    const {
+      sessionIds,
+      artifactIds = [],
+      docType,
+      title,
+      additionalContext,
+      mergeStrategy,
+      organizationId,
+      userId,
+    } = params;
+
+    console.log(
+      `[DocGeneration] Generating ${docType} from ${sessionIds.length} sessions, ` +
+        `${artifactIds.length} artifacts (strategy: ${mergeStrategy})`
+    );
+
+    // Fetch all sessions in parallel
+    const sessionsData = await Promise.all(
+      sessionIds.map((id) => this.getSessionDataWithMeta(id))
+    );
+
+    // Sort by date if chronological strategy
+    if (mergeStrategy === "chronological") {
+      sessionsData.sort(
+        (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()
+      );
+    }
+
+    // Fetch artifact data if provided
+    let artifactsData: ArtifactData[] = [];
+    if (artifactIds.length > 0) {
+      artifactsData = await this.getArtifactsData(artifactIds, organizationId);
+    }
+
+    // Build multi-session prompt
+    const prompt = this.buildMultiSessionPrompt(
+      docType,
+      sessionsData,
+      artifactsData,
+      additionalContext,
+      mergeStrategy
+    );
+
+    // Generate content
+    const completion = await this.groq.chat.completions.create({
+      model: DOC_GEN_CONFIG.TEXT_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      temperature: DOC_GEN_CONFIG.TEMPERATURE,
+      max_tokens: DOC_GEN_CONFIG.MAX_TOKENS * 2, // Allow longer output for multi-session
+    });
+
+    const generatedContent = completion.choices[0]?.message?.content || "";
+    const tokenCount = completion.usage?.total_tokens || 0;
+
+    // Extract title from content if not provided
+    const docTitle = title || this.extractTitle(generatedContent, docType);
+
+    // Create document
+    const [document] = await db
+      .insert(schema.documents)
+      .values({
+        organizationId,
+        createdBy: userId,
+        title: docTitle,
+        docType,
+        content: generatedContent,
+        status: "draft",
+        generationModel: DOC_GEN_CONFIG.TEXT_MODEL,
+        generationPromptVersion: 2, // Version 2 for multi-session
+      })
+      .returning();
+
+    // Build change summary based on sources
+    const sourceParts: string[] = [];
+    if (sessionIds.length > 0) {
+      sourceParts.push(`${sessionIds.length} session${sessionIds.length > 1 ? "s" : ""}`);
+    }
+    if (artifactIds.length > 0) {
+      sourceParts.push(`${artifactIds.length} artifact${artifactIds.length > 1 ? "s" : ""}`);
+    }
+    const changeSummary = `Generated ${docType} from ${sourceParts.join(" and ")}`;
+
+    // Create initial version
+    await db.insert(schema.documentVersions).values({
+      documentId: document.id,
+      version: 1,
+      content: generatedContent,
+      changeType: "created",
+      changedBy: userId,
+      changeSummary,
+    });
+
+    // Create session contribution links for each session (only if sessions provided)
+    if (sessionsData.length > 0) {
+      await Promise.all(
+        sessionsData.map((sessionData) =>
+          db
+            .insert(schema.sessionDocumentContributions)
+            .values({
+              sessionId: sessionData.id!,
+              documentId: document.id,
+              contributionType: "source",
+              insightsUsed: sessionData.keyActivities.map((a) => ({ activity: a })),
+            })
+            .onConflictDoNothing()
+        )
+      );
+    }
+
+    // Create artifact source links for each artifact
+    if (artifactIds.length > 0) {
+      await Promise.all(
+        artifactIds.map((artifactId) =>
+          db
+            .insert(schema.documentArtifactSources)
+            .values({
+              documentId: document.id,
+              artifactId,
+              contributionType: "source",
+            })
+            .onConflictDoNothing()
+        )
+      );
+    }
+
+    const generationTimeMs = Date.now() - startTime;
+    console.log(`[DocGeneration] Multi-session document generated in ${generationTimeMs}ms`);
+
+    return {
+      document: document as any,
+      generationMetadata: {
+        model: DOC_GEN_CONFIG.TEXT_MODEL,
+        tokenCount,
+        generationTimeMs,
+        sessionsUsed: sessionIds.length,
+        artifactsUsed: artifactIds.length,
       },
     };
   }
@@ -547,6 +720,231 @@ Revised document:`;
     const hours = Math.floor(ms / 3600000);
     const minutes = Math.round((ms % 3600000) / 60000);
     return `${hours}h ${minutes}m`;
+  }
+
+  /**
+   * Get session data with additional metadata for multi-session generation
+   */
+  private async getSessionDataWithMeta(sessionId: string): Promise<SessionData> {
+    const [session] = await db
+      .select()
+      .from(schema.monitoringSessions)
+      .where(eq(schema.monitoringSessions.id, sessionId))
+      .limit(1);
+
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+
+    // Calculate duration
+    const startTime = new Date(session.startedAt).getTime();
+    const endTime = session.endedAt ? new Date(session.endedAt).getTime() : Date.now();
+    const totalMs = endTime - startTime - (session.totalPausedMs || 0);
+    const duration = this.formatDuration(totalMs);
+
+    return {
+      id: session.id,
+      name: session.name || "Work Session",
+      date: session.startedAt?.toISOString().split("T")[0],
+      summary: session.finalSummary || session.rawActivitySummary || "",
+      keyActivities: (session.keyActivities as any[]) || [],
+      accomplishments: (session.accomplishments as any[]) || [],
+      blockers: (session.blockers as any[]) || [],
+      timeBreakdown: (session.timeBreakdown as Record<string, number>) || {},
+      duration,
+    };
+  }
+
+  /**
+   * Get artifacts data for document generation
+   */
+  private async getArtifactsData(
+    artifactIds: string[],
+    organizationId: string
+  ): Promise<ArtifactData[]> {
+    if (artifactIds.length === 0) return [];
+
+    const artifacts = await db
+      .select({
+        id: schema.artifacts.id,
+        filename: schema.artifacts.filename,
+        extractedText: schema.artifacts.extractedText,
+      })
+      .from(schema.artifacts)
+      .where(
+        and(
+          inArray(schema.artifacts.id, artifactIds),
+          eq(schema.artifacts.organizationId, organizationId)
+        )
+      );
+
+    return artifacts.map((a) => ({
+      id: a.id,
+      filename: a.filename,
+      extractedText: a.extractedText,
+    }));
+  }
+
+  /**
+   * Build prompt for multi-session document generation
+   */
+  private buildMultiSessionPrompt(
+    docType: DocType,
+    sessions: SessionData[],
+    artifacts: ArtifactData[],
+    additionalContext?: string,
+    mergeStrategy: "chronological" | "thematic" = "chronological"
+  ): string {
+    // Build session sections (only if sessions provided)
+    let sessionSections = "";
+    if (sessions.length > 0) {
+      sessionSections = sessions
+        .map((session, index) => {
+          const appBreakdown =
+            Object.entries(session.timeBreakdown)
+              .map(([app, ms]) => `${app}: ${this.formatDuration(ms)}`)
+              .join(", ") || "Various applications";
+
+          const keyActivities =
+            session.keyActivities
+              .map((a) => (typeof a === "string" ? a : (a as any).activity || JSON.stringify(a)))
+              .join("\n    - ") || "Work activities";
+
+          const accomplishments =
+            session.accomplishments
+              .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+              .join("\n    - ") || "Tasks completed";
+
+          const blockers =
+            session.blockers
+              .map((b) => (typeof b === "string" ? b : JSON.stringify(b)))
+              .join("\n    - ") || "None";
+
+          return `
+=== SESSION ${index + 1}: ${session.name} (${session.date}) ===
+Duration: ${session.duration}
+Apps Used: ${appBreakdown}
+Key Activities:
+    - ${keyActivities}
+Accomplishments:
+    - ${accomplishments}
+Blockers: ${blockers}
+Summary: ${session.summary}
+`;
+        })
+        .join("\n");
+    }
+
+    // Build artifacts section if any
+    let artifactsSection = "";
+    if (artifacts.length > 0) {
+      const artifactTexts = artifacts
+        .filter((a) => a.extractedText && a.extractedText.length > 0)
+        .map((a) => {
+          // Truncate to avoid token limit issues
+          const text = documentExtractionService.truncateForTokenLimit(
+            a.extractedText!,
+            2000
+          );
+          return `
+--- ${a.filename} ---
+${text}
+`;
+        })
+        .join("\n");
+
+      if (artifactTexts) {
+        artifactsSection = `
+=== REFERENCE MATERIALS ===
+${artifactTexts}
+`;
+      }
+    }
+
+    // Build final prompt based on doc type
+    const docTypeInstructions: Record<DocType, string> = {
+      "how-to": `Create a comprehensive how-to guide that:
+1. Has a clear, action-oriented title
+2. Synthesizes the processes from ALL sessions into a unified workflow
+3. Includes a prerequisites section if applicable
+4. Breaks down the process into numbered steps
+5. Incorporates relevant information from reference materials
+6. Includes tips, warnings, and best practices observed across sessions
+7. Ends with verification/success criteria`,
+
+      "knowledge-article": `Create a comprehensive knowledge article that:
+1. Has an informative title explaining the topic
+2. Opens with a brief overview synthesizing learnings from ALL sessions
+3. Organizes content into logical sections with headers
+4. Identifies patterns and common themes across sessions
+5. Incorporates relevant information from reference materials
+6. Includes practical examples from the sessions
+7. Notes related topics and next steps`,
+
+      troubleshooting: `Create a comprehensive troubleshooting guide that:
+1. Has a clear problem statement title
+2. Synthesizes issues encountered across ALL sessions
+3. Lists symptoms to recognize each issue type
+4. Provides diagnostic steps based on session learnings
+5. Gives solution steps observed to work across sessions
+6. Incorporates relevant information from reference materials
+7. Includes prevention tips based on session blockers`,
+    };
+
+    const strategyInstruction =
+      mergeStrategy === "chronological"
+        ? "Present information in chronological order, showing progression over time."
+        : "Group information thematically, combining related insights regardless of when they occurred.";
+
+    // Build intro based on what sources are provided
+    let intro = "";
+    if (sessions.length > 0 && artifacts.length > 0) {
+      intro = `You are an expert technical writer creating a ${docType} from work sessions and reference materials.`;
+    } else if (sessions.length > 0) {
+      intro = `You are an expert technical writer creating a ${docType} from ${sessions.length > 1 ? "MULTIPLE work sessions" : "a work session"}.`;
+    } else {
+      intro = `You are an expert technical writer creating a ${docType} from reference materials/artifacts.`;
+    }
+
+    // Build important notes based on sources
+    let importantNotes = "";
+    if (sessions.length > 0 && artifacts.length > 0) {
+      importantNotes = `Important:
+- Synthesize insights from ALL ${sessions.length} session${sessions.length > 1 ? "s" : ""} and ${artifacts.length} artifact${artifacts.length > 1 ? "s" : ""} into ONE unified document
+- Identify patterns and common themes across all sources
+- Reference specific sessions or artifacts when citing examples
+- Use Markdown formatting with proper heading hierarchy
+- Keep it comprehensive but concise`;
+    } else if (sessions.length > 0) {
+      importantNotes = `Important:
+- Synthesize insights from ALL ${sessions.length} session${sessions.length > 1 ? "s" : ""} into ONE unified document
+- Identify patterns and common themes across sessions
+- Reference specific sessions when citing examples
+- Use Markdown formatting with proper heading hierarchy
+- Keep it comprehensive but concise`;
+    } else {
+      importantNotes = `Important:
+- Synthesize content from ALL ${artifacts.length} artifact${artifacts.length > 1 ? "s" : ""} into ONE unified document
+- Extract key information and organize it logically
+- Reference specific documents when citing information
+- Use Markdown formatting with proper heading hierarchy
+- Keep it comprehensive but concise`;
+    }
+
+    return `${intro}
+
+${sessionSections}
+${artifactsSection}
+=== INSTRUCTIONS ===
+${docTypeInstructions[docType]}
+
+${sessions.length > 1 ? `Organization strategy: ${strategyInstruction}` : ""}
+
+${additionalContext ? `Additional context from user: ${additionalContext}` : ""}
+
+${importantNotes}
+
+Output in Markdown format.`;
   }
 }
 

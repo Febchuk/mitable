@@ -726,16 +726,41 @@ router.post("/:id/revise", requireAuth, async (req: Request, res: Response): Pro
 
 /**
  * POST /api/documents/generate
- * Generate a new document from a monitoring session
+ * Generate a new document from one or more monitoring sessions with optional artifacts
+ *
+ * Supports both single-session (legacy) and multi-session generation:
+ * - Legacy: { sessionId, docType, ... }
+ * - New: { sessionIds[], artifactIds[], docType, mergeStrategy, ... }
  */
 router.post("/generate", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;
-  const { sessionId, docType, title, additionalContext } = req.body;
+  const {
+    sessionId,
+    sessionIds,
+    artifactIds,
+    docType,
+    title,
+    additionalContext,
+    mergeStrategy,
+  } = req.body;
 
-  if (!sessionId || !docType) {
+  // Handle both legacy (sessionId) and new (sessionIds) formats
+  const resolvedSessionIds = sessionIds || (sessionId ? [sessionId] : []);
+  const resolvedArtifactIds = artifactIds || [];
+
+  // Require at least one session OR artifact
+  if (!resolvedSessionIds.length && !resolvedArtifactIds.length) {
     res.status(400).json({
       error: "Bad Request",
-      message: "sessionId and docType are required",
+      message: "At least one session or artifact is required",
+    });
+    return;
+  }
+
+  if (!docType) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "docType is required",
     });
     return;
   }
@@ -746,6 +771,16 @@ router.post("/generate", requireAuth, async (req: Request, res: Response): Promi
     res.status(400).json({
       error: "Bad Request",
       message: `Invalid docType. Must be one of: ${validDocTypes.join(", ")}`,
+    });
+    return;
+  }
+
+  // Validate mergeStrategy if provided
+  const validMergeStrategies = ["chronological", "thematic"];
+  if (mergeStrategy && !validMergeStrategies.includes(mergeStrategy)) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: `Invalid mergeStrategy. Must be one of: ${validMergeStrategies.join(", ")}`,
     });
     return;
   }
@@ -766,48 +801,95 @@ router.post("/generate", requireAuth, async (req: Request, res: Response): Promi
       return;
     }
 
-    // Verify session belongs to user
-    const [session] = await db
-      .select()
-      .from(schema.monitoringSessions)
-      .where(
-        and(
-          eq(schema.monitoringSessions.id, sessionId),
-          eq(schema.monitoringSessions.userId, userId)
-        )
-      )
-      .limit(1);
+    // Verify all sessions belong to user and are completed (only if sessions provided)
+    if (resolvedSessionIds.length > 0) {
+      const sessions = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.userId, userId));
 
-    if (!session) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "Session not found",
-      });
-      return;
+      const sessionMap = new Map(sessions.map((s) => [s.id, s]));
+      const invalidSessions: string[] = [];
+      const incompleteSession: string[] = [];
+
+      for (const sid of resolvedSessionIds) {
+        const session = sessionMap.get(sid);
+        if (!session) {
+          invalidSessions.push(sid);
+        } else if (session.status !== "ready" && session.status !== "delivered") {
+          incompleteSession.push(sid);
+        }
+      }
+
+      if (invalidSessions.length > 0) {
+        res.status(404).json({
+          error: "Not Found",
+          message: `Sessions not found: ${invalidSessions.join(", ")}`,
+        });
+        return;
+      }
+
+      if (incompleteSession.length > 0) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: `Sessions must be completed (ready or delivered status): ${incompleteSession.join(", ")}`,
+        });
+        return;
+      }
     }
 
-    if (session.status !== "ready" && session.status !== "delivered") {
-      res.status(400).json({
-        error: "Bad Request",
-        message: "Session must be completed (ready or delivered status) to generate documentation",
-      });
-      return;
+    // Verify artifacts belong to user (if provided)
+    if (artifactIds && artifactIds.length > 0) {
+      const artifacts = await db
+        .select({ id: schema.artifacts.id })
+        .from(schema.artifacts)
+        .where(
+          and(
+            eq(schema.artifacts.organizationId, user.organizationId),
+            eq(schema.artifacts.uploadedBy, userId)
+          )
+        );
+
+      const artifactSet = new Set(artifacts.map((a) => a.id));
+      const invalidArtifacts = artifactIds.filter((id: string) => !artifactSet.has(id));
+
+      if (invalidArtifacts.length > 0) {
+        res.status(404).json({
+          error: "Not Found",
+          message: `Artifacts not found or not accessible: ${invalidArtifacts.join(", ")}`,
+        });
+        return;
+      }
     }
 
     // Import doc generation service
     const { docGenerationService } = await import("../services/doc-generation.service.js");
 
-    // Generate document
-    const result = await docGenerationService.generateFromSession({
-      sessionId,
-      docType,
-      title,
-      additionalContext,
-      organizationId: user.organizationId,
-      userId,
-    });
-
-    res.status(201).json(result);
+    // Use multi-session generation if multiple sessions, any artifacts, or artifacts-only
+    if (resolvedSessionIds.length > 1 || resolvedArtifactIds.length > 0 || resolvedSessionIds.length === 0) {
+      const result = await docGenerationService.generateFromMultipleSessions({
+        sessionIds: resolvedSessionIds,
+        artifactIds: resolvedArtifactIds,
+        docType,
+        title,
+        additionalContext,
+        mergeStrategy: mergeStrategy || "chronological",
+        organizationId: user.organizationId,
+        userId,
+      });
+      res.status(201).json(result);
+    } else {
+      // Single session only, use legacy method for backward compatibility
+      const result = await docGenerationService.generateFromSession({
+        sessionId: resolvedSessionIds[0],
+        docType,
+        title,
+        additionalContext,
+        organizationId: user.organizationId,
+        userId,
+      });
+      res.status(201).json(result);
+    }
   } catch (error) {
     console.error("[Documents] Error generating document:", error);
     res.status(500).json({
@@ -922,11 +1004,11 @@ router.post("/:id/enhance", requireAuth, async (req: Request, res: Response): Pr
 });
 
 /**
- * POST /api/documents/:id/export/notion
+ * POST /api/documents/:id/export-notion
  * Export document to Notion
  */
 router.post(
-  "/:id/export/notion",
+  "/:id/export-notion",
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.userId!;

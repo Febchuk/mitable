@@ -23,6 +23,8 @@ import SessionDetail from "./components/views/employee/MonitoringView/SessionDet
 import { monitoringKeys } from "./hooks/queries/monitoring";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
+import ArtifactsView from "./components/views/employee/ArtifactsView";
+import ArtifactDetail from "./components/views/employee/ArtifactsView/ArtifactDetail";
 import TodosView from "./components/views/employee/TodosView";
 import UserProfilePage from "./pages/UserProfilePage";
 import DashboardView from "./components/views/admin/DashboardView";
@@ -177,6 +179,8 @@ function App() {
                 {/* Employee Routes */}
                 <Route path="docs" element={<DocsView />} />
                 <Route path="docs/:docId" element={<DocDetail />} />
+                <Route path="artifacts" element={<ArtifactsView />} />
+                <Route path="artifacts/:artifactId" element={<ArtifactDetail />} />
                 <Route path="todos" element={<TodosView />} />
                 {/* Monitoring Routes */}
                 <Route path="monitoring" element={<MonitoringView />} />
