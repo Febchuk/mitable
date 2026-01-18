@@ -1,0 +1,322 @@
+/**
+ * Focus Window Tracker
+ *
+ * Automatically tracks windows the user focuses on during a monitoring session.
+ * Implements a 10-minute TTL (time-to-live) for each window:
+ * - When a window is focused, it's added to the watch list
+ * - Each focus resets the 10-minute timer
+ * - Windows are removed after 10 minutes of not being focused
+ * - Only windows blocked by capture policy are excluded
+ *
+ * @module focusWindowTracker
+ */
+
+import { BrowserWindow } from "electron";
+import { createLogger } from "../lib/logger";
+import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
+import { windowDetectionService } from "./windowDetectionService";
+import { IPC_CHANNELS } from "@mitable/shared";
+import type { SelectedWindowInfo } from "@mitable/shared";
+
+const logger = createLogger("FocusWindowTracker");
+
+// TTL for watched windows (10 minutes in ms)
+const WINDOW_TTL_MS = 10 * 60 * 1000;
+
+// Polling interval for active window detection (2 seconds)
+const POLL_INTERVAL_MS = 2000;
+
+// Cleanup interval for expired windows (30 seconds)
+const CLEANUP_INTERVAL_MS = 30 * 1000;
+
+interface TrackedWindow {
+    windowId: string;
+    appName: string;
+    windowTitle: string;
+    displayName?: string;
+    tabTitle?: string;
+    isBrowser?: boolean;
+    lastFocusedAt: number; // Timestamp of last focus
+    expiresAt: number; // Timestamp when window should be removed
+}
+
+// Exact window titles of our own Electron renderers to exclude
+const MITABLE_WINDOW_TITLES = new Set([
+    "Mitable Agent",
+    "Mitable Conversation",
+    "Mitable Console",
+    "Mitable Overlay",
+    "Mitable Guide",
+    "Mitable Nudge",
+    "Watch Button",
+]);
+
+class FocusWindowTracker {
+    private isTracking = false;
+    private pollTimer: NodeJS.Timeout | null = null;
+    private cleanupTimer: NodeJS.Timeout | null = null;
+    private trackedWindows: Map<string, TrackedWindow> = new Map();
+    private lastActiveWindowId: string | null = null;
+
+    // Callback to notify when windows change
+    private onWindowsChanged: ((windows: SelectedWindowInfo[]) => void) | null = null;
+
+    constructor() {
+        logger.info(" Initialized");
+    }
+
+    /**
+     * Start tracking focused windows
+     * Called when a monitoring session starts
+     */
+    async start(onWindowsChanged?: (windows: SelectedWindowInfo[]) => void): Promise<void> {
+        if (this.isTracking) {
+            logger.warn(" Already tracking, ignoring start request");
+            return;
+        }
+
+        this.isTracking = true;
+        this.trackedWindows.clear();
+        this.lastActiveWindowId = null;
+        this.onWindowsChanged = onWindowsChanged || null;
+
+        // Immediately capture the current active window
+        await this.checkActiveWindow();
+
+        // Start polling for active window changes
+        this.pollTimer = setInterval(() => {
+            this.checkActiveWindow();
+        }, POLL_INTERVAL_MS);
+
+        // Start cleanup timer for expired windows
+        this.cleanupTimer = setInterval(() => {
+            this.cleanupExpiredWindows();
+        }, CLEANUP_INTERVAL_MS);
+
+        logger.info(" Started tracking focused windows");
+    }
+
+    /**
+     * Stop tracking focused windows
+     * Called when a monitoring session ends
+     */
+    stop(): void {
+        if (!this.isTracking) {
+            return;
+        }
+
+        this.isTracking = false;
+
+        if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
+        }
+
+        if (this.cleanupTimer) {
+            clearInterval(this.cleanupTimer);
+            this.cleanupTimer = null;
+        }
+
+        this.trackedWindows.clear();
+        this.lastActiveWindowId = null;
+        this.onWindowsChanged = null;
+
+        logger.info(" Stopped tracking focused windows");
+    }
+
+    /**
+     * Get currently tracked windows as SelectedWindowInfo array
+     */
+    getTrackedWindows(): SelectedWindowInfo[] {
+        return Array.from(this.trackedWindows.values()).map((tw) => ({
+            windowId: tw.windowId,
+            appName: tw.appName,
+            windowTitle: tw.windowTitle,
+            displayName: tw.displayName,
+            tabTitle: tw.tabTitle,
+            isBrowser: tw.isBrowser,
+        }));
+    }
+
+    /**
+     * Get tracked window IDs only
+     */
+    getTrackedWindowIds(): string[] {
+        return Array.from(this.trackedWindows.keys());
+    }
+
+    /**
+     * Check if tracking is active
+     */
+    isActive(): boolean {
+        return this.isTracking;
+    }
+
+    /**
+     * Check for active window and update tracking
+     */
+    private async checkActiveWindow(): Promise<void> {
+        if (!this.isTracking) {
+            return;
+        }
+
+        try {
+            // Dynamic import for ESM-only package
+            const activeWin = (await import("active-win")).default;
+            const activeWindow = await activeWin();
+
+            if (!activeWindow) {
+                return;
+            }
+
+            const windowId = String(activeWindow.id);
+            const appName = activeWindow.owner?.name ?? "";
+            const windowTitle = activeWindow.title ?? "";
+
+            // Skip if same window as last check
+            if (windowId === this.lastActiveWindowId) {
+                return;
+            }
+
+            this.lastActiveWindowId = windowId;
+
+            // Skip Mitable's own windows
+            if (MITABLE_WINDOW_TITLES.has(windowTitle)) {
+                logger.info(` Skipping Mitable window: ${windowTitle}`);
+                return;
+            }
+
+            // Skip windows with no title
+            if (!windowTitle || windowTitle.trim() === "") {
+                return;
+            }
+
+            // Check capture policy - only exclude policy-blocked windows
+            const policy = getCapturePolicy();
+            const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
+
+            if (policyDecision.blocked) {
+                logger.info(` Skipping policy-blocked window: ${appName} - ${windowTitle}`);
+                return;
+            }
+
+            // Determine if it's a browser
+            const browserApps = ["Google Chrome", "Safari", "Firefox", "Arc", "Microsoft Edge", "Brave Browser"];
+            const isBrowser = browserApps.includes(appName);
+
+            // Add or refresh the window
+            this.addOrRefreshWindow({
+                windowId,
+                appName,
+                windowTitle,
+                displayName: appName,
+                tabTitle: isBrowser ? windowTitle : undefined,
+                isBrowser,
+            });
+        } catch (error) {
+            // Log but don't throw - polling should continue
+            logger.error(" Error checking active window:", error);
+        }
+    }
+
+    /**
+     * Add a new window or refresh its TTL
+     */
+    private addOrRefreshWindow(window: Omit<TrackedWindow, "lastFocusedAt" | "expiresAt">): void {
+        const now = Date.now();
+        const existingWindow = this.trackedWindows.get(window.windowId);
+
+        if (existingWindow) {
+            // Refresh TTL
+            existingWindow.lastFocusedAt = now;
+            existingWindow.expiresAt = now + WINDOW_TTL_MS;
+            existingWindow.windowTitle = window.windowTitle; // Update title (e.g., browser tab change)
+            existingWindow.tabTitle = window.tabTitle;
+
+            logger.info(` Refreshed TTL for window: ${window.appName} (${window.windowTitle.substring(0, 40)}...)`);
+        } else {
+            // Add new window
+            const trackedWindow: TrackedWindow = {
+                ...window,
+                lastFocusedAt: now,
+                expiresAt: now + WINDOW_TTL_MS,
+            };
+            this.trackedWindows.set(window.windowId, trackedWindow);
+
+            logger.info(` Added window to tracking: ${window.appName} (${window.windowTitle.substring(0, 40)}...)`);
+        }
+
+        // Sync with windowDetectionService for compatibility with existing capture logic
+        windowDetectionService.addWindow({
+            windowId: window.windowId,
+            appName: window.appName,
+            windowTitle: window.windowTitle,
+            displayName: window.displayName,
+            tabTitle: window.tabTitle,
+            isBrowser: window.isBrowser,
+        });
+
+        // Notify listeners
+        this.notifyWindowsChanged();
+    }
+
+    /**
+     * Remove expired windows from tracking
+     */
+    private cleanupExpiredWindows(): void {
+        const now = Date.now();
+        const expiredWindowIds: string[] = [];
+
+        for (const [windowId, window] of this.trackedWindows) {
+            if (window.expiresAt <= now) {
+                expiredWindowIds.push(windowId);
+            }
+        }
+
+        if (expiredWindowIds.length === 0) {
+            return;
+        }
+
+        for (const windowId of expiredWindowIds) {
+            const window = this.trackedWindows.get(windowId);
+            if (window) {
+                logger.info(` Removed expired window: ${window.appName} (last focused ${Math.round((now - window.lastFocusedAt) / 1000 / 60)} min ago)`);
+                this.trackedWindows.delete(windowId);
+                windowDetectionService.removeWindow(windowId);
+            }
+        }
+
+        // Notify listeners
+        this.notifyWindowsChanged();
+    }
+
+    /**
+     * Notify listeners that the tracked windows have changed
+     */
+    private notifyWindowsChanged(): void {
+        const windows = this.getTrackedWindows();
+
+        // Call the callback if set
+        if (this.onWindowsChanged) {
+            this.onWindowsChanged(windows);
+        }
+
+        // Also broadcast to all Electron windows
+        this.broadcastWindowsUpdate(windows);
+    }
+
+    /**
+     * Broadcast windows update to all BrowserWindows
+     */
+    private broadcastWindowsUpdate(windows: SelectedWindowInfo[]): void {
+        const allWindows = BrowserWindow.getAllWindows();
+        for (const win of allWindows) {
+            if (!win.isDestroyed()) {
+                win.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, windows);
+            }
+        }
+    }
+}
+
+// Export singleton instance
+export const focusWindowTracker = new FocusWindowTracker();

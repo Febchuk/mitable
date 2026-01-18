@@ -25,6 +25,7 @@ const logger = createLogger("MonitoringSession");
 import { localFrameStorage, type FrameMetadata } from "./localFrameStorage";
 import { checkpointService } from "./checkpointService";
 import { authManager } from "./authManager";
+import { focusWindowTracker } from "./focusWindowTracker";
 import { IPC_CHANNELS } from "@mitable/shared";
 import type {
   SelectedWindowInfo,
@@ -38,7 +39,7 @@ import type {
 
 interface SessionConfig {
   sessionId: string; // Backend's session ID - passed from renderer
-  selectedWindows: SelectedWindowInfo[];
+  selectedWindows?: SelectedWindowInfo[]; // Optional - focus tracker will add windows dynamically
   captureIntervalMs: number;
   name?: string;
   sessionGoal?: string; // Optional goal for on_task detection
@@ -74,6 +75,9 @@ class MonitoringSessionService {
   /**
    * Start a new monitoring session
    * @param config - Session config including sessionId from backend
+   * 
+   * Note: selectedWindows is now optional. If not provided, the focusWindowTracker
+   * will automatically add windows as the user focuses on them during the session.
    */
   async startSession(config: SessionConfig): Promise<{ sessionId: string; error?: string }> {
     // Check for existing active session
@@ -92,14 +96,6 @@ class MonitoringSessionService {
       };
     }
 
-    // Validate config
-    if (!config.selectedWindows || config.selectedWindows.length === 0) {
-      return {
-        sessionId: "",
-        error: "At least one window must be selected",
-      };
-    }
-
     if (!config.sessionId) {
       return {
         sessionId: "",
@@ -108,8 +104,21 @@ class MonitoringSessionService {
     }
 
     const sessionId = config.sessionId;
+    
+    // Use provided windows or empty array (focus tracker will add windows dynamically)
+    const initialWindows = config.selectedWindows || [];
 
     try {
+      // Start focus window tracker to automatically add focused windows
+      await focusWindowTracker.start((windows) => {
+        // Update config's selectedWindows when focus tracker detects changes
+        if (this.activeSession) {
+          this.activeSession.config.selectedWindows = windows;
+          // Broadcast update so UI can show current watched windows
+          this.broadcastSessionUpdate();
+        }
+      });
+
       // Initialize local frame storage (persistent directory)
       const localPath = await localFrameStorage.initSession({
         sessionId,
@@ -117,7 +126,7 @@ class MonitoringSessionService {
         userId: config.userId,
         sessionGoal: config.sessionGoal,
         captureIntervalMs: config.captureIntervalMs,
-        selectedWindows: config.selectedWindows.map((w) => ({
+        selectedWindows: initialWindows.map((w) => ({
           windowId: w.windowId,
           appName: w.appName,
           windowTitle: w.windowTitle,
@@ -152,7 +161,7 @@ class MonitoringSessionService {
         totalPausedMs: 0,
         localPath,
         manifestPath: `${localPath}/manifest.json`,
-        selectedWindows: config.selectedWindows.map((w) => ({
+        selectedWindows: initialWindows.map((w) => ({
           windowId: w.windowId,
           appName: w.appName,
           windowTitle: w.windowTitle,
@@ -167,8 +176,9 @@ class MonitoringSessionService {
       this.broadcastSessionUpdate();
 
       logger.info(` Session started: ${sessionId}`, {
-        windowCount: config.selectedWindows.length,
+        initialWindowCount: initialWindows.length,
         intervalMs: config.captureIntervalMs,
+        focusTrackingEnabled: true,
       });
 
       return { sessionId };
@@ -296,6 +306,9 @@ class MonitoringSessionService {
 
     // Stop capture loop
     this.stopCaptureLoop();
+    
+    // Stop focus window tracker
+    focusWindowTracker.stop();
 
     // Calculate final pause time if currently paused
     if (this.activeSession.status === "paused" && this.activeSession.pausedAt) {
@@ -388,6 +401,7 @@ class MonitoringSessionService {
    */
   resetSession(): void {
     this.stopCaptureLoop();
+    focusWindowTracker.stop();
     this.activeSession = null;
     this.broadcastSessionUpdate();
     logger.info(" Session reset (external deletion)");
@@ -564,6 +578,7 @@ class MonitoringSessionService {
 
   /**
    * Capture screenshots of selected windows
+   * Gets windows dynamically from focusWindowTracker
    */
   private async captureSelectedWindows(
     trigger: "periodic" | "focus_change" | "manual"
@@ -572,11 +587,18 @@ class MonitoringSessionService {
       return;
     }
 
-    const selectedWindowIds = this.activeSession.config.selectedWindows.map((w) => w.windowId);
+    // Get windows from focus tracker (dynamic list based on user focus)
+    const trackedWindowIds = focusWindowTracker.getTrackedWindowIds();
+    
+    // If no windows are being tracked yet, skip this capture cycle
+    if (trackedWindowIds.length === 0) {
+      logger.info(" No windows tracked yet, skipping capture");
+      return;
+    }
 
     try {
-      // Use existing capture service
-      const result = await captureService.captureVisibleWindows(false, selectedWindowIds);
+      // Use existing capture service with dynamically tracked windows
+      const result = await captureService.captureVisibleWindows(false, trackedWindowIds);
 
       if (!result.success) {
         logger.warn(" Capture failed:", result.error);

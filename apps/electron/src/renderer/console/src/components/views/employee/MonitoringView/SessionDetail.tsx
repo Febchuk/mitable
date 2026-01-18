@@ -403,12 +403,12 @@ export default function SessionDetail() {
     includeScreenshots: boolean;
   }) => {
     if (!sessionId) return;
-    
+
     setIsEnding(true);
     try {
       // 1. Stop Electron capture
       const electronResult = await window.consoleAPI.stopMonitoringSession();
-      
+
       // If Electron session is already ended (e.g., from pill), that's OK
       if (electronResult.error && electronResult.error !== "No active session") {
         throw new Error(electronResult.error);
@@ -416,7 +416,7 @@ export default function SessionDetail() {
 
       // 2. Upload captures if any
       if (electronResult.captures && electronResult.captures.length > 0) {
-         await uploadCaptures(sessionId, electronResult.captures);
+        await uploadCaptures(sessionId, electronResult.captures);
       }
 
       // 3. Trigger backend end + summary generation with preferences
@@ -424,9 +424,9 @@ export default function SessionDetail() {
         sessionId,
         preferences // Pass preferences to backend
       });
-      
+
       setIsEndDialogOpen(false);
-      
+
       // Handle pill hiding logic
       if (hidePillOnSessionEnd || dontAskHidePillAgain) {
         window.consoleAPI.hidePill();
@@ -438,7 +438,7 @@ export default function SessionDetail() {
         title: "Session Ended",
         description: "Generating your master story...",
       });
-      
+
     } catch (error) {
       logger.error("Error ending session:", error);
       toast({
@@ -731,10 +731,10 @@ export default function SessionDetail() {
             <span className="text-text-primary font-medium">
               {session.endedAt
                 ? formatDuration(
-                    new Date(session.startedAt),
-                    new Date(session.endedAt),
-                    session.totalPausedMs
-                  )
+                  new Date(session.startedAt),
+                  new Date(session.endedAt),
+                  session.totalPausedMs
+                )
                 : "In progress"}
             </span>
           </span>
@@ -1161,12 +1161,12 @@ export default function SessionDetail() {
       />
 
       {/* End Session Dialog */}
-      <EndSessionDialog 
-         open={isEndDialogOpen}
-         onOpenChange={setIsEndDialogOpen}
-         onConfirm={handleConfirmEndSession}
-         isProcessing={isEnding}
-       />
+      <EndSessionDialog
+        open={isEndDialogOpen}
+        onOpenChange={setIsEndDialogOpen}
+        onConfirm={handleConfirmEndSession}
+        isProcessing={isEnding}
+      />
 
       {/* Session End Toast */}
       {showSessionEndToast && (
