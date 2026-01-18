@@ -53,15 +53,9 @@ export interface SessionListItem {
 }
 
 export interface CreateSessionRequest {
-  selectedWindows: SelectedWindowInfo[];
+  selectedWindows?: SelectedWindowInfo[]; // Optional - focus tracker adds windows dynamically
   captureIntervalMs?: number;
   name?: string;
-  // Goal context fields (optional)
-  sessionGoal?: string;
-  linearIssueId?: string;
-  linearIssueTitle?: string;
-  linearIssueDescription?: string;
-  additionalContext?: string;
 }
 
 export interface LinearIssue {

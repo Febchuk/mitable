@@ -26,7 +26,7 @@ import { localFrameStorage, type FrameMetadata } from "./localFrameStorage";
 import { checkpointService } from "./checkpointService";
 import { authManager } from "./authManager";
 import { focusWindowTracker } from "./focusWindowTracker";
-import { IPC_CHANNELS } from "@mitable/shared";
+import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
 import type {
   SelectedWindowInfo,
   MonitoringSessionState,
@@ -104,7 +104,7 @@ class MonitoringSessionService {
     }
 
     const sessionId = config.sessionId;
-    
+
     // Use provided windows or empty array (focus tracker will add windows dynamically)
     const initialWindows = config.selectedWindows || [];
 
@@ -306,7 +306,7 @@ class MonitoringSessionService {
 
     // Stop capture loop
     this.stopCaptureLoop();
-    
+
     // Stop focus window tracker
     focusWindowTracker.stop();
 
@@ -427,7 +427,7 @@ class MonitoringSessionService {
       id: this.activeSession.id,
       status: this.activeSession.status,
       name: this.activeSession.config.name,
-      selectedWindows: this.activeSession.config.selectedWindows,
+      selectedWindows: this.activeSession.config.selectedWindows || [],
       captureIntervalMs: this.activeSession.config.captureIntervalMs,
       startedAt: this.activeSession.startedAt,
       pausedAt: this.activeSession.pausedAt,
@@ -550,7 +550,7 @@ class MonitoringSessionService {
       clearInterval(this.captureTimer);
     }
 
-    const intervalMs = this.activeSession?.config.captureIntervalMs || 30000;
+    const intervalMs = this.activeSession?.config.captureIntervalMs || SESSION_DEFAULTS.CAPTURE_INTERVAL_MS;
 
     // Take initial capture immediately
     this.captureSelectedWindows("periodic");
@@ -589,7 +589,7 @@ class MonitoringSessionService {
 
     // Get windows from focus tracker (dynamic list based on user focus)
     const trackedWindowIds = focusWindowTracker.getTrackedWindowIds();
-    
+
     // If no windows are being tracked yet, skip this capture cycle
     if (trackedWindowIds.length === 0) {
       logger.info(" No windows tracked yet, skipping capture");
@@ -899,14 +899,14 @@ class MonitoringSessionService {
       captureCount: this.activeSession.captureCount,
       latestCapture: latestFrame
         ? {
-            id: latestFrame.frameId,
-            sequenceNumber: latestFrame.sequenceNumber,
-            captureTrigger: latestFrame.trigger,
-            capturedAt: new Date(latestFrame.timestamp).getTime(),
-            windowId: latestFrame.windowSourceId,
-            appName: latestFrame.appName,
-            windowTitle: latestFrame.windowTitle,
-          }
+          id: latestFrame.frameId,
+          sequenceNumber: latestFrame.sequenceNumber,
+          captureTrigger: latestFrame.trigger,
+          capturedAt: new Date(latestFrame.timestamp).getTime(),
+          windowId: latestFrame.windowSourceId,
+          appName: latestFrame.appName,
+          windowTitle: latestFrame.windowTitle,
+        }
         : undefined,
     };
 

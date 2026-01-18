@@ -1,5 +1,5 @@
 import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
-import { IPC_CHANNELS } from "@mitable/shared";
+import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
 import {
   app,
   BrowserWindow,
@@ -103,12 +103,12 @@ function createConsoleWindow() {
     ...(isMac
       ? {}
       : {
-          titleBarOverlay: {
-            color: "#1a1a1a",
-            symbolColor: "#ffffff",
-            height: 32,
-          },
-        }),
+        titleBarOverlay: {
+          color: "#1a1a1a",
+          symbolColor: "#ffffff",
+          height: 32,
+        },
+      }),
     maximizable: true,
     // Platform-specific transparency and background
     ...(isMac && {
@@ -125,8 +125,8 @@ function createConsoleWindow() {
     // Linux: solid background
     ...(!isMac &&
       !isWindows && {
-        backgroundColor: "#1a1a1a",
-      }),
+      backgroundColor: "#1a1a1a",
+    }),
     // Don't show until ready (ensures proper Dock visibility on macOS)
     show: false,
     webPreferences: {
@@ -786,8 +786,8 @@ function setupIPC() {
 
           // 3. Create backend session
           try {
-            const sessionName = `Session ${new Date().toLocaleDateString()}`;
-            const captureIntervalMs = 3000;
+            const sessionName = SESSION_DEFAULTS.DEFAULT_NAME;
+            const captureIntervalMs = SESSION_DEFAULTS.CAPTURE_INTERVAL_MS;
 
             monitoringLogger.info(` Creating backend session: ${sessionName}`);
             const response = await authManager.authenticatedFetch("/api/monitoring/sessions", {
@@ -1219,9 +1219,8 @@ function setupWatchModeHandlers() {
     }
 
     watchModeLogger.info(
-      `Broadcasted update to windows. Selected windows: ${
-        selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
-        "none"
+      `Broadcasted update to windows. Selected windows: ${selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
+      "none"
       }`
     );
   }
@@ -1322,7 +1321,7 @@ function setupMonitoringSessionHandlers() {
       const result = await monitoringSessionService.startSession({
         sessionId: config.sessionId,
         selectedWindows: config.selectedWindows,
-        captureIntervalMs: config.captureIntervalMs || 30000,
+        captureIntervalMs: config.captureIntervalMs || SESSION_DEFAULTS.CAPTURE_INTERVAL_MS,
         name: config.name,
         userId: config.userId,
         organizationId: config.organizationId,

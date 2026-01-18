@@ -35,6 +35,7 @@ import {
   type LinearIssue,
 } from "@/console/src/services/monitoringService";
 import type { SelectedWindowInfo } from "@mitable/shared";
+import { SESSION_DEFAULTS } from "@mitable/shared";
 
 interface StartSessionDialogProps {
   open: boolean;
@@ -139,8 +140,8 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
       // 1. Create session in backend
       const backendResult = await createSession({
         selectedWindows: windowsToMonitor,
-        captureIntervalMs: 30000, // Fixed 30s interval
-        name: "Work Session",
+        captureIntervalMs: SESSION_DEFAULTS.CAPTURE_INTERVAL_MS,
+        name: SESSION_DEFAULTS.DEFAULT_NAME,
       });
 
       const backendSessionId = backendResult.session.id;
@@ -149,8 +150,8 @@ export default function StartSessionDialog({ open, onOpenChange }: StartSessionD
       const electronResult = await startMonitoringSession({
         sessionId: backendSessionId,
         selectedWindows: windowsToMonitor,
-        captureIntervalMs: 30000,
-        name: "Work Session",
+        captureIntervalMs: SESSION_DEFAULTS.CAPTURE_INTERVAL_MS,
+        name: SESSION_DEFAULTS.DEFAULT_NAME,
         userId: user.id,
         organizationId: user.organizationId,
       });
