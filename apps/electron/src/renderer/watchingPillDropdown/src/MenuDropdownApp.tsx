@@ -1,20 +1,17 @@
 import { useState, useEffect } from "react";
 import { Play } from "lucide-react";
-import type { MonitoringSessionState, SelectedWindowInfo } from "@mitable/shared";
+import type { MonitoringSessionState } from "@mitable/shared";
 import { createLogger } from "../../lib/logger";
 
 const logger = createLogger("MenuDropdownApp");
 
 export default function MenuDropdownApp() {
   const [sessionState, setSessionState] = useState<MonitoringSessionState | null>(null);
-  const [selectedWindows, setSelectedWindows] = useState<SelectedWindowInfo[]>([]);
 
   // Derived state
   const isActive = sessionState?.status === "active";
   const isPaused = sessionState?.status === "paused";
   const hasSession = isActive || isPaused;
-  const showStartSession = !hasSession;
-  const canStartSession = !hasSession && selectedWindows.length > 0;
 
   // Listen for data from main process
   useEffect(() => {
@@ -27,7 +24,6 @@ export default function MenuDropdownApp() {
     const unsubscribe = window.dropdownAPI.onData((data) => {
       if (data.type === "menu") {
         setSessionState(data.sessionState);
-        setSelectedWindows(data.selectedWindows);
       }
     });
 
@@ -41,18 +37,12 @@ export default function MenuDropdownApp() {
 
   return (
     <div className="w-full h-full bg-[#2A2A2A] rounded-lg shadow-xl border border-white/10 py-1 overflow-hidden">
-      {/* Start Session - always show when no session */}
-      {showStartSession && (
+      {/* Start Session - always enabled when no active session */}
+      {!hasSession && (
         <>
           <button
             onClick={() => handleAction("start-session")}
-            disabled={!canStartSession}
-            className={`flex items-center gap-1.5 w-full text-left px-3 py-1.5 text-xs transition-colors whitespace-nowrap ${
-              canStartSession
-                ? "text-green-400 hover:bg-white/10"
-                : "text-white/30 cursor-not-allowed"
-            }`}
-            title={!canStartSession ? "Select windows to watch first" : undefined}
+            className="flex items-center gap-1.5 w-full text-left px-3 py-1.5 text-xs text-green-400 hover:bg-white/10 transition-colors whitespace-nowrap"
           >
             <Play size={10} />
             Start New Session

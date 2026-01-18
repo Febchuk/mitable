@@ -62,6 +62,9 @@ let closedWindowCheckInterval: NodeJS.Timeout | null = null;
 // Watch button windows tracking (module scope for cleanup from multiple handlers)
 const watchButtonWindows: Map<string, BrowserWindow> = new Map();
 
+// User context storage (shared across all windows for session start)
+let currentUserContext: { userId: string; organizationId: string } | null = null;
+
 // Auth token storage (shared across all windows)
 const authTokens: {
   accessToken: string | null;
@@ -766,77 +769,8 @@ function setupIPC() {
           return { success: true };
         }
         case "start-session": {
-          // 1. Get user context (set when user logs in via Console)
-          if (!currentUserContext) {
-            monitoringLogger.warn(" Start session failed: User not logged in. Opening Console...");
-            // Show Console so user can log in
-            if (consoleWindow && !consoleWindow.isDestroyed()) {
-              consoleWindow.show();
-              consoleWindow.focus();
-            }
-            return { success: false, error: "Please log in through the Console first" };
-          }
-
-          // 2. Get selected windows
-          const selectedWindows = windowDetectionService.getSelectedWindows();
-          if (selectedWindows.length === 0) {
-            monitoringLogger.warn(" Start session failed: No windows selected");
-            return { success: false, error: "No windows selected" };
-          }
-
-          // 3. Create backend session
-          try {
-            const sessionName = SESSION_DEFAULTS.DEFAULT_NAME;
-            const captureIntervalMs = SESSION_DEFAULTS.CAPTURE_INTERVAL_MS;
-
-            monitoringLogger.info(` Creating backend session: ${sessionName}`);
-            const response = await authManager.authenticatedFetch("/api/monitoring/sessions", {
-              method: "POST",
-              body: JSON.stringify({
-                name: sessionName,
-                selectedWindows: selectedWindows.map((w) => ({
-                  windowId: w.windowId,
-                  appName: w.appName,
-                  windowTitle: w.windowTitle,
-                })),
-                captureIntervalMs,
-              }),
-            });
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              monitoringLogger.error(" Backend session creation failed:", errorText);
-              return { success: false, error: "Failed to create session" };
-            }
-
-            const backendResult = await response.json();
-            if (!backendResult.session?.id) {
-              monitoringLogger.error(" Backend returned no session ID");
-              return { success: false, error: "Failed to create session" };
-            }
-
-            // 4. Start Electron-side capture
-            monitoringLogger.info(
-              ` Starting Electron capture for session: ${backendResult.session.id}`
-            );
-            const startResult = await monitoringSessionService.startSession({
-              sessionId: backendResult.session.id,
-              selectedWindows,
-              captureIntervalMs,
-              userId: currentUserContext.userId,
-              organizationId: currentUserContext.organizationId,
-            });
-
-            if (!startResult.error) {
-              monitoringLogger.info(" Session started successfully from pill");
-              return { success: true, sessionId: startResult.sessionId };
-            }
-
-            return { success: false, error: startResult.error };
-          } catch (error) {
-            monitoringLogger.error(" Start session error:", error);
-            return { success: false, error: "Failed to start session" };
-          }
+          // Use shared helper function for session start
+          return startSessionFromMain();
         }
         case "pause-session": {
           return monitoringSessionService.pauseSession();
@@ -913,7 +847,7 @@ function setupIPC() {
 
   // ==================== User Context IPC Handlers ====================
   // Store user context for cross-window access (e.g., WatchingPill needs userId/orgId)
-  let currentUserContext: { userId: string; organizationId: string } | null = null;
+  // Note: currentUserContext is defined at module scope for access from global shortcuts
 
   ipcMain.on(
     IPC_CHANNELS.USER_CONTEXT_SET,
@@ -1595,8 +1529,168 @@ function createWatchButtonWindow(window: any, watchButtonWindows: Map<string, Br
   );
 }
 
+// Helper function to start a session from main process (used by shortcuts and pill)
+async function startSessionFromMain(): Promise<{ success: boolean; error?: string; sessionId?: string }> {
+  const shortcutLogger = createLogger("SessionShortcut");
+
+  // Check if user is logged in
+  if (!currentUserContext) {
+    shortcutLogger.warn(" Start session failed: User not logged in");
+    // Show Console so user can log in
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+    }
+    return { success: false, error: "Please log in through the Console first" };
+  }
+
+  // Check if session already active
+  const existingSession = monitoringSessionService.getSessionState();
+  if (existingSession) {
+    shortcutLogger.warn(" Start session failed: Session already active");
+    return { success: false, error: "A session is already active" };
+  }
+
+  try {
+    const sessionName = SESSION_DEFAULTS.DEFAULT_NAME;
+    const captureIntervalMs = SESSION_DEFAULTS.CAPTURE_INTERVAL_MS;
+
+    shortcutLogger.info(` Creating backend session: ${sessionName}`);
+    const response = await authManager.authenticatedFetch("/api/monitoring/sessions", {
+      method: "POST",
+      body: JSON.stringify({
+        name: sessionName,
+        selectedWindows: [], // Empty - focus tracker adds windows dynamically
+        captureIntervalMs,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      shortcutLogger.error(" Backend session creation failed:", errorText);
+      return { success: false, error: "Failed to create session" };
+    }
+
+    const backendResult = await response.json();
+    if (!backendResult.session?.id) {
+      shortcutLogger.error(" Backend returned no session ID");
+      return { success: false, error: "Failed to create session" };
+    }
+
+    // Start Electron-side capture (focus tracker starts automatically)
+    shortcutLogger.info(` Starting Electron capture for session: ${backendResult.session.id}`);
+    const startResult = await monitoringSessionService.startSession({
+      sessionId: backendResult.session.id,
+      selectedWindows: [], // Empty - focus tracker adds windows based on user activity
+      captureIntervalMs,
+      userId: currentUserContext.userId,
+      organizationId: currentUserContext.organizationId,
+    });
+
+    if (!startResult.error) {
+      shortcutLogger.info(" Session started successfully");
+      return { success: true, sessionId: startResult.sessionId };
+    }
+
+    return { success: false, error: startResult.error };
+  } catch (error) {
+    shortcutLogger.error(" Start session error:", error);
+    return { success: false, error: "Failed to start session" };
+  }
+}
+
+// Track sequence for Cmd+M+I+T detection
+let shortcutSequence: string[] = [];
+let lastShortcutKeyTime = 0;
+const SEQUENCE_TIMEOUT_MS = 2000; // 2 second timeout for sequence
+
 // Global shortcuts
 function registerGlobalShortcuts() {
+  const shortcutLogger = createLogger("GlobalShortcuts");
+
+  // Helper to reset sequence if timeout exceeded
+  const resetSequenceIfNeeded = () => {
+    const now = Date.now();
+    if (now - lastShortcutKeyTime > SEQUENCE_TIMEOUT_MS) {
+      shortcutSequence = [];
+    }
+  };
+
+  // Session Start Shortcut (Cmd+M+I+T - press M, I, T in sequence while holding Cmd)
+  globalShortcut.register("CommandOrControl+M", () => {
+    resetSequenceIfNeeded();
+    lastShortcutKeyTime = Date.now();
+    shortcutSequence = ["M"];
+  });
+
+  globalShortcut.register("CommandOrControl+I", () => {
+    resetSequenceIfNeeded();
+    lastShortcutKeyTime = Date.now();
+
+    // Only accept I if M was the last key
+    if (shortcutSequence.length === 1 && shortcutSequence[0] === "M") {
+      shortcutSequence.push("I");
+    } else {
+      shortcutSequence = [];
+    }
+  });
+
+  globalShortcut.register("CommandOrControl+T", async () => {
+    resetSequenceIfNeeded();
+    lastShortcutKeyTime = Date.now();
+
+    // Only accept T if sequence is M, I
+    if (shortcutSequence.length === 2 && shortcutSequence[0] === "M" && shortcutSequence[1] === "I") {
+      // Complete sequence detected - start session
+      shortcutLogger.info(" Cmd+M+I+T detected - starting session");
+      shortcutSequence = []; // Reset
+
+      try {
+        const result = await startSessionFromMain();
+
+        if (result.success) {
+          // Show success notification
+          const notification = new Notification({
+            title: "Session Started",
+            body: "Your work session is now being tracked",
+            silent: false,
+          });
+
+          notification.on("click", () => {
+            if (consoleWindow && !consoleWindow.isDestroyed()) {
+              consoleWindow.show();
+              consoleWindow.focus();
+              consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
+            }
+          });
+
+          notification.show();
+        } else {
+          // Show error notification
+          const notification = new Notification({
+            title: "Could not start session",
+            body: result.error || "Please try again",
+            silent: false,
+          });
+
+          notification.on("click", () => {
+            if (consoleWindow && !consoleWindow.isDestroyed()) {
+              consoleWindow.show();
+              consoleWindow.focus();
+            }
+          });
+
+          notification.show();
+        }
+      } catch (error) {
+        shortcutLogger.error(" Error starting session via shortcut:", error);
+      }
+    } else {
+      // T pressed but sequence not complete - reset
+      shortcutSequence = [];
+    }
+  });
+
   // Update Prompt Trigger (Cmd+Shift+U) - Shows notification to send update
   globalShortcut.register("CommandOrControl+Shift+U", () => {
     try {
