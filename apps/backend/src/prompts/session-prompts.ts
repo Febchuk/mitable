@@ -61,6 +61,54 @@ Lean toward "no" for:
 - When detecting progression: New code (green bars) or modified code (blue bars) appearing = meaningful progression. Code without bars being viewed = navigation only.
 </app_specific_knowledge>
 
+<milestone_inference_examples>
+  <example type="positive">
+    <observation>
+      Frame A: Terminal shows "FAIL: X tests"
+      Frame B: Terminal shows "FAIL: Y tests" where Y < X
+    </observation>
+    <reasoning>Numeric decrease in failure count indicates tests were fixed</reasoning>
+    <output_pattern>description = "[NUMBER] tests now passing" where NUMBER = X - Y</output_pattern>
+    <grounding_rule>ONLY report if you can read the actual numbers from the frames</grounding_rule>
+  </example>
+  
+  <example type="positive">
+    <observation>
+      Frame A: File tab shows asterisk or "unsaved" indicator
+      Frame B: Same file tab, indicator gone
+    </observation>
+    <reasoning>Disappearance of unsaved indicator implies save occurred</reasoning>
+    <output_pattern>description = "Changes to [FILENAME] saved"</output_pattern>
+    <grounding_rule>ONLY report if you can identify the specific file from the tab</grounding_rule>
+  </example>
+  
+  <example type="negative">
+    <observation>
+      Frame A: User editing code
+      Frame B: User still editing same code area
+    </observation>
+    <reasoning>Continued editing is IN_PROGRESS, not a milestone</reasoning>
+    <output_pattern>milestone.detected = false</output_pattern>
+  </example>
+  
+  <example type="negative">
+    <observation>
+      Frame A: Browser on documentation page
+      Frame B: Browser on different documentation page
+    </observation>
+    <reasoning>Navigation between docs is research, not accomplishment</reasoning>
+    <output_pattern>milestone.detected = false</output_pattern>
+  </example>
+</milestone_inference_examples>
+
+<critical_rules>
+1. NEVER output milestone descriptions that match examples exactly - always ground in actual observations
+2. ALWAYS tie milestone.description to specific visual evidence from the frames
+3. If you cannot point to concrete state change, set milestone.detected = false
+4. Use [PLACEHOLDERS] as signals to fill from actual frame content, not example content
+5. A milestone is a STATE TRANSITION, not a transient UI element (toasts fade, milestones persist)
+</critical_rules>
+
 <output_format>
 Respond with only this JSON structure:
 {
@@ -172,11 +220,6 @@ export interface ActivityRegistryContext {
     completedAt: string;
   }>;
 }
-
-/**
- * Context for building storyteller prompts
- */
-// export interface StorytellerContext { ... } // REMOVED - Using simplified Perceiver-only architecture
 
 /**
  * Build the complete prompt for the Progression Detector (Perceiver)
@@ -393,3 +436,131 @@ export function parseProgressionResponse(rawResponse: string): ProgressionDetect
   }
 }
 
+// ============================================================================
+// STORYTELLER
+// ============================================================================
+
+/**
+ * System prompt for the Storyteller (Master Story)
+ */
+export const STORYTELLER_SYSTEM = `<role>
+You are a professional technical biographer writing a first-person "Work Diary" for a software engineer.
+Your goal is to maintain a continuous, high-quality narrative of their work session.
+</role>
+
+<style_guide>
+- **Perspective**: First-person ("I checked the logs...", "I realized that...")
+- **Tone**: Professional, competent, slightly reflective. Avoid robotic or overly enthusiastic language.
+- **Accuracy**: Be specific. Use exact filenames, error messages, and variable names where visible.
+- **Continuity**: Connect the new action to the previous context. Don't just list events; weave a story.
+- **Honesty**: If the user is stuck or researching, say so. Don't hallucinate progress that didn't happen.
+</style_guide>
+
+<input_data>
+You will receive:
+1. The **Current Master Story** (the narrative so far)
+2. The **Latest Action** (a new event to append)
+3. **Context** (artifacts, window titles, signals)
+</input_data>
+
+<output_format>
+Respond with a JSON object:
+{
+  "action": "A refined, narrative description of the latest action (1-2 sentences)",
+  "evidence": "The specific visual evidence used (e.g., 'Terminal output showing 404 error')"
+}
+</output_format>
+
+<rules>
+1. **Append, don't repeat**: The user will append your output to the existing story.
+2. **Filter noise**: If the "Latest Action" is trivial (e.g., "scrolled down"), ignore it or summarize it briefly.
+3. **Handle context switches**: If the user switches tasks, use a transition phrase ("I then switched to...", "Meanwhile, I checked...").
+4. **No hallucinations**: Only describe what is explicitly in the input.
+</rules>`;
+
+export const STORYTELLER_USER = `Here is the current story and the new action to add.`;
+
+export interface ExtractedArtifact {
+  type: string;
+  content: string;
+}
+
+export interface FrameSignals {
+  has_blocker: boolean;
+  has_outcome: boolean;
+  blocker_type: string | null;
+  outcome_type: string | null;
+}
+
+export interface StorytellerInput {
+  userRole: string;
+  userSeniority: string;
+  workContext: string;
+  appName: string;
+  windowTitle: string;
+  currentStory: string;
+  latestAction: string;
+  goalContext?: GoalContext;
+  extractedArtifacts?: ExtractedArtifact[];
+  detectedSignals?: FrameSignals;
+  changeType?: string;
+  changeMagnitude?: string;
+}
+
+export function buildStorytellerPrompt(input: StorytellerInput): { system: string; user: string } {
+  let system = STORYTELLER_SYSTEM;
+
+  // Inject persona
+  system += `\n\n<persona>\nUser: ${input.userRole}\nContext: ${input.workContext}\n</persona>`;
+
+  if (input.goalContext) {
+    system += `\n\n<session_goal>\n${input.goalContext.sessionGoal || input.goalContext.linearIssueTitle || "Unspecified goal"}\n</session_goal>`;
+  }
+
+  let user = `<current_story>\n${input.currentStory}\n</current_story>\n\n<latest_action>\n${input.latestAction}\n</latest_action>`;
+
+  user += `\n\n<context>\nApp: ${input.appName}\nWindow: ${input.windowTitle}\n`;
+
+  if (input.extractedArtifacts && input.extractedArtifacts.length > 0) {
+    user += `Artifacts: ${input.extractedArtifacts.map(a => `${a.type}: ${a.content}`).join(", ")}\n`;
+  }
+
+  user += `</context>`;
+
+  return { system, user };
+}
+
+export interface StorytellerResponse {
+  action: string;
+  evidence: string;
+}
+
+export function parseStorytellerResponse(response: string): StorytellerResponse | null {
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    return JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    return null;
+  }
+}
+
+export function validateStorytellerEntry(
+  entry: StorytellerResponse,
+  _originalAction: string,
+  _artifacts: ExtractedArtifact[]
+): { valid: boolean; reason?: string } {
+  // Basic validation
+  if (!entry.action || !entry.evidence) {
+    return { valid: false, reason: "Missing fields" };
+  }
+  return { valid: true };
+}
+
+export function buildNarrativeFromEntries(currentStory: string, entry: StorytellerResponse): string {
+  return currentStory + (currentStory ? "\n\n" : "") + entry.action;
+}
+
+// Re-export other types that might be needed
+export type ChangeType = "content" | "app_switch" | "window_move" | "scroll" | "none";
+export type ChangeMagnitude = "trivial" | "standard" | "significant" | "major";

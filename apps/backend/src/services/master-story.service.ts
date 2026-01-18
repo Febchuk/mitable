@@ -14,7 +14,8 @@
 import Groq from "groq-sdk";
 import { config } from "../config";
 import { db } from "../db/client";
-import { sessionSummaries, users } from "../db/schema/index";
+import { sessionSummaries, users, keyActivities } from "../db/schema/index";
+import { KeyActivity } from "../db/schema/monitoring.schema";
 import { eq, desc, and } from "drizzle-orm";
 import {
   buildStorytellerPrompt,
@@ -24,6 +25,7 @@ import {
   GoalContext,
 } from "../prompts/session-prompts";
 import { FrameAnalysisResult } from "./frame-analysis.service";
+import { activityRegistryService } from "./activity-registry.service";
 import { withRetry } from "../utils/retry";
 import {
   createSessionLogger,
@@ -61,6 +63,15 @@ export interface StoryUpdateResult {
   tokensUsed: number;
   latencyMs: number;
   error?: string;
+  skipped?: boolean;
+}
+
+export interface PerceiverEntry {
+  capturedAt: Date;
+  activityDescription: string | null;
+  keyActivityId: string | null;
+  keyActivityName?: string;
+  progress: string | null;
 }
 
 class MasterStoryService {
@@ -85,9 +96,64 @@ class MasterStoryService {
       action: context.frameAnalysis.summaryOfAction,
       app: context.windowInfo.appName,
       hasGoalContext: !!context.goalContext,
+      keyActivityId: context.frameAnalysis.keyActivityId,
+      progress: context.frameAnalysis.progress,
+      milestoneDetected: context.frameAnalysis.milestoneDetected,
     });
 
     try {
+      // Materiality Filtering
+      // Check if this update is significant enough to record
+      // 1. Task COMPLETE or Milestone Detected (Always record)
+      const isMaterial = 
+        context.frameAnalysis.progress === "COMPLETE" || 
+        context.frameAnalysis.milestoneDetected;
+      
+      let shouldUpdate = isMaterial;
+      
+      // 2. Check Activity Registry conditions if not already material
+      if (!shouldUpdate && context.frameAnalysis.keyActivityId) {
+        const activity = await activityRegistryService.getActivityById(context.frameAnalysis.keyActivityId);
+        
+        if (activity) {
+          // Rule 3 & 4: Resumption or Sustained Focus (3+ intervals)
+          // We assume resumption (consecutive=1, total>1) is worth recording if it breaks silence,
+          // but strictly following the plan: "3+ consecutive intervals"
+          if ((activity.consecutiveIntervals || 0) >= 3) {
+            shouldUpdate = true;
+            log.debug("Materiality threshold met: Sustained focus", {
+              keyActivityId: activity.id,
+              consecutiveIntervals: activity.consecutiveIntervals
+            });
+          }
+          
+          // Resumption check (naive): If consecutive is low but total is high, it's a return
+          if ((activity.consecutiveIntervals || 0) <= 2 && (activity.totalIntervals || 0) > 5) {
+             // Optional: Be lenient on resumption
+             // shouldUpdate = true; 
+          }
+        }
+      }
+
+      if (!shouldUpdate) {
+        log.info("Skipping story extension: Materiality threshold not met", {
+          keyActivityId: context.frameAnalysis.keyActivityId,
+          progress: context.frameAnalysis.progress,
+          milestoneDetected: context.frameAnalysis.milestoneDetected
+        });
+        
+        // Return skipped result
+        const currentMetadata = await this.getStoryMetadata(context.sessionId);
+        return {
+          success: true,
+          version: currentMetadata?.version || 0,
+          storyLength: currentMetadata?.length || 0,
+          tokensUsed: 0,
+          latencyMs: timer.elapsed(),
+          skipped: true
+        };
+      }
+
       // Get current story from database
       const currentSummary = await db.query.sessionSummaries.findFirst({
         where: and(
@@ -295,6 +361,89 @@ class MasterStoryService {
         latencyMs: timer.elapsed(),
         error: error instanceof Error ? error.message : String(error),
       };
+    }
+  }
+
+  /**
+   * Synthesize an incomplete session (Safety Net)
+   * 
+   * Triggered when a session has significant activity but no completions or milestones.
+   * This ensures we don't lose the narrative of "hard work with no checkmark".
+   */
+  async synthesizeIncompleteSession(
+    sessionId: string,
+    existingMasterStory: string,
+    fullTimeline: PerceiverEntry[],
+    keyActivities: KeyActivity[]
+  ): Promise<string> {
+    const log = createSessionLogger({ sessionId });
+    const timer = createTimer("MasterStory.synthesizeIncompleteSession");
+    
+    log.info("Synthesizing incomplete session", {
+      timelineLength: fullTimeline.length,
+      activityCount: keyActivities.length
+    });
+
+    // Group timeline by activity
+    const timelineByActivity = keyActivities.map(activity => {
+      const entries = fullTimeline.filter(e => e.keyActivityId === activity.id);
+      if (entries.length === 0) return "";
+      
+      const entryList = entries.map((e, index) => 
+        `    <interval seq="${index + 1}">${e.activityDescription || "Working..."}</interval>`
+      ).join("\n");
+      
+      return `  <activity keyActivityId="${activity.id}" keyActivityName="${activity.keyActivityName}" status="${activity.status}" intervals="${entries.length}">\n${entryList}\n  </activity>`;
+    }).join("\n");
+
+    const systemPrompt = `<role>
+You are a professional Ghostwriter. Your job is to update a work session narrative based on a log of activities.
+</role>
+
+<context>
+The user has been working hard but hasn't marked any tasks as "COMPLETE" or hit major milestones.
+We need to capture the progress they DID make.
+</context>
+
+<task>
+Expand the existing master story to include the progress made on each activity.
+Maintain first-person, professional tone. Focus on what was accomplished, not just started.
+Summarize the effort shown in the timeline intervals.
+</task>`;
+
+    const userPrompt = `<existing_master_story>
+${existingMasterStory}
+</existing_master_story>
+
+<timeline_by_activity>
+${timelineByActivity}
+</timeline_by_activity>`;
+
+    try {
+      const response = await this.groq.chat.completions.create({
+        model: STORY_CONFIG.MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: STORY_CONFIG.MAX_TOKENS,
+        temperature: STORY_CONFIG.TEMPERATURE,
+      });
+
+      const newStory = response.choices[0]?.message?.content || existingMasterStory;
+      
+      log.info("Incomplete session synthesized", {
+        originalLength: existingMasterStory.length,
+        newLength: newStory.length,
+        durationMs: timer.elapsed()
+      });
+      
+      return newStory;
+    } catch (error) {
+      log.error("Failed to synthesize incomplete session", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return existingMasterStory;
     }
   }
 

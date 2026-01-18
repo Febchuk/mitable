@@ -19,6 +19,9 @@ import {
   GoalContext,
   ExtractedArtifact,
   FrameSignals,
+  ActivityRegistryContext,
+  ProgressionDetectorResponse,
+  ProgressState,
 } from "../prompts/session-prompts";
 import {
   createSessionLogger,
@@ -41,6 +44,8 @@ export interface FrameAnalysisInput {
   timestamp: string;
   // Optional goal context for enhanced analysis
   goalContext?: GoalContext;
+  // Optional activity context for Activity Registry integration
+  activityContext?: ActivityRegistryContext;
 }
 
 export interface FrameAnalysisResult {
@@ -53,6 +58,16 @@ export interface FrameAnalysisResult {
   changeType: ChangeType;
   changeMagnitude: ChangeMagnitude;
   changeDescription: string;
+
+  // Activity Registry fields
+  keyActivityName: string | null;
+  keyActivityId: string | null;
+  progress: ProgressState;
+  
+  // Milestone Detection
+  milestoneDetected: boolean;
+  milestoneDescription: string | null;
+  evidenceReference: string | null;
 
   // Enhanced analysis fields
   artifacts: ExtractedArtifact[];
@@ -97,9 +112,10 @@ class FrameAnalysisService {
       hasGoalContext: !!input.goalContext,
     });
 
-    // Build prompt with goal context if available
+    // Build prompt with goal context and activity context
     const { system: systemPrompt, user: userPrompt } = buildProgressionDetectorPrompt(
-      input.goalContext
+      input.goalContext,
+      input.activityContext
     );
 
     // Log full prompt for deep debugging (when SESSION_LOG_FULL_AI=true)
@@ -114,6 +130,7 @@ class FrameAnalysisService {
         appName: input.windowInfo.appName,
         windowTitle: input.windowInfo.windowTitle,
         hasGoalContext: !!input.goalContext,
+        hasActivityContext: !!input.activityContext,
         goalContext: input.goalContext
           ? {
               sessionGoal: input.goalContext.sessionGoal,
@@ -161,28 +178,54 @@ class FrameAnalysisService {
         return this.createFallbackResult(input, visionResult);
       }
 
-      // Map progression result - directly use LLM's observable classifications
+      // Map progression result
       const isFirstFrame = input.previousFrame === null;
-      const deltaChanged = isFirstFrame || progressionResult.progression_detected;
+      
+      // Determine if progression happened based on analysis result
+      // The new prompt doesn't return a boolean, but specific states
+      const hasAction = !progressionResult.analysis_result.toLowerCase().includes("no meaningful visual change") &&
+                        !progressionResult.analysis_result.toLowerCase().includes("no observable changes");
+      
+      const progressionDetected = isFirstFrame || 
+                                  progressionResult.milestone_detected || 
+                                  progressionResult.progress === "COMPLETE" || 
+                                  hasAction;
+
+      const deltaChanged = progressionDetected;
 
       const result: FrameAnalysisResult = {
         frameId: input.frameId,
-        progressionDetected: progressionResult.progression_detected,
-        summaryOfAction: progressionResult.summary_of_action,
+        progressionDetected,
+        summaryOfAction: progressionResult.analysis_result,
         deltaChanged,
-        changeType: isFirstFrame ? "none" : progressionResult.change_type,
-        changeMagnitude: isFirstFrame ? "trivial" : progressionResult.change_magnitude,
+        changeType: isFirstFrame ? "none" : (progressionDetected ? "content" : "none"), // Inferred
+        changeMagnitude: isFirstFrame ? "trivial" : (progressionDetected ? "standard" : "none"), // Inferred
         changeDescription: isFirstFrame
           ? "First frame in session"
-          : progressionResult.summary_of_action,
-        // Enhanced analysis fields
-        artifacts: progressionResult.artifacts,
-        signals: progressionResult.signals,
-        onTask: progressionResult.on_task,
-        taskRelevance: progressionResult.task_relevance,
-        offTaskReason: progressionResult.off_task_reason,
+          : progressionResult.analysis_result,
+        
+        // Activity Registry Fields
+        keyActivityName: progressionResult.key_activity_name,
+        keyActivityId: progressionResult.key_activity_id,
+        progress: progressionResult.progress,
+        milestoneDetected: progressionResult.milestone_detected,
+        milestoneDescription: progressionResult.milestone_description,
+        evidenceReference: progressionResult.evidence_reference,
+
+        // Enhanced analysis fields - DEFAULT VALUES as they are removed from prompt
+        artifacts: [],
+        signals: {
+          has_blocker: false,
+          has_outcome: progressionResult.progress === "COMPLETE" || progressionResult.milestone_detected,
+          blocker_type: null,
+          outcome_type: progressionResult.milestone_detected ? "milestone" : (progressionResult.progress === "COMPLETE" ? "completion" : null),
+        },
+        onTask: progressionResult.progress !== "CONTEXT_SWITCH",
+        taskRelevance: progressionResult.progress === "CONTEXT_SWITCH" ? 0.1 : 0.9,
+        offTaskReason: progressionResult.progress === "CONTEXT_SWITCH" ? "Context switch detected" : null,
+        
         // Metadata
-        confidence: progressionResult.confidence,
+        confidence: 0.8, // Default confidence since it's not in the new schema
         analysisLatencyMs: visionResult.latencyMs,
         model: visionResult.model,
         tokenUsage: {
@@ -267,6 +310,15 @@ class FrameAnalysisService {
       changeType: "none",
       changeMagnitude: "trivial",
       changeDescription: isFirstFrame ? "First frame in session" : "Analysis inconclusive",
+      
+      // Activity Registry Fields
+      keyActivityName: null,
+      keyActivityId: null,
+      progress: "IN_PROGRESS",
+      milestoneDetected: false,
+      milestoneDescription: null,
+      evidenceReference: null,
+
       // Default enhanced analysis fields for fallback
       artifacts: [],
       signals: {
