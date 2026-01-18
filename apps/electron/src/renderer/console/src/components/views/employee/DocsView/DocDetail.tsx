@@ -9,7 +9,7 @@
  * - Export to Notion
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { createLogger } from "../../../../../../lib/logger";
 
@@ -19,6 +19,8 @@ import {
   useDeleteDocument,
   useUpdateDocument,
   useExportToNotion,
+  useExportToGoogleDocs,
+  useGoogleDriveFolders,
 } from "@/console/src/hooks/queries/documents";
 import {
   ArrowLeft,
@@ -27,10 +29,8 @@ import {
   FileText,
   BookOpen,
   AlertCircle,
-  ExternalLink,
   CheckCircle,
   Clock,
-  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { DocEditor } from "@/console/src/components/editor";
 import ExportNotionDialog from "./dialogs/ExportNotionDialog";
+import ExportGoogleDocsDialog from "./dialogs/ExportGoogleDocsDialog";
+import ExportPopover from "./components/ExportPopover";
 import type { DocType, DocStatus } from "@mitable/shared";
 
 const DOC_TYPE_LABELS: Record<DocType, string> = {
@@ -64,64 +66,126 @@ export default function DocDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const { data: document, isLoading } = useDocument(docId || "");
+  const { data: document, isLoading, refetch: refetchDocument } = useDocument(docId || "");
   const updateMutation = useUpdateDocument();
   const deleteMutation = useDeleteDocument();
-  const exportMutation = useExportToNotion();
+  const exportNotionMutation = useExportToNotion();
+  const exportGoogleDocsMutation = useExportToGoogleDocs();
+  const {
+    data: driveFolders,
+    isLoading: isLoadingFolders,
+    refetch: refetchFolders,
+  } = useGoogleDriveFolders();
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isExportNotionDialogOpen, setIsExportNotionDialogOpen] = useState(false);
+  const [isExportGoogleDocsDialogOpen, setIsExportGoogleDocsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [title, setTitle] = useState("");
 
-  // Handle autosave (debounced content changes)
-  const handleContentChange = useCallback(
-    async (content: string) => {
-      if (!docId) return;
+  // Debounce timers
+  const titleSaveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const contentSaveTimeout = useRef<NodeJS.Timeout | null>(null);
 
-      setHasUnsavedChanges(true);
+  // Initialize title when document loads
+  useEffect(() => {
+    if (document) {
+      setTitle(document.title);
+      setLastSaved(new Date(document.updatedAt));
+    }
+  }, [document]);
 
-      try {
-        await updateMutation.mutateAsync({
-          id: docId,
-          data: { content },
-        });
-        setHasUnsavedChanges(false);
-      } catch (error) {
-        logger.error("Autosave failed:", error);
-        // Don't show error toast for autosave - just keep hasUnsavedChanges true
-      }
-    },
-    [docId, updateMutation]
-  );
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (titleSaveTimeout.current) clearTimeout(titleSaveTimeout.current);
+      if (contentSaveTimeout.current) clearTimeout(contentSaveTimeout.current);
+    };
+  }, []);
 
-  // Handle explicit save (⌘+S)
-  const handleSave = useCallback(
-    async (content: string) => {
+  // Debounced save function
+  const debouncedSave = useCallback(
+    async (field: "title" | "content", value: string) => {
       if (!docId) return;
 
       setIsSaving(true);
       try {
         await updateMutation.mutateAsync({
           id: docId,
-          data: { content },
+          data: { [field]: value },
         });
-        setHasUnsavedChanges(false);
-        toast({
-          title: "Document saved",
-          description: "Your changes have been saved.",
-        });
+        setLastSaved(new Date());
       } catch (error) {
-        toast({
-          title: "Save failed",
-          description: "Failed to save document. Please try again.",
-          variant: "destructive",
-        });
+        logger.error(`${field} autosave failed:`, error);
       } finally {
         setIsSaving(false);
       }
     },
-    [docId, updateMutation, toast]
+    [docId, updateMutation]
+  );
+
+  // Handle title change with debounced autosave
+  const handleTitleChange = useCallback(
+    (newTitle: string) => {
+      // Update local state immediately (no lag)
+      setTitle(newTitle);
+
+      // Clear existing timeout
+      if (titleSaveTimeout.current) {
+        clearTimeout(titleSaveTimeout.current);
+      }
+
+      // Debounce the API call (wait 1 second after typing stops)
+      titleSaveTimeout.current = setTimeout(() => {
+        debouncedSave("title", newTitle);
+      }, 1000);
+    },
+    [debouncedSave]
+  );
+
+  // Handle content change with debounced autosave
+  const handleContentChange = useCallback(
+    (newContent: string) => {
+      // Clear existing timeout
+      if (contentSaveTimeout.current) {
+        clearTimeout(contentSaveTimeout.current);
+      }
+
+      // Debounce the API call (wait 2 seconds after typing stops)
+      contentSaveTimeout.current = setTimeout(() => {
+        debouncedSave("content", newContent);
+      }, 2000);
+    },
+    [debouncedSave]
+  );
+
+  // Handle explicit save from editor (⌘+S)
+  const handleSave = useCallback(
+    async (contentToSave: string) => {
+      if (!docId) return;
+
+      // Clear pending timeouts and save immediately
+      if (titleSaveTimeout.current) clearTimeout(titleSaveTimeout.current);
+      if (contentSaveTimeout.current) clearTimeout(contentSaveTimeout.current);
+
+      setIsSaving(true);
+      try {
+        await updateMutation.mutateAsync({
+          id: docId,
+          data: {
+            title,
+            content: contentToSave,
+          },
+        });
+        setLastSaved(new Date());
+      } catch (error) {
+        logger.error("Manual save failed:", error);
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [docId, title, updateMutation]
   );
 
   const handleDelete = async () => {
@@ -147,13 +211,16 @@ export default function DocDetail() {
     if (!docId) return;
 
     try {
-      const result = await exportMutation.mutateAsync({ id: docId });
-      setIsExportDialogOpen(false);
+      const result = await exportNotionMutation.mutateAsync({ id: docId });
+      setIsExportNotionDialogOpen(false);
+
+      // Force immediate UI update
+      await refetchDocument();
+
       toast({
         title: "Exported to Notion",
         description: "Document has been exported successfully.",
       });
-      // Open Notion page in browser
       if (result.notionPageUrl) {
         window.open(result.notionPageUrl, "_blank");
       }
@@ -164,6 +231,54 @@ export default function DocDetail() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleExportToGoogleDocs = async (folderId?: string) => {
+    if (!docId) return;
+
+    try {
+      const result = await exportGoogleDocsMutation.mutateAsync({ id: docId, folderId });
+      console.log("✅ [Export] Google Docs export result:", result);
+      setIsExportGoogleDocsDialogOpen(false);
+
+      // Force immediate UI update
+      const refetchResult = await refetchDocument();
+      console.log("✅ [Export] Refetched document data:", refetchResult.data);
+
+      toast({
+        title: "Exported to Google Docs",
+        description: "Document has been exported successfully.",
+      });
+      if (result.documentUrl) {
+        window.open(result.documentUrl, "_blank");
+      }
+    } catch (error) {
+      console.error("❌ [Export] Failed:", error);
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Failed to export to Google Docs.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReExportToNotion = async () => {
+    if (!docId) return;
+    await handleExportToNotion();
+  };
+
+  const handleReExportToGoogleDocs = async () => {
+    if (!docId) return;
+    await handleExportToGoogleDocs();
+  };
+
+  const handleExportToAll = async () => {
+    if (!docId) return;
+    await Promise.all([handleExportToNotion(), handleExportToGoogleDocs()]);
+    toast({
+      title: "Exported to all destinations",
+      description: "Document has been synced to Notion and Google Docs.",
+    });
   };
 
   if (isLoading) {
@@ -205,8 +320,14 @@ export default function DocDetail() {
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <Icon size={20} className="text-primary" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-text-primary">{document.title}</h1>
+            <div className="flex-1">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                className="text-xl font-bold text-text-primary bg-transparent border-none outline-none focus:outline-none w-full max-w-2xl"
+                placeholder="Document title..."
+              />
               <div className="flex items-center gap-3 mt-0.5">
                 <span className="text-text-secondary text-sm">
                   {DOC_TYPE_LABELS[document.docType as DocType]}
@@ -218,36 +339,53 @@ export default function DocDetail() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Save status indicator */}
-          {(isSaving || hasUnsavedChanges) && (
-            <span className="text-xs text-text-secondary flex items-center gap-1 mr-2">
-              {isSaving ? (
-                <>
-                  <Loader2 className="animate-spin" size={12} />
-                  Saving...
-                </>
-              ) : hasUnsavedChanges ? (
-                <>
-                  <Save size={12} />
-                  Unsaved changes
-                </>
-              ) : null}
-            </span>
-          )}
+          {/* Google Docs-style save indicator */}
+          <span className="text-xs text-text-secondary flex items-center gap-1.5 mr-2">
+            {isSaving ? (
+              <>
+                <Loader2 className="animate-spin" size={14} />
+                <span>Saving...</span>
+              </>
+            ) : lastSaved ? (
+              <>
+                <CheckCircle size={14} className="text-status-success" />
+                <span>All changes saved</span>
+              </>
+            ) : null}
+          </span>
 
-          <Button
-            variant="outline"
-            onClick={() => setIsExportDialogOpen(true)}
-            className="gap-2 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary"
-            disabled={exportMutation.isPending}
-          >
-            {exportMutation.isPending ? (
-              <Loader2 className="animate-spin" size={16} />
-            ) : (
-              <ExternalLink size={16} />
-            )}
-            {document.notionPageId ? "Re-export" : "Export to Notion"}
-          </Button>
+          <ExportPopover
+            destinations={[
+              {
+                id: "notion",
+                name: "Notion",
+                isExported: !!document.notionPageId,
+                lastSyncedAt: document.notionSyncedAt ? new Date(document.notionSyncedAt) : null,
+                documentUrl: document.notionPageId
+                  ? `https://notion.so/${document.notionPageId}`
+                  : null,
+                onExport: () => setIsExportNotionDialogOpen(true),
+                onReExport: handleReExportToNotion,
+              },
+              {
+                id: "google-docs",
+                name: "Google Docs",
+                isExported: !!document.googleDocsId,
+                lastSyncedAt: document.googleDocsSyncedAt
+                  ? new Date(document.googleDocsSyncedAt)
+                  : null,
+                documentUrl: document.googleDocsId
+                  ? `https://docs.google.com/document/d/${document.googleDocsId}/edit`
+                  : null,
+                onExport: () => setIsExportGoogleDocsDialogOpen(true),
+                onReExport: handleReExportToGoogleDocs,
+              },
+            ]}
+            onExportAll={
+              document.notionPageId && document.googleDocsId ? handleExportToAll : undefined
+            }
+            isExporting={exportNotionMutation.isPending || exportGoogleDocsMutation.isPending}
+          />
           <Button
             variant="ghost"
             size="icon"
@@ -286,7 +424,7 @@ export default function DocDetail() {
         {document.notionPageId && (
           <div className="flex items-center gap-1 text-status-success">
             <CheckCircle size={14} />
-            <span>Synced to Notion</span>
+            <span>Synced</span>
           </div>
         )}
         <div className="ml-auto text-text-tertiary text-xs">
@@ -344,6 +482,28 @@ export default function DocDetail() {
         </div>
       )}
 
+      {/* Export Dialogs */}
+      <ExportNotionDialog
+        open={isExportNotionDialogOpen}
+        onOpenChange={setIsExportNotionDialogOpen}
+        documentTitle={document.title}
+        onExport={handleExportToNotion}
+        isExporting={exportNotionMutation.isPending}
+        existingNotionPageId={document.notionPageId}
+      />
+
+      <ExportGoogleDocsDialog
+        open={isExportGoogleDocsDialogOpen}
+        onOpenChange={setIsExportGoogleDocsDialogOpen}
+        documentTitle={document.title}
+        onExport={handleExportToGoogleDocs}
+        isExporting={exportGoogleDocsMutation.isPending}
+        existingGoogleDocsId={document.googleDocsId}
+        folders={driveFolders?.folders || []}
+        isLoadingFolders={isLoadingFolders}
+        onRefreshFolders={() => refetchFolders()}
+      />
+
       {/* Delete Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="bg-background-primary border-border-subtle">
@@ -375,16 +535,6 @@ export default function DocDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Export Dialog */}
-      <ExportNotionDialog
-        open={isExportDialogOpen}
-        onOpenChange={setIsExportDialogOpen}
-        documentTitle={document.title}
-        onExport={handleExportToNotion}
-        isExporting={exportMutation.isPending}
-        existingNotionPageId={document.notionPageId}
-      />
     </div>
   );
 }

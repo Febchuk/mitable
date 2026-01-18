@@ -19,7 +19,7 @@ import { monitoringSessions } from "./monitoring.schema";
  * Stores documentation generated from monitoring sessions or created manually.
  * Supports How-to Guides, Knowledge Articles, and Troubleshooting Docs.
  *
- * Flow: Session ends → Generate Doc → Edit with AI assist → Publish → Export to Notion
+ * Flow: Session ends → Generate Doc → Edit with AI assist → Publish → Export to Notion/Google Docs
  */
 export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -48,6 +48,14 @@ export const documents = pgTable("documents", {
   // States: null | 'pending' | 'synced' | 'error'
   notionSyncedAt: timestamp("notion_synced_at"),
   notionSyncError: text("notion_sync_error"),
+
+  // Google Docs export tracking
+  googleDocsId: varchar("google_docs_id", { length: 100 }),
+  googleDocsFolderId: varchar("google_docs_folder_id", { length: 100 }),
+  googleDocsSyncStatus: varchar("google_docs_sync_status", { length: 50 }),
+  // States: null | 'pending' | 'synced' | 'error'
+  googleDocsSyncedAt: timestamp("google_docs_synced_at"),
+  googleDocsSyncError: text("google_docs_sync_error"),
 
   // AI generation metadata
   generationModel: varchar("generation_model", { length: 100 }),

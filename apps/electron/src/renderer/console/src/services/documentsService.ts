@@ -154,8 +154,37 @@ export async function exportToNotion(
   id: string,
   data?: ExportNotionRequest
 ): Promise<ExportNotionResponse> {
-  return apiRequest<ExportNotionResponse>(`/documents/${id}/export/notion`, {
+  return apiRequest<ExportNotionResponse>(`/documents/${id}/export-notion`, {
     method: "POST",
     body: JSON.stringify(data || {}),
   });
+}
+
+// ===========================
+// Export to Google Docs
+// ===========================
+
+export async function exportToGoogleDocs(
+  id: string,
+  folderId?: string
+): Promise<{ documentUrl: string; googleDocsId: string }> {
+  return apiRequest<{ documentUrl: string; googleDocsId: string }>(
+    `/documents/${id}/export-google-docs`,
+    {
+      method: "POST",
+      body: JSON.stringify({ folderId }),
+    }
+  );
+}
+
+// ===========================
+// List Google Drive Folders
+// ===========================
+
+export async function fetchGoogleDriveFolders(): Promise<{
+  folders: Array<{ id: string; name: string; mimeType: string }>;
+}> {
+  return apiRequest<{ folders: Array<{ id: string; name: string; mimeType: string }> }>(
+    "/documents/google-drive-folders"
+  );
 }

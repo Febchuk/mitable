@@ -27,7 +27,7 @@ import {
   Info,
   Download,
 } from "lucide-react";
-import { SiLinear, SiGmail } from "react-icons/si";
+import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import { BillingSection } from "@/console/src/components/billing";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -43,6 +43,12 @@ interface GmailStatus {
   email: string | null;
 }
 
+interface NotionStatus {
+  connected: boolean;
+  expired: boolean;
+  workspaceId: string | null;
+}
+
 export default function SettingsView() {
   const { toast } = useToast();
   const [linearStatus, setLinearStatus] = useState<LinearStatus | null>(null);
@@ -55,6 +61,12 @@ export default function SettingsView() {
   const [isGmailLoading, setIsGmailLoading] = useState(true);
   const [isGmailConnecting, setIsGmailConnecting] = useState(false);
   const [isGmailDisconnecting, setIsGmailDisconnecting] = useState(false);
+
+  // Notion state
+  const [notionStatus, setNotionStatus] = useState<NotionStatus | null>(null);
+  const [isNotionLoading, setIsNotionLoading] = useState(true);
+  const [isNotionConnecting, setIsNotionConnecting] = useState(false);
+  const [isNotionDisconnecting, setIsNotionDisconnecting] = useState(false);
 
   // About / Version state
   const [appVersion, setAppVersion] = useState<string>("");
@@ -81,6 +93,7 @@ export default function SettingsView() {
   useEffect(() => {
     loadLinearStatus();
     loadGmailStatus();
+    loadNotionStatus();
     loadAppVersion();
   }, []);
 
@@ -176,6 +189,29 @@ export default function SettingsView() {
       logger.error("Error loading Gmail status:", error);
     } finally {
       setIsGmailLoading(false);
+    }
+  };
+
+  const loadNotionStatus = async () => {
+    setIsNotionLoading(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/notion/user/status`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNotionStatus(data);
+      }
+    } catch (error) {
+      logger.error("Error loading Notion status:", error);
+    } finally {
+      setIsNotionLoading(false);
     }
   };
 
@@ -445,6 +481,113 @@ export default function SettingsView() {
     }
   };
 
+  const handleConnectNotion = async () => {
+    setIsNotionConnecting(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Not authenticated. Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/notion/user/oauth/start`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start Notion OAuth");
+      }
+
+      const { authUrl } = await response.json();
+
+      // Open OAuth URL in default browser
+      window.open(authUrl, "_blank");
+
+      toast({
+        title: "Complete in Browser",
+        description: "Please complete the Notion authorization in your browser, then return here.",
+      });
+
+      // Start polling for connection status
+      const pollInterval = setInterval(async () => {
+        try {
+          const token = authService.getAccessToken();
+          if (!token) return;
+
+          const resp = await fetch(`${API_BASE_URL}/api/integrations/notion/user/status`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (resp.ok) {
+            const data = await resp.json();
+            setNotionStatus(data);
+            if (data.connected) {
+              clearInterval(pollInterval);
+              toast({
+                title: "Notion Connected",
+                description: "Your Notion workspace has been connected successfully!",
+              });
+            }
+          }
+        } catch (err) {
+          logger.error("Polling error:", err);
+        }
+      }, 2000);
+
+      // Stop polling after 2 minutes
+      setTimeout(() => clearInterval(pollInterval), 120000);
+    } catch (error) {
+      logger.error("Error connecting Notion:", error);
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect to Notion. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsNotionConnecting(false);
+    }
+  };
+
+  const handleDisconnectNotion = async () => {
+    setIsNotionDisconnecting(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/notion/user/disconnect`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setNotionStatus({ connected: false, expired: false, workspaceId: null });
+        toast({
+          title: "Notion Disconnected",
+          description: "Your Notion workspace has been disconnected.",
+        });
+      }
+    } catch (error) {
+      logger.error("Error disconnecting Notion:", error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect Notion. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsNotionDisconnecting(false);
+    }
+  };
+
   return (
     <div className="p-8 space-y-6">
       <div>
@@ -619,6 +762,84 @@ export default function SettingsView() {
             <div className="mt-4 p-3 rounded-lg bg-status-warning/10 border border-status-warning/20">
               <p className="text-sm text-status-warning">
                 Your Linear connection has expired. Please reconnect to continue sending updates.
+              </p>
+            </div>
+          )}
+        </Card>
+
+        {/* Notion Integration Card */}
+        <Card className="p-6 bg-background-elevated border-border-subtle">
+          <div className="flex items-center gap-4">
+            {/* Notion Icon */}
+            <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
+              <SiNotion className="w-6 h-6 text-black" />
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-semibold text-white">Notion</h3>
+              <p className="text-sm text-muted-foreground">
+                Connect your Notion workspace to export documents.
+              </p>
+            </div>
+
+            {/* Action Button */}
+            {isNotionLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            ) : notionStatus?.connected ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1 text-sm text-status-success">
+                  <Check className="w-4 h-4" />
+                  Connected
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleConnectNotion}
+                  disabled={isNotionConnecting}
+                  className="text-muted-foreground hover:text-white border-border-subtle"
+                >
+                  {isNotionConnecting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Settings className="w-4 h-4" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDisconnectNotion}
+                  disabled={isNotionDisconnecting}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  {isNotionDisconnecting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Unlink className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectNotion}
+                disabled={isNotionConnecting}
+                className="bg-black hover:bg-zinc-800 text-white gap-2"
+              >
+                {isNotionConnecting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Link2 className="w-4 h-4" />
+                )}
+                Connect
+              </Button>
+            )}
+          </div>
+
+          {notionStatus?.expired && (
+            <div className="mt-4 p-3 rounded-lg bg-status-warning/10 border border-status-warning/20">
+              <p className="text-sm text-status-warning">
+                Your Notion connection has expired. Please reconnect to continue exporting
+                documents.
               </p>
             </div>
           )}

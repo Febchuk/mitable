@@ -94,6 +94,10 @@ export const config = {
     redirectUri: (
       process.env.NOTION_REDIRECT_URI || `http://localhost:${PORT}/api/integrations/notion/callback`
     ).trim(),
+    userRedirectUri: (
+      process.env.NOTION_USER_REDIRECT_URI ||
+      `http://localhost:${PORT}/api/integrations/notion/user/callback`
+    ).trim(),
     // Notion uses versioned API - must include in all requests
     apiVersion: "2022-06-28",
   },

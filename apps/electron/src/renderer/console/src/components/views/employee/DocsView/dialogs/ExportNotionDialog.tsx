@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, ExternalLink, AlertCircle, CheckCircle } from "lucide-react";
+import { Loader2, ExternalLink, CheckCircle } from "lucide-react";
 
 interface ExportNotionDialogProps {
   open: boolean;
@@ -42,7 +42,7 @@ export default function ExportNotionDialog({
           </DialogTitle>
           <DialogDescription className="text-text-secondary">
             {existingNotionPageId
-              ? "This document was previously exported to Notion. Export again to create a new page with the latest content."
+              ? "This document was previously exported to Notion. Export again to update the existing page with the latest content."
               : "Export this document to your connected Notion workspace."}
           </DialogDescription>
         </DialogHeader>
@@ -54,14 +54,14 @@ export default function ExportNotionDialog({
             <div className="text-text-primary font-medium">{documentTitle}</div>
           </div>
 
-          {/* Previous Export Warning */}
+          {/* Previous Export Info */}
           {existingNotionPageId && (
-            <div className="flex items-start gap-3 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-              <AlertCircle size={18} className="text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+              <CheckCircle size={18} className="text-blue-400 flex-shrink-0 mt-0.5" />
               <div className="text-sm">
-                <div className="text-yellow-400 font-medium">Previously Exported</div>
+                <div className="text-blue-400 font-medium">Previously Exported</div>
                 <div className="text-text-secondary">
-                  A new Notion page will be created. The previous export will not be updated.
+                  The existing Notion page will be updated with the latest content.
                 </div>
               </div>
             </div>

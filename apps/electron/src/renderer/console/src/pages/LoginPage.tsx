@@ -41,7 +41,7 @@ export default function LoginPage() {
       if (response.profile.role === "admin") {
         navigate("/dashboard");
       } else {
-        navigate("/roadmap");
+        navigate("/docs");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

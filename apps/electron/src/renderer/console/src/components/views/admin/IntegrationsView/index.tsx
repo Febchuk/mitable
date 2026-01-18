@@ -11,6 +11,7 @@ import NotionConfigureDialog from "./components/NotionConfigureDialog";
 import GitHubConnectDialog from "./components/GitHubConnectDialog";
 import LinearUsersDialog from "./components/LinearUsersDialog";
 import GmailUsersDialog from "./components/GmailUsersDialog";
+import GmailConfigureDialog from "./components/GmailConfigureDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +39,7 @@ export default function IntegrationsView() {
   const [githubDialogOpen, setGithubDialogOpen] = useState(false);
   const [linearUsersDialogOpen, setLinearUsersDialogOpen] = useState(false);
   const [gmailUsersDialogOpen, setGmailUsersDialogOpen] = useState(false);
+  const [gmailConfigureDialogOpen, setGmailConfigureDialogOpen] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSlackConnect = () => {
@@ -82,6 +84,15 @@ export default function IntegrationsView() {
 
   const handleGmailViewUsers = () => {
     setGmailUsersDialogOpen(true);
+  };
+
+  const handleGmailConfigure = () => {
+    setGmailConfigureDialogOpen(true);
+  };
+
+  const handleGmailConfigureSave = () => {
+    // Refresh integrations to get updated metadata
+    refetch();
   };
 
   const handleGithubOAuthComplete = () => {
@@ -420,7 +431,7 @@ export default function IntegrationsView() {
                       : integration.provider === "linear"
                         ? handleLinearViewUsers
                         : integration.provider === "gmail"
-                          ? handleGmailViewUsers
+                          ? handleGmailConfigure
                           : handleConfigureIntegration
                   }
                   onSync={
@@ -475,7 +486,7 @@ export default function IntegrationsView() {
                           : integration.provider === "linear"
                             ? handleLinearViewUsers
                             : integration.provider === "gmail"
-                              ? handleGmailViewUsers
+                              ? handleGmailConfigure
                               : handleConfigureIntegration
                     }
                     onSync={
@@ -525,7 +536,7 @@ export default function IntegrationsView() {
                           : integration.provider === "linear"
                             ? handleLinearViewUsers
                             : integration.provider === "gmail"
-                              ? handleGmailViewUsers
+                              ? handleGmailConfigure
                               : handleConfigureIntegration
                     }
                     onSync={
@@ -601,6 +612,13 @@ export default function IntegrationsView() {
 
       {/* Gmail Users Dialog */}
       <GmailUsersDialog open={gmailUsersDialogOpen} onOpenChange={setGmailUsersDialogOpen} />
+
+      {/* Gmail Configure Dialog */}
+      <GmailConfigureDialog
+        open={gmailConfigureDialogOpen}
+        onOpenChange={setGmailConfigureDialogOpen}
+        onSave={handleGmailConfigureSave}
+      />
     </div>
   );
 }

@@ -39,7 +39,7 @@ export default function TitleBar() {
       if (role === "admin") {
         navigate("/dashboard");
       } else {
-        navigate("/roadmap");
+        navigate("/docs");
       }
     }
   };

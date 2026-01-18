@@ -147,6 +147,32 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 /**
+ * GET /api/documents/google-drive-folders
+ * List user's Google Drive folders for document export selection
+ * Requires user to have connected Gmail/Google Workspace
+ */
+router.get(
+  "/google-drive-folders",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+
+    try {
+      const { googleDocsExportService } = await import("../services/google-docs-export.service.js");
+
+      const folders = await googleDocsExportService.listFolders(userId);
+      res.json({ folders });
+    } catch (error) {
+      console.error("[Documents] Error listing Drive folders:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to list Google Drive folders",
+      });
+    }
+  }
+);
+
+/**
  * GET /api/documents/:id
  * Get a single document with full content
  */
@@ -186,6 +212,11 @@ router.get("/:id", requireAuth, async (req: Request, res: Response): Promise<voi
         notionSyncStatus: schema.documents.notionSyncStatus,
         notionSyncedAt: schema.documents.notionSyncedAt,
         notionSyncError: schema.documents.notionSyncError,
+        googleDocsId: schema.documents.googleDocsId,
+        googleDocsFolderId: schema.documents.googleDocsFolderId,
+        googleDocsSyncStatus: schema.documents.googleDocsSyncStatus,
+        googleDocsSyncedAt: schema.documents.googleDocsSyncedAt,
+        googleDocsSyncError: schema.documents.googleDocsSyncError,
         generationModel: schema.documents.generationModel,
         generationPromptVersion: schema.documents.generationPromptVersion,
         createdAt: schema.documents.createdAt,
@@ -232,6 +263,11 @@ router.get("/:id", requireAuth, async (req: Request, res: Response): Promise<voi
       )
       .where(eq(schema.sessionDocumentContributions.documentId, documentId))
       .orderBy(desc(schema.sessionDocumentContributions.createdAt));
+
+    // Prevent caching to ensure fresh data after exports
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
 
     res.json({
       ...document,
@@ -936,10 +972,10 @@ router.post(
       // Import notion export service
       const { notionExportService } = await import("../services/notion-export.service.js");
 
-      // Export to Notion
+      // Export to Notion using user's personal token
       const result = await notionExportService.exportDocument({
         documentId,
-        organizationId: user.organizationId,
+        userId,
         parentPageId,
       });
 
@@ -949,6 +985,133 @@ router.post(
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to export to Notion",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/documents/:id/export-google-docs
+ * Export a document to Google Docs
+ * Requires user to have connected Gmail/Google Workspace
+ */
+router.post(
+  "/:id/export-google-docs",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const documentId = req.params.id;
+    const { folderId } = req.body; // Optional Drive folder ID
+
+    try {
+      // Get user's organization
+      const [user] = await db
+        .select({ organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!user?.organizationId) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "User organization not found",
+        });
+        return;
+      }
+
+      // Verify document belongs to user's org
+      const [document] = await db
+        .select()
+        .from(schema.documents)
+        .where(
+          and(
+            eq(schema.documents.id, documentId),
+            eq(schema.documents.organizationId, user.organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!document) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Document not found",
+        });
+        return;
+      }
+
+      // Import Google Docs export service
+      const { googleDocsExportService } = await import("../services/google-docs-export.service.js");
+
+      // Export to Google Docs using user's Gmail tokens
+      const result = await googleDocsExportService.exportDocument(documentId, userId, folderId);
+
+      res.json(result);
+    } catch (error) {
+      console.error("[Documents] Error exporting to Google Docs:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to export to Google Docs",
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/documents/:id/disconnect-google-docs
+ * Disconnect Google Docs integration for a document
+ */
+router.delete(
+  "/:id/disconnect-google-docs",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const documentId = req.params.id;
+
+    try {
+      // Get user's organization
+      const [user] = await db
+        .select({ organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!user?.organizationId) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "User organization not found",
+        });
+        return;
+      }
+
+      // Verify document belongs to user's org
+      const [document] = await db
+        .select()
+        .from(schema.documents)
+        .where(
+          and(
+            eq(schema.documents.id, documentId),
+            eq(schema.documents.organizationId, user.organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!document) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Document not found",
+        });
+        return;
+      }
+
+      const { googleDocsExportService } = await import("../services/google-docs-export.service.js");
+
+      await googleDocsExportService.disconnectDocument(documentId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[Documents] Error disconnecting Google Docs:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to disconnect Google Docs",
       });
     }
   }
