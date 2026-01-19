@@ -31,6 +31,7 @@
     "migrate:0022": "tsx src/scripts/run-migration-0022.ts",
     "migrate:0023": "tsx src/scripts/run-migration-0023.ts",
     "migrate:0024": "tsx src/scripts/run-migration-0024.ts",
+    "migrate:persona-fields": "tsx src/scripts/run-migration-add-persona-fields.ts",
     "test-search": "tsx src/scripts/test-search.ts",
     "sync-slack": "tsx src/scripts/sync-slack.ts",
     "sync-notion": "tsx src/scripts/sync-notion.ts",

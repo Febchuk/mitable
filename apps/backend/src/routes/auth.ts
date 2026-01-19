@@ -615,11 +615,43 @@ authRouter.post("/login", async (req: Request, res: Response) => {
     }
 
     // Fetch user profile from database
-    const [userProfile] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, data.user.id))
-      .limit(1);
+    // Try full select first, fallback to basic fields if persona columns don't exist
+    let userProfile;
+    try {
+      userProfile = (
+        await db
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.id, data.user.id))
+          .limit(1)
+      )[0];
+    } catch (error: any) {
+      // If error is due to missing columns (like job_title), select only basic fields
+      if (error?.code === "42703" || error?.message?.includes("does not exist")) {
+        userProfile = (
+          await db
+            .select({
+              id: schema.users.id,
+              organizationId: schema.users.organizationId,
+              email: schema.users.email,
+              firstName: schema.users.firstName,
+              lastName: schema.users.lastName,
+              role: schema.users.role,
+              avatarUrl: schema.users.avatarUrl,
+              currentWeek: schema.users.currentWeek,
+              startDate: schema.users.startDate,
+              status: schema.users.status,
+              createdAt: schema.users.createdAt,
+              updatedAt: schema.users.updatedAt,
+            })
+            .from(schema.users)
+            .where(eq(schema.users.id, data.user.id))
+            .limit(1)
+        )[0];
+      } else {
+        throw error;
+      }
+    }
 
     res.json({
       user: data.user,

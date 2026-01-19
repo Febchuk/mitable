@@ -1,13 +1,20 @@
 /**
  * Renderer Process Logger
  *
- * Centralized logging utility using electron-log for renderer processes.
- * Logs are automatically sent to the main process via IPC and written to the same log file.
+ * Centralized logging utility for renderer processes.
+ * Uses console-based logging since electron-log/renderer doesn't work well when bundled by Vite.
+ * Logs are visible in DevTools console.
  *
- * Note: Requires `log.initialize()` to be called in the main process first.
+ * Note: In production builds, electron-log/renderer may work, but for dev mode we use console.
  */
 
-import log from "electron-log/renderer";
+// Console-based logger (works reliably in all environments)
+const log = {
+  debug: (msg: string, ...args: unknown[]) => console.debug(`[DEBUG] ${msg}`, ...args),
+  info: (msg: string, ...args: unknown[]) => console.info(`[INFO] ${msg}`, ...args),
+  warn: (msg: string, ...args: unknown[]) => console.warn(`[WARN] ${msg}`, ...args),
+  error: (msg: string, ...args: unknown[]) => console.error(`[ERROR] ${msg}`, ...args),
+};
 
 // Set up global error handlers for the renderer
 if (typeof window !== "undefined") {
