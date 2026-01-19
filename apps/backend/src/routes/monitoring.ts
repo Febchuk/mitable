@@ -89,13 +89,8 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
 
   const organizationId = user.organizationId;
 
-  if (!selectedWindows || selectedWindows.length === 0) {
-    res.status(400).json({
-      error: "Bad Request",
-      message: "At least one window must be selected",
-    });
-    return;
-  }
+  // Allow empty selectedWindows array - focus tracker will add windows dynamically
+  const initialWindows = selectedWindows || [];
 
   try {
     // Check for existing active session
@@ -178,7 +173,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
         name: name || null,
         status: "active",
         captureIntervalMs,
-        selectedWindows: selectedWindows as any,
+        selectedWindows: initialWindows as any,
         startedAt: new Date(),
         // Goal context fields
         sessionGoal: computedSessionGoal,
@@ -203,7 +198,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       goalPreview: computedSessionGoal?.substring(0, 100),
       hasLinearIssue: !!linearIssueId,
       linearIssueId,
-      windowCount: selectedWindows.length,
+      windowCount: initialWindows.length,
       hasRelatedDocs: !!relatedDocsContext,
       relatedDocsCount: relatedDocsContext ? relatedDocsContext.split("---").length : 0,
       captureIntervalMs,
@@ -212,7 +207,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
     log.trackEvent(SESSION_EVENTS.SESSION_STARTED, {
       hasGoal: !!computedSessionGoal,
       hasLinearIssue: !!linearIssueId,
-      windowCount: selectedWindows.length,
+      windowCount: initialWindows.length,
       hasRelatedDocs: !!relatedDocsContext,
     });
 
@@ -222,7 +217,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
         id: session.id,
         status: session.status,
         name: session.name,
-        selectedWindows: session.selectedWindows,
+        selectedWindows: session.selectedWindows || [],
         captureIntervalMs: session.captureIntervalMs,
         startedAt: session.startedAt,
         sessionGoal: session.sessionGoal,
