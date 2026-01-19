@@ -70,7 +70,8 @@ function normalizeAppName(appName: string): string {
 function shouldExcludeWindow(
     windowTitle: string,
     appName: string,
-    policy: ReturnType<typeof getCapturePolicy>
+    policy: ReturnType<typeof getCapturePolicy>,
+    userId?: string
 ): { excluded: boolean; reason?: string } {
     // Check 1: Mitable windows by title
     if (MITABLE_WINDOW_TITLES.has(windowTitle)) {
@@ -103,8 +104,14 @@ function shouldExcludeWindow(
         return { excluded: true, reason: "Spotify app" };
     }
 
-    // Check 7: Policy-blocked windows
-    const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
+    // Check 7: Policy-blocked windows (pass userId if available)
+    const policyDecision = isBlockedByPolicy(
+        windowTitle,
+        appName,
+        policy,
+        undefined,
+        userId
+    );
     if (policyDecision.blocked) {
         return { excluded: true, reason: policyDecision.reason || "Policy-blocked" };
     }
@@ -118,6 +125,7 @@ class FocusWindowTracker {
     private cleanupTimer: NodeJS.Timeout | null = null;
     private trackedWindows: Map<string, TrackedWindow> = new Map();
     private lastActiveWindowId: string | null = null;
+    private currentUserId: string | undefined = undefined;
 
     // Callback to notify when windows change
     private onWindowsChanged: ((windows: SelectedWindowInfo[]) => void) | null = null;
@@ -130,7 +138,10 @@ class FocusWindowTracker {
      * Start tracking focused windows
      * Called when a monitoring session starts
      */
-    async start(onWindowsChanged?: (windows: SelectedWindowInfo[]) => void): Promise<void> {
+    async start(
+        onWindowsChanged?: (windows: SelectedWindowInfo[]) => void,
+        userId?: string
+    ): Promise<void> {
         if (this.isTracking) {
             logger.warn(" Already tracking, ignoring start request");
             return;
@@ -140,6 +151,7 @@ class FocusWindowTracker {
         this.trackedWindows.clear();
         this.lastActiveWindowId = null;
         this.onWindowsChanged = onWindowsChanged || null;
+        this.currentUserId = userId;
 
         // Immediately capture the current active window
         await this.checkActiveWindow();
@@ -248,7 +260,7 @@ class FocusWindowTracker {
 
             // Check if window should be excluded (Mitable, Spotify, or policy-blocked)
             const policy = getCapturePolicy();
-            const exclusionCheck = shouldExcludeWindow(windowTitle, appName, policy);
+            const exclusionCheck = shouldExcludeWindow(windowTitle, appName, policy, this.currentUserId);
 
             if (exclusionCheck.excluded) {
                 logger.info(

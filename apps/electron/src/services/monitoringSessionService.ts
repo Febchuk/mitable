@@ -110,14 +110,17 @@ class MonitoringSessionService {
 
     try {
       // Start focus window tracker to automatically add focused windows
-      await focusWindowTracker.start((windows) => {
-        // Update config's selectedWindows when focus tracker detects changes
-        if (this.activeSession) {
-          this.activeSession.config.selectedWindows = windows;
-          // Broadcast update so UI can show current watched windows
-          this.broadcastSessionUpdate();
-        }
-      });
+      await focusWindowTracker.start(
+        (windows) => {
+          // Update config's selectedWindows when focus tracker detects changes
+          if (this.activeSession) {
+            this.activeSession.config.selectedWindows = windows;
+            // Broadcast update so UI can show current watched windows
+            this.broadcastSessionUpdate();
+          }
+        },
+        config.userId
+      );
 
       // Initialize local frame storage (persistent directory)
       const localPath = await localFrameStorage.initSession({

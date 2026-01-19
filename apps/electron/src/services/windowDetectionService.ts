@@ -52,6 +52,10 @@ class WindowDetectionService {
   // Track if we've logged the permission warning to avoid spam
   private permissionWarningLogged = false;
 
+  // Track apps that have been detected (for block list management)
+  // Key: normalized app name (lowercase), Value: original app name
+  private detectedApps: Map<string, string> = new Map();
+
   // Exact window titles of our own Electron renderers to exclude
   private readonly MITABLE_WINDOW_TITLES: Set<string> = new Set([
     "Mitable Agent",
@@ -108,6 +112,12 @@ class WindowDetectionService {
         if (isSystemApp(appName)) {
           logger.info(` Skipping system app: ${appName}`);
           continue;
+        }
+
+        // Track detected apps for block list management
+        const normalizedAppName = this.normalizeAppName(appName).toLowerCase();
+        if (normalizedAppName && !this.detectedApps.has(normalizedAppName)) {
+          this.detectedApps.set(normalizedAppName, appName);
         }
 
         // Check capture policy
@@ -367,6 +377,21 @@ class WindowDetectionService {
       selectedCount: this.selectedWindows.size,
       selectedWindows: this.getSelectedWindows(),
     };
+  }
+
+  /**
+   * Get list of apps that have been detected (for block list management)
+   * Returns array of normalized app names (lowercase)
+   */
+  getDetectedApps(): string[] {
+    return Array.from(this.detectedApps.keys()).sort();
+  }
+
+  /**
+   * Get original app name for a normalized app name
+   */
+  getOriginalAppName(normalizedAppName: string): string | undefined {
+    return this.detectedApps.get(normalizedAppName.toLowerCase());
   }
 
   /**

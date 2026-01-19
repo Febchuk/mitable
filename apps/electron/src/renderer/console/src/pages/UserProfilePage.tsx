@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect } from "react";
+import { useState, FormEvent, useEffect, useCallback } from "react";
 import {
   Eye,
   EyeOff,
@@ -15,6 +15,8 @@ import {
   Info,
   Download,
   Settings,
+  Shield,
+  Plus,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import Button from "../components/ui/Button";
@@ -101,6 +103,190 @@ export default function UserProfilePage() {
     updatePreference,
   } = usePreferences();
 
+  // Block list state
+  const [blockedApps, setBlockedApps] = useState<string[]>([]);
+  const [detectedApps, setDetectedApps] = useState<
+    Array<{ normalizedName: string; originalName: string }>
+  >([]);
+  const [isBlockListLoading, setIsBlockListLoading] = useState(true);
+
+  // Notification frequency state
+  const [notificationFrequency, setNotificationFrequency] = useState<number>(30);
+  const [isNotificationFrequencyLoading, setIsNotificationFrequencyLoading] = useState(true);
+
+  // Auto session start state
+  const [autoSessionStart, setAutoSessionStart] = useState<boolean>(false);
+  const [isAutoSessionStartLoading, setIsAutoSessionStartLoading] = useState(true);
+
+  // Block list functions
+  const loadBlockList = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setIsBlockListLoading(true);
+      const apps = await window.consoleAPI.getBlockList(user.id);
+      setBlockedApps(apps);
+    } catch (error) {
+      logger.error("Error loading block list:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load blocked apps.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBlockListLoading(false);
+    }
+  }, [user?.id, toast]);
+
+  const loadDetectedApps = useCallback(async () => {
+    try {
+      const apps = await window.consoleAPI.getDetectedApps();
+      setDetectedApps(apps);
+    } catch (error) {
+      logger.error("Error loading detected apps:", error);
+    }
+  }, []);
+
+  // Helper function to clean app names (remove .app, .exe, .AppImage suffixes)
+  const cleanAppName = (appName: string): string => {
+    return appName.replace(/\.(app|exe|AppImage)$/i, "");
+  };
+
+  const handleAddBlockedApp = async (appName: string) => {
+    if (!user?.id) return;
+    try {
+      await window.consoleAPI.addBlockedApp(user.id, appName);
+      await loadBlockList();
+      const detectedApp = detectedApps.find((a) => a.normalizedName === appName.toLowerCase());
+      const displayName = cleanAppName(detectedApp?.originalName || appName);
+      toast({
+        title: "App blocked",
+        description: `${displayName} has been added to your block list.`,
+      });
+    } catch (error) {
+      logger.error("Error adding blocked app:", error);
+      toast({
+        title: "Error",
+        description: "Failed to block app.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveBlockedApp = async (appName: string) => {
+    if (!user?.id) return;
+    try {
+      await window.consoleAPI.removeBlockedApp(user.id, appName);
+      await loadBlockList();
+      const detectedApp = detectedApps.find((a) => a.normalizedName === appName.toLowerCase());
+      const displayName = cleanAppName(detectedApp?.originalName || appName);
+      toast({
+        title: "App unblocked",
+        description: `${displayName} has been removed from your block list.`,
+      });
+    } catch (error) {
+      logger.error("Error removing blocked app:", error);
+      toast({
+        title: "Error",
+        description: "Failed to unblock app.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Notification frequency functions
+  const loadNotificationFrequency = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setIsNotificationFrequencyLoading(true);
+      const frequency = await window.consoleAPI.getNotificationFrequency(user.id);
+      setNotificationFrequency(frequency);
+    } catch (error) {
+      logger.error("Error loading notification frequency:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load notification frequency.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsNotificationFrequencyLoading(false);
+    }
+  }, [user?.id, toast]);
+
+  const handleNotificationFrequencyChange = async (minutes: number) => {
+    if (!user?.id) return;
+    try {
+      const result = await window.consoleAPI.setNotificationFrequency(user.id, minutes);
+      if (result.success) {
+        setNotificationFrequency(minutes);
+        toast({
+          title: "Preference saved",
+          description: `Reminder notifications will appear every ${minutes} minutes.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save notification frequency.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting notification frequency:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save notification frequency.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Auto session start functions
+  const loadAutoSessionStart = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setIsAutoSessionStartLoading(true);
+      const enabled = await window.consoleAPI.getAutoSessionStart(user.id);
+      setAutoSessionStart(enabled);
+    } catch (error) {
+      logger.error("Error loading auto session start:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load auto session start preference.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAutoSessionStartLoading(false);
+    }
+  }, [user?.id, toast]);
+
+  const handleAutoSessionStartChange = async (enabled: boolean) => {
+    if (!user?.id) return;
+    try {
+      const result = await window.consoleAPI.setAutoSessionStart(user.id, enabled);
+      if (result.success) {
+        setAutoSessionStart(enabled);
+        toast({
+          title: "Preference saved",
+          description: enabled
+            ? "Sessions will automatically start when your computer wakes from sleep."
+            : "Auto session start disabled.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save auto session start preference.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting auto session start:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save auto session start preference.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Customer Profile state
   const [jobTitle, setJobTitle] = useState("");
   const [regularTasks, setRegularTasks] = useState<string[]>([]);
@@ -150,7 +336,13 @@ export default function UserProfilePage() {
     loadNotionStatus();
     loadAppVersion();
     loadUserProfile();
-  }, []);
+    if (user?.id) {
+      loadBlockList();
+      loadDetectedApps();
+      loadNotificationFrequency();
+      loadAutoSessionStart();
+    }
+  }, [user?.id, loadBlockList, loadDetectedApps, loadNotificationFrequency, loadAutoSessionStart]);
 
   const loadUserProfile = async () => {
     setIsLoadingProfile(true);
@@ -1256,6 +1448,163 @@ export default function UserProfilePage() {
                         }}
                         className="flex-shrink-0"
                       />
+                    )}
+                  </div>
+
+                  {/* Notification Frequency Setting */}
+                  <div className="flex items-center justify-between pt-4 border-t border-border-subtle">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label
+                        htmlFor="notification-frequency-input"
+                        className="text-sm font-medium text-text-primary cursor-pointer"
+                      >
+                        Reminder Notification Frequency
+                      </Label>
+                      <p className="text-xs text-text-tertiary">
+                        How often (in minutes) you'd like to receive reminders to record work
+                        sessions
+                      </p>
+                    </div>
+                    {isNotificationFrequencyLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                    ) : (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <input
+                          id="notification-frequency-input"
+                          type="number"
+                          min="5"
+                          max="240"
+                          step="5"
+                          value={notificationFrequency}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value, 10);
+                            if (!isNaN(value) && value >= 5 && value <= 240) {
+                              handleNotificationFrequencyChange(value);
+                            }
+                          }}
+                          className="w-20 h-10 rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent"
+                        />
+                        <span className="text-sm text-text-secondary">minutes</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Auto Session Start Toggle */}
+                  <div className="flex items-center justify-between pt-4 border-t border-border-subtle">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label
+                        htmlFor="auto-session-start-toggle-profile"
+                        className="text-sm font-medium text-text-primary cursor-pointer"
+                      >
+                        Auto Session Start
+                      </Label>
+                      <p className="text-xs text-text-tertiary">
+                        Automatically start a new session when your computer wakes from sleep or
+                        unlocks. If a session was already running, it will continue instead.
+                      </p>
+                    </div>
+                    {isAutoSessionStartLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                    ) : (
+                      <Switch
+                        id="auto-session-start-toggle-profile"
+                        checked={autoSessionStart}
+                        onCheckedChange={handleAutoSessionStartChange}
+                        className="flex-shrink-0"
+                      />
+                    )}
+                  </div>
+
+                  {/* Block List Section */}
+                  <div className="pt-6 border-t border-border-subtle space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Shield size={18} className="text-text-tertiary" />
+                      <h3 className="text-heading-4 text-white">Blocked Apps</h3>
+                    </div>
+                    <p className="text-body-sm text-text-tertiary">
+                      Apps in this list will never be tracked or captured.
+                    </p>
+
+                    {isBlockListLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                      </div>
+                    ) : (
+                      <>
+                        {/* Currently Blocked Apps */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-text-primary">
+                            Blocked Apps
+                          </Label>
+                          {blockedApps.length === 0 ? (
+                            <p className="text-xs text-text-tertiary italic">
+                              No apps are currently blocked
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {blockedApps.map((appName) => {
+                                const detectedApp = detectedApps.find(
+                                  (a) => a.normalizedName === appName.toLowerCase()
+                                );
+                                const displayName = cleanAppName(
+                                  detectedApp?.originalName || appName
+                                );
+                                return (
+                                  <div
+                                    key={appName}
+                                    className="flex items-center gap-1.5 bg-destructive/20 border border-destructive/30 rounded-full pl-3 pr-2 py-1"
+                                  >
+                                    <span className="text-xs text-white">{displayName}</span>
+                                    <button
+                                      onClick={() => handleRemoveBlockedApp(appName)}
+                                      className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-destructive/30 transition-colors"
+                                      aria-label={`Unblock ${displayName}`}
+                                    >
+                                      <X size={10} className="text-white/70" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Available Apps to Block */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-text-primary">
+                            Add App to Block List
+                          </Label>
+                          {detectedApps.length === 0 ? (
+                            <p className="text-xs text-text-tertiary italic">
+                              No apps detected yet. Start a session to detect apps on your system.
+                            </p>
+                          ) : (
+                            <div className="max-h-32 overflow-y-auto border border-border-subtle rounded-lg">
+                              {detectedApps
+                                .filter((app) => !blockedApps.includes(app.normalizedName))
+                                .map((app) => {
+                                  const displayName = cleanAppName(app.originalName);
+                                  return (
+                                    <button
+                                      key={app.normalizedName}
+                                      onClick={() => handleAddBlockedApp(app.normalizedName)}
+                                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-background-secondary transition-colors text-left"
+                                    >
+                                      <Plus size={14} className="text-text-tertiary" />
+                                      <span className="text-sm text-white">{displayName}</span>
+                                    </button>
+                                  );
+                                })}
+                              {detectedApps.filter((app) => !blockedApps.includes(app.normalizedName))
+                                .length === 0 && (
+                                <div className="px-3 py-2 text-xs text-text-tertiary italic">
+                                  All detected apps are already blocked
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
