@@ -5,6 +5,8 @@
  * Used by services that need to make authenticated API calls.
  */
 
+import { net } from "electron";
+
 class AuthManager {
   private accessToken: string | null = null;
   private _refreshToken: string | null = null; // Stored for future refresh logic
@@ -53,6 +55,8 @@ class AuthManager {
 
   /**
    * Make an authenticated fetch request
+   * Uses Electron's net.fetch() which uses Chromium's network stack
+   * (instead of Node's fetch which has SSL issues in packaged apps)
    */
   async authenticatedFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
     if (!this.accessToken) {
@@ -61,7 +65,7 @@ class AuthManager {
 
     const url = endpoint.startsWith("http") ? endpoint : `${this.apiBaseUrl}${endpoint}`;
 
-    return fetch(url, {
+    return net.fetch(url, {
       ...options,
       headers: {
         "Content-Type": "application/json",

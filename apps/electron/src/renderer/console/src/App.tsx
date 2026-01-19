@@ -70,6 +70,23 @@ function NavigationHandler() {
         navigate("/monitoring");
       }
     });
+
+    // Listen for pill-triggered navigate and auto-end
+    window.consoleAPI.onNavigateAndEndSession?.((sessionId: string) => {
+      logger.info(" Pill triggered navigate-and-end-session:", sessionId);
+      navigate(`/monitoring/${sessionId}`);
+
+      // Auto-click end session button after navigation completes
+      setTimeout(() => {
+        const endButton = document.querySelector("[data-end-session-button]") as HTMLButtonElement;
+        if (endButton && !endButton.disabled) {
+          logger.info(" Auto-clicking end session button");
+          endButton.click();
+        } else {
+          logger.warn(" End session button not found or disabled");
+        }
+      }, 500); // Wait for page to render
+    });
   }, [navigate]);
 
   return null;

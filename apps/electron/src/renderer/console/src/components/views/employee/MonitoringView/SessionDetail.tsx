@@ -147,6 +147,8 @@ export default function SessionDetail() {
     };
   }, [sessionId, queryClient]);
 
+  // Auto-trigger end session when navigated from pill (useEffect in parent handles this)
+
   // Check Gmail connection status
   useEffect(() => {
     const checkGmail = async () => {
@@ -579,6 +581,7 @@ export default function SessionDetail() {
                 onClick={handleEndSession}
                 disabled={endSessionMutation.isPending}
                 className="gap-2 bg-status-error text-white hover:bg-status-error/90"
+                data-end-session-button
               >
                 {endSessionMutation.isPending ? (
                   <Loader2 className="animate-spin" size={16} />
@@ -608,6 +611,7 @@ export default function SessionDetail() {
                 disabled={endSessionMutation.isPending}
                 variant="outline"
                 className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
+                data-end-session-button
               >
                 {endSessionMutation.isPending ? (
                   <Loader2 className="animate-spin" size={16} />

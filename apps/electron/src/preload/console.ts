@@ -237,6 +237,15 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     });
   },
 
+  // Navigate to session and auto-trigger end (from pill)
+  onNavigateAndEndSession: (callback: (sessionId: string) => void) => {
+    const handler = (_event: IpcRendererEvent, sessionId: string) => callback(sessionId);
+    ipcRenderer.on("navigate-and-end-session", handler);
+    return () => {
+      ipcRenderer.removeListener("navigate-and-end-session", handler);
+    };
+  },
+
   // Update notifications
   getAppVersion: (): Promise<string> => ipcRenderer.invoke("get-app-version"),
   checkForUpdates: (): Promise<{ success: boolean }> => ipcRenderer.invoke("check-for-updates"),

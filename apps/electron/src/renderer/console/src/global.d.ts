@@ -30,6 +30,9 @@ interface ConsoleAPI {
   // Active session navigation (from native notification click)
   onNavigateToActiveSession: (callback: () => void) => void;
 
+  // Navigate to session page and auto-trigger end (from pill)
+  onNavigateAndEndSession: (callback: (sessionId: string) => void) => () => void;
+
   // Auth management
   setAuthTokens: (accessToken: string, refreshToken: string) => void;
   clearAuthTokens: () => void;

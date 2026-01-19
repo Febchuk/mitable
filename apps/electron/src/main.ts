@@ -845,43 +845,34 @@ function setupIPC() {
           return monitoringSessionService.resumeSession();
         }
         case "end-session": {
-          // 1. End Electron-side capture loop and get captures
-          const result = await monitoringSessionService.endSession();
+          monitoringLogger.info(" Pill triggered end-session - opening console UI");
 
-          if (!result.success || !result.sessionId) {
-            return result;
+          // Get active session ID
+          const sessionState = monitoringSessionService.getSessionState();
+          if (!sessionState?.id) {
+            monitoringLogger.error(" No active session to end");
+            return { success: false, error: "No active session" };
           }
 
-          // 2. Upload captures and end backend session
-          try {
-            // Upload captures if any exist
-            if (result.captures && result.captures.length > 0) {
-              monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
-              await authManager.authenticatedFetch(
-                `/api/monitoring/sessions/${result.sessionId}/captures`,
-                {
-                  method: "POST",
-                  body: JSON.stringify({ captures: result.captures }),
-                }
-              );
-            }
+          const sessionId = sessionState.id;
 
-            // ALWAYS end backend session (triggers summarization)
-            monitoringLogger.info(` Triggering backend summarization`);
-            await authManager.authenticatedFetch(
-              `/api/monitoring/sessions/${result.sessionId}/end`,
-              { method: "POST" }
-            );
-          } catch (error) {
-            monitoringLogger.error(" Error:", error);
-          }
-
-          // Hide watching pill after successful end
+          // Immediate UI feedback: hide pill + show console
           if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
             watchingPillWindow.hide();
+            monitoringLogger.info(" Pill hidden immediately");
           }
 
-          return result;
+          if (consoleWindow && !consoleWindow.isDestroyed()) {
+            consoleWindow.show();
+            consoleWindow.focus();
+            monitoringLogger.info(" Console shown and focused");
+
+            // Navigate to session page and auto-trigger end
+            consoleWindow.webContents.send("navigate-and-end-session", sessionId);
+            monitoringLogger.info(` Sent navigate-and-end-session for ${sessionId}`);
+          }
+
+          return { success: true };
         }
         case "show-console": {
           if (consoleWindow && !consoleWindow.isDestroyed()) {
