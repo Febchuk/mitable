@@ -713,15 +713,21 @@ router.post(
           formatPreference,
         }),
       ])
-        .then(() => {
+        .then(async () => {
           log.info("Session end processing completed", { sessionId: id });
+          // Update status to ready after successful story generation
+          await db
+            .update(schema.monitoringSessions)
+            .set({ status: "ready" })
+            .where(eq(schema.monitoringSessions.id, id));
         })
-        .catch((error) => {
+        .catch(async (error) => {
           log.error("Session end processing failed", {
             error: error instanceof Error ? error.message : String(error),
           });
           // Update status to indicate completion (even without story)
-          db.update(schema.monitoringSessions)
+          await db
+            .update(schema.monitoringSessions)
             .set({ status: "ready" })
             .where(eq(schema.monitoringSessions.id, id));
         });
@@ -1495,8 +1501,8 @@ router.get(
 
 /**
  * GET /api/monitoring/sessions/:id/story
- * Get the progressive master story for a session
- * This is the "living document" narrative built incrementally during captures
+ * Get the master story for a session
+ * The master story is generated at session end based on the activity timeline
  */
 router.get(
   "/sessions/:id/story",

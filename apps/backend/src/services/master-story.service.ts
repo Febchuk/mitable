@@ -18,7 +18,10 @@ import { config } from "../config";
 import { db } from "../db/client";
 import { sessionCaptures, sessionSummaries } from "../db/schema/index";
 import { eq, desc, and, isNotNull, asc } from "drizzle-orm";
-import { STORYTELLER_SYSTEM_PROMPT } from "../prompts/session-prompts";
+import {
+  STORYTELLER_SYSTEM_PROMPT,
+  buildStorytellerUserPrompt,
+} from "../prompts/session-prompts";
 import { createSessionLogger, createTimer, CHECKPOINTS } from "../lib/sessionLogger";
 
 export interface GenerateStoryOptions {
@@ -48,8 +51,8 @@ class MasterStoryService {
     log.info("Starting Master Story generation", { options });
 
     try {
-      // 1. Fetch Activity Timeline (Classifier Output)
-      const activities = await db.query.sessionCaptures.findMany({
+      // 1. Fetch Activity Timeline (Classifier Output) - already ordered chronologically by sequenceNumber
+      const rawActivities = await db.query.sessionCaptures.findMany({
         where: and(
           eq(sessionCaptures.sessionId, options.sessionId),
           isNotNull(sessionCaptures.activityDescription)
@@ -61,46 +64,51 @@ class MasterStoryService {
         },
       });
 
-      if (activities.length === 0) {
+      // Filter out nulls and map to format needed by prompt builder
+      const timeline = rawActivities
+        .filter((a): a is { activityDescription: string; capturedAt: Date } =>
+          a.activityDescription !== null
+        )
+        .map((a) => ({
+          activityDescription: a.activityDescription!,
+          capturedAt: a.capturedAt,
+        }));
+
+      if (timeline.length === 0) {
         log.warn("No activities found for story generation");
         return "No activity recorded in this session.";
       }
 
-      // 2. Format Timeline for Prompt
-      const timelineText = activities
-        .map((a, i) => `${i + 1}. [${a.capturedAt.toISOString()}] ${a.activityDescription}`)
-        .join("\n");
+      // 2. Build adaptive prompt based on user preferences
+      const userPrompt = buildStorytellerUserPrompt(timeline, options.formatPreference);
 
-      // 3. Build Prompt
-      const userPrompt = `
-TIMELINE:
-${timelineText}
+      log.debug("Generated prompt for story", {
+        activityCount: timeline.length,
+        style: options.formatPreference.style,
+        format: options.formatPreference.format,
+        includeScreenshots: options.formatPreference.includeScreenshots,
+      });
 
-PREFERENCES:
-Style: ${options.formatPreference.style}
-Format: ${options.formatPreference.format}
-
-Generate the Master Story update:`;
-
-      // 4. Call LLM (Llama 3 70b or 8b)
+      // 3. Call LLM (Llama 3 70b or 8b)
       const completion = await this.groq.chat.completions.create({
         messages: [
           { role: "system", content: STORYTELLER_SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
-        model: "llama3-70b-8192", // High capacity for summarization
+        model: "llama-3.3-70b-versatile", // High capacity for summarization
         temperature: 0.2,
+        max_tokens: options.formatPreference.style === "verbose" ? 2000 : 1000,
       });
 
       const story = completion.choices[0]?.message?.content || "Failed to generate story.";
 
-      // 5. Save Summary to DB
+      // 4. Save Summary to DB
       await db.insert(sessionSummaries).values({
         sessionId: options.sessionId,
         version: 1, // Reset versioning for this new flow
         summaryType: "master_story", // or 'final_summary'
         narrativeSummary: story,
-        modelUsed: "llama3-70b-8192",
+        modelUsed: "llama-3.3-70b-versatile",
         tokenCount: completion.usage?.total_tokens || 0,
         generationTimeMs: timer.elapsed(),
       });

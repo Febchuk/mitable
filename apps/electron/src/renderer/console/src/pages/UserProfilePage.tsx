@@ -29,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import { createLogger } from "../../../lib/logger";
 import { API_BASE_URL } from "../lib/config";
+import MultiSelectPicker from "../components/shared/MultiSelectPicker/index";
 
 const logger = createLogger("UserProfilePage");
 
@@ -100,12 +101,129 @@ export default function UserProfilePage() {
     updatePreference,
   } = usePreferences();
 
+  // Customer Profile state
+  const [jobTitle, setJobTitle] = useState("");
+  const [regularTasks, setRegularTasks] = useState<string[]>([]);
+  const [regularApps, setRegularApps] = useState<string[]>([]);
+  const [additionalContext, setAdditionalContext] = useState("");
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Predefined options
+  const regularAppsOptions = [
+    "Cursor",
+    "Slack",
+    "Chrome",
+    "Safari",
+    "Figma",
+    "Granola",
+    "Linear",
+    "VS Code",
+    "Terminal",
+    "Notion",
+    "Obsidian",
+    "Spotify",
+    "Zoom",
+    "Teams",
+    "Discord",
+  ];
+
+  const regularTasksOptions = [
+    "Email",
+    "Coding",
+    "Research",
+    "Design",
+    "Communication",
+    "Planning",
+    "Writing",
+    "Reviewing",
+    "Debugging",
+    "Testing",
+    "Documentation",
+    "Meetings",
+    "Learning",
+  ];
+
   useEffect(() => {
     loadLinearStatus();
     loadGmailStatus();
     loadNotionStatus();
     loadAppVersion();
+    loadUserProfile();
   }, []);
+
+  const loadUserProfile = async () => {
+    setIsLoadingProfile(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const profile = data.profile;
+        setJobTitle(profile.jobTitle || "");
+        setRegularTasks((profile.regularTasks as string[]) || []);
+        setRegularApps((profile.regularApps as string[]) || []);
+        setAdditionalContext(profile.additionalContext || "");
+      }
+    } catch (error) {
+      logger.error("Error loading user profile:", error);
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Not authenticated. Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jobTitle: jobTitle || null,
+          regularTasks,
+          regularApps,
+          additionalContext: additionalContext || null,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Profile updated",
+          description: "Your customer profile has been saved successfully.",
+        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to save profile");
+      }
+    } catch (error) {
+      logger.error("Error saving profile:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save profile",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   // Listen for update events
   useEffect(() => {
@@ -746,6 +864,123 @@ export default function UserProfilePage() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Customer Profile Section */}
+                <div className="bg-background-secondary rounded-xl border border-border-subtle p-6 space-y-6">
+                  <div className="flex items-center gap-3 pb-4 border-b border-border-subtle">
+                    <div className="w-10 h-10 bg-primary-light/20 rounded-full flex items-center justify-center">
+                      <User className="w-5 h-5 text-primary-light" />
+                    </div>
+                    <div>
+                      <h2 className="text-heading-4 text-white">Customer Profile</h2>
+                      <p className="text-body-sm text-text-tertiary">
+                        Help us understand your work context to improve session classification
+                      </p>
+                    </div>
+                  </div>
+
+                  {isLoadingProfile ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-text-tertiary" />
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Job Title */}
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="jobTitle"
+                          className="text-sm font-medium text-text-secondary"
+                        >
+                          Job Title
+                        </label>
+                        <input
+                          id="jobTitle"
+                          type="text"
+                          value={jobTitle}
+                          onChange={(e) => setJobTitle(e.target.value)}
+                          placeholder="e.g., Software Engineer, Designer, Product Manager"
+                          maxLength={100}
+                          disabled={isSavingProfile}
+                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                        />
+                      </div>
+
+                      {/* Regular Apps */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-text-secondary">
+                          Regular Apps
+                        </label>
+                        <p className="text-xs text-text-tertiary">
+                          Select the applications you use regularly in your work
+                        </p>
+                        <MultiSelectPicker
+                          options={regularAppsOptions}
+                          selectedValues={regularApps}
+                          onSelectionChange={setRegularApps}
+                          placeholder="Select apps you use regularly..."
+                          disabled={isSavingProfile}
+                        />
+                      </div>
+
+                      {/* Regular Tasks */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-text-secondary">
+                          Regular Tasks
+                        </label>
+                        <p className="text-xs text-text-tertiary">
+                          Select the types of tasks you perform regularly
+                        </p>
+                        <MultiSelectPicker
+                          options={regularTasksOptions}
+                          selectedValues={regularTasks}
+                          onSelectionChange={setRegularTasks}
+                          placeholder="Select tasks you perform regularly..."
+                          disabled={isSavingProfile}
+                        />
+                      </div>
+
+                      {/* Additional Context */}
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="additionalContext"
+                          className="text-sm font-medium text-text-secondary"
+                        >
+                          Additional Context
+                        </label>
+                        <p className="text-xs text-text-tertiary">
+                          Any other information that would help us understand your work better
+                        </p>
+                        <textarea
+                          id="additionalContext"
+                          value={additionalContext}
+                          onChange={(e) => setAdditionalContext(e.target.value)}
+                          placeholder="e.g., I work primarily on frontend features, focus on accessibility..."
+                          rows={4}
+                          disabled={isSavingProfile}
+                          className="flex w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all resize-none"
+                        />
+                      </div>
+
+                      {/* Save Button */}
+                      <div className="pt-4">
+                        <Button
+                          onClick={handleSaveProfile}
+                          disabled={isSavingProfile}
+                          className="w-full md:w-auto"
+                        >
+                          {isSavingProfile ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            "Save Profile"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Subscription Section */}

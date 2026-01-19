@@ -89,7 +89,7 @@ class ClassifierService {
           { role: "system", content: CLASSIFIER_SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
-        model: "llama3-70b-8192", // High intelligence for context understanding
+        model: "llama-3.3-70b-versatile", // High intelligence for context understanding
         temperature: 0.1, // Low temp for consistency
         response_format: { type: "json_object" },
       });
@@ -99,7 +99,7 @@ class ClassifierService {
 
       // 5. Parse Output
       const parsed = JSON.parse(content);
-      
+
       return {
         activity: parsed.activity || input.deltaDescription, // Fallback to delta if missing
         confidence: parsed.confidence || 0.5,

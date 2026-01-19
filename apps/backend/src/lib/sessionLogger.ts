@@ -359,7 +359,7 @@ export function checkDuplicateSummary(
 export const CHECKPOINTS = {
   // Master Story Service
   MASTER_STORY_INIT: "MASTER_STORY_INIT",
-  MASTER_STORY_EXTEND: "MASTER_STORY_EXTEND",
+  MASTER_STORY_EXTEND: "MASTER_STORY_EXTEND", // Legacy: unused (master story now generated at session end, not incrementally)
   MASTER_STORY_RETRIEVAL: "MASTER_STORY_RETRIEVAL",
 
   // Session Summarization Service
@@ -396,7 +396,7 @@ export const SESSION_EVENTS = {
   SESSION_RESUMED: "session_resumed",
   SUMMARY_GENERATED: "session_summary_generated",
   SUMMARY_PATH_USED: "session_summary_path",
-  MASTER_STORY_EXTENDED: "session_master_story_extended",
+  MASTER_STORY_EXTENDED: "session_master_story_extended", // Legacy: unused (master story now generated at session end, not incrementally)
   FRAME_ANALYZED: "session_frame_analyzed",
   DELIVERY_ATTEMPTED: "session_delivery_attempted",
   DELIVERY_SUCCEEDED: "session_delivery_succeeded",

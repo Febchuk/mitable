@@ -119,7 +119,7 @@ class SessionSummarizationService {
 
   /**
    * Generate a complete summary for a monitoring session
-   * Primary path: Use master story (built in real-time)
+   * Primary path: Use master story (generated at session end)
    * Fallback path: Batch screenshot analysis (if master story unavailable)
    */
   async generateSessionSummary(sessionId: string): Promise<SessionSummaryResult> {
