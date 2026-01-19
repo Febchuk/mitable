@@ -28,9 +28,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import { createLogger } from "../../../lib/logger";
+import { API_BASE_URL } from "../lib/config";
 
 const logger = createLogger("UserProfilePage");
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 interface LinearStatus {
   connected: boolean;

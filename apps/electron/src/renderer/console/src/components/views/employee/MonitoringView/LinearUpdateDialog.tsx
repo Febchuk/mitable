@@ -33,8 +33,7 @@ import { authService } from "@/console/src/services/authService";
 import { Loader2, Search, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SiLinear } from "react-icons/si";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { API_BASE_URL } from "@/console/src/lib/config";
 const LINEAR_APP_NAME = import.meta.env.VITE_LINEAR_APP_NAME || "Mitable-dev";
 
 interface LinearIssue {

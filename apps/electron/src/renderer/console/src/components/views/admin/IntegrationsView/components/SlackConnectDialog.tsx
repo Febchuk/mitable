@@ -13,8 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, MessageSquare, FileText } from "lucide-react";
 import { authService } from "@/console/src/services/authService";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { API_BASE_URL } from "@/console/src/lib/config";
 
 interface SlackConnectDialogProps {
   open: boolean;
