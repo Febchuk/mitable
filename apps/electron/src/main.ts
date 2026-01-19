@@ -106,12 +106,12 @@ function createConsoleWindow() {
     ...(isMac
       ? {}
       : {
-          titleBarOverlay: {
-            color: "#1a1a1a",
-            symbolColor: "#ffffff",
-            height: 32,
-          },
-        }),
+        titleBarOverlay: {
+          color: "#1a1a1a",
+          symbolColor: "#ffffff",
+          height: 32,
+        },
+      }),
     maximizable: true,
     // Platform-specific transparency and background
     ...(isMac && {
@@ -128,8 +128,8 @@ function createConsoleWindow() {
     // Linux: solid background
     ...(!isMac &&
       !isWindows && {
-        backgroundColor: "#1a1a1a",
-      }),
+      backgroundColor: "#1a1a1a",
+    }),
     // Don't show until ready (ensures proper Dock visibility on macOS)
     show: false,
     webPreferences: {
@@ -745,10 +745,16 @@ function setupIPC() {
             appName: payload.appName,
             windowTitle: payload.windowTitle,
           });
-          // Notify pill to update badge count
+          // Notify pill and dropdown to update badge count / selected windows list
           const selectedWindows = windowDetectionService.getSelectedWindows();
           if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
             watchingPillWindow.webContents.send(
+              IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
+              selectedWindows
+            );
+          }
+          if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
+            watchingPillEyeDropdown.webContents.send(
               IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
               selectedWindows
             );
@@ -758,10 +764,16 @@ function setupIPC() {
         case "unselect-window": {
           const windowId = action.payload as string;
           windowDetectionService.removeWindow(windowId);
-          // Notify pill to update badge count
+          // Notify pill and dropdown to update badge count / selected windows list
           const selectedWindows = windowDetectionService.getSelectedWindows();
           if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
             watchingPillWindow.webContents.send(
+              IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
+              selectedWindows
+            );
+          }
+          if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
+            watchingPillEyeDropdown.webContents.send(
               IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
               selectedWindows
             );
@@ -1153,9 +1165,8 @@ function setupWatchModeHandlers() {
     }
 
     watchModeLogger.info(
-      `Broadcasted update to windows. Selected windows: ${
-        selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
-        "none"
+      `Broadcasted update to windows. Selected windows: ${selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
+      "none"
       }`
     );
   }
@@ -1594,6 +1605,18 @@ async function startSessionFromMain(): Promise<{
 
     if (!startResult.error) {
       shortcutLogger.info(" Session started successfully");
+
+      // Show the watching pill if preference allows (same logic as IPC handler)
+      const shouldShowPill = preferencesService.getShowPillOnSessionStart();
+      if (shouldShowPill) {
+        if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+          createWatchingPillWindow();
+        }
+        if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+          watchingPillWindow.show();
+        }
+      }
+
       return { success: true, sessionId: startResult.sessionId };
     }
 
@@ -1604,7 +1627,7 @@ async function startSessionFromMain(): Promise<{
   }
 }
 
-// Track sequence for Cmd+M+I+T detection
+// Track sequence for Cmd+M+M detection (Mac) or Ctrl+M+M (Windows)
 let shortcutSequence: string[] = [];
 let lastShortcutKeyTime = 0;
 const SEQUENCE_TIMEOUT_MS = 2000; // 2 second timeout for sequence
@@ -1621,37 +1644,15 @@ function registerGlobalShortcuts() {
     }
   };
 
-  // Session Start Shortcut (Cmd+M+I+T - press M, I, T in sequence while holding Cmd)
-  globalShortcut.register("CommandOrControl+M", () => {
-    resetSequenceIfNeeded();
-    lastShortcutKeyTime = Date.now();
-    shortcutSequence = ["M"];
-  });
-
-  globalShortcut.register("CommandOrControl+I", () => {
+  // Session Start Shortcut (Cmd+M+M on Mac, Ctrl+M+M on Windows - press M twice while holding Cmd/Ctrl)
+  globalShortcut.register("CommandOrControl+M", async () => {
     resetSequenceIfNeeded();
     lastShortcutKeyTime = Date.now();
 
-    // Only accept I if M was the last key
+    // Check if this is the second M press
     if (shortcutSequence.length === 1 && shortcutSequence[0] === "M") {
-      shortcutSequence.push("I");
-    } else {
-      shortcutSequence = [];
-    }
-  });
-
-  globalShortcut.register("CommandOrControl+T", async () => {
-    resetSequenceIfNeeded();
-    lastShortcutKeyTime = Date.now();
-
-    // Only accept T if sequence is M, I
-    if (
-      shortcutSequence.length === 2 &&
-      shortcutSequence[0] === "M" &&
-      shortcutSequence[1] === "I"
-    ) {
       // Complete sequence detected - start session
-      shortcutLogger.info(" Cmd+M+I+T detected - starting session");
+      shortcutLogger.info(" Cmd+M+M / Ctrl+M+M detected - starting session");
       shortcutSequence = []; // Reset
 
       try {
@@ -1695,8 +1696,8 @@ function registerGlobalShortcuts() {
         shortcutLogger.error(" Error starting session via shortcut:", error);
       }
     } else {
-      // T pressed but sequence not complete - reset
-      shortcutSequence = [];
+      // First M press - start tracking sequence
+      shortcutSequence = ["M"];
     }
   });
 

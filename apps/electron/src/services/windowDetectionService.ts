@@ -175,7 +175,7 @@ class WindowDetectionService {
 
   /**
    * Check if a window should be excluded from being added to the watch list
-   * Excludes: Mitable windows, policy-blocked windows, and Spotify
+   * Excludes: Mitable windows, Electron windows, Messages, WhatsApp, policy-blocked windows, and Spotify
    */
   private shouldExcludeWindow(
     windowTitle: string,
@@ -192,12 +192,27 @@ class WindowDetectionService {
       return { excluded: true, reason: "Mitable app" };
     }
 
-    // Check 3: Spotify by app name (normalized)
+    // Check 3: Electron windows (dev app windows)
+    if (normalizedAppName.toLowerCase() === "electron") {
+      return { excluded: true, reason: "Electron window" };
+    }
+
+    // Check 4: Messages app (macOS Messages)
+    if (normalizedAppName.toLowerCase() === "messages") {
+      return { excluded: true, reason: "Messages app" };
+    }
+
+    // Check 5: WhatsApp
+    if (normalizedAppName.toLowerCase() === "whatsapp") {
+      return { excluded: true, reason: "WhatsApp app" };
+    }
+
+    // Check 6: Spotify by app name (normalized)
     if (normalizedAppName.toLowerCase() === "spotify") {
       return { excluded: true, reason: "Spotify app" };
     }
 
-    // Check 4: Policy-blocked windows
+    // Check 7: Policy-blocked windows
     const policy = getCapturePolicy();
     const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
     if (policyDecision.blocked) {

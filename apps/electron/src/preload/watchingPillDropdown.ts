@@ -7,6 +7,7 @@ const IPC_CHANNELS = {
   WATCHING_PILL_DROPDOWN_ACTION: "watching-pill-dropdown-action",
   WATCHING_PILL_HIDE_EYE_DROPDOWN: "watching-pill-hide-eye-dropdown",
   WATCHING_PILL_HIDE_MENU_DROPDOWN: "watching-pill-hide-menu-dropdown",
+  WATCH_WINDOWS_UPDATED: "watch-windows-updated",
 } as const;
 
 // Data types for dropdowns
@@ -32,6 +33,13 @@ contextBridge.exposeInMainWorld("dropdownAPI", {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, handler);
   },
 
+  // Listen for window updates (when windows are added/removed dynamically)
+  onWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, windows: SelectedWindowInfo[]) => callback(windows);
+    ipcRenderer.on(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, handler);
+  },
+
   // Send actions to main process
   action: (actionType: string, payload?: unknown): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_ACTION, {
@@ -54,6 +62,7 @@ declare global {
   interface Window {
     dropdownAPI: {
       onData: (callback: (data: DropdownData) => void) => () => void;
+      onWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => () => void;
       action: (
         actionType: string,
         payload?: unknown
