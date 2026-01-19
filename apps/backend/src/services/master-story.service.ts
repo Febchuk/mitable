@@ -18,10 +18,7 @@ import { config } from "../config";
 import { db } from "../db/client";
 import { sessionCaptures, sessionSummaries } from "../db/schema/index";
 import { eq, desc, and, isNotNull, asc } from "drizzle-orm";
-import {
-  STORYTELLER_SYSTEM_PROMPT,
-  buildStorytellerUserPrompt,
-} from "../prompts/session-prompts";
+import { STORYTELLER_SYSTEM_PROMPT, buildStorytellerUserPrompt } from "../prompts/session-prompts";
 import { createSessionLogger, createTimer, CHECKPOINTS } from "../lib/sessionLogger";
 
 export interface GenerateStoryOptions {
@@ -66,8 +63,9 @@ class MasterStoryService {
 
       // Filter out nulls and map to format needed by prompt builder
       const timeline = rawActivities
-        .filter((a): a is { activityDescription: string; capturedAt: Date } =>
-          a.activityDescription !== null
+        .filter(
+          (a): a is { activityDescription: string; capturedAt: Date } =>
+            a.activityDescription !== null
         )
         .map((a) => ({
           activityDescription: a.activityDescription!,
@@ -119,7 +117,6 @@ class MasterStoryService {
       });
 
       return story;
-
     } catch (error) {
       log.error("Failed to generate master story", {
         error: error instanceof Error ? error.message : String(error),

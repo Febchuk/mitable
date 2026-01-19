@@ -106,12 +106,12 @@ function createConsoleWindow() {
     ...(isMac
       ? {}
       : {
-        titleBarOverlay: {
-          color: "#1a1a1a",
-          symbolColor: "#ffffff",
-          height: 32,
-        },
-      }),
+          titleBarOverlay: {
+            color: "#1a1a1a",
+            symbolColor: "#ffffff",
+            height: 32,
+          },
+        }),
     maximizable: true,
     // Platform-specific transparency and background
     ...(isMac && {
@@ -128,8 +128,8 @@ function createConsoleWindow() {
     // Linux: solid background
     ...(!isMac &&
       !isWindows && {
-      backgroundColor: "#1a1a1a",
-    }),
+        backgroundColor: "#1a1a1a",
+      }),
     // Don't show until ready (ensures proper Dock visibility on macOS)
     show: false,
     webPreferences: {
@@ -1153,8 +1153,9 @@ function setupWatchModeHandlers() {
     }
 
     watchModeLogger.info(
-      `Broadcasted update to windows. Selected windows: ${selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
-      "none"
+      `Broadcasted update to windows. Selected windows: ${
+        selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
+        "none"
       }`
     );
   }
@@ -1530,7 +1531,11 @@ function createWatchButtonWindow(window: any, watchButtonWindows: Map<string, Br
 }
 
 // Helper function to start a session from main process (used by shortcuts and pill)
-async function startSessionFromMain(): Promise<{ success: boolean; error?: string; sessionId?: string }> {
+async function startSessionFromMain(): Promise<{
+  success: boolean;
+  error?: string;
+  sessionId?: string;
+}> {
   const shortcutLogger = createLogger("SessionShortcut");
 
   // Check if user is logged in
@@ -1640,7 +1645,11 @@ function registerGlobalShortcuts() {
     lastShortcutKeyTime = Date.now();
 
     // Only accept T if sequence is M, I
-    if (shortcutSequence.length === 2 && shortcutSequence[0] === "M" && shortcutSequence[1] === "I") {
+    if (
+      shortcutSequence.length === 2 &&
+      shortcutSequence[0] === "M" &&
+      shortcutSequence[1] === "I"
+    ) {
       // Complete sequence detected - start session
       shortcutLogger.info(" Cmd+M+I+T detected - starting session");
       shortcutSequence = []; // Reset

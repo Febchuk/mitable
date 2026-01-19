@@ -3,7 +3,7 @@
  *
  * Main view for session monitoring functionality.
  * Lists past sessions and provides controls to start new sessions.
- * 
+ *
  * Sessions start instantly without a modal dialog.
  * Windows are tracked automatically based on user focus.
  */

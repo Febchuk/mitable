@@ -49,7 +49,6 @@ import {
   ChevronUp,
   Image,
   Mail,
-  StopCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -219,10 +218,9 @@ export default function SessionDetail() {
         navigate("/settings");
         return;
       }
-      const response = await fetch(
-        `${API_BASE_URL}/api/integrations/linear/status`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/integrations/linear/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.ok) {
         const data = await response.json();
         if (data.connected) {
@@ -407,7 +405,7 @@ export default function SessionDetail() {
     setIsEnding(true);
     try {
       // 1. Stop Electron capture
-      const electronResult = await window.consoleAPI.stopMonitoringSession();
+      const electronResult = await window.consoleAPI.endMonitoringSession();
 
       // If Electron session is already ended (e.g., from pill), that's OK
       if (electronResult.error && electronResult.error !== "No active session") {
@@ -422,7 +420,7 @@ export default function SessionDetail() {
       // 3. Trigger backend end + summary generation with preferences
       await endSessionMutation.mutateAsync({
         sessionId,
-        preferences // Pass preferences to backend
+        preferences, // Pass preferences to backend
       });
 
       setIsEndDialogOpen(false);
@@ -438,7 +436,6 @@ export default function SessionDetail() {
         title: "Session Ended",
         description: "Generating your master story...",
       });
-
     } catch (error) {
       logger.error("Error ending session:", error);
       toast({
@@ -609,11 +606,7 @@ export default function SessionDetail() {
                 disabled={isEnding}
                 className="gap-2 bg-status-error text-white hover:bg-status-error/90"
               >
-                {isEnding ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Square size={16} />
-                )}
+                {isEnding ? <Loader2 className="animate-spin" size={16} /> : <Square size={16} />}
                 End Session
               </Button>
             </>
@@ -638,11 +631,7 @@ export default function SessionDetail() {
                 variant="outline"
                 className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
               >
-                {isEnding ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Square size={16} />
-                )}
+                {isEnding ? <Loader2 className="animate-spin" size={16} /> : <Square size={16} />}
                 End Session
               </Button>
             </>
@@ -738,10 +727,10 @@ export default function SessionDetail() {
             <span className="text-text-primary font-medium">
               {session.endedAt
                 ? formatDuration(
-                  new Date(session.startedAt),
-                  new Date(session.endedAt),
-                  session.totalPausedMs
-                )
+                    new Date(session.startedAt),
+                    new Date(session.endedAt),
+                    session.totalPausedMs
+                  )
                 : "In progress"}
             </span>
           </span>

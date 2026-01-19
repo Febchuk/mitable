@@ -9,5 +9,5 @@ const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
 
 // Use env vars in development, hardcoded values in production
 export const API_BASE_URL = import.meta.env.DEV
-  ? (import.meta.env.VITE_API_URL || PROD_API_URL)
+  ? import.meta.env.VITE_API_URL || PROD_API_URL
   : PROD_API_URL;

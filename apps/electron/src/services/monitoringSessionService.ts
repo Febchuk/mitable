@@ -75,7 +75,7 @@ class MonitoringSessionService {
   /**
    * Start a new monitoring session
    * @param config - Session config including sessionId from backend
-   * 
+   *
    * Note: selectedWindows is now optional. If not provided, the focusWindowTracker
    * will automatically add windows as the user focuses on them during the session.
    */
@@ -550,7 +550,8 @@ class MonitoringSessionService {
       clearInterval(this.captureTimer);
     }
 
-    const intervalMs = this.activeSession?.config.captureIntervalMs || SESSION_DEFAULTS.CAPTURE_INTERVAL_MS;
+    const intervalMs =
+      this.activeSession?.config.captureIntervalMs || SESSION_DEFAULTS.CAPTURE_INTERVAL_MS;
 
     // Take initial capture immediately
     this.captureSelectedWindows("periodic");
@@ -763,7 +764,8 @@ class MonitoringSessionService {
           importanceScore: result.analysis.importanceScore,
           importanceReason: result.analysis.importanceReason,
           // Include classified activity description if available
-          activityDescription: result.analysis.activityDescription || result.analysis.summaryOfAction,
+          activityDescription:
+            result.analysis.activityDescription || result.analysis.summaryOfAction,
         });
 
         logger.info(` Frame analyzed: ${frameId}`, {
@@ -919,14 +921,14 @@ class MonitoringSessionService {
       captureCount: this.activeSession.captureCount,
       latestCapture: latestFrame
         ? {
-          id: latestFrame.frameId,
-          sequenceNumber: latestFrame.sequenceNumber,
-          captureTrigger: latestFrame.trigger,
-          capturedAt: new Date(latestFrame.timestamp).getTime(),
-          windowId: latestFrame.windowSourceId,
-          appName: latestFrame.appName,
-          windowTitle: latestFrame.windowTitle,
-        }
+            id: latestFrame.frameId,
+            sequenceNumber: latestFrame.sequenceNumber,
+            captureTrigger: latestFrame.trigger,
+            capturedAt: new Date(latestFrame.timestamp).getTime(),
+            windowId: latestFrame.windowSourceId,
+            appName: latestFrame.appName,
+            windowTitle: latestFrame.windowTitle,
+          }
         : undefined,
     };
 

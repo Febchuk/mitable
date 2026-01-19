@@ -208,9 +208,10 @@ function calculateSimilarity(text1: string, text2: string): number {
 /**
  * Determine if frame is on-task - always returns true now that goal context is removed
  */
-export function determineOnTask(
-  _frame: FrameForDelta
-): { onTask: boolean; taskRelevance?: string } {
+export function determineOnTask(_frame: FrameForDelta): {
+  onTask: boolean;
+  taskRelevance?: string;
+} {
   // All activity is considered on-task (goal context removed)
   return {
     onTask: true,
@@ -346,9 +347,7 @@ export function selectTopKFrames(
 /**
  * Process a batch of frames for delta detection
  */
-export function processBatchDelta(
-  frames: FrameForDelta[]
-): DeltaDetectionResult[] {
+export function processBatchDelta(frames: FrameForDelta[]): DeltaDetectionResult[] {
   const results: DeltaDetectionResult[] = [];
 
   for (let i = 0; i < frames.length; i++) {

@@ -3,10 +3,7 @@ import { users, sessionCaptures } from "../db/schema";
 import { eq, desc, and, isNotNull } from "drizzle-orm";
 import Groq from "groq-sdk";
 import { config } from "../config";
-import {
-  CLASSIFIER_SYSTEM_PROMPT,
-  buildClassifierUserPrompt,
-} from "../prompts/session-prompts";
+import { CLASSIFIER_SYSTEM_PROMPT, buildClassifierUserPrompt } from "../prompts/session-prompts";
 import { createSessionLogger } from "../lib/sessionLogger";
 
 export interface ClassifierInput {
@@ -67,9 +64,7 @@ class ClassifierService {
       });
 
       // Reverse to get chronological order [oldest ... newest]
-      const history = historyCaptures
-        .map((c) => c.activityDescription as string)
-        .reverse();
+      const history = historyCaptures.map((c) => c.activityDescription as string).reverse();
 
       // 3. Build Prompt
       const userPrompt = buildClassifierUserPrompt(
@@ -105,7 +100,6 @@ class ClassifierService {
         confidence: parsed.confidence || 0.5,
         isContinuation: parsed.is_continuation || false,
       };
-
     } catch (error) {
       log.error("Classifier failed", {
         error: error instanceof Error ? error.message : String(error),

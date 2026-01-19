@@ -1,6 +1,6 @@
 /**
  * Stub for electron-log modules
- * 
+ *
  * Prevents Vite from trying to bundle electron-log in the renderer process.
  * The renderer uses console-based logging instead (see logger.ts).
  */

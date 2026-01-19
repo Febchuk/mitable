@@ -450,6 +450,7 @@ class LocalFrameStorage {
       taskRelevance?: string;
       importanceScore?: number;
       importanceReason?: string;
+      activityDescription?: string;
     }
   ): Promise<void> {
     await this.updateFrameMetadata(sessionId, frameId, {

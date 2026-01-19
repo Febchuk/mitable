@@ -122,14 +122,9 @@ export default function EndSessionDialog({
           <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
             <div className="space-y-0.5">
               <Label className="text-base">Include Screenshots</Label>
-              <p className="text-sm text-muted-foreground">
-                Attach key visuals to your update
-              </p>
+              <p className="text-sm text-muted-foreground">Attach key visuals to your update</p>
             </div>
-            <Switch
-              checked={includeScreenshots}
-              onCheckedChange={setIncludeScreenshots}
-            />
+            <Switch checked={includeScreenshots} onCheckedChange={setIncludeScreenshots} />
           </div>
         </div>
 

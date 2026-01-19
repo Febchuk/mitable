@@ -14,15 +14,8 @@
  */
 
 import { geminiVisionFrameService } from "./gemini-vision-frame.service";
-import {
-  SENSOR_SYSTEM_PROMPT,
-  SENSOR_USER_PROMPT,
-} from "../prompts/session-prompts";
-import {
-  createSessionLogger,
-  createTimer,
-  CHECKPOINTS,
-} from "../lib/sessionLogger";
+import { SENSOR_SYSTEM_PROMPT, SENSOR_USER_PROMPT } from "../prompts/session-prompts";
+import { createSessionLogger, createTimer, CHECKPOINTS } from "../lib/sessionLogger";
 
 // Types
 export type ChangeType =
@@ -184,7 +177,6 @@ class FrameAnalysisService {
       });
 
       return result;
-
     } catch (error) {
       log.error("Error analyzing frame", {
         frameId: input.frameId,
@@ -206,9 +198,9 @@ class FrameAnalysisService {
       const parsed = JSON.parse(jsonMatch[0]);
 
       return {
-        changed: typeof parsed.changed === 'boolean' ? parsed.changed : false,
-        change_type: parsed.change_type || 'none',
-        description: parsed.description || 'No visual change detected',
+        changed: typeof parsed.changed === "boolean" ? parsed.changed : false,
+        change_type: parsed.change_type || "none",
+        description: parsed.description || "No visual change detected",
       };
     } catch (e) {
       return null;

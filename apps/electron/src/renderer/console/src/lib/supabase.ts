@@ -7,11 +7,11 @@ const PROD_SUPABASE_ANON_KEY =
 
 // Use env vars in development, hardcoded values in production
 const supabaseUrl = import.meta.env.DEV
-  ? (import.meta.env.VITE_SUPABASE_URL || PROD_SUPABASE_URL)
+  ? import.meta.env.VITE_SUPABASE_URL || PROD_SUPABASE_URL
   : PROD_SUPABASE_URL;
 
 const supabaseAnonKey = import.meta.env.DEV
-  ? (import.meta.env.VITE_SUPABASE_ANON_KEY || PROD_SUPABASE_ANON_KEY)
+  ? import.meta.env.VITE_SUPABASE_ANON_KEY || PROD_SUPABASE_ANON_KEY
   : PROD_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

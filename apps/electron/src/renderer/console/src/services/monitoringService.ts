@@ -185,7 +185,14 @@ export async function updateSession(
 /**
  * End a session and trigger summary generation
  */
-export async function endSession(sessionId: string): Promise<{
+export async function endSession(
+  sessionId: string,
+  preferences?: {
+    style: "verbose" | "concise";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
+  }
+): Promise<{
   success: boolean;
   session: {
     id: string;
@@ -201,8 +208,25 @@ export async function endSession(sessionId: string): Promise<{
     captureCount: number;
   };
 }> {
+  const body: {
+    preferences?: {
+      detailLevel: "verbose" | "concise";
+      format: "bullets" | "paragraphs";
+      includeScreenshots: boolean;
+    };
+  } = {};
+
+  if (preferences) {
+    body.preferences = {
+      detailLevel: preferences.style, // Backend expects detailLevel, frontend uses style
+      format: preferences.format,
+      includeScreenshots: preferences.includeScreenshots,
+    };
+  }
+
   return apiRequest(`/monitoring/sessions/${sessionId}/end`, {
     method: "POST",
+    body: JSON.stringify(body),
   });
 }
 

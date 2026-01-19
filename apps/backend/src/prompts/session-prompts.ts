@@ -110,9 +110,10 @@ Apps: ${persona.regularApps?.join(", ") || "Standard office apps"}
 Context: ${persona.additionalContext || "None"}
 `.trim();
 
-  const historyDesc = history.length > 0
-    ? history.map((h, i) => `${i + 1}. ${h}`).join("\n")
-    : "(No recent history - session start)";
+  const historyDesc =
+    history.length > 0
+      ? history.map((h, i) => `${i + 1}. ${h}`).join("\n")
+      : "(No recent history - session start)";
 
   return `
 PERSONA:
@@ -168,10 +169,10 @@ export function buildStorytellerUserPrompt(
   // Group by time windows to show temporal flow
   const timelineText = timeline
     .map((a, i) => {
-      const timeStr = new Date(a.capturedAt).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
+      const timeStr = new Date(a.capturedAt).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
       });
       return `${i + 1}. [${timeStr}] ${a.activityDescription}`;
     })
@@ -180,9 +181,10 @@ export function buildStorytellerUserPrompt(
   // Calculate session duration for context
   const sessionStart = timeline[0]?.capturedAt;
   const sessionEnd = timeline[timeline.length - 1]?.capturedAt;
-  const durationMinutes = sessionStart && sessionEnd
-    ? Math.round((sessionEnd.getTime() - sessionStart.getTime()) / (1000 * 60))
-    : null;
+  const durationMinutes =
+    sessionStart && sessionEnd
+      ? Math.round((sessionEnd.getTime() - sessionStart.getTime()) / (1000 * 60))
+      : null;
 
   // Content Selection Guidelines
   const contentSelectionGuidelines = `
@@ -298,7 +300,7 @@ SCREENSHOTS: TEXT-ONLY SUMMARY
   return `
 <activity_timeline>
 Total activities: ${timeline.length}
-${durationMinutes ? `Session duration: ${durationMinutes} minutes` : ''}
+${durationMinutes ? `Session duration: ${durationMinutes} minutes` : ""}
 
 Activities (chronologically ordered):
 ${timelineText}

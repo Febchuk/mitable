@@ -11,7 +11,7 @@ import type { SessionCapture } from "../services/monitoringService";
 // Configuration for grouping algorithm
 const GROUPING_CONFIG = {
   maxGapMinutes: 10, // Increased gap allowance since we have semantic grouping now
-  minCapturesPerGroup: 1, 
+  minCapturesPerGroup: 1,
 };
 
 export interface TimelineGroup {
@@ -48,8 +48,8 @@ function generateId(): string {
 function computeDominantActivity(captures: SessionCapture[], appName: string | null): string {
   // Count frequency of each activity description
   const counts: Record<string, number> = {};
-  
-  captures.forEach(c => {
+
+  captures.forEach((c) => {
     if (c.activityDescription) {
       counts[c.activityDescription] = (counts[c.activityDescription] || 0) + 1;
     }
@@ -69,7 +69,7 @@ function computeDominantActivity(captures: SessionCapture[], appName: string | n
   if (bestActivity) return bestActivity;
 
   // Fallback to first non-null activity
-  const firstActivity = captures.find(c => c.activityDescription)?.activityDescription;
+  const firstActivity = captures.find((c) => c.activityDescription)?.activityDescription;
   if (firstActivity) return firstActivity;
 
   return appName ? `Working in ${appName}` : "Activity";
@@ -103,12 +103,12 @@ function groupCaptures(
   for (const capture of sorted) {
     // Determine if this capture belongs to the current group
     // Criteria: Same App AND (Same Activity OR Time gap is small)
-    
-    // We treat "activityDescription" as a strong grouper. 
+
+    // We treat "activityDescription" as a strong grouper.
     // If activity changes significantly, we break group.
-    
+
     const activity = capture.activityDescription || null;
-    
+
     const shouldStartNewGroup =
       currentGroup === null ||
       capture.appName !== currentGroup.appName ||

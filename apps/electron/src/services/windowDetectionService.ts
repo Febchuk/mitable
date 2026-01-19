@@ -177,7 +177,10 @@ class WindowDetectionService {
    * Check if a window should be excluded from being added to the watch list
    * Excludes: Mitable windows, policy-blocked windows, and Spotify
    */
-  private shouldExcludeWindow(windowTitle: string, appName: string): { excluded: boolean; reason?: string } {
+  private shouldExcludeWindow(
+    windowTitle: string,
+    appName: string
+  ): { excluded: boolean; reason?: string } {
     // Check 1: Mitable windows by title
     if (this.isMitableWindow(windowTitle)) {
       return { excluded: true, reason: "Mitable window" };

@@ -136,10 +136,17 @@ export function useEndSession() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (sessionId: string) => monitoringService.endSession(sessionId),
-    onSuccess: (_, sessionId) => {
+    mutationFn: (params: {
+      sessionId: string;
+      preferences?: {
+        style: "verbose" | "concise";
+        format: "bullets" | "paragraphs";
+        includeScreenshots: boolean;
+      };
+    }) => monitoringService.endSession(params.sessionId, params.preferences),
+    onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(params.sessionId) });
     },
   });
 }

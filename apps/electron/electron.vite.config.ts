@@ -21,19 +21,25 @@ const VITE_PORT = getVitePort();
 const excludeMainProcessPlugin = (): Plugin => {
   const rendererLoggerPath = resolve(__dirname, "src/renderer/lib/logger.ts");
   const mainLoggerPath = resolve(__dirname, "src/lib/logger.ts");
-  
+
   return {
     name: "exclude-main-process",
     resolveId(id) {
       // If trying to resolve the main process logger, redirect to renderer logger
-      if (id === mainLoggerPath || id.includes("/src/lib/logger") && !id.includes("/src/renderer/")) {
+      if (
+        id === mainLoggerPath ||
+        (id.includes("/src/lib/logger") && !id.includes("/src/renderer/"))
+      ) {
         return rendererLoggerPath;
       }
       return null;
     },
     load(id) {
       // If Vite tries to load the main process logger, return the renderer logger instead
-      if (id === mainLoggerPath || (id.includes("/src/lib/logger.ts") && !id.includes("/src/renderer/"))) {
+      if (
+        id === mainLoggerPath ||
+        (id.includes("/src/lib/logger.ts") && !id.includes("/src/renderer/"))
+      ) {
         // Re-export from renderer logger
         return `export * from "${rendererLoggerPath}";`;
       }

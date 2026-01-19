@@ -17,7 +17,11 @@ interface ActivityTimelineProps {
   className?: string;
 }
 
-export default function ActivityTimeline({ sessionId, sessionStatus, className = "" }: ActivityTimelineProps) {
+export default function ActivityTimeline({
+  sessionId,
+  sessionStatus,
+  className = "",
+}: ActivityTimelineProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Fetch captures (polls while session is active/paused)
@@ -25,9 +29,8 @@ export default function ActivityTimeline({ sessionId, sessionStatus, className =
 
   // Filter out captures that don't have an activity description yet (unless it's the very start)
   // We prefer showing "meaningful" activities.
-  const meaningfulCaptures = captures?.filter(c => 
-    c.activityDescription || c.deltaChangeDescription
-  ) || [];
+  const meaningfulCaptures =
+    captures?.filter((c) => c.activityDescription || c.deltaChangeDescription) || [];
 
   // Transform into grouped timeline
   const timeline = useTimelineTransform(meaningfulCaptures);
@@ -91,8 +94,8 @@ export default function ActivityTimeline({ sessionId, sessionStatus, className =
           {timeline && timeline.groups.length === 0 && !isLoading && (
             <div className="text-center py-8">
               <p className="text-text-secondary">
-                {isSessionActive 
-                  ? "Waiting for activity to be recorded..." 
+                {isSessionActive
+                  ? "Waiting for activity to be recorded..."
                   : "No recorded activity yet."}
               </p>
             </div>

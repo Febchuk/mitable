@@ -284,13 +284,13 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
     const captureCounts =
       sessionIds.length > 0
         ? await db
-          .select({
-            sessionId: schema.sessionCaptures.sessionId,
-            count: sql<number>`count(*)::int`,
-          })
-          .from(schema.sessionCaptures)
-          .where(inArray(schema.sessionCaptures.sessionId, sessionIds))
-          .groupBy(schema.sessionCaptures.sessionId)
+            .select({
+              sessionId: schema.sessionCaptures.sessionId,
+              count: sql<number>`count(*)::int`,
+            })
+            .from(schema.sessionCaptures)
+            .where(inArray(schema.sessionCaptures.sessionId, sessionIds))
+            .groupBy(schema.sessionCaptures.sessionId)
         : [];
 
     // Build response with duration and captureCount
@@ -580,8 +580,8 @@ router.post(
     const { id } = req.params;
     const { preferences } = req.body as {
       preferences?: {
-        detailLevel: 'concise' | 'verbose';
-        format: 'bullets' | 'paragraphs';
+        detailLevel: "concise" | "verbose";
+        format: "bullets" | "paragraphs";
         includeScreenshots: boolean;
       };
     };
@@ -674,15 +674,15 @@ router.post(
       // Transform frontend preferences (detailLevel) to service format (style)
       const formatPreference = preferences
         ? {
-          style: preferences.detailLevel,
-          format: preferences.format,
-          includeScreenshots: preferences.includeScreenshots,
-        }
+            style: preferences.detailLevel,
+            format: preferences.format,
+            includeScreenshots: preferences.includeScreenshots,
+          }
         : {
-          style: 'concise' as const,
-          format: 'bullets' as const,
-          includeScreenshots: false,
-        };
+            style: "concise" as const,
+            format: "bullets" as const,
+            includeScreenshots: false,
+          };
 
       // Generate AI title and story in parallel (async, don't block response)
       Promise.all([
@@ -1864,9 +1864,9 @@ router.post(
           deliveryError: allSucceeded
             ? null
             : result.results
-              .filter((r) => r.status === "failed")
-              .map((r) => `${r.email || r.name || r.id}: ${r.error}`)
-              .join("; "),
+                .filter((r) => r.status === "failed")
+                .map((r) => `${r.email || r.name || r.id}: ${r.error}`)
+                .join("; "),
           updatedAt: new Date(),
         })
         .where(eq(schema.monitoringSessions.id, id));
@@ -2013,4 +2013,3 @@ router.delete("/sessions/:id", requireAuth, async (req: Request, res: Response):
 });
 
 export default router;
-

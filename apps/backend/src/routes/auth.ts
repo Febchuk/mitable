@@ -619,11 +619,7 @@ authRouter.post("/login", async (req: Request, res: Response) => {
     let userProfile;
     try {
       userProfile = (
-        await db
-          .select()
-          .from(schema.users)
-          .where(eq(schema.users.id, data.user.id))
-          .limit(1)
+        await db.select().from(schema.users).where(eq(schema.users.id, data.user.id)).limit(1)
       )[0];
     } catch (error: any) {
       // If error is due to missing columns (like job_title), select only basic fields
