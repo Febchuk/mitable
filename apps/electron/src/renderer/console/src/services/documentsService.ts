@@ -154,7 +154,7 @@ export async function exportToNotion(
   id: string,
   data?: ExportNotionRequest
 ): Promise<ExportNotionResponse> {
-  return apiRequest<ExportNotionResponse>(`/documents/${id}/export-notion`, {
+  return apiRequest<ExportNotionResponse>(`/documents/${id}/export/notion`, {
     method: "POST",
     body: JSON.stringify(data || {}),
   });
