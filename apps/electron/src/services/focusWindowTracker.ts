@@ -6,7 +6,7 @@
  * - When a window is focused, it's added to the watch list
  * - Each focus resets the 10-minute timer
  * - Windows are removed after 10 minutes of not being focused
- * - Only windows blocked by capture policy are excluded
+ * - Excludes: Mitable Electron renderers, policy-blocked windows, and Spotify
  *
  * @module focusWindowTracker
  */
@@ -50,6 +50,48 @@ const MITABLE_WINDOW_TITLES = new Set([
     "Mitable Nudge",
     "Watch Button",
 ]);
+
+/**
+ * Normalize app name by removing OS-specific extensions
+ * This ensures cross-platform matching works correctly
+ */
+function normalizeAppName(appName: string): string {
+    if (!appName) return "";
+    return appName
+        .replace(/\.exe$/i, "") // Windows
+        .replace(/\.app$/i, "") // macOS
+        .replace(/\.AppImage$/i, ""); // Linux AppImage
+}
+
+/**
+ * Check if a window should be excluded from tracking
+ * Excludes: Mitable windows, policy-blocked windows, and Spotify
+ */
+function shouldExcludeWindow(windowTitle: string, appName: string, policy: ReturnType<typeof getCapturePolicy>): { excluded: boolean; reason?: string } {
+    // Check 1: Mitable windows by title
+    if (MITABLE_WINDOW_TITLES.has(windowTitle)) {
+        return { excluded: true, reason: "Mitable window" };
+    }
+
+    // Check 2: Mitable windows by app name (normalized)
+    const normalizedAppName = normalizeAppName(appName);
+    if (normalizedAppName.toLowerCase() === "mitable") {
+        return { excluded: true, reason: "Mitable app" };
+    }
+
+    // Check 3: Spotify by app name (normalized)
+    if (normalizedAppName.toLowerCase() === "spotify") {
+        return { excluded: true, reason: "Spotify app" };
+    }
+
+    // Check 4: Policy-blocked windows
+    const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
+    if (policyDecision.blocked) {
+        return { excluded: true, reason: policyDecision.reason || "Policy-blocked" };
+    }
+
+    return { excluded: false };
+}
 
 class FocusWindowTracker {
     private isTracking = false;
@@ -180,23 +222,17 @@ class FocusWindowTracker {
 
             this.lastActiveWindowId = windowId;
 
-            // Skip Mitable's own windows
-            if (MITABLE_WINDOW_TITLES.has(windowTitle)) {
-                logger.info(` Skipping Mitable window: ${windowTitle}`);
-                return;
-            }
-
             // Skip windows with no title
             if (!windowTitle || windowTitle.trim() === "") {
                 return;
             }
 
-            // Check capture policy - only exclude policy-blocked windows
+            // Check if window should be excluded (Mitable, Spotify, or policy-blocked)
             const policy = getCapturePolicy();
-            const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
+            const exclusionCheck = shouldExcludeWindow(windowTitle, appName, policy);
 
-            if (policyDecision.blocked) {
-                logger.info(` Skipping policy-blocked window: ${appName} - ${windowTitle}`);
+            if (exclusionCheck.excluded) {
+                logger.info(` Skipping excluded window: ${appName} - ${windowTitle} (${exclusionCheck.reason})`);
                 return;
             }
 

@@ -163,15 +163,67 @@ class WindowDetectionService {
   }
 
   /**
+   * Normalize app name by removing OS-specific extensions
+   */
+  private normalizeAppName(appName: string): string {
+    if (!appName) return "";
+    return appName
+      .replace(/\.exe$/i, "") // Windows
+      .replace(/\.app$/i, "") // macOS
+      .replace(/\.AppImage$/i, ""); // Linux AppImage
+  }
+
+  /**
+   * Check if a window should be excluded from being added to the watch list
+   * Excludes: Mitable windows, policy-blocked windows, and Spotify
+   */
+  private shouldExcludeWindow(windowTitle: string, appName: string): { excluded: boolean; reason?: string } {
+    // Check 1: Mitable windows by title
+    if (this.isMitableWindow(windowTitle)) {
+      return { excluded: true, reason: "Mitable window" };
+    }
+
+    // Check 2: Mitable windows by app name (normalized)
+    const normalizedAppName = this.normalizeAppName(appName);
+    if (normalizedAppName.toLowerCase() === "mitable") {
+      return { excluded: true, reason: "Mitable app" };
+    }
+
+    // Check 3: Spotify by app name (normalized)
+    if (normalizedAppName.toLowerCase() === "spotify") {
+      return { excluded: true, reason: "Spotify app" };
+    }
+
+    // Check 4: Policy-blocked windows
+    const policy = getCapturePolicy();
+    const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
+    if (policyDecision.blocked) {
+      return { excluded: true, reason: policyDecision.reason || "Policy-blocked" };
+    }
+
+    return { excluded: false };
+  }
+
+  /**
    * Add a window to the watch list
    *
    * @param window - Window metadata to track
-   * @returns true if added, false if already watching
+   * @returns true if added, false if already watching or excluded
    */
   addWindow(window: SelectedWindowInfo): boolean {
     if (this.selectedWindows.has(window.windowId)) {
       return false;
     }
+
+    // Check if window should be excluded (Mitable, Spotify, or policy-blocked)
+    const exclusionCheck = this.shouldExcludeWindow(window.windowTitle, window.appName);
+    if (exclusionCheck.excluded) {
+      logger.info(
+        `[WindowDetectionService] Rejected excluded window: ${window.appName} (${window.windowTitle}) [${window.windowId}] - ${exclusionCheck.reason}`
+      );
+      return false;
+    }
+
     this.selectedWindows.set(window.windowId, window);
     logger.info(
       `[WindowDetectionService] Added window to watch list: ${window.appName} (${window.windowTitle}) [${window.windowId}]`
