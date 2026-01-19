@@ -63,8 +63,10 @@ export function useSession(sessionId: string, options?: { pollWhileSummarizing?:
 
 /**
  * Fetch captures for a session
+ * @param sessionId - The session ID to fetch captures for
+ * @param sessionStatus - Current session status (for conditional polling)
  */
-export function useSessionCaptures(sessionId: string) {
+export function useSessionCaptures(sessionId: string, sessionStatus?: string) {
   return useQuery({
     queryKey: monitoringKeys.captures(sessionId),
     queryFn: async () => {
@@ -72,6 +74,8 @@ export function useSessionCaptures(sessionId: string) {
       return response.captures;
     },
     enabled: !!sessionId,
+    // Poll every 5 seconds while session is active or paused (same as useSessionStory)
+    refetchInterval: sessionStatus === "active" || sessionStatus === "paused" ? 5000 : false,
   });
 }
 

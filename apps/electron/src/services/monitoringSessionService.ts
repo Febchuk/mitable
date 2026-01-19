@@ -686,6 +686,11 @@ class MonitoringSessionService {
           windowSourceId: screenshot.windowId,
           appName: screenshot.appName,
           windowTitle: screenshot.windowTitle,
+        },
+        {
+          sequenceNumber: frameMetadata.sequenceNumber,
+          captureTrigger: trigger,
+          capturedAt: new Date(frameMetadata.timestamp).getTime(),
         }
       );
     } catch (error) {
@@ -701,7 +706,12 @@ class MonitoringSessionService {
     frameId: string,
     currentImage: string,
     previousImage: string | null,
-    windowInfo: { windowSourceId: string; appName: string; windowTitle: string }
+    windowInfo: { windowSourceId: string; appName: string; windowTitle: string },
+    captureMetadata?: {
+      sequenceNumber: number;
+      captureTrigger: "periodic" | "focus_change" | "manual";
+      capturedAt: number;
+    }
   ): Promise<void> {
     // Don't attempt analysis if no auth token
     if (!authManager.getAccessToken()) {
@@ -720,6 +730,12 @@ class MonitoringSessionService {
             previousImage,
             windowInfo,
             sessionGoal: this.activeSession?.config.sessionGoal,
+            // Include capture metadata for database record creation/update
+            ...(captureMetadata && {
+              sequenceNumber: captureMetadata.sequenceNumber,
+              captureTrigger: captureMetadata.captureTrigger,
+              capturedAt: captureMetadata.capturedAt,
+            }),
           }),
         }
       );
@@ -746,11 +762,15 @@ class MonitoringSessionService {
           taskRelevance: result.analysis.taskRelevance,
           importanceScore: result.analysis.importanceScore,
           importanceReason: result.analysis.importanceReason,
+          // Include classified activity description if available
+          activityDescription: result.analysis.activityDescription || result.analysis.summaryOfAction,
         });
 
         logger.info(` Frame analyzed: ${frameId}`, {
           changeType: result.analysis.changeType,
+          activityDescription: result.analysis.activityDescription,
           importanceScore: result.analysis.importanceScore,
+          captureId: result.analysis.captureId,
         });
       }
     } catch (error) {

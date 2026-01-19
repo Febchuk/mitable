@@ -900,7 +900,7 @@ export default function SessionDetail() {
         )}
 
       {/* Activity Timeline */}
-      <ActivityTimeline sessionId={sessionId || ""} />
+      <ActivityTimeline sessionId={sessionId || ""} sessionStatus={session?.status} />
 
       {/* Top-K Frames Gallery - Shows after session ends */}
       {session.topKFrames && session.topKFrames.length > 0 && (

@@ -9,6 +9,7 @@ import {
 } from "../services/session-delivery.service.js";
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
 import { frameAnalysisService } from "../services/frame-analysis.service.js";
+import { classifierService } from "../services/classifier.service.js";
 import { masterStoryService } from "../services/master-story.service.js";
 import { searchService } from "../services/search.service.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
@@ -958,6 +959,10 @@ router.post(
       currentImage,
       previousImage,
       windowInfo,
+      // Optional capture metadata for database record creation/update
+      sequenceNumber,
+      captureTrigger,
+      capturedAt,
     }: {
       frameId: string;
       currentImage: string; // Base64 image data
@@ -967,6 +972,9 @@ router.post(
         appName: string;
         windowTitle: string;
       };
+      sequenceNumber?: number;
+      captureTrigger?: "periodic" | "focus_change" | "manual";
+      capturedAt?: number; // Unix timestamp in ms
     } = req.body;
 
     if (!frameId || !currentImage || !windowInfo) {
@@ -1032,7 +1040,7 @@ router.post(
         return;
       }
 
-      // Analyze frame
+      // Step 1: Analyze frame with Sensor (detect visual delta)
       const analysisResult = await frameAnalysisService.analyzeFrame({
         sessionId: id,
         frameId,
@@ -1042,6 +1050,110 @@ router.post(
         timestamp: new Date().toISOString(),
       });
 
+      // Step 2: Classify activity using Classifier (interpret delta into meaningful activity)
+      let activityDescription: string | null = null;
+      let classifierConfidence: number = analysisResult.confidence;
+
+      // Only call Classifier if there's a meaningful delta change
+      if (analysisResult.deltaChanged && analysisResult.changeDescription) {
+        try {
+          const classifierResult = await classifierService.classifyActivity({
+            userId,
+            sessionId: id,
+            deltaDescription: analysisResult.changeDescription,
+            frameId,
+          });
+
+          if (classifierResult) {
+            activityDescription = classifierResult.activity;
+            classifierConfidence = classifierResult.confidence;
+
+            log.debug("Activity classified", {
+              frameId,
+              activity: activityDescription,
+              confidence: classifierConfidence,
+            });
+          }
+        } catch (error) {
+          log.warn("Classifier failed, using sensor delta as fallback", {
+            frameId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Fallback to sensor delta description
+          activityDescription = analysisResult.changeDescription;
+        }
+      } else {
+        // No delta change, use sensor description as fallback
+        activityDescription = analysisResult.changeDescription || null;
+      }
+
+      // Step 3: Create or update database capture record if metadata provided
+      let captureId: string | null = null;
+      if (sequenceNumber !== undefined && captureTrigger && capturedAt !== undefined) {
+        try {
+          // Try to find existing capture by sequenceNumber and sessionId
+          const [existingCapture] = await db
+            .select({ id: schema.sessionCaptures.id })
+            .from(schema.sessionCaptures)
+            .where(
+              and(
+                eq(schema.sessionCaptures.sessionId, id),
+                eq(schema.sessionCaptures.sequenceNumber, sequenceNumber)
+              )
+            )
+            .limit(1);
+
+          if (existingCapture) {
+            // Update existing capture with analysis results
+            captureId = existingCapture.id;
+            await db
+              .update(schema.sessionCaptures)
+              .set({
+                analysisStatus: "analyzed",
+                activityDescription,
+                confidence: String(classifierConfidence),
+                deltaChanged: analysisResult.deltaChanged,
+                deltaChangeType: analysisResult.changeType || null,
+                deltaChangeDescription: analysisResult.changeDescription || null,
+                importanceScore: calculateImportanceScore(analysisResult),
+              })
+              .where(eq(schema.sessionCaptures.id, captureId));
+
+            log.debug("Updated database capture record", { captureId, sequenceNumber });
+          } else {
+            // Create new capture record
+            const [newCapture] = await db
+              .insert(schema.sessionCaptures)
+              .values({
+                sessionId: id,
+                sequenceNumber,
+                captureTrigger,
+                capturedAt: new Date(capturedAt),
+                windowId: windowInfo.windowSourceId || null,
+                appName: windowInfo.appName || null,
+                windowTitle: windowInfo.windowTitle || null,
+                analysisStatus: "analyzed",
+                activityDescription,
+                confidence: String(classifierConfidence),
+                deltaChanged: analysisResult.deltaChanged,
+                deltaChangeType: analysisResult.changeType || null,
+                deltaChangeDescription: analysisResult.changeDescription || null,
+                importanceScore: calculateImportanceScore(analysisResult),
+              })
+              .returning({ id: schema.sessionCaptures.id });
+
+            captureId = newCapture.id;
+            log.debug("Created database capture record", { captureId, sequenceNumber });
+          }
+        } catch (error) {
+          log.warn("Failed to create/update database capture record", {
+            frameId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Continue even if DB update fails - analysis still succeeded
+        }
+      }
+
       // Calculate importance score based on analysis
       const importanceScore = calculateImportanceScore(analysisResult);
 
@@ -1049,9 +1161,11 @@ router.post(
 
       log.debug("Frame analyzed", {
         frameId,
+        captureId,
         progressionDetected: analysisResult.progressionDetected,
         changeType: analysisResult.changeType,
         changeMagnitude: analysisResult.changeMagnitude,
+        activityDescription,
         importanceScore,
         latencyMs: analysisResult.analysisLatencyMs,
       });
@@ -1060,8 +1174,10 @@ router.post(
         success: true,
         analysis: {
           frameId: analysisResult.frameId,
+          captureId, // Return database capture ID if created/updated
           progressionDetected: analysisResult.progressionDetected,
-          summaryOfAction: analysisResult.summaryOfAction,
+          summaryOfAction: activityDescription || analysisResult.summaryOfAction, // Use classified activity
+          activityDescription, // Include classified activity description
           deltaChanged: analysisResult.deltaChanged,
           changeType: analysisResult.changeType,
           changeMagnitude: analysisResult.changeMagnitude,
@@ -1074,7 +1190,7 @@ router.post(
           offTaskReason: analysisResult.offTaskReason,
           importanceScore,
           importanceReason: getImportanceReason(analysisResult, importanceScore),
-          confidence: analysisResult.confidence,
+          confidence: classifierConfidence, // Use classifier confidence
           model: analysisResult.model,
           latencyMs: analysisResult.analysisLatencyMs,
         },
@@ -1294,6 +1410,7 @@ router.get(
           windowTitle: schema.sessionCaptures.windowTitle,
           analysisStatus: schema.sessionCaptures.analysisStatus,
           activityDescription: schema.sessionCaptures.activityDescription,
+          deltaChangeDescription: schema.sessionCaptures.deltaChangeDescription,
           confidence: schema.sessionCaptures.confidence,
           imageData: schema.sessionCaptures.imageData,
         })

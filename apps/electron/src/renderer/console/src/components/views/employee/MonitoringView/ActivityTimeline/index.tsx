@@ -13,14 +13,15 @@ import TimelineGroup from "./TimelineGroup";
 
 interface ActivityTimelineProps {
   sessionId: string;
+  sessionStatus?: string;
   className?: string;
 }
 
-export default function ActivityTimeline({ sessionId, className = "" }: ActivityTimelineProps) {
+export default function ActivityTimeline({ sessionId, sessionStatus, className = "" }: ActivityTimelineProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Fetch captures
-  const { data: captures, isLoading, error } = useSessionCaptures(sessionId);
+  // Fetch captures (polls while session is active/paused)
+  const { data: captures, isLoading, error } = useSessionCaptures(sessionId, sessionStatus);
 
   // Filter out captures that don't have an activity description yet (unless it's the very start)
   // We prefer showing "meaningful" activities.
@@ -31,10 +32,8 @@ export default function ActivityTimeline({ sessionId, className = "" }: Activity
   // Transform into grouped timeline
   const timeline = useTimelineTransform(meaningfulCaptures);
 
-  // Don't render if no captures
-  if (!isLoading && meaningfulCaptures.length === 0) {
-    return null;
-  }
+  // Determine if session is currently active or paused
+  const isSessionActive = sessionStatus === "active" || sessionStatus === "paused";
 
   return (
     <div className={`bg-background-elevated rounded-lg border border-border-subtle ${className}`}>
@@ -91,7 +90,11 @@ export default function ActivityTimeline({ sessionId, className = "" }: Activity
           {/* Empty state */}
           {timeline && timeline.groups.length === 0 && !isLoading && (
             <div className="text-center py-8">
-              <p className="text-text-secondary">No recorded activity yet.</p>
+              <p className="text-text-secondary">
+                {isSessionActive 
+                  ? "Waiting for activity to be recorded..." 
+                  : "No recorded activity yet."}
+              </p>
             </div>
           )}
         </div>

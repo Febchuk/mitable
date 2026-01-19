@@ -86,6 +86,7 @@ export interface SessionCapture {
   windowTitle: string | null;
   analysisStatus: string | null;
   activityDescription: string | null;
+  deltaChangeDescription: string | null;
   confidence: number | null;
   imageData: string | null;
 }
