@@ -10,6 +10,9 @@ import { createLogger } from "../logger";
 
 const logger = createLogger("ConversationsAPI");
 
+// Production API URL (Railway)
+const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
+
 // Message type (formerly from conversation renderer)
 interface MessageType {
   id: string;
@@ -21,8 +24,10 @@ interface MessageType {
   sources?: Array<{ title: string; url: string; snippet: string }>;
 }
 
-// Base URL for backend API (configurable via Vite env)
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// Base URL for backend API - hardcode production, use env for dev
+const API_BASE_URL = import.meta.env.DEV
+  ? (import.meta.env.VITE_API_URL || PROD_API_URL)
+  : PROD_API_URL;
 
 // Re-export Message type for convenience
 export type Message = MessageType;

@@ -4,10 +4,12 @@
 
 import { authService } from "./authService";
 import { createLogger } from "../../../lib/logger";
+import { API_BASE_URL } from "../lib/config";
 
 const logger = createLogger("API");
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// Re-export for convenience
+export { API_BASE_URL };
 
 /**
  * Get the authentication token from localStorage

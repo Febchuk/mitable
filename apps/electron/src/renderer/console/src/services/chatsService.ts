@@ -1,6 +1,7 @@
 import { apiRequest } from "./api";
 import type { MultiWindowCaptureResult, WindowScreenshot } from "@mitable/shared";
 import { createLogger } from "../../../lib/logger";
+import { API_BASE_URL } from "../lib/config";
 
 const logger = createLogger("ChatsService");
 
@@ -169,7 +170,6 @@ export async function sendStreamingMessage(
   multiWindowCapture?: MultiWindowCaptureResult | null,
   metadata?: any
 ): Promise<void> {
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
   try {
     // Forward all captured screenshots (if any) from multi-window capture
