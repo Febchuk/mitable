@@ -339,10 +339,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   getNotificationFrequency: (userId: string): Promise<number> =>
     ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_FREQUENCY_GET, userId),
 
-  setNotificationFrequency: (
-    userId: string,
-    minutes: number
-  ): Promise<{ success: boolean }> =>
+  setNotificationFrequency: (userId: string, minutes: number): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_FREQUENCY_SET, userId, minutes),
 
   // Auto session start API (user-scoped)

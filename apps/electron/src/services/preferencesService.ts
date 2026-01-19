@@ -158,7 +158,10 @@ class PreferencesService {
   removeUserBlockedApp(userId: string, appName: string): void {
     const normalizedAppName = appName.toLowerCase();
     const current = this.getUserBlockedApps(userId);
-    this.setUserBlockedApps(userId, current.filter((app) => app !== normalizedAppName));
+    this.setUserBlockedApps(
+      userId,
+      current.filter((app) => app !== normalizedAppName)
+    );
   }
 
   // Notification frequency preference (user-scoped)

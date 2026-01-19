@@ -1595,8 +1595,9 @@ export default function UserProfilePage() {
                                     </button>
                                   );
                                 })}
-                              {detectedApps.filter((app) => !blockedApps.includes(app.normalizedName))
-                                .length === 0 && (
+                              {detectedApps.filter(
+                                (app) => !blockedApps.includes(app.normalizedName)
+                              ).length === 0 && (
                                 <div className="px-3 py-2 text-xs text-text-tertiary italic">
                                   All detected apps are already blocked
                                 </div>

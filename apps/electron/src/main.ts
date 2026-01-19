@@ -107,12 +107,12 @@ function createConsoleWindow() {
     ...(isMac
       ? {}
       : {
-        titleBarOverlay: {
-          color: "#1a1a1a",
-          symbolColor: "#ffffff",
-          height: 32,
-        },
-      }),
+          titleBarOverlay: {
+            color: "#1a1a1a",
+            symbolColor: "#ffffff",
+            height: 32,
+          },
+        }),
     maximizable: true,
     // Platform-specific transparency and background
     ...(isMac && {
@@ -129,8 +129,8 @@ function createConsoleWindow() {
     // Linux: solid background
     ...(!isMac &&
       !isWindows && {
-      backgroundColor: "#1a1a1a",
-    }),
+        backgroundColor: "#1a1a1a",
+      }),
     // Don't show until ready (ensures proper Dock visibility on macOS)
     show: false,
     webPreferences: {
@@ -569,8 +569,7 @@ function setupPowerMonitor() {
 
     // Check if there's already an active session
     const sessionState = monitoringSessionService.getSessionState();
-    const isSessionActive =
-      sessionState?.status === "active" || sessionState?.status === "paused";
+    const isSessionActive = sessionState?.status === "active" || sessionState?.status === "paused";
 
     if (isSessionActive) {
       powerLogger.info(" Session already active, continuing existing session");
@@ -1227,8 +1226,9 @@ function setupWatchModeHandlers() {
     }
 
     watchModeLogger.info(
-      `Broadcasted update to windows. Selected windows: ${selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
-      "none"
+      `Broadcasted update to windows. Selected windows: ${
+        selectedWindows.map((window) => `${window.appName} - ${window.windowTitle}`).join(", ") ||
+        "none"
       }`
     );
   }
@@ -1532,15 +1532,12 @@ function setupMonitoringSessionHandlers() {
     return preferencesService.getUserNotificationFrequency(userId);
   });
 
-  ipcMain.handle(
-    IPC_CHANNELS.NOTIFICATION_FREQUENCY_SET,
-    (_, userId: string, minutes: number) => {
-      preferencesService.setUserNotificationFrequency(userId, minutes);
-      // Restart the notification timer with the new frequency
-      startNotificationTimer();
-      return { success: true };
-    }
-  );
+  ipcMain.handle(IPC_CHANNELS.NOTIFICATION_FREQUENCY_SET, (_, userId: string, minutes: number) => {
+    preferencesService.setUserNotificationFrequency(userId, minutes);
+    // Restart the notification timer with the new frequency
+    startNotificationTimer();
+    return { success: true };
+  });
 
   // Auto session start IPC handlers (user-scoped)
   ipcMain.handle(IPC_CHANNELS.AUTO_SESSION_START_GET, (_, userId: string) => {
