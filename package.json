@@ -1,6 +1,6 @@
 {
   "name": "mitable",
-  "version": "0.1.16",
+  "version": "0.1.6",
   "private": true,
   "description": "Mitable AI Onboarding Buddy - Intelligent desktop assistant for contextual employee onboarding",
   "workspaces": [

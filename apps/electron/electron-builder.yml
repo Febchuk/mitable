@@ -12,13 +12,12 @@ publish:
   - provider: generic
     url: https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev
     useMultipleRangeRequest: false
-  # Temporarily commented out for local builds without GH_TOKEN
-  # - provider: github
-  #   owner: Febchuk
-  #   repo: mitable
-  #   releaseType: release
-  #   private: true
-  #   token: ${env.GH_TOKEN}
+  - provider: github
+    owner: Febchuk
+    repo: mitable
+    releaseType: release
+    private: true
+    token: ${env.GH_TOKEN}
 
 # macOS Configuration
 mac:
