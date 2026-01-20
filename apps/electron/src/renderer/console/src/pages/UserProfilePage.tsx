@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect, useCallback } from "react";
+import { useState, FormEvent, useEffect, useCallback, useRef } from "react";
 import {
   Eye,
   EyeOff,
@@ -117,6 +117,26 @@ export default function UserProfilePage() {
   // Auto session start state
   const [autoSessionStart, setAutoSessionStart] = useState<boolean>(false);
   const [isAutoSessionStartLoading, setIsAutoSessionStartLoading] = useState(true);
+
+  // OAuth polling interval refs - for cleanup on unmount
+  const linearPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const gmailPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const notionPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup OAuth polling intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (linearPollIntervalRef.current) {
+        clearInterval(linearPollIntervalRef.current);
+      }
+      if (gmailPollIntervalRef.current) {
+        clearInterval(gmailPollIntervalRef.current);
+      }
+      if (notionPollIntervalRef.current) {
+        clearInterval(notionPollIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Block list functions
   const loadBlockList = useCallback(async () => {
@@ -620,10 +640,11 @@ export default function UserProfilePage() {
           });
 
           if (resp.ok) {
-            const data = await response.json();
+            const data = await resp.json();
             setLinearStatus(data);
             if (data.connected) {
               clearInterval(pollInterval);
+              linearPollIntervalRef.current = null;
               toast({
                 title: "Linear Connected",
                 description: "Your Linear account has been connected successfully!",
@@ -635,7 +656,11 @@ export default function UserProfilePage() {
         }
       }, 2000);
 
-      setTimeout(() => clearInterval(pollInterval), 120000);
+      linearPollIntervalRef.current = pollInterval;
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        linearPollIntervalRef.current = null;
+      }, 120000);
     } catch (error) {
       logger.error("Error connecting Linear:", error);
       toast({
@@ -725,6 +750,7 @@ export default function UserProfilePage() {
             setGmailStatus(data);
             if (data.connected) {
               clearInterval(pollInterval);
+              gmailPollIntervalRef.current = null;
               toast({
                 title: "Gmail Connected",
                 description: `Your Gmail account (${data.email}) has been connected successfully!`,
@@ -736,7 +762,11 @@ export default function UserProfilePage() {
         }
       }, 2000);
 
-      setTimeout(() => clearInterval(pollInterval), 120000);
+      gmailPollIntervalRef.current = pollInterval;
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        gmailPollIntervalRef.current = null;
+      }, 120000);
     } catch (error) {
       logger.error("Error connecting Gmail:", error);
       toast({
@@ -826,6 +856,7 @@ export default function UserProfilePage() {
             setNotionStatus(data);
             if (data.connected) {
               clearInterval(pollInterval);
+              notionPollIntervalRef.current = null;
               toast({
                 title: "Notion Connected",
                 description: "Your Notion workspace has been connected successfully!",
@@ -837,7 +868,11 @@ export default function UserProfilePage() {
         }
       }, 2000);
 
-      setTimeout(() => clearInterval(pollInterval), 120000);
+      notionPollIntervalRef.current = pollInterval;
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        notionPollIntervalRef.current = null;
+      }, 120000);
     } catch (error) {
       logger.error("Error connecting Notion:", error);
       toast({

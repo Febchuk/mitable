@@ -19,6 +19,7 @@ import { captureService } from "./services/captureService";
 import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
 import { windowDetectionService } from "./services/windowDetectionService";
 import { monitoringSessionService } from "./services/monitoringSessionService";
+import { focusWindowTracker } from "./services/focusWindowTracker";
 import { authManager } from "./services/authManager";
 import { preferencesService } from "./services/preferencesService";
 import { updateService } from "./services/updateService";
@@ -1965,4 +1966,6 @@ app.on("will-quit", () => {
 app.on("before-quit", () => {
   updateService.stopPeriodicChecks();
   stopNotificationTimer();
+  // Ensure focus window tracker is stopped even if session state is corrupted
+  focusWindowTracker.stop();
 });

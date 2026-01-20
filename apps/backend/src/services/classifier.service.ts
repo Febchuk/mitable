@@ -1,6 +1,6 @@
 import { db } from "../db/client";
 import { users, sessionCaptures } from "../db/schema";
-import { eq, desc, and, isNotNull } from "drizzle-orm";
+import { eq, asc, and, isNotNull } from "drizzle-orm";
 import Groq from "groq-sdk";
 import { config } from "../config";
 import { CLASSIFIER_SYSTEM_PROMPT, buildClassifierUserPrompt } from "../prompts/session-prompts";
@@ -51,20 +51,21 @@ class ClassifierService {
 
       // 2. Fetch Recent History (Last 5 valid activities)
       // We look for captures that HAVE an activityDescription already
+      // Order by capturedAt ascending to get chronological order directly
       const historyCaptures = await db.query.sessionCaptures.findMany({
         where: and(
           eq(sessionCaptures.sessionId, input.sessionId),
           isNotNull(sessionCaptures.activityDescription)
         ),
-        orderBy: [desc(sessionCaptures.sequenceNumber)],
+        orderBy: [asc(sessionCaptures.capturedAt)],
         limit: 5,
         columns: {
           activityDescription: true,
         },
       });
 
-      // Reverse to get chronological order [oldest ... newest]
-      const history = historyCaptures.map((c) => c.activityDescription as string).reverse();
+      // History is already in chronological order [oldest ... newest]
+      const history = historyCaptures.map((c) => c.activityDescription as string);
 
       // 3. Build Prompt
       const userPrompt = buildClassifierUserPrompt(

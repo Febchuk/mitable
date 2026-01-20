@@ -11,6 +11,26 @@
 // ============================================================================
 
 // ============================================================================
+// SECURITY HELPERS
+// ============================================================================
+
+/**
+ * Escape user-provided fields to prevent prompt injection attacks.
+ * - Removes angle brackets (potential XML/tag injection)
+ * - Normalizes newlines to spaces (prevents multi-line injection)
+ * - Truncates to max length to prevent prompt overflow
+ */
+function escapePromptField(value: string, maxLength = 200): string {
+  return value
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, " ")
+    .replace(/\r/g, " ")
+    .substring(0, maxLength)
+    .trim();
+}
+
+// ============================================================================
 // SENSOR (VISUAL DELTA DETECTOR)
 // ============================================================================
 
@@ -92,6 +112,7 @@ Return a JSON object:
 
 /**
  * Build the user prompt for the Classifier with context
+ * All user-provided fields are escaped to prevent prompt injection
  */
 export function buildClassifierUserPrompt(
   persona: {
@@ -103,17 +124,31 @@ export function buildClassifierUserPrompt(
   history: string[],
   delta: string
 ): string {
+  // Escape all user-provided persona fields to prevent prompt injection
+  const safeJobTitle = escapePromptField(persona.jobTitle || "Knowledge Worker");
+  const safeTasks = persona.regularTasks
+    ? escapePromptField(persona.regularTasks.join(", "), 500)
+    : "General computer work";
+  const safeApps = persona.regularApps
+    ? escapePromptField(persona.regularApps.join(", "), 500)
+    : "Standard office apps";
+  const safeContext = escapePromptField(persona.additionalContext || "None");
+
   const personaDesc = `
-Role: ${persona.jobTitle || "Knowledge Worker"}
-Tasks: ${persona.regularTasks?.join(", ") || "General computer work"}
-Apps: ${persona.regularApps?.join(", ") || "Standard office apps"}
-Context: ${persona.additionalContext || "None"}
+Role: ${safeJobTitle}
+Tasks: ${safeTasks}
+Apps: ${safeApps}
+Context: ${safeContext}
 `.trim();
 
+  // Escape history entries (from previous classifications)
   const historyDesc =
     history.length > 0
-      ? history.map((h, i) => `${i + 1}. ${h}`).join("\n")
+      ? history.map((h, i) => `${i + 1}. ${escapePromptField(h, 150)}`).join("\n")
       : "(No recent history - session start)";
+
+  // Escape the current delta (from vision model output)
+  const safeDelta = escapePromptField(delta, 300);
 
   return `
 PERSONA:
@@ -123,7 +158,7 @@ RECENT HISTORY:
 ${historyDesc}
 
 CURRENT DELTA:
-${delta}
+${safeDelta}
 
 Classify this activity:`;
 }
