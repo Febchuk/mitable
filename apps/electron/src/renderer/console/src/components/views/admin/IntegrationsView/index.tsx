@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Filter, Plus } from "lucide-react";
 import { authService } from "@/console/src/services/authService";
+import { API_BASE_URL } from "@/console/src/lib/config";
 
 // Polling configuration for OAuth callback
 const POLLING_CONFIG = {
@@ -24,8 +25,6 @@ const POLLING_CONFIG = {
   MAX_POLLS: 120, // Maximum 120 polls (2 minutes timeout)
   UI_DELAY_MS: 500, // Delay before opening configure dialog
 } as const;
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export default function IntegrationsView() {
   const { data: integrations = [], refetch } = useIntegrations();

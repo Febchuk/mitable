@@ -30,6 +30,7 @@ import {
   checkGmailConnection,
   startGmailOAuth,
 } from "@/console/src/services/monitoringService";
+import { API_BASE_URL } from "@/console/src/lib/config";
 import {
   ArrowLeft,
   Clock,
@@ -215,7 +216,7 @@ export default function SessionDetail() {
         return;
       }
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/integrations/linear/status`,
+        `${API_BASE_URL}/api/integrations/linear/status`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.ok) {

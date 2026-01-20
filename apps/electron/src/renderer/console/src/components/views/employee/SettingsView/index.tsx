@@ -29,8 +29,7 @@ import {
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import { BillingSection } from "@/console/src/components/billing";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { API_BASE_URL } from "@/console/src/lib/config";
 
 interface LinearStatus {
   connected: boolean;

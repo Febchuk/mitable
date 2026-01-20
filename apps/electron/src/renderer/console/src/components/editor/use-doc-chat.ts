@@ -18,9 +18,7 @@ import { DefaultChatTransport } from "ai";
 import { useEditorRef, usePluginOption } from "platejs/react";
 
 import { aiChatPlugin } from "@/components/editor/plugins/ai-kit";
-
-// API base URL from environment
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { API_BASE_URL } from "../../../../console/src/lib/config";
 
 /**
  * Hook to connect Plate editor AI features to our backend
