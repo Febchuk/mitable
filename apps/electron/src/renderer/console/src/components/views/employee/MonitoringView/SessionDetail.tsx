@@ -864,30 +864,6 @@ export default function SessionDetail() {
         )}
       </div>
 
-      {/* Key Activities (if available) */}
-      {session.keyActivities &&
-        Array.isArray(session.keyActivities) &&
-        session.keyActivities.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-text-primary">Key Activities</h2>
-            <ul className="space-y-2">
-              {session.keyActivities.map((activity: any, i: number) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-3 p-3 bg-background-elevated rounded-lg border border-border-subtle"
-                >
-                  <CheckCircle size={18} className="text-status-success mt-0.5 flex-shrink-0" />
-                  <span className="text-text-primary">
-                    {typeof activity === "string"
-                      ? activity
-                      : activity.activity || activity.description || JSON.stringify(activity)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
       {/* Activity Timeline */}
       <ActivityTimeline sessionId={sessionId || ""} sessionStatus={session?.status} />
 
