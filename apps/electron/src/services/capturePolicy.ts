@@ -2,8 +2,10 @@
  * Capture Policy - ENV-based deny-first window capture control
  *
  * Prevents Mitable from capturing screenshots of sensitive applications
- * as specified in environment variables.
+ * as specified in environment variables and user preferences.
  */
+
+import { preferencesService } from "./preferencesService";
 
 export type CapturePolicy = {
   appsDeny: (string | RegExp)[];
@@ -54,6 +56,7 @@ const defaultDenyList: CapturePolicy = {
 
 /**
  * Get the active capture policy (ENV overrides defaults)
+ * Note: User preferences are checked separately in isBlockedByPolicy
  */
 export function getCapturePolicy(): CapturePolicy {
   const envPolicy = loadPolicyFromEnv();
@@ -115,6 +118,7 @@ function matchesAny(
  * Uses defense-in-depth approach:
  * 1. First checks window title against deny patterns
  * 2. Then checks app name (normalized) against deny patterns
+ * 3. Also checks user's custom block list if userId is provided
  *
  * This dual-check ensures maximum blocking coverage:
  * - Window title catches browser-based apps ("Gmail - Inbox")
@@ -127,7 +131,8 @@ export function isBlockedByPolicy(
   windowTitle: string,
   appName?: string,
   policy?: CapturePolicy,
-  url?: string
+  url?: string,
+  userId?: string
 ): { blocked: boolean; reason?: string } {
   const activePolicy = policy || getCapturePolicy();
 
@@ -150,6 +155,15 @@ export function isBlockedByPolicy(
   // Catches: "Slack.app", "1Password.exe", "Outlook"
   if (matchesAny(app, activePolicy.appsDeny, true)) {
     return { blocked: true, reason: "App name denied by capture policy" };
+  }
+
+  // Check 3: User's custom block list (if userId provided)
+  if (userId) {
+    const normalizedAppName = normalizeAppName(app).toLowerCase();
+    const userBlockedApps = preferencesService.getUserBlockedApps(userId);
+    if (userBlockedApps.includes(normalizedAppName)) {
+      return { blocked: true, reason: "App blocked by user preference" };
+    }
   }
 
   return { blocked: false };

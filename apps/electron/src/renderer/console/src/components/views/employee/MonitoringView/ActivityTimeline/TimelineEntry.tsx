@@ -2,11 +2,21 @@
  * TimelineEntry
  *
  * Individual capture entry in the timeline.
- * Shows timestamp, activity description, and expandable inline screenshot.
+ * Shows timestamp (local time) and semantic activity description.
  */
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Activity,
+  Terminal,
+  Code,
+  Globe,
+  FileText,
+  Image as ImageIcon,
+  Loader2,
+} from "lucide-react";
 import type { SessionCapture } from "@/console/src/services/monitoringService";
 
 interface TimelineEntryProps {
@@ -23,89 +33,117 @@ function formatTime(dateString: string): string {
   });
 }
 
+function getActivityIcon(appName: string | null, activity: string | null) {
+  const text = (appName + " " + activity).toLowerCase();
+
+  if (text.includes("code") || text.includes("cursor") || text.includes("vs"))
+    return <Code className="w-3.5 h-3.5" />;
+  if (text.includes("terminal") || text.includes("warp") || text.includes("iterm"))
+    return <Terminal className="w-3.5 h-3.5" />;
+  if (text.includes("chrome") || text.includes("browser") || text.includes("safari"))
+    return <Globe className="w-3.5 h-3.5" />;
+  if (text.includes("notion") || text.includes("doc")) return <FileText className="w-3.5 h-3.5" />;
+
+  return <Activity className="w-3.5 h-3.5" />;
+}
+
 export default function TimelineEntry({ capture, isLast = false }: TimelineEntryProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const entryRef = useRef<HTMLDivElement>(null);
 
-  // Reset image loaded state when collapsed
   useEffect(() => {
-    if (!isExpanded) {
-      setImageLoaded(false);
-    }
+    if (!isExpanded) setImageLoaded(false);
   }, [isExpanded]);
 
   const hasImage = !!capture.imageData;
-  const activityText = capture.activityDescription || capture.windowTitle || "Activity captured";
+
+  // Prefer the Classifier output, fallback to Sensor delta, then Window title
+  const activityText =
+    capture.activityDescription ||
+    capture.deltaChangeDescription ||
+    capture.windowTitle ||
+    "Activity captured";
+
+  // Visual style based on confidence/type
+  const isPending = !capture.activityDescription && !capture.deltaChangeDescription;
 
   return (
-    <div ref={entryRef} className={`relative ${!isLast ? "pb-3" : ""}`}>
-      {/* Timeline connector line */}
-      {!isLast && <div className="absolute left-[7px] top-6 bottom-0 w-[2px] bg-border-subtle" />}
+    <div ref={entryRef} className={`relative ${!isLast ? "pb-2" : ""}`}>
+      {/* Connector Line */}
+      {!isLast && (
+        <div className="absolute left-[15px] top-7 bottom-0 w-[1px] bg-border-subtle/50" />
+      )}
 
-      {/* Entry row */}
       <div
-        className={`flex items-start gap-3 cursor-pointer group ${
-          hasImage ? "hover:bg-background-tertiary/50" : ""
-        } rounded-md p-1 -ml-1 transition-colors`}
+        className={`flex items-start gap-3 group rounded-md p-1.5 -ml-1.5 transition-colors ${
+          hasImage ? "hover:bg-background-tertiary/30 cursor-pointer" : ""
+        }`}
         onClick={() => hasImage && setIsExpanded(!isExpanded)}
       >
-        {/* Timeline dot */}
-        <div className="relative flex-shrink-0 mt-1.5">
-          <div className="w-4 h-4 rounded-full border-2 border-border-default bg-background-primary flex items-center justify-center">
-            {hasImage &&
-              (isExpanded ? (
-                <ChevronDown className="w-2.5 h-2.5 text-text-tertiary" />
-              ) : (
-                <ChevronRight className="w-2.5 h-2.5 text-text-tertiary" />
-              ))}
+        {/* Timestamp Column */}
+        <div className="w-16 flex-shrink-0 pt-0.5 text-right">
+          <span className="text-text-tertiary text-xs font-mono">
+            {formatTime(capture.capturedAt)}
+          </span>
+        </div>
+
+        {/* Icon Marker */}
+        <div className="relative flex-shrink-0 mt-1">
+          <div
+            className={`w-5 h-5 rounded-full border border-border-default bg-background-elevated flex items-center justify-center text-text-tertiary ${isPending ? "animate-pulse" : ""}`}
+          >
+            {getActivityIcon(capture.appName, activityText)}
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Timestamp */}
-            <span className="text-text-tertiary text-xs font-mono flex-shrink-0">
-              {formatTime(capture.capturedAt)}
+        {/* Content Column */}
+        <div className="flex-1 min-w-0 pt-0.5">
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-sm ${isPending ? "text-text-tertiary italic" : "text-text-secondary"}`}
+            >
+              {isPending ? "Analyzing..." : activityText}
             </span>
 
-            {/* Confidence badge */}
-            {capture.confidence !== null && capture.confidence > 0 && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-background-tertiary text-text-secondary">
-                {Math.round(capture.confidence * 100)}%
-              </span>
+            {hasImage && (
+              <ImageIcon className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
             )}
           </div>
 
-          {/* Activity description */}
-          <p className="text-text-secondary text-sm mt-0.5 line-clamp-2">{activityText}</p>
-
-          {/* Window title if different from activity */}
-          {capture.windowTitle &&
-            capture.activityDescription &&
-            capture.windowTitle !== capture.activityDescription && (
-              <p className="text-text-tertiary text-xs mt-0.5 truncate">{capture.windowTitle}</p>
-            )}
+          {/* Debug/Metadata info (optional, can be hidden in prod) */}
+          {capture.confidence !== null && capture.confidence < 0.8 && capture.confidence > 0 && (
+            <span className="text-[10px] text-text-tertiary mt-0.5 block">
+              Low confidence: {Math.round(capture.confidence * 100)}%
+            </span>
+          )}
         </div>
+
+        {/* Expand/Collapse Indicator */}
+        {hasImage && (
+          <div className="pt-1 text-text-tertiary opacity-0 group-hover:opacity-50">
+            {isExpanded ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Expanded screenshot */}
+      {/* Expanded Screenshot */}
       {isExpanded && hasImage && (
-        <div className="ml-7 mt-2 mb-3">
-          <div className="relative rounded-lg overflow-hidden border border-border-subtle bg-background-tertiary">
-            {/* Loading skeleton */}
+        <div className="ml-[5.5rem] mt-2 mb-3">
+          <div className="relative rounded bg-background-black border border-border-subtle overflow-hidden max-w-lg shadow-lg">
             {!imageLoaded && (
-              <div className="absolute inset-0 animate-pulse bg-background-tertiary" />
+              <div className="absolute inset-0 flex items-center justify-center bg-background-tertiary h-32">
+                <Loader2 className="w-4 h-4 text-text-tertiary animate-spin" />
+              </div>
             )}
-
-            {/* Screenshot image */}
             <img
               src={capture.imageData!}
-              alt={activityText}
-              className={`w-full h-auto transition-opacity duration-200 ${
-                imageLoaded ? "opacity-100" : "opacity-0"
-              }`}
+              alt="Screen capture"
+              className={`w-full h-auto transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
               onLoad={() => setImageLoaded(true)}
             />
           </div>

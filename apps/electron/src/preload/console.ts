@@ -47,6 +47,16 @@ const IPC_CHANNELS = {
   PREFERENCES_GET: "preferences-get",
   PREFERENCES_SET: "preferences-set",
   PREFERENCES_GET_ALL: "preferences-get-all",
+  // Block list
+  BLOCK_LIST_GET: "block-list-get",
+  BLOCK_LIST_SET: "block-list-set",
+  BLOCK_LIST_ADD: "block-list-add",
+  BLOCK_LIST_REMOVE: "block-list-remove",
+  BLOCK_LIST_GET_DETECTED_APPS: "block-list-get-detected-apps",
+  NOTIFICATION_FREQUENCY_GET: "notification-frequency-get",
+  NOTIFICATION_FREQUENCY_SET: "notification-frequency-set",
+  AUTO_SESSION_START_GET: "auto-session-start-get",
+  AUTO_SESSION_START_SET: "auto-session-start-set",
   // Watching pill
   WATCHING_PILL_HIDE: "watching-pill-hide",
 } as const;
@@ -308,6 +318,36 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       showPillOnSessionStart: boolean;
     };
   }> => ipcRenderer.invoke(IPC_CHANNELS.PREFERENCES_GET_ALL),
+
+  // Block list API (user-scoped)
+  getBlockList: (userId: string): Promise<string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_GET, userId),
+
+  setBlockList: (userId: string, blockedApps: string[]): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_SET, userId, blockedApps),
+
+  addBlockedApp: (userId: string, appName: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_ADD, userId, appName),
+
+  removeBlockedApp: (userId: string, appName: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_REMOVE, userId, appName),
+
+  getDetectedApps: (): Promise<Array<{ normalizedName: string; originalName: string }>> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_GET_DETECTED_APPS),
+
+  // Notification frequency API (user-scoped)
+  getNotificationFrequency: (userId: string): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_FREQUENCY_GET, userId),
+
+  setNotificationFrequency: (userId: string, minutes: number): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_FREQUENCY_SET, userId, minutes),
+
+  // Auto session start API (user-scoped)
+  getAutoSessionStart: (userId: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AUTO_SESSION_START_GET, userId),
+
+  setAutoSessionStart: (userId: string, enabled: boolean): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AUTO_SESSION_START_SET, userId, enabled),
 
   // Hide watching pill
   hidePill: () => ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE),

@@ -26,7 +26,7 @@ interface MessageType {
 
 // Base URL for backend API - hardcode production, use env for dev
 const API_BASE_URL = import.meta.env.DEV
-  ? (import.meta.env.VITE_API_URL || PROD_API_URL)
+  ? import.meta.env.VITE_API_URL || PROD_API_URL
   : PROD_API_URL;
 
 // Re-export Message type for convenience

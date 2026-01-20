@@ -53,15 +53,9 @@ export interface SessionListItem {
 }
 
 export interface CreateSessionRequest {
-  selectedWindows: SelectedWindowInfo[];
+  selectedWindows?: SelectedWindowInfo[]; // Optional - focus tracker adds windows dynamically
   captureIntervalMs?: number;
   name?: string;
-  // Goal context fields (optional)
-  sessionGoal?: string;
-  linearIssueId?: string;
-  linearIssueTitle?: string;
-  linearIssueDescription?: string;
-  additionalContext?: string;
 }
 
 export interface LinearIssue {
@@ -92,6 +86,7 @@ export interface SessionCapture {
   windowTitle: string | null;
   analysisStatus: string | null;
   activityDescription: string | null;
+  deltaChangeDescription: string | null;
   confidence: number | null;
   imageData: string | null;
 }
@@ -190,7 +185,14 @@ export async function updateSession(
 /**
  * End a session and trigger summary generation
  */
-export async function endSession(sessionId: string): Promise<{
+export async function endSession(
+  sessionId: string,
+  preferences?: {
+    style: "verbose" | "concise";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
+  }
+): Promise<{
   success: boolean;
   session: {
     id: string;
@@ -206,8 +208,25 @@ export async function endSession(sessionId: string): Promise<{
     captureCount: number;
   };
 }> {
+  const body: {
+    preferences?: {
+      detailLevel: "verbose" | "concise";
+      format: "bullets" | "paragraphs";
+      includeScreenshots: boolean;
+    };
+  } = {};
+
+  if (preferences) {
+    body.preferences = {
+      detailLevel: preferences.style, // Backend expects detailLevel, frontend uses style
+      format: preferences.format,
+      includeScreenshots: preferences.includeScreenshots,
+    };
+  }
+
   return apiRequest(`/monitoring/sessions/${sessionId}/end`, {
     method: "POST",
+    body: JSON.stringify(body),
   });
 }
 

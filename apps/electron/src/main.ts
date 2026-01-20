@@ -1,5 +1,5 @@
 import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
-import { IPC_CHANNELS } from "@mitable/shared";
+import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
 import {
   app,
   BrowserWindow,
@@ -7,6 +7,7 @@ import {
   ipcMain,
   nativeTheme,
   Notification,
+  powerMonitor,
   screen,
   shell,
 } from "electron";
@@ -18,6 +19,7 @@ import { captureService } from "./services/captureService";
 import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
 import { windowDetectionService } from "./services/windowDetectionService";
 import { monitoringSessionService } from "./services/monitoringSessionService";
+import { focusWindowTracker } from "./services/focusWindowTracker";
 import { authManager } from "./services/authManager";
 import { preferencesService } from "./services/preferencesService";
 import { updateService } from "./services/updateService";
@@ -61,6 +63,9 @@ let closedWindowCheckInterval: NodeJS.Timeout | null = null;
 
 // Watch button windows tracking (module scope for cleanup from multiple handlers)
 const watchButtonWindows: Map<string, BrowserWindow> = new Map();
+
+// User context storage (shared across all windows for session start)
+let currentUserContext: { userId: string; organizationId: string } | null = null;
 
 // Auth token storage (shared across all windows)
 const authTokens: {
@@ -491,8 +496,14 @@ function hideNotification() {
 
 // Start periodic notification timer (prompts user to turn on monitoring)
 function startNotificationTimer() {
-  // Check every 30 minutes
-  const NOTIFICATION_INTERVAL = 30 * 60 * 1000; // 30 minutes
+  // Get user's preferred notification frequency (defaults to 30 minutes)
+  let notificationFrequencyMinutes = 30;
+  if (currentUserContext?.userId) {
+    notificationFrequencyMinutes = preferencesService.getUserNotificationFrequency(
+      currentUserContext.userId
+    );
+  }
+  const NOTIFICATION_INTERVAL = notificationFrequencyMinutes * 60 * 1000; // Convert minutes to milliseconds
   // const NOTIFICATION_INTERVAL = 0.5 * 60 * 1000; // 0.5 minutes for testing
 
   if (notificationTimer) {
@@ -522,7 +533,9 @@ function startNotificationTimer() {
     }
   }, NOTIFICATION_INTERVAL);
 
-  notificationLogger.info(" Notification timer started (30 min interval)");
+  notificationLogger.info(
+    ` Notification timer started (${notificationFrequencyMinutes} min interval)`
+  );
 }
 
 function stopNotificationTimer() {
@@ -531,6 +544,58 @@ function stopNotificationTimer() {
     notificationTimer = null;
     notificationLogger.info(" Notification timer stopped");
   }
+}
+
+// Setup powerMonitor listeners for auto session start
+function setupPowerMonitor() {
+  const powerLogger = createLogger("PowerMonitor");
+
+  // Listen for system resume (wake from sleep or unlock)
+  powerMonitor.on("resume", async () => {
+    powerLogger.info(" System resumed (wake from sleep/unlock)");
+
+    // Check if auto session start is enabled for current user
+    if (!currentUserContext?.userId) {
+      powerLogger.info(" No user context, skipping auto session start");
+      return;
+    }
+
+    const autoSessionStartEnabled = preferencesService.getUserAutoSessionStart(
+      currentUserContext.userId
+    );
+    if (!autoSessionStartEnabled) {
+      powerLogger.info(" Auto session start disabled, skipping");
+      return;
+    }
+
+    // Check if there's already an active session
+    const sessionState = monitoringSessionService.getSessionState();
+    const isSessionActive = sessionState?.status === "active" || sessionState?.status === "paused";
+
+    if (isSessionActive) {
+      powerLogger.info(" Session already active, continuing existing session");
+      // If session was paused, resume it
+      if (sessionState?.status === "paused") {
+        await monitoringSessionService.resumeSession();
+      }
+      return;
+    }
+
+    // No active session - start a new one
+    powerLogger.info(" No active session, starting new session via auto-start");
+    try {
+      const result = await startSessionFromMain();
+      if (result.success) {
+        powerLogger.info(" Auto session started successfully:", result.sessionId);
+      } else {
+        powerLogger.warn(" Auto session start failed:", result.error);
+      }
+    } catch (error) {
+      powerLogger.error(" Error starting auto session:", error);
+    }
+  });
+
+  powerLogger.info(" PowerMonitor listeners registered");
 }
 
 // IPC Handlers
@@ -742,10 +807,16 @@ function setupIPC() {
             appName: payload.appName,
             windowTitle: payload.windowTitle,
           });
-          // Notify pill to update badge count
+          // Notify pill and dropdown to update badge count / selected windows list
           const selectedWindows = windowDetectionService.getSelectedWindows();
           if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
             watchingPillWindow.webContents.send(
+              IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
+              selectedWindows
+            );
+          }
+          if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
+            watchingPillEyeDropdown.webContents.send(
               IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
               selectedWindows
             );
@@ -755,7 +826,7 @@ function setupIPC() {
         case "unselect-window": {
           const windowId = action.payload as string;
           windowDetectionService.removeWindow(windowId);
-          // Notify pill to update badge count
+          // Notify pill and dropdown to update badge count / selected windows list
           const selectedWindows = windowDetectionService.getSelectedWindows();
           if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
             watchingPillWindow.webContents.send(
@@ -763,80 +834,17 @@ function setupIPC() {
               selectedWindows
             );
           }
+          if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
+            watchingPillEyeDropdown.webContents.send(
+              IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
+              selectedWindows
+            );
+          }
           return { success: true };
         }
         case "start-session": {
-          // 1. Get user context (set when user logs in via Console)
-          if (!currentUserContext) {
-            monitoringLogger.warn(" Start session failed: User not logged in. Opening Console...");
-            // Show Console so user can log in
-            if (consoleWindow && !consoleWindow.isDestroyed()) {
-              consoleWindow.show();
-              consoleWindow.focus();
-            }
-            return { success: false, error: "Please log in through the Console first" };
-          }
-
-          // 2. Get selected windows
-          const selectedWindows = windowDetectionService.getSelectedWindows();
-          if (selectedWindows.length === 0) {
-            monitoringLogger.warn(" Start session failed: No windows selected");
-            return { success: false, error: "No windows selected" };
-          }
-
-          // 3. Create backend session
-          try {
-            const sessionName = `Session ${new Date().toLocaleDateString()}`;
-            const captureIntervalMs = 3000;
-
-            monitoringLogger.info(` Creating backend session: ${sessionName}`);
-            const response = await authManager.authenticatedFetch("/api/monitoring/sessions", {
-              method: "POST",
-              body: JSON.stringify({
-                name: sessionName,
-                selectedWindows: selectedWindows.map((w) => ({
-                  windowId: w.windowId,
-                  appName: w.appName,
-                  windowTitle: w.windowTitle,
-                })),
-                captureIntervalMs,
-              }),
-            });
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              monitoringLogger.error(" Backend session creation failed:", errorText);
-              return { success: false, error: "Failed to create session" };
-            }
-
-            const backendResult = await response.json();
-            if (!backendResult.session?.id) {
-              monitoringLogger.error(" Backend returned no session ID");
-              return { success: false, error: "Failed to create session" };
-            }
-
-            // 4. Start Electron-side capture
-            monitoringLogger.info(
-              ` Starting Electron capture for session: ${backendResult.session.id}`
-            );
-            const startResult = await monitoringSessionService.startSession({
-              sessionId: backendResult.session.id,
-              selectedWindows,
-              captureIntervalMs,
-              userId: currentUserContext.userId,
-              organizationId: currentUserContext.organizationId,
-            });
-
-            if (!startResult.error) {
-              monitoringLogger.info(" Session started successfully from pill");
-              return { success: true, sessionId: startResult.sessionId };
-            }
-
-            return { success: false, error: startResult.error };
-          } catch (error) {
-            monitoringLogger.error(" Start session error:", error);
-            return { success: false, error: "Failed to start session" };
-          }
+          // Use shared helper function for session start
+          return startSessionFromMain();
         }
         case "pause-session": {
           return monitoringSessionService.pauseSession();
@@ -913,7 +921,7 @@ function setupIPC() {
 
   // ==================== User Context IPC Handlers ====================
   // Store user context for cross-window access (e.g., WatchingPill needs userId/orgId)
-  let currentUserContext: { userId: string; organizationId: string } | null = null;
+  // Note: currentUserContext is defined at module scope for access from global shortcuts
 
   ipcMain.on(
     IPC_CHANNELS.USER_CONTEXT_SET,
@@ -1322,7 +1330,7 @@ function setupMonitoringSessionHandlers() {
       const result = await monitoringSessionService.startSession({
         sessionId: config.sessionId,
         selectedWindows: config.selectedWindows,
-        captureIntervalMs: config.captureIntervalMs || 30000,
+        captureIntervalMs: config.captureIntervalMs || SESSION_DEFAULTS.CAPTURE_INTERVAL_MS,
         name: config.name,
         userId: config.userId,
         organizationId: config.organizationId,
@@ -1491,6 +1499,57 @@ function setupMonitoringSessionHandlers() {
     return preferencesService.getAllPreferences();
   });
 
+  // Block list IPC handlers (user-scoped)
+  ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_GET, (_, userId: string) => {
+    return preferencesService.getUserBlockedApps(userId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_SET, (_, userId: string, blockedApps: string[]) => {
+    preferencesService.setUserBlockedApps(userId, blockedApps);
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_ADD, (_, userId: string, appName: string) => {
+    preferencesService.addUserBlockedApp(userId, appName);
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_REMOVE, (_, userId: string, appName: string) => {
+    preferencesService.removeUserBlockedApp(userId, appName);
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_GET_DETECTED_APPS, () => {
+    const detectedApps = windowDetectionService.getDetectedApps();
+    const appsWithOriginalNames = detectedApps.map((normalized) => ({
+      normalizedName: normalized,
+      originalName: windowDetectionService.getOriginalAppName(normalized) || normalized,
+    }));
+    return appsWithOriginalNames;
+  });
+
+  // Notification frequency IPC handlers (user-scoped)
+  ipcMain.handle(IPC_CHANNELS.NOTIFICATION_FREQUENCY_GET, (_, userId: string) => {
+    return preferencesService.getUserNotificationFrequency(userId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.NOTIFICATION_FREQUENCY_SET, (_, userId: string, minutes: number) => {
+    preferencesService.setUserNotificationFrequency(userId, minutes);
+    // Restart the notification timer with the new frequency
+    startNotificationTimer();
+    return { success: true };
+  });
+
+  // Auto session start IPC handlers (user-scoped)
+  ipcMain.handle(IPC_CHANNELS.AUTO_SESSION_START_GET, (_, userId: string) => {
+    return preferencesService.getUserAutoSessionStart(userId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AUTO_SESSION_START_SET, (_, userId: string, enabled: boolean) => {
+    preferencesService.setUserAutoSessionStart(userId, enabled);
+    return { success: true };
+  });
+
   ipcLogger.info(" Monitoring session handlers registered successfully");
 }
 
@@ -1596,8 +1655,166 @@ function createWatchButtonWindow(window: any, watchButtonWindows: Map<string, Br
   );
 }
 
+// Helper function to start a session from main process (used by shortcuts and pill)
+async function startSessionFromMain(): Promise<{
+  success: boolean;
+  error?: string;
+  sessionId?: string;
+}> {
+  const shortcutLogger = createLogger("SessionShortcut");
+
+  // Check if user is logged in
+  if (!currentUserContext) {
+    shortcutLogger.warn(" Start session failed: User not logged in");
+    // Show Console so user can log in
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.show();
+      consoleWindow.focus();
+    }
+    return { success: false, error: "Please log in through the Console first" };
+  }
+
+  // Check if session already active
+  const existingSession = monitoringSessionService.getSessionState();
+  if (existingSession) {
+    shortcutLogger.warn(" Start session failed: Session already active");
+    return { success: false, error: "A session is already active" };
+  }
+
+  try {
+    const sessionName = SESSION_DEFAULTS.DEFAULT_NAME;
+    const captureIntervalMs = SESSION_DEFAULTS.CAPTURE_INTERVAL_MS;
+
+    shortcutLogger.info(` Creating backend session: ${sessionName}`);
+    const response = await authManager.authenticatedFetch("/api/monitoring/sessions", {
+      method: "POST",
+      body: JSON.stringify({
+        name: sessionName,
+        selectedWindows: [], // Empty - focus tracker adds windows dynamically
+        captureIntervalMs,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      shortcutLogger.error(" Backend session creation failed:", errorText);
+      return { success: false, error: "Failed to create session" };
+    }
+
+    const backendResult = await response.json();
+    if (!backendResult.session?.id) {
+      shortcutLogger.error(" Backend returned no session ID");
+      return { success: false, error: "Failed to create session" };
+    }
+
+    // Start Electron-side capture (focus tracker starts automatically)
+    shortcutLogger.info(` Starting Electron capture for session: ${backendResult.session.id}`);
+    const startResult = await monitoringSessionService.startSession({
+      sessionId: backendResult.session.id,
+      selectedWindows: [], // Empty - focus tracker adds windows based on user activity
+      captureIntervalMs,
+      userId: currentUserContext.userId,
+      organizationId: currentUserContext.organizationId,
+    });
+
+    if (!startResult.error) {
+      shortcutLogger.info(" Session started successfully");
+
+      // Show the watching pill if preference allows (same logic as IPC handler)
+      const shouldShowPill = preferencesService.getShowPillOnSessionStart();
+      if (shouldShowPill) {
+        if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+          createWatchingPillWindow();
+        }
+        if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+          watchingPillWindow.show();
+        }
+      }
+
+      return { success: true, sessionId: startResult.sessionId };
+    }
+
+    return { success: false, error: startResult.error };
+  } catch (error) {
+    shortcutLogger.error(" Start session error:", error);
+    return { success: false, error: "Failed to start session" };
+  }
+}
+
+// Track sequence for Cmd+M+M detection (Mac) or Ctrl+M+M (Windows)
+let shortcutSequence: string[] = [];
+let lastShortcutKeyTime = 0;
+const SEQUENCE_TIMEOUT_MS = 2000; // 2 second timeout for sequence
+
 // Global shortcuts
 function registerGlobalShortcuts() {
+  const shortcutLogger = createLogger("GlobalShortcuts");
+
+  // Helper to reset sequence if timeout exceeded
+  const resetSequenceIfNeeded = () => {
+    const now = Date.now();
+    if (now - lastShortcutKeyTime > SEQUENCE_TIMEOUT_MS) {
+      shortcutSequence = [];
+    }
+  };
+
+  // Session Start Shortcut (Cmd+M+M on Mac, Ctrl+M+M on Windows - press M twice while holding Cmd/Ctrl)
+  globalShortcut.register("CommandOrControl+M", async () => {
+    resetSequenceIfNeeded();
+    lastShortcutKeyTime = Date.now();
+
+    // Check if this is the second M press
+    if (shortcutSequence.length === 1 && shortcutSequence[0] === "M") {
+      // Complete sequence detected - start session
+      shortcutLogger.info(" Cmd+M+M / Ctrl+M+M detected - starting session");
+      shortcutSequence = []; // Reset
+
+      try {
+        const result = await startSessionFromMain();
+
+        if (result.success) {
+          // Show success notification
+          const notification = new Notification({
+            title: "Session Started",
+            body: "Your work session is now being tracked",
+            silent: false,
+          });
+
+          notification.on("click", () => {
+            if (consoleWindow && !consoleWindow.isDestroyed()) {
+              consoleWindow.show();
+              consoleWindow.focus();
+              consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
+            }
+          });
+
+          notification.show();
+        } else {
+          // Show error notification
+          const notification = new Notification({
+            title: "Could not start session",
+            body: result.error || "Please try again",
+            silent: false,
+          });
+
+          notification.on("click", () => {
+            if (consoleWindow && !consoleWindow.isDestroyed()) {
+              consoleWindow.show();
+              consoleWindow.focus();
+            }
+          });
+
+          notification.show();
+        }
+      } catch (error) {
+        shortcutLogger.error(" Error starting session via shortcut:", error);
+      }
+    } else {
+      // First M press - start tracking sequence
+      shortcutSequence = ["M"];
+    }
+  });
+
   // Update Prompt Trigger (Cmd+Shift+U) - Shows notification to send update
   globalShortcut.register("CommandOrControl+Shift+U", () => {
     try {
@@ -1657,6 +1874,9 @@ app.whenReady().then(async () => {
 
   setupIPC();
   registerGlobalShortcuts();
+
+  // Setup powerMonitor listeners for auto session start
+  setupPowerMonitor();
 
   // Start automatic update checks (every 4 hours)
   updateService.startPeriodicChecks(240);
@@ -1746,4 +1966,6 @@ app.on("will-quit", () => {
 app.on("before-quit", () => {
   updateService.stopPeriodicChecks();
   stopNotificationTimer();
+  // Ensure focus window tracker is stopped even if session state is corrupted
+  focusWindowTracker.stop();
 });

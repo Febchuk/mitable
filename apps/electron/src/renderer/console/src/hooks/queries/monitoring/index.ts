@@ -63,8 +63,10 @@ export function useSession(sessionId: string, options?: { pollWhileSummarizing?:
 
 /**
  * Fetch captures for a session
+ * @param sessionId - The session ID to fetch captures for
+ * @param sessionStatus - Current session status (for conditional polling)
  */
-export function useSessionCaptures(sessionId: string) {
+export function useSessionCaptures(sessionId: string, sessionStatus?: string) {
   return useQuery({
     queryKey: monitoringKeys.captures(sessionId),
     queryFn: async () => {
@@ -72,6 +74,8 @@ export function useSessionCaptures(sessionId: string) {
       return response.captures;
     },
     enabled: !!sessionId,
+    // Poll every 5 seconds while session is active or paused (same as useSessionStory)
+    refetchInterval: sessionStatus === "active" || sessionStatus === "paused" ? 5000 : false,
   });
 }
 
@@ -132,10 +136,17 @@ export function useEndSession() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (sessionId: string) => monitoringService.endSession(sessionId),
-    onSuccess: (_, sessionId) => {
+    mutationFn: (params: {
+      sessionId: string;
+      preferences?: {
+        style: "verbose" | "concise";
+        format: "bullets" | "paragraphs";
+        includeScreenshots: boolean;
+      };
+    }) => monitoringService.endSession(params.sessionId, params.preferences),
+    onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(params.sessionId) });
     },
   });
 }

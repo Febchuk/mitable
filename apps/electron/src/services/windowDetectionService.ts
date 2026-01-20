@@ -52,6 +52,10 @@ class WindowDetectionService {
   // Track if we've logged the permission warning to avoid spam
   private permissionWarningLogged = false;
 
+  // Track apps that have been detected (for block list management)
+  // Key: normalized app name (lowercase), Value: original app name
+  private detectedApps: Map<string, string> = new Map();
+
   // Exact window titles of our own Electron renderers to exclude
   private readonly MITABLE_WINDOW_TITLES: Set<string> = new Set([
     "Mitable Agent",
@@ -110,6 +114,12 @@ class WindowDetectionService {
           continue;
         }
 
+        // Track detected apps for block list management
+        const normalizedAppName = this.normalizeAppName(appName).toLowerCase();
+        if (normalizedAppName && !this.detectedApps.has(normalizedAppName)) {
+          this.detectedApps.set(normalizedAppName, appName);
+        }
+
         // Check capture policy
         const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
 
@@ -163,15 +173,85 @@ class WindowDetectionService {
   }
 
   /**
+   * Normalize app name by removing OS-specific extensions
+   */
+  private normalizeAppName(appName: string): string {
+    if (!appName) return "";
+    return appName
+      .replace(/\.exe$/i, "") // Windows
+      .replace(/\.app$/i, "") // macOS
+      .replace(/\.AppImage$/i, ""); // Linux AppImage
+  }
+
+  /**
+   * Check if a window should be excluded from being added to the watch list
+   * Excludes: Mitable windows, Electron windows, Messages, WhatsApp, policy-blocked windows, and Spotify
+   */
+  private shouldExcludeWindow(
+    windowTitle: string,
+    appName: string
+  ): { excluded: boolean; reason?: string } {
+    // Check 1: Mitable windows by title
+    if (this.isMitableWindow(windowTitle)) {
+      return { excluded: true, reason: "Mitable window" };
+    }
+
+    // Check 2: Mitable windows by app name (normalized)
+    const normalizedAppName = this.normalizeAppName(appName);
+    if (normalizedAppName.toLowerCase() === "mitable") {
+      return { excluded: true, reason: "Mitable app" };
+    }
+
+    // Check 3: Electron windows (dev app windows)
+    if (normalizedAppName.toLowerCase() === "electron") {
+      return { excluded: true, reason: "Electron window" };
+    }
+
+    // Check 4: Messages app (macOS Messages)
+    if (normalizedAppName.toLowerCase() === "messages") {
+      return { excluded: true, reason: "Messages app" };
+    }
+
+    // Check 5: WhatsApp
+    if (normalizedAppName.toLowerCase() === "whatsapp") {
+      return { excluded: true, reason: "WhatsApp app" };
+    }
+
+    // Check 6: Spotify by app name (normalized)
+    if (normalizedAppName.toLowerCase() === "spotify") {
+      return { excluded: true, reason: "Spotify app" };
+    }
+
+    // Check 7: Policy-blocked windows
+    const policy = getCapturePolicy();
+    const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
+    if (policyDecision.blocked) {
+      return { excluded: true, reason: policyDecision.reason || "Policy-blocked" };
+    }
+
+    return { excluded: false };
+  }
+
+  /**
    * Add a window to the watch list
    *
    * @param window - Window metadata to track
-   * @returns true if added, false if already watching
+   * @returns true if added, false if already watching or excluded
    */
   addWindow(window: SelectedWindowInfo): boolean {
     if (this.selectedWindows.has(window.windowId)) {
       return false;
     }
+
+    // Check if window should be excluded (Mitable, Spotify, or policy-blocked)
+    const exclusionCheck = this.shouldExcludeWindow(window.windowTitle, window.appName);
+    if (exclusionCheck.excluded) {
+      logger.info(
+        `[WindowDetectionService] Rejected excluded window: ${window.appName} (${window.windowTitle}) [${window.windowId}] - ${exclusionCheck.reason}`
+      );
+      return false;
+    }
+
     this.selectedWindows.set(window.windowId, window);
     logger.info(
       `[WindowDetectionService] Added window to watch list: ${window.appName} (${window.windowTitle}) [${window.windowId}]`
@@ -297,6 +377,21 @@ class WindowDetectionService {
       selectedCount: this.selectedWindows.size,
       selectedWindows: this.getSelectedWindows(),
     };
+  }
+
+  /**
+   * Get list of apps that have been detected (for block list management)
+   * Returns array of normalized app names (lowercase)
+   */
+  getDetectedApps(): string[] {
+    return Array.from(this.detectedApps.keys()).sort();
+  }
+
+  /**
+   * Get original app name for a normalized app name
+   */
+  getOriginalAppName(normalizedAppName: string): string | undefined {
+    return this.detectedApps.get(normalizedAppName.toLowerCase());
   }
 
   /**

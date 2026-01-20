@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect } from "react";
+import { useState, FormEvent, useEffect, useCallback, useRef } from "react";
 import {
   Eye,
   EyeOff,
@@ -15,6 +15,8 @@ import {
   Info,
   Download,
   Settings,
+  Shield,
+  Plus,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import Button from "../components/ui/Button";
@@ -29,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import { createLogger } from "../../../lib/logger";
 import { API_BASE_URL } from "../lib/config";
+import MultiSelectPicker from "../components/shared/MultiSelectPicker/index";
 
 const logger = createLogger("UserProfilePage");
 
@@ -100,12 +103,339 @@ export default function UserProfilePage() {
     updatePreference,
   } = usePreferences();
 
+  // Block list state
+  const [blockedApps, setBlockedApps] = useState<string[]>([]);
+  const [detectedApps, setDetectedApps] = useState<
+    Array<{ normalizedName: string; originalName: string }>
+  >([]);
+  const [isBlockListLoading, setIsBlockListLoading] = useState(true);
+
+  // Notification frequency state
+  const [notificationFrequency, setNotificationFrequency] = useState<number>(30);
+  const [isNotificationFrequencyLoading, setIsNotificationFrequencyLoading] = useState(true);
+
+  // Auto session start state
+  const [autoSessionStart, setAutoSessionStart] = useState<boolean>(false);
+  const [isAutoSessionStartLoading, setIsAutoSessionStartLoading] = useState(true);
+
+  // OAuth polling interval refs - for cleanup on unmount
+  const linearPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const gmailPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const notionPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup OAuth polling intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (linearPollIntervalRef.current) {
+        clearInterval(linearPollIntervalRef.current);
+      }
+      if (gmailPollIntervalRef.current) {
+        clearInterval(gmailPollIntervalRef.current);
+      }
+      if (notionPollIntervalRef.current) {
+        clearInterval(notionPollIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Block list functions
+  const loadBlockList = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setIsBlockListLoading(true);
+      const apps = await window.consoleAPI.getBlockList(user.id);
+      setBlockedApps(apps);
+    } catch (error) {
+      logger.error("Error loading block list:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load blocked apps.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBlockListLoading(false);
+    }
+  }, [user?.id, toast]);
+
+  const loadDetectedApps = useCallback(async () => {
+    try {
+      const apps = await window.consoleAPI.getDetectedApps();
+      setDetectedApps(apps);
+    } catch (error) {
+      logger.error("Error loading detected apps:", error);
+    }
+  }, []);
+
+  // Helper function to clean app names (remove .app, .exe, .AppImage suffixes)
+  const cleanAppName = (appName: string): string => {
+    return appName.replace(/\.(app|exe|AppImage)$/i, "");
+  };
+
+  const handleAddBlockedApp = async (appName: string) => {
+    if (!user?.id) return;
+    try {
+      await window.consoleAPI.addBlockedApp(user.id, appName);
+      await loadBlockList();
+      const detectedApp = detectedApps.find((a) => a.normalizedName === appName.toLowerCase());
+      const displayName = cleanAppName(detectedApp?.originalName || appName);
+      toast({
+        title: "App blocked",
+        description: `${displayName} has been added to your block list.`,
+      });
+    } catch (error) {
+      logger.error("Error adding blocked app:", error);
+      toast({
+        title: "Error",
+        description: "Failed to block app.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveBlockedApp = async (appName: string) => {
+    if (!user?.id) return;
+    try {
+      await window.consoleAPI.removeBlockedApp(user.id, appName);
+      await loadBlockList();
+      const detectedApp = detectedApps.find((a) => a.normalizedName === appName.toLowerCase());
+      const displayName = cleanAppName(detectedApp?.originalName || appName);
+      toast({
+        title: "App unblocked",
+        description: `${displayName} has been removed from your block list.`,
+      });
+    } catch (error) {
+      logger.error("Error removing blocked app:", error);
+      toast({
+        title: "Error",
+        description: "Failed to unblock app.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Notification frequency functions
+  const loadNotificationFrequency = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setIsNotificationFrequencyLoading(true);
+      const frequency = await window.consoleAPI.getNotificationFrequency(user.id);
+      setNotificationFrequency(frequency);
+    } catch (error) {
+      logger.error("Error loading notification frequency:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load notification frequency.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsNotificationFrequencyLoading(false);
+    }
+  }, [user?.id, toast]);
+
+  const handleNotificationFrequencyChange = async (minutes: number) => {
+    if (!user?.id) return;
+    try {
+      const result = await window.consoleAPI.setNotificationFrequency(user.id, minutes);
+      if (result.success) {
+        setNotificationFrequency(minutes);
+        toast({
+          title: "Preference saved",
+          description: `Reminder notifications will appear every ${minutes} minutes.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save notification frequency.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting notification frequency:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save notification frequency.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Auto session start functions
+  const loadAutoSessionStart = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setIsAutoSessionStartLoading(true);
+      const enabled = await window.consoleAPI.getAutoSessionStart(user.id);
+      setAutoSessionStart(enabled);
+    } catch (error) {
+      logger.error("Error loading auto session start:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load auto session start preference.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAutoSessionStartLoading(false);
+    }
+  }, [user?.id, toast]);
+
+  const handleAutoSessionStartChange = async (enabled: boolean) => {
+    if (!user?.id) return;
+    try {
+      const result = await window.consoleAPI.setAutoSessionStart(user.id, enabled);
+      if (result.success) {
+        setAutoSessionStart(enabled);
+        toast({
+          title: "Preference saved",
+          description: enabled
+            ? "Sessions will automatically start when your computer wakes from sleep."
+            : "Auto session start disabled.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save auto session start preference.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting auto session start:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save auto session start preference.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Customer Profile state
+  const [jobTitle, setJobTitle] = useState("");
+  const [regularTasks, setRegularTasks] = useState<string[]>([]);
+  const [regularApps, setRegularApps] = useState<string[]>([]);
+  const [additionalContext, setAdditionalContext] = useState("");
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Predefined options
+  const regularAppsOptions = [
+    "Cursor",
+    "Slack",
+    "Chrome",
+    "Safari",
+    "Figma",
+    "Granola",
+    "Linear",
+    "VS Code",
+    "Terminal",
+    "Notion",
+    "Obsidian",
+    "Spotify",
+    "Zoom",
+    "Teams",
+    "Discord",
+  ];
+
+  const regularTasksOptions = [
+    "Email",
+    "Coding",
+    "Research",
+    "Design",
+    "Communication",
+    "Planning",
+    "Writing",
+    "Reviewing",
+    "Debugging",
+    "Testing",
+    "Documentation",
+    "Meetings",
+    "Learning",
+  ];
+
   useEffect(() => {
     loadLinearStatus();
     loadGmailStatus();
     loadNotionStatus();
     loadAppVersion();
-  }, []);
+    loadUserProfile();
+    if (user?.id) {
+      loadBlockList();
+      loadDetectedApps();
+      loadNotificationFrequency();
+      loadAutoSessionStart();
+    }
+  }, [user?.id, loadBlockList, loadDetectedApps, loadNotificationFrequency, loadAutoSessionStart]);
+
+  const loadUserProfile = async () => {
+    setIsLoadingProfile(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const profile = data.profile;
+        setJobTitle(profile.jobTitle || "");
+        setRegularTasks((profile.regularTasks as string[]) || []);
+        setRegularApps((profile.regularApps as string[]) || []);
+        setAdditionalContext(profile.additionalContext || "");
+      }
+    } catch (error) {
+      logger.error("Error loading user profile:", error);
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Not authenticated. Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jobTitle: jobTitle || null,
+          regularTasks,
+          regularApps,
+          additionalContext: additionalContext || null,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Profile updated",
+          description: "Your customer profile has been saved successfully.",
+        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to save profile");
+      }
+    } catch (error) {
+      logger.error("Error saving profile:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save profile",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   // Listen for update events
   useEffect(() => {
@@ -310,10 +640,11 @@ export default function UserProfilePage() {
           });
 
           if (resp.ok) {
-            const data = await response.json();
+            const data = await resp.json();
             setLinearStatus(data);
             if (data.connected) {
               clearInterval(pollInterval);
+              linearPollIntervalRef.current = null;
               toast({
                 title: "Linear Connected",
                 description: "Your Linear account has been connected successfully!",
@@ -325,7 +656,11 @@ export default function UserProfilePage() {
         }
       }, 2000);
 
-      setTimeout(() => clearInterval(pollInterval), 120000);
+      linearPollIntervalRef.current = pollInterval;
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        linearPollIntervalRef.current = null;
+      }, 120000);
     } catch (error) {
       logger.error("Error connecting Linear:", error);
       toast({
@@ -415,6 +750,7 @@ export default function UserProfilePage() {
             setGmailStatus(data);
             if (data.connected) {
               clearInterval(pollInterval);
+              gmailPollIntervalRef.current = null;
               toast({
                 title: "Gmail Connected",
                 description: `Your Gmail account (${data.email}) has been connected successfully!`,
@@ -426,7 +762,11 @@ export default function UserProfilePage() {
         }
       }, 2000);
 
-      setTimeout(() => clearInterval(pollInterval), 120000);
+      gmailPollIntervalRef.current = pollInterval;
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        gmailPollIntervalRef.current = null;
+      }, 120000);
     } catch (error) {
       logger.error("Error connecting Gmail:", error);
       toast({
@@ -516,6 +856,7 @@ export default function UserProfilePage() {
             setNotionStatus(data);
             if (data.connected) {
               clearInterval(pollInterval);
+              notionPollIntervalRef.current = null;
               toast({
                 title: "Notion Connected",
                 description: "Your Notion workspace has been connected successfully!",
@@ -527,7 +868,11 @@ export default function UserProfilePage() {
         }
       }, 2000);
 
-      setTimeout(() => clearInterval(pollInterval), 120000);
+      notionPollIntervalRef.current = pollInterval;
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        notionPollIntervalRef.current = null;
+      }, 120000);
     } catch (error) {
       logger.error("Error connecting Notion:", error);
       toast({
@@ -746,6 +1091,123 @@ export default function UserProfilePage() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Customer Profile Section */}
+                <div className="bg-background-secondary rounded-xl border border-border-subtle p-6 space-y-6">
+                  <div className="flex items-center gap-3 pb-4 border-b border-border-subtle">
+                    <div className="w-10 h-10 bg-primary-light/20 rounded-full flex items-center justify-center">
+                      <User className="w-5 h-5 text-primary-light" />
+                    </div>
+                    <div>
+                      <h2 className="text-heading-4 text-white">Customer Profile</h2>
+                      <p className="text-body-sm text-text-tertiary">
+                        Help us understand your work context to improve session classification
+                      </p>
+                    </div>
+                  </div>
+
+                  {isLoadingProfile ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-text-tertiary" />
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Job Title */}
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="jobTitle"
+                          className="text-sm font-medium text-text-secondary"
+                        >
+                          Job Title
+                        </label>
+                        <input
+                          id="jobTitle"
+                          type="text"
+                          value={jobTitle}
+                          onChange={(e) => setJobTitle(e.target.value)}
+                          placeholder="e.g., Software Engineer, Designer, Product Manager"
+                          maxLength={100}
+                          disabled={isSavingProfile}
+                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                        />
+                      </div>
+
+                      {/* Regular Apps */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-text-secondary">
+                          Regular Apps
+                        </label>
+                        <p className="text-xs text-text-tertiary">
+                          Select the applications you use regularly in your work
+                        </p>
+                        <MultiSelectPicker
+                          options={regularAppsOptions}
+                          selectedValues={regularApps}
+                          onSelectionChange={setRegularApps}
+                          placeholder="Select apps you use regularly..."
+                          disabled={isSavingProfile}
+                        />
+                      </div>
+
+                      {/* Regular Tasks */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-text-secondary">
+                          Regular Tasks
+                        </label>
+                        <p className="text-xs text-text-tertiary">
+                          Select the types of tasks you perform regularly
+                        </p>
+                        <MultiSelectPicker
+                          options={regularTasksOptions}
+                          selectedValues={regularTasks}
+                          onSelectionChange={setRegularTasks}
+                          placeholder="Select tasks you perform regularly..."
+                          disabled={isSavingProfile}
+                        />
+                      </div>
+
+                      {/* Additional Context */}
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="additionalContext"
+                          className="text-sm font-medium text-text-secondary"
+                        >
+                          Additional Context
+                        </label>
+                        <p className="text-xs text-text-tertiary">
+                          Any other information that would help us understand your work better
+                        </p>
+                        <textarea
+                          id="additionalContext"
+                          value={additionalContext}
+                          onChange={(e) => setAdditionalContext(e.target.value)}
+                          placeholder="e.g., I work primarily on frontend features, focus on accessibility..."
+                          rows={4}
+                          disabled={isSavingProfile}
+                          className="flex w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all resize-none"
+                        />
+                      </div>
+
+                      {/* Save Button */}
+                      <div className="pt-4">
+                        <Button
+                          onClick={handleSaveProfile}
+                          disabled={isSavingProfile}
+                          className="w-full md:w-auto"
+                        >
+                          {isSavingProfile ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            "Save Profile"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Subscription Section */}
@@ -1021,6 +1483,164 @@ export default function UserProfilePage() {
                         }}
                         className="flex-shrink-0"
                       />
+                    )}
+                  </div>
+
+                  {/* Notification Frequency Setting */}
+                  <div className="flex items-center justify-between pt-4 border-t border-border-subtle">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label
+                        htmlFor="notification-frequency-input"
+                        className="text-sm font-medium text-text-primary cursor-pointer"
+                      >
+                        Reminder Notification Frequency
+                      </Label>
+                      <p className="text-xs text-text-tertiary">
+                        How often (in minutes) you'd like to receive reminders to record work
+                        sessions
+                      </p>
+                    </div>
+                    {isNotificationFrequencyLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                    ) : (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <input
+                          id="notification-frequency-input"
+                          type="number"
+                          min="5"
+                          max="240"
+                          step="5"
+                          value={notificationFrequency}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value, 10);
+                            if (!isNaN(value) && value >= 5 && value <= 240) {
+                              handleNotificationFrequencyChange(value);
+                            }
+                          }}
+                          className="w-20 h-10 rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent"
+                        />
+                        <span className="text-sm text-text-secondary">minutes</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Auto Session Start Toggle */}
+                  <div className="flex items-center justify-between pt-4 border-t border-border-subtle">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label
+                        htmlFor="auto-session-start-toggle-profile"
+                        className="text-sm font-medium text-text-primary cursor-pointer"
+                      >
+                        Auto Session Start
+                      </Label>
+                      <p className="text-xs text-text-tertiary">
+                        Automatically start a new session when your computer wakes from sleep or
+                        unlocks. If a session was already running, it will continue instead.
+                      </p>
+                    </div>
+                    {isAutoSessionStartLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                    ) : (
+                      <Switch
+                        id="auto-session-start-toggle-profile"
+                        checked={autoSessionStart}
+                        onCheckedChange={handleAutoSessionStartChange}
+                        className="flex-shrink-0"
+                      />
+                    )}
+                  </div>
+
+                  {/* Block List Section */}
+                  <div className="pt-6 border-t border-border-subtle space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Shield size={18} className="text-text-tertiary" />
+                      <h3 className="text-heading-4 text-white">Blocked Apps</h3>
+                    </div>
+                    <p className="text-body-sm text-text-tertiary">
+                      Apps in this list will never be tracked or captured.
+                    </p>
+
+                    {isBlockListLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                      </div>
+                    ) : (
+                      <>
+                        {/* Currently Blocked Apps */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-text-primary">
+                            Blocked Apps
+                          </Label>
+                          {blockedApps.length === 0 ? (
+                            <p className="text-xs text-text-tertiary italic">
+                              No apps are currently blocked
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {blockedApps.map((appName) => {
+                                const detectedApp = detectedApps.find(
+                                  (a) => a.normalizedName === appName.toLowerCase()
+                                );
+                                const displayName = cleanAppName(
+                                  detectedApp?.originalName || appName
+                                );
+                                return (
+                                  <div
+                                    key={appName}
+                                    className="flex items-center gap-1.5 bg-destructive/20 border border-destructive/30 rounded-full pl-3 pr-2 py-1"
+                                  >
+                                    <span className="text-xs text-white">{displayName}</span>
+                                    <button
+                                      onClick={() => handleRemoveBlockedApp(appName)}
+                                      className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-destructive/30 transition-colors"
+                                      aria-label={`Unblock ${displayName}`}
+                                    >
+                                      <X size={10} className="text-white/70" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Available Apps to Block */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-text-primary">
+                            Add App to Block List
+                          </Label>
+                          {detectedApps.length === 0 ? (
+                            <p className="text-xs text-text-tertiary italic">
+                              No apps detected yet. Start a session to detect apps on your system.
+                            </p>
+                          ) : (
+                            <div className="max-h-32 overflow-y-auto border border-border-subtle rounded-lg">
+                              {detectedApps
+                                .filter((app) => !blockedApps.includes(app.normalizedName))
+                                .map((app) => {
+                                  const displayName = cleanAppName(app.originalName);
+                                  return (
+                                    <button
+                                      key={app.normalizedName}
+                                      onClick={() => handleAddBlockedApp(app.normalizedName)}
+                                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-background-secondary transition-colors text-left"
+                                    >
+                                      <Plus size={14} className="text-text-tertiary" />
+                                      <span className="text-sm text-white">{displayName}</span>
+                                    </button>
+                                  );
+                                })}
+                              {detectedApps.filter(
+                                (app) => !blockedApps.includes(app.normalizedName)
+                              ).length === 0 && (
+                                <div className="px-3 py-2 text-xs text-text-tertiary italic">
+                                  All detected apps are already blocked
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>

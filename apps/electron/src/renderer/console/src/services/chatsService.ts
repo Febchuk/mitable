@@ -170,7 +170,6 @@ export async function sendStreamingMessage(
   multiWindowCapture?: MultiWindowCaptureResult | null,
   metadata?: any
 ): Promise<void> {
-
   try {
     // Forward all captured screenshots (if any) from multi-window capture
     let screenshotsPayload: WindowScreenshot[] | undefined;

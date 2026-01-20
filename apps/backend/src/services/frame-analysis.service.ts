@@ -1,33 +1,46 @@
 /**
  * Frame Analysis Service
  *
- * Analyzes individual frames using the Progression Detector prompt.
- * Compares consecutive frames to detect meaningful user actions.
+ * Implements the "Sensor" (Step 1) of the Screen Understanding Pipeline.
  *
- * Key features:
- * - Two-image comparison (before/after)
- * - Delta detection (distinguishes action from passive viewing)
- * - Integration with Groq Vision (Llama 4 Scout)
+ * Responsibility:
+ * - Compare consecutive frames (Previous A vs Current B).
+ * - Detect purely visual deltas (text input, scroll, focus change).
+ * - NO interpretation of "work" or "progress" (that happens in Classifier).
+ *
+ * Key changes from v1:
+ * - Replaced "Progression Detector" with "Sensor Prompt".
+ * - Output is strictly physical/visual, not semantic.
  */
 
 import { geminiVisionFrameService } from "./gemini-vision-frame.service";
-import {
-  buildProgressionDetectorPrompt,
-  parseProgressionResponse,
-  ChangeType,
-  ChangeMagnitude,
-  GoalContext,
-  ExtractedArtifact,
-  FrameSignals,
-} from "../prompts/session-prompts";
-import {
-  createSessionLogger,
-  createTimer,
-  CHECKPOINTS,
-  SESSION_EVENTS,
-} from "../lib/sessionLogger";
+import { SENSOR_SYSTEM_PROMPT, SENSOR_USER_PROMPT } from "../prompts/session-prompts";
+import { createSessionLogger, createTimer, CHECKPOINTS } from "../lib/sessionLogger";
 
 // Types
+export type ChangeType =
+  | "text_input"
+  | "scroll"
+  | "window_switch"
+  | "click"
+  | "navigation"
+  | "none";
+
+export type ChangeMagnitude = "major" | "minor" | "trivial";
+
+export interface ExtractedArtifact {
+  type: string;
+  value: string;
+}
+
+export interface FrameSignals {
+  has_blocker?: boolean;
+  has_outcome?: boolean;
+  blocker_type?: string | null;
+  outcome_type?: string | null;
+}
+
+// Input/Output Types
 export interface FrameAnalysisInput {
   sessionId: string;
   frameId: string;
@@ -39,27 +52,15 @@ export interface FrameAnalysisInput {
     windowTitle: string;
   };
   timestamp: string;
-  // Optional goal context for enhanced analysis
-  goalContext?: GoalContext;
 }
 
 export interface FrameAnalysisResult {
   frameId: string;
-  progressionDetected: boolean;
-  summaryOfAction: string;
 
-  // Observable delta detection (what visually changed, not how)
+  // Sensor Output (Visual Delta)
   deltaChanged: boolean;
   changeType: ChangeType;
-  changeMagnitude: ChangeMagnitude;
-  changeDescription: string;
-
-  // Enhanced analysis fields
-  artifacts: ExtractedArtifact[];
-  signals: FrameSignals;
-  onTask: boolean;
-  taskRelevance: number;
-  offTaskReason: string | null;
+  changeDescription: string; // The "Literal Delta"
 
   // Metadata
   confidence: number;
@@ -70,119 +71,79 @@ export interface FrameAnalysisResult {
     completion: number;
     total: number;
   };
+
+  // Legacy fields (kept for type compatibility until full system update)
+  progressionDetected: boolean;
+  summaryOfAction: string;
+  changeMagnitude: ChangeMagnitude;
+  artifacts: ExtractedArtifact[];
+  signals: FrameSignals;
+  onTask: boolean;
+  taskRelevance: number;
+  offTaskReason: string | null;
+}
+
+interface SensorResponse {
+  changed: boolean;
+  change_type: ChangeType;
+  description: string;
 }
 
 class FrameAnalysisService {
   /**
-   * Analyze a frame using the Progression Detector
-   * @param input Frame analysis input including optional goal context
+   * Analyze a frame using the Sensor Prompt (Step 1)
    */
   async analyzeFrame(input: FrameAnalysisInput): Promise<FrameAnalysisResult> {
     const timer = createTimer("FrameAnalysis.analyzeFrame");
     const log = createSessionLogger({ sessionId: input.sessionId });
 
-    log.debug("Starting frame analysis", {
+    log.debug("Starting frame analysis (Sensor)", {
       frameId: input.frameId,
       isFirstFrame: input.previousFrame === null,
       appName: input.windowInfo.appName,
-      hasGoalContext: !!input.goalContext,
     });
 
-    // CHECKPOINT: Frame analysis start
+    // CHECKPOINT: Sensor start
     log.checkpoint(CHECKPOINTS.FRAME_ANALYSIS_START, {
       frameId: input.frameId,
-      isFirstFrame: input.previousFrame === null,
-      appName: input.windowInfo.appName,
-      windowTitle: input.windowInfo.windowTitle,
-      hasGoalContext: !!input.goalContext,
+      stage: "sensor_visual_delta",
     });
 
-    // Build prompt with goal context if available
-    const { system: systemPrompt, user: userPrompt } = buildProgressionDetectorPrompt(
-      input.goalContext
-    );
-
-    // Log full prompt for deep debugging (when SESSION_LOG_FULL_AI=true)
-    log.logFullAIInteraction(
-      "progression_detector_prompt_full",
-      systemPrompt,
-      userPrompt,
-      "", // Response comes later
-      {
-        frameId: input.frameId,
-        isFirstFrame: input.previousFrame === null,
-        appName: input.windowInfo.appName,
-        windowTitle: input.windowInfo.windowTitle,
-        hasGoalContext: !!input.goalContext,
-        goalContext: input.goalContext
-          ? {
-              sessionGoal: input.goalContext.sessionGoal,
-              linearIssueId: input.goalContext.linearIssueId,
-              linearIssueTitle: input.goalContext.linearIssueTitle,
-              hasRelatedDocs: !!input.goalContext.relatedDocsContext,
-            }
-          : null,
-      }
-    );
-
     try {
-      // Call Gemini Vision with two images
+      // 1. Handle First Frame (No comparison possible)
+      if (!input.previousFrame) {
+        return this.createFirstFrameResult(input);
+      }
+
+      // 2. Call Gemini Vision with Sensor Prompt
       const visionResult = await geminiVisionFrameService.compareFrames(
         input.previousFrame,
         input.currentFrame,
-        systemPrompt,
-        userPrompt
+        SENSOR_SYSTEM_PROMPT,
+        SENSOR_USER_PROMPT
       );
 
-      // Log full response for deep debugging (when SESSION_LOG_FULL_AI=true)
-      log.logFullAIInteraction(
-        "progression_detector_response_full",
-        "", // Prompt already logged
-        "", // Prompt already logged
-        visionResult.content,
-        {
-          frameId: input.frameId,
-          model: visionResult.model,
-          latencyMs: visionResult.latencyMs,
-          tokensUsed: visionResult.usage.totalTokens,
-          promptTokens: visionResult.usage.promptTokens,
-          completionTokens: visionResult.usage.completionTokens,
-        }
-      );
+      // 3. Parse Sensor Response
+      const sensorData = this.parseSensorResponse(visionResult.content);
 
-      // Parse the structured response
-      const progressionResult = parseProgressionResponse(visionResult.content);
-
-      if (!progressionResult) {
-        log.warn("Failed to parse progression response", {
+      if (!sensorData) {
+        log.warn("Failed to parse sensor response", {
           frameId: input.frameId,
           responsePreview: visionResult.content.slice(0, 200),
         });
         return this.createFallbackResult(input, visionResult);
       }
 
-      // Map progression result - directly use LLM's observable classifications
-      const isFirstFrame = input.previousFrame === null;
-      const deltaChanged = isFirstFrame || progressionResult.progression_detected;
-
       const result: FrameAnalysisResult = {
         frameId: input.frameId,
-        progressionDetected: progressionResult.progression_detected,
-        summaryOfAction: progressionResult.summary_of_action,
-        deltaChanged,
-        changeType: isFirstFrame ? "none" : progressionResult.change_type,
-        changeMagnitude: isFirstFrame ? "trivial" : progressionResult.change_magnitude,
-        changeDescription: isFirstFrame
-          ? "First frame in session"
-          : progressionResult.summary_of_action,
-        // Enhanced analysis fields
-        artifacts: progressionResult.artifacts,
-        signals: progressionResult.signals,
-        onTask: progressionResult.on_task,
-        taskRelevance: progressionResult.task_relevance,
-        offTaskReason: progressionResult.off_task_reason,
+
+        // Sensor Data
+        deltaChanged: sensorData.changed,
+        changeType: sensorData.change_type,
+        changeDescription: sensorData.description,
+
         // Metadata
-        confidence: progressionResult.confidence,
+        confidence: 0.9, // Sensor is usually high confidence on literal changes
         analysisLatencyMs: visionResult.latencyMs,
         model: visionResult.model,
         tokenUsage: {
@@ -190,37 +151,28 @@ class FrameAnalysisService {
           completion: visionResult.usage.completionTokens,
           total: visionResult.usage.totalTokens,
         },
+
+        // Legacy / Default fields (to be filled by Classifier or ignored)
+        progressionDetected: sensorData.changed,
+        summaryOfAction: sensorData.description, // Temporarily use delta as summary
+        changeMagnitude: sensorData.changed ? "minor" : "trivial",
+        artifacts: [],
+        signals: {
+          has_blocker: false,
+          has_outcome: false,
+          blocker_type: null,
+          outcome_type: null,
+        },
+        onTask: true,
+        taskRelevance: 0.5,
+        offTaskReason: null,
       };
 
-      // CHECKPOINT: Frame analysis complete
+      // CHECKPOINT: Sensor complete
       log.checkpoint(CHECKPOINTS.FRAME_ANALYSIS_COMPLETE, {
         frameId: input.frameId,
-        progressionDetected: result.progressionDetected,
         deltaChanged: result.deltaChanged,
         changeType: result.changeType,
-        changeMagnitude: result.changeMagnitude,
-        hasBlocker: result.signals.has_blocker,
-        hasOutcome: result.signals.has_outcome,
-        onTask: result.onTask,
-        confidence: result.confidence,
-        durationMs: timer.elapsed(),
-        tokensUsed: result.tokenUsage.total,
-      });
-
-      log.debug("Frame analysis completed", {
-        frameId: input.frameId,
-        progressionDetected: result.progressionDetected,
-        durationMs: timer.elapsed(),
-      });
-
-      // Track analytics event
-      log.trackEvent(SESSION_EVENTS.FRAME_ANALYZED, {
-        frameId: input.frameId,
-        progressionDetected: result.progressionDetected,
-        deltaChanged: result.deltaChanged,
-        hasBlocker: result.signals.has_blocker,
-        hasOutcome: result.signals.has_outcome,
-        confidence: result.confidence,
         durationMs: timer.elapsed(),
       });
 
@@ -236,18 +188,45 @@ class FrameAnalysisService {
   }
 
   /**
-   * Batch analyze multiple frames
-   * Note: Processes sequentially to maintain frame order for delta comparison
+   * Parse the JSON response from the Sensor model
    */
-  async analyzeFrameBatch(frames: FrameAnalysisInput[]): Promise<FrameAnalysisResult[]> {
-    const results: FrameAnalysisResult[] = [];
+  private parseSensorResponse(rawResponse: string): SensorResponse | null {
+    try {
+      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
 
-    for (const frame of frames) {
-      const result = await this.analyzeFrame(frame);
-      results.push(result);
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      return {
+        changed: typeof parsed.changed === "boolean" ? parsed.changed : false,
+        change_type: parsed.change_type || "none",
+        description: parsed.description || "No visual change detected",
+      };
+    } catch (e) {
+      return null;
     }
+  }
 
-    return results;
+  private createFirstFrameResult(input: FrameAnalysisInput): FrameAnalysisResult {
+    return {
+      frameId: input.frameId,
+      deltaChanged: true,
+      changeType: "none",
+      changeDescription: "Session started (First frame)",
+      confidence: 1.0,
+      analysisLatencyMs: 0,
+      model: "system",
+      tokenUsage: { prompt: 0, completion: 0, total: 0 },
+      // Legacy defaults
+      progressionDetected: true,
+      summaryOfAction: "Session started",
+      changeMagnitude: "trivial",
+      artifacts: [],
+      signals: { has_blocker: false, has_outcome: false, blocker_type: null, outcome_type: null },
+      onTask: true,
+      taskRelevance: 0.5,
+      offTaskReason: null,
+    };
   }
 
   /**
@@ -257,28 +236,11 @@ class FrameAnalysisService {
     input: FrameAnalysisInput,
     visionResult: { latencyMs: number; model: string; usage: any }
   ): FrameAnalysisResult {
-    const isFirstFrame = input.previousFrame === null;
-
     return {
       frameId: input.frameId,
-      progressionDetected: isFirstFrame, // First frame is always considered progression
-      summaryOfAction: isFirstFrame ? "Session started" : "Unable to determine activity",
-      deltaChanged: isFirstFrame,
+      deltaChanged: false,
       changeType: "none",
-      changeMagnitude: "trivial",
-      changeDescription: isFirstFrame ? "First frame in session" : "Analysis inconclusive",
-      // Default enhanced analysis fields for fallback
-      artifacts: [],
-      signals: {
-        has_blocker: false,
-        has_outcome: false,
-        blocker_type: null,
-        outcome_type: null,
-      },
-      onTask: true,
-      taskRelevance: 0.5,
-      offTaskReason: null,
-      // Metadata
+      changeDescription: "Analysis inconclusive",
       confidence: 0.5,
       analysisLatencyMs: visionResult.latencyMs,
       model: visionResult.model,
@@ -287,16 +249,21 @@ class FrameAnalysisService {
         completion: visionResult.usage.completionTokens,
         total: visionResult.usage.totalTokens,
       },
+      // Legacy defaults
+      progressionDetected: false,
+      summaryOfAction: "Analysis failed",
+      changeMagnitude: "trivial",
+      artifacts: [],
+      signals: { has_blocker: false, has_outcome: false, blocker_type: null, outcome_type: null },
+      onTask: true,
+      taskRelevance: 0.5,
+      offTaskReason: null,
     };
   }
 
-  /**
-   * Check if the service is available
-   */
   isAvailable(): boolean {
     return geminiVisionFrameService.isAvailable();
   }
 }
 
-// Export singleton instance
 export const frameAnalysisService = new FrameAnalysisService();

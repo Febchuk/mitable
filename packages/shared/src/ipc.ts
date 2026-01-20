@@ -69,6 +69,15 @@ export const IPC_CHANNELS = {
   PREFERENCES_GET: "preferences-get",
   PREFERENCES_SET: "preferences-set",
   PREFERENCES_GET_ALL: "preferences-get-all",
+  BLOCK_LIST_GET: "block-list-get",
+  BLOCK_LIST_SET: "block-list-set",
+  BLOCK_LIST_ADD: "block-list-add",
+  BLOCK_LIST_REMOVE: "block-list-remove",
+  BLOCK_LIST_GET_DETECTED_APPS: "block-list-get-detected-apps",
+  NOTIFICATION_FREQUENCY_GET: "notification-frequency-get",
+  NOTIFICATION_FREQUENCY_SET: "notification-frequency-set",
+  AUTO_SESSION_START_GET: "auto-session-start-get",
+  AUTO_SESSION_START_SET: "auto-session-start-set",
 
   // Custom Notifications (Granola-style prompts)
   NOTIFICATION_SHOW: "notification-show", // Show notification with config

@@ -9,9 +9,9 @@ import {
 } from "../services/session-delivery.service.js";
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
 import { frameAnalysisService } from "../services/frame-analysis.service.js";
+import { classifierService } from "../services/classifier.service.js";
 import { masterStoryService } from "../services/master-story.service.js";
 import { searchService } from "../services/search.service.js";
-import type { GoalContext } from "../prompts/session-prompts.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { logger } from "../lib/logger";
@@ -90,13 +90,8 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
 
   const organizationId = user.organizationId;
 
-  if (!selectedWindows || selectedWindows.length === 0) {
-    res.status(400).json({
-      error: "Bad Request",
-      message: "At least one window must be selected",
-    });
-    return;
-  }
+  // Allow empty selectedWindows array - focus tracker will add windows dynamically
+  const initialWindows = selectedWindows || [];
 
   try {
     // Check for existing active session
@@ -179,7 +174,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
         name: name || null,
         status: "active",
         captureIntervalMs,
-        selectedWindows: selectedWindows as any,
+        selectedWindows: initialWindows as any,
         startedAt: new Date(),
         // Goal context fields
         sessionGoal: computedSessionGoal,
@@ -204,7 +199,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       goalPreview: computedSessionGoal?.substring(0, 100),
       hasLinearIssue: !!linearIssueId,
       linearIssueId,
-      windowCount: selectedWindows.length,
+      windowCount: initialWindows.length,
       hasRelatedDocs: !!relatedDocsContext,
       relatedDocsCount: relatedDocsContext ? relatedDocsContext.split("---").length : 0,
       captureIntervalMs,
@@ -213,7 +208,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
     log.trackEvent(SESSION_EVENTS.SESSION_STARTED, {
       hasGoal: !!computedSessionGoal,
       hasLinearIssue: !!linearIssueId,
-      windowCount: selectedWindows.length,
+      windowCount: initialWindows.length,
       hasRelatedDocs: !!relatedDocsContext,
     });
 
@@ -223,7 +218,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
         id: session.id,
         status: session.status,
         name: session.name,
-        selectedWindows: session.selectedWindows,
+        selectedWindows: session.selectedWindows || [],
         captureIntervalMs: session.captureIntervalMs,
         startedAt: session.startedAt,
         sessionGoal: session.sessionGoal,
@@ -583,6 +578,13 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.userId!;
     const { id } = req.params;
+    const { preferences } = req.body as {
+      preferences?: {
+        detailLevel: "concise" | "verbose";
+        format: "bullets" | "paragraphs";
+        includeScreenshots: boolean;
+      };
+    };
 
     try {
       // Verify ownership
@@ -658,7 +660,6 @@ router.post(
         captureCount,
         activeDurationMs,
         totalPausedMs,
-        sessionGoal: session.sessionGoal,
         linearIssueId: session.linearIssueId,
         previousStatus: session.status,
       });
@@ -667,21 +668,66 @@ router.post(
         captureCount,
         activeDurationMs,
         totalPausedMs,
-        hasGoal: !!session.sessionGoal,
       });
 
-      // Trigger async summary generation (don't await - let it run in background)
-      sessionSummarizationService
-        .generateSessionSummary(id)
-        .then(() => {
-          log.info("Summary generation completed", { sessionId: id });
+      // Trigger async story generation using the new 3-step pipeline (don't await - let it run in background)
+      // Transform frontend preferences (detailLevel) to service format (style)
+      const formatPreference = preferences
+        ? {
+            style: preferences.detailLevel,
+            format: preferences.format,
+            includeScreenshots: preferences.includeScreenshots,
+          }
+        : {
+            style: "concise" as const,
+            format: "bullets" as const,
+            includeScreenshots: false,
+          };
+
+      // Generate AI title and story in parallel (async, don't block response)
+      Promise.all([
+        // Generate session title from activity timeline
+        (async () => {
+          try {
+            const { sessionTitleService } = await import("../services/session-title.service.js");
+            const aiTitle = await sessionTitleService.generateTitle(id);
+
+            // Update session name if AI generated a valid title
+            if (aiTitle && aiTitle !== "Work session") {
+              await db
+                .update(schema.monitoringSessions)
+                .set({ name: aiTitle })
+                .where(eq(schema.monitoringSessions.id, id));
+              log.info("Session title generated", { sessionId: id, title: aiTitle });
+            }
+          } catch (error) {
+            log.error("Session title generation failed", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })(),
+        // Generate master story
+        masterStoryService.generateStory({
+          sessionId: id,
+          userId,
+          formatPreference,
+        }),
+      ])
+        .then(async () => {
+          log.info("Session end processing completed", { sessionId: id });
+          // Update status to ready after successful story generation
+          await db
+            .update(schema.monitoringSessions)
+            .set({ status: "ready" })
+            .where(eq(schema.monitoringSessions.id, id));
         })
-        .catch((error) => {
-          log.error("Summary generation failed", {
+        .catch(async (error) => {
+          log.error("Session end processing failed", {
             error: error instanceof Error ? error.message : String(error),
           });
-          // Update status to indicate completion (even without summary)
-          db.update(schema.monitoringSessions)
+          // Update status to indicate completion (even without story)
+          await db
+            .update(schema.monitoringSessions)
             .set({ status: "ready" })
             .where(eq(schema.monitoringSessions.id, id));
         });
@@ -733,7 +779,6 @@ router.post(
     }
   }
 );
-
 /**
  * POST /api/monitoring/sessions/:id/regenerate-summary
  * DEV ONLY: Regenerate the session summary without re-running the session
@@ -920,7 +965,10 @@ router.post(
       currentImage,
       previousImage,
       windowInfo,
-      sessionGoal,
+      // Optional capture metadata for database record creation/update
+      sequenceNumber,
+      captureTrigger,
+      capturedAt,
     }: {
       frameId: string;
       currentImage: string; // Base64 image data
@@ -930,7 +978,9 @@ router.post(
         appName: string;
         windowTitle: string;
       };
-      sessionGoal?: string;
+      sequenceNumber?: number;
+      captureTrigger?: "periodic" | "focus_change" | "manual";
+      capturedAt?: number; // Unix timestamp in ms
     } = req.body;
 
     if (!frameId || !currentImage || !windowInfo) {
@@ -965,17 +1015,6 @@ router.post(
         return;
       }
 
-      // Build goal context from session data (stored at session creation via RAG)
-      const goalContext: GoalContext | undefined =
-        session.sessionGoal || session.linearIssueTitle
-          ? {
-              sessionGoal: session.sessionGoal || undefined,
-              linearIssueId: session.linearIssueId || undefined,
-              linearIssueTitle: session.linearIssueTitle || undefined,
-              relatedDocsContext: session.relatedDocsContext || undefined,
-            }
-          : undefined;
-
       // Create session logger for frame analysis
       const log = createSessionLogger({
         sessionId: id,
@@ -1007,7 +1046,7 @@ router.post(
         return;
       }
 
-      // Analyze frame with goal context for enhanced analysis
+      // Step 1: Analyze frame with Sensor (detect visual delta)
       const analysisResult = await frameAnalysisService.analyzeFrame({
         sessionId: id,
         frameId,
@@ -1015,41 +1054,125 @@ router.post(
         previousFrame: previousImage,
         windowInfo,
         timestamp: new Date().toISOString(),
-        goalContext, // Pass goal context to prompt builder
       });
 
-      // Calculate importance score based on analysis
-      const importanceScore = calculateImportanceScore(analysisResult, sessionGoal);
+      // Step 2: Classify activity using Classifier (interpret delta into meaningful activity)
+      let activityDescription: string | null = null;
+      let classifierConfidence: number = analysisResult.confidence;
 
-      // Extend master story if progression was detected
-      let storyUpdateResult = null;
-      if (analysisResult.progressionDetected && masterStoryService.isAvailable()) {
-        storyUpdateResult = await masterStoryService.extendStory({
-          sessionId: id,
-          userId,
-          frameAnalysis: analysisResult,
-          windowInfo: {
-            appName: windowInfo.appName,
-            windowTitle: windowInfo.windowTitle,
-          },
-          goalContext, // Pass goal context for enhanced storytelling
-        });
-
-        if (!storyUpdateResult.success) {
-          log.warn("Master story update failed", {
+      // Only call Classifier if there's a meaningful delta change
+      if (analysisResult.deltaChanged && analysisResult.changeDescription) {
+        try {
+          const classifierResult = await classifierService.classifyActivity({
+            userId,
+            sessionId: id,
+            deltaDescription: analysisResult.changeDescription,
             frameId,
-            error: storyUpdateResult.error,
           });
+
+          if (classifierResult) {
+            activityDescription = classifierResult.activity;
+            classifierConfidence = classifierResult.confidence;
+
+            log.debug("Activity classified", {
+              frameId,
+              activity: activityDescription,
+              confidence: classifierConfidence,
+            });
+          }
+        } catch (error) {
+          log.warn("Classifier failed, using sensor delta as fallback", {
+            frameId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Fallback to sensor delta description
+          activityDescription = analysisResult.changeDescription;
+        }
+      } else {
+        // No delta change, use sensor description as fallback
+        activityDescription = analysisResult.changeDescription || null;
+      }
+
+      // Step 3: Create or update database capture record if metadata provided
+      let captureId: string | null = null;
+      if (sequenceNumber !== undefined && captureTrigger && capturedAt !== undefined) {
+        try {
+          // Try to find existing capture by sequenceNumber and sessionId
+          const [existingCapture] = await db
+            .select({ id: schema.sessionCaptures.id })
+            .from(schema.sessionCaptures)
+            .where(
+              and(
+                eq(schema.sessionCaptures.sessionId, id),
+                eq(schema.sessionCaptures.sequenceNumber, sequenceNumber)
+              )
+            )
+            .limit(1);
+
+          if (existingCapture) {
+            // Update existing capture with analysis results
+            captureId = existingCapture.id;
+            await db
+              .update(schema.sessionCaptures)
+              .set({
+                analysisStatus: "analyzed",
+                activityDescription,
+                confidence: String(classifierConfidence),
+                deltaChanged: analysisResult.deltaChanged,
+                deltaChangeType: analysisResult.changeType || null,
+                deltaChangeDescription: analysisResult.changeDescription || null,
+                importanceScore: calculateImportanceScore(analysisResult),
+              })
+              .where(eq(schema.sessionCaptures.id, captureId));
+
+            log.debug("Updated database capture record", { captureId, sequenceNumber });
+          } else {
+            // Create new capture record
+            const [newCapture] = await db
+              .insert(schema.sessionCaptures)
+              .values({
+                sessionId: id,
+                sequenceNumber,
+                captureTrigger,
+                capturedAt: new Date(capturedAt),
+                windowId: windowInfo.windowSourceId || null,
+                appName: windowInfo.appName || null,
+                windowTitle: windowInfo.windowTitle || null,
+                analysisStatus: "analyzed",
+                activityDescription,
+                confidence: String(classifierConfidence),
+                deltaChanged: analysisResult.deltaChanged,
+                deltaChangeType: analysisResult.changeType || null,
+                deltaChangeDescription: analysisResult.changeDescription || null,
+                importanceScore: calculateImportanceScore(analysisResult),
+              })
+              .returning({ id: schema.sessionCaptures.id });
+
+            captureId = newCapture.id;
+            log.debug("Created database capture record", { captureId, sequenceNumber });
+          }
+        } catch (error) {
+          log.warn("Failed to create/update database capture record", {
+            frameId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Continue even if DB update fails - analysis still succeeded
         }
       }
 
+      // Calculate importance score based on analysis
+      const importanceScore = calculateImportanceScore(analysisResult);
+
+      // Note: Master story is now generated at session end, not during each frame capture
+
       log.debug("Frame analyzed", {
         frameId,
+        captureId,
         progressionDetected: analysisResult.progressionDetected,
         changeType: analysisResult.changeType,
         changeMagnitude: analysisResult.changeMagnitude,
+        activityDescription,
         importanceScore,
-        storyUpdated: storyUpdateResult?.success ?? false,
         latencyMs: analysisResult.analysisLatencyMs,
       });
 
@@ -1057,8 +1180,10 @@ router.post(
         success: true,
         analysis: {
           frameId: analysisResult.frameId,
+          captureId, // Return database capture ID if created/updated
           progressionDetected: analysisResult.progressionDetected,
-          summaryOfAction: analysisResult.summaryOfAction,
+          summaryOfAction: activityDescription || analysisResult.summaryOfAction, // Use classified activity
+          activityDescription, // Include classified activity description
           deltaChanged: analysisResult.deltaChanged,
           changeType: analysisResult.changeType,
           changeMagnitude: analysisResult.changeMagnitude,
@@ -1071,7 +1196,7 @@ router.post(
           offTaskReason: analysisResult.offTaskReason,
           importanceScore,
           importanceReason: getImportanceReason(analysisResult, importanceScore),
-          confidence: analysisResult.confidence,
+          confidence: classifierConfidence, // Use classifier confidence
           model: analysisResult.model,
           latencyMs: analysisResult.analysisLatencyMs,
         },
@@ -1291,6 +1416,7 @@ router.get(
           windowTitle: schema.sessionCaptures.windowTitle,
           analysisStatus: schema.sessionCaptures.analysisStatus,
           activityDescription: schema.sessionCaptures.activityDescription,
+          deltaChangeDescription: schema.sessionCaptures.deltaChangeDescription,
           confidence: schema.sessionCaptures.confidence,
           imageData: schema.sessionCaptures.imageData,
         })
@@ -1375,8 +1501,8 @@ router.get(
 
 /**
  * GET /api/monitoring/sessions/:id/story
- * Get the progressive master story for a session
- * This is the "living document" narrative built incrementally during captures
+ * Get the master story for a session
+ * The master story is generated at session end based on the activity timeline
  */
 router.get(
   "/sessions/:id/story",

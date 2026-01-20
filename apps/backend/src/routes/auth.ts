@@ -615,11 +615,39 @@ authRouter.post("/login", async (req: Request, res: Response) => {
     }
 
     // Fetch user profile from database
-    const [userProfile] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, data.user.id))
-      .limit(1);
+    // Try full select first, fallback to basic fields if persona columns don't exist
+    let userProfile;
+    try {
+      userProfile = (
+        await db.select().from(schema.users).where(eq(schema.users.id, data.user.id)).limit(1)
+      )[0];
+    } catch (error: any) {
+      // If error is due to missing columns (like job_title), select only basic fields
+      if (error?.code === "42703" || error?.message?.includes("does not exist")) {
+        userProfile = (
+          await db
+            .select({
+              id: schema.users.id,
+              organizationId: schema.users.organizationId,
+              email: schema.users.email,
+              firstName: schema.users.firstName,
+              lastName: schema.users.lastName,
+              role: schema.users.role,
+              avatarUrl: schema.users.avatarUrl,
+              currentWeek: schema.users.currentWeek,
+              startDate: schema.users.startDate,
+              status: schema.users.status,
+              createdAt: schema.users.createdAt,
+              updatedAt: schema.users.updatedAt,
+            })
+            .from(schema.users)
+            .where(eq(schema.users.id, data.user.id))
+            .limit(1)
+        )[0];
+      } else {
+        throw error;
+      }
+    }
 
     res.json({
       user: data.user,
@@ -769,6 +797,172 @@ authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
     res.status(500).json({
       error: "Internal Server Error",
       message: "Failed to fetch user profile",
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /auth/me:
+ *   patch:
+ *     tags:
+ *       - Authentication
+ *     summary: Update current user profile
+ *     description: Update the profile of the currently authenticated user. Supports partial updates for persona fields.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               jobTitle:
+ *                 type: string
+ *                 maxLength: 100
+ *                 description: User's job title or role
+ *               regularTasks:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of regular tasks the user performs
+ *               regularApps:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of regular apps the user uses
+ *               additionalContext:
+ *                 type: string
+ *                 description: Free-text additional context about the user
+ *     responses:
+ *       200:
+ *         description: User profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 profile:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+authRouter.patch("/me", requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!req.userId) {
+      res.status(401).json({
+        error: "Unauthorized",
+        message: "User not authenticated",
+      });
+      return;
+    }
+
+    const { jobTitle, regularTasks, regularApps, additionalContext } = req.body;
+
+    // Build update object with only provided fields
+    const updates: Record<string, any> = {};
+
+    if (jobTitle !== undefined) {
+      if (typeof jobTitle !== "string" || jobTitle.length > 100) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "jobTitle must be a string with max length 100",
+        });
+        return;
+      }
+      updates.jobTitle = jobTitle || null;
+    }
+
+    if (regularTasks !== undefined) {
+      if (!Array.isArray(regularTasks) || !regularTasks.every((task) => typeof task === "string")) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "regularTasks must be an array of strings",
+        });
+        return;
+      }
+      updates.regularTasks = regularTasks;
+    }
+
+    if (regularApps !== undefined) {
+      if (!Array.isArray(regularApps) || !regularApps.every((app) => typeof app === "string")) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "regularApps must be an array of strings",
+        });
+        return;
+      }
+      updates.regularApps = regularApps;
+    }
+
+    if (additionalContext !== undefined) {
+      if (typeof additionalContext !== "string") {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "additionalContext must be a string",
+        });
+        return;
+      }
+      updates.additionalContext = additionalContext || null;
+    }
+
+    // If no updates provided, return current profile
+    if (Object.keys(updates).length === 0) {
+      const [userProfile] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, req.userId))
+        .limit(1);
+
+      if (!userProfile) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "User profile not found",
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        profile: userProfile,
+      });
+      return;
+    }
+
+    // Update user profile
+    const [updatedProfile] = await db
+      .update(schema.users)
+      .set(updates)
+      .where(eq(schema.users.id, req.userId))
+      .returning();
+
+    if (!updatedProfile) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "User profile not found",
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      profile: updatedProfile,
+    });
+  } catch (error) {
+    console.error("Update user profile error:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to update user profile",
     });
   }
 });

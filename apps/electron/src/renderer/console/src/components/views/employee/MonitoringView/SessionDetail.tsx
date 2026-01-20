@@ -73,6 +73,7 @@ import { SessionEndToast } from "@/console/src/components/shared/SessionEndToast
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import LinearUpdateDialog from "./LinearUpdateDialog";
 import ActivityTimeline from "./ActivityTimeline";
+import EndSessionDialog from "./EndSessionDialog"; // Import the new dialog
 import { SiLinear } from "react-icons/si";
 
 function formatDateTime(dateString: string | null): string {
@@ -130,6 +131,10 @@ export default function SessionDetail() {
   }>({ connected: false, email: null, loading: true });
   const [isConnectingGmail, setIsConnectingGmail] = useState(false);
   const [showSessionEndToast, setShowSessionEndToast] = useState(false);
+
+  // End Session Dialog State
+  const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
 
   // Preferences for hide pill on session end
   const { hidePillOnSessionEnd, dontAskHidePillAgain, updatePreference } = usePreferences();
@@ -213,10 +218,9 @@ export default function SessionDetail() {
         navigate("/settings");
         return;
       }
-      const response = await fetch(
-        `${API_BASE_URL}/api/integrations/linear/status`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/integrations/linear/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.ok) {
         const data = await response.json();
         if (data.connected) {
@@ -385,48 +389,62 @@ export default function SessionDetail() {
     }
   };
 
-  const handleEndSession = async () => {
+  // Replaced handleEndSession with EndSessionDialog trigger
+  const handleEndButtonClick = () => {
+    setIsEndDialogOpen(true);
+  };
+
+  // Confirm handler for the dialog
+  const handleConfirmEndSession = async (preferences: {
+    style: "verbose" | "concise";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
+  }) => {
     if (!sessionId) return;
 
+    setIsEnding(true);
     try {
-      // 1. End Electron-side capture loop and get captures
+      // 1. Stop Electron capture
       const electronResult = await window.consoleAPI.endMonitoringSession();
 
-      // If Electron session is already ended (e.g., from pill), that's OK - just proceed with backend
+      // If Electron session is already ended (e.g., from pill), that's OK
       if (electronResult.error && electronResult.error !== "No active session") {
         throw new Error(electronResult.error);
       }
 
-      // 2. Upload captures to backend (so summarization can use them)
+      // 2. Upload captures if any
       if (electronResult.captures && electronResult.captures.length > 0) {
-        logger.info(`Uploading ${electronResult.captures.length} captures to backend`);
         await uploadCaptures(sessionId, electronResult.captures);
-      } else {
-        logger.info("No captures to upload (session may have been ended from pill)");
       }
 
-      // 3. Trigger backend summarization
-      await endSessionMutation.mutateAsync(sessionId);
+      // 3. Trigger backend end + summary generation with preferences
+      await endSessionMutation.mutateAsync({
+        sessionId,
+        preferences, // Pass preferences to backend
+      });
 
-      // 4. Handle pill visibility based on preferences
+      setIsEndDialogOpen(false);
+
+      // Handle pill hiding logic
       if (hidePillOnSessionEnd || dontAskHidePillAgain) {
-        // Auto-hide pill
         window.consoleAPI.hidePill();
-        toast({
-          title: "Session ended",
-          description: "Summary is being generated...",
-        });
       } else {
-        // Show toast with "don't ask again" option
         setShowSessionEndToast(true);
       }
+
+      toast({
+        title: "Session Ended",
+        description: "Generating your master story...",
+      });
     } catch (error) {
       logger.error("Error ending session:", error);
       toast({
         title: "Error",
-        description: "Failed to end session. Please try again.",
+        description: "Failed to end session properly.",
         variant: "destructive",
       });
+    } finally {
+      setIsEnding(false);
     }
   };
 
@@ -555,7 +573,14 @@ export default function SessionDetail() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-text-primary">
-              {session.name || "Work Session"}
+              {session.name === "Work session" && session.status === "summarizing" ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="animate-spin" size={24} />
+                  Generating title...
+                </span>
+              ) : (
+                session.name || "Untitled Session"
+              )}
             </h1>
             <p className="text-text-secondary mt-1">{formatDateTime(session.startedAt)}</p>
           </div>
@@ -577,15 +602,11 @@ export default function SessionDetail() {
                 Pause
               </Button>
               <Button
-                onClick={handleEndSession}
-                disabled={endSessionMutation.isPending}
+                onClick={handleEndButtonClick}
+                disabled={isEnding}
                 className="gap-2 bg-status-error text-white hover:bg-status-error/90"
               >
-                {endSessionMutation.isPending ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Square size={16} />
-                )}
+                {isEnding ? <Loader2 className="animate-spin" size={16} /> : <Square size={16} />}
                 End Session
               </Button>
             </>
@@ -605,16 +626,12 @@ export default function SessionDetail() {
                 Resume
               </Button>
               <Button
-                onClick={handleEndSession}
-                disabled={endSessionMutation.isPending}
+                onClick={handleEndButtonClick}
+                disabled={isEnding}
                 variant="outline"
                 className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
               >
-                {endSessionMutation.isPending ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Square size={16} />
-                )}
+                {isEnding ? <Loader2 className="animate-spin" size={16} /> : <Square size={16} />}
                 End Session
               </Button>
             </>
@@ -847,32 +864,8 @@ export default function SessionDetail() {
         )}
       </div>
 
-      {/* Key Activities (if available) */}
-      {session.keyActivities &&
-        Array.isArray(session.keyActivities) &&
-        session.keyActivities.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-text-primary">Key Activities</h2>
-            <ul className="space-y-2">
-              {session.keyActivities.map((activity: any, i: number) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-3 p-3 bg-background-elevated rounded-lg border border-border-subtle"
-                >
-                  <CheckCircle size={18} className="text-status-success mt-0.5 flex-shrink-0" />
-                  <span className="text-text-primary">
-                    {typeof activity === "string"
-                      ? activity
-                      : activity.activity || activity.description || JSON.stringify(activity)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
       {/* Activity Timeline */}
-      <ActivityTimeline sessionId={sessionId || ""} />
+      <ActivityTimeline sessionId={sessionId || ""} sessionStatus={session?.status} />
 
       {/* Top-K Frames Gallery - Shows after session ends */}
       {session.topKFrames && session.topKFrames.length > 0 && (
@@ -1137,6 +1130,14 @@ export default function SessionDetail() {
           queryClient.invalidateQueries({ queryKey: ["monitoring", "session", sessionId] });
           queryClient.invalidateQueries({ queryKey: ["monitoring", "sessions"] });
         }}
+      />
+
+      {/* End Session Dialog */}
+      <EndSessionDialog
+        open={isEndDialogOpen}
+        onOpenChange={setIsEndDialogOpen}
+        onConfirm={handleConfirmEndSession}
+        isProcessing={isEnding}
       />
 
       {/* Session End Toast */}

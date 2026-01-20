@@ -17,14 +17,25 @@ export default function EyeDropdownApp() {
       return;
     }
 
-    const unsubscribe = window.dropdownAPI.onData((data) => {
+    const unsubscribeData = window.dropdownAPI.onData((data) => {
       if (data.type === "eye") {
         setSelectedWindows(data.selectedWindows);
         setAvailableWindows(data.availableWindows);
       }
     });
 
-    return unsubscribe;
+    // Listen for window updates (when windows are added/removed dynamically by focusTracker)
+    const unsubscribeWindows = window.dropdownAPI.onWindowsUpdated((windows) => {
+      logger.info(" Windows updated in dropdown:", windows);
+      setSelectedWindows(windows);
+      // Note: availableWindows will be refreshed when dropdown is reopened
+      // We could also fetch them here, but it's expensive and not critical for UX
+    });
+
+    return () => {
+      unsubscribeData();
+      unsubscribeWindows();
+    };
   }, []);
 
   const handleSelectWindow = async (windowInfo: WatchableWindow) => {

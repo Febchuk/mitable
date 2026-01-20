@@ -3,22 +3,27 @@
  *
  * Main view for session monitoring functionality.
  * Lists past sessions and provides controls to start new sessions.
+ *
+ * Sessions start instantly without a modal dialog.
+ * Windows are tracked automatically based on user focus.
  */
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSessions } from "@/console/src/hooks/queries/monitoring";
-import { Search, Plus, Camera } from "lucide-react";
+import { useStartSession } from "@/console/src/hooks/useStartSession";
+import { Search, Plus, Camera, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import StartSessionDialog from "./StartSessionDialog";
 import SessionCard from "./SessionCard";
 
 export default function MonitoringView() {
   const { data: sessions = [], isLoading, error } = useSessions();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isStartDialogOpen, setIsStartDialogOpen] = useState(false);
+
+  // Reusable session start hook - handles all creation logic
+  const { startSession, isStarting } = useStartSession();
 
   // Filter sessions based on search query
   const filteredSessions = sessions.filter(
@@ -59,11 +64,21 @@ export default function MonitoringView() {
           </p>
         </div>
         <Button
-          onClick={() => setIsStartDialogOpen(true)}
+          onClick={startSession}
+          disabled={isStarting}
           className="gap-2 bg-primary text-white hover:bg-primary/90"
         >
-          <Plus size={20} />
-          <span>Start Session</span>
+          {isStarting ? (
+            <>
+              <Loader2 size={20} className="animate-spin" />
+              <span>Starting...</span>
+            </>
+          ) : (
+            <>
+              <Plus size={20} />
+              <span>Start Session</span>
+            </>
+          )}
         </Button>
       </div>
 
@@ -106,18 +121,25 @@ export default function MonitoringView() {
           </p>
           {!searchQuery && (
             <Button
-              onClick={() => setIsStartDialogOpen(true)}
+              onClick={startSession}
+              disabled={isStarting}
               className="gap-2 bg-primary text-white hover:bg-primary/90"
             >
-              <Plus size={20} />
-              <span>Start Your First Session</span>
+              {isStarting ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  <span>Starting...</span>
+                </>
+              ) : (
+                <>
+                  <Plus size={20} />
+                  <span>Start Your First Session</span>
+                </>
+              )}
             </Button>
           )}
         </div>
       )}
-
-      {/* Start Session Dialog */}
-      <StartSessionDialog open={isStartDialogOpen} onOpenChange={setIsStartDialogOpen} />
     </div>
   );
 }

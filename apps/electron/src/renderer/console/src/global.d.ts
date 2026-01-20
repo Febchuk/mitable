@@ -127,6 +127,21 @@ interface ConsoleAPI {
     };
   }>;
 
+  // Block list API (user-scoped)
+  getBlockList: (userId: string) => Promise<string[]>;
+  setBlockList: (userId: string, blockedApps: string[]) => Promise<{ success: boolean }>;
+  addBlockedApp: (userId: string, appName: string) => Promise<{ success: boolean }>;
+  removeBlockedApp: (userId: string, appName: string) => Promise<{ success: boolean }>;
+  getDetectedApps: () => Promise<Array<{ normalizedName: string; originalName: string }>>;
+
+  // Notification frequency API (user-scoped)
+  getNotificationFrequency: (userId: string) => Promise<number>;
+  setNotificationFrequency: (userId: string, minutes: number) => Promise<{ success: boolean }>;
+
+  // Auto session start API (user-scoped)
+  getAutoSessionStart: (userId: string) => Promise<boolean>;
+  setAutoSessionStart: (userId: string, enabled: boolean) => Promise<{ success: boolean }>;
+
   // Hide watching pill
   hidePill: () => void;
 }

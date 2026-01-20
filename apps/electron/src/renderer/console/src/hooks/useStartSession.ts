@@ -1,0 +1,148 @@
+/**
+ * useStartSession Hook
+ *
+ * Encapsulates all logic for starting a monitoring session.
+ * Used by MonitoringView, watching pill, and keyboard shortcuts.
+ */
+
+import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "@/console/src/context/UserContext";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { monitoringKeys } from "@/console/src/hooks/queries/monitoring";
+import { createSession, startMonitoringSession } from "@/console/src/services/monitoringService";
+import { SESSION_DEFAULTS } from "@mitable/shared";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger("useStartSession");
+
+interface UseStartSessionOptions {
+  /** Navigate to session detail after start (default: true) */
+  navigateOnSuccess?: boolean;
+  /** Show toast notifications (default: true) */
+  showToasts?: boolean;
+}
+
+interface UseStartSessionReturn {
+  /** Start a new session */
+  startSession: () => Promise<string | null>;
+  /** Whether a session is currently being started */
+  isStarting: boolean;
+  /** Error message if start failed */
+  error: string | null;
+}
+
+/**
+ * Hook for starting monitoring sessions.
+ *
+ * Handles:
+ * - Creating backend session
+ * - Starting Electron capture loop
+ * - Focus tracker integration (windows added automatically)
+ * - Toast notifications
+ * - Navigation to session detail
+ * - Query cache invalidation
+ *
+ * @example
+ * const { startSession, isStarting } = useStartSession();
+ * <Button onClick={startSession} disabled={isStarting}>Start</Button>
+ */
+export function useStartSession(options: UseStartSessionOptions = {}): UseStartSessionReturn {
+  const { navigateOnSuccess = true, showToasts = true } = options;
+
+  const { user } = useUser();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [isStarting, setIsStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const startSession = useCallback(async (): Promise<string | null> => {
+    // Validate user is logged in
+    if (!user?.id || !user?.organizationId) {
+      const errorMsg = "Please log in to start a session";
+      setError(errorMsg);
+      if (showToasts) {
+        toast({
+          title: "Error",
+          description: errorMsg,
+          variant: "destructive",
+        });
+      }
+      return null;
+    }
+
+    setIsStarting(true);
+    setError(null);
+
+    try {
+      // 1. Create backend session
+      const backendResult = await createSession({
+        selectedWindows: [], // Focus tracker adds windows dynamically
+        captureIntervalMs: SESSION_DEFAULTS.CAPTURE_INTERVAL_MS,
+        name: SESSION_DEFAULTS.DEFAULT_NAME,
+      });
+
+      const sessionId = backendResult.session.id;
+      logger.info("Backend session created:", sessionId);
+
+      // 2. Start Electron capture loop (focus tracker starts automatically)
+      const electronResult = await startMonitoringSession({
+        sessionId,
+        selectedWindows: [], // Focus tracker adds windows based on user activity
+        captureIntervalMs: SESSION_DEFAULTS.CAPTURE_INTERVAL_MS,
+        name: SESSION_DEFAULTS.DEFAULT_NAME,
+        userId: user.id,
+        organizationId: user.organizationId,
+      });
+
+      if (electronResult.error) {
+        throw new Error(electronResult.error);
+      }
+
+      logger.info("Session started successfully:", sessionId);
+
+      // 3. Invalidate sessions query to refresh list
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+
+      // 4. Show success toast
+      if (showToasts) {
+        toast({
+          title: "Session started",
+          description: "Your work session is now being tracked",
+        });
+      }
+
+      // 5. Navigate to session detail
+      if (navigateOnSuccess) {
+        navigate(`/monitoring/${sessionId}`);
+      }
+
+      return sessionId;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to start session";
+      logger.error("Failed to start session:", err);
+      setError(errorMsg);
+
+      if (showToasts) {
+        toast({
+          title: "Failed to start session",
+          description: errorMsg,
+          variant: "destructive",
+        });
+      }
+
+      return null;
+    } finally {
+      setIsStarting(false);
+    }
+  }, [user, navigate, toast, queryClient, navigateOnSuccess, showToasts]);
+
+  return {
+    startSession,
+    isStarting,
+    error,
+  };
+}
