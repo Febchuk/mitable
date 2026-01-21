@@ -40,8 +40,9 @@ const excludeMainProcessPlugin = (): Plugin => {
         id === mainLoggerPath ||
         (id.includes("/src/lib/logger.ts") && !id.includes("/src/renderer/"))
       ) {
-        // Re-export from renderer logger
-        return `export * from "${rendererLoggerPath}";`;
+        // Re-export from renderer logger (use forward slashes for cross-platform compatibility)
+        const normalizedPath = rendererLoggerPath.replace(/\\/g, "/");
+        return `export * from "${normalizedPath}";`;
       }
       return null;
     },
@@ -128,17 +129,6 @@ export default defineConfig({
             "src/renderer/watchingPillDropdown/menu.html"
           ),
           notifications: resolve(__dirname, "src/renderer/notifications/index.html"),
-        },
-        // Externalize main process files to prevent Vite from processing them
-        external: (id) => {
-          // Exclude main process directory and preload directory
-          if (id.includes("/src/lib/") && !id.includes("/src/renderer/")) {
-            return true;
-          }
-          if (id.includes("/src/main/") || id.includes("/src/preload/")) {
-            return true;
-          }
-          return false;
         },
       },
     },
