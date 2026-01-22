@@ -1919,17 +1919,7 @@ function registerGlobalShortcuts() {
 }
 
 app.whenReady().then(async () => {
-  // Initialize active window bridge for capture policy
-  initActiveWindowBridge();
-
-  // Create Console window (main dashboard)
-  createConsoleWindow();
-  // WatchingPill is created on-demand when session starts
-
-  setupIPC();
-  registerGlobalShortcuts();
-
-  // Enforce Single Instance Lock
+  // Enforce Single Instance Lock - must be first to prevent duplicate initialization
   const gotTheLock = app.requestSingleInstanceLock();
   if (!gotTheLock) {
     consoleLogger.info(" Another instance is already running. Quitting...");
@@ -1945,6 +1935,16 @@ app.whenReady().then(async () => {
       consoleWindow.focus();
     }
   });
+
+  // Initialize active window bridge for capture policy
+  initActiveWindowBridge();
+
+  // Create Console window (main dashboard)
+  createConsoleWindow();
+  // WatchingPill is created on-demand when session starts
+
+  setupIPC();
+  registerGlobalShortcuts();
 
   // Setup powerMonitor listeners for auto session start
   setupPowerMonitor();
