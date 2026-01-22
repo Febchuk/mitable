@@ -76,13 +76,47 @@ const authTokens: {
   refreshToken: null,
 };
 
+function isBoundsVisible(bounds: Electron.Rectangle): boolean {
+  const displays = screen.getAllDisplays();
+  return displays.some((display) => {
+    const area = display.workArea;
+    const withinX = bounds.x + bounds.width > area.x && bounds.x < area.x + area.width;
+    const withinY = bounds.y + bounds.height > area.y && bounds.y < area.y + area.height;
+    return withinX && withinY;
+  });
+}
+
+function clampToDisplay(bounds: Electron.Rectangle): Electron.Rectangle {
+  const targetDisplay = screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y });
+  const { x, y, width, height } = targetDisplay.workArea;
+
+  const clampedWidth = Math.min(bounds.width, width);
+  const clampedHeight = Math.min(bounds.height, height);
+
+  const clampedX = Math.min(Math.max(bounds.x, x), x + width - clampedWidth);
+  const clampedY = Math.min(Math.max(bounds.y, y), y + height - clampedHeight);
+
+  return {
+    x: clampedX,
+    y: clampedY,
+    width: clampedWidth,
+    height: clampedHeight,
+  };
+}
+
 function createConsoleWindow() {
   consoleLogger.info(" Creating console window...");
   consoleLogger.info(" Preload script path:", join(__dirname, "../preload/console.cjs"));
 
-  // Get screen dimensions for responsive window sizing
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+  // Get dimensions of the display nearest the cursor to avoid off-screen placement
+  const cursorPoint = screen.getCursorScreenPoint();
+  const targetDisplay = screen.getDisplayNearestPoint(cursorPoint) ?? screen.getPrimaryDisplay();
+  const {
+    width: screenWidth,
+    height: screenHeight,
+    x: screenX,
+    y: screenY,
+  } = targetDisplay.workArea;
 
   // Calculate window dimensions based on screen size (max 1264x888, with padding)
   const maxWidth = 1264;
@@ -99,9 +133,9 @@ function createConsoleWindow() {
     title: "Mitable Console",
     width: windowWidth,
     height: windowHeight,
-    // Center the window
-    x: Math.floor((screenWidth - windowWidth) / 2),
-    y: Math.floor((screenHeight - windowHeight) / 2),
+    // Center the window within the chosen display's work area
+    x: screenX + Math.floor((screenWidth - windowWidth) / 2),
+    y: screenY + Math.floor((screenHeight - windowHeight) / 2),
     // Hidden title bar with native controls
     titleBarStyle: "hidden",
     // Show native window controls on Windows/Linux via titleBarOverlay
@@ -143,8 +177,28 @@ function createConsoleWindow() {
 
   // Show window when ready (ensures proper Dock visibility on macOS)
   consoleWindow.once("ready-to-show", () => {
-    consoleWindow?.show();
+    if (!consoleWindow) return;
+
+    const bounds = consoleWindow.getBounds();
+    if (!isBoundsVisible(bounds)) {
+      const clamped = clampToDisplay(bounds);
+      consoleLogger.warn(" Console window bounds were off-screen, clamping:", {
+        original: bounds,
+        clamped,
+      });
+      consoleWindow.setBounds(clamped);
+    }
+
+    consoleWindow.show();
   });
+
+  // Safety timeout: Force show window if ready-to-show doesn't fire (Windows edge case)
+  setTimeout(() => {
+    if (consoleWindow && !consoleWindow.isVisible()) {
+      consoleLogger.warn(" Force-showing window after timeout (ready-to-show didn't fire)");
+      consoleWindow.show();
+    }
+  }, 5000);
 
   // Log when preload script finishes loading
   consoleWindow.webContents.on("did-finish-load", () => {
@@ -1865,6 +1919,23 @@ function registerGlobalShortcuts() {
 }
 
 app.whenReady().then(async () => {
+  // Enforce Single Instance Lock - must be first to prevent duplicate initialization
+  const gotTheLock = app.requestSingleInstanceLock();
+  if (!gotTheLock) {
+    consoleLogger.info(" Another instance is already running. Quitting...");
+    app.quit();
+    return;
+  }
+
+  app.on("second-instance", () => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (consoleWindow) {
+      if (consoleWindow.isMinimized()) consoleWindow.restore();
+      consoleWindow.show();
+      consoleWindow.focus();
+    }
+  });
+
   // Initialize active window bridge for capture policy
   initActiveWindowBridge();
 
