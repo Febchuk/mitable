@@ -1,31 +1,55 @@
 import { db } from "../db/client";
 import { users, sessionCaptures } from "../db/schema";
 import { eq, asc, and, isNotNull } from "drizzle-orm";
-import Groq from "groq-sdk";
-import { config } from "../config";
-import { CLASSIFIER_SYSTEM_PROMPT, buildClassifierUserPrompt } from "../prompts/session-prompts";
 import { createSessionLogger } from "../lib/sessionLogger";
+import { classifierRLMService } from "./classifier-rlm/classifier-rlm.service";
 
 export interface ClassifierInput {
   userId: string;
   sessionId: string;
   deltaDescription: string;
   frameId: string;
+  windowInfo?: {
+    appName: string;
+    windowTitle: string;
+  };
+  previousDelta?: string;
+  timeElapsedSec?: number;
+  intervalEvidence?: {
+    keyboardEventCount: number;
+    copyCount: number;
+    pasteCount: number;
+    cutCount: number;
+    mouseClickCount: number;
+    mouseScrollCount: number;
+  };
+}
+
+export interface ClassifierEvent {
+  type: "navigation" | "composition" | "paste" | "view" | "edit";
+  verb: string;
+  object: string;
+  via?: string;
 }
 
 export interface ClassifierResult {
   activity: string;
   confidence: number;
   isContinuation: boolean;
+  actionType?: "VIEWING" | "NAVIGATION" | "PASTING" | "AUTHORING" | "EDITING";
+  events?: ClassifierEvent[];
+  entities?: {
+    people: string[];
+    systems: string[];
+  };
+  metrics?: {
+    messages_composed: number;
+    links_opened: number;
+    pastes_performed: number;
+  };
 }
 
 class ClassifierService {
-  private groq: Groq;
-
-  constructor() {
-    this.groq = new Groq({ apiKey: config.groq.apiKey });
-  }
-
   /**
    * Classify the current delta into a meaningful activity
    */
@@ -67,40 +91,73 @@ class ClassifierService {
       // History is already in chronological order [oldest ... newest]
       const history = historyCaptures.map((c) => c.activityDescription as string);
 
-      // 3. Build Prompt
-      const userPrompt = buildClassifierUserPrompt(
-        {
+      // Fetch previous delta for temporal reasoning (N-1 frame)
+      let previousDelta = input.previousDelta;
+      const timeElapsedSec = input.timeElapsedSec;
+
+      if (!previousDelta) {
+        const previousCaptures = await db.query.sessionCaptures.findMany({
+          where: and(
+            eq(sessionCaptures.sessionId, input.sessionId),
+            isNotNull(sessionCaptures.deltaChangeDescription)
+          ),
+          orderBy: [asc(sessionCaptures.capturedAt)],
+          limit: 2,
+          columns: {
+            deltaChangeDescription: true,
+            capturedAt: true,
+          },
+        });
+
+        // Get N-1 capture (previous delta)
+        if (previousCaptures.length >= 2) {
+          previousDelta =
+            previousCaptures[previousCaptures.length - 2].deltaChangeDescription || undefined;
+        } else if (previousCaptures.length === 1) {
+          previousDelta = previousCaptures[0].deltaChangeDescription || undefined;
+        }
+      }
+
+      // Use Classifier RLM with 3 focused tools for iterative reasoning
+      const rlmResult = await classifierRLMService.classify({
+        userId: input.userId,
+        sessionId: input.sessionId,
+        frameId: input.frameId,
+        deltaDescription: input.deltaDescription,
+        windowInfo: input.windowInfo,
+        intervalEvidence: input.intervalEvidence,
+        previousDelta,
+        timeElapsedSec,
+        recentHistory: history,
+        userPersona: {
           jobTitle: user.jobTitle || undefined,
           regularTasks: (user.regularTasks as string[]) || undefined,
           regularApps: (user.regularApps as string[]) || undefined,
           additionalContext: user.additionalContext || undefined,
         },
-        history,
-        input.deltaDescription
-      );
-
-      // 4. Call LLM (Llama 3 70b or 8b for speed/quality balance)
-      const completion = await this.groq.chat.completions.create({
-        messages: [
-          { role: "system", content: CLASSIFIER_SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-        model: "llama-3.3-70b-versatile", // High intelligence for context understanding
-        temperature: 0.1, // Low temp for consistency
-        response_format: { type: "json_object" },
       });
 
-      const content = completion.choices[0]?.message?.content;
-      if (!content) throw new Error("Empty response from Classifier LLM");
-
-      // 5. Parse Output
-      const parsed = JSON.parse(content);
-
-      return {
-        activity: parsed.activity || input.deltaDescription, // Fallback to delta if missing
-        confidence: parsed.confidence || 0.5,
-        isContinuation: parsed.is_continuation || false,
+      // Map RLM result to ClassifierResult interface
+      const result: ClassifierResult = {
+        activity: rlmResult.activity,
+        confidence: rlmResult.confidence,
+        isContinuation: rlmResult.is_continuation,
+        actionType: rlmResult.action_type,
+        events: rlmResult.events,
+        entities: rlmResult.entities,
+        metrics: rlmResult.metrics,
       };
+
+      log.info("✅ Classifier RLM completed:", {
+        frameId: input.frameId,
+        activity: result.activity,
+        actionType: result.actionType,
+        confidence: result.confidence,
+        toolCalls: rlmResult.toolCallCount,
+        executionTimeMs: rlmResult.executionTimeMs,
+      });
+
+      return result;
     } catch (error) {
       log.error("Classifier failed", {
         error: error instanceof Error ? error.message : String(error),

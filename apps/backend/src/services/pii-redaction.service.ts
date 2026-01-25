@@ -1001,6 +1001,75 @@ class PIIRedactionService {
   }
 
   /**
+   * Extract text from screenshot using Tesseract.js OCR (no PII redaction)
+   * Used as validation corpus for Classifier to correct Vision model errors
+   *
+   * @param screenshot - Base64 data URL
+   * @returns Extracted text corpus with confidence scores
+   */
+  async extractText(screenshot: string): Promise<{
+    text: string;
+    words: Array<{ text: string; confidence: number }>;
+    averageConfidence: number;
+  }> {
+    await this.initializeOCRWorkers();
+
+    try {
+      const base64Data = this.extractBase64Data(screenshot);
+      const imageBuffer = Buffer.from(base64Data, "base64");
+
+      // Use simple preprocessing for speed (just one OCR pass)
+      const preppedBuffer = await sharp(imageBuffer)
+        .greyscale()
+        .normalize()
+        .sharpen()
+        .png()
+        .toBuffer();
+
+      // Use first worker for text extraction
+      const result = await this.ocrWorkers[0].recognize(preppedBuffer, {}, { blocks: true });
+
+      // Extract words and calculate confidence
+      const words: Array<{ text: string; confidence: number }> = [];
+      let totalConfidence = 0;
+
+      const blocks = result.data.blocks || [];
+      for (const block of blocks) {
+        if (!block.paragraphs) continue;
+        for (const paragraph of block.paragraphs) {
+          if (!paragraph.lines) continue;
+          for (const line of paragraph.lines) {
+            if (!line.words) continue;
+            for (const word of line.words) {
+              words.push({
+                text: word.text,
+                confidence: word.confidence || 0,
+              });
+              totalConfidence += word.confidence || 0;
+            }
+          }
+        }
+      }
+
+      const averageConfidence = words.length > 0 ? totalConfidence / words.length : 0;
+      const text = words.map((w) => w.text).join(" ");
+
+      return {
+        text,
+        words,
+        averageConfidence,
+      };
+    } catch (error) {
+      console.error("[PIIRedactionService] Text extraction failed:", error);
+      return {
+        text: "",
+        words: [],
+        averageConfidence: 0,
+      };
+    }
+  }
+
+  /**
    * Clear the cache (useful for testing)
    */
   clearCache(): void {

@@ -128,9 +128,10 @@ export const sessionCaptures = pgTable(
     // Analysis results (populated during or after capture)
     analysisStatus: varchar("analysis_status", { length: 50 }).default("pending"),
     // States: 'pending' | 'analyzed' | 'skipped' | 'duplicate'
-    activityDescription: text("activity_description"), // What Gemini detected
+    activityDescription: text("activity_description"), // Human-readable activity summary
     confidence: decimal("confidence", { precision: 3, scale: 2 }), // 0.00-1.00
     detectedElements: jsonb("detected_elements").default("[]"), // UI elements if relevant
+    classifierData: jsonb("classifier_data"), // Full Classifier RLM output (events, entities, metrics, actionType)
 
     // Delta detection (what changed between frames)
     deltaChanged: boolean("delta_changed").default(false),
