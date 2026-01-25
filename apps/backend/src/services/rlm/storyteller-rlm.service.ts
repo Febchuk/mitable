@@ -70,56 +70,52 @@ class StorytellerRLMService {
     let iterations = 0;
     let finalSummary = "";
 
-    try {
-      while (iterations < this.maxIterations) {
-        iterations++;
+    while (iterations < this.maxIterations) {
+      iterations++;
 
-        // Get LLM decision on next tool to call
-        const llmResponse = await this.getLLMDecision(
-          environment,
-          toolCallHistory,
-          iterations === 1 ? "start" : "continue"
+      // Get LLM decision on next tool to call
+      const llmResponse = await this.getLLMDecision(
+        environment,
+        toolCallHistory,
+        iterations === 1 ? "start" : "continue"
+      );
+
+      // Check if LLM is done
+      if (llmResponse.done && llmResponse.summary) {
+        finalSummary = llmResponse.summary;
+        break;
+      }
+
+      // Execute the tool
+      if (llmResponse.tool && llmResponse.parameters !== undefined) {
+        const toolResult = await this.executeTool(
+          llmResponse.tool,
+          llmResponse.parameters,
+          environment
         );
 
-        // Check if LLM is done
-        if (llmResponse.done && llmResponse.summary) {
-          finalSummary = llmResponse.summary;
-          break;
-        }
-
-        // Execute the tool
-        if (llmResponse.tool && llmResponse.parameters !== undefined) {
-          const toolResult = await this.executeTool(
-            llmResponse.tool,
-            llmResponse.parameters,
-            environment
-          );
-
-          toolCallHistory.push({
-            tool: llmResponse.tool,
-            result: toolResult,
-          });
-        } else {
-          break;
-        }
+        toolCallHistory.push({
+          tool: llmResponse.tool,
+          result: toolResult,
+        });
+      } else {
+        break;
       }
-
-      if (!finalSummary && iterations >= this.maxIterations) {
-        // Fallback: try to extract any summary from tool history
-        finalSummary = this.extractFallbackSummary(toolCallHistory);
-      }
-
-      const totalTime = timer.elapsed();
-
-      return {
-        summary: finalSummary || "Failed to generate summary",
-        toolCallCount: toolCallHistory.length,
-        recursionDepth: this.calculateRecursionDepth(toolCallHistory),
-        executionTimeMs: totalTime,
-      };
-    } catch (error) {
-      throw error;
     }
+
+    if (!finalSummary && iterations >= this.maxIterations) {
+      // Fallback: try to extract any summary from tool history
+      finalSummary = this.extractFallbackSummary(toolCallHistory);
+    }
+
+    const totalTime = timer.elapsed();
+
+    return {
+      summary: finalSummary || "Failed to generate summary",
+      toolCallCount: toolCallHistory.length,
+      recursionDepth: this.calculateRecursionDepth(toolCallHistory),
+      executionTimeMs: totalTime,
+    };
   }
 
   /**
