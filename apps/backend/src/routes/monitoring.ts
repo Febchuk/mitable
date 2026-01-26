@@ -610,10 +610,11 @@ router.post(
         return;
       }
 
-      if (session.status !== "active" && session.status !== "paused") {
+      // Allow re-generating summary for sessions in any status except "deleted"
+      if (session.status === "deleted") {
         res.status(400).json({
           error: "Bad Request",
-          message: `Cannot end session with status: ${session.status}`,
+          message: `Cannot end deleted session`,
         });
         return;
       }
@@ -814,12 +815,35 @@ router.post(
         .set({ status: "summarizing" })
         .where(eq(schema.monitoringSessions.id, id));
 
-      // Trigger regeneration in background
-      sessionSummarizationService.generateSessionSummary(id).catch((err) => {
-        console.error("[DEV] Regenerate summary failed:", err);
-      });
+      // Trigger regeneration in background using RLM
+      masterStoryService
+        .generateStory({
+          sessionId: id,
+          userId,
+          formatPreference: {
+            style: "concise",
+            format: "bullets",
+            includeScreenshots: false,
+          },
+        })
+        .then(async () => {
+          // Update status to ready after successful regeneration
+          await db
+            .update(schema.monitoringSessions)
+            .set({ status: "ready" })
+            .where(eq(schema.monitoringSessions.id, id));
+          console.log("[DEV] ✅ RLM Regeneration completed for session:", id);
+        })
+        .catch(async (err) => {
+          console.error("[DEV] ❌ RLM Regenerate summary failed:", err);
+          // Still mark as ready even if failed
+          await db
+            .update(schema.monitoringSessions)
+            .set({ status: "ready" })
+            .where(eq(schema.monitoringSessions.id, id));
+        });
 
-      res.json({ success: true, message: "Summary regeneration started" });
+      res.json({ success: true, message: "RLM summary regeneration started" });
     } catch (error) {
       res.status(500).json({
         error: "Internal Server Error",
@@ -969,6 +993,8 @@ router.post(
       sequenceNumber,
       captureTrigger,
       capturedAt,
+      // Optional activity metadata from Electron
+      intervalEvidence,
     }: {
       frameId: string;
       currentImage: string; // Base64 image data
@@ -981,6 +1007,14 @@ router.post(
       sequenceNumber?: number;
       captureTrigger?: "periodic" | "focus_change" | "manual";
       capturedAt?: number; // Unix timestamp in ms
+      intervalEvidence?: {
+        keyboardEventCount: number;
+        copyCount: number;
+        pasteCount: number;
+        cutCount: number;
+        mouseClickCount: number;
+        mouseScrollCount: number;
+      };
     } = req.body;
 
     if (!frameId || !currentImage || !windowInfo) {
@@ -1046,6 +1080,23 @@ router.post(
         return;
       }
 
+      // Log activity evidence if available
+      if (intervalEvidence) {
+        log.info("📊 Activity Evidence Received:", {
+          frameId,
+          evidence: {
+            keyboard: intervalEvidence.keyboardEventCount,
+            copy: intervalEvidence.copyCount,
+            paste: intervalEvidence.pasteCount,
+            cut: intervalEvidence.cutCount,
+            clicks: intervalEvidence.mouseClickCount,
+            scrolls: intervalEvidence.mouseScrollCount,
+          },
+        });
+      } else {
+        log.debug("No activity evidence provided for this frame", { frameId });
+      }
+
       // Step 1: Analyze frame with Sensor (detect visual delta)
       const analysisResult = await frameAnalysisService.analyzeFrame({
         sessionId: id,
@@ -1059,6 +1110,7 @@ router.post(
       // Step 2: Classify activity using Classifier (interpret delta into meaningful activity)
       let activityDescription: string | null = null;
       let classifierConfidence: number = analysisResult.confidence;
+      let classifierData: any = null;
 
       // Only call Classifier if there's a meaningful delta change
       if (analysisResult.deltaChanged && analysisResult.changeDescription) {
@@ -1068,16 +1120,37 @@ router.post(
             sessionId: id,
             deltaDescription: analysisResult.changeDescription,
             frameId,
+            windowInfo: {
+              appName: windowInfo.appName,
+              windowTitle: windowInfo.windowTitle,
+            },
+            intervalEvidence,
           });
 
           if (classifierResult) {
             activityDescription = classifierResult.activity;
             classifierConfidence = classifierResult.confidence;
 
+            // Store full structured output for Storyteller
+            classifierData = {
+              actionType: classifierResult.actionType,
+              events: classifierResult.events || [],
+              entities: classifierResult.entities || { people: [], systems: [] },
+              metrics: classifierResult.metrics || {
+                messages_composed: 0,
+                links_opened: 0,
+                pastes_performed: 0,
+              },
+              isContinuation: classifierResult.isContinuation,
+            };
+
             log.debug("Activity classified", {
               frameId,
               activity: activityDescription,
               confidence: classifierConfidence,
+              actionType: classifierResult.actionType,
+              hasEvents: !!classifierResult.events,
+              hasEntities: !!classifierResult.entities,
             });
           }
         } catch (error) {
@@ -1118,6 +1191,7 @@ router.post(
                 analysisStatus: "analyzed",
                 activityDescription,
                 confidence: String(classifierConfidence),
+                classifierData: classifierData ? JSON.stringify(classifierData) : null,
                 deltaChanged: analysisResult.deltaChanged,
                 deltaChangeType: analysisResult.changeType || null,
                 deltaChangeDescription: analysisResult.changeDescription || null,
@@ -1141,6 +1215,7 @@ router.post(
                 analysisStatus: "analyzed",
                 activityDescription,
                 confidence: String(classifierConfidence),
+                classifierData: classifierData ? JSON.stringify(classifierData) : null,
                 deltaChanged: analysisResult.deltaChanged,
                 deltaChangeType: analysisResult.changeType || null,
                 deltaChangeDescription: analysisResult.changeDescription || null,

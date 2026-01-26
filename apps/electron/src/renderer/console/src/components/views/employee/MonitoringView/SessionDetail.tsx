@@ -539,7 +539,13 @@ export default function SessionDetail() {
     );
   }
 
-  const summary = summaryData?.finalSummary || summaryData?.rawSummary || "";
+  // RLM summary is in summaryData.summary.narrativeSummary (from session_summaries table)
+  // Fallback to old fields for backward compatibility
+  const summary =
+    summaryData?.summary?.narrativeSummary ||
+    summaryData?.finalSummary ||
+    summaryData?.rawSummary ||
+    "";
   const isDelivered = session.deliveryStatus === "delivered";
 
   // AI Edit Mode - full screen split-pane editor

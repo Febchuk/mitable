@@ -127,6 +127,7 @@
     "remark-math": "^6.0.0",
     "sonner": "^2.0.7",
     "tailwind-scrollbar-hide": "^4.0.0",
+    "uiohook-napi": "^1.5.4",
     "uploadthing": "^7.7.4",
     "use-file-picker": "^2.1.2",
     "zod": "^3.25.76"

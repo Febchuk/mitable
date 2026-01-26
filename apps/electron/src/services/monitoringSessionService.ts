@@ -26,6 +26,8 @@ import { localFrameStorage, type FrameMetadata } from "./localFrameStorage";
 import { checkpointService } from "./checkpointService";
 import { authManager } from "./authManager";
 import { focusWindowTracker } from "./focusWindowTracker";
+import { activityTracker, type IntervalEvidence } from "./activityTracker";
+import { windowDetectionService } from "./windowDetectionService";
 import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
 import type {
   SelectedWindowInfo,
@@ -65,6 +67,7 @@ interface ActiveSession {
 class MonitoringSessionService {
   private activeSession: ActiveSession | null = null;
   private captureTimer: NodeJS.Timeout | null = null;
+  private cleanupTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     logger.info(
@@ -118,6 +121,9 @@ class MonitoringSessionService {
           this.broadcastSessionUpdate();
         }
       }, config.userId);
+
+      // Start activity tracker to collect keyboard/mouse/clipboard events
+      activityTracker.start();
 
       // Initialize local frame storage (persistent directory)
       const localPath = await localFrameStorage.initSession({
@@ -310,6 +316,9 @@ class MonitoringSessionService {
     // Stop focus window tracker
     focusWindowTracker.stop();
 
+    // Stop activity tracker
+    activityTracker.stop();
+
     // Calculate final pause time if currently paused
     if (this.activeSession.status === "paused" && this.activeSession.pausedAt) {
       const pauseDuration = Date.now() - this.activeSession.pausedAt;
@@ -402,13 +411,13 @@ class MonitoringSessionService {
   resetSession(): void {
     this.stopCaptureLoop();
     focusWindowTracker.stop();
+    activityTracker.stop();
     this.activeSession = null;
     this.broadcastSessionUpdate();
-    logger.info(" Session reset (external deletion)");
   }
 
   /**
-   * Get current session state
+   * Get current session state for UI
    */
   getSessionState(): MonitoringSessionState | null {
     if (!this.activeSession) {
@@ -563,6 +572,9 @@ class MonitoringSessionService {
       }
     }, intervalMs);
 
+    // Set up periodic cleanup of closed windows (every 10 seconds)
+    this.startWindowCleanupLoop();
+
     logger.info(` Capture loop started (interval: ${intervalMs}ms)`);
   }
 
@@ -574,7 +586,39 @@ class MonitoringSessionService {
       clearInterval(this.captureTimer);
       this.captureTimer = null;
     }
+    this.stopWindowCleanupLoop();
     logger.info(" Capture loop stopped");
+  }
+
+  /**
+   * Start periodic cleanup of closed windows
+   */
+  private startWindowCleanupLoop(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+    }
+
+    // Check for closed windows every 10 seconds
+    this.cleanupTimer = setInterval(async () => {
+      if (this.activeSession?.status === "active") {
+        const closedWindows = await windowDetectionService.checkForClosedWindows();
+        if (closedWindows.length > 0) {
+          logger.info(` Removed ${closedWindows.length} closed windows from watch list`);
+          // Broadcast update so watch pill reflects accurate count
+          this.broadcastSessionUpdate();
+        }
+      }
+    }, 10000);
+  }
+
+  /**
+   * Stop periodic window cleanup
+   */
+  private stopWindowCleanupLoop(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
   }
 
   /**
@@ -677,6 +721,9 @@ class MonitoringSessionService {
         app: screenshot.appName,
       });
 
+      // Get and reset interval evidence (activity metadata since last capture)
+      const intervalEvidence = activityTracker.reset();
+
       // Trigger async frame analysis (don't block capture loop)
       this.analyzeFrameAsync(
         this.activeSession.id,
@@ -692,7 +739,8 @@ class MonitoringSessionService {
           sequenceNumber: frameMetadata.sequenceNumber,
           captureTrigger: trigger,
           capturedAt: new Date(frameMetadata.timestamp).getTime(),
-        }
+        },
+        intervalEvidence
       );
     } catch (error) {
       logger.error(" Error saving capture:", error);
@@ -712,7 +760,8 @@ class MonitoringSessionService {
       sequenceNumber: number;
       captureTrigger: "periodic" | "focus_change" | "manual";
       capturedAt: number;
-    }
+    },
+    intervalEvidence?: IntervalEvidence
   ): Promise<void> {
     // Don't attempt analysis if no auth token
     if (!authManager.getAccessToken()) {
@@ -737,6 +786,8 @@ class MonitoringSessionService {
               captureTrigger: captureMetadata.captureTrigger,
               capturedAt: captureMetadata.capturedAt,
             }),
+            // Include interval evidence (activity metadata)
+            ...(intervalEvidence && { intervalEvidence }),
           }),
         }
       );

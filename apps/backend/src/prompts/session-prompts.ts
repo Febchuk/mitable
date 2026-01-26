@@ -47,10 +47,17 @@ Identify the literal changes between Frame A and Frame B. Be specific about WHAT
 </task>
 
 <output_rules>
-1. Focus on text additions, UI element shifts, and window focus changes.
-2. Ignore minor rendering artifacts or clock time changes.
-3. Be specific: "Added 'import React' to line 4" is better than "Edited code".
-4. If the screen is identical, report "No visual change".
+1. Read and transcribe visible text content verbatim - this includes names, message snippets, code, URLs, document titles, recipient names, etc.
+2. Use your visual intelligence to understand UI context:
+   - Distinguish input boxes (drafting) from sent messages/published content
+   - Recognize messaging interfaces, code editors, browsers, documents, etc.
+   - In chat/messaging interfaces: Header/title shows RECIPIENT, message bubbles show SENDER
+   - Example: LinkedIn chat with "Sarah Chen" in header + "John Doe" in message = John is messaging Sarah
+   - Identify recipient names from chat headers, window titles, or "To:" fields
+3. Be thorough and capture what the user is actually doing - don't use generic descriptions like "typed a message" when you can see "Drafting message to Sarah: 'Can we meet tomorrow?'"
+4. Ignore minor rendering artifacts or clock time changes.
+5. Be specific: "Added 'import React' to line 4" is better than "Edited code".
+6. If the screen is identical, report "No visual change".
 </output_rules>
 
 <output_format>
@@ -58,14 +65,17 @@ Return a JSON object:
 {
   "changed": boolean,
   "change_type": "text_input" | "scroll" | "window_switch" | "click" | "navigation" | "none",
-  "description": "Literal description of the visual change (max 15 words)"
+  "description": "Detailed literal description of the visual change (max 100 words)"
 }
 </output_format>
 
 <examples>
-- {"changed": true, "change_type": "text_input", "description": "Typed 'const user =' in editor"}
-- {"changed": true, "change_type": "window_switch", "description": "Switched focus to Chrome window 'Stack Overflow'"}
-- {"changed": true, "change_type": "scroll", "description": "Scrolled down in file 'auth.ts'"}
+- {"changed": true, "change_type": "text_input", "description": "Typed 'const user = await fetchUser()' in VS Code editor, line 42 of auth.ts"}
+- {"changed": true, "change_type": "text_input", "description": "Drafting message to Oluwaseun Obikoya in LinkedIn: 'Hey Olu, when will you be free to meet up and talk about the YC thing? sometime next week?'"}
+- {"changed": true, "change_type": "navigation", "description": "Navigated to ycombinator.com/jobs in Opera browser"}
+- {"changed": true, "change_type": "window_switch", "description": "Switched focus to Chrome window 'API Documentation - Stripe'"}
+- {"changed": true, "change_type": "scroll", "description": "Scrolled down in file 'auth.ts', now viewing lines 120-150"}
+- {"changed": true, "change_type": "text_input", "description": "Added paragraph to Google Doc 'Q1 Product Roadmap': 'We will prioritize authentication improvements...'"}
 </examples>`;
 
 export const SENSOR_USER_PROMPT = `Compare these two screenshots and report the visual delta.`;
@@ -93,12 +103,24 @@ Classify the "Current Delta" into a single, human-readable activity line that fi
 Connect the dots: If they were "Reading docs" and now are "Typing code", the activity is "Implementing [feature]".
 </task>
 
+<reasoning_process>
+Before classifying, THINK THROUGH:
+1. **Context Analysis:** What is the user actually doing based on the delta and history?
+2. **Pattern Recognition:** Does this continue the previous activity or start something new?
+3. **Precision Check:** What EXACTLY happened vs what might have happened?
+   - "Checking team messages" is NOT the same as "Joining a team meeting"
+   - "Scrolling through chat" is NOT the same as "Participating in meeting"
+4. **Evidence Verification:** Is there clear evidence in the delta for this classification?
+5. **Avoid Assumptions:** Only classify what you can clearly see in the delta.
+</reasoning_process>
+
 <output_rules>
 1. Be concise (max 10-12 words).
 2. Use active verbs (e.g., "Debugging", "Writing", "Researching").
 3. Avoid technical jargon unless relevant to the Persona.
 4. If the delta is trivial (scrolling/minor nav) but part of a larger task, describe the larger task (e.g., "Reviewing code").
 5. Do NOT hallucinate tasks not supported by the Delta or History.
+6. Be PRECISE: Distinguish between similar but different activities (checking messages vs joining meeting).
 </output_rules>
 
 <output_format>
@@ -122,7 +144,21 @@ export function buildClassifierUserPrompt(
     additionalContext?: string;
   },
   history: string[],
-  delta: string
+  delta: string,
+  windowInfo?: {
+    appName: string;
+    windowTitle: string;
+  },
+  previousDelta?: string,
+  timeElapsedSec?: number,
+  intervalEvidence?: {
+    keyboardEventCount: number;
+    copyCount: number;
+    pasteCount: number;
+    cutCount: number;
+    mouseClickCount: number;
+    mouseScrollCount: number;
+  }
 ): string {
   // Escape all user-provided persona fields to prevent prompt injection
   const safeJobTitle = escapePromptField(persona.jobTitle || "Knowledge Worker");
@@ -150,9 +186,54 @@ Context: ${safeContext}
   // Escape the current delta (from vision model output)
   const safeDelta = escapePromptField(delta, 300);
 
+  // Build app context (NEW: helps LLM reason about app types)
+  let appContext = "(Unknown application)";
+  if (windowInfo) {
+    const safeAppName = escapePromptField(windowInfo.appName, 100);
+    const safeWindowTitle = escapePromptField(windowInfo.windowTitle, 200);
+    appContext = `App: ${safeAppName}\nWindow: ${safeWindowTitle}`;
+  }
+
+  // Build evidence-based reasoning section
+  let evidenceContext = "";
+  if (intervalEvidence || previousDelta || timeElapsedSec !== undefined) {
+    evidenceContext = "\n\nACTIVITY EVIDENCE:";
+
+    if (previousDelta) {
+      const safePreviousDelta = escapePromptField(previousDelta, 200);
+      evidenceContext += `\nPrevious state: ${safePreviousDelta}`;
+    }
+
+    if (timeElapsedSec !== undefined) {
+      evidenceContext += `\nTime elapsed: ${timeElapsedSec}s`;
+    }
+
+    if (intervalEvidence) {
+      evidenceContext += `
+Keyboard events: ${intervalEvidence.keyboardEventCount}
+Copy commands: ${intervalEvidence.copyCount} (Ctrl+C)
+Paste commands: ${intervalEvidence.pasteCount} (Ctrl+V)
+Cut commands: ${intervalEvidence.cutCount} (Ctrl+X)
+Mouse clicks: ${intervalEvidence.mouseClickCount}
+Mouse scrolls: ${intervalEvidence.mouseScrollCount}
+
+REASONING RULES:
+- If pasteCount > 0: User pasted content (not authored)
+- If copyCount > 0 + pasteCount > 0: User copied and pasted
+- If cutCount > 0: User moved/removed content
+- If keyboardEventCount < 5 AND pasteCount = 0 AND content appears: User opened existing file
+- If keyboardEventCount > 50: User likely authored/edited content
+- If mouseScrollCount > 10 AND keyboardEventCount < 5: User reading/reviewing
+- Default to "viewing/reviewing" verbs unless evidence supports "editing/authoring"`;
+    }
+  }
+
   return `
 PERSONA:
 ${personaDesc}
+
+APPLICATION CONTEXT:
+${appContext}${evidenceContext}
 
 RECENT HISTORY:
 ${historyDesc}
@@ -160,7 +241,35 @@ ${historyDesc}
 CURRENT DELTA:
 ${safeDelta}
 
-Classify this activity:`;
+Before classifying, work through this analysis step-by-step:
+
+1. PREVIOUS STATE ANALYSIS: What was visible/happening in the previous capture?
+   - Review the "Previous state" or last history item
+   - What context does this provide?
+
+2. CURRENT STATE ANALYSIS: What changed between previous and current?
+   - What is now visible that wasn't before?
+   - What disappeared or changed?
+   - Was this a major change or minor adjustment?
+
+3. ACTIVITY EVIDENCE ANALYSIS: What do the event counts tell us?
+   - If keyboard events = 0 and paste = 0: User is VIEWING, not creating
+   - If paste > 0: User PASTED content (not authored)
+   - If keyboard events > 20: User is TYPING/AUTHORING
+   - If only clicks/scrolls: User is NAVIGATING/READING
+   - BE CONSERVATIVE: Absence of typing evidence means NO typing occurred
+
+4. TEMPORAL ANALYSIS: How much time elapsed?
+   - Short time (<15s) + major change = Navigation/opening
+   - Long time (>30s) + text visible = Likely reading/reviewing
+   - Consider if the time allows for the claimed action
+
+5. SEQUENTIAL LOGIC: Does the transition make sense?
+   - Previous: Chat visible → Current: Webpage open + clicks = 3 → Conclusion: Clicked link
+   - Previous: Empty editor → Current: Code visible + keyboard = 0 → Conclusion: Opened file
+   - Previous: Text selected → Current: Pasted elsewhere + paste = 1 → Conclusion: Copy-pasted
+
+Based on this analysis, classify with PRECISION. Output your final classification:`;
 }
 
 // ============================================================================

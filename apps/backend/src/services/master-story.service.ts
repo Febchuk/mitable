@@ -8,18 +8,17 @@
  * - Applies the "Materiality Filter" (summarizing 10 small actions into 1 meaningful update).
  * - Respects user formatting preferences (Verbose/Concise, Bullets/Paragraphs).
  *
- * Key changes from v1:
- * - Consumes `activityDescription` from `session_captures` (Classifier Output).
- * - Triggered ON DEMAND at session end (via `generateStory`), not incrementally.
+ * Key changes from v2 (RLM Architecture):
+ * - Uses Storyteller mini-RLM for recursive summarization
+ * - RLM handles chunking and merging for large timelines
+ * - Tool-based approach (no arbitrary code execution)
  */
 
-import Groq from "groq-sdk";
-import { config } from "../config";
 import { db } from "../db/client";
 import { sessionCaptures, sessionSummaries } from "../db/schema/index";
 import { eq, desc, and, isNotNull, asc } from "drizzle-orm";
-import { STORYTELLER_SYSTEM_PROMPT, buildStorytellerUserPrompt } from "../prompts/session-prompts";
 import { createSessionLogger, createTimer, CHECKPOINTS } from "../lib/sessionLogger";
+import { storytellerRLMService } from "./rlm/storyteller-rlm.service";
 
 export interface GenerateStoryOptions {
   sessionId: string;
@@ -32,20 +31,14 @@ export interface GenerateStoryOptions {
 }
 
 class MasterStoryService {
-  private groq: Groq;
-
-  constructor() {
-    this.groq = new Groq({ apiKey: config.groq.apiKey });
-  }
-
   /**
-   * Generate the Master Story from the Activity Timeline
+   * Generate the Master Story from the Activity Timeline using RLM
    */
   async generateStory(options: GenerateStoryOptions): Promise<string> {
     const log = createSessionLogger({ sessionId: options.sessionId });
     const timer = createTimer("MasterStory.generateStory");
 
-    log.info("Starting Master Story generation", { options });
+    log.info("Starting Master Story generation (RLM)", { options });
 
     try {
       // 1. Fetch Activity Timeline (Classifier Output) - already ordered chronologically by sequenceNumber
@@ -58,18 +51,31 @@ class MasterStoryService {
         columns: {
           activityDescription: true,
           capturedAt: true,
+          sequenceNumber: true,
+          classifierData: true, // Rich structured output from Classifier RLM
         },
       });
 
-      // Filter out nulls and map to format needed by prompt builder
+      // Filter out nulls and map to format needed by RLM
       const timeline = rawActivities
         .filter(
-          (a): a is { activityDescription: string; capturedAt: Date } =>
-            a.activityDescription !== null
+          (
+            a
+          ): a is {
+            activityDescription: string;
+            capturedAt: Date;
+            sequenceNumber: number;
+            classifierData: any;
+          } => a.activityDescription !== null
         )
         .map((a) => ({
           activityDescription: a.activityDescription!,
           capturedAt: a.capturedAt,
+          classifierData: a.classifierData
+            ? typeof a.classifierData === "string"
+              ? JSON.parse(a.classifierData)
+              : a.classifierData
+            : undefined,
         }));
 
       if (timeline.length === 0) {
@@ -77,48 +83,65 @@ class MasterStoryService {
         return "No activity recorded in this session.";
       }
 
-      // 2. Build adaptive prompt based on user preferences
-      const userPrompt = buildStorytellerUserPrompt(timeline, options.formatPreference);
+      // 2. Calculate session metadata
+      const sessionStart = timeline[0]?.capturedAt;
+      const sessionEnd = timeline[timeline.length - 1]?.capturedAt;
+      const durationMinutes =
+        sessionStart && sessionEnd
+          ? Math.round((sessionEnd.getTime() - sessionStart.getTime()) / (1000 * 60))
+          : 0;
 
-      log.debug("Generated prompt for story", {
+      const metadata = {
+        sessionId: options.sessionId,
+        totalActivities: timeline.length,
+        durationMinutes,
+        startTime: sessionStart || new Date(),
+        endTime: sessionEnd || new Date(),
+      };
+
+      log.debug("Invoking Storyteller RLM", {
         activityCount: timeline.length,
+        durationMinutes,
         style: options.formatPreference.style,
         format: options.formatPreference.format,
-        includeScreenshots: options.formatPreference.includeScreenshots,
       });
 
-      // 3. Call LLM (Llama 3 70b or 8b)
-      const completion = await this.groq.chat.completions.create({
-        messages: [
-          { role: "system", content: STORYTELLER_SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-        model: "llama-3.3-70b-versatile", // High capacity for summarization
-        temperature: 0.2,
-        max_tokens: options.formatPreference.style === "verbose" ? 2000 : 1000,
+      // 3. Use Storyteller RLM for recursive summarization
+      const rlmResult = await storytellerRLMService.generateSummary({
+        sessionId: options.sessionId,
+        timeline,
+        metadata,
+        preferences: options.formatPreference,
       });
 
-      const story = completion.choices[0]?.message?.content || "Failed to generate story.";
+      log.info("Storyteller RLM completed", {
+        toolCalls: rlmResult.toolCallCount,
+        recursionDepth: rlmResult.recursionDepth,
+        executionTimeMs: rlmResult.executionTimeMs,
+        summaryLength: rlmResult.summary.length,
+      });
 
       // 4. Save Summary to DB
       await db.insert(sessionSummaries).values({
         sessionId: options.sessionId,
-        version: 1, // Reset versioning for this new flow
-        summaryType: "master_story", // or 'final_summary'
-        narrativeSummary: story,
-        modelUsed: "llama-3.3-70b-versatile",
-        tokenCount: completion.usage?.total_tokens || 0,
+        version: 2, // v2 = RLM architecture
+        summaryType: "master_story", // Keep same type for UI compatibility
+        narrativeSummary: rlmResult.summary,
+        modelUsed: "openai/gpt-oss-120b",
+        tokenCount: 0, // RLM uses multiple calls, tracking separately
         generationTimeMs: timer.elapsed(),
       });
 
       log.checkpoint(CHECKPOINTS.SUMMARY_SAVE, {
-        length: story.length,
+        length: rlmResult.summary.length,
         durationMs: timer.elapsed(),
+        rlmToolCalls: rlmResult.toolCallCount,
+        rlmRecursionDepth: rlmResult.recursionDepth,
       });
 
-      return story;
+      return rlmResult.summary;
     } catch (error) {
-      log.error("Failed to generate master story", {
+      log.error("Failed to generate master story (RLM)", {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
