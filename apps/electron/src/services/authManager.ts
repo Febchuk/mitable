@@ -5,13 +5,22 @@
  * Used by services that need to make authenticated API calls.
  */
 
+import { app } from "electron";
+
+// Production API URL (Railway) - must match renderer config
+const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
+
 class AuthManager {
   private accessToken: string | null = null;
   private _refreshToken: string | null = null; // Stored for future refresh logic
   private apiBaseUrl: string;
 
   constructor() {
-    this.apiBaseUrl = process.env.VITE_API_URL || "http://localhost:3000";
+    // Use env var in development, hardcoded production URL in packaged app
+    // Note: VITE_* env vars are NOT available in main process at runtime
+    this.apiBaseUrl = app.isPackaged
+      ? PROD_API_URL
+      : (process.env.VITE_API_URL || "http://localhost:3000");
   }
 
   /**
