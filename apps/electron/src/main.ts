@@ -666,12 +666,22 @@ function setupIPC() {
   // Auth Management - Cross-window token sharing
   // Console sets tokens after login
   ipcMain.on(IPC_CHANNELS.AUTH_SET_TOKENS, (_event, accessToken: string, refreshToken: string) => {
-    authLogger.info(" Tokens set from Console window");
+    authLogger.info(" Tokens received from Console window", {
+      hasAccessToken: !!accessToken,
+      accessTokenLength: accessToken?.length || 0,
+      hasRefreshToken: !!refreshToken,
+    });
+
     authTokens.accessToken = accessToken;
     authTokens.refreshToken = refreshToken;
 
     // Update centralized auth manager (used by services like monitoringSessionService)
     authManager.setTokens(accessToken, refreshToken);
+
+    // Confirm token is now available in authManager
+    authLogger.info(" Auth manager token state after sync:", {
+      managerHasToken: !!authManager.getAccessToken(),
+    });
 
     // Broadcast token update to all windows
     const allWindows = [consoleWindow, watchingPillWindow];

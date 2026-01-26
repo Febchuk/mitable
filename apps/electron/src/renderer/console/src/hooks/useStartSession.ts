@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { monitoringKeys } from "@/console/src/hooks/queries/monitoring";
 import { createSession, startMonitoringSession } from "@/console/src/services/monitoringService";
+import { authService } from "@/console/src/services/authService";
 import { SESSION_DEFAULTS } from "@mitable/shared";
 import { createLogger } from "../../../../lib/logger";
 
@@ -78,6 +79,22 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
     setError(null);
 
     try {
+      // 0. Ensure auth tokens are synced to main process BEFORE starting session
+      // This is critical for frame analysis - the main process needs the token
+      // to call /analyze-frame API. Without this, frames are saved as "pending".
+      const accessToken = authService.getAccessToken();
+      const refreshToken = authService.getRefreshToken();
+
+      if (accessToken && window.consoleAPI?.setAuthTokens) {
+        logger.info("Syncing auth tokens to main process before session start");
+        window.consoleAPI.setAuthTokens(accessToken, refreshToken || "");
+        // Small delay to ensure IPC message is processed
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        logger.info("Auth token sync completed");
+      } else {
+        logger.warn("No access token available for main process sync");
+      }
+
       // 1. Create backend session
       const backendResult = await createSession({
         selectedWindows: [], // Focus tracker adds windows dynamically

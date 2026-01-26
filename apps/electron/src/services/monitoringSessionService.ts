@@ -91,6 +91,30 @@ class MonitoringSessionService {
       };
     }
 
+    // Wait for auth token with timeout (handles IPC sync delay from Console renderer)
+    // The Console window syncs tokens via IPC before calling this method,
+    // but we add a wait here to handle any race conditions
+    const maxWaitMs = 5000;
+    const pollIntervalMs = 100;
+    const startTime = Date.now();
+
+    logger.info("[MonitoringSessionService] Waiting for auth token...", {
+      hasTokenNow: !!authManager.getAccessToken(),
+    });
+
+    while (!authManager.getAccessToken() && Date.now() - startTime < maxWaitMs) {
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+
+    const waitedMs = Date.now() - startTime;
+    const hasToken = !!authManager.getAccessToken();
+
+    logger.info("[MonitoringSessionService] Auth wait completed", {
+      waitedMs,
+      hasToken,
+      timedOut: !hasToken && waitedMs >= maxWaitMs,
+    });
+
     // Require authentication before starting session (prevents 401 errors on analyze-frame)
     if (!authManager.getAccessToken()) {
       return {
