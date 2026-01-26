@@ -18,7 +18,7 @@ import { withRetry } from "../utils/retry";
 
 // Configuration
 const VISION_CONFIG = {
-  DEFAULT_MODEL: "gemini-3-flash", // Upgraded from 2.5-flash for better text/name reading accuracy
+  DEFAULT_MODEL: "gemini-3-flash-preview", // Upgraded from 2.5-flash for better text/name reading accuracy
   MAX_TOKENS: 1024,
   TEMPERATURE: 0.2, // Lower for more deterministic outputs
   RETRY_ATTEMPTS: 3,

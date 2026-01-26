@@ -43,6 +43,12 @@ class ActivityTracker {
     }
 
     console.log("[ActivityTracker] Stopping activity tracking");
+
+    // Remove event listeners to prevent memory leaks
+    uIOhook.off("keydown", this.handleKeyDown);
+    uIOhook.off("click", this.handleClick);
+    uIOhook.off("wheel", this.handleWheel);
+
     uIOhook.stop();
     this.isRunning = false;
   }
