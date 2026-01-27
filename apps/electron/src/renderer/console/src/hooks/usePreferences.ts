@@ -7,6 +7,7 @@ interface SessionPreferences {
   hidePillOnSessionEnd: boolean;
   dontAskHidePillAgain: boolean;
   showPillOnSessionStart: boolean;
+  enableBatchedClassifier: boolean;
 }
 
 interface Preferences {
@@ -56,5 +57,6 @@ export function usePreferences() {
     hidePillOnSessionEnd: preferences?.session.hidePillOnSessionEnd ?? false,
     dontAskHidePillAgain: preferences?.session.dontAskHidePillAgain ?? false,
     showPillOnSessionStart: preferences?.session.showPillOnSessionStart ?? true,
+    enableBatchedClassifier: preferences?.session.enableBatchedClassifier ?? true,
   };
 }

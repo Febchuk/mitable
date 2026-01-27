@@ -316,6 +316,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       hidePillOnSessionEnd: boolean;
       dontAskHidePillAgain: boolean;
       showPillOnSessionStart: boolean;
+      enableBatchedClassifier: boolean;
     };
   }> => ipcRenderer.invoke(IPC_CHANNELS.PREFERENCES_GET_ALL),
 

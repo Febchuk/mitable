@@ -99,6 +99,7 @@ export default function UserProfilePage() {
   const {
     showPillOnSessionStart,
     hidePillOnSessionEnd,
+    enableBatchedClassifier,
     isLoading: isPreferencesLoading,
     updatePreference,
   } = usePreferences();
@@ -1472,6 +1473,50 @@ export default function UserProfilePage() {
                               description: checked
                                 ? "Watching pill will be hidden when sessions end"
                                 : "Watching pill will remain visible when sessions end",
+                            });
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: "Failed to save preference",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        className="flex-shrink-0"
+                      />
+                    )}
+                  </div>
+
+                  {/* Enable Batched Classifier Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label
+                        htmlFor="batched-classifier-toggle-profile"
+                        className="text-sm font-medium text-text-primary cursor-pointer"
+                      >
+                        Use Batched Analysis (1-minute windows)
+                      </Label>
+                      <p className="text-xs text-text-tertiary">
+                        When enabled, screenshots are analyzed in 1-minute batches for better cost efficiency and reduced rate limiting. When disabled, uses 10-second interval analysis.
+                      </p>
+                      <p className="text-xs text-text-tertiary italic mt-1">
+                        Leave this on for increased activity timeline performance during sessions
+                      </p>
+                    </div>
+                    {isPreferencesLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                    ) : (
+                      <Switch
+                        id="batched-classifier-toggle-profile"
+                        checked={enableBatchedClassifier}
+                        onCheckedChange={async (checked) => {
+                          const result = await updatePreference("enableBatchedClassifier", checked);
+                          if (result.success) {
+                            toast({
+                              title: "Preference saved",
+                              description: checked
+                                ? "Using batched analysis (1-minute windows)"
+                                : "Using interval analysis (10-second intervals)",
                             });
                           } else {
                             toast({

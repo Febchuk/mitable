@@ -16,6 +16,7 @@ interface PreferencesSchema {
     hidePillOnSessionEnd: boolean;
     dontAskHidePillAgain: boolean;
     showPillOnSessionStart: boolean;
+    enableBatchedClassifier: boolean; // Use 1-minute batch analysis (default: true) vs 10-second interval analysis
   };
   // User-scoped preferences (keyed by userId)
   users: {
@@ -33,6 +34,7 @@ const defaults: PreferencesSchema = {
     hidePillOnSessionEnd: false,
     dontAskHidePillAgain: false,
     showPillOnSessionStart: true,
+    enableBatchedClassifier: true, // Default to batched classifier (1-minute windows)
   },
   users: {},
 };
@@ -55,6 +57,7 @@ class PreferencesService {
             hidePillOnSessionEnd: { type: "boolean" },
             dontAskHidePillAgain: { type: "boolean" },
             showPillOnSessionStart: { type: "boolean" },
+            enableBatchedClassifier: { type: "boolean" },
           },
         },
       },
@@ -90,6 +93,15 @@ class PreferencesService {
     logger.info(" showPillOnSessionStart set to:", value);
   }
 
+  getEnableBatchedClassifier(): boolean {
+    return this.store.get("session.enableBatchedClassifier", true) as boolean; // Default to true
+  }
+
+  setEnableBatchedClassifier(value: boolean): void {
+    this.store.set("session.enableBatchedClassifier", value);
+    logger.info(" enableBatchedClassifier set to:", value);
+  }
+
   // Generic get/set by key
   getPreference(key: string): boolean | null {
     switch (key) {
@@ -99,6 +111,8 @@ class PreferencesService {
         return this.getDontAskHidePillAgain();
       case "showPillOnSessionStart":
         return this.getShowPillOnSessionStart();
+      case "enableBatchedClassifier":
+        return this.getEnableBatchedClassifier();
       default:
         logger.warn(" Unknown preference key:", key);
         return null;
@@ -115,6 +129,9 @@ class PreferencesService {
         return { success: true };
       case "showPillOnSessionStart":
         this.setShowPillOnSessionStart(value);
+        return { success: true };
+      case "enableBatchedClassifier":
+        this.setEnableBatchedClassifier(value);
         return { success: true };
       default:
         logger.warn(" Unknown preference key:", key);
