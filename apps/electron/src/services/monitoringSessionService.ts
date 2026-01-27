@@ -697,12 +697,14 @@ class MonitoringSessionService {
       return;
     }
 
-    // Check if batched classifier is enabled
+    // Check if batched classifier is enabled (user preference)
     const useBatchMode = preferencesService.getEnableBatchedClassifier();
 
     if (useBatchMode) {
+      logger.debug("Using batch mode (60-second windows)");
       await this.captureForBatch(trigger);
     } else {
+      logger.debug("Using interval mode (10-second analysis)");
       await this.captureForInterval(trigger);
     }
   }

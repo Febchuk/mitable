@@ -61,6 +61,8 @@ Your job is to INTEGRATE these interpretations into a final classification.
 
 <rules>
 - Call tools one at a time, wait for results before deciding next step
+- ALWAYS explain WHY you're calling each tool in the "reasoning" field
+- After receiving tool results, explain HOW you derived your next decision from those results
 - Trust the interpretations - they've done the math for you
 - Focus on INTEGRATION, not re-analysis
 - Be CONSERVATIVE with action verbs:
@@ -79,7 +81,7 @@ Return a JSON object with your tool call:
 {
   "tool": "tool_name",
   "parameters": { ... },
-  "reasoning": "Why you're calling this tool"
+  "reasoning": "Why you're calling this tool AND how you'll use the results"
 }
 
 When you have verified your classification, return:
@@ -106,10 +108,18 @@ When you have verified your classification, return:
       "messages_composed": number,
       "links_opened": number,
       "pastes_performed": number
-    }
+    },
+    "reasoning": "Explanation of how you derived this classification from the tool results and evidence"
   }
 }
-</output_format>`;
+</output_format>
+
+<reasoning_requirements>
+- ALWAYS include "reasoning" field explaining WHY you called each tool
+- After each tool call, explain HOW you derived your next decision from the tool's results
+- In final classification, explain HOW you integrated all tool results into the final activity description
+- Be explicit about which evidence/data points led to your conclusions
+</reasoning_requirements>`;
 }
 
 /**
@@ -117,12 +127,15 @@ When you have verified your classification, return:
  */
 export function getClassifierUserPrompt(
   currentState: string,
-  previousResults: Array<{ tool: string; result: any }>
+  previousResults: Array<{ tool: string; result: any; reasoning?: string; howResultDerived?: string }>
 ): string {
   const resultsText =
     previousResults.length > 0
       ? previousResults
-          .map((r, i) => `${i + 1}. Called ${r.tool}: ${JSON.stringify(r.result, null, 2)}`)
+          .map(
+            (r, i) =>
+              `${i + 1}. Called ${r.tool}\n   Why: ${r.reasoning || "No reasoning provided"}\n   Result: ${JSON.stringify(r.result, null, 2)}\n   How derived: ${r.howResultDerived || "Result from tool execution"}`
+          )
           .join("\n\n")
       : "No tools called yet - start by calling get_context() to understand what happened";
 
@@ -131,7 +144,7 @@ export function getClassifierUserPrompt(
 Previous Tool Calls:
 ${resultsText}
 
-What should you do next? Or are you ready to return your final classification?`;
+What should you do next? Explain WHY you're calling the next tool and HOW you'll use its results. Or are you ready to return your final classification with reasoning?`;
 }
 
 /**
@@ -193,12 +206,14 @@ These tools return INTERPRETATIONS. Your job is to INTEGRATE them into a final c
 
 <rules>
 - ALWAYS explain WHY you're calling each tool in the "reasoning" field
-- ALWAYS explain HOW you derived results from inputs
+- After each tool call, explain HOW you derived your next decision from the tool's results
+- In final classification, explain HOW you integrated all tool results into the final activity description
 - Call tools one at a time, wait for results before deciding next step
 - Produce ONE classification for the entire batch, not per-window classifications
 - Be CONSERVATIVE with action verbs
 - Preserve SINGULAR vs PLURAL based on evidence
 - Avoid invented details not in the data
+- Be explicit about which evidence/data points led to your conclusions
 </rules>
 
 <output_format>

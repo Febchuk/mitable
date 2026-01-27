@@ -239,7 +239,10 @@ class ClassifierRLMService {
       }
 
       // Add reasoning and tool call history to result
-      finalClassification.reasoning = this.buildReasoningSummary(toolCallHistory);
+      // Prefer LLM's reasoning if provided, otherwise build summary from tool calls
+      if (!finalClassification.reasoning) {
+        finalClassification.reasoning = this.buildReasoningSummary(toolCallHistory);
+      }
       finalClassification.toolCallHistory = toolCallHistory;
 
       return finalClassification;
@@ -304,6 +307,7 @@ class ClassifierRLMService {
       },
       toolCallCount,
       executionTimeMs,
+      reasoning: classification.reasoning, // Include reasoning from LLM
     };
   }
 

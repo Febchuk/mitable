@@ -1142,6 +1142,8 @@ router.post(
                 pastes_performed: 0,
               },
               isContinuation: classifierResult.isContinuation,
+              reasoning: classifierResult.reasoning, // Explanation of how classification was derived
+              toolCallHistory: classifierResult.toolCallHistory || [], // Full tool call history with reasoning traces
             };
 
             log.debug("Activity classified", {
@@ -1491,7 +1493,8 @@ router.post(
               batchStartTime,
               batchEndTime,
               captureCount: captures.length,
-              reasoning: batchClassification.reasoning,
+              reasoning: batchClassification.reasoning, // Explanation of how classification was derived
+              toolCallHistory: batchClassification.toolCallHistory || [], // Full tool call history with reasoning traces
             }),
             deltaChanged: sensorResults.some((r) => r.deltaChanged),
             deltaChangeType: null, // Batch has multiple change types

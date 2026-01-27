@@ -47,6 +47,13 @@ export interface ClassifierResult {
     links_opened: number;
     pastes_performed: number;
   };
+  reasoning?: string; // Explanation of how classification was derived
+  toolCallHistory?: Array<{
+    tool: string;
+    result: any;
+    reasoning?: string;
+    howResultDerived?: string;
+  }>; // Full tool call history with reasoning traces
 }
 
 export interface BatchClassifierInput {
@@ -99,6 +106,12 @@ export interface BatchClassifierResult {
     pastes_performed: number;
   };
   reasoning?: string; // Explanation of how the classification was derived
+  toolCallHistory?: Array<{
+    tool: string;
+    result: any;
+    reasoning?: string;
+    howResultDerived?: string;
+  }>; // Full tool call history with reasoning traces
 }
 
 class ClassifierService {
@@ -198,6 +211,8 @@ class ClassifierService {
         events: rlmResult.events,
         entities: rlmResult.entities,
         metrics: rlmResult.metrics,
+        reasoning: rlmResult.reasoning, // Include reasoning explanation
+        toolCallHistory: rlmResult.toolCallHistory, // Include full tool call history
       };
 
       log.info("✅ Classifier RLM completed:", {
@@ -281,6 +296,7 @@ class ClassifierService {
           pastes_performed: 0,
         },
         reasoning: rlmResult.reasoning,
+        toolCallHistory: rlmResult.toolCallHistory, // Include full tool call history
       };
     } catch (error) {
       log.error("Batch classification failed", {
