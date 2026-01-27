@@ -35,6 +35,46 @@ export interface ClassifierContext {
   };
 }
 
+export interface BatchContext {
+  userId: string;
+  sessionId: string;
+  batchStartTime: number; // UNIX timestamp
+  batchEndTime: number; // UNIX timestamp
+  captures: Array<{
+    frameId: string;
+    windowInfo: {
+      windowSourceId: string;
+      appName: string;
+      windowTitle: string;
+    };
+    capturedAt: number; // UNIX timestamp
+    timestampISO: string; // ISO formatted timestamp
+    sequenceNumber: number;
+    hasPreviousFrame: boolean;
+    deltaDescription?: string; // Visual change description from sensor (after analysis)
+    deltaChanged?: boolean; // Whether visual change was detected
+  }>;
+  activityEvents: Array<{
+    type: "keyboard" | "copy" | "paste" | "cut" | "click" | "scroll";
+    timestampUnix: number;
+    timestampISO: string;
+  }>;
+  activityTimeline: Array<{
+    sequenceNumber: number;
+    capturedAt: Date;
+    activityDescription: string;
+    classifierData?: any;
+    windows: Array<{ appName: string; windowTitle: string }>;
+  }>;
+  userPersona?: {
+    jobTitle?: string;
+    regularTasks?: string[];
+    regularApps?: string[];
+    additionalContext?: string;
+  };
+  sessionGoal?: string;
+}
+
 /**
  * ClassifierEnvironment
  *
@@ -44,7 +84,7 @@ export interface ClassifierContext {
 export class ClassifierEnvironment {
   private cache = new Map<string, any>();
 
-  constructor(public readonly context: ClassifierContext) {}
+  constructor(public readonly context: ClassifierContext | BatchContext) {}
 
   /**
    * Cache intermediate results (e.g., evidence analysis)
@@ -62,23 +102,47 @@ export class ClassifierEnvironment {
   }
 
   /**
-   * Get all available context
+   * Check if this is a batch context
+   */
+  isBatchContext(): boolean {
+    return "batchStartTime" in this.context;
+  }
+
+  /**
+   * Get all available context (single frame mode)
    */
   getContext() {
+    if (this.isBatchContext()) {
+      throw new Error("getContext() called on batch context - use getBatchContext() instead");
+    }
+    const ctx = this.context as ClassifierContext;
     return {
-      currentDelta: this.context.currentDelta,
-      previousDeltas: this.context.previousDeltas || [],
-      recentHistory: this.context.recentHistory || [],
-      timeElapsed: this.context.timeElapsedSec,
-      windowInfo: this.context.windowInfo,
-      userPersona: this.context.userPersona,
+      currentDelta: ctx.currentDelta,
+      previousDeltas: ctx.previousDeltas || [],
+      recentHistory: ctx.recentHistory || [],
+      timeElapsed: ctx.timeElapsedSec,
+      windowInfo: ctx.windowInfo,
+      userPersona: ctx.userPersona,
     };
   }
 
   /**
-   * Get all evidence data
+   * Get batch context (batch mode)
+   */
+  getBatchContext() {
+    if (!this.isBatchContext()) {
+      throw new Error("getBatchContext() called on single frame context");
+    }
+    return this.context as BatchContext;
+  }
+
+  /**
+   * Get all evidence data (single frame mode)
    */
   getEvidence() {
-    return this.context.intervalEvidence;
+    if (this.isBatchContext()) {
+      return undefined;
+    }
+    return (this.context as ClassifierContext).intervalEvidence;
   }
 }
