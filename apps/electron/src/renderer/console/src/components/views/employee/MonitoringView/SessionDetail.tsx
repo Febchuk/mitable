@@ -47,7 +47,6 @@ import {
   ChevronDown,
   BookOpen,
   ChevronUp,
-  Image,
   Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -123,7 +122,6 @@ export default function SessionDetail() {
   const [emailInput, setEmailInput] = useState("");
   const [isLinearDialogOpen, setIsLinearDialogOpen] = useState(false);
   const [isStoryExpanded, setIsStoryExpanded] = useState(true);
-  const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
   const [gmailStatus, setGmailStatus] = useState<{
     connected: boolean;
     email: string | null;
@@ -872,95 +870,6 @@ export default function SessionDetail() {
 
       {/* Activity Timeline */}
       <ActivityTimeline sessionId={sessionId || ""} sessionStatus={session?.status} />
-
-      {/* Top-K Frames Gallery - Shows after session ends */}
-      {session.topKFrames && session.topKFrames.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Image size={18} className="text-primary" />
-            <h2 className="text-xl font-semibold text-text-primary">
-              Key Frames ({session.topKFrames.length})
-            </h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {session.topKFrames.map((frame: any) => (
-              <div
-                key={frame.id}
-                className="group relative bg-background-elevated rounded-lg border border-border-subtle overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => setSelectedFrame(frame.id)}
-              >
-                {frame.imageData ? (
-                  <img
-                    src={`data:image/png;base64,${frame.imageData}`}
-                    alt={frame.activityDescription || "Session capture"}
-                    className="w-full aspect-video object-cover"
-                  />
-                ) : (
-                  <div className="w-full aspect-video bg-background-tertiary flex items-center justify-center">
-                    <Camera size={24} className="text-text-tertiary" />
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-white text-xs line-clamp-2">
-                    {frame.activityDescription || frame.appName || "Captured frame"}
-                  </p>
-                  <p className="text-white/60 text-xs mt-1">
-                    {new Date(frame.capturedAt).toLocaleTimeString()}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Frame Preview Dialog */}
-      <Dialog open={!!selectedFrame} onOpenChange={() => setSelectedFrame(null)}>
-        <DialogContent className="bg-background-primary border-border-subtle max-w-4xl">
-          <DialogHeader>
-            <DialogTitle className="text-text-primary">Frame Preview</DialogTitle>
-          </DialogHeader>
-          {selectedFrame &&
-            (() => {
-              const frame = session.topKFrames?.find((f: any) => f.id === selectedFrame);
-              if (!frame) return null;
-              return (
-                <div className="space-y-4">
-                  {frame.imageData ? (
-                    <img
-                      src={`data:image/png;base64,${frame.imageData}`}
-                      alt={frame.activityDescription || "Session capture"}
-                      className="w-full rounded-lg"
-                    />
-                  ) : (
-                    <div className="w-full aspect-video bg-background-tertiary flex items-center justify-center rounded-lg">
-                      <Camera size={48} className="text-text-tertiary" />
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <p className="text-text-primary">
-                      {frame.activityDescription || "No description available"}
-                    </p>
-                    <div className="flex items-center gap-4 text-sm text-text-secondary">
-                      <span>{frame.appName || "Unknown app"}</span>
-                      <span>•</span>
-                      <span>{new Date(frame.capturedAt).toLocaleString()}</span>
-                      {frame.importanceScore && (
-                        <>
-                          <span>•</span>
-                          <Badge variant="secondary">
-                            Importance: {(frame.importanceScore * 100).toFixed(0)}%
-                          </Badge>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-        </DialogContent>
-      </Dialog>
 
       {/* Delivery Dialog */}
       <Dialog open={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen}>
