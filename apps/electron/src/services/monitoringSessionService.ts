@@ -29,9 +29,9 @@ import { focusWindowTracker } from "./focusWindowTracker";
 import {
   activityTracker,
   type IntervalEvidence,
-  type TimestampedActivityEvent,
 } from "./activityTracker";
 import { windowDetectionService } from "./windowDetectionService";
+import { preferencesService } from "./preferencesService";
 import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
 import type {
   SelectedWindowInfo,
@@ -53,6 +53,17 @@ interface SessionConfig {
   organizationId: string;
 }
 
+interface BatchedCapture {
+  frameId: string;
+  windowInfo: { windowSourceId: string; appName: string; windowTitle: string };
+  imageData: string; // Base64 image data
+  previousImage: string | null; // Base64 image data (null for first frame)
+  hasPreviousFrame: boolean;
+  sequenceNumber: number;
+  capturedAt: number; // UNIX timestamp
+  timestampISO: string; // ISO formatted timestamp
+}
+
 interface ActiveSession {
   id: string; // Session ID (from backend - ensures Electron and backend use same ID)
   config: SessionConfig;
@@ -62,6 +73,10 @@ interface ActiveSession {
   totalPausedMs: number;
   captureCount: number; // Track count from manifest
   lastCaptureHashByWindow: Map<string, string>; // Per-window deduplication
+  // Batch collection (only used when enableBatchedClassifier is true)
+  batchStartTime?: number; // When current batch started (UNIX timestamp)
+  batchedCaptures: BatchedCapture[]; // Accumulated screenshots for current batch
+  batchTimer?: NodeJS.Timeout; // Timer for 60-second batch window
 }
 
 // ===========================
@@ -179,6 +194,7 @@ class MonitoringSessionService {
         totalPausedMs: 0,
         captureCount: 0,
         lastCaptureHashByWindow: new Map(),
+        batchedCaptures: [], // Initialize batch collection array
       };
 
       // Start checkpoint tracking for crash recovery
@@ -229,6 +245,15 @@ class MonitoringSessionService {
    * Pause the active session
    */
   async pauseSession(): Promise<{ success: boolean; error?: string }> {
+    // Process any pending batch before pausing
+    if (this.activeSession?.batchTimer) {
+      clearTimeout(this.activeSession.batchTimer);
+      this.activeSession.batchTimer = undefined;
+      // Process batch immediately if there are captures
+      if (this.activeSession.batchedCaptures.length > 0) {
+        await this.processBatch();
+      }
+    }
     if (!this.activeSession) {
       return { success: false, error: "No active session" };
     }
@@ -340,6 +365,16 @@ class MonitoringSessionService {
 
     // Stop capture loop
     this.stopCaptureLoop();
+
+    // Process any pending batch before ending
+    if (this.activeSession.batchTimer) {
+      clearTimeout(this.activeSession.batchTimer);
+      this.activeSession.batchTimer = undefined;
+      // Process batch immediately if there are captures
+      if (this.activeSession.batchedCaptures.length > 0) {
+        await this.processBatch();
+      }
+    }
 
     // Stop focus window tracker
     focusWindowTracker.stop();
@@ -521,6 +556,7 @@ class MonitoringSessionService {
         totalPausedMs: checkpoint.totalPausedMs,
         captureCount: checkpoint.frameCount,
         lastCaptureHashByWindow: new Map(),
+        batchedCaptures: [], // Initialize batch collection array
       };
 
       // Resume capture loop if session was active
@@ -652,8 +688,30 @@ class MonitoringSessionService {
   /**
    * Capture screenshots of selected windows
    * Gets windows dynamically from focusWindowTracker
+   * Routes to batch or interval mode based on enableBatchedClassifier preference
    */
   private async captureSelectedWindows(
+    trigger: "periodic" | "focus_change" | "manual"
+  ): Promise<void> {
+    if (!this.activeSession || this.activeSession.status !== "active") {
+      return;
+    }
+
+    // Check if batched classifier is enabled
+    const useBatchMode = preferencesService.getEnableBatchedClassifier();
+
+    if (useBatchMode) {
+      await this.captureForBatch(trigger);
+    } else {
+      await this.captureForInterval(trigger);
+    }
+  }
+
+  /**
+   * Capture for interval mode (10-second analysis)
+   * Analyzes each screenshot immediately
+   */
+  private async captureForInterval(
     trigger: "periodic" | "focus_change" | "manual"
   ): Promise<void> {
     if (!this.activeSession || this.activeSession.status !== "active") {
@@ -678,7 +736,7 @@ class MonitoringSessionService {
         return;
       }
 
-      // Process each screenshot
+      // Process each screenshot (analyzes immediately)
       for (const screenshot of result.screenshots) {
         await this.processCapture(screenshot, trigger);
       }
@@ -687,6 +745,150 @@ class MonitoringSessionService {
       this.broadcastCaptureProgress();
     } catch (error) {
       logger.error(" Error capturing windows:", error);
+    }
+  }
+
+  /**
+   * Capture for batch mode (60-second windows)
+   * Accumulates screenshots for 60 seconds, then analyzes together
+   * 
+   * How accumulation works:
+   * - Called every 10 seconds (from capture loop)
+   * - Each call captures ALL tracked windows (1-N windows)
+   * - Screenshots are added to batchedCaptures array
+   * - After 60 seconds: ~6 capture cycles × N windows = total screenshots
+   * - Example: 2 windows tracked = ~12 screenshots per batch
+   */
+  private async captureForBatch(
+    trigger: "periodic" | "focus_change" | "manual"
+  ): Promise<void> {
+    if (!this.activeSession || this.activeSession.status !== "active") {
+      return;
+    }
+
+    // Get windows from focus tracker (dynamic list based on user focus)
+    const trackedWindowIds = focusWindowTracker.getTrackedWindowIds();
+
+    // If no windows are being tracked yet, skip this capture cycle
+    if (trackedWindowIds.length === 0) {
+      logger.info(" No windows tracked yet, skipping capture");
+      return;
+    }
+
+    try {
+      // Use existing capture service with dynamically tracked windows
+      const result = await captureService.captureVisibleWindows(false, trackedWindowIds);
+
+      if (!result.success) {
+        logger.warn(" Capture failed:", result.error);
+        return;
+      }
+
+      // Initialize batch if this is the first capture
+      if (!this.activeSession.batchStartTime) {
+        this.activeSession.batchStartTime = Date.now();
+        this.activeSession.batchedCaptures = [];
+        logger.info(" Started new batch collection window");
+      }
+
+      // Process each screenshot and add to batch (don't analyze yet)
+      for (const screenshot of result.screenshots) {
+        await this.processCaptureForBatch(screenshot, trigger);
+      }
+
+      // Broadcast capture progress
+      this.broadcastCaptureProgress();
+
+      // Start batch timer if not already started (60 seconds)
+      if (!this.activeSession.batchTimer) {
+        this.activeSession.batchTimer = setTimeout(() => {
+          this.processBatch();
+        }, 60000); // 60 seconds
+      }
+    } catch (error) {
+      logger.error(" Error capturing windows:", error);
+    }
+  }
+
+  /**
+   * Process a single capture for batch mode (deduplication, save to local storage, add to batch)
+   * Does NOT analyze immediately - waits for batch window to complete
+   */
+  private async processCaptureForBatch(
+    screenshot: { windowId: string; windowTitle: string; appName: string; dataUrl: string },
+    trigger: "periodic" | "focus_change" | "manual"
+  ): Promise<void> {
+    if (!this.activeSession) {
+      return;
+    }
+
+    // Generate hash for deduplication
+    const hash = this.hashScreenshot(screenshot.dataUrl);
+
+    // Check if duplicate for THIS specific window (not global)
+    const lastHashForWindow = this.activeSession.lastCaptureHashByWindow.get(screenshot.windowId);
+    const isDuplicate = hash === lastHashForWindow;
+
+    if (isDuplicate && trigger === "periodic") {
+      logger.info(
+        `[MonitoringSessionService] Skipping duplicate capture for window: ${screenshot.windowId}`
+      );
+      return;
+    }
+
+    // Update last hash for this window
+    this.activeSession.lastCaptureHashByWindow.set(screenshot.windowId, hash);
+
+    try {
+      // Extract base64 data and convert to buffer
+      const base64Data = screenshot.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+      const imageBuffer = Buffer.from(base64Data, "base64");
+
+      // Get previous frame for this window (for delta analysis)
+      const previousFrame = await localFrameStorage.getPreviousFrameForWindow(
+        this.activeSession.id,
+        screenshot.windowId
+      );
+      const hasPreviousFrame = previousFrame !== null;
+
+      // Save to local frame storage
+      const frameMetadata = await localFrameStorage.saveFrame(this.activeSession.id, imageBuffer, {
+        windowSourceId: screenshot.windowId,
+        appName: screenshot.appName,
+        windowTitle: screenshot.windowTitle,
+        trigger,
+      });
+
+      // Update capture count
+      this.activeSession.captureCount++;
+
+      // Update checkpoint
+      await checkpointService.onFrameCaptured(frameMetadata.frameId, frameMetadata.timestamp);
+
+      logger.info(` Capture saved for batch: ${frameMetadata.frameId}`, {
+        sequenceNumber: frameMetadata.sequenceNumber,
+        trigger,
+        app: screenshot.appName,
+      });
+
+      // Add to batch collection (don't analyze yet)
+      const capturedAt = Date.now();
+      this.activeSession.batchedCaptures.push({
+        frameId: frameMetadata.frameId,
+        windowInfo: {
+          windowSourceId: screenshot.windowId,
+          appName: screenshot.appName,
+          windowTitle: screenshot.windowTitle,
+        },
+        imageData: base64Data,
+        previousImage: previousFrame?.imageData || null,
+        hasPreviousFrame,
+        sequenceNumber: frameMetadata.sequenceNumber,
+        capturedAt,
+        timestampISO: new Date(capturedAt).toISOString(),
+      });
+    } catch (error) {
+      logger.error(" Error saving capture for batch:", error);
     }
   }
 
@@ -773,6 +975,110 @@ class MonitoringSessionService {
     } catch (error) {
       logger.error(" Error saving capture:", error);
     }
+  }
+
+  /**
+   * Process accumulated batch (60 seconds of screenshots)
+   * Sends all screenshots together to backend for batch analysis
+   */
+  private async processBatch(): Promise<void> {
+    if (!this.activeSession || this.activeSession.status !== "active") {
+      return;
+    }
+
+    const batch = this.activeSession.batchedCaptures;
+    if (batch.length === 0) {
+      logger.info(" Batch window completed but no captures to analyze");
+      // Reset batch state and start new batch window
+      this.resetBatchState();
+      return;
+    }
+
+    logger.info(` Processing batch: ${batch.length} captures over 60 seconds`);
+
+    // Get timestamped activity events for this batch window
+    const activityEvents = activityTracker.getAndResetTimestampedEvents();
+
+    // Don't attempt analysis if no auth token
+    if (!authManager.getAccessToken()) {
+      logger.info(" Skipping batch analysis - no auth token");
+      this.resetBatchState();
+      return;
+    }
+
+    try {
+      // Call backend analyze-batch endpoint (to be created in Phase 5)
+      const response = await authManager.authenticatedFetch(
+        `/api/monitoring/sessions/${this.activeSession.id}/analyze-batch`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            batchStartTime: this.activeSession.batchStartTime,
+            batchEndTime: Date.now(),
+            captures: batch.map((capture) => ({
+              frameId: capture.frameId,
+              windowInfo: capture.windowInfo,
+              currentImage: capture.imageData,
+              previousImage: capture.previousImage,
+              hasPreviousFrame: capture.hasPreviousFrame,
+              sequenceNumber: capture.sequenceNumber,
+              capturedAt: capture.capturedAt,
+              timestampISO: capture.timestampISO,
+            })),
+            activityEvents: activityEvents.map((event) => ({
+              type: event.type,
+              timestampUnix: event.timestampUnix,
+              timestampISO: event.timestampISO,
+            })),
+            sessionGoal: this.activeSession.config.sessionGoal,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.warn(` Batch analysis failed: ${response.status}`, errorText);
+        this.resetBatchState();
+        return;
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.classification) {
+        logger.info(" Batch analysis completed", {
+          classification: result.classification.activityDescription,
+          confidence: result.classification.confidence,
+        });
+
+        // Update frame metadata with batch classification results
+        // (to be implemented in Phase 9)
+      }
+
+      // Reset batch state and start new batch window
+      this.resetBatchState();
+    } catch (error) {
+      logger.error(" Error processing batch:", error);
+      this.resetBatchState();
+    }
+  }
+
+  /**
+   * Reset batch collection state and start new batch window
+   */
+  private resetBatchState(): void {
+    if (!this.activeSession) {
+      return;
+    }
+
+    // Clear batch timer if exists
+    if (this.activeSession.batchTimer) {
+      clearTimeout(this.activeSession.batchTimer);
+      this.activeSession.batchTimer = undefined;
+    }
+
+    // Reset batch collection
+    this.activeSession.batchStartTime = Date.now();
+    this.activeSession.batchedCaptures = [];
   }
 
   /**
