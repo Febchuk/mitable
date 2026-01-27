@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eq, sql, desc, and, inArray } from "drizzle-orm";
+import { eq, sql, desc, and, inArray, asc, isNotNull } from "drizzle-orm";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -1285,6 +1285,260 @@ router.post(
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to analyze frame",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/monitoring/sessions/:id/analyze-batch
+ * Analyze a batch of screenshots (60-second window)
+ * Runs parallel sensor analysis, then returns SINGLE classification for the batch
+ */
+router.post(
+  "/sessions/:id/analyze-batch",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const {
+      batchStartTime,
+      batchEndTime,
+      captures,
+      activityEvents,
+      sessionGoal,
+    }: {
+      batchStartTime: number; // UNIX timestamp
+      batchEndTime: number; // UNIX timestamp
+      captures: Array<{
+        frameId: string;
+        windowInfo: {
+          windowSourceId: string;
+          appName: string;
+          windowTitle: string;
+        };
+        currentImage: string; // Base64 image data
+        previousImage: string | null; // Base64 image data (null for first frame)
+        hasPreviousFrame: boolean;
+        sequenceNumber: number;
+        capturedAt: number; // UNIX timestamp
+        timestampISO: string; // ISO formatted timestamp
+      }>;
+      activityEvents: Array<{
+        type: "keyboard" | "copy" | "paste" | "cut" | "click" | "scroll";
+        timestampUnix: number;
+        timestampISO: string;
+      }>;
+      sessionGoal?: string;
+    } = req.body;
+
+    if (!batchStartTime || !batchEndTime || !captures || captures.length === 0) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "batchStartTime, batchEndTime, and captures array are required",
+      });
+      return;
+    }
+
+    const log = createSessionLogger({ sessionId: id, userId });
+
+    try {
+      // Verify session exists and user has access
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+
+      log.info("Analyzing batch", {
+        batchStartTime,
+        batchEndTime,
+        captureCount: captures.length,
+        activityEventCount: activityEvents.length,
+      });
+
+      // Step 1: Parallel sensor analysis for each capture
+      const sensorPromises = captures.map(async (capture) => {
+        if (!capture.hasPreviousFrame) {
+          return {
+            frameId: capture.frameId,
+            deltaDescription: "First frame for this window",
+            deltaChanged: false,
+            changeType: "none" as const,
+          };
+        }
+
+        const analysisResult = await frameAnalysisService.analyzeFrame({
+          sessionId: id,
+          frameId: capture.frameId,
+          currentFrame: capture.currentImage,
+          previousFrame: capture.previousImage,
+          windowInfo: capture.windowInfo,
+          timestamp: capture.timestampISO,
+        });
+
+        return {
+          frameId: capture.frameId,
+          deltaDescription: analysisResult.changeDescription || "No change detected",
+          deltaChanged: analysisResult.deltaChanged,
+          changeType: analysisResult.changeType || "none",
+        };
+      });
+
+      const sensorResults = await Promise.all(sensorPromises);
+
+      // Step 2: Fetch activity timeline (all previous classifications)
+      const timelineCaptures = await db.query.sessionCaptures.findMany({
+        where: and(
+          eq(schema.sessionCaptures.sessionId, id),
+          isNotNull(schema.sessionCaptures.activityDescription)
+        ),
+        orderBy: [asc(schema.sessionCaptures.capturedAt)],
+        columns: {
+          sequenceNumber: true,
+          capturedAt: true,
+          activityDescription: true,
+          classifierData: true,
+          appName: true,
+          windowTitle: true,
+        },
+      });
+
+      const activityTimeline = timelineCaptures.map((capture) => ({
+        sequenceNumber: capture.sequenceNumber,
+        capturedAt: capture.capturedAt,
+        activityDescription: capture.activityDescription || "",
+        classifierData: capture.classifierData
+          ? typeof capture.classifierData === "string"
+            ? JSON.parse(capture.classifierData)
+            : capture.classifierData
+          : null,
+        windows: [
+          {
+            appName: capture.appName || "Unknown",
+            windowTitle: capture.windowTitle || "Unknown",
+          },
+        ],
+      }));
+
+      // Step 3: Classify batch (returns SINGLE classification)
+      // This will be implemented in Phase 6 - for now return placeholder
+      const batchClassification = await classifierService.classifyBatch({
+        userId,
+        sessionId: id,
+        batchStartTime,
+        batchEndTime,
+        captures: captures.map((capture, index) => ({
+          ...capture,
+          deltaDescription: sensorResults[index]?.deltaDescription,
+          deltaChanged: sensorResults[index]?.deltaChanged ?? false,
+        })),
+        activityEvents,
+        activityTimeline,
+        sessionGoal,
+      });
+
+      if (!batchClassification) {
+        res.status(500).json({
+          error: "Internal Server Error",
+          message: "Failed to classify batch",
+        });
+        return;
+      }
+
+      // Step 4: Store classification in database
+      // Create a single capture record representing the batch
+      // Use the earliest sequence number and timestamp from the batch
+      const earliestCapture = captures.reduce((earliest, current) =>
+        current.sequenceNumber < earliest.sequenceNumber ? current : earliest
+      );
+
+      try {
+        const [batchCapture] = await db
+          .insert(schema.sessionCaptures)
+          .values({
+            sessionId: id,
+            sequenceNumber: earliestCapture.sequenceNumber,
+            captureTrigger: "periodic", // Batch is always periodic
+            capturedAt: new Date(earliestCapture.capturedAt),
+            windowId: null, // Batch spans multiple windows
+            appName: null, // Batch spans multiple apps
+            windowTitle: null, // Batch spans multiple windows
+            analysisStatus: "analyzed",
+            activityDescription: batchClassification.activity,
+            confidence: String(batchClassification.confidence),
+            classifierData: JSON.stringify({
+              actionType: batchClassification.actionType,
+              events: batchClassification.events || [],
+              entities: batchClassification.entities || { people: [], systems: [] },
+              metrics: batchClassification.metrics || {
+                messages_composed: 0,
+                links_opened: 0,
+                pastes_performed: 0,
+              },
+              isContinuation: batchClassification.isContinuation,
+              batchMode: true,
+              batchStartTime,
+              batchEndTime,
+              captureCount: captures.length,
+              reasoning: batchClassification.reasoning,
+            }),
+            deltaChanged: sensorResults.some((r) => r.deltaChanged),
+            deltaChangeType: null, // Batch has multiple change types
+            deltaChangeDescription: batchClassification.activity,
+            importanceScore: batchClassification.confidence, // Use confidence as importance
+          })
+          .returning({ id: schema.sessionCaptures.id });
+
+        log.info("Batch classification stored", {
+          captureId: batchCapture.id,
+          activity: batchClassification.activity,
+          confidence: batchClassification.confidence,
+        });
+
+        res.json({
+          success: true,
+          classification: {
+            activity: batchClassification.activity,
+            confidence: batchClassification.confidence,
+            actionType: batchClassification.actionType,
+            captureId: batchCapture.id,
+            reasoning: batchClassification.reasoning,
+          },
+        });
+      } catch (error) {
+        log.error("Failed to store batch classification", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Still return the classification even if DB storage fails
+        res.json({
+          success: true,
+          classification: {
+            activity: batchClassification.activity,
+            confidence: batchClassification.confidence,
+            actionType: batchClassification.actionType,
+            reasoning: batchClassification.reasoning,
+          },
+        });
+      }
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error analyzing batch"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to analyze batch",
       });
     }
   }

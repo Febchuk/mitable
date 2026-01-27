@@ -49,6 +49,58 @@ export interface ClassifierResult {
   };
 }
 
+export interface BatchClassifierInput {
+  userId: string;
+  sessionId: string;
+  batchStartTime: number;
+  batchEndTime: number;
+  captures: Array<{
+    frameId: string;
+    windowInfo: {
+      windowSourceId: string;
+      appName: string;
+      windowTitle: string;
+    };
+    capturedAt: number;
+    timestampISO: string;
+    sequenceNumber: number;
+    hasPreviousFrame: boolean;
+    deltaDescription?: string;
+    deltaChanged?: boolean;
+  }>;
+  activityEvents: Array<{
+    type: "keyboard" | "copy" | "paste" | "cut" | "click" | "scroll";
+    timestampUnix: number;
+    timestampISO: string;
+  }>;
+  activityTimeline: Array<{
+    sequenceNumber: number;
+    capturedAt: Date;
+    activityDescription: string;
+    classifierData?: any;
+    windows: Array<{ appName: string; windowTitle: string }>;
+  }>;
+  sessionGoal?: string;
+}
+
+export interface BatchClassifierResult {
+  activity: string;
+  confidence: number;
+  isContinuation: boolean;
+  actionType: "VIEWING" | "NAVIGATION" | "PASTING" | "AUTHORING" | "EDITING";
+  events?: ClassifierEvent[];
+  entities?: {
+    people: string[];
+    systems: string[];
+  };
+  metrics?: {
+    messages_composed: number;
+    links_opened: number;
+    pastes_performed: number;
+  };
+  reasoning?: string; // Explanation of how the classification was derived
+}
+
 class ClassifierService {
   /**
    * Classify the current delta into a meaningful activity
@@ -169,6 +221,72 @@ class ClassifierService {
         confidence: 0.1,
         isContinuation: false,
       };
+    }
+  }
+
+  /**
+   * Classify a batch of screenshots (60-second window)
+   * Returns SINGLE classification for the entire batch
+   * To be implemented in Phase 6 with RLM service
+   */
+  async classifyBatch(input: BatchClassifierInput): Promise<BatchClassifierResult | null> {
+    const log = createSessionLogger({ sessionId: input.sessionId });
+
+    try {
+      // Fetch User Persona
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, input.userId),
+        columns: {
+          jobTitle: true,
+          regularTasks: true,
+          regularApps: true,
+          additionalContext: true,
+        },
+      });
+
+      if (!user) {
+        log.warn("User not found for batch classification", { userId: input.userId });
+        return null;
+      }
+
+      // Call Classifier RLM with batch context
+      const rlmResult = await classifierRLMService.classifyBatch({
+        userId: input.userId,
+        sessionId: input.sessionId,
+        batchStartTime: input.batchStartTime,
+        batchEndTime: input.batchEndTime,
+        captures: input.captures,
+        activityEvents: input.activityEvents,
+        activityTimeline: input.activityTimeline,
+        userPersona: {
+          jobTitle: user.jobTitle || undefined,
+          regularTasks: (user.regularTasks as string[]) || undefined,
+          regularApps: (user.regularApps as string[]) || undefined,
+          additionalContext: user.additionalContext || undefined,
+        },
+        sessionGoal: input.sessionGoal,
+      });
+
+      // Map RLM result to BatchClassifierResult format
+      return {
+        activity: rlmResult.activity,
+        confidence: rlmResult.confidence,
+        isContinuation: rlmResult.is_continuation,
+        actionType: rlmResult.action_type,
+        events: rlmResult.events || [],
+        entities: rlmResult.entities || { people: [], systems: [] },
+        metrics: rlmResult.metrics || {
+          messages_composed: 0,
+          links_opened: 0,
+          pastes_performed: 0,
+        },
+        reasoning: rlmResult.reasoning,
+      };
+    } catch (error) {
+      log.error("Batch classification failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
     }
   }
 }
