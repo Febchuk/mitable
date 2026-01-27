@@ -26,7 +26,11 @@ import { localFrameStorage, type FrameMetadata } from "./localFrameStorage";
 import { checkpointService } from "./checkpointService";
 import { authManager } from "./authManager";
 import { focusWindowTracker } from "./focusWindowTracker";
-import { activityTracker, type IntervalEvidence } from "./activityTracker";
+import {
+  activityTracker,
+  type IntervalEvidence,
+  type TimestampedActivityEvent,
+} from "./activityTracker";
 import { windowDetectionService } from "./windowDetectionService";
 import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
 import type {
