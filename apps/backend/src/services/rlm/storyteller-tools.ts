@@ -30,10 +30,84 @@ export interface RLMTool {
  */
 export const GET_TIMELINE_STATS: RLMTool = {
   name: "get_timeline_stats",
-  description: "Get metadata about the activity timeline (count, duration, date range)",
+  description: "Get metadata about the timeline (count, duration, date range)",
   parameters: [],
   execute: (_params, env: StorytellerEnvironment) => {
     return env.getStats();
+  },
+};
+
+/**
+ * Tool: Get Sustained Work
+ * Groups activities by app/artifact and identifies sustained work (5+ captures)
+ * These MUST be included in the summary regardless of position in session
+ */
+export const GET_SUSTAINED_WORK: RLMTool = {
+  name: "get_sustained_work",
+  description: "Get work clusters with 5+ captures. Sustained work MUST be included in summary.",
+  parameters: [],
+  execute: (_params, env: StorytellerEnvironment) => {
+    const log = createSessionLogger({ sessionId: env.metadata.sessionId });
+
+    if (env.timeline.length === 0) {
+      return { sustainedWork: [], message: "No timeline data" };
+    }
+
+    // Group activities by app (simple grouping)
+    const workGroups = new Map<string, any[]>();
+
+    for (const activity of env.timeline) {
+      if (
+        !activity.activityDescription ||
+        activity.activityDescription === "Analysis inconclusive"
+      ) {
+        continue;
+      }
+
+      const classifierData: any = activity.classifierData || {};
+      const app = classifierData.app || classifierData.system || "Unknown";
+
+      if (!workGroups.has(app)) {
+        workGroups.set(app, []);
+      }
+
+      workGroups.get(app)!.push({
+        time: activity.capturedAt.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        description: activity.activityDescription,
+        actionType: classifierData.actionType,
+      });
+    }
+
+    // Filter for sustained work (5+ captures)
+    const sustainedWork = Array.from(workGroups.entries())
+      .filter(([_app, activities]) => activities.length >= 5)
+      .map(([app, activities]) => ({
+        app,
+        captureCount: activities.length,
+        firstCapture: activities[0].time,
+        lastCapture: activities[activities.length - 1].time,
+        sampleActivities: activities.slice(0, 3).map((a) => a.description),
+        mustInclude: true,
+      }))
+      .sort((a, b) => b.captureCount - a.captureCount);
+
+    log.debug("Identified sustained work", {
+      totalGroups: workGroups.size,
+      sustainedCount: sustainedWork.length,
+      threshold: 5,
+    });
+
+    return {
+      sustainedWork,
+      count: sustainedWork.length,
+      message:
+        sustainedWork.length > 0
+          ? `Found ${sustainedWork.length} sustained work clusters (5+ captures each) - ALL must be included in summary`
+          : "No sustained work clusters found (need 5+ captures per app/task)",
+    };
   },
 };
 
@@ -196,7 +270,7 @@ export const SUMMARIZE_CHUNK: RLMTool = {
       })
       .join("\n");
 
-    const prompt = `Summarize these activities concisely (2-4 sentences max). Focus on outcomes and meaningful work.
+    const prompt = `Summarize these activities concisely (2-4 sentences max). Focus on what was accomplished.
 
 Activities:
 ${activitiesText}
@@ -212,11 +286,11 @@ Summary:`;
           {
             role: "system",
             content:
-              "You are a concise work summarizer. Before summarizing, analyze the activities to identify patterns, outcomes, and meaningful progress. Think through what the user actually accomplished and filter out noise.",
+              "You are a concise work summarizer. Analyze the activities to identify patterns and outcomes. Summarize what the user accomplished without filtering or judging importance.",
           },
           {
             role: "user",
-            content: `${prompt}\n\nFirst, analyze these activities and identify: (1) actual outcomes and completions, (2) collaboration and communication, (3) research and learning. Then write a concise summary focusing on meaningful work.`,
+            content: `${prompt}\n\nAnalyze these activities and identify: (1) outcomes and completions, (2) collaboration and communication, (3) research and administrative tasks. Write a concise summary of all work performed.`,
           },
         ],
         model: "openai/gpt-oss-120b",
@@ -243,6 +317,192 @@ Summary:`;
       });
       throw error;
     }
+  },
+};
+
+/**
+ * Tool: Polish Summary
+ * Final cleanup pass - no new claims, just formatting and clarity
+ */
+export const POLISH_SUMMARY: RLMTool = {
+  name: "polish_summary",
+  description:
+    "Polish the final summary for clarity and formatting. Automatically chunks large summaries. DO NOT add new information.",
+  parameters: [
+    {
+      name: "draftSummary",
+      type: "string",
+      description: "The draft summary to polish",
+      required: true,
+    },
+  ],
+  execute: async (params, env: StorytellerEnvironment) => {
+    const { draftSummary } = params;
+    const log = createSessionLogger({ sessionId: env.metadata.sessionId });
+
+    const styleGuidance =
+      env.preferences.style === "concise"
+        ? "Keep it concise and tight."
+        : "Maintain detail and context.";
+
+    const formatGuidance =
+      env.preferences.format === "bullets"
+        ? "Format as clean bullet points."
+        : "Format as connected paragraphs.";
+
+    const groq = new Groq({ apiKey: config.groq.apiKey });
+
+    // Split large summaries into chunks (by paragraph or bullet point)
+    const CHUNK_SIZE = 1000; // chars per chunk
+
+    if (draftSummary.length <= CHUNK_SIZE) {
+      // Small summary - polish in one call
+      const prompt = `Polish this work summary for clarity and formatting. DO NOT add new information or claims.
+
+${styleGuidance}
+${formatGuidance}
+
+Draft Summary:
+${draftSummary}
+
+Instructions:
+- Fix any grammar or clarity issues
+- Ensure consistent formatting
+- Remove redundancy
+- DO NOT invent new work items
+- DO NOT add people or systems not mentioned in the draft
+- Write in first person
+
+Polished Summary:`;
+
+      try {
+        const completion = await groq.chat.completions.create({
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a copy editor. Polish the summary for clarity and formatting. DO NOT add new information. Only improve what's already there.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          model: "openai/gpt-oss-120b",
+          temperature: 0.1,
+          max_tokens: env.preferences.style === "verbose" ? 1500 : 800,
+        });
+
+        const polished = completion.choices[0]?.message?.content || draftSummary;
+
+        log.debug("Polished summary (single pass)", {
+          originalLength: draftSummary.length,
+          polishedLength: polished.length,
+        });
+
+        return polished;
+      } catch (error) {
+        log.error("Failed to polish summary", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return draftSummary;
+      }
+    }
+
+    // Large summary - split into chunks
+    log.debug("Summary too large, chunking for polish", {
+      length: draftSummary.length,
+      chunkSize: CHUNK_SIZE,
+    });
+
+    // Split by paragraphs or bullet points
+    const separator = env.preferences.format === "bullets" ? /\n[-•]\s*/g : /\n\n+/g;
+    const segments = draftSummary.split(separator).filter((s: string) => s.trim().length > 0);
+
+    // Group segments into chunks
+    const chunks: string[] = [];
+    let currentChunk = "";
+
+    for (const segment of segments) {
+      if ((currentChunk + segment).length > CHUNK_SIZE && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = segment;
+      } else {
+        currentChunk += (currentChunk.length > 0 ? "\n\n" : "") + segment;
+      }
+    }
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+    }
+
+    log.debug("Split summary into chunks", { chunkCount: chunks.length });
+
+    // Polish each chunk
+    const polishedChunks: string[] = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const prompt = `Polish this section of a work summary for clarity and formatting. DO NOT add new information.
+
+${styleGuidance}
+${formatGuidance}
+
+Section ${i + 1} of ${chunks.length}:
+${chunk}
+
+Instructions:
+- Fix any grammar or clarity issues
+- Ensure consistent formatting
+- Remove redundancy
+- DO NOT invent new work items
+- DO NOT add people or systems not mentioned
+- Write in first person
+
+Polished Section:`;
+
+      try {
+        const completion = await groq.chat.completions.create({
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a copy editor. Polish the summary section for clarity and formatting. DO NOT add new information. Only improve what's already there.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          model: "openai/gpt-oss-120b",
+          temperature: 0.1,
+          max_tokens: 600,
+        });
+
+        const polished = completion.choices[0]?.message?.content || chunk;
+        polishedChunks.push(polished);
+
+        log.debug(`Polished chunk ${i + 1}/${chunks.length}`, {
+          originalLength: chunk.length,
+          polishedLength: polished.length,
+        });
+      } catch (error) {
+        log.error(`Failed to polish chunk ${i + 1}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        polishedChunks.push(chunk); // Keep original chunk on error
+      }
+    }
+
+    // Reassemble
+    const finalSummary = polishedChunks.join("\n\n");
+
+    log.debug("Reassembled polished summary", {
+      originalLength: draftSummary.length,
+      polishedLength: finalSummary.length,
+      chunkCount: chunks.length,
+    });
+
+    return finalSummary;
   },
 };
 
@@ -338,11 +598,12 @@ Final Summary:`;
  */
 export const STORYTELLER_TOOLS: RLMTool[] = [
   GET_TIMELINE_STATS,
+  GET_SUSTAINED_WORK,
   GET_ACTIVITIES,
   CHUNK_TIMELINE,
-  FILTER_BY_PRIORITY,
   SUMMARIZE_CHUNK,
   MERGE_SUMMARIES,
+  POLISH_SUMMARY,
 ];
 
 /**

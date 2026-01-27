@@ -48,16 +48,21 @@ Identify the literal changes between Frame A and Frame B. Be specific about WHAT
 
 <output_rules>
 1. Read and transcribe visible text content verbatim - this includes names, message snippets, code, URLs, document titles, recipient names, etc.
-2. Use your visual intelligence to understand UI context:
+2. Extract content/topic when visible:
+   - Messages/Emails: Include brief description of what the message is about based on visible text
+   - Code: Include brief description of the function/code block based on visible code
+   - Documents: Include subject/topic from visible titles or content
+   - Don't infer intent - just describe what's literally visible on screen
+3. Use your visual intelligence to identify UI context:
    - Distinguish input boxes (drafting) from sent messages/published content
    - Recognize messaging interfaces, code editors, browsers, documents, etc.
    - In chat/messaging interfaces: Header/title shows RECIPIENT, message bubbles show SENDER
-   - Example: LinkedIn chat with "Sarah Chen" in header + "John Doe" in message = John is messaging Sarah
+   - Example: LinkedIn chat with "Sarah Chen" in header = user is messaging Sarah
    - Identify recipient names from chat headers, window titles, or "To:" fields
-3. Be thorough and capture what the user is actually doing - don't use generic descriptions like "typed a message" when you can see "Drafting message to Sarah: 'Can we meet tomorrow?'"
-4. Ignore minor rendering artifacts or clock time changes.
-5. Be specific: "Added 'import React' to line 4" is better than "Edited code".
-6. If the screen is identical, report "No visual change".
+4. Be thorough and capture visible content - don't use generic descriptions like "typed a message" when you can see "Drafting message to Mark about database access permissions"
+5. Ignore minor rendering artifacts or clock time changes.
+6. Be specific with code: "Added function getUserById() that queries the database" is better than "Edited code".
+7. If the screen is identical, report "No visual change".
 </output_rules>
 
 <output_format>
@@ -70,12 +75,13 @@ Return a JSON object:
 </output_format>
 
 <examples>
-- {"changed": true, "change_type": "text_input", "description": "Typed 'const user = await fetchUser()' in VS Code editor, line 42 of auth.ts"}
-- {"changed": true, "change_type": "text_input", "description": "Drafting message to Oluwaseun Obikoya in LinkedIn: 'Hey Olu, when will you be free to meet up and talk about the YC thing? sometime next week?'"}
+- {"changed": true, "change_type": "text_input", "description": "Typed function getUserById() that queries the database by user ID in VS Code editor, line 42 of auth.ts"}
+- {"changed": true, "change_type": "text_input", "description": "Drafting message to Mark Cupp in Teams about database access permissions: 'Can you grant me access to the production DB?'"}
+- {"changed": true, "change_type": "text_input", "description": "Drafting email to Wendy about meeting schedule: 'Are you available Tuesday at 2pm?'"}
 - {"changed": true, "change_type": "navigation", "description": "Navigated to ycombinator.com/jobs in Opera browser"}
 - {"changed": true, "change_type": "window_switch", "description": "Switched focus to Chrome window 'API Documentation - Stripe'"}
 - {"changed": true, "change_type": "scroll", "description": "Scrolled down in file 'auth.ts', now viewing lines 120-150"}
-- {"changed": true, "change_type": "text_input", "description": "Added paragraph to Google Doc 'Q1 Product Roadmap': 'We will prioritize authentication improvements...'"}
+- {"changed": true, "change_type": "text_input", "description": "Added paragraph to Google Doc 'Q1 Product Roadmap' about prioritizing authentication improvements and security features"}
 </examples>`;
 
 export const SENSOR_USER_PROMPT = `Compare these two screenshots and report the visual delta.`;
@@ -115,12 +121,17 @@ Before classifying, THINK THROUGH:
 </reasoning_process>
 
 <output_rules>
-1. Be concise (max 10-12 words).
-2. Use active verbs (e.g., "Debugging", "Writing", "Researching").
-3. Avoid technical jargon unless relevant to the Persona.
-4. If the delta is trivial (scrolling/minor nav) but part of a larger task, describe the larger task (e.g., "Reviewing code").
-5. Do NOT hallucinate tasks not supported by the Delta or History.
-6. Be PRECISE: Distinguish between similar but different activities (checking messages vs joining meeting).
+1. Preserve important context from the delta - especially topics, purposes, or content:
+   - If delta mentions message topic: "asked Mark about database access"
+   - If delta mentions code function: "wrote getUserById() function that queries database"
+   - If delta mentions email subject: "drafted email about meeting schedule"
+   - Don't reduce to generic verbs when specific context is available
+2. Keep it readable but include the "what" and "about what" (max 15-20 words when context matters).
+3. Use active verbs (e.g., "Debugging", "Writing", "Researching").
+4. Avoid technical jargon unless relevant to the Persona.
+5. If the delta is trivial (scrolling/minor nav) but part of a larger task, describe the larger task (e.g., "Reviewing code").
+6. Do NOT hallucinate tasks not supported by the Delta or History.
+7. Be PRECISE: Distinguish between similar but different activities (checking messages vs joining meeting).
 </output_rules>
 
 <output_format>

@@ -45,11 +45,32 @@ export interface UserPreferences {
   includeScreenshots: boolean;
 }
 
+export interface ActivityCluster {
+  id: number;
+  artifactKey: string;
+  timeSpan: {
+    start: number;
+    end: number;
+    startTime: Date;
+    endTime: Date;
+  };
+  captureCount: number;
+  gist: string;
+  importance: number;
+  mustMention: boolean;
+  actionTypes: string[];
+  entities: {
+    people: string[];
+    systems: string[];
+  };
+  activities: Activity[];
+}
+
 /**
  * StorytellerEnvironment
  *
  * Represents the data environment for the Storyteller RLM.
- * Tools operate on this environment to chunk, filter, and summarize the timeline.
+ * Tools operate on this environment to analyze and summarize the timeline.
  */
 export class StorytellerEnvironment {
   private cache = new Map<string, any>();

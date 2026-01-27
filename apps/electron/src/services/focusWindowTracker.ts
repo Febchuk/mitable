@@ -240,6 +240,11 @@ class FocusWindowTracker {
       const appName = activeWindow.owner?.name ?? "";
       const windowTitle = activeWindow.title ?? "";
 
+      // Log all detected windows for debugging (especially for RDP/Citrix)
+      logger.info(
+        ` Detected active window: ID=${windowId}, App="${appName}", Title="${windowTitle}"`
+      );
+
       // Skip if same window as last check
       if (windowId === this.lastActiveWindowId) {
         return;
@@ -247,8 +252,18 @@ class FocusWindowTracker {
 
       this.lastActiveWindowId = windowId;
 
-      // Skip windows with no title
-      if (!windowTitle || windowTitle.trim() === "") {
+      // Check if it's a remote desktop app (Citrix, RDP, etc.)
+      const isRemoteDesktopApp =
+        appName.toLowerCase().includes("citrix") ||
+        appName.toLowerCase().includes("hdx") ||
+        appName.toLowerCase().includes("wfica") ||
+        appName.toLowerCase().includes("remote desktop") ||
+        appName.toLowerCase().includes("mstsc") ||
+        windowTitle.toLowerCase().includes("remote desktop");
+
+      // Skip windows with no title UNLESS it's a remote desktop app
+      if ((!windowTitle || windowTitle.trim() === "") && !isRemoteDesktopApp) {
+        logger.info(` Skipping window with empty title: ${appName}`);
         return;
       }
 

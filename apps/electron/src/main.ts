@@ -1472,7 +1472,7 @@ function setupMonitoringSessionHandlers() {
         const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
         const API_BASE_URL = app.isPackaged
           ? PROD_API_URL
-          : (process.env.VITE_API_URL || "http://localhost:3000");
+          : process.env.VITE_API_URL || "http://localhost:3000";
 
         // Step 1: Upload captures to backend
         if (captures.length > 0) {

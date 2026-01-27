@@ -148,7 +148,15 @@ class StorytellerRLMService {
       const parsed = JSON.parse(content) as LLMResponse;
       return parsed;
     } catch (e) {
-      throw new Error(`Failed to parse LLM response: ${content}`);
+      // If JSON parsing fails, try to extract summary from malformed response
+      const summaryMatch = content.match(/"summary":\s*"([^"]+)"/);
+      if (summaryMatch) {
+        return {
+          done: true,
+          summary: summaryMatch[1].replace(/\\n/g, "\n"),
+        };
+      }
+      throw new Error(`Failed to parse LLM response: ${content.substring(0, 500)}...`);
     }
   }
 

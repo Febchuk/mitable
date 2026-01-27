@@ -106,7 +106,7 @@ class MasterStoryService {
         format: options.formatPreference.format,
       });
 
-      // 3. Use Storyteller RLM for recursive summarization
+      // 3. Use Storyteller RLM for summarization (LLM does clustering)
       const rlmResult = await storytellerRLMService.generateSummary({
         sessionId: options.sessionId,
         timeline,
