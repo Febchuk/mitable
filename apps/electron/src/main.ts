@@ -1647,6 +1647,29 @@ function setupMonitoringSessionHandlers() {
     return appsWithOriginalNames;
   });
 
+  // Get all blockable apps (detected + installed)
+  ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_GET_ALL_APPS, async (_, forceRefresh?: boolean) => {
+    try {
+      const allApps = await windowDetectionService.getAllBlockableApps(forceRefresh ?? false);
+      return { success: true, apps: allApps };
+    } catch (error) {
+      ipcLogger.error("Error getting all blockable apps:", error);
+      return { success: false, apps: [], error: (error as Error).message };
+    }
+  });
+
+  // Refresh installed apps cache
+  ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_REFRESH_INSTALLED_APPS, async () => {
+    try {
+      await windowDetectionService.refreshInstalledApps();
+      const allApps = await windowDetectionService.getAllBlockableApps(false);
+      return { success: true, apps: allApps };
+    } catch (error) {
+      ipcLogger.error("Error refreshing installed apps:", error);
+      return { success: false, apps: [], error: (error as Error).message };
+    }
+  });
+
   // Notification frequency IPC handlers (user-scoped)
   ipcMain.handle(IPC_CHANNELS.NOTIFICATION_FREQUENCY_GET, (_, userId: string) => {
     return preferencesService.getUserNotificationFrequency(userId);

@@ -19,6 +19,18 @@ import { desktopCapturer } from "electron";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
 import { isBrowserApp, parseBrowserTitle, isSystemApp } from "../utils/browserTitleParser";
 import { createLogger } from "../lib/logger";
+import { installedAppsService } from "./installedAppsService";
+
+/**
+ * Represents an app that can be added to the block list
+ */
+export interface BlockableApp {
+  normalizedName: string; // Lowercase key for matching
+  originalName: string; // Display name
+  source: "detected" | "installed" | "both"; // How the app was discovered
+  bundleId?: string; // macOS bundle identifier (if from installed apps)
+  path?: string; // Install path (if from installed apps)
+}
 
 const logger = createLogger("WindowDetection");
 // Dynamic import for get-windows (ESM-only package) - see getAllVisibleWindows()
@@ -467,6 +479,82 @@ class WindowDetectionService {
    */
   getOriginalAppName(normalizedAppName: string): string | undefined {
     return this.detectedApps.get(normalizedAppName.toLowerCase());
+  }
+
+  /**
+   * Get all blockable apps (merged from detected and installed)
+   * Priority: detected app names take precedence (more accurate from runtime)
+   *
+   * @param forceRefresh - Force a fresh scan of installed apps
+   * @returns Array of blockable apps sorted alphabetically
+   */
+  async getAllBlockableApps(forceRefresh = false): Promise<BlockableApp[]> {
+    const mergedApps = new Map<string, BlockableApp>();
+
+    // 1. Start with detected apps (runtime detected, most accurate names)
+    for (const [normalized, original] of this.detectedApps) {
+      mergedApps.set(normalized, {
+        normalizedName: normalized,
+        originalName: original,
+        source: "detected",
+      });
+    }
+
+    // 2. Merge installed apps
+    try {
+      const installedApps = await installedAppsService.getInstalledApps(forceRefresh);
+
+      for (const app of installedApps) {
+        const existing = mergedApps.get(app.normalizedName);
+
+        if (existing) {
+          // App exists in both - mark as "both" and keep detected name (more accurate)
+          existing.source = "both";
+          // Add additional info from installed apps
+          if (app.bundleId) existing.bundleId = app.bundleId;
+          if (app.path) existing.path = app.path;
+        } else {
+          // Only in installed apps
+          mergedApps.set(app.normalizedName, {
+            normalizedName: app.normalizedName,
+            originalName: app.name,
+            source: "installed",
+            bundleId: app.bundleId,
+            path: app.path,
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn("Error getting installed apps, using detected apps only:", error);
+    }
+
+    // 3. Filter out apps that shouldn't be blockable
+    const filteredApps = Array.from(mergedApps.values()).filter((app) => {
+      const normalized = app.normalizedName.toLowerCase();
+      // Exclude Mitable itself
+      if (normalized === "mitable" || normalized === "electron") {
+        return false;
+      }
+      // Exclude system apps
+      if (isSystemApp(app.originalName)) {
+        return false;
+      }
+      return true;
+    });
+
+    // 4. Sort alphabetically by display name
+    return filteredApps.sort((a, b) =>
+      a.originalName.toLowerCase().localeCompare(b.originalName.toLowerCase())
+    );
+  }
+
+  /**
+   * Refresh the installed apps cache
+   * Call this when user clicks "Refresh App List" button
+   */
+  async refreshInstalledApps(): Promise<void> {
+    await installedAppsService.refreshCache();
+    logger.info("Installed apps cache refreshed");
   }
 
   /**

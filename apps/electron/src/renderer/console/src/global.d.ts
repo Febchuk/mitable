@@ -133,6 +133,24 @@ interface ConsoleAPI {
   addBlockedApp: (userId: string, appName: string) => Promise<{ success: boolean }>;
   removeBlockedApp: (userId: string, appName: string) => Promise<{ success: boolean }>;
   getDetectedApps: () => Promise<Array<{ normalizedName: string; originalName: string }>>;
+  getAllBlockableApps: (forceRefresh?: boolean) => Promise<{
+    success: boolean;
+    apps: Array<{
+      normalizedName: string;
+      originalName: string;
+      source: "detected" | "installed" | "both";
+    }>;
+    error?: string;
+  }>;
+  refreshInstalledApps: () => Promise<{
+    success: boolean;
+    apps: Array<{
+      normalizedName: string;
+      originalName: string;
+      source: "detected" | "installed" | "both";
+    }>;
+    error?: string;
+  }>;
 
   // Notification frequency API (user-scoped)
   getNotificationFrequency: (userId: string) => Promise<number>;

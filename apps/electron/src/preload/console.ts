@@ -53,6 +53,8 @@ const IPC_CHANNELS = {
   BLOCK_LIST_ADD: "block-list-add",
   BLOCK_LIST_REMOVE: "block-list-remove",
   BLOCK_LIST_GET_DETECTED_APPS: "block-list-get-detected-apps",
+  BLOCK_LIST_GET_ALL_APPS: "block-list-get-all-apps",
+  BLOCK_LIST_REFRESH_INSTALLED_APPS: "block-list-refresh-installed-apps",
   NOTIFICATION_FREQUENCY_GET: "notification-frequency-get",
   NOTIFICATION_FREQUENCY_SET: "notification-frequency-set",
   AUTO_SESSION_START_GET: "auto-session-start-get",
@@ -344,6 +346,30 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   getDetectedApps: (): Promise<Array<{ normalizedName: string; originalName: string }>> =>
     ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_GET_DETECTED_APPS),
+
+  // Get all blockable apps (detected + installed)
+  getAllBlockableApps: (
+    forceRefresh?: boolean
+  ): Promise<{
+    success: boolean;
+    apps: Array<{
+      normalizedName: string;
+      originalName: string;
+      source: "detected" | "installed" | "both";
+    }>;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_GET_ALL_APPS, forceRefresh),
+
+  // Refresh installed apps cache
+  refreshInstalledApps: (): Promise<{
+    success: boolean;
+    apps: Array<{
+      normalizedName: string;
+      originalName: string;
+      source: "detected" | "installed" | "both";
+    }>;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_REFRESH_INSTALLED_APPS),
 
   // Notification frequency API (user-scoped)
   getNotificationFrequency: (userId: string): Promise<number> =>

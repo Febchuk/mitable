@@ -74,6 +74,8 @@ export const IPC_CHANNELS = {
   BLOCK_LIST_ADD: "block-list-add",
   BLOCK_LIST_REMOVE: "block-list-remove",
   BLOCK_LIST_GET_DETECTED_APPS: "block-list-get-detected-apps",
+  BLOCK_LIST_GET_ALL_APPS: "block-list-get-all-apps",
+  BLOCK_LIST_REFRESH_INSTALLED_APPS: "block-list-refresh-installed-apps",
   NOTIFICATION_FREQUENCY_GET: "notification-frequency-get",
   NOTIFICATION_FREQUENCY_SET: "notification-frequency-set",
   AUTO_SESSION_START_GET: "auto-session-start-get",
