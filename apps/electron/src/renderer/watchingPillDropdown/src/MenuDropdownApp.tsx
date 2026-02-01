@@ -21,13 +21,24 @@ export default function MenuDropdownApp() {
       return;
     }
 
-    const unsubscribe = window.dropdownAPI.onData((data) => {
+    // Initial data when dropdown is shown
+    const unsubscribeData = window.dropdownAPI.onData((data) => {
       if (data.type === "menu") {
+        logger.info(" Received initial menu data:", data.sessionState);
         setSessionState(data.sessionState);
       }
     });
 
-    return unsubscribe;
+    // Listen for session state updates (when session starts/stops/pauses while dropdown is open)
+    const unsubscribeSession = window.dropdownAPI.onSessionUpdate((state) => {
+      logger.info(" Session update received:", state);
+      setSessionState(state);
+    });
+
+    return () => {
+      unsubscribeData();
+      unsubscribeSession();
+    };
   }, []);
 
   const handleAction = async (actionType: string) => {

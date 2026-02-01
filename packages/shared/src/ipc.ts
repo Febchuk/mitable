@@ -79,6 +79,18 @@ export const IPC_CHANNELS = {
   AUTO_SESSION_START_GET: "auto-session-start-get",
   AUTO_SESSION_START_SET: "auto-session-start-set",
 
+  // Summary preferences
+  SUMMARY_PREFERENCES_GET: "summary-preferences-get",
+  SUMMARY_PREFERENCES_SET: "summary-preferences-set",
+  SUMMARY_DEFAULTS_GET: "summary-defaults-get",
+  SUMMARY_DEFAULTS_SET: "summary-defaults-set",
+  ALWAYS_ASK_ON_SESSION_END_GET: "always-ask-on-session-end-get",
+  ALWAYS_ASK_ON_SESSION_END_SET: "always-ask-on-session-end-set",
+
+  // End session dialog coordination (pill → console)
+  SHOW_END_SESSION_DIALOG: "show-end-session-dialog", // Main → Console: trigger dialog
+  END_SESSION_WITH_PREFERENCES: "end-session-with-preferences", // Console → Main: end with prefs
+
   // Custom Notifications (Granola-style prompts)
   NOTIFICATION_SHOW: "notification-show", // Show notification with config
   NOTIFICATION_HIDE: "notification-hide", // Hide/dismiss notification

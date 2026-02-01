@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createLogger } from "../../../../../../lib/logger";
 
 const logger = createLogger("SessionDetail");
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   useSession,
   useSessionSummary,
@@ -92,6 +92,7 @@ function formatDateTime(dateString: string | null): string {
 export default function SessionDetail() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -135,9 +136,22 @@ export default function SessionDetail() {
   // End Session Dialog State
   const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const [isExternallyTriggered, setIsExternallyTriggered] = useState(false); // Track if triggered from pill
 
   // Preferences for hide pill on session end
   const { hidePillOnSessionEnd, dontAskHidePillAgain, updatePreference } = usePreferences();
+
+  // Check for URL param to open end dialog (triggered from pill via App.tsx navigation)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get("openEndDialog") === "true") {
+      logger.info("End session dialog triggered via URL param from pill");
+      setIsExternallyTriggered(true);
+      setIsEndDialogOpen(true);
+      // Clean up URL param (replace to avoid back button issues)
+      navigate(`/monitoring/${sessionId}`, { replace: true });
+    }
+  }, [location.search, sessionId, navigate]);
 
   // Listen for session updates from watch pill (e.g., pause/resume)
   useEffect(() => {
@@ -404,32 +418,59 @@ export default function SessionDetail() {
 
     setIsEnding(true);
     try {
-      // 1. Stop Electron capture
-      const electronResult = await window.consoleAPI.endMonitoringSession();
+      // Map style to detailLevel for API
+      const apiPreferences = {
+        detailLevel: preferences.style as "verbose" | "concise",
+        format: preferences.format,
+        includeScreenshots: preferences.includeScreenshots,
+      };
 
-      // If Electron session is already ended (e.g., from pill), that's OK
-      if (electronResult.error && electronResult.error !== "No active session") {
-        throw new Error(electronResult.error);
+      if (isExternallyTriggered) {
+        // Triggered from pill - use the unified IPC call that handles everything
+        // (Electron session end + upload + backend summary)
+        logger.info("Ending session via pill trigger (using endSessionWithPreferences)");
+        const result = await window.consoleAPI.endSessionWithPreferences(apiPreferences);
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to end session");
+        }
+
+        // Invalidate React Query caches to refresh UI (pill flow bypasses mutation's onSuccess)
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+        logger.info("Invalidated session queries after external end");
+      } else {
+        // Triggered from Console - use the original flow
+        // 1. Stop Electron capture
+        const electronResult = await window.consoleAPI.endMonitoringSession();
+
+        // If Electron session is already ended (e.g., from pill), that's OK
+        if (electronResult.error && electronResult.error !== "No active session") {
+          throw new Error(electronResult.error);
+        }
+
+        // 2. Upload captures if any
+        if (electronResult.captures && electronResult.captures.length > 0) {
+          await uploadCaptures(sessionId, electronResult.captures);
+        }
+
+        // 3. Trigger backend end + summary generation with preferences
+        await endSessionMutation.mutateAsync({
+          sessionId,
+          preferences, // Pass preferences to backend
+        });
       }
-
-      // 2. Upload captures if any
-      if (electronResult.captures && electronResult.captures.length > 0) {
-        await uploadCaptures(sessionId, electronResult.captures);
-      }
-
-      // 3. Trigger backend end + summary generation with preferences
-      await endSessionMutation.mutateAsync({
-        sessionId,
-        preferences, // Pass preferences to backend
-      });
 
       setIsEndDialogOpen(false);
+      setIsExternallyTriggered(false); // Reset for next time
 
-      // Handle pill hiding logic
-      if (hidePillOnSessionEnd || dontAskHidePillAgain) {
-        window.consoleAPI.hidePill();
-      } else {
-        setShowSessionEndToast(true);
+      // Handle pill hiding logic (only for non-externally triggered - pill handles its own hiding)
+      if (!isExternallyTriggered) {
+        if (hidePillOnSessionEnd || dontAskHidePillAgain) {
+          window.consoleAPI.hidePill();
+        } else {
+          setShowSessionEndToast(true);
+        }
       }
 
       toast({
@@ -1141,7 +1182,13 @@ export default function SessionDetail() {
       {/* End Session Dialog */}
       <EndSessionDialog
         open={isEndDialogOpen}
-        onOpenChange={setIsEndDialogOpen}
+        onOpenChange={(open) => {
+          setIsEndDialogOpen(open);
+          if (!open) {
+            // Reset external trigger flag when dialog closes
+            setIsExternallyTriggered(false);
+          }
+        }}
         onConfirm={handleConfirmEndSession}
         isProcessing={isEnding}
       />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Loader2 } from "lucide-react";
 import type { SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
 import { createLogger } from "../../lib/logger";
 
@@ -8,6 +8,7 @@ const logger = createLogger("EyeDropdownApp");
 export default function EyeDropdownApp() {
   const [selectedWindows, setSelectedWindows] = useState<SelectedWindowInfo[]>([]);
   const [availableWindows, setAvailableWindows] = useState<WatchableWindow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Listen for data from main process
   useEffect(() => {
@@ -21,6 +22,7 @@ export default function EyeDropdownApp() {
       if (data.type === "eye") {
         setSelectedWindows(data.selectedWindows);
         setAvailableWindows(data.availableWindows);
+        setIsLoading(data.isLoading ?? false);
       }
     });
 
@@ -109,7 +111,12 @@ export default function EyeDropdownApp() {
       {/* Available windows to add */}
       <div className="text-[10px] text-white/50 px-3 py-1">Add Window</div>
       <div className="max-h-[180px] overflow-y-auto custom-scrollbar">
-        {unselectedWindows.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center gap-2 px-3 py-3 text-xs text-white/50">
+            <Loader2 size={14} className="animate-spin" />
+            <span>Loading windows...</span>
+          </div>
+        ) : unselectedWindows.length === 0 ? (
           <div className="px-3 py-2 text-xs text-white/30">
             {availableWindows.length === 0 ? "No windows available" : "All windows added"}
           </div>

@@ -58,3 +58,103 @@ export function usePreferences() {
     showPillOnSessionStart: preferences?.session.showPillOnSessionStart ?? true,
   };
 }
+
+// Summary preferences types
+export interface SummaryPreferences {
+  detailLevel: "concise" | "verbose";
+  format: "bullets" | "paragraphs";
+  includeScreenshots: boolean;
+  alwaysAskOnSessionEnd: boolean;
+}
+
+/**
+ * Hook for managing summary/session end preferences
+ */
+export function useSummaryPreferences() {
+  const [summaryPrefs, setSummaryPrefs] = useState<SummaryPreferences | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load summary preferences on mount
+  useEffect(() => {
+    const loadSummaryPreferences = async () => {
+      try {
+        const prefs = await window.consoleAPI.getSummaryPreferences();
+        setSummaryPrefs(prefs);
+      } catch (error) {
+        logger.error(" Failed to load summary preferences:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSummaryPreferences();
+  }, []);
+
+  // Update summary preferences
+  const updateSummaryPreferences = useCallback(
+    async (prefs: Partial<SummaryPreferences>) => {
+      try {
+        const result = await window.consoleAPI.setSummaryPreferences(prefs);
+        if (result.success) {
+          // Reload preferences after update
+          const updated = await window.consoleAPI.getSummaryPreferences();
+          setSummaryPrefs(updated);
+        }
+        return result;
+      } catch (error) {
+        logger.error(" Failed to update summary preferences:", error);
+        return { success: false, error: String(error) };
+      }
+    },
+    []
+  );
+
+  // Update just the "always ask" preference
+  const setAlwaysAsk = useCallback(async (value: boolean) => {
+    try {
+      const result = await window.consoleAPI.setAlwaysAskOnSessionEnd(value);
+      if (result.success) {
+        const updated = await window.consoleAPI.getSummaryPreferences();
+        setSummaryPrefs(updated);
+      }
+      return result;
+    } catch (error) {
+      logger.error(" Failed to update always ask preference:", error);
+      return { success: false, error: String(error) };
+    }
+  }, []);
+
+  // Update default values (detail level, format, include screenshots)
+  const updateDefaults = useCallback(
+    async (defaults: {
+      detailLevel?: "concise" | "verbose";
+      format?: "bullets" | "paragraphs";
+      includeScreenshots?: boolean;
+    }) => {
+      try {
+        const result = await window.consoleAPI.setSummaryDefaults(defaults);
+        if (result.success) {
+          const updated = await window.consoleAPI.getSummaryPreferences();
+          setSummaryPrefs(updated);
+        }
+        return result;
+      } catch (error) {
+        logger.error(" Failed to update summary defaults:", error);
+        return { success: false, error: String(error) };
+      }
+    },
+    []
+  );
+
+  return {
+    summaryPrefs,
+    isLoading,
+    updateSummaryPreferences,
+    setAlwaysAsk,
+    updateDefaults,
+    // Convenience getters
+    detailLevel: summaryPrefs?.detailLevel ?? "concise",
+    format: summaryPrefs?.format ?? "bullets",
+    includeScreenshots: summaryPrefs?.includeScreenshots ?? true,
+    alwaysAskOnSessionEnd: summaryPrefs?.alwaysAskOnSessionEnd ?? true,
+  };
+}

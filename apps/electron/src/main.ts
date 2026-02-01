@@ -1,4 +1,4 @@
-import type { MultiWindowCaptureResult, SelectedWindowInfo } from "@mitable/shared";
+import type { MultiWindowCaptureResult, SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
 import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
 import {
   app,
@@ -774,18 +774,41 @@ function setupIPC() {
         height: 280,
       });
 
-      // Get current window data and send to dropdown
+      // Get selected windows synchronously (fast) and show dropdown immediately with loading state
       const selectedWindows = windowDetectionService.getSelectedWindows();
-      const availableWindows = await windowDetectionService.getAllVisibleWindows();
 
+      // Send initial data with loading state - dropdown appears immediately
       watchingPillEyeDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
         type: "eye",
         selectedWindows,
-        availableWindows,
+        availableWindows: [],
+        isLoading: true,
       });
 
+      // Show dropdown immediately - no waiting for window list
       watchingPillEyeDropdown.show();
       watchingPillEyeDropdown.focus();
+
+      // Fetch available windows asynchronously, then update dropdown
+      // Wrap getAllVisibleWindows in try-catch since get-windows can fail
+      // (e.g., permission issues, binary not found)
+      let availableWindows: WatchableWindow[] = [];
+      try {
+        availableWindows = await windowDetectionService.getAllVisibleWindows();
+      } catch (error) {
+        watchingPillLogger.error(" Failed to get visible windows:", error);
+        // Continue with empty available windows - user can still see selected ones
+      }
+
+      // Send updated data with available windows (loading complete)
+      if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
+        watchingPillEyeDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
+          type: "eye",
+          selectedWindows: windowDetectionService.getSelectedWindows(), // Refresh in case changed
+          availableWindows,
+          isLoading: false,
+        });
+      }
     }
   });
 
@@ -917,6 +940,25 @@ function setupIPC() {
           return monitoringSessionService.resumeSession();
         }
         case "end-session": {
+          // Check if user wants to be asked for summary preferences
+          const alwaysAsk = preferencesService.getAlwaysAskOnSessionEnd();
+
+          if (alwaysAsk) {
+            // Open Console and trigger the EndSessionDialog
+            monitoringLogger.info(" Always ask is enabled - showing Console with dialog");
+            if (consoleWindow && !consoleWindow.isDestroyed()) {
+              consoleWindow.show();
+              consoleWindow.focus();
+              // Send event to Console to show EndSessionDialog
+              consoleWindow.webContents.send(IPC_CHANNELS.SHOW_END_SESSION_DIALOG);
+            }
+            return { success: true, dialogTriggered: true };
+          }
+
+          // User doesn't want dialog - use stored defaults
+          monitoringLogger.info(" Using stored summary defaults (dialog disabled)");
+          const summaryDefaults = preferencesService.getSummaryDefaults();
+
           // 1. End Electron-side capture loop and get captures
           const result = await monitoringSessionService.endSession();
 
@@ -924,7 +966,7 @@ function setupIPC() {
             return result;
           }
 
-          // 2. Upload captures and end backend session
+          // 2. Upload captures and end backend session with defaults
           try {
             // Upload captures if any exist
             if (result.captures && result.captures.length > 0) {
@@ -938,11 +980,20 @@ function setupIPC() {
               );
             }
 
-            // ALWAYS end backend session (triggers summarization)
-            monitoringLogger.info(` Triggering backend summarization`);
+            // End backend session with stored preferences
+            monitoringLogger.info(` Triggering backend summarization with defaults`);
             await authManager.authenticatedFetch(
               `/api/monitoring/sessions/${result.sessionId}/end`,
-              { method: "POST" }
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  preferences: {
+                    detailLevel: summaryDefaults.detailLevel,
+                    format: summaryDefaults.format,
+                    includeScreenshots: summaryDefaults.includeScreenshots,
+                  },
+                }),
+              }
             );
           } catch (error) {
             monitoringLogger.error(" Error:", error);
@@ -1617,6 +1668,114 @@ function setupMonitoringSessionHandlers() {
     preferencesService.setUserAutoSessionStart(userId, enabled);
     return { success: true };
   });
+
+  // Summary preferences IPC handlers
+  ipcMain.handle(IPC_CHANNELS.SUMMARY_PREFERENCES_GET, () => {
+    return preferencesService.getSummaryPreferences();
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.SUMMARY_PREFERENCES_SET,
+    (
+      _,
+      prefs: {
+        detailLevel?: "concise" | "verbose";
+        format?: "bullets" | "paragraphs";
+        includeScreenshots?: boolean;
+        alwaysAskOnSessionEnd?: boolean;
+      }
+    ) => {
+      return preferencesService.setSummaryPreferences(prefs);
+    }
+  );
+
+  ipcMain.handle(IPC_CHANNELS.SUMMARY_DEFAULTS_GET, () => {
+    return preferencesService.getSummaryDefaults();
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.SUMMARY_DEFAULTS_SET,
+    (
+      _,
+      defaults: {
+        detailLevel?: "concise" | "verbose";
+        format?: "bullets" | "paragraphs";
+        includeScreenshots?: boolean;
+      }
+    ) => {
+      return preferencesService.setSummaryDefaults(defaults);
+    }
+  );
+
+  ipcMain.handle(IPC_CHANNELS.ALWAYS_ASK_ON_SESSION_END_GET, () => {
+    return preferencesService.getAlwaysAskOnSessionEnd();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ALWAYS_ASK_ON_SESSION_END_SET, (_, value: boolean) => {
+    return preferencesService.setAlwaysAskOnSessionEnd(value);
+  });
+
+  // End session with preferences (called from Console after dialog confirmation)
+  ipcMain.handle(
+    IPC_CHANNELS.END_SESSION_WITH_PREFERENCES,
+    async (
+      _,
+      preferences: {
+        detailLevel: "concise" | "verbose";
+        format: "bullets" | "paragraphs";
+        includeScreenshots: boolean;
+      }
+    ) => {
+      monitoringLogger.info(" End session with preferences requested:", preferences);
+
+      // End Electron-side capture loop and get captures
+      const result = await monitoringSessionService.endSession();
+
+      if (!result.success || !result.sessionId) {
+        return result;
+      }
+
+      // Upload captures and end backend session with preferences
+      try {
+        // Upload captures if any exist
+        if (result.captures && result.captures.length > 0) {
+          monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
+          await authManager.authenticatedFetch(
+            `/api/monitoring/sessions/${result.sessionId}/captures`,
+            {
+              method: "POST",
+              body: JSON.stringify({ captures: result.captures }),
+            }
+          );
+        }
+
+        // End backend session with preferences
+        monitoringLogger.info(` Triggering backend summarization with preferences`);
+        await authManager.authenticatedFetch(
+          `/api/monitoring/sessions/${result.sessionId}/end`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              preferences: {
+                detailLevel: preferences.detailLevel,
+                format: preferences.format,
+                includeScreenshots: preferences.includeScreenshots,
+              },
+            }),
+          }
+        );
+      } catch (error) {
+        monitoringLogger.error(" Error ending session with preferences:", error);
+      }
+
+      // Hide watching pill after successful end
+      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+        watchingPillWindow.hide();
+      }
+
+      return result;
+    }
+  );
 
   ipcLogger.info(" Monitoring session handlers registered successfully");
 }

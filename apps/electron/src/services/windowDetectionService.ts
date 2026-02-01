@@ -15,6 +15,7 @@
  */
 
 import type { SelectedWindowInfo, WatchableWindow, WatchState } from "@mitable/shared";
+import { desktopCapturer } from "electron";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
 import { isBrowserApp, parseBrowserTitle, isSystemApp } from "../utils/browserTitleParser";
 import { createLogger } from "../lib/logger";
@@ -154,13 +155,21 @@ class WindowDetectionService {
       );
       return watchableWindows;
     } catch (error) {
-      logger.error(" Failed to get windows:", error);
-      logger.error(" Error details:", {
-        name: (error as Error)?.name,
-        message: (error as Error)?.message,
-        stack: (error as Error)?.stack,
-      });
-      throw error; // Re-throw so caller can report the actual error
+      logger.warn(" get-windows failed, trying desktopCapturer fallback:", (error as Error)?.message);
+
+      // Fallback to desktopCapturer when get-windows fails
+      try {
+        return await this.getVisibleWindowsFromDesktopCapturer();
+      } catch (fallbackError) {
+        logger.error(" desktopCapturer fallback also failed:", fallbackError);
+        logger.error(" Error details:", {
+          name: (fallbackError as Error)?.name,
+          message: (fallbackError as Error)?.message,
+          stack: (fallbackError as Error)?.stack,
+        });
+        // Return empty array as last resort - UI will show "No windows available"
+        return [];
+      }
     }
   }
 
@@ -170,6 +179,72 @@ class WindowDetectionService {
   private isMitableWindow(title: string): boolean {
     // Only exclude exact-known titles from our app to avoid false positives
     return this.MITABLE_WINDOW_TITLES.has(title);
+  }
+
+  /**
+   * Fallback window detection using Electron's desktopCapturer
+   * Used when get-windows fails (e.g., permission issues, binary failures)
+   *
+   * Note: desktopCapturer provides less metadata than get-windows but is more reliable
+   */
+  private async getVisibleWindowsFromDesktopCapturer(): Promise<WatchableWindow[]> {
+    logger.info(" Using desktopCapturer fallback for window detection");
+
+    const sources = await desktopCapturer.getSources({
+      types: ["window"],
+      fetchWindowIcons: false,
+    });
+
+    const policy = getCapturePolicy();
+    const watchableWindows: WatchableWindow[] = [];
+
+    for (const source of sources) {
+      const windowTitle = source.name;
+
+      // Skip empty titles
+      if (!windowTitle || windowTitle.trim() === "") {
+        continue;
+      }
+
+      // Skip Mitable windows
+      if (this.isMitableWindow(windowTitle)) {
+        continue;
+      }
+
+      // Extract app name from title (desktopCapturer doesn't provide app name separately)
+      // Common pattern: "Tab Title - App Name" or just "App Name"
+      const titleParts = windowTitle.split(" - ");
+      const appName = titleParts.length > 1 ? titleParts[titleParts.length - 1] : windowTitle;
+
+      // Skip system apps
+      if (isSystemApp(appName)) {
+        continue;
+      }
+
+      // Check capture policy
+      const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
+
+      // Parse browser title for better display
+      const isBrowser = isBrowserApp(appName);
+      const parsed = parseBrowserTitle(windowTitle, appName);
+
+      watchableWindows.push({
+        windowId: source.id, // desktopCapturer uses string IDs like "window:123:0"
+        appName,
+        windowTitle,
+        displayName: parsed.browserDisplayName,
+        tabTitle: isBrowser ? parsed.tabTitle : undefined,
+        isBrowser,
+        bounds: { x: 0, y: 0, width: 0, height: 0 }, // desktopCapturer doesn't provide bounds
+        isBlocked: policyDecision.blocked,
+        blockReason: policyDecision.reason,
+      });
+    }
+
+    logger.info(
+      ` desktopCapturer fallback returned ${watchableWindows.length} windows`
+    );
+    return watchableWindows;
   }
 
   /**

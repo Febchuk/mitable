@@ -10,6 +10,17 @@ import { createLogger } from "../lib/logger";
 
 const logger = createLogger("Preferences");
 
+// Summary preference types
+type SummaryDetailLevel = "concise" | "verbose";
+type SummaryFormat = "bullets" | "paragraphs";
+
+interface SummaryPreferences {
+  detailLevel: SummaryDetailLevel;
+  format: SummaryFormat;
+  includeScreenshots: boolean;
+  alwaysAskOnSessionEnd: boolean; // When true, show dialog; when false, use defaults
+}
+
 // Preferences schema
 interface PreferencesSchema {
   session: {
@@ -17,6 +28,7 @@ interface PreferencesSchema {
     dontAskHidePillAgain: boolean;
     showPillOnSessionStart: boolean;
   };
+  summary: SummaryPreferences;
   // User-scoped preferences (keyed by userId)
   users: {
     [userId: string]: {
@@ -33,6 +45,12 @@ const defaults: PreferencesSchema = {
     hidePillOnSessionEnd: false,
     dontAskHidePillAgain: false,
     showPillOnSessionStart: true,
+  },
+  summary: {
+    detailLevel: "concise",
+    format: "bullets",
+    includeScreenshots: true,
+    alwaysAskOnSessionEnd: true, // Default to asking for preferences
   },
   users: {},
 };
@@ -55,6 +73,15 @@ class PreferencesService {
             hidePillOnSessionEnd: { type: "boolean" },
             dontAskHidePillAgain: { type: "boolean" },
             showPillOnSessionStart: { type: "boolean" },
+          },
+        },
+        summary: {
+          type: "object",
+          properties: {
+            detailLevel: { type: "string", enum: ["concise", "verbose"] },
+            format: { type: "string", enum: ["bullets", "paragraphs"] },
+            includeScreenshots: { type: "boolean" },
+            alwaysAskOnSessionEnd: { type: "boolean" },
           },
         },
       },
@@ -195,8 +222,52 @@ class PreferencesService {
     });
     logger.info(` Auto session start for user ${userId} set to: ${enabled}`);
   }
+
+  // Summary preferences
+  getSummaryPreferences(): SummaryPreferences {
+    return (
+      (this.store.get("summary") as SummaryPreferences) ?? {
+        detailLevel: "concise",
+        format: "bullets",
+        includeScreenshots: true,
+        alwaysAskOnSessionEnd: true,
+      }
+    );
+  }
+
+  setSummaryPreferences(prefs: Partial<SummaryPreferences>): { success: boolean } {
+    const current = this.getSummaryPreferences();
+    this.store.set("summary", { ...current, ...prefs });
+    logger.info(" Summary preferences updated:", prefs);
+    return { success: true };
+  }
+
+  getSummaryDefaults(): Omit<SummaryPreferences, "alwaysAskOnSessionEnd"> {
+    const prefs = this.getSummaryPreferences();
+    return {
+      detailLevel: prefs.detailLevel,
+      format: prefs.format,
+      includeScreenshots: prefs.includeScreenshots,
+    };
+  }
+
+  setSummaryDefaults(defaults: {
+    detailLevel?: SummaryDetailLevel;
+    format?: SummaryFormat;
+    includeScreenshots?: boolean;
+  }): { success: boolean } {
+    return this.setSummaryPreferences(defaults);
+  }
+
+  getAlwaysAskOnSessionEnd(): boolean {
+    return this.getSummaryPreferences().alwaysAskOnSessionEnd;
+  }
+
+  setAlwaysAskOnSessionEnd(value: boolean): { success: boolean } {
+    return this.setSummaryPreferences({ alwaysAskOnSessionEnd: value });
+  }
 }
 
 // Export singleton
 export const preferencesService = new PreferencesService();
-export type { PreferencesSchema };
+export type { PreferencesSchema, SummaryPreferences, SummaryDetailLevel, SummaryFormat };

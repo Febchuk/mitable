@@ -3,9 +3,10 @@
  *
  * Modal that appears when stopping a session.
  * Captures user preferences for the final summary (Storyteller Step 3).
+ * Enhanced with "Save as default" and "Don't ask again" options.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FileText, List, Sparkles } from "lucide-react";
+import { createLogger } from "../../../../../../../lib/logger";
+
+const logger = createLogger("EndSessionDialog");
 
 interface EndSessionDialogProps {
   open: boolean;
@@ -29,6 +34,14 @@ interface EndSessionDialogProps {
     includeScreenshots: boolean;
   }) => Promise<void>;
   isProcessing: boolean;
+  /** Optional: Initial preferences to pre-populate the form */
+  initialPreferences?: {
+    style?: "verbose" | "concise";
+    format?: "bullets" | "paragraphs";
+    includeScreenshots?: boolean;
+  };
+  /** Optional: Whether this dialog was triggered from the pill (affects behavior) */
+  triggeredFromPill?: boolean;
 }
 
 export default function EndSessionDialog({
@@ -36,12 +49,79 @@ export default function EndSessionDialog({
   onOpenChange,
   onConfirm,
   isProcessing,
+  initialPreferences,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  triggeredFromPill: _triggeredFromPill = false,
 }: EndSessionDialogProps) {
-  const [style, setStyle] = useState<"verbose" | "concise">("concise");
-  const [format, setFormat] = useState<"bullets" | "paragraphs">("bullets");
-  const [includeScreenshots, setIncludeScreenshots] = useState(true);
+  const [style, setStyle] = useState<"verbose" | "concise">(
+    initialPreferences?.style ?? "concise"
+  );
+  const [format, setFormat] = useState<"bullets" | "paragraphs">(
+    initialPreferences?.format ?? "bullets"
+  );
+  const [includeScreenshots, setIncludeScreenshots] = useState(
+    initialPreferences?.includeScreenshots ?? true
+  );
+  const [saveAsDefaults, setSaveAsDefaults] = useState(false);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
+
+  // Load stored defaults when dialog opens
+  useEffect(() => {
+    if (open) {
+      loadStoredDefaults();
+    }
+  }, [open]);
+
+  const loadStoredDefaults = async () => {
+    try {
+      const defaults = await window.consoleAPI.getSummaryDefaults();
+      if (defaults) {
+        // Map detailLevel to style (backend uses detailLevel, frontend uses style)
+        setStyle(defaults.detailLevel === "verbose" ? "verbose" : "concise");
+        setFormat(defaults.format === "paragraphs" ? "paragraphs" : "bullets");
+        setIncludeScreenshots(defaults.includeScreenshots ?? true);
+        logger.info("Loaded stored defaults:", defaults);
+      }
+    } catch (error) {
+      logger.error("Failed to load stored defaults:", error);
+    }
+  };
 
   const handleConfirm = async () => {
+    // Save as defaults if checkbox is checked
+    if (saveAsDefaults) {
+      try {
+        await window.consoleAPI.setSummaryDefaults({
+          detailLevel: style,
+          format,
+          includeScreenshots,
+        });
+        logger.info("Saved preferences as defaults");
+      } catch (error) {
+        logger.error("Failed to save preferences as defaults:", error);
+      }
+    }
+
+    // Disable future dialogs if "Don't ask again" is checked
+    if (dontAskAgain) {
+      try {
+        // Also save as defaults when disabling future dialogs
+        await window.consoleAPI.setSummaryDefaults({
+          detailLevel: style,
+          format,
+          includeScreenshots,
+        });
+        await window.consoleAPI.setAlwaysAskOnSessionEnd(false);
+        logger.info("Disabled future end session dialogs");
+      } catch (error) {
+        logger.error("Failed to disable future dialogs:", error);
+      }
+    }
+
+    // Reset checkboxes for next time
+    setSaveAsDefaults(false);
+    setDontAskAgain(false);
+
     await onConfirm({
       style,
       format,
@@ -125,6 +205,46 @@ export default function EndSessionDialog({
               <p className="text-sm text-muted-foreground">Attach key visuals to your update</p>
             </div>
             <Switch checked={includeScreenshots} onCheckedChange={setIncludeScreenshots} />
+          </div>
+
+          {/* Save as defaults checkbox */}
+          <div className="flex items-start space-x-3 pt-2 border-t">
+            <Checkbox
+              id="save-defaults"
+              checked={saveAsDefaults}
+              onCheckedChange={(checked) => setSaveAsDefaults(checked === true)}
+            />
+            <div className="grid gap-1.5 leading-none">
+              <Label
+                htmlFor="save-defaults"
+                className="text-sm font-medium leading-none cursor-pointer"
+              >
+                Save as my default preferences
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Use these settings by default for future sessions
+              </p>
+            </div>
+          </div>
+
+          {/* Don't ask again checkbox */}
+          <div className="flex items-start space-x-3">
+            <Checkbox
+              id="dont-ask"
+              checked={dontAskAgain}
+              onCheckedChange={(checked) => setDontAskAgain(checked === true)}
+            />
+            <div className="grid gap-1.5 leading-none">
+              <Label
+                htmlFor="dont-ask"
+                className="text-sm font-medium leading-none cursor-pointer"
+              >
+                Don't ask me again
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                End sessions automatically using these preferences
+              </p>
+            </div>
           </div>
         </div>
 

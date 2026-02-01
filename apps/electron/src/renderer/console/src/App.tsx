@@ -70,6 +70,27 @@ function NavigationHandler() {
         navigate("/monitoring");
       }
     });
+
+    // Listen for end session dialog trigger from pill (via main process)
+    // Navigate to session detail page with query param to open dialog
+    const unsubscribeEndDialog = window.consoleAPI.onShowEndSessionDialog?.(async () => {
+      logger.info(" End session dialog triggered from pill");
+      try {
+        const sessionState = await window.consoleAPI?.getMonitoringSessionState();
+        if (sessionState?.id) {
+          logger.info(" Navigating to session detail with dialog flag:", sessionState.id);
+          navigate(`/monitoring/${sessionState.id}?openEndDialog=true`);
+        } else {
+          logger.warn(" No active session found for end dialog trigger");
+        }
+      } catch (error) {
+        logger.error(" Error getting session state for end dialog:", error);
+      }
+    });
+
+    return () => {
+      unsubscribeEndDialog?.();
+    };
   }, [navigate]);
 
   return null;

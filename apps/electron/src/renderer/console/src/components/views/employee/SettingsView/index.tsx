@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/console/src/services/authService";
-import { usePreferences } from "@/console/src/hooks/usePreferences";
+import { usePreferences, useSummaryPreferences } from "@/console/src/hooks/usePreferences";
 import {
   Loader2,
   Check,
@@ -26,6 +26,9 @@ import {
   ExternalLink,
   Info,
   Download,
+  FileText,
+  List,
+  Sparkles,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import { BillingSection } from "@/console/src/components/billing";
@@ -88,6 +91,17 @@ export default function SettingsView() {
     isLoading: isPreferencesLoading,
     updatePreference,
   } = usePreferences();
+
+  // Summary preferences
+  const {
+    detailLevel,
+    format,
+    includeScreenshots,
+    alwaysAskOnSessionEnd,
+    isLoading: isSummaryPrefsLoading,
+    setAlwaysAsk,
+    updateDefaults,
+  } = useSummaryPreferences();
 
   useEffect(() => {
     loadLinearStatus();
@@ -693,6 +707,192 @@ export default function SettingsView() {
                   />
                 )}
               </div>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border-subtle my-4" />
+
+            {/* Summary Preferences */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <FileText size={18} className="text-text-secondary" />
+                <h3 className="text-lg font-semibold text-white">Session Summary</h3>
+              </div>
+
+              {/* Always Ask at End of Session */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="always-ask-toggle"
+                    className="text-sm font-medium text-white cursor-pointer"
+                  >
+                    Always ask for summary preferences
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Show the summary configuration dialog when ending a session
+                  </p>
+                </div>
+
+                {isSummaryPrefsLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                ) : (
+                  <Switch
+                    id="always-ask-toggle"
+                    checked={alwaysAskOnSessionEnd}
+                    onCheckedChange={async (checked) => {
+                      const result = await setAlwaysAsk(checked);
+                      if (result.success) {
+                        toast({
+                          title: "Preference saved",
+                          description: checked
+                            ? "You'll be asked for summary preferences when ending sessions"
+                            : "Sessions will end using your default preferences below",
+                        });
+                      } else {
+                        toast({
+                          title: "Error",
+                          description: "Failed to save preference",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Default Summary Settings (shown when "always ask" is disabled) */}
+              {!alwaysAskOnSessionEnd && (
+                <div className="pl-4 border-l-2 border-border-subtle space-y-4 mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    These defaults will be used when ending sessions:
+                  </p>
+
+                  {/* Default Detail Level */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium text-white">Detail Level</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {detailLevel === "concise" ? "Key highlights only" : "Full narrative"}
+                      </p>
+                    </div>
+
+                    {isSummaryPrefsLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button
+                          variant={detailLevel === "concise" ? "default" : "outline"}
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={async () => {
+                            const result = await updateDefaults({ detailLevel: "concise" });
+                            if (result.success) {
+                              toast({ title: "Default updated", description: "Concise summaries" });
+                            }
+                          }}
+                        >
+                          <Sparkles size={14} />
+                          Concise
+                        </Button>
+                        <Button
+                          variant={detailLevel === "verbose" ? "default" : "outline"}
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={async () => {
+                            const result = await updateDefaults({ detailLevel: "verbose" });
+                            if (result.success) {
+                              toast({ title: "Default updated", description: "Verbose summaries" });
+                            }
+                          }}
+                        >
+                          <FileText size={14} />
+                          Verbose
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Default Format */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium text-white">Format</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {format === "bullets" ? "Bullet points" : "Paragraphs"}
+                      </p>
+                    </div>
+
+                    {isSummaryPrefsLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button
+                          variant={format === "bullets" ? "default" : "outline"}
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={async () => {
+                            const result = await updateDefaults({ format: "bullets" });
+                            if (result.success) {
+                              toast({ title: "Default updated", description: "Bullet points" });
+                            }
+                          }}
+                        >
+                          <List size={14} />
+                          Bullets
+                        </Button>
+                        <Button
+                          variant={format === "paragraphs" ? "default" : "outline"}
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={async () => {
+                            const result = await updateDefaults({ format: "paragraphs" });
+                            if (result.success) {
+                              toast({ title: "Default updated", description: "Paragraphs" });
+                            }
+                          }}
+                        >
+                          <FileText size={14} />
+                          Paragraphs
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Include Screenshots */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label
+                        htmlFor="include-screenshots-toggle"
+                        className="text-sm font-medium text-white cursor-pointer"
+                      >
+                        Include Screenshots
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Attach key visuals to session summaries
+                      </p>
+                    </div>
+
+                    {isSummaryPrefsLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Switch
+                        id="include-screenshots-toggle"
+                        checked={includeScreenshots}
+                        onCheckedChange={async (checked) => {
+                          const result = await updateDefaults({ includeScreenshots: checked });
+                          if (result.success) {
+                            toast({
+                              title: "Default updated",
+                              description: checked
+                                ? "Screenshots will be included"
+                                : "Screenshots will not be included",
+                            });
+                          }
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </Card>

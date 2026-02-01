@@ -17,6 +17,7 @@ import {
   Settings,
   Shield,
   Plus,
+  FileText,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import Button from "../components/ui/Button";
@@ -28,6 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { BillingSection } from "@/console/src/components/billing";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import { createLogger } from "../../../lib/logger";
 import { API_BASE_URL } from "../lib/config";
@@ -117,6 +119,19 @@ export default function UserProfilePage() {
   // Auto session start state
   const [autoSessionStart, setAutoSessionStart] = useState<boolean>(false);
   const [isAutoSessionStartLoading, setIsAutoSessionStartLoading] = useState(true);
+
+  // Summary preferences state
+  const [summaryDefaults, setSummaryDefaults] = useState<{
+    detailLevel: "concise" | "verbose";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
+  }>({
+    detailLevel: "concise",
+    format: "bullets",
+    includeScreenshots: true,
+  });
+  const [alwaysAskOnSessionEnd, setAlwaysAskOnSessionEnd] = useState<boolean>(true);
+  const [isSummaryPrefsLoading, setIsSummaryPrefsLoading] = useState(true);
 
   // OAuth polling interval refs - for cleanup on unmount
   const linearPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -307,6 +322,74 @@ export default function UserProfilePage() {
     }
   };
 
+  // Summary preferences functions
+  const loadSummaryPreferences = useCallback(async () => {
+    try {
+      setIsSummaryPrefsLoading(true);
+      const prefs = await window.consoleAPI.getSummaryPreferences();
+      if (prefs) {
+        setSummaryDefaults({
+          detailLevel: prefs.detailLevel,
+          format: prefs.format,
+          includeScreenshots: prefs.includeScreenshots,
+        });
+        setAlwaysAskOnSessionEnd(prefs.alwaysAskOnSessionEnd);
+      }
+    } catch (error) {
+      logger.error("Error loading summary preferences:", error);
+    } finally {
+      setIsSummaryPrefsLoading(false);
+    }
+  }, []);
+
+  const handleAlwaysAskOnSessionEndChange = async (enabled: boolean) => {
+    try {
+      const result = await window.consoleAPI.setAlwaysAskOnSessionEnd(enabled);
+      if (result.success) {
+        setAlwaysAskOnSessionEnd(enabled);
+        toast({
+          title: "Preference saved",
+          description: enabled
+            ? "You'll be asked for summary preferences when ending sessions"
+            : "Sessions will end using your default preferences",
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting always ask preference:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save preference",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSummaryDefaultChange = async (
+    key: "detailLevel" | "format" | "includeScreenshots",
+    value: string | boolean
+  ) => {
+    try {
+      const newDefaults = { ...summaryDefaults, [key]: value };
+      const result = await window.consoleAPI.setSummaryDefaults({
+        [key]: value,
+      });
+      if (result.success) {
+        setSummaryDefaults(newDefaults);
+        toast({
+          title: "Preference saved",
+          description: "Summary default updated",
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting summary default:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save preference",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Customer Profile state
   const [jobTitle, setJobTitle] = useState("");
   const [regularTasks, setRegularTasks] = useState<string[]>([]);
@@ -361,8 +444,9 @@ export default function UserProfilePage() {
       loadDetectedApps();
       loadNotificationFrequency();
       loadAutoSessionStart();
+      loadSummaryPreferences();
     }
-  }, [user?.id, loadBlockList, loadDetectedApps, loadNotificationFrequency, loadAutoSessionStart]);
+  }, [user?.id, loadBlockList, loadDetectedApps, loadNotificationFrequency, loadAutoSessionStart, loadSummaryPreferences]);
 
   const loadUserProfile = async () => {
     setIsLoadingProfile(true);
@@ -1548,6 +1632,142 @@ export default function UserProfilePage() {
                         className="flex-shrink-0"
                       />
                     )}
+                  </div>
+
+                  {/* Session Summary Defaults Section */}
+                  <div className="pt-6 border-t border-border-subtle space-y-4">
+                    <div className="flex items-center gap-2">
+                      <FileText size={18} className="text-text-tertiary" />
+                      <h3 className="text-heading-4 text-white">Session Summary Defaults</h3>
+                    </div>
+                    <p className="text-body-sm text-text-tertiary">
+                      Configure default preferences for session summaries when ending sessions
+                    </p>
+
+                    {/* Always Ask for Summary Preferences */}
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5 flex-1 pr-4">
+                        <Label
+                          htmlFor="always-ask-summary-toggle"
+                          className="text-sm font-medium text-text-primary cursor-pointer"
+                        >
+                          Always ask for summary preferences
+                        </Label>
+                        <p className="text-xs text-text-tertiary">
+                          Show the summary configuration dialog when ending sessions. When disabled,
+                          sessions will end immediately using your default preferences.
+                        </p>
+                      </div>
+                      {isSummaryPrefsLoading ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                      ) : (
+                        <Switch
+                          id="always-ask-summary-toggle"
+                          checked={alwaysAskOnSessionEnd}
+                          onCheckedChange={handleAlwaysAskOnSessionEndChange}
+                          className="flex-shrink-0"
+                        />
+                      )}
+                    </div>
+
+                    {/* Default Detail Level */}
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5 flex-1 pr-4">
+                        <Label className="text-sm font-medium text-text-primary">
+                          Default Detail Level
+                        </Label>
+                        <p className="text-xs text-text-tertiary">
+                          How detailed your session summaries should be
+                        </p>
+                      </div>
+                      {isSummaryPrefsLoading ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                      ) : (
+                        <RadioGroup
+                          value={summaryDefaults.detailLevel}
+                          onValueChange={(v) =>
+                            handleSummaryDefaultChange("detailLevel", v as "concise" | "verbose")
+                          }
+                          className="flex gap-4"
+                        >
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="concise" id="detail-concise" />
+                            <Label htmlFor="detail-concise" className="text-sm text-text-primary cursor-pointer">
+                              Concise
+                            </Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="verbose" id="detail-verbose" />
+                            <Label htmlFor="detail-verbose" className="text-sm text-text-primary cursor-pointer">
+                              Verbose
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      )}
+                    </div>
+
+                    {/* Default Format */}
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5 flex-1 pr-4">
+                        <Label className="text-sm font-medium text-text-primary">
+                          Default Format
+                        </Label>
+                        <p className="text-xs text-text-tertiary">
+                          How your session summaries should be formatted
+                        </p>
+                      </div>
+                      {isSummaryPrefsLoading ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                      ) : (
+                        <RadioGroup
+                          value={summaryDefaults.format}
+                          onValueChange={(v) =>
+                            handleSummaryDefaultChange("format", v as "bullets" | "paragraphs")
+                          }
+                          className="flex gap-4"
+                        >
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="bullets" id="format-bullets" />
+                            <Label htmlFor="format-bullets" className="text-sm text-text-primary cursor-pointer">
+                              Bullets
+                            </Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="paragraphs" id="format-paragraphs" />
+                            <Label htmlFor="format-paragraphs" className="text-sm text-text-primary cursor-pointer">
+                              Paragraphs
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      )}
+                    </div>
+
+                    {/* Include Screenshots by Default */}
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5 flex-1 pr-4">
+                        <Label
+                          htmlFor="include-screenshots-toggle"
+                          className="text-sm font-medium text-text-primary cursor-pointer"
+                        >
+                          Include Screenshots by Default
+                        </Label>
+                        <p className="text-xs text-text-tertiary">
+                          Attach key screenshots to your session summaries
+                        </p>
+                      </div>
+                      {isSummaryPrefsLoading ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                      ) : (
+                        <Switch
+                          id="include-screenshots-toggle"
+                          checked={summaryDefaults.includeScreenshots}
+                          onCheckedChange={(checked) =>
+                            handleSummaryDefaultChange("includeScreenshots", checked)
+                          }
+                          className="flex-shrink-0"
+                        />
+                      )}
+                    </div>
                   </div>
 
                   {/* Block List Section */}
