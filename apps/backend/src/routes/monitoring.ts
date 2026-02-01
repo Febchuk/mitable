@@ -13,6 +13,7 @@ import { classifierService } from "../services/classifier.service.js";
 import { masterStoryService } from "../services/master-story.service.js";
 import { searchService } from "../services/search.service.js";
 import { SessionIngestionService } from "../services/session-ingestion.service.js";
+import { workstreamAggregationService } from "../services/workstream-aggregation.service.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { logger } from "../lib/logger";
@@ -1541,6 +1542,81 @@ router.get(
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to fetch captures",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/monitoring/sessions/:id/workstreams
+ * Get aggregated workstreams for a session with timeline visualization data
+ *
+ * Returns:
+ * - workstreams: Array of workstream objects with segments, apps used, and capture counts
+ * - sessionStats: Session statistics (total time, deep work, interruptions, etc.)
+ * - sessionStartTime: ISO timestamp of session start
+ * - sessionEndTime: ISO timestamp of session end
+ */
+router.get(
+  "/sessions/:id/workstreams",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to access this session",
+        });
+        return;
+      }
+
+      // Fetch captures for this session
+      const captures = await db
+        .select({
+          id: schema.sessionCaptures.id,
+          capturedAt: schema.sessionCaptures.capturedAt,
+          appName: schema.sessionCaptures.appName,
+          windowTitle: schema.sessionCaptures.windowTitle,
+          activityDescription: schema.sessionCaptures.activityDescription,
+          deltaChangeDescription: schema.sessionCaptures.deltaChangeDescription,
+        })
+        .from(schema.sessionCaptures)
+        .where(eq(schema.sessionCaptures.sessionId, id))
+        .orderBy(schema.sessionCaptures.sequenceNumber);
+
+      // Aggregate into workstreams
+      const result = workstreamAggregationService.aggregateWorkstreams(captures, {
+        linearIssueId: session.linearIssueId,
+        linearIssueTitle: session.linearIssueTitle,
+      });
+
+      res.json(result);
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error fetching workstreams"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to fetch workstreams",
       });
     }
   }

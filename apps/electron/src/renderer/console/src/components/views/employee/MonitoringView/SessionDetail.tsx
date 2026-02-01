@@ -73,6 +73,7 @@ import { SessionEndToast } from "@/console/src/components/shared/SessionEndToast
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import LinearUpdateDialog from "./LinearUpdateDialog";
 import ActivityTimeline from "./ActivityTimeline";
+import SessionTimeline from "./SessionTimeline";
 import EndSessionDialog from "./EndSessionDialog"; // Import the new dialog
 import { SiLinear } from "react-icons/si";
 
@@ -911,7 +912,10 @@ export default function SessionDetail() {
         )}
       </div>
 
-      {/* Activity Timeline */}
+      {/* Workstream Timeline (new visualization) */}
+      <SessionTimeline sessionId={sessionId || ""} sessionStatus={session?.status} />
+
+      {/* Activity Timeline (original) */}
       <ActivityTimeline sessionId={sessionId || ""} sessionStatus={session?.status} />
 
       {/* Top-K Frames Gallery - Shows after session ends */}
