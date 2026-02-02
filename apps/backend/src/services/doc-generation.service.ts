@@ -14,10 +14,11 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, desc } from "drizzle-orm";
 import type { DocType, GenerateDocumentResponse, EnhanceDocumentResponse } from "@mitable/shared";
+import { sessionRetrieverService } from "./session-retriever.service.js";
 
 // Configuration
 const DOC_GEN_CONFIG = {
-  TEXT_MODEL: "llama-3.1-8b-instant",
+  TEXT_MODEL: "openai/gpt-oss-120b", // OpenAI GPT-OSS 120B on Groq
   TEMPERATURE: 0.4,
   MAX_TOKENS: 2000,
 };
@@ -206,8 +207,8 @@ class DocGenerationService {
 
     console.log(`[DocGeneration] Generating ${docType} from session: ${sessionId}`);
 
-    // Get session data
-    const sessionData = await this.getSessionData(sessionId);
+    // Get session data using RAG
+    const sessionData = await this.getSessionData(sessionId, organizationId);
 
     // Build prompt
     const prompt = this.buildGenerationPrompt(docType, sessionData, additionalContext);
@@ -291,8 +292,8 @@ class DocGenerationService {
       throw new Error("Document not found");
     }
 
-    // Get session data
-    const sessionData = await this.getSessionData(sessionId);
+    // Get session data using RAG
+    const sessionData = await this.getSessionData(sessionId, document.organizationId);
 
     // Build enhancement prompt
     const prompt = this.buildEnhancementPrompt(
@@ -402,9 +403,9 @@ Revised document:`;
   }
 
   /**
-   * Get session data for doc generation
+   * Get session data for doc generation using RAG from session_chunks
    */
-  private async getSessionData(sessionId: string): Promise<SessionData> {
+  private async getSessionData(sessionId: string, organizationId: string): Promise<SessionData> {
     const [session] = await db
       .select()
       .from(schema.monitoringSessions)
@@ -421,14 +422,74 @@ Revised document:`;
     const totalMs = endTime - startTime - (session.totalPausedMs || 0);
     const duration = this.formatDuration(totalMs);
 
+    // Fetch session chunks using RAG
+    const { chunks, sessionMap } = await sessionRetrieverService.getSessionChunks(
+      [sessionId],
+      organizationId
+    );
+
+    if (chunks.length === 0) {
+      throw new Error(
+        `No chunks found for session: ${sessionId}. Session may not be ingested yet.`
+      );
+    }
+
+    // Build context from chunks
+    const sessionContext = sessionRetrieverService.buildDocumentContext(sessionMap);
+
+    // Extract key activities and accomplishments from chunks
+    const keyActivities = this.extractActivities(chunks);
+    const accomplishments = this.extractAccomplishments(chunks);
+    const blockers: string[] = []; // TODO: Extract from metadata if needed
+
     return {
-      summary: session.finalSummary || session.rawActivitySummary || "",
-      keyActivities: (session.keyActivities as any[]) || [],
-      accomplishments: (session.accomplishments as any[]) || [],
-      blockers: (session.blockers as any[]) || [],
+      summary: sessionContext,
+      keyActivities,
+      accomplishments,
+      blockers,
       timeBreakdown: (session.timeBreakdown as Record<string, number>) || {},
       duration,
     };
+  }
+
+  /**
+   * Extract key activities from session chunks
+   */
+  private extractActivities(chunks: any[]): string[] {
+    const activities: string[] = [];
+
+    for (const chunk of chunks) {
+      if (chunk.chunkType === "classifier" && chunk.metadata?.eventTypes) {
+        activities.push(...chunk.metadata.eventTypes);
+      }
+    }
+
+    return [...new Set(activities)]; // Deduplicate
+  }
+
+  /**
+   * Extract accomplishments from storyteller chunks
+   */
+  private extractAccomplishments(chunks: any[]): string[] {
+    const accomplishments: string[] = [];
+
+    for (const chunk of chunks) {
+      if (chunk.chunkType === "storyteller_summary") {
+        // Extract key achievements from summary text
+        const text = chunk.text;
+        const lines = text
+          .split("\n")
+          .filter(
+            (line: string) =>
+              line.toLowerCase().includes("completed") ||
+              line.toLowerCase().includes("accomplished") ||
+              line.toLowerCase().includes("finished")
+          );
+        accomplishments.push(...lines);
+      }
+    }
+
+    return accomplishments;
   }
 
   /**

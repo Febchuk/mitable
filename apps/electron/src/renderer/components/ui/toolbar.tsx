@@ -212,14 +212,13 @@ export function ToolbarSplitButtonPrimary({
   );
 }
 
-export function ToolbarSplitButtonSecondary({
-  className,
-  size,
-  variant,
-  ...props
-}: React.ComponentPropsWithoutRef<"span"> & VariantProps<typeof dropdownArrowVariants>) {
+export const ToolbarSplitButtonSecondary = React.forwardRef<
+  HTMLSpanElement,
+  React.ComponentPropsWithoutRef<"span"> & VariantProps<typeof dropdownArrowVariants>
+>(({ className, size, variant, ...props }, ref) => {
   return (
     <span
+      ref={ref}
       className={cn(
         dropdownArrowVariants({
           size,
@@ -235,7 +234,9 @@ export function ToolbarSplitButtonSecondary({
       <ChevronDown className="size-3.5 text-muted-foreground" data-icon />
     </span>
   );
-}
+});
+
+ToolbarSplitButtonSecondary.displayName = "ToolbarSplitButtonSecondary";
 
 export const ToolbarToggleItem = React.forwardRef<
   React.ElementRef<typeof ToolbarPrimitive.ToggleItem>,

@@ -12,6 +12,7 @@ import { frameAnalysisService } from "../services/frame-analysis.service.js";
 import { classifierService } from "../services/classifier.service.js";
 import { masterStoryService } from "../services/master-story.service.js";
 import { searchService } from "../services/search.service.js";
+import { SessionIngestionService } from "../services/session-ingestion.service.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { logger } from "../lib/logger";
@@ -721,6 +722,14 @@ router.post(
             .update(schema.monitoringSessions)
             .set({ status: "ready" })
             .where(eq(schema.monitoringSessions.id, id));
+
+          // Trigger session ingestion (chunk + embed session data)
+          SessionIngestionService.ingestSession(id).catch((error) => {
+            log.error("Session ingestion failed", {
+              sessionId: id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
         })
         .catch(async (error) => {
           log.error("Session end processing failed", {
@@ -731,6 +740,14 @@ router.post(
             .update(schema.monitoringSessions)
             .set({ status: "ready" })
             .where(eq(schema.monitoringSessions.id, id));
+
+          // Trigger session ingestion (chunk + embed session data)
+          SessionIngestionService.ingestSession(id).catch((ingestError) => {
+            log.error("Session ingestion failed", {
+              sessionId: id,
+              error: ingestError instanceof Error ? ingestError.message : String(ingestError),
+            });
+          });
         });
 
       // Schedule cleanup of imageData after 1 hour to free up storage
@@ -833,6 +850,14 @@ router.post(
             .set({ status: "ready" })
             .where(eq(schema.monitoringSessions.id, id));
           console.log("[DEV] ✅ RLM Regeneration completed for session:", id);
+
+          // Trigger session ingestion (chunk + embed session data)
+          SessionIngestionService.ingestSession(id).catch((error) => {
+            console.error("[SessionIngestion] Failed after regeneration:", {
+              sessionId: id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
         })
         .catch(async (err) => {
           console.error("[DEV] ❌ RLM Regenerate summary failed:", err);
@@ -841,6 +866,14 @@ router.post(
             .update(schema.monitoringSessions)
             .set({ status: "ready" })
             .where(eq(schema.monitoringSessions.id, id));
+
+          // Trigger session ingestion (chunk + embed session data)
+          SessionIngestionService.ingestSession(id).catch((ingestError) => {
+            console.error("[SessionIngestion] Failed after failed regeneration:", {
+              sessionId: id,
+              error: ingestError instanceof Error ? ingestError.message : String(ingestError),
+            });
+          });
         });
 
       res.json({ success: true, message: "RLM summary regeneration started" });

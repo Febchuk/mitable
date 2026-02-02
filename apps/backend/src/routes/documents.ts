@@ -725,6 +725,98 @@ router.post("/:id/revise", requireAuth, async (req: Request, res: Response): Pro
 });
 
 /**
+ * POST /api/documents/generate/stream
+ * Generate a new document from user prompt with streaming progress (SSE)
+ */
+router.post("/generate/stream", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { prompt, docType } = req.body;
+
+  if (!prompt || !docType) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "prompt and docType are required",
+    });
+    return;
+  }
+
+  // Validate docType
+  const validDocTypes = ["how-to", "knowledge-article", "troubleshooting"];
+  if (!validDocTypes.includes(docType)) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: `Invalid docType. Must be one of: ${validDocTypes.join(", ")}`,
+    });
+    return;
+  }
+
+  try {
+    // Get user's organization
+    const [user] = await db
+      .select({ organizationId: schema.users.organizationId })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!user?.organizationId) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "User organization not found",
+      });
+      return;
+    }
+
+    // Set up Server-Sent Events
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    // Keep connection alive
+    const keepAliveInterval = setInterval(() => {
+      res.write(":ping\n\n");
+    }, 15000);
+
+    try {
+      // Import doc generation stream service
+      const { docGenerationStreamService } =
+        await import("../services/doc-generation-stream.service.js");
+
+      // Stream document generation
+      const stream = docGenerationStreamService.generateFromPrompt({
+        prompt,
+        docType,
+        organizationId: user.organizationId,
+        userId,
+      });
+
+      for await (const chunk of stream) {
+        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      }
+
+      res.write("data: [DONE]\n\n");
+      res.end();
+    } catch (error) {
+      console.error("[Documents] Error in stream generation:", error);
+      const errorMessage = error instanceof Error ? error.message : "Generation failed";
+      res.write(`data: ${JSON.stringify({ type: "error", error: errorMessage })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+    } finally {
+      clearInterval(keepAliveInterval);
+    }
+  } catch (error) {
+    console.error("[Documents] Error setting up stream:", error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to start generation",
+      });
+    }
+  }
+});
+
+/**
  * POST /api/documents/generate
  * Generate a new document from a monitoring session
  */

@@ -9,8 +9,9 @@
  * - Export to Notion
  */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { createLogger } from "../../../../../../lib/logger";
 
 const logger = createLogger("DocDetail");
@@ -31,6 +32,7 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,8 +48,22 @@ import { useToast } from "@/hooks/use-toast";
 import { DocEditor } from "@/console/src/components/editor";
 import ExportNotionDialog from "./dialogs/ExportNotionDialog";
 import ExportGoogleDocsDialog from "./dialogs/ExportGoogleDocsDialog";
-import ExportPopover from "./components/ExportPopover";
+import ExportPopover, { type ExportDestination } from "./components/ExportPopover";
 import type { DocType, DocStatus } from "@mitable/shared";
+import { useUser } from "@/console/src/context/UserContext";
+import { apiRequest } from "@/console/src/services/api";
+
+interface GmailStatus {
+  connected: boolean;
+  expired: boolean;
+  email: string | null;
+}
+
+interface NotionStatus {
+  connected: boolean;
+  expired: boolean;
+  workspaceId: string | null;
+}
 
 const DOC_TYPE_LABELS: Record<DocType, string> = {
   "how-to": "How-To Guide",
@@ -65,17 +81,35 @@ export default function DocDetail() {
   const { docId } = useParams<{ docId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useUser();
 
   const { data: document, isLoading, refetch: refetchDocument } = useDocument(docId || "");
   const updateMutation = useUpdateDocument();
   const deleteMutation = useDeleteDocument();
   const exportNotionMutation = useExportToNotion();
   const exportGoogleDocsMutation = useExportToGoogleDocs();
+  const { data: notionStatus, isLoading: isNotionStatusLoading } = useQuery({
+    queryKey: ["integrations", "notion", "user", "status"],
+    queryFn: () => apiRequest<NotionStatus>("/integrations/notion/user/status"),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: gmailStatus, isLoading: isGmailStatusLoading } = useQuery({
+    queryKey: ["integrations", "gmail", "status"],
+    queryFn: () => apiRequest<GmailStatus>("/integrations/gmail/status"),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const googleDocsAvailable = !!gmailStatus?.connected && !gmailStatus?.expired;
+  const notionAvailable = !!notionStatus?.connected && !notionStatus?.expired;
+
   const {
     data: driveFolders,
     isLoading: isLoadingFolders,
     refetch: refetchFolders,
-  } = useGoogleDriveFolders();
+  } = useGoogleDriveFolders(googleDocsAvailable);
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isExportNotionDialogOpen, setIsExportNotionDialogOpen] = useState(false);
@@ -103,6 +137,15 @@ export default function DocDetail() {
       if (contentSaveTimeout.current) clearTimeout(contentSaveTimeout.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!notionAvailable) {
+      setIsExportNotionDialogOpen(false);
+    }
+    if (!googleDocsAvailable) {
+      setIsExportGoogleDocsDialogOpen(false);
+    }
+  }, [notionAvailable, googleDocsAvailable]);
 
   // Debounced save function
   const debouncedSave = useCallback(
@@ -281,6 +324,49 @@ export default function DocDetail() {
     });
   };
 
+  const exportDestinations = useMemo<ExportDestination[]>(() => {
+    if (!document) return [];
+
+    const destinations: ExportDestination[] = [];
+
+    if (notionAvailable) {
+      destinations.push({
+        id: "notion",
+        name: "Notion",
+        isExported: !!document.notionPageId,
+        lastSyncedAt: document.notionSyncedAt ? new Date(document.notionSyncedAt) : null,
+        documentUrl: document.notionPageId ? `https://notion.so/${document.notionPageId}` : null,
+        onExport: () => setIsExportNotionDialogOpen(true),
+        onReExport: handleReExportToNotion,
+      });
+    }
+
+    if (googleDocsAvailable) {
+      destinations.push({
+        id: "google-docs",
+        name: "Google Docs",
+        isExported: !!document.googleDocsId,
+        lastSyncedAt: document.googleDocsSyncedAt ? new Date(document.googleDocsSyncedAt) : null,
+        documentUrl: document.googleDocsId
+          ? `https://docs.google.com/document/d/${document.googleDocsId}/edit`
+          : null,
+        onExport: () => setIsExportGoogleDocsDialogOpen(true),
+        onReExport: handleReExportToGoogleDocs,
+      });
+    }
+
+    return destinations;
+  }, [
+    document,
+    googleDocsAvailable,
+    notionAvailable,
+    handleReExportToGoogleDocs,
+    handleReExportToNotion,
+  ]);
+
+  const hasExportIntegrations = exportDestinations.length > 0;
+  const isIntegrationStatusLoading = isNotionStatusLoading || isGmailStatusLoading;
+
   if (isLoading) {
     return (
       <div className="p-8 flex items-center justify-center">
@@ -354,38 +440,30 @@ export default function DocDetail() {
             ) : null}
           </span>
 
-          <ExportPopover
-            destinations={[
-              {
-                id: "notion",
-                name: "Notion",
-                isExported: !!document.notionPageId,
-                lastSyncedAt: document.notionSyncedAt ? new Date(document.notionSyncedAt) : null,
-                documentUrl: document.notionPageId
-                  ? `https://notion.so/${document.notionPageId}`
-                  : null,
-                onExport: () => setIsExportNotionDialogOpen(true),
-                onReExport: handleReExportToNotion,
-              },
-              {
-                id: "google-docs",
-                name: "Google Docs",
-                isExported: !!document.googleDocsId,
-                lastSyncedAt: document.googleDocsSyncedAt
-                  ? new Date(document.googleDocsSyncedAt)
-                  : null,
-                documentUrl: document.googleDocsId
-                  ? `https://docs.google.com/document/d/${document.googleDocsId}/edit`
-                  : null,
-                onExport: () => setIsExportGoogleDocsDialogOpen(true),
-                onReExport: handleReExportToGoogleDocs,
-              },
-            ]}
-            onExportAll={
-              document.notionPageId && document.googleDocsId ? handleExportToAll : undefined
-            }
-            isExporting={exportNotionMutation.isPending || exportGoogleDocsMutation.isPending}
-          />
+          {hasExportIntegrations ? (
+            <ExportPopover
+              destinations={exportDestinations}
+              onExportAll={
+                notionAvailable &&
+                googleDocsAvailable &&
+                document.notionPageId &&
+                document.googleDocsId
+                  ? handleExportToAll
+                  : undefined
+              }
+              isExporting={exportNotionMutation.isPending || exportGoogleDocsMutation.isPending}
+            />
+          ) : (
+            <Button
+              variant="outline"
+              className="bg-background-elevated border-border-subtle text-text-primary hover:bg-background-hover gap-2"
+              onClick={() => navigate("/profile?tab=integrations")}
+              disabled={isIntegrationStatusLoading}
+            >
+              <ExternalLink size={16} />
+              Export
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -437,18 +515,20 @@ export default function DocDetail() {
       </div>
 
       {/* Editor */}
-      <div className="flex-1 overflow-hidden bg-background-primary pl-3 pr-5 pt-3">
-        <DocEditor
-          key={docId} // Reset editor when document changes
-          initialContent={document.content}
-          onChange={handleContentChange}
-          onSave={handleSave}
-          documentId={docId}
-          variant="fullWidth"
-          placeholder="Start writing your document... Press / for commands or ⌘+J for AI assistance."
-          autosaveDelay={3000}
-          className="h-full"
-        />
+      <div className="flex-1 overflow-auto bg-background-primary">
+        <div className="max-w-4xl mx-auto px-8 py-6">
+          <DocEditor
+            key={docId} // Reset editor when document changes
+            initialContent={document.content}
+            onChange={handleContentChange}
+            onSave={handleSave}
+            documentId={docId}
+            variant="default"
+            placeholder="Start writing your document... Press / for commands or ⌘+J for AI assistance."
+            autosaveDelay={3000}
+            className="h-full"
+          />
+        </div>
       </div>
 
       {/* Contributing Sessions (collapsed at bottom if exists) */}

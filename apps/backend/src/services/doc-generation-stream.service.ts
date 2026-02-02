@@ -1,0 +1,361 @@
+/**
+ * Document Generation Stream Service
+ *
+ * AI-powered document generation from user sessions using RAG + RLM pipeline.
+ * Streams progress events via SSE for real-time UI updates.
+ *
+ * Pipeline:
+ * 1. Create document record (status='generating')
+ * 2. Use KnowledgeAgent to search sessions via search_content (RAG)
+ * 3. Extract session data + RLM environments
+ * 4. Generate document content via LLM
+ * 5. Update document with content (status='draft')
+ *
+ * Progress events emitted:
+ * - progress: { phase: "searching_sessions" | "analyzing_data" | "drafting" | "polishing" }
+ * - chunk: { content: string }
+ * - complete: { content: string, documentId: string }
+ * - error: { error: string }
+ */
+
+import { db } from "../db/client.js";
+import * as schema from "../db/schema/index.js";
+import { eq } from "drizzle-orm";
+import type { DocType } from "@mitable/shared";
+import type { StreamChunk } from "../tools/base.tool.js";
+import { sessionRetrieverService } from "./session-retriever.service.js";
+import { documentGenerationAgent } from "./document-generation/agent.js";
+import { createDocumentEnvironment } from "./document-generation/environment.js";
+
+const DOC_GEN_CONFIG = {
+  TEXT_MODEL: "openai/gpt-oss-120b", // OpenAI GPT-OSS 120B on Groq
+  TEMPERATURE: 0.5,
+  MAX_TOKENS: 4000,
+};
+
+interface GenerateStreamParams {
+  prompt: string;
+  docType: DocType;
+  organizationId: string;
+  userId: string;
+}
+
+interface ProgressEvent {
+  type: "progress";
+  phase: "searching_sessions" | "analyzing_data" | "drafting" | "polishing";
+  message: string;
+}
+
+class DocGenerationStreamService {
+  constructor() {
+    // Groq client now handled by RLM agent
+  }
+
+  /**
+   * Generate document from user prompt with streaming progress
+   */
+  async *generateFromPrompt(
+    params: GenerateStreamParams
+  ): AsyncIterable<StreamChunk | ProgressEvent> {
+    const { prompt, docType, organizationId, userId } = params;
+
+    try {
+      // Phase 1: Create document record immediately (status='generating')
+      yield {
+        type: "progress",
+        phase: "searching_sessions",
+        message: "Creating document and searching your sessions...",
+      } as ProgressEvent;
+
+      const [document] = await db
+        .insert(schema.documents)
+        .values({
+          organizationId,
+          createdBy: userId,
+          title: `Generating: ${prompt.slice(0, 60)}...`,
+          docType,
+          content: "",
+          status: "draft", // We'll update this with content when done
+          generationModel: DOC_GEN_CONFIG.TEXT_MODEL,
+          generationPromptVersion: 1,
+        })
+        .returning();
+
+      const documentId = document.id;
+
+      // Phase 2: Search sessions using RAG
+      yield {
+        type: "progress",
+        phase: "searching_sessions",
+        message: "Searching through your work sessions...",
+      } as ProgressEvent;
+
+      // Parse date range from prompt (e.g., "this week", "last week", "today")
+      const dateRange = this.parseDateRangeFromPrompt(prompt);
+
+      if (dateRange) {
+        console.log(
+          `[DocGenerationStream] Detected date range: ${dateRange.start.toISOString()} to ${dateRange.end.toISOString()}`
+        );
+      }
+
+      // Use SessionRetriever to find relevant session IDs (filtered to this user only)
+      const { sessionMap } = await sessionRetrieverService.search({
+        query: prompt,
+        organizationId,
+        userId, // CRITICAL: Filter to user's sessions only
+        dateRange,
+        topK: 30,
+        minSimilarity: 0.3,
+      });
+
+      const sessionIds = Array.from(sessionMap.keys());
+      console.log(`[DocGenerationStream] Found ${sessionIds.length} relevant sessions`);
+
+      if (sessionIds.length === 0) {
+        throw new Error(
+          "No relevant sessions found for the specified criteria. Try adjusting your query or date range."
+        );
+      }
+
+      // Build sources list
+      const sources = Array.from(sessionMap.entries()).map(([sessionId, sessionChunks]) => ({
+        type: "session",
+        sessionId,
+        sessionName: sessionChunks[0]?.sessionName || "Unnamed Session",
+        chunkCount: sessionChunks.length,
+      }));
+
+      // Phase 3: Create RLM environment
+      yield {
+        type: "progress",
+        phase: "analyzing_data",
+        message: "Creating analysis environment...",
+      } as ProgressEvent;
+
+      const environment = createDocumentEnvironment(
+        sessionIds,
+        organizationId,
+        userId, // CRITICAL: Pass userId to prevent data leakage
+        prompt,
+        dateRange || null
+      );
+
+      // Phase 4: Run RLM agent with tool-calling loop
+      yield {
+        type: "progress",
+        phase: "drafting",
+        message: "Analyzing sessions with AI agent...",
+      } as ProgressEvent;
+
+      let generatedContent = "";
+      let toolCallCount = 0;
+
+      // Stream RLM agent execution
+      for await (const step of documentGenerationAgent.generateDocument(
+        docType,
+        prompt,
+        environment
+      )) {
+        if (step.type === "tool_call") {
+          toolCallCount += step.toolCalls?.length || 0;
+          console.log(`[DocGenerationStream] Agent made ${toolCallCount} total tool calls`);
+          // Optionally yield progress updates
+          yield {
+            type: "progress",
+            phase: "drafting",
+            message: `Analyzing data (${toolCallCount} queries)...`,
+          } as ProgressEvent;
+        } else if (step.type === "content") {
+          generatedContent = step.content || "";
+          // Stream the content character by character for smooth UX
+          for (let i = 0; i < generatedContent.length; i += 50) {
+            const chunk = generatedContent.substring(i, i + 50);
+            yield { type: "chunk", content: chunk } as StreamChunk;
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+        }
+      }
+
+      console.log(
+        `[DocGenerationStream] RLM generation complete (${toolCallCount} tool calls, ${generatedContent.length} chars)`
+      );
+
+      // Phase 5: Polish and finalize
+      yield {
+        type: "progress",
+        phase: "polishing",
+        message: "Finalizing document...",
+      } as ProgressEvent;
+
+      // Extract title from content
+      const title = this.extractTitle(generatedContent, docType, prompt);
+
+      // Update document with final content
+      await db
+        .update(schema.documents)
+        .set({
+          title,
+          content: generatedContent,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.documents.id, documentId));
+
+      // Create initial version
+      await db.insert(schema.documentVersions).values({
+        documentId,
+        version: 1,
+        content: generatedContent,
+        changeType: "created",
+        changedBy: userId,
+        changeSummary: `Generated ${docType} from prompt: "${prompt.slice(0, 100)}"`,
+      });
+
+      // Link contributing sessions (if sources found)
+      if (sources.length > 0) {
+        const sessionIds = sources
+          .filter((s: any) => s.type === "session" && s.sessionId)
+          .map((s: any) => s.sessionId);
+
+        const uniqueSessionIds = [...new Set(sessionIds)];
+
+        for (const sessionId of uniqueSessionIds.slice(0, 10)) {
+          // Limit to 10 sessions
+          await db
+            .insert(schema.sessionDocumentContributions)
+            .values({
+              sessionId,
+              documentId,
+              contributionType: "source",
+              insightsUsed: [],
+            })
+            .onConflictDoNothing();
+        }
+      }
+
+      // Yield complete event
+      yield {
+        type: "complete",
+        content: generatedContent,
+        documentId,
+        sources,
+      } as any;
+    } catch (error) {
+      console.error("[DocGenerationStream] Error:", error);
+      yield {
+        type: "error",
+        error: error instanceof Error ? error.message : "Document generation failed",
+      } as StreamChunk;
+    }
+  }
+
+  /**
+   * Parse date range from natural language prompt
+   */
+  private parseDateRangeFromPrompt(prompt: string): { start: Date; end: Date } | undefined {
+    const now = new Date();
+    const lowerPrompt = prompt.toLowerCase();
+
+    // Helper: Get start of week (Monday)
+    const getStartOfWeek = (date: Date): Date => {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+      d.setDate(diff);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
+    // Helper: Get end of day
+    const getEndOfDay = (date: Date): Date => {
+      const d = new Date(date);
+      d.setHours(23, 59, 59, 999);
+      return d;
+    };
+
+    // "this week" or "weekly report"
+    if (lowerPrompt.includes("this week") || lowerPrompt.includes("weekly report")) {
+      const start = getStartOfWeek(now);
+      const end = getEndOfDay(now);
+      return { start, end };
+    }
+
+    // "last week"
+    if (lowerPrompt.includes("last week")) {
+      const lastWeekStart = getStartOfWeek(now);
+      lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+      const lastWeekEnd = new Date(lastWeekStart);
+      lastWeekEnd.setDate(lastWeekEnd.getDate() + 6);
+      lastWeekEnd.setHours(23, 59, 59, 999);
+      return { start: lastWeekStart, end: lastWeekEnd };
+    }
+
+    // "today"
+    if (lowerPrompt.includes("today")) {
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      const end = getEndOfDay(now);
+      return { start, end };
+    }
+
+    // "yesterday"
+    if (lowerPrompt.includes("yesterday")) {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      const end = new Date(yesterday);
+      end.setHours(23, 59, 59, 999);
+      return { start: yesterday, end };
+    }
+
+    // "this month"
+    if (lowerPrompt.includes("this month")) {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const end = getEndOfDay(now);
+      return { start, end };
+    }
+
+    // "last month"
+    if (lowerPrompt.includes("last month")) {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      return { start: lastMonth, end: lastMonthEnd };
+    }
+
+    // No date range detected
+    return undefined;
+  }
+
+  /**
+   * Extract title from generated content or create from prompt
+   */
+  private extractTitle(content: string, docType: DocType, prompt: string): string {
+    // Try to extract first heading
+    const headingMatch = content.match(/^#\s+(.+)$/m);
+    if (headingMatch) {
+      return headingMatch[1].trim();
+    }
+
+    // Try to extract from prompt
+    const cleanedPrompt = prompt
+      .replace(/^(create|write|generate|make|build)\s+(a|an|the)?\s*/i, "")
+      .trim();
+
+    if (cleanedPrompt.length > 10 && cleanedPrompt.length < 100) {
+      // Capitalize first letter
+      return cleanedPrompt.charAt(0).toUpperCase() + cleanedPrompt.slice(1);
+    }
+
+    // Fallback titles by type
+    const fallbacks: Record<DocType, string> = {
+      "how-to": "How-To Guide",
+      "knowledge-article": "Knowledge Article",
+      troubleshooting: "Troubleshooting Guide",
+    };
+
+    return fallbacks[docType];
+  }
+}
+
+// Export singleton
+export const docGenerationStreamService = new DocGenerationStreamService();
