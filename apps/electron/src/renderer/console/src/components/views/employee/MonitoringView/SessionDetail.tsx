@@ -33,22 +33,18 @@ import {
 import { API_BASE_URL } from "@/console/src/lib/config";
 import {
   ArrowLeft,
-  Clock,
-  Camera,
   Edit2,
   Send,
   Trash2,
-  CheckCircle,
   Loader2,
   Square,
   Pause,
   Play,
   RefreshCw,
   ChevronDown,
-  BookOpen,
   ChevronUp,
-  Image,
   Mail,
+  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -688,10 +684,9 @@ export default function SessionDetail() {
             session.status !== "paused" &&
             (isDelivered ? (
               <div className="flex items-center gap-2">
-                <Badge className="bg-status-success/20 text-status-success border-transparent">
-                  <CheckCircle size={14} className="mr-1" />
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium text-emerald bg-emerald/10">
                   Delivered
-                </Badge>
+                </span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -767,39 +762,30 @@ export default function SessionDetail() {
       </div>
 
       {/* Stats */}
-      <div className="flex items-center gap-6 text-sm border-b border-border-subtle pb-6">
-        <div className="flex items-center gap-2 text-text-secondary">
-          <Clock size={18} />
-          <span>
-            Duration:{" "}
-            <span className="text-text-primary font-medium">
-              {session.endedAt
-                ? formatDuration(
-                    new Date(session.startedAt),
-                    new Date(session.endedAt),
-                    session.totalPausedMs
-                  )
-                : "In progress"}
-            </span>
+      <div className="flex items-center gap-6 text-sm border-b border-stroke-subtle pb-6">
+        <span className="text-ink-secondary">
+          Duration:{" "}
+          <span className="text-ink-primary font-medium">
+            {session.endedAt
+              ? formatDuration(
+                  new Date(session.startedAt),
+                  new Date(session.endedAt),
+                  session.totalPausedMs
+                )
+              : "In progress"}
           </span>
-        </div>
-        <div className="flex items-center gap-2 text-text-secondary">
-          <Camera size={18} />
-          <span>
-            Captures:{" "}
-            <span className="text-text-primary font-medium">{session.captureCount ?? 0}</span>
-          </span>
-        </div>
+        </span>
+        <span className="text-ink-secondary">
+          Captures:{" "}
+          <span className="text-ink-primary font-medium">{session.captureCount ?? 0}</span>
+        </span>
         {session.deliveredAt && (
-          <div className="flex items-center gap-2 text-text-secondary">
-            <Send size={18} />
-            <span>
-              Delivered:{" "}
-              <span className="text-text-primary font-medium">
-                {formatDateTime(session.deliveredAt)}
-              </span>
+          <span className="text-ink-secondary">
+            Delivered:{" "}
+            <span className="text-ink-primary font-medium">
+              {formatDateTime(session.deliveredAt)}
             </span>
-          </div>
+          </span>
         )}
       </div>
 
@@ -810,18 +796,14 @@ export default function SessionDetail() {
             onClick={() => setIsStoryExpanded(!isStoryExpanded)}
             className="flex items-center gap-2 w-full text-left group"
           >
-            <BookOpen size={18} className="text-primary" />
-            <h2 className="text-lg font-semibold text-text-primary flex-1">Live Progress Story</h2>
-            <Badge variant="secondary" className="text-xs">
+            <h2 className="text-lg font-semibold text-ink-primary flex-1">Live Progress Story</h2>
+            <span className="text-xs text-ink-tertiary tabular-nums">
               v{storyData.metadata?.version || 0}
-            </Badge>
+            </span>
             {isStoryExpanded ? (
-              <ChevronUp size={18} className="text-text-secondary group-hover:text-text-primary" />
+              <ChevronUp size={16} className="text-ink-tertiary group-hover:text-ink-primary" />
             ) : (
-              <ChevronDown
-                size={18}
-                className="text-text-secondary group-hover:text-text-primary"
-              />
+              <ChevronDown size={16} className="text-ink-tertiary group-hover:text-ink-primary" />
             )}
           </button>
 
@@ -921,12 +903,9 @@ export default function SessionDetail() {
       {/* Top-K Frames Gallery - Shows after session ends */}
       {session.topKFrames && session.topKFrames.length > 0 && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Image size={18} className="text-primary" />
-            <h2 className="text-xl font-semibold text-text-primary">
-              Key Frames ({session.topKFrames.length})
-            </h2>
-          </div>
+          <h2 className="text-xl font-semibold text-ink-primary">
+            Key Frames ({session.topKFrames.length})
+          </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {session.topKFrames.map((frame: any) => (
               <div

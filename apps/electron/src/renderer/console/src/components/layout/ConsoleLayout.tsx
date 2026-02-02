@@ -28,22 +28,25 @@ export default function ConsoleLayout() {
   }, [navigate]);
 
   // macOS: transparent to show vibrancy, Windows: solid background (Mica handles the effect)
-  const rootBackground = isMac ? "bg-black/20" : "bg-[#1a1a1a]";
+  const rootBackground = isMac ? "bg-canvas-base/80" : "bg-canvas-base";
 
   return (
     <SidebarProvider>
-      {/* Root container - transparent on macOS for vibrancy, solid on Windows for Mica */}
-      <div className={`flex flex-col h-screen overflow-hidden ${rootBackground}`}>
+      {/* Root container with noise texture overlay */}
+      <div className={`flex flex-col h-screen overflow-hidden ${rootBackground} noise-overlay`}>
         {/* Custom Title Bar - Spans full width */}
         <TitleBar />
 
         <div className="flex-1 flex overflow-hidden relative">
           <Sidebar />
 
-          {/* Main Content Area - Floating Card Style */}
+          {/* Main Content Area - Floating Card Style with ambient glow */}
           <div className="flex-1 flex flex-col h-full pb-3 pr-3 overflow-hidden">
-            <div className="flex-1 overflow-hidden rounded-2xl shadow-2xl border border-white/5 bg-background-primary backdrop-blur-sm relative flex flex-col">
-              <ScrollArea className="h-full w-full">
+            <div className="flex-1 overflow-hidden rounded-2xl shadow-2xl border border-stroke-subtle bg-canvas-raised relative flex flex-col">
+              {/* Ambient glow effect */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-gradient-to-b from-indigo/5 to-transparent pointer-events-none rounded-t-2xl" />
+
+              <ScrollArea className="h-full w-full relative">
                 <Outlet />
               </ScrollArea>
             </div>

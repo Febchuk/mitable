@@ -1,34 +1,70 @@
 /**
  * DocsView - Main documents list view
  *
- * Follows console pattern: clean list with search, organized by time.
- * Create flow uses slide-over panel for AI conversation.
+ * Main view for knowledge base documentation.
+ * Features a hero section and chronological timeline of documents.
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDocuments } from "@/console/src/hooks/queries/documents";
 import {
   Search,
-  Plus,
   FileText,
   BookOpen,
   AlertCircle,
-  Clock,
-  MoreHorizontal,
   Sparkles,
+  PenLine,
+  ChevronRight,
+  Filter,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import DocumentCreator from "./DocumentCreator";
-import type { DocType, DocStatus } from "@mitable/shared";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import DocRow from "./DocRow";
+import GenerateDocDialog from "./dialogs/GenerateDocDialog";
+import type { DocType, DocStatus, Document } from "@mitable/shared";
+
+// Group documents by date category
+function groupDocumentsByDate(documents: Document[]) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const weekAgo = new Date(today.getTime() - 7 * 86400000);
+
+  const groups: { label: string; documents: Document[] }[] = [
+    { label: "Today", documents: [] },
+    { label: "Yesterday", documents: [] },
+    { label: "This Week", documents: [] },
+    { label: "Earlier", documents: [] },
+  ];
+
+  documents.forEach((doc) => {
+    const docDate = new Date(doc.updatedAt);
+    const docDay = new Date(
+      docDate.getFullYear(),
+      docDate.getMonth(),
+      docDate.getDate()
+    );
+
+    if (docDay.getTime() >= today.getTime()) {
+      groups[0].documents.push(doc);
+    } else if (docDay.getTime() >= yesterday.getTime()) {
+      groups[1].documents.push(doc);
+    } else if (docDay.getTime() >= weekAgo.getTime()) {
+      groups[2].documents.push(doc);
+    } else {
+      groups[3].documents.push(doc);
+    }
+  });
+
+  return groups.filter((g) => g.documents.length > 0);
+}
 
 function formatRelativeTime(date: Date): string {
   const now = new Date();
@@ -82,7 +118,10 @@ function getStatusBadge(status: DocStatus) {
 export default function DocsView() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isCreatorOpen, setIsCreatorOpen] = useState(false);
+  const [docTypeFilter, setDocTypeFilter] = useState<DocType | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<DocStatus | "all">("all");
+  const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const { data, isLoading, error } = useDocuments({
     search: searchQuery || undefined,
@@ -90,29 +129,34 @@ export default function DocsView() {
 
   const documents = data?.documents || [];
 
-  // Group documents by time
-  const now = new Date();
-  const today = documents.filter((doc: any) => {
-    const docDate = new Date(doc.createdAt);
-    return docDate.toDateString() === now.toDateString();
-  });
+  // Sort by updated date (most recent first)
+  const sortedDocuments = useMemo(() => {
+    return [...documents].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
+  }, [documents]);
 
-  const thisWeek = documents.filter((doc: any) => {
-    const docDate = new Date(doc.createdAt);
-    const diffDays = Math.floor((now.getTime() - docDate.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays > 0 && diffDays <= 7;
-  });
+  // Group by date
+  const groupedDocuments = useMemo(
+    () => groupDocumentsByDate(sortedDocuments),
+    [sortedDocuments]
+  );
 
-  const older = documents.filter((doc: any) => {
-    const docDate = new Date(doc.createdAt);
-    const diffDays = Math.floor((now.getTime() - docDate.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays > 7;
-  });
+  // Count stats
+  const draftCount = documents.filter((d) => d.status === "draft").length;
+  const publishedCount = documents.filter((d) => d.status === "published").length;
 
   if (isLoading) {
     return (
-      <div className="p-8">
-        <div className="text-center text-text-secondary">Loading documents...</div>
+      <div className="min-h-[500px] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full border-2 border-indigo/20 border-t-indigo animate-spin" />
+          </div>
+          <span className="text-ink-tertiary text-sm font-medium">
+            Loading documents...
+          </span>
+        </div>
       </div>
     );
   }
@@ -120,159 +164,220 @@ export default function DocsView() {
   if (error) {
     return (
       <div className="p-8">
-        <div className="text-center text-status-error">Error loading documents</div>
+        <div className="text-center text-red-400">Error loading documents</div>
       </div>
     );
   }
 
-  const renderDocSection = (title: string, docs: any[]) => {
-    if (docs.length === 0) return null;
-    return (
-      <div className="space-y-2">
-        <h3 className="text-xs font-medium text-text-tertiary uppercase tracking-wider px-2">
-          {title}
-        </h3>
-        {docs.map((doc) => {
-          const Icon = getDocTypeIcon(doc.docType);
-          return (
-            <div
-              key={doc.id}
-              onClick={() => navigate(`/docs/${doc.id}`)}
-              className="group bg-background-secondary border border-border-subtle rounded-lg p-4 hover:border-purple-500/30 hover:shadow-card-hover transition-all duration-200 cursor-pointer"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="w-10 h-10 bg-background-elevated rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Icon size={18} className={getDocTypeColor(doc.docType)} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="text-text-primary font-medium truncate group-hover:text-white transition-colors">
-                        {doc.title}
-                      </h4>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full border ${getStatusBadge(doc.status)}`}
-                      >
-                        {doc.status}
-                      </span>
-                    </div>
-                    <p className="text-text-tertiary text-sm line-clamp-2">
-                      {doc.summary || "No summary available"}
-                    </p>
-                    <div className="flex items-center gap-3 mt-2 text-xs text-text-quaternary">
-                      <span className="flex items-center gap-1">
-                        <Clock size={12} />
-                        {formatRelativeTime(doc.createdAt)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <MoreHorizontal size={16} className="text-text-tertiary" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => navigate(`/docs/${doc.id}`)}>
-                      View
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>Edit</DropdownMenuItem>
-                    <DropdownMenuItem className="text-status-error">Delete</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  const hasActiveFilters = docTypeFilter !== "all" || statusFilter !== "all";
 
   return (
-    <div className="p-8 space-y-6 app-no-drag">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Documents</h1>
-          <p className="text-text-secondary mt-2">
-            Create and manage documentation from your work sessions
-          </p>
-        </div>
-        <Button
-          onClick={() => setIsCreatorOpen(true)}
-          className="gap-2 bg-gradient-purple text-white hover:shadow-glow-purple transition-all duration-300"
-        >
-          <Plus size={20} />
-          <span>Create Document</span>
-        </Button>
-      </div>
+    <div className="min-h-full app-no-drag">
+      {/* ═══════════════════════════════════════════════════════════════════
+          HERO SECTION - Create/Generate Document CTAs
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="px-8 pt-8 pb-6">
+        <div className="stagger-1">
+          {/* Header */}
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <h1 className="font-display text-3xl font-semibold text-ink-primary tracking-tight">
+                Docs
+              </h1>
+              <p className="text-ink-tertiary mt-1 text-sm">
+                {documents.length} total · {publishedCount} published · {draftCount} drafts
+              </p>
+            </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none"
-          size={20}
-        />
-        <Input
-          placeholder="Search documents..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
-        />
-      </div>
-
-      {/* Document List */}
-      <div className="space-y-6">
-        {renderDocSection("Today", today)}
-        {renderDocSection("This Week", thisWeek)}
-        {renderDocSection("Older", older)}
-      </div>
-
-      {/* Empty State */}
-      {documents.length === 0 && (
-        <div className="bg-background-secondary/50 backdrop-blur rounded-xl border border-border-subtle p-12 text-center shadow-card">
-          <div className="w-16 h-16 bg-gradient-purple-blue rounded-full flex items-center justify-center mx-auto mb-4">
-            <FileText size={32} className="text-white" />
+            {/* Search + Filter Toggle */}
+            <div className="flex items-center gap-2">
+              <div className="relative w-64">
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary"
+                  size={15}
+                />
+                <Input
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9 text-sm bg-canvas-muted/50 border-transparent text-ink-primary placeholder:text-ink-tertiary focus:bg-canvas-overlay focus:border-stroke transition-all"
+                />
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all ${
+                  showFilters || hasActiveFilters
+                    ? "bg-indigo/20 text-indigo"
+                    : "bg-canvas-muted/50 text-ink-tertiary hover:text-ink-secondary"
+                }`}
+              >
+                <Filter size={16} />
+              </button>
+            </div>
           </div>
-          <p className="text-text-secondary text-lg">
-            {searchQuery ? `No documents found matching "${searchQuery}"` : "No documents yet"}
-          </p>
-          <p className="text-text-tertiary text-sm mt-2">
-            {searchQuery
-              ? "Try a different search term"
-              : "Create your first document with AI assistance"}
-          </p>
-          {!searchQuery && (
-            <Button
-              onClick={() => setIsCreatorOpen(true)}
-              className="gap-2 mt-6 bg-gradient-purple text-white hover:shadow-glow-purple"
-            >
-              <Sparkles size={18} />
-              <span>Create Document</span>
-            </Button>
-          )}
-        </div>
-      )}
 
-      {/* Document Creator Modal */}
-      <Dialog open={isCreatorOpen} onOpenChange={setIsCreatorOpen}>
-        <DialogContent
-          showCloseButton={false}
-          overlayClassName="bg-black/40 backdrop-blur-md"
-          className="w-[420px] max-w-[92vw] h-[78vh] max-h-[760px] p-0 bg-background-primary border-border-subtle shadow-2xl rounded-2xl overflow-hidden"
-        >
-          <DialogTitle className="sr-only">Create Document</DialogTitle>
-          <DialogDescription className="sr-only">
-            Start a new document with AI assistance from your session data.
-          </DialogDescription>
-          <DocumentCreator onClose={() => setIsCreatorOpen(false)} />
-        </DialogContent>
-      </Dialog>
+          {/* Filters Row - Collapsible */}
+          {showFilters && (
+            <div className="flex gap-3 mb-6 animate-reveal-up">
+              <Select
+                value={docTypeFilter}
+                onValueChange={(v) => setDocTypeFilter(v as DocType | "all")}
+              >
+                <SelectTrigger className="w-[160px] h-9 text-sm bg-canvas-overlay border-stroke-subtle">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="how-to">How-To Guides</SelectItem>
+                  <SelectItem value="knowledge-article">Knowledge Articles</SelectItem>
+                  <SelectItem value="troubleshooting">Troubleshooting</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={statusFilter}
+                onValueChange={(v) => setStatusFilter(v as DocStatus | "all")}
+              >
+                <SelectTrigger className="w-[140px] h-9 text-sm bg-canvas-overlay border-stroke-subtle">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <button
+                  onClick={() => {
+                    setDocTypeFilter("all");
+                    setStatusFilter("all");
+                  }}
+                  className="px-3 h-9 text-sm text-ink-tertiary hover:text-ink-secondary transition-colors"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Action Cards - Two options side by side */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Generate from Session */}
+            <button
+              onClick={() => setIsGenerateDialogOpen(true)}
+              className="group relative overflow-hidden rounded-2xl border border-stroke-subtle bg-gradient-to-br from-canvas-overlay to-canvas-raised p-6 text-left transition-all duration-300 hover:border-rose/30 hover:shadow-[0_0_40px_-10px_rgba(244,114,182,0.3)]"
+            >
+              <div className="absolute -top-16 -right-16 w-48 h-48 bg-rose/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+              <div className="relative flex items-center gap-4">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-rose/10 border border-rose/20 group-hover:bg-rose/20 group-hover:scale-105 transition-all duration-300">
+                  <Sparkles size={22} className="text-rose" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
+                    Generate from Session
+                  </h3>
+                  <p className="text-ink-tertiary text-sm mt-0.5">
+                    AI-powered documentation
+                  </p>
+                </div>
+                <ChevronRight
+                  size={18}
+                  className="text-ink-tertiary group-hover:text-rose group-hover:translate-x-1 transition-all"
+                />
+              </div>
+            </button>
+
+            {/* Create New Document */}
+            <button
+              onClick={() => navigate("/docs/new")}
+              className="group relative overflow-hidden rounded-2xl border border-stroke-subtle bg-gradient-to-br from-canvas-overlay to-canvas-raised p-6 text-left transition-all duration-300 hover:border-indigo/30 hover:shadow-[0_0_40px_-10px_rgba(99,102,241,0.3)]"
+            >
+              <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+              <div className="relative flex items-center gap-4">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-indigo/10 border border-indigo/20 group-hover:bg-indigo/20 group-hover:scale-105 transition-all duration-300">
+                  <PenLine size={22} className="text-indigo" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
+                    Write New Document
+                  </h3>
+                  <p className="text-ink-tertiary text-sm mt-0.5">
+                    Start from scratch
+                  </p>
+                </div>
+                <ChevronRight
+                  size={18}
+                  className="text-ink-tertiary group-hover:text-indigo group-hover:translate-x-1 transition-all"
+                />
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          DOCUMENT TIMELINE - Chronological list grouped by date
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="px-8 pb-8">
+        {groupedDocuments.length > 0 ? (
+          <div className="space-y-6 stagger-2">
+            {groupedDocuments.map((group, groupIndex) => (
+              <div key={group.label}>
+                {/* Date Group Header */}
+                <div className="flex items-center gap-3 mb-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
+                    {group.label}
+                  </h3>
+                  <div className="flex-1 h-px bg-stroke-subtle" />
+                  <span className="text-xs text-ink-tertiary tabular-nums">
+                    {group.documents.length}
+                  </span>
+                </div>
+
+                {/* Document Rows */}
+                <div className="space-y-2">
+                  {group.documents.map((doc, docIndex) => (
+                    <DocRow
+                      key={doc.id}
+                      document={doc}
+                      onClick={() => navigate(`/docs/${doc.id}`)}
+                      style={{
+                        animationDelay: `${groupIndex * 0.05 + docIndex * 0.03}s`,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Empty State */
+          <div className="py-16 text-center stagger-2">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-canvas-overlay border border-stroke-subtle mb-4">
+              <FileText size={28} className="text-ink-tertiary" />
+            </div>
+            <h3 className="font-display text-lg font-medium text-ink-primary mb-1">
+              {searchQuery || hasActiveFilters ? "No matches" : "No documents yet"}
+            </h3>
+            <p className="text-ink-tertiary text-sm max-w-xs mx-auto">
+              {searchQuery || hasActiveFilters
+                ? "Try adjusting your search or filters"
+                : "Generate docs from sessions or create one manually"}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Generate Doc Dialog */}
+      <GenerateDocDialog
+        open={isGenerateDialogOpen}
+        onOpenChange={setIsGenerateDialogOpen}
+      />
     </div>
   );
 }
