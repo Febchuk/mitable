@@ -61,7 +61,6 @@ export const sessionChunks = pgTable(
   (table) => ({
     sessionIdIdx: index("idx_session_chunks_session_id").on(table.sessionId),
     orgIdIdx: index("idx_session_chunks_org_id").on(table.organizationId),
-    userIdIdx: index("idx_session_chunks_user_id").on(table.userId), // Added in migration 0028
     chunkTypeIdx: index("idx_session_chunks_type").on(table.chunkType),
     embeddingIdx: index("idx_session_chunks_embedding").using(
       "hnsw",

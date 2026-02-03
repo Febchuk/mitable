@@ -649,6 +649,19 @@ authRouter.post("/login", async (req: Request, res: Response) => {
       }
     }
 
+    // CRITICAL: Check if user exists in database
+    if (!userProfile) {
+      console.error("Login error: User exists in Supabase Auth but not in database", {
+        supabaseUserId: data.user.id,
+        email: data.user.email,
+      });
+      res.status(500).json({
+        error: "Database Sync Error",
+        message: "User profile not found. Please contact support or try signing up again.",
+      });
+      return;
+    }
+
     res.json({
       user: data.user,
       session: data.session,
