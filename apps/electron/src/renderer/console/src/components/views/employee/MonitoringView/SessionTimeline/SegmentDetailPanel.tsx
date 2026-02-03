@@ -63,7 +63,7 @@ export default function SegmentDetailPanel({
     <div
       ref={panelRef}
       className={`
-        bg-background-elevated rounded-lg border border-border-subtle
+        bg-canvas-overlay rounded-xl border border-stroke-subtle
         overflow-hidden
         animate-in slide-in-from-top-2 duration-250
         ${className}
@@ -74,24 +74,24 @@ export default function SegmentDetailPanel({
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+      <div className="flex items-center justify-between p-4 border-b border-stroke-subtle">
         <div>
           <div className="flex items-center gap-2">
-            <span className={`w-3 h-3 rounded-full ${colorClasses.bg}`} />
-            <h3 className="text-lg font-semibold text-text-primary">
+            <span className={`w-2.5 h-2.5 rounded-full ${colorClasses.bg}`} />
+            <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
               {workstream.name}
             </h3>
           </div>
-          <div className="text-sm text-text-secondary mt-1">
+          <div className="text-sm text-ink-secondary mt-1 tabular-nums">
             {overallTimeRange}
-            <span className="mx-2">·</span>
+            <span className="mx-2 text-ink-tertiary">·</span>
             {formatDuration(workstream.totalDurationMinutes)}
           </div>
         </div>
 
         <button
           onClick={onClose}
-          className="p-2 rounded-lg hover:bg-background-tertiary text-text-secondary hover:text-text-primary transition-colors"
+          className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
           aria-label="Close detail panel"
         >
           <X className="w-5 h-5" />
@@ -114,8 +114,8 @@ export default function SegmentDetailPanel({
 
         {/* Apps used */}
         {workstream.appsUsed.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-border-subtle">
-            <div className="text-xs text-text-tertiary">
+          <div className="mt-4 pt-4 border-t border-stroke-subtle">
+            <div className="text-xs text-ink-tertiary">
               Apps: {workstream.appsUsed.join(" · ")}
             </div>
           </div>

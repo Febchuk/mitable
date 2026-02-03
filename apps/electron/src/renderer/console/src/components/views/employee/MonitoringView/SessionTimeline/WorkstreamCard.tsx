@@ -35,33 +35,32 @@ export default function WorkstreamCard({
     <div
       onClick={onClick}
       className={`
-        p-4 rounded-lg border cursor-pointer
+        p-4 rounded-xl border cursor-pointer
         transition-all duration-200 ease-out
         ${isSelected
-          ? `border-2 ${colorClasses.border} bg-${workstream.color}-500/5`
-          : "border-border-subtle bg-background-elevated"
+          ? `border-2 ${colorClasses.border} bg-canvas-muted/50`
+          : "border-stroke-subtle bg-canvas-overlay/50 hover:bg-canvas-overlay hover:border-stroke"
         }
         ${isDimmed ? "opacity-30" : "opacity-100"}
-        ${!isSelected && !isDimmed ? "hover:shadow-md hover:scale-[1.02]" : ""}
       `}
     >
       {/* Row 1: Color dot + Name */}
       <div className="flex items-center gap-2 mb-1">
-        <span className={`w-3 h-3 rounded-full ${colorClasses.bg}`} />
-        <span className="font-medium text-text-primary truncate">
+        <span className={`w-2.5 h-2.5 rounded-full ${colorClasses.bg}`} />
+        <span className="font-medium text-ink-primary truncate">
           {workstream.name}
         </span>
       </div>
 
       {/* Row 2: Total duration */}
-      <div className="text-text-secondary text-sm mb-2">
+      <div className="text-ink-secondary text-sm mb-2 tabular-nums">
         {formatDuration(workstream.totalDurationMinutes)} total
       </div>
 
       {/* Row 3: Apps used */}
       {appsDisplay && (
         <div
-          className="text-xs text-text-tertiary truncate mb-1"
+          className="text-xs text-ink-tertiary truncate mb-1"
           title={appsDisplay}
         >
           {appsDisplay}
@@ -70,7 +69,7 @@ export default function WorkstreamCard({
 
       {/* Row 4: Time ranges */}
       <div
-        className="text-xs text-text-tertiary truncate font-mono"
+        className="text-xs text-ink-tertiary truncate tabular-nums"
         title={timeRanges}
       >
         {timeRanges}

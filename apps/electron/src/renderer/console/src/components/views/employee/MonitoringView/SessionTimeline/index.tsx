@@ -7,7 +7,7 @@
  */
 
 import { useState, useCallback } from "react";
-import { Layers, ChevronDown, ChevronUp, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, RefreshCw } from "lucide-react";
 import { useSessionWorkstreams } from "./hooks/useSessionWorkstreams";
 import type { Workstream } from "./utils/types";
 import { WORKSTREAM_COLOR_MAP } from "./utils/types";
@@ -65,7 +65,7 @@ export default function SessionTimeline({
   const isSessionActive = sessionStatus === "active" || sessionStatus === "paused";
 
   return (
-    <div className={`bg-background-elevated rounded-lg border border-border-subtle ${className}`}>
+    <div className={`bg-canvas-overlay rounded-xl border border-stroke-subtle ${className}`}>
       {/* Header */}
       <div
         role="button"
@@ -77,34 +77,33 @@ export default function SessionTimeline({
             setIsCollapsed(!isCollapsed);
           }
         }}
-        className="w-full flex items-center justify-between p-4 hover:bg-background-tertiary/30 transition-colors rounded-t-lg cursor-pointer"
+        className="w-full flex items-center justify-between p-4 hover:bg-canvas-muted/30 transition-colors rounded-t-xl cursor-pointer"
       >
-        <div className="flex items-center gap-2">
-          <Layers className="w-5 h-5 text-text-secondary" />
-          <h3 className="text-lg font-semibold text-text-primary">Workstream Timeline</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">Workstream Timeline</h3>
           {transformedData && (
-            <span className="text-sm text-text-tertiary">
-              ({transformedData.workstreams.length} workstreams)
+            <span className="text-sm text-ink-tertiary">
+              {transformedData.workstreams.length} workstreams
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {/* Dev regenerate button */}
           {isDev && (
             <button
               onClick={(e) => {
-                e.stopPropagation(); // Don't trigger collapse
+                e.stopPropagation();
                 triggerAnalysis();
               }}
               disabled={isAnalyzing || isLoading}
-              className="flex items-center gap-1 text-xs text-amber-500 hover:text-amber-400 disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-amber-500/10 transition-colors"
+              className="text-xs text-ink-tertiary hover:text-ink-secondary disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-canvas-muted transition-colors"
               title="Force RLM workstream analysis"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? "animate-spin" : ""}`} />
-              Regenerate (Dev)
+              <RefreshCw className={`w-3.5 h-3.5 inline mr-1 ${isAnalyzing ? "animate-spin" : ""}`} />
+              Regenerate
             </button>
           )}
-          <div className="text-text-tertiary">
+          <div className="text-ink-tertiary">
             {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
           </div>
         </div>
@@ -116,23 +115,22 @@ export default function SessionTimeline({
           {/* Loading state */}
           {isLoading && (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 text-text-tertiary animate-spin" />
-              <span className="ml-2 text-text-secondary">Loading workstreams...</span>
+              <Loader2 className="w-5 h-5 text-ink-tertiary animate-spin" />
+              <span className="ml-2 text-sm text-ink-secondary">Loading workstreams...</span>
             </div>
           )}
 
           {/* Analyzing state (RLM running) */}
           {isAnalyzing && !isLoading && (
-            <div className="flex items-center justify-center py-2 px-4 bg-accent-primary/10 rounded-lg border border-accent-primary/20">
-              <Sparkles className="w-4 h-4 text-accent-primary animate-pulse" />
-              <span className="ml-2 text-sm text-accent-primary">Analyzing workstreams with AI...</span>
+            <div className="flex items-center justify-center py-2 px-4 bg-indigo/10 rounded-lg border border-indigo/20">
+              <span className="text-sm text-indigo">Analyzing workstreams...</span>
             </div>
           )}
 
           {/* Error state */}
           {error && (
             <div className="text-center py-8">
-              <p className="text-text-secondary">Failed to load workstream data</p>
+              <p className="text-sm text-ink-secondary">Failed to load workstream data</p>
             </div>
           )}
 
@@ -177,7 +175,7 @@ export default function SessionTimeline({
           {/* Empty state */}
           {transformedData && transformedData.workstreams.length === 0 && !isLoading && (
             <div className="text-center py-8">
-              <p className="text-text-secondary">
+              <p className="text-sm text-ink-secondary">
                 {isSessionActive
                   ? "Waiting for activity to be recorded..."
                   : "No workstream activity recorded."}
@@ -188,7 +186,7 @@ export default function SessionTimeline({
           {/* No data state */}
           {!transformedData && !isLoading && !error && (
             <div className="text-center py-8">
-              <p className="text-text-secondary">
+              <p className="text-sm text-ink-secondary">
                 {isSessionActive
                   ? "Recording activity..."
                   : "No activity data available."}
@@ -216,7 +214,7 @@ function WorkstreamLegend({
   onLegendClick,
 }: WorkstreamLegendProps) {
   return (
-    <div className="flex flex-wrap justify-center gap-4 pt-2">
+    <div className="flex flex-wrap justify-center gap-4 pt-2 border-t border-stroke-subtle mt-4">
       {workstreams.map((workstream) => {
         const colorClasses = WORKSTREAM_COLOR_MAP[workstream.color];
         const isDimmed = selectedWorkstreamId !== null && selectedWorkstreamId !== workstream.id;
@@ -226,13 +224,13 @@ function WorkstreamLegend({
             key={workstream.id}
             onClick={() => onLegendClick(workstream.id)}
             className={`
-              flex items-center gap-2 text-sm transition-opacity duration-200
+              flex items-center gap-2 text-sm pt-4 transition-opacity duration-200
               hover:opacity-100
-              ${isDimmed ? "opacity-50" : "opacity-100"}
+              ${isDimmed ? "opacity-40" : "opacity-100"}
             `}
           >
-            <span className={`w-2.5 h-2.5 rounded-full ${colorClasses.bg}`} />
-            <span className="text-text-secondary">{workstream.name}</span>
+            <span className={`w-2 h-2 rounded-full ${colorClasses.bg}`} />
+            <span className="text-ink-secondary">{workstream.name}</span>
           </button>
         );
       })}

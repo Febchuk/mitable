@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { History, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { useSessionCaptures } from "@/console/src/hooks/queries/monitoring";
 import { useTimelineTransform } from "@/console/src/hooks/useTimelineTransform";
 import TimelineGroup from "./TimelineGroup";
@@ -39,22 +39,21 @@ export default function ActivityTimeline({
   const isSessionActive = sessionStatus === "active" || sessionStatus === "paused";
 
   return (
-    <div className={`bg-background-elevated rounded-lg border border-border-subtle ${className}`}>
+    <div className={`bg-canvas-overlay rounded-xl border border-stroke-subtle ${className}`}>
       {/* Header */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="w-full flex items-center justify-between p-4 hover:bg-background-tertiary/30 transition-colors rounded-t-lg"
+        className="w-full flex items-center justify-between p-4 hover:bg-canvas-muted/30 transition-colors rounded-t-xl"
       >
-        <div className="flex items-center gap-2">
-          <History className="w-5 h-5 text-text-secondary" />
-          <h3 className="text-lg font-semibold text-text-primary">Activity Transcript</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">Activity Transcript</h3>
           {timeline && (
-            <span className="text-sm text-text-tertiary">
-              ({timeline.groups.length} activities)
+            <span className="text-sm text-ink-tertiary">
+              {timeline.groups.length} activities
             </span>
           )}
         </div>
-        <div className="text-text-tertiary">
+        <div className="text-ink-tertiary">
           {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
         </div>
       </button>
@@ -65,15 +64,15 @@ export default function ActivityTimeline({
           {/* Loading state */}
           {isLoading && (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 text-text-tertiary animate-spin" />
-              <span className="ml-2 text-text-secondary">Loading transcript...</span>
+              <Loader2 className="w-5 h-5 text-ink-tertiary animate-spin" />
+              <span className="ml-2 text-sm text-ink-secondary">Loading transcript...</span>
             </div>
           )}
 
           {/* Error state */}
           {error && (
             <div className="text-center py-8">
-              <p className="text-text-secondary">Failed to load transcript</p>
+              <p className="text-sm text-ink-secondary">Failed to load transcript</p>
             </div>
           )}
 
@@ -93,7 +92,7 @@ export default function ActivityTimeline({
           {/* Empty state */}
           {timeline && timeline.groups.length === 0 && !isLoading && (
             <div className="text-center py-8">
-              <p className="text-text-secondary">
+              <p className="text-sm text-ink-secondary">
                 {isSessionActive
                   ? "Waiting for activity to be recorded..."
                   : "No recorded activity yet."}

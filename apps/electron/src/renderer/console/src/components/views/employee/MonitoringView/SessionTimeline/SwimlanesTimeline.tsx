@@ -52,7 +52,7 @@ export default function SwimlanesTimeline({
         {timeLabels.map((label, index) => (
           <span
             key={index}
-            className="absolute text-xs text-text-tertiary transform -translate-x-1/2"
+            className="absolute text-xs text-ink-tertiary tabular-nums transform -translate-x-1/2"
             style={{ left: `${label.position}%` }}
           >
             {label.time}
@@ -124,7 +124,7 @@ function SwimlaneRow({
     >
       {/* Workstream label */}
       <div
-        className="w-[120px] flex-shrink-0 truncate text-sm font-medium text-text-primary"
+        className="w-[120px] flex-shrink-0 truncate text-sm font-medium text-ink-primary"
         title={workstream.name}
       >
         <span className={`inline-block w-2 h-2 rounded-full mr-2 ${colorClasses.bg}`} />
@@ -133,7 +133,7 @@ function SwimlaneRow({
 
       {/* Timeline lane */}
       <div
-        className="flex-1 h-8 relative bg-background-tertiary/30 rounded-md cursor-pointer"
+        className="flex-1 h-8 relative bg-canvas-muted/30 rounded-md cursor-pointer"
         onClick={onClick}
       >
         {workstream.segments.map((segment, index) => {
@@ -185,14 +185,14 @@ function SegmentTooltip({ workstream, segmentIndex, x, y }: SegmentTooltipProps)
 
   return (
     <div
-      className="fixed z-50 bg-background-primary border border-border-subtle rounded-lg shadow-lg px-3 py-2 text-sm pointer-events-none transform -translate-x-1/2 -translate-y-full -mt-2"
+      className="fixed z-50 bg-canvas-raised border border-stroke-subtle rounded-lg shadow-lg px-3 py-2 text-sm pointer-events-none transform -translate-x-1/2 -translate-y-full -mt-2"
       style={{ left: x, top: y }}
     >
-      <div className="font-medium text-text-primary">{workstream.name}</div>
-      <div className="text-text-secondary">
+      <div className="font-medium text-ink-primary">{workstream.name}</div>
+      <div className="text-ink-secondary tabular-nums">
         {formatTimeRange(segment.startTime, segment.endTime)}
       </div>
-      <div className="text-text-tertiary text-xs">
+      <div className="text-ink-tertiary text-xs tabular-nums">
         {formatDuration(segment.durationMinutes)}
       </div>
     </div>

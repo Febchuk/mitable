@@ -2,10 +2,11 @@
  * ScreenshotCarousel
  *
  * Screenshot viewer with navigation for the detail panel.
+ * Clean design without decorative icons.
  */
 
 import { useState, useCallback, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Camera, Maximize2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
 import type { SessionCapture } from "@/console/src/services/monitoringService";
 import { formatTime } from "./utils/formatDuration";
 
@@ -59,11 +60,8 @@ export default function ScreenshotCarousel({
 
   if (capturesWithImages.length === 0) {
     return (
-      <div className={`flex items-center justify-center bg-background-tertiary rounded-lg p-8 ${className}`}>
-        <div className="text-center">
-          <Camera className="w-12 h-12 text-text-tertiary mx-auto mb-2" />
-          <p className="text-text-secondary text-sm">No screenshots available</p>
-        </div>
+      <div className={`flex items-center justify-center bg-canvas-muted/30 rounded-xl p-8 ${className}`}>
+        <p className="text-sm text-ink-tertiary">No screenshots available</p>
       </div>
     );
   }
@@ -75,11 +73,8 @@ export default function ScreenshotCarousel({
   // Extra safety check - should never happen but prevents crash
   if (!currentCapture) {
     return (
-      <div className={`flex items-center justify-center bg-background-tertiary rounded-lg p-8 ${className}`}>
-        <div className="text-center">
-          <Camera className="w-12 h-12 text-text-tertiary mx-auto mb-2" />
-          <p className="text-text-secondary text-sm">Loading screenshots...</p>
-        </div>
+      <div className={`flex items-center justify-center bg-canvas-muted/30 rounded-xl p-8 ${className}`}>
+        <p className="text-sm text-ink-tertiary">Loading screenshots...</p>
       </div>
     );
   }
@@ -88,7 +83,7 @@ export default function ScreenshotCarousel({
     <>
       <div className={`relative group ${className}`}>
         {/* Main image container */}
-        <div className="relative bg-background-tertiary rounded-lg overflow-hidden aspect-video">
+        <div className="relative bg-canvas-muted/30 rounded-xl overflow-hidden aspect-video">
           <img
             src={`data:image/png;base64,${currentCapture.imageData}`}
             alt={currentCapture.activityDescription || "Screenshot"}
@@ -100,14 +95,14 @@ export default function ScreenshotCarousel({
             <>
               <button
                 onClick={goToPrevious}
-                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-canvas-base/80 text-ink-secondary opacity-0 group-hover:opacity-100 transition-all hover:bg-canvas-base hover:text-ink-primary"
                 aria-label="Previous screenshot"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button
                 onClick={goToNext}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-canvas-base/80 text-ink-secondary opacity-0 group-hover:opacity-100 transition-all hover:bg-canvas-base hover:text-ink-primary"
                 aria-label="Next screenshot"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -118,7 +113,7 @@ export default function ScreenshotCarousel({
           {/* Fullscreen button */}
           <button
             onClick={() => setIsFullscreen(true)}
-            className="absolute top-2 right-2 p-2 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+            className="absolute top-2 right-2 p-2 rounded-lg bg-canvas-base/80 text-ink-tertiary opacity-0 group-hover:opacity-100 transition-all hover:bg-canvas-base hover:text-ink-primary"
             aria-label="View fullscreen"
           >
             <Maximize2 className="w-4 h-4" />
@@ -126,27 +121,29 @@ export default function ScreenshotCarousel({
         </div>
 
         {/* Caption */}
-        <div className="mt-2 text-center">
-          <div className="text-sm text-text-primary">
-            Screenshot {currentIndex + 1} of {capturesWithImages.length}
-          </div>
-          <div className="text-xs text-text-tertiary">
+        <div className="mt-3 flex items-center justify-between text-sm">
+          <span className="text-ink-secondary tabular-nums">
+            {currentIndex + 1} / {capturesWithImages.length}
+          </span>
+          <span className="text-ink-tertiary tabular-nums">
             {formatTime(currentCapture.capturedAt)}
-            {currentCapture.appName && ` · ${currentCapture.appName}`}
-          </div>
+            {currentCapture.appName && (
+              <span className="ml-2 text-ink-tertiary">{currentCapture.appName}</span>
+            )}
+          </span>
         </div>
 
         {/* Dot indicators (for few screenshots) */}
         {capturesWithImages.length > 1 && capturesWithImages.length <= 10 && (
-          <div className="flex justify-center gap-1.5 mt-2">
+          <div className="flex justify-center gap-1.5 mt-3">
             {capturesWithImages.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`w-2 h-2 rounded-full transition-colors ${
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${
                   index === currentIndex
-                    ? "bg-primary"
-                    : "bg-background-tertiary hover:bg-text-tertiary"
+                    ? "bg-indigo"
+                    : "bg-canvas-muted hover:bg-ink-tertiary"
                 }`}
                 aria-label={`Go to screenshot ${index + 1}`}
               />
@@ -158,21 +155,21 @@ export default function ScreenshotCarousel({
       {/* Fullscreen modal */}
       {isFullscreen && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-canvas-base/95 flex items-center justify-center p-4"
           onClick={() => setIsFullscreen(false)}
         >
           <button
             onClick={() => setIsFullscreen(false)}
-            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+            className="absolute top-4 right-4 p-2 rounded-lg bg-canvas-overlay text-ink-secondary hover:text-ink-primary transition-colors"
             aria-label="Close fullscreen"
           >
-            <span className="text-xl">×</span>
+            <X className="w-5 h-5" />
           </button>
 
           <img
             src={`data:image/png;base64,${currentCapture.imageData}`}
             alt={currentCapture.activityDescription || "Screenshot"}
-            className="max-w-full max-h-full object-contain"
+            className="max-w-full max-h-full object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />
 
@@ -184,7 +181,7 @@ export default function ScreenshotCarousel({
                   e.stopPropagation();
                   goToPrevious();
                 }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-lg bg-canvas-overlay text-ink-secondary hover:text-ink-primary transition-colors"
                 aria-label="Previous screenshot"
               >
                 <ChevronLeft className="w-6 h-6" />
@@ -194,7 +191,7 @@ export default function ScreenshotCarousel({
                   e.stopPropagation();
                   goToNext();
                 }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-lg bg-canvas-overlay text-ink-secondary hover:text-ink-primary transition-colors"
                 aria-label="Next screenshot"
               >
                 <ChevronRight className="w-6 h-6" />
@@ -203,7 +200,7 @@ export default function ScreenshotCarousel({
           )}
 
           {/* Counter */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white text-sm bg-black/50 px-3 py-1 rounded-full">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-ink-primary text-sm bg-canvas-overlay px-4 py-2 rounded-lg tabular-nums">
             {currentIndex + 1} / {capturesWithImages.length}
           </div>
         </div>

@@ -44,7 +44,6 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
-  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -616,17 +615,17 @@ export default function SessionDetail() {
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-text-primary">
+            <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
               {session.name === "Work session" && session.status === "summarizing" ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="animate-spin" size={24} />
+                  <Loader2 className="animate-spin" size={20} />
                   Generating title...
                 </span>
               ) : (
                 session.name || "Untitled Session"
               )}
             </h1>
-            <p className="text-text-secondary mt-1">{formatDateTime(session.startedAt)}</p>
+            <p className="text-ink-secondary text-sm mt-1">{formatDateTime(session.startedAt)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -796,7 +795,7 @@ export default function SessionDetail() {
             onClick={() => setIsStoryExpanded(!isStoryExpanded)}
             className="flex items-center gap-2 w-full text-left group"
           >
-            <h2 className="text-lg font-semibold text-ink-primary flex-1">Live Progress Story</h2>
+            <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight flex-1">Live Progress</h2>
             <span className="text-xs text-ink-tertiary tabular-nums">
               v{storyData.metadata?.version || 0}
             </span>
@@ -808,16 +807,16 @@ export default function SessionDetail() {
           </button>
 
           {isStoryExpanded && (
-            <div className="bg-background-elevated rounded-lg border border-primary/20 p-4">
+            <div className="bg-canvas-overlay rounded-xl border border-indigo/20 p-4">
               <div className="prose prose-invert prose-sm max-w-none">
                 {storyData.story.split("\n").map((paragraph, i) => (
-                  <p key={i} className="text-text-primary mb-2 last:mb-0 text-sm leading-relaxed">
+                  <p key={i} className="text-ink-primary mb-2 last:mb-0 text-sm leading-relaxed">
                     {paragraph || <br />}
                   </p>
                 ))}
               </div>
               {storyData.metadata?.lastUpdated && (
-                <div className="mt-3 pt-2 border-t border-border-subtle text-xs text-text-tertiary">
+                <div className="mt-3 pt-2 border-t border-stroke-subtle text-xs text-ink-tertiary tabular-nums">
                   Last updated: {new Date(storyData.metadata.lastUpdated).toLocaleTimeString()}
                 </div>
               )}
@@ -829,7 +828,7 @@ export default function SessionDetail() {
       {/* Summary Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-text-primary">Session Summary</h2>
+          <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight">Summary</h2>
           <div className="flex items-center gap-2">
             {/* DEV ONLY: Regenerate button - hidden in production */}
             {import.meta.env.DEV && session.status === "ready" && (
@@ -874,18 +873,18 @@ export default function SessionDetail() {
         </div>
 
         {summary ? (
-          <div className="bg-background-elevated rounded-lg border border-border-subtle p-6">
+          <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-6">
             <div className="prose prose-invert prose-sm max-w-none">
               {summary.split("\n").map((paragraph, i) => (
-                <p key={i} className="text-text-primary mb-3 last:mb-0">
+                <p key={i} className="text-ink-primary mb-3 last:mb-0 text-sm leading-relaxed">
                   {paragraph || <br />}
                 </p>
               ))}
             </div>
           </div>
         ) : (
-          <div className="bg-background-elevated rounded-lg border border-border-subtle p-8 text-center">
-            <p className="text-text-secondary">
+          <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-8 text-center">
+            <p className="text-sm text-ink-secondary">
               {session.status === "summarizing"
                 ? "Generating summary..."
                 : "No summary available for this session."}
@@ -903,14 +902,14 @@ export default function SessionDetail() {
       {/* Top-K Frames Gallery - Shows after session ends */}
       {session.topKFrames && session.topKFrames.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-ink-primary">
-            Key Frames ({session.topKFrames.length})
+          <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight">
+            Key Frames <span className="text-ink-tertiary font-normal">({session.topKFrames.length})</span>
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {session.topKFrames.map((frame: any) => (
               <div
                 key={frame.id}
-                className="group relative bg-background-elevated rounded-lg border border-border-subtle overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+                className="group relative bg-canvas-overlay rounded-xl border border-stroke-subtle overflow-hidden cursor-pointer hover:border-stroke transition-colors"
                 onClick={() => setSelectedFrame(frame.id)}
               >
                 {frame.imageData ? (
@@ -920,16 +919,16 @@ export default function SessionDetail() {
                     className="w-full aspect-video object-cover"
                   />
                 ) : (
-                  <div className="w-full aspect-video bg-background-tertiary flex items-center justify-center">
-                    <Camera size={24} className="text-text-tertiary" />
+                  <div className="w-full aspect-video bg-canvas-muted flex items-center justify-center">
+                    <span className="text-sm text-ink-tertiary">No preview</span>
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-white text-xs line-clamp-2">
+                <div className="absolute inset-0 bg-gradient-to-t from-canvas-base/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute bottom-0 left-0 right-0 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-ink-primary text-xs line-clamp-2">
                     {frame.activityDescription || frame.appName || "Captured frame"}
                   </p>
-                  <p className="text-white/60 text-xs mt-1">
+                  <p className="text-ink-tertiary text-xs mt-1 tabular-nums">
                     {new Date(frame.capturedAt).toLocaleTimeString()}
                   </p>
                 </div>
@@ -941,9 +940,9 @@ export default function SessionDetail() {
 
       {/* Frame Preview Dialog */}
       <Dialog open={!!selectedFrame} onOpenChange={() => setSelectedFrame(null)}>
-        <DialogContent className="bg-background-primary border-border-subtle max-w-4xl">
+        <DialogContent className="bg-canvas-raised border-stroke-subtle max-w-4xl">
           <DialogHeader>
-            <DialogTitle className="text-text-primary">Frame Preview</DialogTitle>
+            <DialogTitle className="font-display text-base font-semibold text-ink-primary tracking-tight">Frame Preview</DialogTitle>
           </DialogHeader>
           {selectedFrame &&
             (() => {
@@ -955,27 +954,27 @@ export default function SessionDetail() {
                     <img
                       src={`data:image/png;base64,${frame.imageData}`}
                       alt={frame.activityDescription || "Session capture"}
-                      className="w-full rounded-lg"
+                      className="w-full rounded-xl"
                     />
                   ) : (
-                    <div className="w-full aspect-video bg-background-tertiary flex items-center justify-center rounded-lg">
-                      <Camera size={48} className="text-text-tertiary" />
+                    <div className="w-full aspect-video bg-canvas-muted flex items-center justify-center rounded-xl">
+                      <span className="text-sm text-ink-tertiary">No preview available</span>
                     </div>
                   )}
                   <div className="space-y-2">
-                    <p className="text-text-primary">
+                    <p className="text-ink-primary text-sm">
                       {frame.activityDescription || "No description available"}
                     </p>
-                    <div className="flex items-center gap-4 text-sm text-text-secondary">
+                    <div className="flex items-center gap-4 text-sm text-ink-secondary">
                       <span>{frame.appName || "Unknown app"}</span>
-                      <span>•</span>
-                      <span>{new Date(frame.capturedAt).toLocaleString()}</span>
+                      <span className="text-ink-tertiary">·</span>
+                      <span className="tabular-nums">{new Date(frame.capturedAt).toLocaleString()}</span>
                       {frame.importanceScore && (
                         <>
-                          <span>•</span>
-                          <Badge variant="secondary">
-                            Importance: {(frame.importanceScore * 100).toFixed(0)}%
-                          </Badge>
+                          <span className="text-ink-tertiary">·</span>
+                          <span className="text-indigo tabular-nums">
+                            {(frame.importanceScore * 100).toFixed(0)}%
+                          </span>
                         </>
                       )}
                     </div>
