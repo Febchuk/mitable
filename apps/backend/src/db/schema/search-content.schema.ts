@@ -25,15 +25,27 @@ const tsvector = customType<{ data: string }>({
 });
 
 /**
- * Search content table for hybrid search (PostgreSQL FTS + Pinecone semantic)
+ * Custom type for pgvector embedding (vector(1536))
+ * Used for semantic similarity search
+ */
+const vector = customType<{ data: number[]; dimensions?: number }>({
+  dataType(config) {
+    return `vector(${(config as any)?.dimensions ?? 1536})`;
+  },
+});
+
+/**
+ * Search content table for hybrid search (pgvector semantic + PostgreSQL FTS keyword)
  *
- * This table mirrors Pinecone vectors but stores text for keyword search.
+ * This table stores both vector embeddings and text for hybrid search.
  * The text_vector column is auto-updated by a PostgreSQL trigger (see migration).
  *
  * Architecture:
- * - Pinecone: Semantic search (vector similarity)
- * - PostgreSQL: Keyword search (full-text search with tsvector + GIN index)
+ * - pgvector: Semantic search (HNSW index for vector similarity)
+ * - PostgreSQL FTS: Keyword search (tsvector + GIN index)
  * - Hybrid: Combine both with Reciprocal Rank Fusion (RRF)
+ *
+ * Sources: 'slack' | 'notion' | 'session' | 'artifact'
  */
 export const searchContent = pgTable(
   "search_content",
@@ -57,6 +69,33 @@ export const searchContent = pgTable(
     // Auto-updated by trigger on INSERT/UPDATE (see migration file)
     // Uses 'english' configuration for stemming, stop words, etc.
     textVector: tsvector("text_vector").notNull(),
+
+    // pgvector embedding for semantic search (Migration 0026)
+    // 1536 dimensions for OpenAI text-embedding-3-small
+    embedding: vector("embedding", { dimensions: 1536 }),
+
+    // 🆕 SESSION METADATA (Migration 0026)
+    sessionId: uuid("session_id"),
+    sessionName: text("session_name"),
+    sessionGoal: text("session_goal"),
+    sessionStatus: text("session_status"),
+    actionType: text("action_type"), // VIEWING | AUTHORING | EDITING | PASTING | NAVIGATION
+    appName: text("app_name"),
+    windowTitle: text("window_title"),
+    importanceScore: integer("importance_score"), // 0-100
+    confidence: integer("confidence"), // 0-100
+    startTime: timestamp("start_time"),
+    endTime: timestamp("end_time"),
+    durationMinutes: integer("duration_minutes"),
+    activityCount: integer("activity_count"),
+
+    // Doc facts layer (structured claims for reliability)
+    docFacts: jsonb("doc_facts"), // { claim, evidence[], outcome, confidence }
+
+    // RLM environments (retrieved only when explicitly requested via tools)
+    classifierEnvironmentJsonb: jsonb("classifier_environment_jsonb"),
+    storytellerEnvironmentJsonb: jsonb("storyteller_environment_jsonb"),
+    rawCaptureIds: text("raw_capture_ids").array(),
 
     // Slack-specific metadata
     channelId: text("channel_id"),
@@ -168,17 +207,30 @@ export interface SearchResultMetadata {
   source: string;
   sourceType?: string;
   relevanceScore: number; // Combined score from RRF
-  semanticScore?: number; // Pinecone cosine similarity
+  semanticScore?: number; // pgvector cosine similarity
   keywordScore?: number; // PostgreSQL ts_rank
 
   // Source-specific metadata
+  // Slack
   channelId?: string;
   channelName?: string;
   username?: string;
+
+  // Notion
   pageId?: string;
   pageTitle?: string;
+
+  // Session
+  sessionId?: string;
+  sessionName?: string;
+  sessionGoal?: string;
+  actionType?: string;
+  appName?: string;
+  importanceScore?: number;
 
   // Temporal
   timestamp?: number;
   date?: string;
+  startTime?: Date;
+  endTime?: Date;
 }

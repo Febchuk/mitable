@@ -203,13 +203,13 @@ export function useExportToGoogleDocs() {
 // List Google Drive Folders
 // ===========================
 
-export function useGoogleDriveFolders() {
+export function useGoogleDriveFolders(enabled = true) {
   const { user } = useUser();
 
   return useQuery({
     queryKey: ["google-drive-folders"],
     queryFn: () => documentsService.fetchGoogleDriveFolders(),
-    enabled: !!user,
+    enabled: !!user && enabled,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }

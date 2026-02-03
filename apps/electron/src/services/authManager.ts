@@ -20,7 +20,7 @@ class AuthManager {
     // Note: VITE_* env vars are NOT available in main process at runtime
     this.apiBaseUrl = app.isPackaged
       ? PROD_API_URL
-      : (process.env.VITE_API_URL || "http://localhost:3000");
+      : process.env.VITE_API_URL || "http://localhost:3000";
   }
 
   /**

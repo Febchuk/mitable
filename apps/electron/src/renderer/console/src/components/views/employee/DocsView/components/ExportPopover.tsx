@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ExternalLink, CheckCircle, Circle, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-interface ExportDestination {
+export interface ExportDestination {
   id: "notion" | "google-docs";
   name: string;
   isExported: boolean;

@@ -90,7 +90,14 @@ class GoogleDocsExportService {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to list Drive folders: ${await response.text()}`);
+      const errorText = await response.text();
+      // Check for auth errors (401/403) - token expired or revoked
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(
+          "RECONNECT_REQUIRED: Google Drive authentication expired. Please reconnect your Gmail/Google Workspace integration."
+        );
+      }
+      throw new Error(`Failed to list Drive folders: ${errorText}`);
     }
 
     const data = (await response.json()) as { files?: DriveFolder[] };
@@ -351,6 +358,11 @@ class GoogleDocsExportService {
       });
       console.log(`Deleted old Google Doc: ${googleDocsId}`);
     } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes("401")) {
+          throw new Error("RECONNECT_REQUIRED");
+        }
+      }
       console.error("Error deleting Google Doc (continuing anyway):", error);
       // Don't throw - if delete fails, we'll just create a new doc
     }
