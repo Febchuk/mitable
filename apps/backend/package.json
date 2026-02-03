@@ -32,6 +32,7 @@
     "migrate:0023": "tsx src/scripts/run-migration-0023.ts",
     "migrate:0024": "tsx src/scripts/run-migration-0024.ts",
     "migrate:0025": "tsx src/scripts/run-migration-0025.ts",
+    "migrate:0026": "tsx src/scripts/run-migration-0026.ts",
     "migrate:persona-fields": "tsx src/scripts/run-migration-add-persona-fields.ts",
     "test-search": "tsx src/scripts/test-search.ts",
     "sync-slack": "tsx src/scripts/sync-slack.ts",
@@ -52,6 +53,7 @@
     "@sentry/node": "^10.32.1",
     "@slack/web-api": "^7.11.0",
     "@supabase/supabase-js": "^2.75.0",
+    "color": "^4.2.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.44.6",
@@ -70,7 +72,7 @@
     "posthog-node": "^5.18.1",
     "resend": "^6.6.0",
     "sharp": "^0.33.5",
-    "color": "^4.2.3",
+    "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "tesseract.js": "^6.0.1",
@@ -79,10 +81,10 @@
     "zod-to-json-schema": "^3.24.6"
   },
   "optionalDependencies": {
-    "@img/sharp-win32-x64": "^0.33.5",
-    "@img/sharp-darwin-x64": "^0.33.5",
     "@img/sharp-darwin-arm64": "^0.33.5",
-    "@img/sharp-linux-x64": "^0.33.5"
+    "@img/sharp-darwin-x64": "^0.33.5",
+    "@img/sharp-linux-x64": "^0.33.5",
+    "@img/sharp-win32-x64": "^0.33.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

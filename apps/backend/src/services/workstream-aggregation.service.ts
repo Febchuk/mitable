@@ -13,10 +13,11 @@ import type {
 } from "@mitable/shared";
 import { WORKSTREAM_COLORS } from "@mitable/shared";
 import { workstreamDetectionService } from "./workstream-detection.service.js";
+import type { SessionWorkstream } from "../db/schema/workstreams.schema.js";
 
 // Configuration
 const CONFIG = {
-  maxGapMinutes: 10, // Gap threshold for merging segments
+  maxGapMinutes: 2, // Gap threshold for merging segments (reduced to detect context switches)
 };
 
 // Capture data from database
@@ -27,6 +28,7 @@ interface CaptureData {
   windowTitle: string | null;
   activityDescription: string | null;
   deltaChangeDescription: string | null;
+  workstreamId?: string | null;
 }
 
 // Session context for workstream detection
@@ -141,6 +143,148 @@ class WorkstreamAggregationService {
   }
 
   /**
+   * Aggregate workstreams from RLM-generated database records
+   * Transforms session_workstreams table data into the frontend format
+   */
+  aggregateFromRLMWorkstreams(
+    rlmWorkstreams: SessionWorkstream[],
+    captures: CaptureData[],
+    sessionStartTime: string,
+    sessionEndTime: string
+  ): WorkstreamResponse {
+    if (!rlmWorkstreams || rlmWorkstreams.length === 0) {
+      return {
+        workstreams: [],
+        sessionStats: {
+          totalTimeMinutes: 0,
+          deepWorkMinutes: 0,
+          deepWorkPercent: 0,
+          interruptionCount: 0,
+          interruptionMinutes: 0,
+          longestFocusMinutes: 0,
+          longestFocusWorkstream: "",
+        },
+        sessionStartTime,
+        sessionEndTime,
+      };
+    }
+
+    // Group captures by workstream ID
+    const capturesByWorkstream = new Map<string, CaptureData[]>();
+    for (const capture of captures) {
+      if (capture.workstreamId) {
+        if (!capturesByWorkstream.has(capture.workstreamId)) {
+          capturesByWorkstream.set(capture.workstreamId, []);
+        }
+        capturesByWorkstream.get(capture.workstreamId)!.push(capture);
+      }
+    }
+
+    // Transform RLM workstreams to frontend format
+    const workstreams: Workstream[] = rlmWorkstreams.map((ws) => {
+      const wsCaptures = capturesByWorkstream.get(ws.id) || [];
+      // Pass all captures to detect interleaving (context switches to other workstreams)
+      const segments = this.buildSegments(wsCaptures, captures);
+
+      return {
+        id: ws.id,
+        name: ws.name,
+        color: ws.color as WorkstreamColor,
+        totalDurationMinutes: ws.totalDurationMinutes,
+        segments,
+        appsUsed: ws.appsUsed || [],
+        captureCount: ws.captureCount,
+        dominantActivity: ws.summary || this.computeDominantActivity(wsCaptures),
+        captureIds: wsCaptures.map((c) => c.id),
+        // RLM-specific fields
+        category: ws.category || undefined,
+        summary: ws.summary || undefined,
+        isProvisional: ws.isProvisional,
+      };
+    });
+
+    // Calculate session stats
+    const sessionStats = this.calculateSessionStatsFromRLM(workstreams, rlmWorkstreams);
+
+    return {
+      workstreams,
+      sessionStats,
+      sessionStartTime,
+      sessionEndTime,
+    };
+  }
+
+  /**
+   * Calculate session statistics from RLM workstreams
+   */
+  private calculateSessionStatsFromRLM(
+    workstreams: Workstream[],
+    rlmWorkstreams: SessionWorkstream[]
+  ): SessionStats {
+    // Total time
+    const totalTimeMinutes = workstreams.reduce(
+      (sum, ws) => sum + ws.totalDurationMinutes,
+      0
+    );
+
+    // Deep work time (development, design, research)
+    let deepWorkMinutes = 0;
+    const deepWorkCategories = ["development", "design", "research", "review"];
+
+    rlmWorkstreams.forEach((ws) => {
+      if (ws.category && deepWorkCategories.includes(ws.category)) {
+        deepWorkMinutes += ws.totalDurationMinutes;
+      }
+    });
+
+    // Interruptions (communication/meetings)
+    let interruptionCount = 0;
+    let interruptionMinutes = 0;
+    const interruptionCategories = ["communication", "meeting"];
+
+    rlmWorkstreams.forEach((ws) => {
+      if (ws.category && interruptionCategories.includes(ws.category)) {
+        const wsData = workstreams.find((w) => w.id === ws.id);
+        if (wsData) {
+          interruptionCount += wsData.segments.length;
+          interruptionMinutes += ws.totalDurationMinutes;
+        }
+      }
+    });
+
+    // Longest focus session
+    let longestFocusMinutes = 0;
+    let longestFocusWorkstream = "";
+
+    rlmWorkstreams.forEach((ws) => {
+      if (!ws.category || !interruptionCategories.includes(ws.category)) {
+        const wsData = workstreams.find((w) => w.id === ws.id);
+        if (wsData) {
+          wsData.segments.forEach((seg) => {
+            if (seg.durationMinutes > longestFocusMinutes) {
+              longestFocusMinutes = seg.durationMinutes;
+              longestFocusWorkstream = ws.name;
+            }
+          });
+        }
+      }
+    });
+
+    return {
+      totalTimeMinutes,
+      deepWorkMinutes,
+      deepWorkPercent:
+        totalTimeMinutes > 0
+          ? Math.round((deepWorkMinutes / totalTimeMinutes) * 100)
+          : 0,
+      interruptionCount,
+      interruptionMinutes,
+      longestFocusMinutes,
+      longestFocusWorkstream,
+    };
+  }
+
+  /**
    * Group captures by normalized workstream name
    */
   private groupCapturesByWorkstream(
@@ -170,8 +314,11 @@ class WorkstreamAggregationService {
 
   /**
    * Build time segments from captures (handles non-contiguous time blocks)
+   * Breaks segments when:
+   * 1. There's a gap > maxGapMinutes between consecutive captures
+   * 2. OR there were captures from other workstreams in between (context switch)
    */
-  private buildSegments(captures: CaptureData[]): TimeSegment[] {
+  private buildSegments(captures: CaptureData[], allCaptures?: CaptureData[]): TimeSegment[] {
     if (captures.length === 0) return [];
 
     // Sort by time
@@ -179,10 +326,18 @@ class WorkstreamAggregationService {
       (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime()
     );
 
+    // If we have all captures, we can detect interleaving (context switches)
+    const sortedAllCaptures = allCaptures
+      ? [...allCaptures].sort(
+          (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime()
+        )
+      : null;
+
     const segments: TimeSegment[] = [];
     let currentSegment: { startTime: string; endTime: string } | null = null;
 
-    for (const capture of sorted) {
+    for (let i = 0; i < sorted.length; i++) {
+      const capture = sorted[i];
       const captureTime =
         capture.capturedAt instanceof Date
           ? capture.capturedAt.toISOString()
@@ -196,7 +351,21 @@ class WorkstreamAggregationService {
       } else {
         const gap = getDurationMinutes(currentSegment.endTime, captureTime);
 
-        if (gap > CONFIG.maxGapMinutes) {
+        // Check if there were OTHER workstream captures in between (context switch)
+        let hasInterleaving = false;
+        if (sortedAllCaptures && gap > 0) {
+          const prevTime = new Date(currentSegment.endTime).getTime();
+          const currTime = new Date(captureTime).getTime();
+
+          // Look for captures from OTHER workstreams between prev and curr
+          hasInterleaving = sortedAllCaptures.some(c => {
+            if (c.workstreamId === capture.workstreamId) return false; // Same workstream
+            const cTime = new Date(c.capturedAt).getTime();
+            return cTime > prevTime && cTime < currTime;
+          });
+        }
+
+        if (gap > CONFIG.maxGapMinutes || hasInterleaving) {
           // Finalize current segment and start new one
           segments.push({
             startTime: currentSegment.startTime,

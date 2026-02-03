@@ -3,12 +3,14 @@
  *
  * Fetches workstreams from the backend API with fallback to client-side transform.
  * Provides consistent workstream data regardless of the data source.
+ * Supports automatic RLM force-analysis when heuristic results are detected.
  */
 
-import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useEffect, useRef, useCallback, useState } from "react";
 import {
   fetchSessionWorkstreams,
+  forceAnalyzeWorkstreams,
   type WorkstreamResponse,
 } from "@/console/src/services/monitoringService";
 import { useSessionCaptures } from "@/console/src/hooks/queries/monitoring";
@@ -53,6 +55,8 @@ interface UseSessionWorkstreamsOptions {
   useBackend?: boolean;
   /** Session status for conditional fetching */
   sessionStatus?: string;
+  /** Auto-trigger RLM analysis if heuristic results are returned. Default: true */
+  autoAnalyze?: boolean;
 }
 
 interface UseSessionWorkstreamsResult {
@@ -61,6 +65,14 @@ interface UseSessionWorkstreamsResult {
   error: Error | null;
   /** Which source provided the data: "backend" | "client" | null */
   dataSource: "backend" | "client" | null;
+  /** How backend generated workstreams: "rlm" (AI) or "heuristic" (pattern matching) */
+  analysisSource: "rlm" | "heuristic" | null;
+  /** Whether RLM analysis is currently running */
+  isAnalyzing: boolean;
+  /** Manually trigger RLM analysis */
+  triggerAnalysis: () => Promise<void>;
+  /** Refetch workstreams data */
+  refetch: () => void;
 }
 
 /**
@@ -68,12 +80,18 @@ interface UseSessionWorkstreamsResult {
  *
  * By default, fetches from backend API.
  * Falls back to client-side transform if backend fails.
+ * Automatically triggers RLM analysis when heuristic results are detected.
  */
 export function useSessionWorkstreams(
   sessionId: string,
   options: UseSessionWorkstreamsOptions = {}
 ): UseSessionWorkstreamsResult {
-  const { useBackend = true, sessionStatus } = options;
+  const { useBackend = true, sessionStatus, autoAnalyze = true } = options;
+  const queryClient = useQueryClient();
+
+  // Track if we've already triggered analysis for this session
+  const hasTriggeredAnalysis = useRef(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Always fetch captures (needed for both backend and client paths)
   const {
@@ -87,6 +105,7 @@ export function useSessionWorkstreams(
     data: backendData,
     isLoading: backendLoading,
     error: backendError,
+    refetch: refetchBackend,
   } = useQuery({
     queryKey: ["session-workstreams", sessionId],
     queryFn: () => fetchSessionWorkstreams(sessionId),
@@ -107,6 +126,50 @@ export function useSessionWorkstreams(
     return transformToWorkstreams(filteredCaptures);
   }, [captures]);
 
+  // Function to trigger RLM analysis
+  const triggerAnalysis = useCallback(async () => {
+    if (!sessionId || isAnalyzing) return;
+
+    setIsAnalyzing(true);
+    try {
+      await forceAnalyzeWorkstreams(sessionId);
+      // Refetch workstreams after analysis completes
+      await queryClient.invalidateQueries({
+        queryKey: ["session-workstreams", sessionId],
+      });
+    } catch (error) {
+      console.error("[useSessionWorkstreams] RLM analysis failed:", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [sessionId, isAnalyzing, queryClient]);
+
+  // Auto-trigger RLM analysis when heuristic results are detected
+  useEffect(() => {
+    if (
+      autoAnalyze &&
+      backendData?.analysisSource === "heuristic" &&
+      !hasTriggeredAnalysis.current &&
+      !isAnalyzing &&
+      captures &&
+      captures.length > 0 // Only analyze if there are captures
+    ) {
+      hasTriggeredAnalysis.current = true;
+      console.log("[useSessionWorkstreams] Heuristic results detected, triggering RLM analysis");
+      triggerAnalysis();
+    }
+  }, [autoAnalyze, backendData?.analysisSource, isAnalyzing, captures, triggerAnalysis]);
+
+  // Reset the analysis trigger when session changes
+  useEffect(() => {
+    hasTriggeredAnalysis.current = false;
+  }, [sessionId]);
+
+  // Refetch function
+  const refetch = useCallback(() => {
+    refetchBackend();
+  }, [refetchBackend]);
+
   // Determine final result
   const result = useMemo((): UseSessionWorkstreamsResult => {
     // If using backend and it succeeded
@@ -116,6 +179,10 @@ export function useSessionWorkstreams(
         isLoading: false,
         error: null,
         dataSource: "backend",
+        analysisSource: backendData.analysisSource || null,
+        isAnalyzing,
+        triggerAnalysis,
+        refetch,
       };
     }
 
@@ -126,6 +193,10 @@ export function useSessionWorkstreams(
         isLoading: false,
         error: null,
         dataSource: "client",
+        analysisSource: null,
+        isAnalyzing,
+        triggerAnalysis,
+        refetch,
       };
     }
 
@@ -136,6 +207,10 @@ export function useSessionWorkstreams(
         isLoading: false,
         error: null,
         dataSource: "client",
+        analysisSource: null,
+        isAnalyzing,
+        triggerAnalysis,
+        refetch,
       };
     }
 
@@ -146,6 +221,10 @@ export function useSessionWorkstreams(
         isLoading: true,
         error: null,
         dataSource: null,
+        analysisSource: null,
+        isAnalyzing,
+        triggerAnalysis,
+        refetch,
       };
     }
 
@@ -156,6 +235,10 @@ export function useSessionWorkstreams(
       isLoading: false,
       error,
       dataSource: null,
+      analysisSource: null,
+      isAnalyzing,
+      triggerAnalysis,
+      refetch,
     };
   }, [
     useBackend,
@@ -166,6 +249,9 @@ export function useSessionWorkstreams(
     captures,
     capturesLoading,
     capturesError,
+    isAnalyzing,
+    triggerAnalysis,
+    refetch,
   ]);
 
   return result;

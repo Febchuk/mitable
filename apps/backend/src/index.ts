@@ -6,11 +6,14 @@ import { logger } from "./lib/logger.js";
 initSentry();
 initAnalytics();
 
+import { createServer } from "http";
 import { app } from "./app.js";
 import { config, validateConfig, checkPortAvailability } from "./config.js";
 import { testConnection } from "./db/client.js";
 import { vectorService } from "./services/vector.service.js";
 import { piiRedactionService } from "./services/pii-redaction.service.js";
+import { socketService } from "./services/socket.service.js";
+import { setupWorkstreamSocketEmitter } from "./services/workstream-socket-emitter.js";
 
 async function startServer() {
   // Validate environment variables
@@ -60,12 +63,20 @@ async function startServer() {
   await piiRedactionService.initializeOCRWorkers();
   logger.info("PII redaction service ready (5 workers)");
 
+  // Create HTTP server and initialize Socket.IO
+  const httpServer = createServer(app);
+  socketService.initialize(httpServer);
+
+  // Set up workstream event emitter to broadcast via WebSocket
+  setupWorkstreamSocketEmitter();
+
   // Start server
-  app.listen(config.port, () => {
+  httpServer.listen(config.port, () => {
     logger.info(
       { port: config.port, environment: config.nodeEnv },
       `Mitable Backend API running on http://localhost:${config.port}`
     );
+    logger.info("WebSocket server ready for real-time workstream updates");
   });
 }
 

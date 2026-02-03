@@ -554,6 +554,8 @@ export interface WorkstreamResponse {
   sessionStats: SessionStats;
   sessionStartTime: string;
   sessionEndTime: string;
+  /** How the workstreams were generated: "rlm" (AI-analyzed) or "heuristic" (pattern matching) */
+  analysisSource?: "rlm" | "heuristic";
 }
 
 /**
@@ -562,4 +564,37 @@ export interface WorkstreamResponse {
  */
 export async function fetchSessionWorkstreams(sessionId: string): Promise<WorkstreamResponse> {
   return apiRequest<WorkstreamResponse>(`/monitoring/sessions/${sessionId}/workstreams`);
+}
+
+/**
+ * Force analyze workstream response
+ */
+export interface ForceAnalyzeWorkstreamsResponse {
+  success: boolean;
+  message: string;
+  workstreamCount: number;
+  workstreams: Array<{
+    id: string;
+    name: string;
+    color: string;
+    category: string | null;
+    summary: string | null;
+    captureCount: number;
+    totalDurationMinutes: number;
+    appsUsed: string[];
+    isProvisional: boolean;
+  }>;
+}
+
+/**
+ * Force immediate RLM analysis of workstreams
+ * Use this when opening the timeline view to ensure workstreams are up-to-date
+ */
+export async function forceAnalyzeWorkstreams(
+  sessionId: string
+): Promise<ForceAnalyzeWorkstreamsResponse> {
+  return apiRequest<ForceAnalyzeWorkstreamsResponse>(
+    `/monitoring/sessions/${sessionId}/workstreams/analyze`,
+    { method: "POST" }
+  );
 }

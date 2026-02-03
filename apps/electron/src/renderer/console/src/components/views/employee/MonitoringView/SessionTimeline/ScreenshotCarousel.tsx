@@ -68,7 +68,21 @@ export default function ScreenshotCarousel({
     );
   }
 
-  const currentCapture = capturesWithImages[currentIndex];
+  // Ensure currentIndex is within bounds (can be out of sync when array changes)
+  const safeIndex = Math.min(Math.max(0, currentIndex), capturesWithImages.length - 1);
+  const currentCapture = capturesWithImages[safeIndex];
+
+  // Extra safety check - should never happen but prevents crash
+  if (!currentCapture) {
+    return (
+      <div className={`flex items-center justify-center bg-background-tertiary rounded-lg p-8 ${className}`}>
+        <div className="text-center">
+          <Camera className="w-12 h-12 text-text-tertiary mx-auto mb-2" />
+          <p className="text-text-secondary text-sm">Loading screenshots...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
