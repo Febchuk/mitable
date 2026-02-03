@@ -26,6 +26,50 @@ import { Editor, EditorContainer } from "@/components/ui/editor";
 
 import { DocEditorKit } from "./doc-editor-kit";
 import { createEmptyDocument, markdownToPlate, plateToMarkdown } from "./markdown-utils";
+
+// Error boundary component
+class EditorErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallbackContent?: string },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; fallbackContent?: string }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    logger.error("Editor crashed:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 bg-canvas-overlay rounded-xl border border-stroke-subtle">
+          <div className="text-ink-primary font-medium mb-2">
+            Unable to render document
+          </div>
+          <p className="text-sm text-ink-secondary mb-4">
+            The document content has formatting issues that couldn't be parsed.
+          </p>
+          {this.props.fallbackContent && (
+            <div className="bg-canvas-muted rounded-lg p-4 max-h-96 overflow-auto">
+              <pre className="text-sm text-ink-secondary whitespace-pre-wrap font-mono">
+                {this.props.fallbackContent}
+              </pre>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // TODO: Re-enable when AI chat is properly configured
 // import { useDocChat } from './use-doc-chat';
 
@@ -151,11 +195,13 @@ export function DocEditor({
   }, []);
 
   return (
-    <Plate editor={editor} onChange={handleChange}>
-      <EditorContainer className={className}>
-        <Editor variant={variant} readOnly={readOnly} placeholder={placeholder} />
-      </EditorContainer>
-    </Plate>
+    <EditorErrorBoundary fallbackContent={initialContent}>
+      <Plate editor={editor} onChange={handleChange}>
+        <EditorContainer className={className}>
+          <Editor variant={variant} readOnly={readOnly} placeholder={placeholder} />
+        </EditorContainer>
+      </Plate>
+    </EditorErrorBoundary>
   );
 }
 

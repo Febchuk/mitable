@@ -34,6 +34,82 @@ export function plateToMarkdown(editor: PlateEditor, value?: Value): string {
 }
 
 /**
+ * Sanitize table nodes to ensure all rows have valid children arrays.
+ * This prevents the "row.children is not iterable" error in the table plugin.
+ */
+function sanitizeNode(node: unknown): unknown {
+  if (!node || typeof node !== "object") {
+    return node;
+  }
+
+  const typedNode = node as { type?: string; children?: unknown[] };
+
+  // If it's a table, sanitize its structure
+  if (typedNode.type === "table") {
+    const tableNode = node as { type: string; children?: unknown[] };
+    return {
+      ...tableNode,
+      children: Array.isArray(tableNode.children)
+        ? tableNode.children.map(sanitizeNode).filter(Boolean)
+        : [],
+    };
+  }
+
+  // If it's a table row, ensure it has children array
+  if (typedNode.type === "tr") {
+    const rowNode = node as { type: string; children?: unknown[] };
+    const children = Array.isArray(rowNode.children)
+      ? rowNode.children.map(sanitizeNode).filter(Boolean)
+      : [];
+
+    // If row has no cells, add an empty cell
+    if (children.length === 0) {
+      children.push({ type: "td", children: [{ text: "" }] });
+    }
+
+    return {
+      ...rowNode,
+      children,
+    };
+  }
+
+  // If it's a table cell, ensure it has children
+  if (typedNode.type === "td" || typedNode.type === "th") {
+    const cellNode = node as { type: string; children?: unknown[] };
+    const children = Array.isArray(cellNode.children)
+      ? cellNode.children.map(sanitizeNode).filter(Boolean)
+      : [];
+
+    // If cell has no content, add empty text
+    if (children.length === 0) {
+      children.push({ text: "" });
+    }
+
+    return {
+      ...cellNode,
+      children,
+    };
+  }
+
+  // For other nodes with children, recursively sanitize
+  if (Array.isArray(typedNode.children)) {
+    return {
+      ...typedNode,
+      children: typedNode.children.map(sanitizeNode).filter(Boolean),
+    };
+  }
+
+  return node;
+}
+
+/**
+ * Sanitize all nodes in the value array
+ */
+function sanitizeValue(value: Value): Value {
+  return value.map((node) => sanitizeNode(node)).filter(Boolean) as Value;
+}
+
+/**
  * Deserialize Markdown string to Plate editor value
  *
  * @param editor - The Plate editor instance
@@ -53,7 +129,8 @@ export function markdownToPlate(editor: PlateEditor, markdown: string): Value {
       return [{ type: "p", children: [{ text: "" }] }];
     }
 
-    return result;
+    // Sanitize table nodes to prevent rendering errors
+    return sanitizeValue(result);
   } catch (error) {
     logger.error("Error deserializing markdown:", error);
     // Fallback: wrap in paragraph

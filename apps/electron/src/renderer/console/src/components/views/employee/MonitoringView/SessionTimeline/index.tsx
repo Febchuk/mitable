@@ -33,7 +33,7 @@ export default function SessionTimeline({
     isLoading,
     error,
     isAnalyzing,
-    analysisSource,
+    analysisSource: _analysisSource,
     triggerAnalysis,
   } = useSessionWorkstreams(sessionId, {
     sessionStatus,

@@ -17,6 +17,7 @@ import { createLogger } from "../../../../../../lib/logger";
 const logger = createLogger("DocDetail");
 import {
   useDocument,
+  useCreateDocument,
   useDeleteDocument,
   useUpdateDocument,
   useExportToNotion,
@@ -83,7 +84,11 @@ export default function DocDetail() {
   const { toast } = useToast();
   const { user } = useUser();
 
+  // Check if this is a new document
+  const isNewDocument = docId === "new";
+
   const { data: document, isLoading, refetch: refetchDocument } = useDocument(docId || "");
+  const createMutation = useCreateDocument();
   const updateMutation = useUpdateDocument();
   const deleteMutation = useDeleteDocument();
   const exportNotionMutation = useExportToNotion();
@@ -116,7 +121,8 @@ export default function DocDetail() {
   const [isExportGoogleDocsDialogOpen, setIsExportGoogleDocsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(isNewDocument ? "Untitled Document" : "");
+  const [createdDocId, setCreatedDocId] = useState<string | null>(null); // Track if we've created the doc
 
   // Debounce timers
   const titleSaveTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -147,15 +153,22 @@ export default function DocDetail() {
     }
   }, [notionAvailable, googleDocsAvailable]);
 
-  // Debounced save function
+  // Debounced save function (handles both new and existing documents)
   const debouncedSave = useCallback(
     async (field: "title" | "content", value: string) => {
-      if (!docId) return;
+      // For new documents, don't autosave - wait for explicit ⌘+S
+      if (isNewDocument && !createdDocId) {
+        return;
+      }
+
+      // Use the created ID if we just created the doc, otherwise use docId
+      const targetId = createdDocId || docId;
+      if (!targetId || targetId === "new") return;
 
       setIsSaving(true);
       try {
         await updateMutation.mutateAsync({
-          id: docId,
+          id: targetId,
           data: { [field]: value },
         });
         setLastSaved(new Date());
@@ -165,7 +178,7 @@ export default function DocDetail() {
         setIsSaving(false);
       }
     },
-    [docId, updateMutation]
+    [docId, isNewDocument, createdDocId, updateMutation]
   );
 
   // Handle title change with debounced autosave
@@ -206,16 +219,37 @@ export default function DocDetail() {
   // Handle explicit save from editor (⌘+S)
   const handleSave = useCallback(
     async (contentToSave: string) => {
-      if (!docId) return;
-
       // Clear pending timeouts and save immediately
       if (titleSaveTimeout.current) clearTimeout(titleSaveTimeout.current);
       if (contentSaveTimeout.current) clearTimeout(contentSaveTimeout.current);
 
       setIsSaving(true);
       try {
+        // If this is a new document, create it first
+        if (isNewDocument && !createdDocId) {
+          const result = await createMutation.mutateAsync({
+            title: title || "Untitled Document",
+            docType: "knowledge-article",
+            content: contentToSave,
+          });
+          const newDocId = result.document.id;
+          setCreatedDocId(newDocId);
+          setLastSaved(new Date());
+          // Navigate to the new document URL
+          navigate(`/docs/${newDocId}`, { replace: true });
+          toast({
+            title: "Document created",
+            description: "Your document has been saved.",
+          });
+          return;
+        }
+
+        // Update existing document
+        const targetId = createdDocId || docId;
+        if (!targetId || targetId === "new") return;
+
         await updateMutation.mutateAsync({
-          id: docId,
+          id: targetId,
           data: {
             title,
             content: contentToSave,
@@ -224,11 +258,16 @@ export default function DocDetail() {
         setLastSaved(new Date());
       } catch (error) {
         logger.error("Manual save failed:", error);
+        toast({
+          title: "Save failed",
+          description: "Failed to save document.",
+          variant: "destructive",
+        });
       } finally {
         setIsSaving(false);
       }
     },
-    [docId, title, updateMutation]
+    [docId, title, isNewDocument, createdDocId, createMutation, updateMutation, navigate, toast]
   );
 
   const handleDelete = async () => {
@@ -367,7 +406,7 @@ export default function DocDetail() {
   const hasExportIntegrations = exportDestinations.length > 0;
   const isIntegrationStatusLoading = isNotionStatusLoading || isGmailStatusLoading;
 
-  if (isLoading) {
+  if (isLoading && !isNewDocument) {
     return (
       <div className="p-8 flex items-center justify-center">
         <Loader2 className="animate-spin text-text-secondary" size={32} />
@@ -375,7 +414,7 @@ export default function DocDetail() {
     );
   }
 
-  if (!document) {
+  if (!document && !isNewDocument) {
     return (
       <div className="p-8 text-center">
         <p className="text-text-secondary">Document not found</p>
@@ -386,8 +425,11 @@ export default function DocDetail() {
     );
   }
 
-  const Icon = getDocTypeIcon(document.docType as DocType);
-  const statusColor = DOC_STATUS_COLORS[document.status as DocStatus];
+  // For new documents, use defaults
+  const docType = document?.docType || "knowledge-article";
+  const docStatus = document?.status || "draft";
+  const Icon = getDocTypeIcon(docType as DocType);
+  const statusColor = DOC_STATUS_COLORS[docStatus as DocStatus];
 
   return (
     <div className="h-full flex flex-col app-no-drag">
@@ -416,9 +458,9 @@ export default function DocDetail() {
               />
               <div className="flex items-center gap-3 mt-0.5">
                 <span className="text-text-secondary text-sm">
-                  {DOC_TYPE_LABELS[document.docType as DocType]}
+                  {DOC_TYPE_LABELS[docType as DocType]}
                 </span>
-                <Badge className={statusColor}>{document.status}</Badge>
+                <Badge className={statusColor}>{docStatus}</Badge>
               </div>
             </div>
           </div>
@@ -440,14 +482,14 @@ export default function DocDetail() {
             ) : null}
           </span>
 
-          {hasExportIntegrations ? (
+          {hasExportIntegrations && !isNewDocument ? (
             <ExportPopover
               destinations={exportDestinations}
               onExportAll={
                 notionAvailable &&
                 googleDocsAvailable &&
-                document.notionPageId &&
-                document.googleDocsId
+                document?.notionPageId &&
+                document?.googleDocsId
                   ? handleExportToAll
                   : undefined
               }
@@ -464,45 +506,55 @@ export default function DocDetail() {
               Export
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsDeleteDialogOpen(true)}
-            className="text-status-error hover:text-status-error hover:bg-status-error/10"
-          >
-            <Trash2 size={18} />
-          </Button>
+          {!isNewDocument && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="text-status-error hover:text-status-error hover:bg-status-error/10"
+            >
+              <Trash2 size={18} />
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Metadata bar */}
       <div className="flex items-center gap-6 text-sm px-6 py-3 border-b border-border-subtle bg-background-secondary/30">
-        <div className="flex items-center gap-2 text-text-secondary">
-          <Clock size={14} />
-          <span>
-            Updated:{" "}
-            <span className="text-text-primary">
-              {new Date(document.updatedAt).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-            </span>
-          </span>
-        </div>
-        {document.creator && (
+        {document ? (
+          <>
+            <div className="flex items-center gap-2 text-text-secondary">
+              <Clock size={14} />
+              <span>
+                Updated:{" "}
+                <span className="text-text-primary">
+                  {new Date(document.updatedAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </span>
+            </div>
+            {document.creator && (
+              <div className="text-text-secondary">
+                By:{" "}
+                <span className="text-text-primary">
+                  {document.creator.firstName} {document.creator.lastName}
+                </span>
+              </div>
+            )}
+            {document.notionPageId && (
+              <div className="flex items-center gap-1 text-status-success">
+                <CheckCircle size={14} />
+                <span>Synced</span>
+              </div>
+            )}
+          </>
+        ) : (
           <div className="text-text-secondary">
-            By:{" "}
-            <span className="text-text-primary">
-              {document.creator.firstName} {document.creator.lastName}
-            </span>
-          </div>
-        )}
-        {document.notionPageId && (
-          <div className="flex items-center gap-1 text-status-success">
-            <CheckCircle size={14} />
-            <span>Synced</span>
+            New document - press <kbd className="px-1.5 py-0.5 rounded bg-background-tertiary border border-border-subtle">⌘+S</kbd> to save
           </div>
         )}
         <div className="ml-auto text-text-tertiary text-xs">
@@ -519,7 +571,7 @@ export default function DocDetail() {
         <div className="max-w-4xl mx-auto px-8 py-6">
           <DocEditor
             key={docId} // Reset editor when document changes
-            initialContent={document.content}
+            initialContent={document?.content || ""}
             onChange={handleContentChange}
             onSave={handleSave}
             documentId={docId}
@@ -532,7 +584,7 @@ export default function DocDetail() {
       </div>
 
       {/* Contributing Sessions (collapsed at bottom if exists) */}
-      {document.sessionContributions && document.sessionContributions.length > 0 && (
+      {document?.sessionContributions && document.sessionContributions.length > 0 && (
         <div className="border-t border-border-subtle p-4 bg-background-secondary/30">
           <details className="group">
             <summary className="text-sm font-medium text-text-secondary cursor-pointer hover:text-text-primary">
@@ -562,27 +614,31 @@ export default function DocDetail() {
         </div>
       )}
 
-      {/* Export Dialogs */}
-      <ExportNotionDialog
-        open={isExportNotionDialogOpen}
-        onOpenChange={setIsExportNotionDialogOpen}
-        documentTitle={document.title}
-        onExport={handleExportToNotion}
-        isExporting={exportNotionMutation.isPending}
-        existingNotionPageId={document.notionPageId}
-      />
+      {/* Export Dialogs - only shown for existing documents */}
+      {document && (
+        <>
+          <ExportNotionDialog
+            open={isExportNotionDialogOpen}
+            onOpenChange={setIsExportNotionDialogOpen}
+            documentTitle={document.title}
+            onExport={handleExportToNotion}
+            isExporting={exportNotionMutation.isPending}
+            existingNotionPageId={document.notionPageId}
+          />
 
-      <ExportGoogleDocsDialog
-        open={isExportGoogleDocsDialogOpen}
-        onOpenChange={setIsExportGoogleDocsDialogOpen}
-        documentTitle={document.title}
-        onExport={handleExportToGoogleDocs}
-        isExporting={exportGoogleDocsMutation.isPending}
-        existingGoogleDocsId={document.googleDocsId}
-        folders={driveFolders?.folders || []}
-        isLoadingFolders={isLoadingFolders}
-        onRefreshFolders={() => refetchFolders()}
-      />
+          <ExportGoogleDocsDialog
+            open={isExportGoogleDocsDialogOpen}
+            onOpenChange={setIsExportGoogleDocsDialogOpen}
+            documentTitle={document.title}
+            onExport={handleExportToGoogleDocs}
+            isExporting={exportGoogleDocsMutation.isPending}
+            existingGoogleDocsId={document.googleDocsId}
+            folders={driveFolders?.folders || []}
+            isLoadingFolders={isLoadingFolders}
+            onRefreshFolders={() => refetchFolders()}
+          />
+        </>
+      )}
 
       {/* Delete Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

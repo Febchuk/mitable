@@ -11,10 +11,7 @@ import { useDocuments } from "@/console/src/hooks/queries/documents";
 import {
   Search,
   FileText,
-  BookOpen,
-  AlertCircle,
   Sparkles,
-  PenLine,
   ChevronRight,
   Filter,
 } from "lucide-react";
@@ -27,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import DocRow from "./DocRow";
-import GenerateDocDialog from "./dialogs/GenerateDocDialog";
+import CreateDocumentModal from "./dialogs/CreateDocumentModal";
 import type { DocType, DocStatus, Document } from "@mitable/shared";
 
 // Group documents by date category
@@ -66,61 +63,12 @@ function groupDocumentsByDate(documents: Document[]) {
   return groups.filter((g) => g.documents.length > 0);
 }
 
-function formatRelativeTime(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - new Date(date).getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return new Date(date).toLocaleDateString();
-}
-
-function getDocTypeIcon(docType: DocType) {
-  switch (docType) {
-    case "how-to":
-      return BookOpen;
-    case "knowledge-article":
-      return FileText;
-    case "troubleshooting":
-      return AlertCircle;
-    default:
-      return FileText;
-  }
-}
-
-function getDocTypeColor(docType: DocType) {
-  switch (docType) {
-    case "how-to":
-      return "text-blue-400";
-    case "knowledge-article":
-      return "text-purple-400";
-    case "troubleshooting":
-      return "text-orange-400";
-    default:
-      return "text-gray-400";
-  }
-}
-
-function getStatusBadge(status: DocStatus) {
-  const styles = {
-    draft: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    published: "bg-green-500/10 text-green-400 border-green-500/20",
-    archived: "bg-gray-500/10 text-gray-400 border-gray-500/20",
-  };
-  return styles[status] || styles.draft;
-}
-
 export default function DocsView() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [docTypeFilter, setDocTypeFilter] = useState<DocType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<DocStatus | "all">("all");
-  const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
   const { data, isLoading, error } = useDocuments({
@@ -263,60 +211,31 @@ export default function DocsView() {
             </div>
           )}
 
-          {/* Action Cards - Two options side by side */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Generate from Session */}
-            <button
-              onClick={() => setIsGenerateDialogOpen(true)}
-              className="group relative overflow-hidden rounded-2xl border border-stroke-subtle bg-gradient-to-br from-canvas-overlay to-canvas-raised p-6 text-left transition-all duration-300 hover:border-rose/30 hover:shadow-[0_0_40px_-10px_rgba(244,114,182,0.3)]"
-            >
-              <div className="absolute -top-16 -right-16 w-48 h-48 bg-rose/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          {/* Create Document Button */}
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="group relative w-full overflow-hidden rounded-2xl border border-stroke-subtle bg-gradient-to-br from-canvas-overlay to-canvas-raised p-6 text-left transition-all duration-300 hover:border-indigo/30 hover:shadow-[0_0_40px_-10px_rgba(99,102,241,0.3)]"
+          >
+            <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-              <div className="relative flex items-center gap-4">
-                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-rose/10 border border-rose/20 group-hover:bg-rose/20 group-hover:scale-105 transition-all duration-300">
-                  <Sparkles size={22} className="text-rose" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
-                    Generate from Session
-                  </h3>
-                  <p className="text-ink-tertiary text-sm mt-0.5">
-                    AI-powered documentation
-                  </p>
-                </div>
-                <ChevronRight
-                  size={18}
-                  className="text-ink-tertiary group-hover:text-rose group-hover:translate-x-1 transition-all"
-                />
+            <div className="relative flex items-center gap-4">
+              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-indigo/20 to-rose/20 border border-indigo/20 group-hover:scale-105 transition-all duration-300">
+                <Sparkles size={22} className="text-indigo" />
               </div>
-            </button>
-
-            {/* Create New Document */}
-            <button
-              onClick={() => navigate("/docs/new")}
-              className="group relative overflow-hidden rounded-2xl border border-stroke-subtle bg-gradient-to-br from-canvas-overlay to-canvas-raised p-6 text-left transition-all duration-300 hover:border-indigo/30 hover:shadow-[0_0_40px_-10px_rgba(99,102,241,0.3)]"
-            >
-              <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-              <div className="relative flex items-center gap-4">
-                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-indigo/10 border border-indigo/20 group-hover:bg-indigo/20 group-hover:scale-105 transition-all duration-300">
-                  <PenLine size={22} className="text-indigo" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
-                    Write New Document
-                  </h3>
-                  <p className="text-ink-tertiary text-sm mt-0.5">
-                    Start from scratch
-                  </p>
-                </div>
-                <ChevronRight
-                  size={18}
-                  className="text-ink-tertiary group-hover:text-indigo group-hover:translate-x-1 transition-all"
-                />
+              <div className="flex-1">
+                <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
+                  Create Document
+                </h3>
+                <p className="text-ink-tertiary text-sm mt-0.5">
+                  Generate with AI or start from scratch
+                </p>
               </div>
-            </button>
-          </div>
+              <ChevronRight
+                size={18}
+                className="text-ink-tertiary group-hover:text-indigo group-hover:translate-x-1 transition-all"
+              />
+            </div>
+          </button>
         </div>
       </div>
 
@@ -373,10 +292,10 @@ export default function DocsView() {
         )}
       </div>
 
-      {/* Generate Doc Dialog */}
-      <GenerateDocDialog
-        open={isGenerateDialogOpen}
-        onOpenChange={setIsGenerateDialogOpen}
+      {/* Create Document Modal */}
+      <CreateDocumentModal
+        open={isCreateModalOpen}
+        onOpenChange={setIsCreateModalOpen}
       />
     </div>
   );
