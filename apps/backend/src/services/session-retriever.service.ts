@@ -164,7 +164,11 @@ class SessionRetrieverService {
       sessionMap.get(chunk.sessionId)!.push(chunk);
     }
 
-    return { chunks, sessionMap };
+    return {
+      chunks,
+      sessionMap,
+      sessionsBeingIndexed: sessionsBeingIndexed > 0 ? sessionsBeingIndexed : undefined,
+    };
   }
 
   /**
