@@ -112,10 +112,15 @@ export async function getSessionsMetadata(
  * Reads from session_chunks (classifier chunks) which are already time-ordered
  */
 export async function getSessionTimeline(
-  _env: DocumentGenerationEnvironment,
+  env: DocumentGenerationEnvironment,
   sessionId: string,
   limit?: number
 ): Promise<TimelineActivity[]> {
+  // Security: Verify sessionId is in environment's allowed sessions
+  if (!env.sessionIds.includes(sessionId)) {
+    throw new Error(`Unauthorized: Session ${sessionId} not in document context`);
+  }
+
   // Get classifier chunks for this session
   const chunks = await db
     .select({

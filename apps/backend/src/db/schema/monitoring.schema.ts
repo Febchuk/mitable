@@ -54,6 +54,14 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
   //   - 'ready': Summary ready for delivery
   //   - 'delivered': Summary sent to channel
 
+  // RAG ingestion state (separate from session status to avoid race condition)
+  ingestionStatus: varchar("ingestion_status", { length: 50 }).notNull().default("pending"),
+  // States:
+  //   - 'pending': Not yet ingested
+  //   - 'ingesting': Currently being chunked and embedded
+  //   - 'completed': Successfully ingested to session_chunks
+  //   - 'failed': Ingestion failed
+
   // Configuration
   captureIntervalMs: integer("capture_interval_ms").notNull().default(30000), // Default 30 seconds
   selectedWindows: jsonb("selected_windows").notNull().default("[]"),

@@ -12,7 +12,7 @@
  * 5. Update document with content (status='draft')
  *
  * Progress events emitted:
- * - progress: { phase: "searching_sessions" | "analyzing_data" | "drafting" | "polishing" }
+ * - progress: { phase: "indexing_sessions" | "searching_sessions" | "analyzing_data" | "drafting" | "polishing" }
  * - chunk: { content: string }
  * - complete: { content: string, documentId: string }
  * - error: { error: string }
@@ -26,11 +26,18 @@ import type { StreamChunk } from "../tools/base.tool.js";
 import { sessionRetrieverService } from "./session-retriever.service.js";
 import { documentGenerationAgent } from "./document-generation/agent.js";
 import { createDocumentEnvironment } from "./document-generation/environment.js";
+import {
+  DOC_GEN_MODEL,
+  DOC_GEN_TEMPERATURE,
+  DOC_GEN_MAX_TOKENS,
+  SESSION_SEARCH_TOP_K,
+  SESSION_SEARCH_MIN_SIMILARITY,
+} from "./doc-generation-config.js";
 
 const DOC_GEN_CONFIG = {
-  TEXT_MODEL: "openai/gpt-oss-120b", // OpenAI GPT-OSS 120B on Groq
-  TEMPERATURE: 0.5,
-  MAX_TOKENS: 4000,
+  TEXT_MODEL: DOC_GEN_MODEL,
+  TEMPERATURE: DOC_GEN_TEMPERATURE,
+  MAX_TOKENS: DOC_GEN_MAX_TOKENS,
 };
 
 interface GenerateStreamParams {
@@ -46,7 +53,7 @@ interface GenerateStreamParams {
 
 interface ProgressEvent {
   type: "progress";
-  phase: "searching_sessions" | "analyzing_data" | "drafting" | "polishing";
+  phase: "indexing_sessions" | "searching_sessions" | "analyzing_data" | "drafting" | "polishing";
   message: string;
 }
 
@@ -111,14 +118,23 @@ class DocGenerationStreamService {
       }
 
       // Use SessionRetriever to find relevant session IDs (filtered to this user only)
-      const { sessionMap } = await sessionRetrieverService.search({
+      const { sessionMap, sessionsBeingIndexed } = await sessionRetrieverService.search({
         query: prompt,
         organizationId,
         userId, // CRITICAL: Filter to user's sessions only
         dateRange,
-        topK: 30,
-        minSimilarity: 0.3,
+        topK: SESSION_SEARCH_TOP_K,
+        minSimilarity: SESSION_SEARCH_MIN_SIMILARITY,
       });
+
+      // Emit indexing progress if sessions are being ingested
+      if (sessionsBeingIndexed && sessionsBeingIndexed > 0) {
+        yield {
+          type: "progress",
+          phase: "indexing_sessions",
+          message: `Indexing ${sessionsBeingIndexed} session${sessionsBeingIndexed > 1 ? "s" : ""} before generation...`,
+        } as ProgressEvent;
+      }
 
       let sessionIds = Array.from(sessionMap.keys());
       let sources: Array<{
@@ -127,7 +143,7 @@ class DocGenerationStreamService {
         sessionName: string;
         chunkCount: number;
       }> = [];
-      console.log(`[DocGenerationStream] Found ${sessionIds.length} relevant sessions from chunks`);
+      console.log(`[DocGenerationStream] Found ${sessionIds.length} relevant sessions`);
 
       // If hint session IDs provided, prioritize them
       if (hintSessionIds && hintSessionIds.length > 0) {

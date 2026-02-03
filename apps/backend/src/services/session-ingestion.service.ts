@@ -109,6 +109,7 @@ export class SessionIngestionService {
           await db.insert(schema.sessionChunks).values({
             sessionId: session.id,
             organizationId: session.organizationId,
+            userId: session.userId, // Added in migration 0028
             chunkIndex: chunk.chunkIndex,
             chunkType: chunk.chunkType,
             text: chunk.text,

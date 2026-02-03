@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { monitoringSessions } from "./monitoring.schema.js";
 import { organizations } from "./organizations.schema.js";
+import { users } from "./users.schema.js";
 
 export const sessionChunks = pgTable(
   "session_chunks",
@@ -22,6 +23,9 @@ export const sessionChunks = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id), // Added in migration 0028 for efficient user filtering
 
     // Chunk metadata
     chunkIndex: integer("chunk_index").notNull(),
@@ -57,6 +61,7 @@ export const sessionChunks = pgTable(
   (table) => ({
     sessionIdIdx: index("idx_session_chunks_session_id").on(table.sessionId),
     orgIdIdx: index("idx_session_chunks_org_id").on(table.organizationId),
+    userIdIdx: index("idx_session_chunks_user_id").on(table.userId), // Added in migration 0028
     chunkTypeIdx: index("idx_session_chunks_type").on(table.chunkType),
     embeddingIdx: index("idx_session_chunks_embedding").using(
       "hnsw",

@@ -722,16 +722,27 @@ router.post(
           // Update status to ready after successful story generation
           await db
             .update(schema.monitoringSessions)
-            .set({ status: "ready" })
+            .set({ status: "ready", ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
           // Trigger session ingestion (chunk + embed session data)
-          SessionIngestionService.ingestSession(id).catch((error) => {
-            log.error("Session ingestion failed", {
-              sessionId: id,
-              error: error instanceof Error ? error.message : String(error),
+          SessionIngestionService.ingestSession(id)
+            .then(async () => {
+              await db
+                .update(schema.monitoringSessions)
+                .set({ ingestionStatus: "completed" })
+                .where(eq(schema.monitoringSessions.id, id));
+            })
+            .catch(async (error) => {
+              log.error("Session ingestion failed", {
+                sessionId: id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+              await db
+                .update(schema.monitoringSessions)
+                .set({ ingestionStatus: "failed" })
+                .where(eq(schema.monitoringSessions.id, id));
             });
-          });
         })
         .catch(async (error) => {
           log.error("Session end processing failed", {
@@ -740,16 +751,27 @@ router.post(
           // Update status to indicate completion (even without story)
           await db
             .update(schema.monitoringSessions)
-            .set({ status: "ready" })
+            .set({ status: "ready", ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
           // Trigger session ingestion (chunk + embed session data)
-          SessionIngestionService.ingestSession(id).catch((ingestError) => {
-            log.error("Session ingestion failed", {
-              sessionId: id,
-              error: ingestError instanceof Error ? ingestError.message : String(ingestError),
+          SessionIngestionService.ingestSession(id)
+            .then(async () => {
+              await db
+                .update(schema.monitoringSessions)
+                .set({ ingestionStatus: "completed" })
+                .where(eq(schema.monitoringSessions.id, id));
+            })
+            .catch(async (ingestError) => {
+              log.error("Session ingestion failed", {
+                sessionId: id,
+                error: ingestError instanceof Error ? ingestError.message : String(ingestError),
+              });
+              await db
+                .update(schema.monitoringSessions)
+                .set({ ingestionStatus: "failed" })
+                .where(eq(schema.monitoringSessions.id, id));
             });
-          });
         });
 
       // Schedule cleanup of imageData after 1 hour to free up storage

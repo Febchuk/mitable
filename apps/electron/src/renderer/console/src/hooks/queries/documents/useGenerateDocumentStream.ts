@@ -10,7 +10,7 @@ import { generateDocumentStream } from "../../../services/documentStreamService"
 import { documentsKeys } from "./index";
 
 export interface GenerationProgress {
-  phase: "searching_sessions" | "analyzing_data" | "drafting" | "polishing" | "complete";
+  phase: "indexing_sessions" | "searching_sessions" | "analyzing_data" | "drafting" | "polishing" | "complete";
   message: string;
 }
 
