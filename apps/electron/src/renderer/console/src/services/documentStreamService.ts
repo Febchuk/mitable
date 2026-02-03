@@ -28,7 +28,8 @@ export interface StreamCallbacks {
 export async function generateDocumentStream(
   prompt: string,
   docType: string,
-  callbacks: StreamCallbacks
+  callbacks: StreamCallbacks,
+  options?: { sessionIds?: string[] }
 ): Promise<void> {
   const token = await getAuthToken();
   if (!token) {
@@ -41,7 +42,11 @@ export async function generateDocumentStream(
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ prompt, docType }),
+    body: JSON.stringify({
+      prompt,
+      docType,
+      ...(options?.sessionIds && options.sessionIds.length > 0 && { sessionIds: options.sessionIds }),
+    }),
   });
 
   if (!response.ok) {

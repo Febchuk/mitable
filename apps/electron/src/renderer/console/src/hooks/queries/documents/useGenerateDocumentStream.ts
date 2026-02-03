@@ -33,7 +33,7 @@ export function useGenerateDocumentStream() {
   });
 
   const generate = useCallback(
-    async (prompt: string, docType: string) => {
+    async (prompt: string, docType: string, options?: { sessionIds?: string[] }) => {
       setState({
         isGenerating: true,
         content: "",
@@ -78,7 +78,7 @@ export function useGenerateDocumentStream() {
               error,
             }));
           },
-        });
+        }, options);
       } catch (error) {
         setState((prev) => ({
           ...prev,

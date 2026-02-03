@@ -11,7 +11,7 @@ import { useDocuments } from "@/console/src/hooks/queries/documents";
 import {
   Search,
   FileText,
-  Sparkles,
+  Plus,
   ChevronRight,
   Filter,
 } from "lucide-react";
@@ -214,25 +214,23 @@ export default function DocsView() {
           {/* Create Document Button */}
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="group relative w-full overflow-hidden rounded-2xl border border-stroke-subtle bg-gradient-to-br from-canvas-overlay to-canvas-raised p-6 text-left transition-all duration-300 hover:border-indigo/30 hover:shadow-[0_0_40px_-10px_rgba(99,102,241,0.3)]"
+            className="group w-full rounded-xl border border-stroke-subtle bg-canvas-overlay p-5 text-left transition-all hover:border-indigo/40 hover:bg-canvas-muted"
           >
-            <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-            <div className="relative flex items-center gap-4">
-              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-indigo/20 to-rose/20 border border-indigo/20 group-hover:scale-105 transition-all duration-300">
-                <Sparkles size={22} className="text-indigo" />
+            <div className="flex items-center gap-4">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo/10 border border-indigo/20 group-hover:bg-indigo/15 transition-colors">
+                <Plus size={20} className="text-indigo" />
               </div>
               <div className="flex-1">
                 <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
                   Create Document
                 </h3>
                 <p className="text-ink-tertiary text-sm mt-0.5">
-                  Generate with AI or start from scratch
+                  Generate from your work or start blank
                 </p>
               </div>
               <ChevronRight
                 size={18}
-                className="text-ink-tertiary group-hover:text-indigo group-hover:translate-x-1 transition-all"
+                className="text-ink-tertiary group-hover:text-indigo group-hover:translate-x-0.5 transition-all"
               />
             </div>
           </button>

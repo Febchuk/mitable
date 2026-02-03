@@ -38,6 +38,8 @@ interface GenerateStreamParams {
   docType: DocType;
   organizationId: string;
   userId: string;
+  /** Optional session IDs to prioritize - AI will still search all sessions but these get extra weight */
+  sessionIds?: string[];
 }
 
 interface ProgressEvent {
@@ -57,7 +59,7 @@ class DocGenerationStreamService {
   async *generateFromPrompt(
     params: GenerateStreamParams
   ): AsyncIterable<StreamChunk | ProgressEvent> {
-    const { prompt, docType, organizationId, userId } = params;
+    const { prompt, docType, organizationId, userId, sessionIds: hintSessionIds } = params;
 
     try {
       // Phase 1: Create document record immediately (status='generating')
@@ -113,7 +115,22 @@ class DocGenerationStreamService {
       let sources: Array<{ type: string; sessionId: string; sessionName: string; chunkCount: number }> = [];
       console.log(`[DocGenerationStream] Found ${sessionIds.length} relevant sessions from chunks`);
 
-      // Fallback: If no chunks found, query raw sessions directly
+      // If hint session IDs provided, prioritize them
+      if (hintSessionIds && hintSessionIds.length > 0) {
+        console.log(`[DocGenerationStream] Prioritizing ${hintSessionIds.length} hint session(s)`);
+        // Add hint sessions to the front (removing duplicates)
+        const hintSet = new Set(hintSessionIds);
+        const otherSessions = sessionIds.filter(id => !hintSet.has(id));
+        sessionIds = [...hintSessionIds, ...otherSessions];
+      }
+
+      // Fallback: If no chunks found but hint sessions provided, use those
+      if (sessionIds.length === 0 && hintSessionIds && hintSessionIds.length > 0) {
+        console.log(`[DocGenerationStream] No chunks found, using ${hintSessionIds.length} hint session(s)`);
+        sessionIds = hintSessionIds;
+      }
+
+      // Fallback: If still no sessions, query raw sessions directly
       if (sessionIds.length === 0) {
         console.log(`[DocGenerationStream] No chunks found, falling back to raw sessions query`);
         console.log(`[DocGenerationStream] Query params: org=${organizationId}, user=${userId}`);
