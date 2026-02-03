@@ -11,7 +11,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { X, Upload, Check, AlertTriangle, Loader2, File } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useUploadArtifact } from "@/console/src/hooks/queries/artifacts";
 
@@ -202,9 +202,9 @@ export default function UploadArtifactModal({ open, onOpenChange }: UploadArtifa
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4">
-          <h2 className="font-display font-semibold text-ink-primary text-lg">
+          <DialogTitle className="font-display font-semibold text-ink-primary text-lg">
             Upload Artefact
-          </h2>
+          </DialogTitle>
           <button
             onClick={handleClose}
             className="p-2 -mr-2 rounded-lg text-ink-tertiary hover:text-ink-secondary hover:bg-canvas-muted transition-colors"

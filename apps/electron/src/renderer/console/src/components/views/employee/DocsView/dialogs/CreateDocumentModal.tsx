@@ -13,11 +13,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, ChevronRight, ChevronDown, Loader2, Check, FileText, Search } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useGenerateDocumentStream } from "@/console/src/hooks/queries/documents/useGenerateDocumentStream";
 import { useSessions } from "@/console/src/hooks/queries/monitoring";
+import { useArtifacts } from "@/console/src/hooks/queries/artifacts";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
+import type { Artifact } from "@/console/src/services/artifactsService";
 
 interface CreateDocumentModalProps {
   open: boolean;
@@ -72,13 +74,19 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [sessionSearch, setSessionSearch] = useState("");
+  const [selectedArtifactIds, setSelectedArtifactIds] = useState<Set<string>>(new Set());
+  const [artifactSearch, setArtifactSearch] = useState("");
 
   // Generation state
-  const { generate, isGenerating, content, documentId, progress, error, reset } =
+  const { generate, isGenerating, documentId, progress, error, reset } =
     useGenerateDocumentStream();
 
   // Fetch sessions for selection
   const { data: sessions, isLoading: isLoadingSessions } = useSessions();
+
+  // Fetch artifacts for selection
+  const { data: artifactsData, isLoading: isLoadingArtifacts } = useArtifacts();
+  const artifacts = artifactsData?.artifacts || [];
 
   // Filter to completed sessions (ended, ready, delivered) with captures
   const completedSessions = (sessions || []).filter(
@@ -86,12 +94,24 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
       ["ended", "ready", "delivered"].includes(s.status) && s.captureCount > 0
   );
 
-  // Filter by search query
+  // Filter sessions by search query
   const filteredSessions = sessionSearch.trim()
     ? completedSessions.filter((s: SessionListItem) =>
         (s.name || "Unnamed session").toLowerCase().includes(sessionSearch.toLowerCase())
       )
     : completedSessions;
+
+  // Filter to ready artifacts (completed extraction)
+  const readyArtifacts = artifacts.filter(
+    (a: Artifact) => a.extractionStatus === "completed" && a.hasExtractedText
+  );
+
+  // Filter artifacts by search query
+  const filteredArtifacts = artifactSearch.trim()
+    ? readyArtifacts.filter((a: Artifact) =>
+        a.filename.toLowerCase().includes(artifactSearch.toLowerCase())
+      )
+    : readyArtifacts;
 
   // Auto-resize textarea
   useEffect(() => {
@@ -109,6 +129,8 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
       setSelectedSessionIds(new Set());
       setIsAdvancedOpen(false);
       setSessionSearch("");
+      setSelectedArtifactIds(new Set());
+      setArtifactSearch("");
     }
   }, [open]);
 
@@ -127,7 +149,8 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
   const handleGenerate = async () => {
     if (!input.trim()) return;
     const sessionIds = selectedSessionIds.size > 0 ? Array.from(selectedSessionIds) : undefined;
-    await generate(input, "knowledge-article", { sessionIds });
+    const artifactIds = selectedArtifactIds.size > 0 ? Array.from(selectedArtifactIds) : undefined;
+    await generate(input, "knowledge-article", { sessionIds, artifactIds });
   };
 
   const handleStartBlank = () => {
@@ -184,6 +207,39 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
   const allFilteredSelected = filteredSessions.length > 0 &&
     filteredSessions.every((s: SessionListItem) => selectedSessionIds.has(s.id));
 
+  const toggleArtifact = (artifactId: string) => {
+    setSelectedArtifactIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(artifactId)) {
+        next.delete(artifactId);
+      } else {
+        next.add(artifactId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllArtifacts = () => {
+    const allFilteredArtifactsSelected = filteredArtifacts.every((a: Artifact) => selectedArtifactIds.has(a.id));
+
+    if (allFilteredArtifactsSelected) {
+      setSelectedArtifactIds((prev) => {
+        const next = new Set(prev);
+        filteredArtifacts.forEach((a: Artifact) => next.delete(a.id));
+        return next;
+      });
+    } else {
+      setSelectedArtifactIds((prev) => {
+        const next = new Set(prev);
+        filteredArtifacts.forEach((a: Artifact) => next.add(a.id));
+        return next;
+      });
+    }
+  };
+
+  const allFilteredArtifactsSelected = filteredArtifacts.length > 0 &&
+    filteredArtifacts.every((a: Artifact) => selectedArtifactIds.has(a.id));
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
@@ -192,9 +248,9 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4">
-          <h2 className="font-display font-semibold text-ink-primary text-lg">
+          <DialogTitle className="font-display font-semibold text-ink-primary text-lg">
             Create Document
-          </h2>
+          </DialogTitle>
           <button
             onClick={handleClose}
             className="p-2 -mr-2 rounded-lg text-ink-tertiary hover:text-ink-secondary hover:bg-canvas-muted transition-colors"
@@ -324,20 +380,87 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
                     </div>
                   </div>
 
-                  {/* Artifacts Section (Placeholder) */}
-                  <div className="bg-canvas-overlay border border-stroke-subtle rounded-xl opacity-60">
-                    <div className="flex items-center justify-between px-4 py-3">
+                  {/* Artifacts Section */}
+                  <div className="bg-canvas-overlay border border-stroke-subtle rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-stroke-subtle">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-ink-primary">
-                          Artifacts to include
+                          Include artifacts
                         </span>
-                        <span className="px-1.5 py-0.5 text-xs font-medium bg-canvas-muted text-ink-tertiary rounded">
-                          coming soon
-                        </span>
+                        {selectedArtifactIds.size > 0 && (
+                          <span className="px-1.5 py-0.5 text-xs font-medium bg-indigo/10 text-indigo rounded">
+                            {selectedArtifactIds.size}
+                          </span>
+                        )}
                       </div>
+                      {filteredArtifacts.length > 0 && (
+                        <button
+                          onClick={handleSelectAllArtifacts}
+                          className="text-xs text-ink-tertiary hover:text-indigo transition-colors"
+                        >
+                          {allFilteredArtifactsSelected ? "Clear" : "Select all"}
+                        </button>
+                      )}
                     </div>
-                    <div className="px-4 py-6 text-center text-sm text-ink-tertiary border-t border-stroke-subtle">
-                      No artifacts uploaded yet
+
+                    {/* Search input */}
+                    {readyArtifacts.length > 3 && (
+                      <div className="px-3 py-2 border-b border-stroke-subtle">
+                        <div className="relative">
+                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-tertiary" />
+                          <input
+                            type="text"
+                            value={artifactSearch}
+                            onChange={(e) => setArtifactSearch(e.target.value)}
+                            placeholder="Search artifacts..."
+                            className="w-full pl-8 pr-3 py-1.5 text-sm bg-canvas-base border border-stroke-subtle rounded-lg text-ink-primary placeholder:text-ink-tertiary focus:outline-none focus:border-indigo/50"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {isLoadingArtifacts ? (
+                        <div className="px-4 py-6 text-center">
+                          <Loader2 size={16} className="animate-spin text-ink-tertiary mx-auto" />
+                        </div>
+                      ) : readyArtifacts.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-sm text-ink-tertiary">
+                          No artifacts uploaded yet
+                        </div>
+                      ) : filteredArtifacts.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-sm text-ink-tertiary">
+                          No artifacts match "{artifactSearch}"
+                        </div>
+                      ) : (
+                        filteredArtifacts.map((artifact: Artifact) => (
+                          <label
+                            key={artifact.id}
+                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-canvas-muted cursor-pointer transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedArtifactIds.has(artifact.id)}
+                              onChange={() => toggleArtifact(artifact.id)}
+                              className="w-4 h-4 rounded border-stroke-subtle text-indigo focus:ring-indigo/20 focus:ring-offset-0 bg-canvas-overlay"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm text-ink-primary truncate block">
+                                {artifact.filename}
+                              </span>
+                            </div>
+                            <span className="text-xs text-ink-tertiary">
+                              {artifact.fileSizeFormatted}
+                            </span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="px-4 py-2 border-t border-stroke-subtle">
+                      <p className="text-xs text-ink-tertiary">
+                        Uploaded docs will be used as reference material
+                      </p>
                     </div>
                   </div>
                 </div>

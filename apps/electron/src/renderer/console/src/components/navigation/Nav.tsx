@@ -21,7 +21,7 @@ export default function Nav() {
         <NavItem to="/monitoring" icon={Activity} label="Sessions" />
         <NavItem to="/docs" icon={FileText} label="Docs" />
         <NavItem to="/artefacts" icon={Paperclip} label="Artefacts" />
-        <NavItem to="/todos" icon={CheckSquare} label="Todos" />
+        {/* <NavItem to="/todos" icon={CheckSquare} label="Todos" /> */}
       </nav>
     );
   }
@@ -44,7 +44,7 @@ export default function Nav() {
       <NavItem to="/monitoring" icon={Activity} label="Sessions" />
       <NavItem to="/docs" icon={FileText} label="Docs" />
       <NavItem to="/artefacts" icon={Paperclip} label="Artefacts" />
-      <NavItem to="/todos" icon={CheckSquare} label="Todos" />
+      {/* <NavItem to="/todos" icon={CheckSquare} label="Todos" /> */}
     </nav>
   );
 }

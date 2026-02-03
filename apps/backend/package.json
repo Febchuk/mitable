@@ -67,6 +67,7 @@
     "multer": "^2.0.2",
     "node-cache": "^5.1.2",
     "openai": "^6.3.0",
+    "pdfjs-dist": "^5.4.624",
     "pg": "^8.13.1",
     "pino": "^10.1.0",
     "pino-http": "^11.0.0",
@@ -78,6 +79,7 @@
     "swagger-ui-express": "^5.0.1",
     "tesseract.js": "^6.0.1",
     "tiktoken": "^1.0.22",
+    "unpdf": "^1.4.0",
     "zod": "^3.22.4",
     "zod-to-json-schema": "^3.24.6"
   },

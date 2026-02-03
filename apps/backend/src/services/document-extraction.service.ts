@@ -2,14 +2,13 @@
  * Document Extraction Service
  *
  * Extracts text content from various document formats:
- * - PDF files using pdf-parse
+ * - PDF files using unpdf (Node.js-friendly pdfjs wrapper)
  * - DOCX files using mammoth
  * - TXT/MD files via direct UTF-8 read
  * - Images return null (no text extraction)
  */
 
-// Note: These packages need to be installed:
-// npm install pdf-parse mammoth --workspace=apps/backend
+import { extractText as extractPdfText } from "unpdf";
 
 interface ExtractionResult {
   text: string | null;
@@ -65,30 +64,52 @@ class DocumentExtractionService {
   }
 
   /**
-   * Extract text from PDF files
+   * Extract text from PDF files using unpdf
    */
   private async extractFromPdf(buffer: Buffer): Promise<ExtractionResult> {
     try {
-      // Dynamic import to handle optional dependency
-      // @ts-ignore - pdf-parse types may not be available
-      const pdfParse = (await import("pdf-parse")).default;
+      // Convert Buffer to Uint8Array as required by unpdf
+      const uint8Array = new Uint8Array(buffer);
+      const result = await extractPdfText(uint8Array);
 
-      const data = await pdfParse(buffer);
+      // unpdf returns { text: string, totalPages: number } but text might be array or object
+      // Handle different response formats
+      let textContent: string;
+      let pageCount: number;
 
-      const text = data.text.trim();
-      const wordCount = this.countWords(text);
+      if (typeof result === "string") {
+        textContent = result;
+        pageCount = 1;
+      } else if (result && typeof result === "object") {
+        // Result is an object with text property
+        if (typeof result.text === "string") {
+          textContent = result.text;
+        } else if (Array.isArray(result.text)) {
+          // Text is array of page texts
+          textContent = result.text.join("\n\n");
+        } else {
+          textContent = String(result.text || "");
+        }
+        pageCount = result.totalPages || 1;
+      } else {
+        textContent = "";
+        pageCount = 0;
+      }
+
+      const cleanedText = textContent.trim();
+      const wordCount = this.countWords(cleanedText);
 
       console.log(
-        `[DocumentExtraction] PDF extracted: ${data.numpages} pages, ${wordCount} words`
+        `[DocumentExtraction] PDF extracted: ${pageCount} pages, ${wordCount} words`
       );
 
       return {
-        text,
+        text: cleanedText,
         metadata: {
-          pageCount: data.numpages,
+          pageCount,
           wordCount,
-          characterCount: text.length,
-          extractionMethod: "pdf-parse",
+          characterCount: cleanedText.length,
+          extractionMethod: "unpdf",
         },
       };
     } catch (error) {
@@ -233,7 +254,7 @@ class DocumentExtractionService {
   getExtractionMethod(mimeType: string): string {
     switch (mimeType) {
       case "application/pdf":
-        return "pdf-parse";
+        return "unpdf";
       case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
         return "mammoth";
       case "text/plain":

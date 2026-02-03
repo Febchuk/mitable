@@ -33,7 +33,7 @@ export function useGenerateDocumentStream() {
   });
 
   const generate = useCallback(
-    async (prompt: string, docType: string, options?: { sessionIds?: string[] }) => {
+    async (prompt: string, docType: string, options?: { sessionIds?: string[]; artifactIds?: string[] }) => {
       setState({
         isGenerating: true,
         content: "",

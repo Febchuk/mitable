@@ -40,6 +40,8 @@ interface GenerateStreamParams {
   userId: string;
   /** Optional session IDs to prioritize - AI will still search all sessions but these get extra weight */
   sessionIds?: string[];
+  /** Optional artifact IDs to include as reference material */
+  artifactIds?: string[];
 }
 
 interface ProgressEvent {
@@ -59,7 +61,7 @@ class DocGenerationStreamService {
   async *generateFromPrompt(
     params: GenerateStreamParams
   ): AsyncIterable<StreamChunk | ProgressEvent> {
-    const { prompt, docType, organizationId, userId, sessionIds: hintSessionIds } = params;
+    const { prompt, docType, organizationId, userId, sessionIds: hintSessionIds, artifactIds } = params;
 
     try {
       // Phase 1: Create document record immediately (status='generating')
@@ -276,7 +278,8 @@ class DocGenerationStreamService {
         organizationId,
         userId, // CRITICAL: Pass userId to prevent data leakage
         prompt,
-        dateRange || null
+        dateRange || null,
+        artifactIds // Optional artifact IDs for reference material
       );
 
       // Phase 4: Run RLM agent with tool-calling loop

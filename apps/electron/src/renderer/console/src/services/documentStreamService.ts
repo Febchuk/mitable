@@ -29,7 +29,7 @@ export async function generateDocumentStream(
   prompt: string,
   docType: string,
   callbacks: StreamCallbacks,
-  options?: { sessionIds?: string[] }
+  options?: { sessionIds?: string[]; artifactIds?: string[] }
 ): Promise<void> {
   const token = await getAuthToken();
   if (!token) {
@@ -46,6 +46,7 @@ export async function generateDocumentStream(
       prompt,
       docType,
       ...(options?.sessionIds && options.sessionIds.length > 0 && { sessionIds: options.sessionIds }),
+      ...(options?.artifactIds && options.artifactIds.length > 0 && { artifactIds: options.artifactIds }),
     }),
   });
 

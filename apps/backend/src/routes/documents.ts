@@ -730,7 +730,7 @@ router.post("/:id/revise", requireAuth, async (req: Request, res: Response): Pro
  */
 router.post("/generate/stream", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;
-  const { prompt, docType, sessionIds } = req.body;
+  const { prompt, docType, sessionIds, artifactIds } = req.body;
 
   if (!prompt || !docType) {
     res.status(400).json({
@@ -745,6 +745,15 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
     res.status(400).json({
       error: "Bad Request",
       message: "sessionIds must be an array of strings",
+    });
+    return;
+  }
+
+  // Validate artifactIds if provided
+  if (artifactIds && (!Array.isArray(artifactIds) || artifactIds.some((id: unknown) => typeof id !== "string"))) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "artifactIds must be an array of strings",
     });
     return;
   }
@@ -798,6 +807,7 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
         organizationId: user.organizationId,
         userId,
         sessionIds, // Optional session IDs as hints
+        artifactIds, // Optional artifact IDs to include
       });
 
       for await (const chunk of stream) {
