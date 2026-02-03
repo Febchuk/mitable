@@ -90,23 +90,20 @@ export function useSummaryPreferences() {
   }, []);
 
   // Update summary preferences
-  const updateSummaryPreferences = useCallback(
-    async (prefs: Partial<SummaryPreferences>) => {
-      try {
-        const result = await window.consoleAPI.setSummaryPreferences(prefs);
-        if (result.success) {
-          // Reload preferences after update
-          const updated = await window.consoleAPI.getSummaryPreferences();
-          setSummaryPrefs(updated);
-        }
-        return result;
-      } catch (error) {
-        logger.error(" Failed to update summary preferences:", error);
-        return { success: false, error: String(error) };
+  const updateSummaryPreferences = useCallback(async (prefs: Partial<SummaryPreferences>) => {
+    try {
+      const result = await window.consoleAPI.setSummaryPreferences(prefs);
+      if (result.success) {
+        // Reload preferences after update
+        const updated = await window.consoleAPI.getSummaryPreferences();
+        setSummaryPrefs(updated);
       }
-    },
-    []
-  );
+      return result;
+    } catch (error) {
+      logger.error(" Failed to update summary preferences:", error);
+      return { success: false, error: String(error) };
+    }
+  }, []);
 
   // Update just the "always ask" preference
   const setAlwaysAsk = useCallback(async (value: boolean) => {

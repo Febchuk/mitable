@@ -1,4 +1,4 @@
-import { Layers, Users, BarChart3, Plug, Activity, FileText, CheckSquare, Paperclip } from "lucide-react";
+import { Layers, Users, BarChart3, Plug, Activity, FileText, Paperclip } from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 import { useSubscription } from "../../hooks/queries/billing";

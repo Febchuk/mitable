@@ -109,7 +109,9 @@ class ArtifactEmbeddingService {
       artifactIds?: string[];
       topK?: number;
     }
-  ): Promise<Array<{ id: string; text: string; score: number; artifactId: string; filename: string }>> {
+  ): Promise<
+    Array<{ id: string; text: string; score: number; artifactId: string; filename: string }>
+  > {
     const { organizationId, artifactIds, topK = 5 } = options;
 
     // Generate query embedding

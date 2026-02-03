@@ -49,9 +49,7 @@ export const artifacts = pgTable("artifacts", {
 
   // Text extraction
   extractedText: text("extracted_text"), // Parsed text content (null for images)
-  extractionStatus: varchar("extraction_status", { length: 50 })
-    .notNull()
-    .default("pending"),
+  extractionStatus: varchar("extraction_status", { length: 50 }).notNull().default("pending"),
   // States: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
   extractionError: text("extraction_error"),
 
@@ -87,9 +85,7 @@ export const documentArtifactSources = pgTable(
       .notNull()
       .references(() => artifacts.id, { onDelete: "cascade" }),
 
-    contributionType: varchar("contribution_type", { length: 50 })
-      .notNull()
-      .default("source"),
+    contributionType: varchar("contribution_type", { length: 50 }).notNull().default("source"),
     // Types: 'source' | 'reference'
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -112,19 +108,16 @@ export const artifactsRelations = relations(artifacts, ({ one, many }) => ({
   documentSources: many(documentArtifactSources),
 }));
 
-export const documentArtifactSourcesRelations = relations(
-  documentArtifactSources,
-  ({ one }) => ({
-    document: one(documents, {
-      fields: [documentArtifactSources.documentId],
-      references: [documents.id],
-    }),
-    artifact: one(artifacts, {
-      fields: [documentArtifactSources.artifactId],
-      references: [artifacts.id],
-    }),
-  })
-);
+export const documentArtifactSourcesRelations = relations(documentArtifactSources, ({ one }) => ({
+  document: one(documents, {
+    fields: [documentArtifactSources.documentId],
+    references: [documents.id],
+  }),
+  artifact: one(artifacts, {
+    fields: [documentArtifactSources.artifactId],
+    references: [artifacts.id],
+  }),
+}));
 
 // Export types
 export type Artifact = typeof artifacts.$inferSelect;

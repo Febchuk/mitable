@@ -46,11 +46,11 @@ export default function ActivityTimeline({
         className="w-full flex items-center justify-between p-4 hover:bg-canvas-muted/30 transition-colors rounded-t-xl"
       >
         <div className="flex items-center gap-3">
-          <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">Activity Transcript</h3>
+          <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
+            Activity Transcript
+          </h3>
           {timeline && (
-            <span className="text-sm text-ink-tertiary">
-              {timeline.groups.length} activities
-            </span>
+            <span className="text-sm text-ink-tertiary">{timeline.groups.length} activities</span>
           )}
         </div>
         <div className="text-ink-tertiary">

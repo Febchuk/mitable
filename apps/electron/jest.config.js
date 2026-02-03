@@ -1,6 +1,7 @@
 /** @type {import('jest').Config} */
 export default {
   testEnvironment: "jsdom",
+  watchman: false,
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/renderer/$1",
     "\\.(css|less|scss|sass)$": "identity-obj-proxy",

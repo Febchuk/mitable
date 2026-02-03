@@ -48,7 +48,7 @@ function detectWorkstream(capture: SessionCapture): string {
 
   // 3. Git branch detection in terminal
   const gitMatch = title.match(/\(([a-z0-9-_/]+)\)/i);
-  if (gitMatch && gitMatch[1].includes("/") || gitMatch?.[1].includes("-")) {
+  if ((gitMatch && gitMatch[1].includes("/")) || gitMatch?.[1].includes("-")) {
     return gitMatch[1].split("/").pop() || gitMatch[1];
   }
 
@@ -95,7 +95,6 @@ function isDeepWorkApp(appName: string | null): boolean {
   const app = appName.toLowerCase();
   return CONFIG.deepWorkApps.some((d) => app.includes(d));
 }
-
 
 /**
  * Compute dominant activity for a workstream
@@ -177,7 +176,10 @@ function buildSegments(captures: SessionCapture[]): TimeSegment[] {
         segments.push({
           startTime: currentSegment.startTime,
           endTime: currentSegment.endTime,
-          durationMinutes: Math.max(1, getDurationMinutes(currentSegment.startTime, currentSegment.endTime)),
+          durationMinutes: Math.max(
+            1,
+            getDurationMinutes(currentSegment.startTime, currentSegment.endTime)
+          ),
         });
         currentSegment = {
           startTime: capture.capturedAt,
@@ -195,7 +197,10 @@ function buildSegments(captures: SessionCapture[]): TimeSegment[] {
     segments.push({
       startTime: currentSegment.startTime,
       endTime: currentSegment.endTime,
-      durationMinutes: Math.max(1, getDurationMinutes(currentSegment.startTime, currentSegment.endTime)),
+      durationMinutes: Math.max(
+        1,
+        getDurationMinutes(currentSegment.startTime, currentSegment.endTime)
+      ),
     });
   }
 
@@ -220,9 +225,7 @@ function extractAppsUsed(captures: SessionCapture[]): string[] {
 /**
  * Calculate session statistics
  */
-function calculateSessionStats(
-  workstreams: Workstream[]
-): SessionStats {
+function calculateSessionStats(workstreams: Workstream[]): SessionStats {
   // Total time
   const totalTimeMinutes = workstreams.reduce((sum, ws) => sum + ws.totalDurationMinutes, 0);
 
@@ -263,7 +266,8 @@ function calculateSessionStats(
   return {
     totalTimeMinutes,
     deepWorkMinutes,
-    deepWorkPercent: totalTimeMinutes > 0 ? Math.round((deepWorkMinutes / totalTimeMinutes) * 100) : 0,
+    deepWorkPercent:
+      totalTimeMinutes > 0 ? Math.round((deepWorkMinutes / totalTimeMinutes) * 100) : 0,
     interruptionCount,
     interruptionMinutes,
     longestFocusMinutes,

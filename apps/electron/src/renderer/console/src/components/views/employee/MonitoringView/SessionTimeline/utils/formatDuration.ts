@@ -57,7 +57,8 @@ export function formatTimeRange(startTime: string, endTime: string): string {
 
   // If same time (or very close), just show one
   const diffMs = Math.abs(end.getTime() - start.getTime());
-  if (diffMs < 60000) { // Less than 1 minute
+  if (diffMs < 60000) {
+    // Less than 1 minute
     return formatTime(start);
   }
 
@@ -189,7 +190,7 @@ export function generateTimeLabels(
 
   for (let i = 0; i < labelCount; i++) {
     const position = (i / (labelCount - 1)) * 100;
-    const timestamp = start + (duration * i / (labelCount - 1));
+    const timestamp = start + (duration * i) / (labelCount - 1);
     const date = new Date(timestamp);
 
     labels.push({

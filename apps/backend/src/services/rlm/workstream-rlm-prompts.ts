@@ -78,23 +78,30 @@ export function getWorkstreamUserPrompt(
   existingWorkstreams: WorkstreamForPrompt[],
   context: SessionContextForPrompt
 ): string {
-  const formattedCaptures = newCaptures.map((c, i) => {
-    const time = new Date(c.capturedAt).toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    return `[${i + 1}] ${time} | ${c.appName || "Unknown"} | ${c.windowTitle || "No title"}
+  const formattedCaptures = newCaptures
+    .map((c, i) => {
+      const time = new Date(c.capturedAt).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `[${i + 1}] ${time} | ${c.appName || "Unknown"} | ${c.windowTitle || "No title"}
     Activity: ${c.activityDescription || "No description"}
     ID: ${c.id}`;
-  }).join("\n\n");
+    })
+    .join("\n\n");
 
-  const formattedWorkstreams = existingWorkstreams.length > 0
-    ? existingWorkstreams.map((w) => `- "${w.name}" (ID: ${w.id})
+  const formattedWorkstreams =
+    existingWorkstreams.length > 0
+      ? existingWorkstreams
+          .map(
+            (w) => `- "${w.name}" (ID: ${w.id})
     Captures: ${w.captureCount}
     Apps: ${w.appsUsed.join(", ") || "None"}
     Summary: ${w.summary || "No summary yet"}
-    Category: ${w.category || "other"}`).join("\n\n")
-    : "No existing workstreams yet.";
+    Category: ${w.category || "other"}`
+          )
+          .join("\n\n")
+      : "No existing workstreams yet.";
 
   return `## Session Context
 - Session Goal: ${context.linearIssueTitle || "General work session"}
@@ -171,18 +178,20 @@ export function getFinalAnalysisPrompt(
   existingWorkstreams: WorkstreamForPrompt[],
   context: SessionContextForPrompt
 ): string {
-  const formattedCaptures = allCaptures.map((c, i) => {
-    const time = new Date(c.capturedAt).toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    return `[${i + 1}] ${time} | ${c.appName || "Unknown"} | ${c.windowTitle?.slice(0, 50) || "No title"}
+  const formattedCaptures = allCaptures
+    .map((c, i) => {
+      const time = new Date(c.capturedAt).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `[${i + 1}] ${time} | ${c.appName || "Unknown"} | ${c.windowTitle?.slice(0, 50) || "No title"}
     Activity: ${c.activityDescription || "No description"}`;
-  }).join("\n");
+    })
+    .join("\n");
 
-  const formattedWorkstreams = existingWorkstreams.map((w) =>
-    `- "${w.name}" (${w.captureCount} captures, ${w.category || "other"})`
-  ).join("\n");
+  const formattedWorkstreams = existingWorkstreams
+    .map((w) => `- "${w.name}" (${w.captureCount} captures, ${w.category || "other"})`)
+    .join("\n");
 
   return `## Final Session Analysis
 
@@ -231,11 +240,14 @@ ${formattedCaptures}
  */
 export interface WorkstreamAnalysisResult {
   assignments: Record<string, string>;
-  updates: Record<string, {
-    name?: string;
-    summary?: string;
-    category?: string;
-  }>;
+  updates: Record<
+    string,
+    {
+      name?: string;
+      summary?: string;
+      category?: string;
+    }
+  >;
   newWorkstreams: Array<{
     tempId: string;
     name: string;

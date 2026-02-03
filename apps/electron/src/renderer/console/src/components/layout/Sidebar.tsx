@@ -83,18 +83,14 @@ export default function Sidebar() {
               <p className="text-sm font-medium text-ink-primary truncate">
                 {user?.name || "User"}
               </p>
-              <p className="text-xs text-ink-tertiary truncate">
-                {user?.email || ""}
-              </p>
+              <p className="text-xs text-ink-tertiary truncate">{user?.email || ""}</p>
             </div>
           )}
         </button>
 
         {/* Dropdown Menu with glass effect */}
         {dropdownOpen && (
-          <div
-            className="absolute bottom-full left-2 right-2 mb-2 glass border border-stroke rounded-xl shadow-2xl overflow-hidden animate-reveal-up"
-          >
+          <div className="absolute bottom-full left-2 right-2 mb-2 glass border border-stroke rounded-xl shadow-2xl overflow-hidden animate-reveal-up">
             <button
               onClick={() => {
                 navigate("/profile");

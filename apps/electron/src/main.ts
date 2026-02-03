@@ -1,4 +1,8 @@
-import type { MultiWindowCaptureResult, SelectedWindowInfo, WatchableWindow } from "@mitable/shared";
+import type {
+  MultiWindowCaptureResult,
+  SelectedWindowInfo,
+  WatchableWindow,
+} from "@mitable/shared";
 import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
 import {
   app,
@@ -1774,19 +1778,16 @@ function setupMonitoringSessionHandlers() {
 
         // End backend session with preferences
         monitoringLogger.info(` Triggering backend summarization with preferences`);
-        await authManager.authenticatedFetch(
-          `/api/monitoring/sessions/${result.sessionId}/end`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              preferences: {
-                detailLevel: preferences.detailLevel,
-                format: preferences.format,
-                includeScreenshots: preferences.includeScreenshots,
-              },
-            }),
-          }
-        );
+        await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
+          method: "POST",
+          body: JSON.stringify({
+            preferences: {
+              detailLevel: preferences.detailLevel,
+              format: preferences.format,
+              includeScreenshots: preferences.includeScreenshots,
+            },
+          }),
+        });
       } catch (error) {
         monitoringLogger.error(" Error ending session with preferences:", error);
       }

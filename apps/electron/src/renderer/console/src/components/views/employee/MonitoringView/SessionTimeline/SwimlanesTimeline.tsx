@@ -137,11 +137,7 @@ function SwimlaneRow({
         onClick={onClick}
       >
         {workstream.segments.map((segment, index) => {
-          const left = getTimelinePosition(
-            segment.startTime,
-            sessionStartTime,
-            sessionEndTime
-          );
+          const left = getTimelinePosition(segment.startTime, sessionStartTime, sessionEndTime);
           const width = getTimelineWidth(
             segment.startTime,
             segment.endTime,

@@ -93,10 +93,10 @@ interface RLMTriggerState {
 }
 
 const TRIGGER_CONFIG = {
-  captureThreshold: 10,        // Trigger after 10 new captures
-  timeThresholdMs: 180000,     // Trigger after 3 minutes
-  minIntervalMs: 60000,        // Minimum 60s between calls (debounce)
-  contextSwitchTrigger: true,  // Trigger on app category change
+  captureThreshold: 10, // Trigger after 10 new captures
+  timeThresholdMs: 180000, // Trigger after 3 minutes
+  minIntervalMs: 60000, // Minimum 60s between calls (debounce)
+  contextSwitchTrigger: true, // Trigger on app category change
 };
 
 function shouldTriggerAnalysis(state: RLMTriggerState, capture: Capture): boolean {
@@ -139,23 +139,31 @@ You are continuously analyzing a work session to maintain accurate workstream gr
 - Analysis #${sessionContext.analysisCount}
 
 ## Current Workstreams
-${existingWorkstreams.map(w => `
+${existingWorkstreams
+  .map(
+    (w) => `
 ### ${w.name} (${w.id})
 - Captures: ${w.captureCount}
 - Duration: ${w.totalDurationMinutes} min
 - Apps: ${w.appsUsed.join(", ")}
 - Summary: ${w.summary}
 - Category: ${w.category}
-`).join('\n')}
+`
+  )
+  .join("\n")}
 
 ## New Activities Since Last Analysis
-${newCaptures.map((c, i) => `
+${newCaptures
+  .map(
+    (c, i) => `
 [${c.id}] ${formatTime(c.capturedAt)}
   App: ${c.appName}
   Window: ${c.windowTitle}
   Activity: ${c.activityDescription}
   Provisional Assignment: ${c.provisionalWorkstream}
-`).join('\n')}
+`
+  )
+  .join("\n")}
 
 ## Your Task
 
@@ -231,7 +239,7 @@ class WorkstreamRLMService extends EventEmitter {
 
     if (this.shouldTriggerAnalysis(state, capture)) {
       // Don't await - run in background
-      this.triggerAnalysis(sessionId).catch(err => {
+      this.triggerAnalysis(sessionId).catch((err) => {
         console.error(`[WorkstreamRLM] Analysis failed for ${sessionId}:`, err);
       });
     }
@@ -309,8 +317,9 @@ class WorkstreamRLMService extends EventEmitter {
       state.lastAnalysisAt = Date.now();
       state.capturesSinceLastAnalysis = 0;
 
-      console.log(`[WorkstreamRLM] Analysis completed for ${sessionId} in ${Date.now() - startTime}ms`);
-
+      console.log(
+        `[WorkstreamRLM] Analysis completed for ${sessionId} in ${Date.now() - startTime}ms`
+      );
     } catch (error) {
       console.error(`[WorkstreamRLM] Analysis error:`, error);
       throw error;
@@ -365,7 +374,7 @@ class WorkstreamRLMService extends EventEmitter {
       // 4. Assign captures to workstreams
       for (const [captureId, workstreamId] of Object.entries(analysis.assignments)) {
         const wsId = workstreamId.startsWith("new:")
-          ? analysis.newWorkstreams.find(w => w.name === workstreamId.slice(4))?.id
+          ? analysis.newWorkstreams.find((w) => w.name === workstreamId.slice(4))?.id
           : workstreamId;
 
         await tx
@@ -452,10 +461,7 @@ useEffect(() => {
 
   socket.on("workstreams:updated", (data) => {
     // Update local state with new workstreams
-    queryClient.setQueryData(
-      ["session-workstreams", sessionId],
-      data.workstreams
-    );
+    queryClient.setQueryData(["session-workstreams", sessionId], data.workstreams);
   });
 
   return () => socket.disconnect();
@@ -569,6 +575,7 @@ const MODEL_CONFIG = {
 ## Implementation Timeline
 
 ### Week 1: Core Infrastructure
+
 - Day 1: Database schema changes + migrations
 - Day 2: WorkstreamRLMService skeleton + trigger logic
 - Day 3: RLM prompt design + testing
@@ -576,6 +583,7 @@ const MODEL_CONFIG = {
 - Day 5: Integration with capture flow
 
 ### Week 2: Real-time Updates
+
 - Day 1: WebSocket integration
 - Day 2: Frontend subscription + state management
 - Day 3: Animation + UI polish
@@ -583,6 +591,7 @@ const MODEL_CONFIG = {
 - Day 5: Testing + edge cases
 
 ### Week 3: Polish
+
 - Day 1-2: Performance optimization
 - Day 3: Error handling + retry logic
 - Day 4: Monitoring + logging
@@ -594,12 +603,12 @@ const MODEL_CONFIG = {
 
 Using gpt-4o-mini for incremental analysis:
 
-| Session Length | Analyses | Input Tokens | Output Tokens | Cost |
-|----------------|----------|--------------|---------------|------|
-| 30 min | ~10 | ~15,000 | ~5,000 | ~$0.01 |
-| 1 hour | ~20 | ~30,000 | ~10,000 | ~$0.02 |
-| 2 hours | ~40 | ~60,000 | ~20,000 | ~$0.04 |
-| 4 hours | ~80 | ~120,000 | ~40,000 | ~$0.08 |
+| Session Length | Analyses | Input Tokens | Output Tokens | Cost   |
+| -------------- | -------- | ------------ | ------------- | ------ |
+| 30 min         | ~10      | ~15,000      | ~5,000        | ~$0.01 |
+| 1 hour         | ~20      | ~30,000      | ~10,000       | ~$0.02 |
+| 2 hours        | ~40      | ~60,000      | ~20,000       | ~$0.04 |
+| 4 hours        | ~80      | ~120,000     | ~40,000       | ~$0.08 |
 
 **Monthly estimate**: ~$50-100/month per active user (20 sessions/day)
 
@@ -610,6 +619,7 @@ Still very reasonable for the value provided.
 ## Summary
 
 Periodic RLM provides:
+
 - **Real-time intelligent grouping** as user works
 - **Self-correcting workstreams** that improve over time
 - **Semantic understanding** of activity relationships

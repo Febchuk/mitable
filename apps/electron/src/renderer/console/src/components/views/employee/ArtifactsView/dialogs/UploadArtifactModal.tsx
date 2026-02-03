@@ -39,7 +39,17 @@ const ACCEPTED_TYPES = [
   "image/webp",
 ];
 
-const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
+const ACCEPTED_EXTENSIONS = [
+  ".pdf",
+  ".docx",
+  ".txt",
+  ".md",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 function formatFileSize(bytes: number): string {
@@ -136,7 +146,11 @@ export default function UploadArtifactModal({ open, onOpenChange }: UploadArtifa
           setUploadingFiles((prev) =>
             prev.map((f) =>
               f.id === uploadFile.id
-                ? { ...f, status: "error", error: error instanceof Error ? error.message : "Upload failed" }
+                ? {
+                    ...f,
+                    status: "error",
+                    error: error instanceof Error ? error.message : "Upload failed",
+                  }
                 : f
             )
           );
@@ -240,9 +254,7 @@ export default function UploadArtifactModal({ open, onOpenChange }: UploadArtifa
             <p className="text-sm font-medium text-ink-primary mb-1">
               {isDragging ? "Drop files here" : "Drop files here or click to browse"}
             </p>
-            <p className="text-xs text-ink-tertiary">
-              PDF, DOCX, TXT, MD, PNG, JPEG · Max 10MB
-            </p>
+            <p className="text-xs text-ink-tertiary">PDF, DOCX, TXT, MD, PNG, JPEG · Max 10MB</p>
           </div>
 
           {/* Hidden File Input */}

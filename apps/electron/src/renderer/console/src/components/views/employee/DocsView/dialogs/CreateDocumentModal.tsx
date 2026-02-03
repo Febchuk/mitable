@@ -90,8 +90,7 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
 
   // Filter to completed sessions (ended, ready, delivered) with captures
   const completedSessions = (sessions || []).filter(
-    (s: SessionListItem) =>
-      ["ended", "ready", "delivered"].includes(s.status) && s.captureCount > 0
+    (s: SessionListItem) => ["ended", "ready", "delivered"].includes(s.status) && s.captureCount > 0
   );
 
   // Filter sessions by search query
@@ -185,7 +184,9 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
 
   const handleSelectAll = () => {
     const targetSessions = filteredSessions;
-    const allFilteredSelected = targetSessions.every((s: SessionListItem) => selectedSessionIds.has(s.id));
+    const allFilteredSelected = targetSessions.every((s: SessionListItem) =>
+      selectedSessionIds.has(s.id)
+    );
 
     if (allFilteredSelected) {
       // Deselect all filtered sessions
@@ -204,7 +205,8 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
     }
   };
 
-  const allFilteredSelected = filteredSessions.length > 0 &&
+  const allFilteredSelected =
+    filteredSessions.length > 0 &&
     filteredSessions.every((s: SessionListItem) => selectedSessionIds.has(s.id));
 
   const toggleArtifact = (artifactId: string) => {
@@ -220,7 +222,9 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
   };
 
   const handleSelectAllArtifacts = () => {
-    const allFilteredArtifactsSelected = filteredArtifacts.every((a: Artifact) => selectedArtifactIds.has(a.id));
+    const allFilteredArtifactsSelected = filteredArtifacts.every((a: Artifact) =>
+      selectedArtifactIds.has(a.id)
+    );
 
     if (allFilteredArtifactsSelected) {
       setSelectedArtifactIds((prev) => {
@@ -237,7 +241,8 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
     }
   };
 
-  const allFilteredArtifactsSelected = filteredArtifacts.length > 0 &&
+  const allFilteredArtifactsSelected =
+    filteredArtifacts.length > 0 &&
     filteredArtifacts.every((a: Artifact) => selectedArtifactIds.has(a.id));
 
   return (
@@ -320,7 +325,10 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
                     {completedSessions.length > 3 && (
                       <div className="px-3 py-2 border-b border-stroke-subtle">
                         <div className="relative">
-                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-tertiary" />
+                          <Search
+                            size={14}
+                            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-tertiary"
+                          />
                           <input
                             type="text"
                             value={sessionSearch}
@@ -407,7 +415,10 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
                     {readyArtifacts.length > 3 && (
                       <div className="px-3 py-2 border-b border-stroke-subtle">
                         <div className="relative">
-                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-tertiary" />
+                          <Search
+                            size={14}
+                            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-tertiary"
+                          />
                           <input
                             type="text"
                             value={artifactSearch}

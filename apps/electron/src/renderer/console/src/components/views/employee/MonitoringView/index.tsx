@@ -10,15 +10,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSessions } from "@/console/src/hooks/queries/monitoring";
 import { useStartSession } from "@/console/src/hooks/useStartSession";
-import {
-  Search,
-  Play,
-  Loader2,
-  Zap,
-  Clock,
-  ChevronRight,
-  Activity,
-} from "lucide-react";
+import { Search, Play, Loader2, Zap, Clock, ChevronRight, Activity } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import SessionRow from "./SessionRow";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
@@ -67,9 +59,7 @@ export default function MonitoringView() {
   const { startSession, isStarting } = useStartSession();
 
   // Find active session
-  const activeSession = sessions.find(
-    (s) => s.status === "active" || s.status === "paused"
-  );
+  const activeSession = sessions.find((s) => s.status === "active" || s.status === "paused");
 
   // Filter and sort sessions
   const filteredSessions = useMemo(() => {
@@ -84,10 +74,7 @@ export default function MonitoringView() {
   }, [sessions, searchQuery]);
 
   // Group by date
-  const groupedSessions = useMemo(
-    () => groupSessionsByDate(filteredSessions),
-    [filteredSessions]
-  );
+  const groupedSessions = useMemo(() => groupSessionsByDate(filteredSessions), [filteredSessions]);
 
   if (isLoading) {
     return (
@@ -96,9 +83,7 @@ export default function MonitoringView() {
           <div className="relative">
             <div className="w-12 h-12 rounded-full border-2 border-indigo/20 border-t-indigo animate-spin" />
           </div>
-          <span className="text-ink-tertiary text-sm font-medium">
-            Loading sessions...
-          </span>
+          <span className="text-ink-tertiary text-sm font-medium">Loading sessions...</span>
         </div>
       </div>
     );

@@ -14,10 +14,7 @@ interface ActivityLogListProps {
   className?: string;
 }
 
-export default function ActivityLogList({
-  captures,
-  className = "",
-}: ActivityLogListProps) {
+export default function ActivityLogList({ captures, className = "" }: ActivityLogListProps) {
   // Sort captures by time
   const sortedCaptures = [...captures].sort(
     (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime()
@@ -64,7 +61,9 @@ function deduplicateActivities(captures: SessionCapture[]): ActivityEntry[] {
   for (let i = 0; i < captures.length; i++) {
     const capture = captures[i];
     const description =
-      capture.activityDescription || capture.deltaChangeDescription || `Working in ${capture.appName || "app"}`;
+      capture.activityDescription ||
+      capture.deltaChangeDescription ||
+      `Working in ${capture.appName || "app"}`;
 
     // Skip if same as last activity
     if (description === lastActivity && lastEntry) {
@@ -118,18 +117,14 @@ function ActivityLogEntry({ activity }: ActivityLogEntryProps) {
 
       {/* Description */}
       <div className="flex-1 min-w-0">
-        <span className="text-sm text-ink-primary">
-          {activity.description}
-        </span>
+        <span className="text-sm text-ink-primary">{activity.description}</span>
         {activity.durationMinutes && activity.durationMinutes >= 1 && (
           <span className="text-xs text-ink-tertiary ml-2 tabular-nums">
             {activity.durationMinutes}m
           </span>
         )}
         {activity.appName && (
-          <span className="block text-xs text-ink-tertiary mt-0.5">
-            {activity.appName}
-          </span>
+          <span className="block text-xs text-ink-tertiary mt-0.5">{activity.appName}</span>
         )}
       </div>
     </div>

@@ -222,10 +222,7 @@ class WorkstreamAggregationService {
     rlmWorkstreams: SessionWorkstream[]
   ): SessionStats {
     // Total time
-    const totalTimeMinutes = workstreams.reduce(
-      (sum, ws) => sum + ws.totalDurationMinutes,
-      0
-    );
+    const totalTimeMinutes = workstreams.reduce((sum, ws) => sum + ws.totalDurationMinutes, 0);
 
     // Deep work time (development, design, research)
     let deepWorkMinutes = 0;
@@ -274,9 +271,7 @@ class WorkstreamAggregationService {
       totalTimeMinutes,
       deepWorkMinutes,
       deepWorkPercent:
-        totalTimeMinutes > 0
-          ? Math.round((deepWorkMinutes / totalTimeMinutes) * 100)
-          : 0,
+        totalTimeMinutes > 0 ? Math.round((deepWorkMinutes / totalTimeMinutes) * 100) : 0,
       interruptionCount,
       interruptionMinutes,
       longestFocusMinutes,
@@ -339,9 +334,7 @@ class WorkstreamAggregationService {
     for (let i = 0; i < sorted.length; i++) {
       const capture = sorted[i];
       const captureTime =
-        capture.capturedAt instanceof Date
-          ? capture.capturedAt.toISOString()
-          : capture.capturedAt;
+        capture.capturedAt instanceof Date ? capture.capturedAt.toISOString() : capture.capturedAt;
 
       if (!currentSegment) {
         currentSegment = {
@@ -358,7 +351,7 @@ class WorkstreamAggregationService {
           const currTime = new Date(captureTime).getTime();
 
           // Look for captures from OTHER workstreams between prev and curr
-          hasInterleaving = sortedAllCaptures.some(c => {
+          hasInterleaving = sortedAllCaptures.some((c) => {
             if (c.workstreamId === capture.workstreamId) return false; // Same workstream
             const cTime = new Date(c.capturedAt).getTime();
             return cTime > prevTime && cTime < currTime;
@@ -445,22 +438,14 @@ class WorkstreamAggregationService {
   /**
    * Calculate session statistics
    */
-  private calculateSessionStats(
-    workstreams: Workstream[],
-    _captures: CaptureData[]
-  ): SessionStats {
+  private calculateSessionStats(workstreams: Workstream[], _captures: CaptureData[]): SessionStats {
     // Total time
-    const totalTimeMinutes = workstreams.reduce(
-      (sum, ws) => sum + ws.totalDurationMinutes,
-      0
-    );
+    const totalTimeMinutes = workstreams.reduce((sum, ws) => sum + ws.totalDurationMinutes, 0);
 
     // Deep work time (coding, design, etc.)
     let deepWorkMinutes = 0;
     workstreams.forEach((ws) => {
-      const hasDeepWork = ws.appsUsed.some((app) =>
-        workstreamDetectionService.isDeepWorkApp(app)
-      );
+      const hasDeepWork = ws.appsUsed.some((app) => workstreamDetectionService.isDeepWorkApp(app));
       if (hasDeepWork && !workstreamDetectionService.isInterruption(ws.name)) {
         deepWorkMinutes += ws.totalDurationMinutes;
       }
@@ -495,9 +480,7 @@ class WorkstreamAggregationService {
       totalTimeMinutes,
       deepWorkMinutes,
       deepWorkPercent:
-        totalTimeMinutes > 0
-          ? Math.round((deepWorkMinutes / totalTimeMinutes) * 100)
-          : 0,
+        totalTimeMinutes > 0 ? Math.round((deepWorkMinutes / totalTimeMinutes) * 100) : 0,
       interruptionCount,
       interruptionMinutes,
       longestFocusMinutes,

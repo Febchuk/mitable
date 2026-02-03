@@ -62,9 +62,9 @@ export interface WorkstreamUpdateEvent {
  * Configuration for RLM triggers
  */
 const CONFIG = {
-  captureThreshold: 10,      // Trigger after 10 new captures
-  timeThresholdMs: 180000,   // Trigger after 3 minutes (180000ms)
-  minIntervalMs: 60000,      // Minimum 60s between analyses (debounce)
+  captureThreshold: 10, // Trigger after 10 new captures
+  timeThresholdMs: 180000, // Trigger after 3 minutes (180000ms)
+  minIntervalMs: 60000, // Minimum 60s between analyses (debounce)
   model: "llama-3.3-70b-versatile", // Groq model for analysis (upgraded from decommissioned 3.1)
   maxTokens: 2000,
   temperature: 0.2,
@@ -77,19 +77,21 @@ function getAppCategory(appName: string | null): string {
   if (!appName) return "unknown";
   const app = appName.toLowerCase();
 
-  if (["slack", "teams", "mail", "outlook", "messages", "discord"].some(c => app.includes(c))) {
+  if (["slack", "teams", "mail", "outlook", "messages", "discord"].some((c) => app.includes(c))) {
     return "communication";
   }
-  if (["zoom", "meet", "webex", "facetime"].some(m => app.includes(m))) {
+  if (["zoom", "meet", "webex", "facetime"].some((m) => app.includes(m))) {
     return "meeting";
   }
-  if (["code", "vscode", "intellij", "webstorm", "terminal", "iterm"].some(d => app.includes(d))) {
+  if (
+    ["code", "vscode", "intellij", "webstorm", "terminal", "iterm"].some((d) => app.includes(d))
+  ) {
     return "development";
   }
-  if (["figma", "sketch", "xd", "photoshop"].some(d => app.includes(d))) {
+  if (["figma", "sketch", "xd", "photoshop"].some((d) => app.includes(d))) {
     return "design";
   }
-  if (["chrome", "firefox", "safari", "edge", "arc"].some(b => app.includes(b))) {
+  if (["chrome", "firefox", "safari", "edge", "arc"].some((b) => app.includes(b))) {
     return "browser";
   }
 
@@ -140,11 +142,13 @@ class WorkstreamRLMService extends EventEmitter {
     state.lastCaptureAppCategory = currentCategory;
 
     if (triggerReason) {
-      logger.info({ sessionId, triggerReason, capturesSince: state.capturesSinceLastAnalysis },
-        "[WorkstreamRLM] Trigger detected");
+      logger.info(
+        { sessionId, triggerReason, capturesSince: state.capturesSinceLastAnalysis },
+        "[WorkstreamRLM] Trigger detected"
+      );
 
       // Queue analysis (non-blocking)
-      this.queueAnalysis(sessionId, triggerReason).catch(err => {
+      this.queueAnalysis(sessionId, triggerReason).catch((err) => {
         logger.error({ sessionId, error: err.message }, "[WorkstreamRLM] Analysis failed");
       });
     }
@@ -153,7 +157,10 @@ class WorkstreamRLMService extends EventEmitter {
   /**
    * Check if analysis should be triggered
    */
-  private checkTrigger(state: AnalysisState, currentCategory: string): AnalysisTriggerReason | null {
+  private checkTrigger(
+    state: AnalysisState,
+    currentCategory: string
+  ): AnalysisTriggerReason | null {
     if (state.isAnalyzing) return null;
 
     const elapsed = Date.now() - state.lastAnalysisAt;
@@ -169,10 +176,14 @@ class WorkstreamRLMService extends EventEmitter {
     }
 
     // Context switch: dev <-> communication, meeting starts, etc.
-    if (state.lastCaptureAppCategory &&
-        state.lastCaptureAppCategory !== currentCategory &&
-        (currentCategory === "communication" || currentCategory === "meeting" ||
-         state.lastCaptureAppCategory === "communication" || state.lastCaptureAppCategory === "meeting")) {
+    if (
+      state.lastCaptureAppCategory &&
+      state.lastCaptureAppCategory !== currentCategory &&
+      (currentCategory === "communication" ||
+        currentCategory === "meeting" ||
+        state.lastCaptureAppCategory === "communication" ||
+        state.lastCaptureAppCategory === "meeting")
+    ) {
       return "context_switch";
     }
 
@@ -182,7 +193,11 @@ class WorkstreamRLMService extends EventEmitter {
   /**
    * Queue an analysis (prevents concurrent analyses for same session)
    */
-  private async queueAnalysis(sessionId: string, triggerReason: AnalysisTriggerReason, forceMode?: boolean): Promise<void> {
+  private async queueAnalysis(
+    sessionId: string,
+    triggerReason: AnalysisTriggerReason,
+    forceMode?: boolean
+  ): Promise<void> {
     // Wait for any existing analysis to complete
     if (this.analysisQueue.has(sessionId)) {
       await this.analysisQueue.get(sessionId);
@@ -244,7 +259,11 @@ class WorkstreamRLMService extends EventEmitter {
    * Run RLM analysis for a session
    * When forceMode=true, fetches ALL captures regardless of previous assignments
    */
-  private async runAnalysis(sessionId: string, triggerReason: AnalysisTriggerReason, forceMode?: boolean): Promise<void> {
+  private async runAnalysis(
+    sessionId: string,
+    triggerReason: AnalysisTriggerReason,
+    forceMode?: boolean
+  ): Promise<void> {
     const state = this.getOrCreateState(sessionId);
     state.isAnalyzing = true;
     const startTime = Date.now();
@@ -264,15 +283,20 @@ class WorkstreamRLMService extends EventEmitter {
       }
 
       if (session.status === "deleted") {
-        logger.debug({ sessionId, status: session.status }, "[WorkstreamRLM] Session deleted, skipping");
+        logger.debug(
+          { sessionId, status: session.status },
+          "[WorkstreamRLM] Session deleted, skipping"
+        );
         return;
       }
 
       // 2. Fetch ALL captures for this session
       // RLM should always reconsider all data holistically, not incrementally
       // This ensures semantic grouping can see relationships across all activities
-      logger.info({ sessionId, forceMode, lastAnalysisNumber: state.lastAnalysisNumber },
-        "[WorkstreamRLM] Fetching ALL captures for holistic analysis");
+      logger.info(
+        { sessionId, forceMode, lastAnalysisNumber: state.lastAnalysisNumber },
+        "[WorkstreamRLM] Fetching ALL captures for holistic analysis"
+      );
 
       const captures = await db
         .select({
@@ -313,14 +337,14 @@ class WorkstreamRLMService extends EventEmitter {
 
       const systemPrompt = getWorkstreamSystemPrompt();
       const userPrompt = getWorkstreamUserPrompt(
-        captures.map(c => ({
+        captures.map((c) => ({
           id: c.id,
           capturedAt: c.capturedAt.toISOString(),
           appName: c.appName,
           windowTitle: c.windowTitle,
           activityDescription: c.activityDescription,
         })),
-        existingWorkstreams.map(w => ({
+        existingWorkstreams.map((w) => ({
           id: w.id,
           name: w.name,
           captureCount: w.captureCount,
@@ -336,8 +360,14 @@ class WorkstreamRLMService extends EventEmitter {
         }
       );
 
-      logger.debug({ sessionId, captureCount: captures.length, existingWorkstreams: existingWorkstreams.length },
-        "[WorkstreamRLM] Calling LLM");
+      logger.debug(
+        {
+          sessionId,
+          captureCount: captures.length,
+          existingWorkstreams: existingWorkstreams.length,
+        },
+        "[WorkstreamRLM] Calling LLM"
+      );
 
       const completion = await this.groq.chat.completions.create({
         messages: [
@@ -401,16 +431,18 @@ class WorkstreamRLMService extends EventEmitter {
         timestamp: Date.now(),
       } as WorkstreamUpdateEvent);
 
-      logger.info({
-        sessionId,
-        analysisNumber,
-        capturesAnalyzed: captures.length,
-        workstreamsCreated: updates.created,
-        workstreamsMerged: updates.merged,
-        capturesAssigned: updates.assigned,
-        executionTimeMs,
-      }, "[WorkstreamRLM] Analysis completed");
-
+      logger.info(
+        {
+          sessionId,
+          analysisNumber,
+          capturesAnalyzed: captures.length,
+          workstreamsCreated: updates.created,
+          workstreamsMerged: updates.merged,
+          capturesAssigned: updates.assigned,
+          executionTimeMs,
+        },
+        "[WorkstreamRLM] Analysis completed"
+      );
     } catch (error) {
       const executionTimeMs = Date.now() - startTime;
 
@@ -425,8 +457,10 @@ class WorkstreamRLMService extends EventEmitter {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      logger.error({ sessionId, error: error instanceof Error ? error.message : String(error) },
-        "[WorkstreamRLM] Analysis failed");
+      logger.error(
+        { sessionId, error: error instanceof Error ? error.message : String(error) },
+        "[WorkstreamRLM] Analysis failed"
+      );
 
       throw error;
     } finally {
@@ -484,8 +518,10 @@ class WorkstreamRLMService extends EventEmitter {
 
         // Skip if we can't resolve the IDs
         if (!resolvedIntoId || !resolvedFromId) {
-          logger.warn({ merge, resolvedIntoId, resolvedFromId },
-            "[WorkstreamRLM] Skipping merge - could not resolve IDs");
+          logger.warn(
+            { merge, resolvedIntoId, resolvedFromId },
+            "[WorkstreamRLM] Skipping merge - could not resolve IDs"
+          );
           continue;
         }
 
@@ -509,9 +545,7 @@ class WorkstreamRLMService extends EventEmitter {
       // 3. Apply updates to existing workstreams
       for (const [wsId, updates] of Object.entries(result.updates)) {
         // Resolve ID (might be temp ID for new workstream)
-        const resolvedWsId = wsId.startsWith("NEW:")
-          ? tempIdToRealId.get(wsId)
-          : wsId;
+        const resolvedWsId = wsId.startsWith("NEW:") ? tempIdToRealId.get(wsId) : wsId;
 
         if (!resolvedWsId) {
           logger.warn({ wsId }, "[WorkstreamRLM] Skipping update - could not resolve ID");
@@ -551,12 +585,12 @@ class WorkstreamRLMService extends EventEmitter {
 
       // 5. Update workstream stats (capture count, apps used, duration)
       const workstreamIds = new Set([
-        ...Object.values(result.assignments).map(ref =>
-          ref.startsWith("NEW:") ? tempIdToRealId.get(ref) : ref
-        ).filter(Boolean),
-        ...result.merges.map(m =>
-          m.intoId.startsWith("NEW:") ? tempIdToRealId.get(m.intoId) : m.intoId
-        ).filter(Boolean),
+        ...Object.values(result.assignments)
+          .map((ref) => (ref.startsWith("NEW:") ? tempIdToRealId.get(ref) : ref))
+          .filter(Boolean),
+        ...result.merges
+          .map((m) => (m.intoId.startsWith("NEW:") ? tempIdToRealId.get(m.intoId) : m.intoId))
+          .filter(Boolean),
       ]);
 
       for (const wsId of workstreamIds) {
@@ -573,12 +607,13 @@ class WorkstreamRLMService extends EventEmitter {
           .orderBy(asc(schema.sessionCaptures.capturedAt));
 
         if (captures.length > 0) {
-          const apps = [...new Set(captures.map(c => c.appName).filter(Boolean) as string[])];
+          const apps = [...new Set(captures.map((c) => c.appName).filter(Boolean) as string[])];
           const firstCapture = captures[0].capturedAt;
           const lastCapture = captures[captures.length - 1].capturedAt;
-          const durationMinutes = Math.max(1, Math.round(
-            (lastCapture.getTime() - firstCapture.getTime()) / (1000 * 60)
-          ));
+          const durationMinutes = Math.max(
+            1,
+            Math.round((lastCapture.getTime() - firstCapture.getTime()) / (1000 * 60))
+          );
 
           await tx
             .update(schema.sessionWorkstreams)

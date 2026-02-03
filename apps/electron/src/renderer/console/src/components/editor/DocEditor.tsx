@@ -49,9 +49,7 @@ class EditorErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <div className="p-6 bg-canvas-overlay rounded-xl border border-stroke-subtle">
-          <div className="text-ink-primary font-medium mb-2">
-            Unable to render document
-          </div>
+          <div className="text-ink-primary font-medium mb-2">Unable to render document</div>
           <p className="text-sm text-ink-secondary mb-4">
             The document content has formatting issues that couldn't be parsed.
           </p>

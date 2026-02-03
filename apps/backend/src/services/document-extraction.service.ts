@@ -99,9 +99,7 @@ class DocumentExtractionService {
       const cleanedText = textContent.trim();
       const wordCount = this.countWords(cleanedText);
 
-      console.log(
-        `[DocumentExtraction] PDF extracted: ${pageCount} pages, ${wordCount} words`
-      );
+      console.log(`[DocumentExtraction] PDF extracted: ${pageCount} pages, ${wordCount} words`);
 
       return {
         text: cleanedText,
@@ -126,7 +124,6 @@ class DocumentExtractionService {
   private async extractFromDocx(buffer: Buffer): Promise<ExtractionResult> {
     try {
       // Dynamic import to handle optional dependency
-      // @ts-ignore - mammoth types may not be available
       const mammoth = await import("mammoth");
 
       const result = await mammoth.extractRawText({ buffer });

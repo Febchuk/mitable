@@ -74,16 +74,10 @@ export default function DocRow({ document, onClick, style }: DocRowProps) {
       </h4>
 
       {/* Type */}
-      <span className="text-sm text-ink-tertiary w-24">
-        {typeLabel}
-      </span>
+      <span className="text-sm text-ink-tertiary w-24">{typeLabel}</span>
 
       {/* Notion indicator - text only */}
-      {document.notionPageId && (
-        <span className="text-xs text-ink-tertiary">
-          Notion
-        </span>
-      )}
+      {document.notionPageId && <span className="text-xs text-ink-tertiary">Notion</span>}
 
       {/* Status */}
       <span

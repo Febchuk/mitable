@@ -99,9 +99,7 @@ export default function SessionRow({ session, onClick, style }: SessionRowProps)
       </h4>
 
       {/* Duration + Captures - Text only, no icons */}
-      <span className="text-sm text-ink-tertiary tabular-nums">
-        {session.duration.formatted}
-      </span>
+      <span className="text-sm text-ink-tertiary tabular-nums">{session.duration.formatted}</span>
       <span className="text-sm text-ink-tertiary tabular-nums w-16">
         {session.captureCount} caps
       </span>

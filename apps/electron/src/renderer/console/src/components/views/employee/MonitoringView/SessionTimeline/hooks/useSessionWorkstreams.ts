@@ -27,8 +27,7 @@ function convertToFrontendFormat(
   // Map backend workstreams to frontend format
   const workstreams: Workstream[] = response.workstreams.map((ws) => {
     // Find captures that belong to this workstream (by ID matching)
-    const wsCaptures =
-      captures?.filter((c) => ws.captureIds?.includes(c.id)) || [];
+    const wsCaptures = captures?.filter((c) => ws.captureIds?.includes(c.id)) || [];
 
     return {
       id: ws.id,

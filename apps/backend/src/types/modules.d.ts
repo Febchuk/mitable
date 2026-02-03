@@ -2,83 +2,6 @@
  * Type declarations for packages without built-in types
  */
 
-import { Request, RequestHandler } from "express";
-
-// Extend Express Request to include multer file
-declare global {
-  namespace Express {
-    interface Request {
-      file?: Multer.File;
-      files?: { [fieldname: string]: Multer.File[] } | Multer.File[];
-    }
-    namespace Multer {
-      interface File {
-        fieldname: string;
-        originalname: string;
-        encoding: string;
-        mimetype: string;
-        size: number;
-        destination: string;
-        filename: string;
-        path: string;
-        buffer: Buffer;
-      }
-    }
-  }
-}
-
-// multer types
-declare module "multer" {
-  import { Request, RequestHandler } from "express";
-
-  interface StorageEngine {
-    _handleFile(
-      req: Request,
-      file: Express.Multer.File,
-      callback: (error?: Error | null, info?: Partial<Express.Multer.File>) => void
-    ): void;
-    _removeFile(req: Request, file: Express.Multer.File, callback: (error: Error | null) => void): void;
-  }
-
-  interface DiskStorageOptions {
-    destination?: string | ((req: Request, file: Express.Multer.File, callback: (error: Error | null, destination: string) => void) => void);
-    filename?: (req: Request, file: Express.Multer.File, callback: (error: Error | null, filename: string) => void) => void;
-  }
-
-  interface Options {
-    dest?: string;
-    storage?: StorageEngine;
-    limits?: {
-      fieldNameSize?: number;
-      fieldSize?: number;
-      fields?: number;
-      fileSize?: number;
-      files?: number;
-      parts?: number;
-      headerPairs?: number;
-    };
-    preservePath?: boolean;
-    fileFilter?: (req: Request, file: Express.Multer.File, callback: (error: Error | null, acceptFile: boolean) => void) => void;
-  }
-
-  interface Multer {
-    (options?: Options): RequestHandler;
-    single(fieldname: string): RequestHandler;
-    array(fieldname: string, maxCount?: number): RequestHandler;
-    fields(fields: Array<{ name: string; maxCount?: number }>): RequestHandler;
-    none(): RequestHandler;
-    any(): RequestHandler;
-  }
-
-  interface MulterStatic extends Multer {
-    diskStorage(options: DiskStorageOptions): StorageEngine;
-    memoryStorage(): StorageEngine;
-  }
-
-  const multer: MulterStatic;
-  export = multer;
-}
-
 // pdf-parse types
 declare module "pdf-parse" {
   interface PDFData {
@@ -146,9 +69,7 @@ declare module "mammoth" {
     options?: ConversionOptions
   ): Promise<ConversionResult>;
 
-  function extractRawText(
-    input: { buffer: Buffer } | { path: string }
-  ): Promise<ConversionResult>;
+  function extractRawText(input: { buffer: Buffer } | { path: string }): Promise<ConversionResult>;
 
   export { convertToHtml, convertToMarkdown, extractRawText };
 }

@@ -741,7 +741,10 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
   }
 
   // Validate sessionIds if provided
-  if (sessionIds && (!Array.isArray(sessionIds) || sessionIds.some((id: unknown) => typeof id !== "string"))) {
+  if (
+    sessionIds &&
+    (!Array.isArray(sessionIds) || sessionIds.some((id: unknown) => typeof id !== "string"))
+  ) {
     res.status(400).json({
       error: "Bad Request",
       message: "sessionIds must be an array of strings",
@@ -750,7 +753,10 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
   }
 
   // Validate artifactIds if provided
-  if (artifactIds && (!Array.isArray(artifactIds) || artifactIds.some((id: unknown) => typeof id !== "string"))) {
+  if (
+    artifactIds &&
+    (!Array.isArray(artifactIds) || artifactIds.some((id: unknown) => typeof id !== "string"))
+  ) {
     res.status(400).json({
       error: "Bad Request",
       message: "artifactIds must be an array of strings",

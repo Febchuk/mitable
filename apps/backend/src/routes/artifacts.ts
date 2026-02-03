@@ -7,7 +7,6 @@
 
 import { Router, Request, Response } from "express";
 import { eq, sql, desc, and } from "drizzle-orm";
-// @ts-ignore - multer types may not be available
 import multer from "multer";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
@@ -18,6 +17,7 @@ import { artifactEmbeddingService } from "../services/artifact-embedding.service
 import {
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
+  AllowedMimeType,
 } from "../db/schema/artifacts.schema.js";
 
 const router = Router();
@@ -44,12 +44,8 @@ const upload = multer({
   limits: {
     fileSize: MAX_FILE_SIZE_BYTES,
   },
-  fileFilter: (
-    _req: Request,
-    file: { mimetype: string },
-    cb: (error: Error | null, acceptFile?: boolean) => void
-  ) => {
-    if (ALLOWED_MIME_TYPES.includes(file.mimetype as any)) {
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype as AllowedMimeType)) {
       cb(null, true);
     } else {
       cb(
@@ -104,15 +100,12 @@ router.post(
       );
 
       // Upload to Supabase Storage
-      const { storagePath, storageUrl } = await artifactStorageService.uploadArtifact(
-        file.buffer,
-        {
-          filename: file.originalname,
-          mimeType: file.mimetype,
-          organizationId,
-          userId,
-        }
-      );
+      const { storagePath, storageUrl } = await artifactStorageService.uploadArtifact(file.buffer, {
+        filename: file.originalname,
+        mimeType: file.mimetype,
+        organizationId,
+        userId,
+      });
 
       // Create artifact record (text extraction pending)
       const [artifact] = await db
@@ -483,8 +476,10 @@ async function processArtifactText(
       .where(eq(schema.artifacts.id, artifactId));
 
     // Extract text
-    const { text, metadata: extractionMetadata } =
-      await documentExtractionService.extractText(buffer, mimeType);
+    const { text, metadata: extractionMetadata } = await documentExtractionService.extractText(
+      buffer,
+      mimeType
+    );
 
     // Update with extracted text
     await db

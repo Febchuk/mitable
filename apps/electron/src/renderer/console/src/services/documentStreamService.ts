@@ -45,8 +45,10 @@ export async function generateDocumentStream(
     body: JSON.stringify({
       prompt,
       docType,
-      ...(options?.sessionIds && options.sessionIds.length > 0 && { sessionIds: options.sessionIds }),
-      ...(options?.artifactIds && options.artifactIds.length > 0 && { artifactIds: options.artifactIds }),
+      ...(options?.sessionIds &&
+        options.sessionIds.length > 0 && { sessionIds: options.sessionIds }),
+      ...(options?.artifactIds &&
+        options.artifactIds.length > 0 && { artifactIds: options.artifactIds }),
     }),
   });
 

@@ -8,13 +8,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDocuments } from "@/console/src/hooks/queries/documents";
-import {
-  Search,
-  FileText,
-  Plus,
-  ChevronRight,
-  Filter,
-} from "lucide-react";
+import { Search, FileText, Plus, ChevronRight, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -43,11 +37,7 @@ function groupDocumentsByDate(documents: Document[]) {
 
   documents.forEach((doc) => {
     const docDate = new Date(doc.updatedAt);
-    const docDay = new Date(
-      docDate.getFullYear(),
-      docDate.getMonth(),
-      docDate.getDate()
-    );
+    const docDay = new Date(docDate.getFullYear(), docDate.getMonth(), docDate.getDate());
 
     if (docDay.getTime() >= today.getTime()) {
       groups[0].documents.push(doc);
@@ -85,10 +75,7 @@ export default function DocsView() {
   }, [documents]);
 
   // Group by date
-  const groupedDocuments = useMemo(
-    () => groupDocumentsByDate(sortedDocuments),
-    [sortedDocuments]
-  );
+  const groupedDocuments = useMemo(() => groupDocumentsByDate(sortedDocuments), [sortedDocuments]);
 
   // Count stats
   const draftCount = documents.filter((d) => d.status === "draft").length;
@@ -101,9 +88,7 @@ export default function DocsView() {
           <div className="relative">
             <div className="w-12 h-12 rounded-full border-2 border-indigo/20 border-t-indigo animate-spin" />
           </div>
-          <span className="text-ink-tertiary text-sm font-medium">
-            Loading documents...
-          </span>
+          <span className="text-ink-tertiary text-sm font-medium">Loading documents...</span>
         </div>
       </div>
     );
@@ -291,10 +276,7 @@ export default function DocsView() {
       </div>
 
       {/* Create Document Modal */}
-      <CreateDocumentModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-      />
+      <CreateDocumentModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} />
     </div>
   );
 }

@@ -121,10 +121,7 @@ class SocketService {
 
       // Handle disconnection
       socket.on("disconnect", (reason) => {
-        logger.debug(
-          { socketId: socket.id, reason },
-          "[Socket] Client disconnected"
-        );
+        logger.debug({ socketId: socket.id, reason }, "[Socket] Client disconnected");
       });
     });
   }

@@ -15,10 +15,7 @@ interface ScreenshotCarouselProps {
   className?: string;
 }
 
-export default function ScreenshotCarousel({
-  captures,
-  className = "",
-}: ScreenshotCarouselProps) {
+export default function ScreenshotCarousel({ captures, className = "" }: ScreenshotCarouselProps) {
   // Filter to captures that have image data
   const capturesWithImages = captures.filter((c) => c.imageData);
 
@@ -31,15 +28,11 @@ export default function ScreenshotCarousel({
   }, [capturesWithImages.length]);
 
   const goToPrevious = useCallback(() => {
-    setCurrentIndex((prev) =>
-      prev > 0 ? prev - 1 : capturesWithImages.length - 1
-    );
+    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : capturesWithImages.length - 1));
   }, [capturesWithImages.length]);
 
   const goToNext = useCallback(() => {
-    setCurrentIndex((prev) =>
-      prev < capturesWithImages.length - 1 ? prev + 1 : 0
-    );
+    setCurrentIndex((prev) => (prev < capturesWithImages.length - 1 ? prev + 1 : 0));
   }, [capturesWithImages.length]);
 
   // Keyboard navigation
@@ -60,7 +53,9 @@ export default function ScreenshotCarousel({
 
   if (capturesWithImages.length === 0) {
     return (
-      <div className={`flex items-center justify-center bg-canvas-muted/30 rounded-xl p-8 ${className}`}>
+      <div
+        className={`flex items-center justify-center bg-canvas-muted/30 rounded-xl p-8 ${className}`}
+      >
         <p className="text-sm text-ink-tertiary">No screenshots available</p>
       </div>
     );
@@ -73,7 +68,9 @@ export default function ScreenshotCarousel({
   // Extra safety check - should never happen but prevents crash
   if (!currentCapture) {
     return (
-      <div className={`flex items-center justify-center bg-canvas-muted/30 rounded-xl p-8 ${className}`}>
+      <div
+        className={`flex items-center justify-center bg-canvas-muted/30 rounded-xl p-8 ${className}`}
+      >
         <p className="text-sm text-ink-tertiary">Loading screenshots...</p>
       </div>
     );
@@ -141,9 +138,7 @@ export default function ScreenshotCarousel({
                 key={index}
                 onClick={() => setCurrentIndex(index)}
                 className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                  index === currentIndex
-                    ? "bg-indigo"
-                    : "bg-canvas-muted hover:bg-ink-tertiary"
+                  index === currentIndex ? "bg-indigo" : "bg-canvas-muted hover:bg-ink-tertiary"
                 }`}
                 aria-label={`Go to screenshot ${index + 1}`}
               />

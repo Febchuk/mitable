@@ -794,7 +794,9 @@ export default function SessionDetail() {
             onClick={() => setIsStoryExpanded(!isStoryExpanded)}
             className="flex items-center gap-2 w-full text-left group"
           >
-            <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight flex-1">Live Progress</h2>
+            <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight flex-1">
+              Live Progress
+            </h2>
             <span className="text-xs text-ink-tertiary tabular-nums">
               v{storyData.metadata?.version || 0}
             </span>
@@ -827,7 +829,9 @@ export default function SessionDetail() {
       {/* Summary Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight">Summary</h2>
+          <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight">
+            Summary
+          </h2>
           <div className="flex items-center gap-2">
             {/* DEV ONLY: Regenerate button - hidden in production */}
             {import.meta.env.DEV && session.status === "ready" && (
@@ -902,7 +906,8 @@ export default function SessionDetail() {
       {session.topKFrames && session.topKFrames.length > 0 && (
         <div className="space-y-4">
           <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight">
-            Key Frames <span className="text-ink-tertiary font-normal">({session.topKFrames.length})</span>
+            Key Frames{" "}
+            <span className="text-ink-tertiary font-normal">({session.topKFrames.length})</span>
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {session.topKFrames.map((frame: any) => (
@@ -941,7 +946,9 @@ export default function SessionDetail() {
       <Dialog open={!!selectedFrame} onOpenChange={() => setSelectedFrame(null)}>
         <DialogContent className="bg-canvas-raised border-stroke-subtle max-w-4xl">
           <DialogHeader>
-            <DialogTitle className="font-display text-base font-semibold text-ink-primary tracking-tight">Frame Preview</DialogTitle>
+            <DialogTitle className="font-display text-base font-semibold text-ink-primary tracking-tight">
+              Frame Preview
+            </DialogTitle>
           </DialogHeader>
           {selectedFrame &&
             (() => {
@@ -967,7 +974,9 @@ export default function SessionDetail() {
                     <div className="flex items-center gap-4 text-sm text-ink-secondary">
                       <span>{frame.appName || "Unknown app"}</span>
                       <span className="text-ink-tertiary">·</span>
-                      <span className="tabular-nums">{new Date(frame.capturedAt).toLocaleString()}</span>
+                      <span className="tabular-nums">
+                        {new Date(frame.capturedAt).toLocaleString()}
+                      </span>
                       {frame.importanceScore && (
                         <>
                           <span className="text-ink-tertiary">·</span>

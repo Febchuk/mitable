@@ -7,13 +7,7 @@
 
 import { useState, useMemo } from "react";
 import { useArtifacts, useDeleteArtifact } from "@/console/src/hooks/queries/artifacts";
-import {
-  Search,
-  Paperclip,
-  Plus,
-  ChevronRight,
-  Filter,
-} from "lucide-react";
+import { Search, Paperclip, Plus, ChevronRight, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -111,19 +105,15 @@ export default function ArtifactsView() {
   }, [filteredArtifacts]);
 
   // Group by date
-  const groupedArtifacts = useMemo(
-    () => groupArtifactsByDate(sortedArtifacts),
-    [sortedArtifacts]
-  );
+  const groupedArtifacts = useMemo(() => groupArtifactsByDate(sortedArtifacts), [sortedArtifacts]);
 
   // Count stats
   const stats = useMemo(
     () => ({
       total: artifacts.length,
       processed: artifacts.filter((a) => a.extractionStatus === "completed").length,
-      pending: artifacts.filter((a) =>
-        ["pending", "processing"].includes(a.extractionStatus)
-      ).length,
+      pending: artifacts.filter((a) => ["pending", "processing"].includes(a.extractionStatus))
+        .length,
       failed: artifacts.filter((a) => a.extractionStatus === "failed").length,
     }),
     [artifacts]
@@ -145,9 +135,7 @@ export default function ArtifactsView() {
           <div className="relative">
             <div className="w-12 h-12 rounded-full border-2 border-indigo/20 border-t-indigo animate-spin" />
           </div>
-          <span className="text-ink-tertiary text-sm font-medium">
-            Loading artefacts...
-          </span>
+          <span className="text-ink-tertiary text-sm font-medium">Loading artefacts...</span>
         </div>
       </div>
     );
@@ -252,9 +240,7 @@ export default function ArtifactsView() {
                 <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
                   Upload Artefact
                 </h3>
-                <p className="text-ink-tertiary text-sm mt-0.5">
-                  Drop files or click to browse
-                </p>
+                <p className="text-ink-tertiary text-sm mt-0.5">Drop files or click to browse</p>
               </div>
               <ChevronRight
                 size={18}
@@ -320,10 +306,7 @@ export default function ArtifactsView() {
       </div>
 
       {/* Upload Artifact Modal */}
-      <UploadArtifactModal
-        open={isUploadModalOpen}
-        onOpenChange={setIsUploadModalOpen}
-      />
+      <UploadArtifactModal open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen} />
     </div>
   );
 }

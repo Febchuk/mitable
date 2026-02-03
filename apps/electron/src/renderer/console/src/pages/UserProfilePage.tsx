@@ -501,7 +501,14 @@ export default function UserProfilePage() {
       loadAutoSessionStart();
       loadSummaryPreferences();
     }
-  }, [user?.id, loadBlockList, loadAllBlockableApps, loadNotificationFrequency, loadAutoSessionStart, loadSummaryPreferences]);
+  }, [
+    user?.id,
+    loadBlockList,
+    loadAllBlockableApps,
+    loadNotificationFrequency,
+    loadAutoSessionStart,
+    loadSummaryPreferences,
+  ]);
 
   const loadUserProfile = async () => {
     setIsLoadingProfile(true);
@@ -1747,13 +1754,19 @@ export default function UserProfilePage() {
                         >
                           <div className="flex items-center gap-2">
                             <RadioGroupItem value="concise" id="detail-concise" />
-                            <Label htmlFor="detail-concise" className="text-sm text-text-primary cursor-pointer">
+                            <Label
+                              htmlFor="detail-concise"
+                              className="text-sm text-text-primary cursor-pointer"
+                            >
                               Concise
                             </Label>
                           </div>
                           <div className="flex items-center gap-2">
                             <RadioGroupItem value="verbose" id="detail-verbose" />
-                            <Label htmlFor="detail-verbose" className="text-sm text-text-primary cursor-pointer">
+                            <Label
+                              htmlFor="detail-verbose"
+                              className="text-sm text-text-primary cursor-pointer"
+                            >
                               Verbose
                             </Label>
                           </div>
@@ -1783,13 +1796,19 @@ export default function UserProfilePage() {
                         >
                           <div className="flex items-center gap-2">
                             <RadioGroupItem value="bullets" id="format-bullets" />
-                            <Label htmlFor="format-bullets" className="text-sm text-text-primary cursor-pointer">
+                            <Label
+                              htmlFor="format-bullets"
+                              className="text-sm text-text-primary cursor-pointer"
+                            >
                               Bullets
                             </Label>
                           </div>
                           <div className="flex items-center gap-2">
                             <RadioGroupItem value="paragraphs" id="format-paragraphs" />
-                            <Label htmlFor="format-paragraphs" className="text-sm text-text-primary cursor-pointer">
+                            <Label
+                              htmlFor="format-paragraphs"
+                              className="text-sm text-text-primary cursor-pointer"
+                            >
                               Paragraphs
                             </Label>
                           </div>
@@ -1909,7 +1928,8 @@ export default function UserProfilePage() {
                             </div>
                           ) : detectedApps.length === 0 ? (
                             <p className="text-xs text-text-tertiary italic">
-                              No apps found. Click Refresh to scan for installed apps on your system.
+                              No apps found. Click Refresh to scan for installed apps on your
+                              system.
                             </p>
                           ) : (
                             <div className="space-y-2">
@@ -1966,7 +1986,9 @@ export default function UserProfilePage() {
                                         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-background-secondary transition-colors text-left"
                                       >
                                         <Plus size={14} className="text-text-tertiary" />
-                                        <span className="text-sm text-white flex-1">{displayName}</span>
+                                        <span className="text-sm text-white flex-1">
+                                          {displayName}
+                                        </span>
                                         {isInstalledOnly && (
                                           <span className="text-[10px] text-text-tertiary bg-background-secondary px-1.5 py-0.5 rounded">
                                             not opened
@@ -1979,7 +2001,12 @@ export default function UserProfilePage() {
                               </div>
                               {/* App count */}
                               <p className="text-[10px] text-text-tertiary">
-                                {detectedApps.filter((app) => !blockedApps.includes(app.normalizedName)).length} apps available
+                                {
+                                  detectedApps.filter(
+                                    (app) => !blockedApps.includes(app.normalizedName)
+                                  ).length
+                                }{" "}
+                                apps available
                               </p>
                             </div>
                           )}

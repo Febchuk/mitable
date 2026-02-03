@@ -55,9 +55,8 @@ export default function SegmentDetailPanel({
   // Build overall time range from all segments
   const firstSegment = workstream.segments[0];
   const lastSegment = workstream.segments[workstream.segments.length - 1];
-  const overallTimeRange = firstSegment && lastSegment
-    ? formatTimeRange(firstSegment.startTime, lastSegment.endTime)
-    : "";
+  const overallTimeRange =
+    firstSegment && lastSegment ? formatTimeRange(firstSegment.startTime, lastSegment.endTime) : "";
 
   return (
     <div
@@ -115,9 +114,7 @@ export default function SegmentDetailPanel({
         {/* Apps used */}
         {workstream.appsUsed.length > 0 && (
           <div className="mt-4 pt-4 border-t border-stroke-subtle">
-            <div className="text-xs text-ink-tertiary">
-              Apps: {workstream.appsUsed.join(" · ")}
-            </div>
+            <div className="text-xs text-ink-tertiary">Apps: {workstream.appsUsed.join(" · ")}</div>
           </div>
         )}
       </div>

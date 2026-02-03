@@ -1264,19 +1264,21 @@ router.post(
 
           // Trigger workstream RLM analysis check (non-blocking)
           if (captureId) {
-            workstreamRLMService.onCaptureAdded(id, {
-              id: captureId,
-              capturedAt: new Date(capturedAt),
-              appName: windowInfo.appName,
-              windowTitle: windowInfo.windowTitle,
-              activityDescription,
-              workstreamId: null,
-            }).catch(err => {
-              log.warn("Workstream RLM check failed (non-blocking)", {
-                captureId,
-                error: err instanceof Error ? err.message : String(err),
+            workstreamRLMService
+              .onCaptureAdded(id, {
+                id: captureId,
+                capturedAt: new Date(capturedAt),
+                appName: windowInfo.appName,
+                windowTitle: windowInfo.windowTitle,
+                activityDescription,
+                workstreamId: null,
+              })
+              .catch((err) => {
+                log.warn("Workstream RLM check failed (non-blocking)", {
+                  captureId,
+                  error: err instanceof Error ? err.message : String(err),
+                });
               });
-            });
           }
         } catch (error) {
           log.warn("Failed to create/update database capture record", {
@@ -1741,7 +1743,7 @@ router.post(
         success: true,
         message: "Workstream analysis completed",
         workstreamCount: workstreams.length,
-        workstreams: workstreams.map(w => ({
+        workstreams: workstreams.map((w) => ({
           id: w.id,
           name: w.name,
           color: w.color,
@@ -1809,7 +1811,7 @@ router.get(
         .orderBy(desc(schema.workstreamAnalysisLog.createdAt));
 
       res.json({
-        analysisLog: analysisLog.map(log => ({
+        analysisLog: analysisLog.map((log) => ({
           id: log.id,
           analysisNumber: log.analysisNumber,
           triggerReason: log.triggerReason,

@@ -8,14 +8,7 @@
 import { z } from "zod";
 
 // Color types for workstream visualization
-export const WorkstreamColorSchema = z.enum([
-  "violet",
-  "blue",
-  "pink",
-  "emerald",
-  "amber",
-  "cyan",
-]);
+export const WorkstreamColorSchema = z.enum(["violet", "blue", "pink", "emerald", "amber", "cyan"]);
 
 export type WorkstreamColor = z.infer<typeof WorkstreamColorSchema>;
 
@@ -115,17 +108,14 @@ export type ActivityType = z.infer<typeof ActivityTypeSchema>;
 /**
  * Determine activity type from app/window context
  */
-export function getActivityType(
-  appName: string | null,
-  windowTitle: string | null
-): ActivityType {
+export function getActivityType(appName: string | null, windowTitle: string | null): ActivityType {
   const app = appName?.toLowerCase() || "";
   const title = windowTitle?.toLowerCase() || "";
 
   // Code editors
   if (
-    ["code", "vscode", "visual studio", "intellij", "webstorm", "atom", "sublime"].some(
-      (e) => app.includes(e)
+    ["code", "vscode", "visual studio", "intellij", "webstorm", "atom", "sublime"].some((e) =>
+      app.includes(e)
     )
   ) {
     return "code";
@@ -141,36 +131,24 @@ export function getActivityType(
   }
 
   // Browser
-  if (
-    ["chrome", "firefox", "safari", "edge", "browser", "arc"].some((e) => app.includes(e))
-  ) {
+  if (["chrome", "firefox", "safari", "edge", "browser", "arc"].some((e) => app.includes(e))) {
     return "browser";
   }
 
   // Communication
-  if (
-    ["slack", "teams", "discord", "mail", "outlook", "messages"].some((e) =>
-      app.includes(e)
-    )
-  ) {
+  if (["slack", "teams", "discord", "mail", "outlook", "messages"].some((e) => app.includes(e))) {
     return "communication";
   }
 
   // Meeting
   if (
-    ["zoom", "meet", "teams", "webex", "facetime"].some(
-      (e) => app.includes(e) || title.includes(e)
-    )
+    ["zoom", "meet", "teams", "webex", "facetime"].some((e) => app.includes(e) || title.includes(e))
   ) {
     return "meeting";
   }
 
   // Design
-  if (
-    ["figma", "sketch", "xd", "photoshop", "illustrator", "canva"].some((e) =>
-      app.includes(e)
-    )
-  ) {
+  if (["figma", "sketch", "xd", "photoshop", "illustrator", "canva"].some((e) => app.includes(e))) {
     return "design";
   }
 

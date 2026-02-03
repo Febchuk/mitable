@@ -87,10 +87,10 @@ interface CaptureData {
   id: string;
   sequenceNumber: number;
   capturedAt: Date;
-  appName: string | null;      // "Code", "Google Chrome", "Slack"
-  windowTitle: string | null;  // "[mitable] - auth.ts - Visual Studio Code"
-  activityDescription: string | null;     // AI-classified activity
-  deltaChangeDescription: string | null;  // Visual delta description
+  appName: string | null; // "Code", "Google Chrome", "Slack"
+  windowTitle: string | null; // "[mitable] - auth.ts - Visual Studio Code"
+  activityDescription: string | null; // AI-classified activity
+  deltaChangeDescription: string | null; // Visual delta description
 }
 ```
 
@@ -153,7 +153,7 @@ function aggregateWorkstreams(captures, sessionContext) {
 
   for (const capture of captures) {
     const assignment = detectWorkstream(capture);
-    const name = assignment.normalizedName;  // "Auth Refactor"
+    const name = assignment.normalizedName; // "Auth Refactor"
 
     if (!groups.has(name)) {
       groups.set(name, []);
@@ -232,20 +232,25 @@ Session-level statistics are computed from the aggregated workstreams:
 
 ```typescript
 interface SessionStats {
-  totalTimeMinutes: number;       // Sum of all workstream durations
-  deepWorkMinutes: number;        // Time in coding/design apps (non-interruption)
-  deepWorkPercent: number;        // (deepWorkMinutes / totalTimeMinutes) * 100
-  interruptionCount: number;      // Number of Communication/Meeting segments
-  interruptionMinutes: number;    // Total time in interruptions
-  longestFocusMinutes: number;    // Longest single segment duration
+  totalTimeMinutes: number; // Sum of all workstream durations
+  deepWorkMinutes: number; // Time in coding/design apps (non-interruption)
+  deepWorkPercent: number; // (deepWorkMinutes / totalTimeMinutes) * 100
+  interruptionCount: number; // Number of Communication/Meeting segments
+  interruptionMinutes: number; // Total time in interruptions
+  longestFocusMinutes: number; // Longest single segment duration
   longestFocusWorkstream: string; // Workstream name of longest segment
 }
 
 // Deep work apps:
 const DEEP_WORK_APPS = [
-  "code", "vscode", "intellij", "webstorm",  // IDEs
-  "terminal", "iterm",                        // Terminal
-  "figma", "xd"                               // Design
+  "code",
+  "vscode",
+  "intellij",
+  "webstorm", // IDEs
+  "terminal",
+  "iterm", // Terminal
+  "figma",
+  "xd", // Design
 ];
 
 // Interruption workstreams:
@@ -273,25 +278,25 @@ Fetch aggregated workstreams for a session with timeline visualization data.
 interface WorkstreamResponse {
   workstreams: Workstream[];
   sessionStats: SessionStats;
-  sessionStartTime: string;  // ISO timestamp
-  sessionEndTime: string;    // ISO timestamp
+  sessionStartTime: string; // ISO timestamp
+  sessionEndTime: string; // ISO timestamp
 }
 
 interface Workstream {
-  id: string;                      // Unique ID (e.g., "ws-1706789123-abc123")
-  name: string;                    // Display name (e.g., "Auth System Refactor")
-  color: WorkstreamColor;          // "violet" | "blue" | "pink" | "emerald" | "amber" | "cyan"
-  totalDurationMinutes: number;    // Aggregated across all segments
-  segments: TimeSegment[];         // Non-contiguous time blocks
-  appsUsed: string[];              // Unique apps (e.g., ["VS Code", "Terminal"])
-  captureCount: number;            // Number of captures in this workstream
-  dominantActivity: string;        // Most common activity description
-  captureIds?: string[];           // Optional: IDs for capture lookup
+  id: string; // Unique ID (e.g., "ws-1706789123-abc123")
+  name: string; // Display name (e.g., "Auth System Refactor")
+  color: WorkstreamColor; // "violet" | "blue" | "pink" | "emerald" | "amber" | "cyan"
+  totalDurationMinutes: number; // Aggregated across all segments
+  segments: TimeSegment[]; // Non-contiguous time blocks
+  appsUsed: string[]; // Unique apps (e.g., ["VS Code", "Terminal"])
+  captureCount: number; // Number of captures in this workstream
+  dominantActivity: string; // Most common activity description
+  captureIds?: string[]; // Optional: IDs for capture lookup
 }
 
 interface TimeSegment {
-  startTime: string;      // ISO timestamp
-  endTime: string;        // ISO timestamp
+  startTime: string; // ISO timestamp
+  endTime: string; // ISO timestamp
   durationMinutes: number;
 }
 
@@ -367,12 +372,12 @@ interface SessionStats {
 
 **Error Responses**:
 
-| Status | Code | Description |
-|--------|------|-------------|
-| 401 | Unauthorized | Missing or invalid auth token |
-| 403 | Forbidden | User doesn't own this session |
-| 404 | Not Found | Session doesn't exist |
-| 500 | Internal Server Error | Server-side error |
+| Status | Code                  | Description                   |
+| ------ | --------------------- | ----------------------------- |
+| 401    | Unauthorized          | Missing or invalid auth token |
+| 403    | Forbidden             | User doesn't own this session |
+| 404    | Not Found             | Session doesn't exist         |
+| 500    | Internal Server Error | Server-side error             |
 
 ---
 
@@ -439,14 +444,14 @@ function SessionTimeline({ sessionId, sessionStatus }) {
 
 Colors are assigned in order as workstreams are created:
 
-| Index | Color | Hex | Tailwind Class |
-|-------|-------|-----|----------------|
-| 0 | Violet | #8B5CF6 | `bg-violet-500` |
-| 1 | Blue | #3B82F6 | `bg-blue-500` |
-| 2 | Pink | #EC4899 | `bg-pink-500` |
-| 3 | Emerald | #10B981 | `bg-emerald-500` |
-| 4 | Amber | #F59E0B | `bg-amber-500` |
-| 5 | Cyan | #06B6D4 | `bg-cyan-500` |
+| Index | Color   | Hex     | Tailwind Class   |
+| ----- | ------- | ------- | ---------------- |
+| 0     | Violet  | #8B5CF6 | `bg-violet-500`  |
+| 1     | Blue    | #3B82F6 | `bg-blue-500`    |
+| 2     | Pink    | #EC4899 | `bg-pink-500`    |
+| 3     | Emerald | #10B981 | `bg-emerald-500` |
+| 4     | Amber   | #F59E0B | `bg-amber-500`   |
+| 5     | Cyan    | #06B6D4 | `bg-cyan-500`    |
 
 Colors cycle: `workstream.color = COLORS[index % 6]`
 
@@ -569,7 +574,7 @@ const CONFIG = {
 // apps/backend/src/services/workstream-aggregation.service.ts
 
 const CONFIG = {
-  maxGapMinutes: 10,  // Gap threshold for splitting segments
+  maxGapMinutes: 10, // Gap threshold for splitting segments
 };
 ```
 

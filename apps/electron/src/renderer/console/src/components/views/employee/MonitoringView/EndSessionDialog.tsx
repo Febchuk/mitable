@@ -53,9 +53,7 @@ export default function EndSessionDialog({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   triggeredFromPill: _triggeredFromPill = false,
 }: EndSessionDialogProps) {
-  const [style, setStyle] = useState<"verbose" | "concise">(
-    initialPreferences?.style ?? "concise"
-  );
+  const [style, setStyle] = useState<"verbose" | "concise">(initialPreferences?.style ?? "concise");
   const [format, setFormat] = useState<"bullets" | "paragraphs">(
     initialPreferences?.format ?? "bullets"
   );
@@ -235,10 +233,7 @@ export default function EndSessionDialog({
               onCheckedChange={(checked) => setDontAskAgain(checked === true)}
             />
             <div className="grid gap-1.5 leading-none">
-              <Label
-                htmlFor="dont-ask"
-                className="text-sm font-medium leading-none cursor-pointer"
-              >
+              <Label htmlFor="dont-ask" className="text-sm font-medium leading-none cursor-pointer">
                 Don't ask me again
               </Label>
               <p className="text-xs text-muted-foreground">

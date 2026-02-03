@@ -69,9 +69,7 @@ export default function TimelineGroup({ group, isLast = false }: TimelineGroupPr
             <span className="font-medium text-ink-primary truncate">
               {group.appName || "Unknown App"}
             </span>
-            <span className="text-xs text-ink-tertiary tabular-nums">
-              {duration}
-            </span>
+            <span className="text-xs text-ink-tertiary tabular-nums">{duration}</span>
             <span className="text-xs text-ink-tertiary tabular-nums">
               {group.captureCount} captures
             </span>

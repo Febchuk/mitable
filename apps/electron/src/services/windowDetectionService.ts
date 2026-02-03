@@ -167,7 +167,10 @@ class WindowDetectionService {
       );
       return watchableWindows;
     } catch (error) {
-      logger.warn(" get-windows failed, trying desktopCapturer fallback:", (error as Error)?.message);
+      logger.warn(
+        " get-windows failed, trying desktopCapturer fallback:",
+        (error as Error)?.message
+      );
 
       // Fallback to desktopCapturer when get-windows fails
       try {
@@ -253,9 +256,7 @@ class WindowDetectionService {
       });
     }
 
-    logger.info(
-      ` desktopCapturer fallback returned ${watchableWindows.length} windows`
-    );
+    logger.info(` desktopCapturer fallback returned ${watchableWindows.length} windows`);
     return watchableWindows;
   }
 

@@ -155,7 +155,10 @@ class ArtifactStorageService {
   /**
    * Validate file before upload
    */
-  validateFile(file: Buffer | { size: number; mimeType: string }, mimeType?: string): ValidationResult {
+  validateFile(
+    file: Buffer | { size: number; mimeType: string },
+    mimeType?: string
+  ): ValidationResult {
     // Handle both Buffer and metadata object
     const size = Buffer.isBuffer(file) ? file.length : file.size;
     const type = mimeType || (Buffer.isBuffer(file) ? undefined : file.mimeType);

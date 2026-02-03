@@ -16,13 +16,13 @@ Capture 5: "[mitable] auth.test.ts - VS Code" → "mitable" (window title patter
 
 ### Problems with Current Approach
 
-| Problem | Example | Impact |
-|---------|---------|--------|
-| **No semantic understanding** | "JWT best practices" browsing is clearly related to "auth.ts" editing, but gets separate workstream | Over-fragmentation |
-| **Inconsistent naming** | `mitable` vs `Mitable` vs `mitable-app` could be 3 workstreams | Duplicate workstreams |
-| **No temporal reasoning** | Doesn't know that 5 minutes of research followed by 30 minutes of coding are the same task | Poor grouping |
-| **Static assignment** | Once assigned, never reconsidered even if context changes | Can't self-correct |
-| **Context-blind** | Doesn't use the `activityDescription` from AI classifier | Wastes available intelligence |
+| Problem                       | Example                                                                                             | Impact                        |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------- |
+| **No semantic understanding** | "JWT best practices" browsing is clearly related to "auth.ts" editing, but gets separate workstream | Over-fragmentation            |
+| **Inconsistent naming**       | `mitable` vs `Mitable` vs `mitable-app` could be 3 workstreams                                      | Duplicate workstreams         |
+| **No temporal reasoning**     | Doesn't know that 5 minutes of research followed by 30 minutes of coding are the same task          | Poor grouping                 |
+| **Static assignment**         | Once assigned, never reconsidered even if context changes                                           | Can't self-correct            |
+| **Context-blind**             | Doesn't use the `activityDescription` from AI classifier                                            | Wastes available intelligence |
 
 ### Current Detection Priority
 
@@ -91,11 +91,13 @@ Communications                              [████]
 ```
 
 **Pros**:
+
 - Fast (no API calls)
 - Free (no AI costs)
 - Predictable behavior
 
 **Cons**:
+
 - Still can't understand semantics ("JWT research" → "auth work")
 - Requires extensive rule maintenance
 - Limited improvement ceiling
@@ -114,12 +116,16 @@ Communications                              [████]
 const prompt = `
 Given these ${captures.length} activities from a work session:
 
-${captures.map(c => `
+${captures
+  .map(
+    (c) => `
 - ${c.capturedAt}: ${c.appName} - "${c.windowTitle}"
   Activity: ${c.activityDescription}
-`).join('\n')}
+`
+  )
+  .join("\n")}
 
-Session Goal: "${session.linearIssueTitle || 'Not specified'}"
+Session Goal: "${session.linearIssueTitle || "Not specified"}"
 
 Group these into logical workstreams. A workstream is a coherent unit of work
 (e.g., "Implementing JWT authentication", "Code review for PR #123").
@@ -138,12 +144,14 @@ Return JSON:
 ```
 
 **Pros**:
+
 - Semantic understanding (knows JWT research relates to auth coding)
 - Can infer workstream names from activity patterns
 - Uses existing activityDescription data
 - One-time cost per session
 
 **Cons**:
+
 - Only runs at session end (no real-time benefit)
 - API cost (~$0.01-0.05 per session depending on length)
 - Adds latency to session end flow
@@ -166,7 +174,7 @@ Recent activities in this work session:
 ${formatCaptures(recentCaptures)}
 
 Current workstreams:
-${currentWorkstreams.map(w => `- ${w.name}: ${w.captureCount} activities`).join('\n')}
+${currentWorkstreams.map((w) => `- ${w.name}: ${w.captureCount} activities`).join("\n")}
 
 Should any recent activities be reassigned to different workstreams?
 Should any workstreams be merged?
@@ -176,11 +184,13 @@ Return reassignments as JSON.
 ```
 
 **Pros**:
+
 - Near real-time intelligent grouping
 - Can show accurate workstreams during active session
 - Self-correcting as context emerges
 
 **Cons**:
+
 - Higher API costs (multiple calls per session)
 - Complexity of handling reassignments mid-session
 - UI needs to handle workstream changes gracefully
@@ -197,9 +207,9 @@ Return reassignments as JSON.
 ```typescript
 // 1. Generate embeddings for each capture's activity
 const embeddings = await Promise.all(
-  captures.map(c => embedService.embed(
-    `${c.appName}: ${c.windowTitle} - ${c.activityDescription}`
-  ))
+  captures.map((c) =>
+    embedService.embed(`${c.appName}: ${c.windowTitle} - ${c.activityDescription}`)
+  )
 );
 
 // 2. Cluster using DBSCAN or k-means
@@ -213,11 +223,13 @@ const workstreamNames = await llm.nameWorkstreams(clusters);
 ```
 
 **Pros**:
+
 - Mathematically principled grouping
 - Leverages existing embedding infrastructure
 - Can handle large sessions efficiently
 
 **Cons**:
+
 - Clustering algorithms need tuning
 - Still needs LLM for naming
 - May produce non-intuitive groupings
@@ -274,9 +286,11 @@ function detectWorkstreamRealtime(capture, recentCaptures) {
 
   // Temporal clustering: if same app as last capture within 5 min, merge
   const lastCapture = recentCaptures[recentCaptures.length - 1];
-  if (lastCapture &&
-      capture.appName === lastCapture.appName &&
-      getMinutesDiff(lastCapture.capturedAt, capture.capturedAt) < 5) {
+  if (
+    lastCapture &&
+    capture.appName === lastCapture.appName &&
+    getMinutesDiff(lastCapture.capturedAt, capture.capturedAt) < 5
+  ) {
     assignment = lastCapture.workstreamAssignment;
   }
 
@@ -302,6 +316,7 @@ async function refineWorkstreamsWithRLM(sessionId) {
 ```
 
 **Pros**:
+
 - Best of both worlds
 - Real-time feedback (even if provisional)
 - High-quality final results
@@ -309,6 +324,7 @@ async function refineWorkstreamsWithRLM(sessionId) {
 - Can show "refinement in progress" state
 
 **Cons**:
+
 - Most complex to implement
 - UI needs to handle provisional → final transition
 
@@ -320,6 +336,7 @@ async function refineWorkstreamsWithRLM(sessionId) {
 ## Recommendation
 
 ### Phase 1 (Current): Enhanced Heuristics
+
 **Already implemented** - temporal clustering, better normalization
 
 ### Phase 2 (Recommended Next): RLM Refinement at Session End
@@ -479,13 +496,14 @@ Return valid JSON:
 ### RLM Refinement Cost per Session
 
 | Session Length | Captures | Input Tokens | Output Tokens | Cost (GPT-4) |
-|----------------|----------|--------------|---------------|--------------|
-| 30 min | ~20 | ~2,000 | ~500 | ~$0.01 |
-| 1 hour | ~40 | ~4,000 | ~800 | ~$0.02 |
-| 2 hours | ~80 | ~8,000 | ~1,000 | ~$0.04 |
-| 4 hours | ~160 | ~16,000 | ~1,500 | ~$0.08 |
+| -------------- | -------- | ------------ | ------------- | ------------ |
+| 30 min         | ~20      | ~2,000       | ~500          | ~$0.01       |
+| 1 hour         | ~40      | ~4,000       | ~800          | ~$0.02       |
+| 2 hours        | ~80      | ~8,000       | ~1,000        | ~$0.04       |
+| 4 hours        | ~160     | ~16,000      | ~1,500        | ~$0.08       |
 
 **Monthly cost estimate** (assuming 20 sessions/day, 30 days):
+
 - 600 sessions × $0.03 avg = **~$18/month** per active user
 
 This is negligible compared to the value provided.
@@ -494,12 +512,12 @@ This is negligible compared to the value provided.
 
 ## Summary
 
-| Approach | Effort | Impact | Cost | Recommendation |
-|----------|--------|--------|------|----------------|
-| Enhanced Heuristics | Low | Moderate | Free | ✅ Already done |
-| RLM at Session End | Medium | High | ~$0.03/session | ✅ **Recommended** |
-| Periodic RLM | High | Very High | ~$0.15/session | Future consideration |
-| Embedding Clustering | Medium-High | High | ~$0.01/session | Alternative approach |
-| Hybrid | Medium-High | Very High | ~$0.03/session | Ideal end state |
+| Approach             | Effort      | Impact    | Cost           | Recommendation       |
+| -------------------- | ----------- | --------- | -------------- | -------------------- |
+| Enhanced Heuristics  | Low         | Moderate  | Free           | ✅ Already done      |
+| RLM at Session End   | Medium      | High      | ~$0.03/session | ✅ **Recommended**   |
+| Periodic RLM         | High        | Very High | ~$0.15/session | Future consideration |
+| Embedding Clustering | Medium-High | High      | ~$0.01/session | Alternative approach |
+| Hybrid               | Medium-High | Very High | ~$0.03/session | Ideal end state      |
 
 **My recommendation**: Implement **RLM Refinement at Session End** as the next enhancement. It provides the best ROI - significant improvement in workstream quality with minimal cost and reasonable implementation effort.

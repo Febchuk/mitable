@@ -33,7 +33,6 @@ export default function SessionTimeline({
     isLoading,
     error,
     isAnalyzing,
-    analysisSource: _analysisSource,
     triggerAnalysis,
   } = useSessionWorkstreams(sessionId, {
     sessionStatus,
@@ -51,15 +50,12 @@ export default function SessionTimeline({
 
   // Handle selection toggle
   const handleWorkstreamSelect = useCallback((workstreamId: string) => {
-    setSelectedWorkstreamId((prev) =>
-      prev === workstreamId ? null : workstreamId
-    );
+    setSelectedWorkstreamId((prev) => (prev === workstreamId ? null : workstreamId));
   }, []);
 
   // Get selected workstream
-  const selectedWorkstream = transformedData?.workstreams.find(
-    (w) => w.id === selectedWorkstreamId
-  ) || null;
+  const selectedWorkstream =
+    transformedData?.workstreams.find((w) => w.id === selectedWorkstreamId) || null;
 
   // Session is active/paused
   const isSessionActive = sessionStatus === "active" || sessionStatus === "paused";
@@ -80,7 +76,9 @@ export default function SessionTimeline({
         className="w-full flex items-center justify-between p-4 hover:bg-canvas-muted/30 transition-colors rounded-t-xl cursor-pointer"
       >
         <div className="flex items-center gap-3">
-          <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">Workstream Timeline</h3>
+          <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
+            Workstream Timeline
+          </h3>
           {transformedData && (
             <span className="text-sm text-ink-tertiary">
               {transformedData.workstreams.length} workstreams
@@ -99,7 +97,9 @@ export default function SessionTimeline({
               className="text-xs text-ink-tertiary hover:text-ink-secondary disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-canvas-muted transition-colors"
               title="Force RLM workstream analysis"
             >
-              <RefreshCw className={`w-3.5 h-3.5 inline mr-1 ${isAnalyzing ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-3.5 h-3.5 inline mr-1 ${isAnalyzing ? "animate-spin" : ""}`}
+              />
               Regenerate
             </button>
           )}
@@ -187,9 +187,7 @@ export default function SessionTimeline({
           {!transformedData && !isLoading && !error && (
             <div className="text-center py-8">
               <p className="text-sm text-ink-secondary">
-                {isSessionActive
-                  ? "Recording activity..."
-                  : "No activity data available."}
+                {isSessionActive ? "Recording activity..." : "No activity data available."}
               </p>
             </div>
           )}

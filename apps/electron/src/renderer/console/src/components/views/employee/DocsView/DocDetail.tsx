@@ -554,7 +554,11 @@ export default function DocDetail() {
           </>
         ) : (
           <div className="text-text-secondary">
-            New document - press <kbd className="px-1.5 py-0.5 rounded bg-background-tertiary border border-border-subtle">⌘+S</kbd> to save
+            New document - press{" "}
+            <kbd className="px-1.5 py-0.5 rounded bg-background-tertiary border border-border-subtle">
+              ⌘+S
+            </kbd>{" "}
+            to save
           </div>
         )}
         <div className="ml-auto text-text-tertiary text-xs">

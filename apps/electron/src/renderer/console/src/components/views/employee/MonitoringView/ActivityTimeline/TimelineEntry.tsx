@@ -47,9 +47,7 @@ export default function TimelineEntry({ capture, isLast = false }: TimelineEntry
   return (
     <div ref={entryRef} className={`relative ${!isLast ? "pb-2" : ""}`}>
       {/* Connector Line */}
-      {!isLast && (
-        <div className="absolute left-[7px] top-6 bottom-0 w-px bg-stroke-subtle/50" />
-      )}
+      {!isLast && <div className="absolute left-[7px] top-6 bottom-0 w-px bg-stroke-subtle/50" />}
 
       <div
         className={`flex items-start gap-3 group rounded-lg p-1.5 -ml-1.5 transition-colors ${
