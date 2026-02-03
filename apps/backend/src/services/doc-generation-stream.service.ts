@@ -20,7 +20,7 @@
 
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import type { DocType } from "@mitable/shared";
 import type { StreamChunk } from "../tools/base.tool.js";
 import { sessionRetrieverService } from "./session-retriever.service.js";
@@ -38,6 +38,10 @@ interface GenerateStreamParams {
   docType: DocType;
   organizationId: string;
   userId: string;
+  /** Optional session IDs to prioritize - AI will still search all sessions but these get extra weight */
+  sessionIds?: string[];
+  /** Optional artifact IDs to include as reference material */
+  artifactIds?: string[];
 }
 
 interface ProgressEvent {
@@ -57,7 +61,14 @@ class DocGenerationStreamService {
   async *generateFromPrompt(
     params: GenerateStreamParams
   ): AsyncIterable<StreamChunk | ProgressEvent> {
-    const { prompt, docType, organizationId, userId } = params;
+    const {
+      prompt,
+      docType,
+      organizationId,
+      userId,
+      sessionIds: hintSessionIds,
+      artifactIds,
+    } = params;
 
     try {
       // Phase 1: Create document record immediately (status='generating')
@@ -109,22 +120,187 @@ class DocGenerationStreamService {
         minSimilarity: 0.3,
       });
 
-      const sessionIds = Array.from(sessionMap.keys());
-      console.log(`[DocGenerationStream] Found ${sessionIds.length} relevant sessions`);
+      let sessionIds = Array.from(sessionMap.keys());
+      let sources: Array<{
+        type: string;
+        sessionId: string;
+        sessionName: string;
+        chunkCount: number;
+      }> = [];
+      console.log(`[DocGenerationStream] Found ${sessionIds.length} relevant sessions from chunks`);
 
-      if (sessionIds.length === 0) {
-        throw new Error(
-          "No relevant sessions found for the specified criteria. Try adjusting your query or date range."
-        );
+      // If hint session IDs provided, prioritize them
+      if (hintSessionIds && hintSessionIds.length > 0) {
+        console.log(`[DocGenerationStream] Prioritizing ${hintSessionIds.length} hint session(s)`);
+        // Add hint sessions to the front (removing duplicates)
+        const hintSet = new Set(hintSessionIds);
+        const otherSessions = sessionIds.filter((id) => !hintSet.has(id));
+        sessionIds = [...hintSessionIds, ...otherSessions];
       }
 
-      // Build sources list
-      const sources = Array.from(sessionMap.entries()).map(([sessionId, sessionChunks]) => ({
-        type: "session",
-        sessionId,
-        sessionName: sessionChunks[0]?.sessionName || "Unnamed Session",
-        chunkCount: sessionChunks.length,
-      }));
+      // Fallback: If no chunks found but hint sessions provided, use those
+      if (sessionIds.length === 0 && hintSessionIds && hintSessionIds.length > 0) {
+        console.log(
+          `[DocGenerationStream] No chunks found, using ${hintSessionIds.length} hint session(s)`
+        );
+        sessionIds = hintSessionIds;
+      }
+
+      // Fallback: If still no sessions, query raw sessions directly
+      if (sessionIds.length === 0) {
+        console.log(`[DocGenerationStream] No chunks found, falling back to raw sessions query`);
+        console.log(`[DocGenerationStream] Query params: org=${organizationId}, user=${userId}`);
+        if (dateRange) {
+          console.log(
+            `[DocGenerationStream] Date filter: ${dateRange.start.toISOString()} to ${dateRange.end.toISOString()}`
+          );
+        }
+
+        // First, check total sessions for this user (without date filter)
+        const totalUserSessions = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(schema.monitoringSessions)
+          .where(
+            and(
+              eq(schema.monitoringSessions.organizationId, organizationId),
+              eq(schema.monitoringSessions.userId, userId)
+            )
+          );
+        console.log(
+          `[DocGenerationStream] Total sessions for user (no date filter): ${totalUserSessions[0]?.count}`
+        );
+
+        // Also check total captures in database
+        const totalCaptures = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(schema.sessionCaptures);
+        console.log(`[DocGenerationStream] Total captures in database: ${totalCaptures[0]?.count}`);
+
+        // Build conditions for raw session query
+        const conditions = [
+          eq(schema.monitoringSessions.organizationId, organizationId),
+          eq(schema.monitoringSessions.userId, userId),
+        ];
+
+        if (dateRange) {
+          conditions.push(gte(schema.monitoringSessions.startedAt, dateRange.start));
+          conditions.push(lte(schema.monitoringSessions.startedAt, dateRange.end));
+        }
+
+        // Query sessions with capture count using LEFT JOIN
+        const rawSessions = await db
+          .select({
+            id: schema.monitoringSessions.id,
+            name: schema.monitoringSessions.name,
+            startedAt: schema.monitoringSessions.startedAt,
+            captureCount: sql<number>`COALESCE(COUNT(${schema.sessionCaptures.id}), 0)`,
+          })
+          .from(schema.monitoringSessions)
+          .leftJoin(
+            schema.sessionCaptures,
+            eq(schema.monitoringSessions.id, schema.sessionCaptures.sessionId)
+          )
+          .where(and(...conditions))
+          .groupBy(
+            schema.monitoringSessions.id,
+            schema.monitoringSessions.name,
+            schema.monitoringSessions.startedAt
+          )
+          .orderBy(desc(schema.monitoringSessions.startedAt))
+          .limit(20);
+
+        console.log(
+          `[DocGenerationStream] Raw sessions found (with date filter): ${rawSessions.length}`
+        );
+        rawSessions.forEach((s) => {
+          console.log(
+            `[DocGenerationStream]   - ${s.name || "Unnamed"}: ${s.captureCount} captures, started ${s.startedAt}`
+          );
+        });
+
+        // Filter to sessions with captures
+        const sessionsWithCaptures = rawSessions.filter((s) => s.captureCount > 0);
+        console.log(
+          `[DocGenerationStream] Found ${sessionsWithCaptures.length} sessions with captures (fallback)`
+        );
+
+        if (sessionsWithCaptures.length === 0) {
+          // If no sessions in date range, try without date filter
+          if (dateRange) {
+            console.log(
+              `[DocGenerationStream] No sessions in date range, trying without date filter...`
+            );
+            const allSessions = await db
+              .select({
+                id: schema.monitoringSessions.id,
+                name: schema.monitoringSessions.name,
+                startedAt: schema.monitoringSessions.startedAt,
+                captureCount: sql<number>`COALESCE(COUNT(${schema.sessionCaptures.id}), 0)`,
+              })
+              .from(schema.monitoringSessions)
+              .leftJoin(
+                schema.sessionCaptures,
+                eq(schema.monitoringSessions.id, schema.sessionCaptures.sessionId)
+              )
+              .where(
+                and(
+                  eq(schema.monitoringSessions.organizationId, organizationId),
+                  eq(schema.monitoringSessions.userId, userId)
+                )
+              )
+              .groupBy(
+                schema.monitoringSessions.id,
+                schema.monitoringSessions.name,
+                schema.monitoringSessions.startedAt
+              )
+              .orderBy(desc(schema.monitoringSessions.startedAt))
+              .limit(20);
+
+            const allWithCaptures = allSessions.filter((s) => s.captureCount > 0);
+            console.log(
+              `[DocGenerationStream] Sessions with captures (no date filter): ${allWithCaptures.length}`
+            );
+
+            if (allWithCaptures.length > 0) {
+              // Use these sessions instead
+              sessionIds = allWithCaptures.map((s) => s.id);
+              sources = allWithCaptures.map((s) => ({
+                type: "session",
+                sessionId: s.id,
+                sessionName: s.name || "Unnamed Session",
+                chunkCount: s.captureCount,
+              }));
+              console.log(
+                `[DocGenerationStream] Using ${sessionIds.length} sessions from all time`
+              );
+            } else {
+              throw new Error(
+                "No sessions with activity found. Record some work sessions first, then try generating a document."
+              );
+            }
+          } else {
+            throw new Error(
+              "No sessions with activity found. Record some work sessions first, then try generating a document."
+            );
+          }
+        } else {
+          sessionIds = sessionsWithCaptures.map((s) => s.id);
+          sources = sessionsWithCaptures.map((s) => ({
+            type: "session",
+            sessionId: s.id,
+            sessionName: s.name || "Unnamed Session",
+            chunkCount: s.captureCount,
+          }));
+        }
+      } else {
+        // Build sources from chunk data
+        sources = Array.from(sessionMap.entries()).map(([sessionId, sessionChunks]) => ({
+          type: "session",
+          sessionId,
+          sessionName: sessionChunks[0]?.sessionName || "Unnamed Session",
+          chunkCount: sessionChunks.length,
+        }));
+      }
 
       // Phase 3: Create RLM environment
       yield {
@@ -138,7 +314,8 @@ class DocGenerationStreamService {
         organizationId,
         userId, // CRITICAL: Pass userId to prevent data leakage
         prompt,
-        dateRange || null
+        dateRange || null,
+        artifactIds // Optional artifact IDs for reference material
       );
 
       // Phase 4: Run RLM agent with tool-calling loop

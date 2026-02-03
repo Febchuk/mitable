@@ -108,9 +108,11 @@ export default function App() {
         <button
           onClick={handleEyeClick}
           className={`relative w-6 h-6 flex items-center justify-center rounded-full transition-all app-no-drag ${
-            eyeDropdownOpen || selectedWindows.length > 0
-              ? "bg-primary/20 text-white"
-              : "hover:bg-white/10 text-white/70"
+            eyeDropdownOpen
+              ? "bg-primary/30 text-white"
+              : selectedWindows.length > 0
+                ? "bg-primary/20 text-white hover:bg-primary/30 active:bg-primary/40 active:scale-95"
+                : "hover:bg-white/10 active:bg-white/20 active:scale-95 text-white/70"
           }`}
           aria-label="Select windows to watch"
         >

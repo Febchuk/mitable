@@ -74,10 +74,24 @@ export const IPC_CHANNELS = {
   BLOCK_LIST_ADD: "block-list-add",
   BLOCK_LIST_REMOVE: "block-list-remove",
   BLOCK_LIST_GET_DETECTED_APPS: "block-list-get-detected-apps",
+  BLOCK_LIST_GET_ALL_APPS: "block-list-get-all-apps",
+  BLOCK_LIST_REFRESH_INSTALLED_APPS: "block-list-refresh-installed-apps",
   NOTIFICATION_FREQUENCY_GET: "notification-frequency-get",
   NOTIFICATION_FREQUENCY_SET: "notification-frequency-set",
   AUTO_SESSION_START_GET: "auto-session-start-get",
   AUTO_SESSION_START_SET: "auto-session-start-set",
+
+  // Summary preferences
+  SUMMARY_PREFERENCES_GET: "summary-preferences-get",
+  SUMMARY_PREFERENCES_SET: "summary-preferences-set",
+  SUMMARY_DEFAULTS_GET: "summary-defaults-get",
+  SUMMARY_DEFAULTS_SET: "summary-defaults-set",
+  ALWAYS_ASK_ON_SESSION_END_GET: "always-ask-on-session-end-get",
+  ALWAYS_ASK_ON_SESSION_END_SET: "always-ask-on-session-end-set",
+
+  // End session dialog coordination (pill → console)
+  SHOW_END_SESSION_DIALOG: "show-end-session-dialog", // Main → Console: trigger dialog
+  END_SESSION_WITH_PREFERENCES: "end-session-with-preferences", // Console → Main: end with prefs
 
   // Custom Notifications (Granola-style prompts)
   NOTIFICATION_SHOW: "notification-show", // Show notification with config

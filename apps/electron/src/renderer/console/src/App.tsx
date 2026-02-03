@@ -24,6 +24,7 @@ import { monitoringKeys } from "./hooks/queries/monitoring";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
 import TodosView from "./components/views/employee/TodosView";
+import ArtifactsView from "./components/views/employee/ArtifactsView";
 import UserProfilePage from "./pages/UserProfilePage";
 import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
@@ -70,6 +71,27 @@ function NavigationHandler() {
         navigate("/monitoring");
       }
     });
+
+    // Listen for end session dialog trigger from pill (via main process)
+    // Navigate to session detail page with query param to open dialog
+    const unsubscribeEndDialog = window.consoleAPI.onShowEndSessionDialog?.(async () => {
+      logger.info(" End session dialog triggered from pill");
+      try {
+        const sessionState = await window.consoleAPI?.getMonitoringSessionState();
+        if (sessionState?.id) {
+          logger.info(" Navigating to session detail with dialog flag:", sessionState.id);
+          navigate(`/monitoring/${sessionState.id}?openEndDialog=true`);
+        } else {
+          logger.warn(" No active session found for end dialog trigger");
+        }
+      } catch (error) {
+        logger.error(" Error getting session state for end dialog:", error);
+      }
+    });
+
+    return () => {
+      unsubscribeEndDialog?.();
+    };
   }, [navigate]);
 
   return null;
@@ -177,6 +199,7 @@ function App() {
                 {/* Employee Routes */}
                 <Route path="docs" element={<DocsView />} />
                 <Route path="docs/:docId" element={<DocDetail />} />
+                <Route path="artefacts" element={<ArtifactsView />} />
                 <Route path="todos" element={<TodosView />} />
                 {/* Monitoring Routes */}
                 <Route path="monitoring" element={<MonitoringView />} />

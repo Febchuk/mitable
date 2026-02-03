@@ -53,10 +53,22 @@ const IPC_CHANNELS = {
   BLOCK_LIST_ADD: "block-list-add",
   BLOCK_LIST_REMOVE: "block-list-remove",
   BLOCK_LIST_GET_DETECTED_APPS: "block-list-get-detected-apps",
+  BLOCK_LIST_GET_ALL_APPS: "block-list-get-all-apps",
+  BLOCK_LIST_REFRESH_INSTALLED_APPS: "block-list-refresh-installed-apps",
   NOTIFICATION_FREQUENCY_GET: "notification-frequency-get",
   NOTIFICATION_FREQUENCY_SET: "notification-frequency-set",
   AUTO_SESSION_START_GET: "auto-session-start-get",
   AUTO_SESSION_START_SET: "auto-session-start-set",
+  // Summary preferences
+  SUMMARY_PREFERENCES_GET: "summary-preferences-get",
+  SUMMARY_PREFERENCES_SET: "summary-preferences-set",
+  SUMMARY_DEFAULTS_GET: "summary-defaults-get",
+  SUMMARY_DEFAULTS_SET: "summary-defaults-set",
+  ALWAYS_ASK_ON_SESSION_END_GET: "always-ask-on-session-end-get",
+  ALWAYS_ASK_ON_SESSION_END_SET: "always-ask-on-session-end-set",
+  // End session dialog coordination
+  SHOW_END_SESSION_DIALOG: "show-end-session-dialog",
+  END_SESSION_WITH_PREFERENCES: "end-session-with-preferences",
   // Watching pill
   WATCHING_PILL_HIDE: "watching-pill-hide",
 } as const;
@@ -335,6 +347,30 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   getDetectedApps: (): Promise<Array<{ normalizedName: string; originalName: string }>> =>
     ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_GET_DETECTED_APPS),
 
+  // Get all blockable apps (detected + installed)
+  getAllBlockableApps: (
+    forceRefresh?: boolean
+  ): Promise<{
+    success: boolean;
+    apps: Array<{
+      normalizedName: string;
+      originalName: string;
+      source: "detected" | "installed" | "both";
+    }>;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_GET_ALL_APPS, forceRefresh),
+
+  // Refresh installed apps cache
+  refreshInstalledApps: (): Promise<{
+    success: boolean;
+    apps: Array<{
+      normalizedName: string;
+      originalName: string;
+      source: "detected" | "installed" | "both";
+    }>;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.BLOCK_LIST_REFRESH_INSTALLED_APPS),
+
   // Notification frequency API (user-scoped)
   getNotificationFrequency: (userId: string): Promise<number> =>
     ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_FREQUENCY_GET, userId),
@@ -348,6 +384,65 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   setAutoSessionStart: (userId: string, enabled: boolean): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.AUTO_SESSION_START_SET, userId, enabled),
+
+  // Summary preferences API
+  getSummaryPreferences: (): Promise<{
+    detailLevel: "concise" | "verbose";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
+    alwaysAskOnSessionEnd: boolean;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.SUMMARY_PREFERENCES_GET),
+
+  setSummaryPreferences: (prefs: {
+    detailLevel?: "concise" | "verbose";
+    format?: "bullets" | "paragraphs";
+    includeScreenshots?: boolean;
+    alwaysAskOnSessionEnd?: boolean;
+  }): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SUMMARY_PREFERENCES_SET, prefs),
+
+  getSummaryDefaults: (): Promise<{
+    detailLevel: "concise" | "verbose";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.SUMMARY_DEFAULTS_GET),
+
+  setSummaryDefaults: (defaults: {
+    detailLevel?: "concise" | "verbose";
+    format?: "bullets" | "paragraphs";
+    includeScreenshots?: boolean;
+  }): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SUMMARY_DEFAULTS_SET, defaults),
+
+  getAlwaysAskOnSessionEnd: (): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ALWAYS_ASK_ON_SESSION_END_GET),
+
+  setAlwaysAskOnSessionEnd: (value: boolean): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ALWAYS_ASK_ON_SESSION_END_SET, value),
+
+  // End session with preferences (called from Console after dialog confirmation)
+  endSessionWithPreferences: (preferences: {
+    detailLevel: "concise" | "verbose";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
+  }): Promise<{
+    success: boolean;
+    sessionId?: string;
+    captureCount?: number;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.END_SESSION_WITH_PREFERENCES, preferences),
+
+  // Listen for show end session dialog event (triggered from pill)
+  onShowEndSessionDialog: (callback: () => void): (() => void) => {
+    const handler = () => {
+      logger.info(" Show end session dialog event received from pill");
+      callback();
+    };
+    ipcRenderer.on(IPC_CHANNELS.SHOW_END_SESSION_DIALOG, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.SHOW_END_SESSION_DIALOG, handler);
+    };
+  },
 
   // Hide watching pill
   hidePill: () => ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE),

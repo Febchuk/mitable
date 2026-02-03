@@ -50,7 +50,8 @@ export function useDocument(id: string) {
   return useQuery({
     queryKey: documentsKeys.detail(id),
     queryFn: () => documentsService.fetchDocument(id),
-    enabled: !!user && !!id,
+    // Don't fetch when id is "new" - this is the new document creation flow
+    enabled: !!user && !!id && id !== "new",
   });
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "@mitable/electron",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "description": "Mitable AI Onboarding Buddy - Desktop Application",
   "author": "Mitable",
   "type": "module",
@@ -83,6 +83,7 @@
     "@radix-ui/react-toast": "^1.2.15",
     "@radix-ui/react-toolbar": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@radix-ui/react-visually-hidden": "^1.2.3",
     "@tanstack/react-query": "^5.90.5",
     "@tanstack/react-query-devtools": "^5.90.2",
     "@types/react-syntax-highlighter": "^15.5.13",

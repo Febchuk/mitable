@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eq, sql, desc, and, inArray } from "drizzle-orm";
+import { eq, sql, desc, and, inArray, isNull } from "drizzle-orm";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -13,6 +13,8 @@ import { classifierService } from "../services/classifier.service.js";
 import { masterStoryService } from "../services/master-story.service.js";
 import { searchService } from "../services/search.service.js";
 import { SessionIngestionService } from "../services/session-ingestion.service.js";
+import { workstreamAggregationService } from "../services/workstream-aggregation.service.js";
+import { workstreamRLMService } from "../services/workstream-rlm.service.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { logger } from "../lib/logger";
@@ -1259,6 +1261,25 @@ router.post(
             captureId = newCapture.id;
             log.debug("Created database capture record", { captureId, sequenceNumber });
           }
+
+          // Trigger workstream RLM analysis check (non-blocking)
+          if (captureId) {
+            workstreamRLMService
+              .onCaptureAdded(id, {
+                id: captureId,
+                capturedAt: new Date(capturedAt),
+                appName: windowInfo.appName,
+                windowTitle: windowInfo.windowTitle,
+                activityDescription,
+                workstreamId: null,
+              })
+              .catch((err) => {
+                log.warn("Workstream RLM check failed (non-blocking)", {
+                  captureId,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              });
+          }
         } catch (error) {
           log.warn("Failed to create/update database capture record", {
             frameId,
@@ -1541,6 +1562,280 @@ router.get(
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to fetch captures",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/monitoring/sessions/:id/workstreams
+ * Get aggregated workstreams for a session with timeline visualization data
+ *
+ * Reads from session_workstreams table if RLM has analyzed the session,
+ * otherwise falls back to heuristic aggregation.
+ *
+ * Returns:
+ * - workstreams: Array of workstream objects with segments, apps used, and capture counts
+ * - sessionStats: Session statistics (total time, deep work, interruptions, etc.)
+ * - sessionStartTime: ISO timestamp of session start
+ * - sessionEndTime: ISO timestamp of session end
+ * - analysisSource: "rlm" or "heuristic" - indicates how workstreams were generated
+ */
+router.get(
+  "/sessions/:id/workstreams",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to access this session",
+        });
+        return;
+      }
+
+      // Check if we have RLM-generated workstreams
+      const rlmWorkstreams = await db
+        .select()
+        .from(schema.sessionWorkstreams)
+        .where(
+          and(
+            eq(schema.sessionWorkstreams.sessionId, id),
+            isNull(schema.sessionWorkstreams.isMergedInto)
+          )
+        );
+
+      // Fetch captures for this session
+      const captures = await db
+        .select({
+          id: schema.sessionCaptures.id,
+          capturedAt: schema.sessionCaptures.capturedAt,
+          appName: schema.sessionCaptures.appName,
+          windowTitle: schema.sessionCaptures.windowTitle,
+          activityDescription: schema.sessionCaptures.activityDescription,
+          deltaChangeDescription: schema.sessionCaptures.deltaChangeDescription,
+          workstreamId: schema.sessionCaptures.workstreamId,
+        })
+        .from(schema.sessionCaptures)
+        .where(eq(schema.sessionCaptures.sessionId, id))
+        .orderBy(schema.sessionCaptures.sequenceNumber);
+
+      // Session time bounds
+      const sorted = [...captures].sort(
+        (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime()
+      );
+      const sessionStartTime = sorted[0]?.capturedAt
+        ? new Date(sorted[0].capturedAt).toISOString()
+        : new Date().toISOString();
+      const sessionEndTime = sorted[sorted.length - 1]?.capturedAt
+        ? new Date(sorted[sorted.length - 1].capturedAt).toISOString()
+        : sessionStartTime;
+
+      // If RLM workstreams exist, use them
+      if (rlmWorkstreams.length > 0) {
+        const workstreamsResult = workstreamAggregationService.aggregateFromRLMWorkstreams(
+          rlmWorkstreams,
+          captures,
+          sessionStartTime,
+          sessionEndTime
+        );
+
+        res.json({
+          ...workstreamsResult,
+          analysisSource: "rlm",
+        });
+        return;
+      }
+
+      // Fallback to heuristic aggregation
+      const result = workstreamAggregationService.aggregateWorkstreams(captures, {
+        linearIssueId: session.linearIssueId,
+        linearIssueTitle: session.linearIssueTitle,
+      });
+
+      res.json({
+        ...result,
+        analysisSource: "heuristic",
+      });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error fetching workstreams"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to fetch workstreams",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/monitoring/sessions/:id/workstreams/analyze
+ * Force immediate RLM analysis of workstreams
+ *
+ * Use this when opening the timeline view to ensure workstreams are up-to-date
+ */
+router.post(
+  "/sessions/:id/workstreams/analyze",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to analyze this session",
+        });
+        return;
+      }
+
+      // Trigger force analysis (with force=true to clear existing and re-analyze all)
+      await workstreamRLMService.forceAnalysis(id, { force: true });
+
+      // Fetch updated workstreams
+      const workstreams = await db
+        .select()
+        .from(schema.sessionWorkstreams)
+        .where(
+          and(
+            eq(schema.sessionWorkstreams.sessionId, id),
+            isNull(schema.sessionWorkstreams.isMergedInto)
+          )
+        );
+
+      res.json({
+        success: true,
+        message: "Workstream analysis completed",
+        workstreamCount: workstreams.length,
+        workstreams: workstreams.map((w) => ({
+          id: w.id,
+          name: w.name,
+          color: w.color,
+          category: w.category,
+          summary: w.summary,
+          captureCount: w.captureCount,
+          totalDurationMinutes: w.totalDurationMinutes,
+          appsUsed: w.appsUsed,
+          isProvisional: w.isProvisional,
+        })),
+      });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error analyzing workstreams"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to analyze workstreams",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/monitoring/sessions/:id/workstreams/analysis-log
+ * Get history of RLM workstream analyses for debugging
+ */
+router.get(
+  "/sessions/:id/workstreams/analysis-log",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "Session not found",
+        });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to access this session",
+        });
+        return;
+      }
+
+      // Fetch analysis log
+      const analysisLog = await db
+        .select()
+        .from(schema.workstreamAnalysisLog)
+        .where(eq(schema.workstreamAnalysisLog.sessionId, id))
+        .orderBy(desc(schema.workstreamAnalysisLog.createdAt));
+
+      res.json({
+        analysisLog: analysisLog.map((log) => ({
+          id: log.id,
+          analysisNumber: log.analysisNumber,
+          triggerReason: log.triggerReason,
+          capturesAnalyzed: log.capturesAnalyzed,
+          modelUsed: log.modelUsed,
+          promptTokens: log.promptTokens,
+          completionTokens: log.completionTokens,
+          executionTimeMs: log.executionTimeMs,
+          workstreamsCreated: log.workstreamsCreated,
+          workstreamsMerged: log.workstreamsMerged,
+          capturesReassigned: log.capturesReassigned,
+          success: log.success,
+          error: log.error,
+          createdAt: log.createdAt,
+        })),
+      });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error fetching analysis log"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to fetch analysis log",
       });
     }
   }

@@ -15,24 +15,40 @@ export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `group relative flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${
+        `group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-normal ${
           isActive
-            ? "bg-white text-black hover:bg-white/90 before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-1 before:h-8 before:bg-gradient-purple-blue before:rounded-r"
-            : "hover:bg-white/10"
+            ? "bg-canvas-overlay text-ink-primary shadow-sm"
+            : "text-ink-secondary hover:text-ink-primary hover:bg-canvas-muted/50"
         }`
       }
       title={label}
     >
       {({ isActive }) => (
         <>
-          <Icon
-            className={`w-5 h-5 flex-shrink-0 transition-all duration-200 ${
-              isActive ? "" : `text-text-secondary group-hover:text-white group-hover:scale-110`
+          {/* Glow indicator for active state */}
+          {isActive && (
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-indigo rounded-r shadow-[0_0_12px_rgba(99,102,241,0.6)]" />
+          )}
+
+          {/* Icon with tilt effect on hover */}
+          <span
+            className={`flex items-center justify-center w-8 h-8 rounded-md transition-all duration-fast ${
+              isActive
+                ? "bg-indigo/10 text-indigo"
+                : "text-ink-secondary group-hover:text-ink-primary group-hover:rotate-3 group-hover:scale-105"
             }`}
-          />
+          >
+            <Icon className="w-[18px] h-[18px]" />
+          </span>
+
+          {/* Label with letter-spacing animation */}
           {open && (
             <span
-              className={`text-nav-item transition-colors ${!isActive && "group-hover:text-white"}`}
+              className={`text-sm font-medium tracking-tight transition-all duration-normal ${
+                isActive
+                  ? "text-ink-primary"
+                  : "text-ink-secondary group-hover:text-ink-primary group-hover:tracking-normal"
+              }`}
             >
               {label}
             </span>

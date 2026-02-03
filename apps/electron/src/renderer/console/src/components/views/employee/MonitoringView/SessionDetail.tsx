@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createLogger } from "../../../../../../lib/logger";
 
 const logger = createLogger("SessionDetail");
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   useSession,
   useSessionSummary,
@@ -33,25 +33,19 @@ import {
 import { API_BASE_URL } from "@/console/src/lib/config";
 import {
   ArrowLeft,
-  Clock,
-  Camera,
   Edit2,
   Send,
   Trash2,
-  CheckCircle,
   Loader2,
   Square,
   Pause,
   Play,
   RefreshCw,
   ChevronDown,
-  BookOpen,
   ChevronUp,
-  Image,
   Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,6 +67,7 @@ import { SessionEndToast } from "@/console/src/components/shared/SessionEndToast
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import LinearUpdateDialog from "./LinearUpdateDialog";
 import ActivityTimeline from "./ActivityTimeline";
+import SessionTimeline from "./SessionTimeline";
 import EndSessionDialog from "./EndSessionDialog"; // Import the new dialog
 import { SiLinear } from "react-icons/si";
 
@@ -92,6 +87,7 @@ function formatDateTime(dateString: string | null): string {
 export default function SessionDetail() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -135,9 +131,22 @@ export default function SessionDetail() {
   // End Session Dialog State
   const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const [isExternallyTriggered, setIsExternallyTriggered] = useState(false); // Track if triggered from pill
 
   // Preferences for hide pill on session end
   const { hidePillOnSessionEnd, dontAskHidePillAgain, updatePreference } = usePreferences();
+
+  // Check for URL param to open end dialog (triggered from pill via App.tsx navigation)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get("openEndDialog") === "true") {
+      logger.info("End session dialog triggered via URL param from pill");
+      setIsExternallyTriggered(true);
+      setIsEndDialogOpen(true);
+      // Clean up URL param (replace to avoid back button issues)
+      navigate(`/monitoring/${sessionId}`, { replace: true });
+    }
+  }, [location.search, sessionId, navigate]);
 
   // Listen for session updates from watch pill (e.g., pause/resume)
   useEffect(() => {
@@ -404,32 +413,59 @@ export default function SessionDetail() {
 
     setIsEnding(true);
     try {
-      // 1. Stop Electron capture
-      const electronResult = await window.consoleAPI.endMonitoringSession();
+      // Map style to detailLevel for API
+      const apiPreferences = {
+        detailLevel: preferences.style as "verbose" | "concise",
+        format: preferences.format,
+        includeScreenshots: preferences.includeScreenshots,
+      };
 
-      // If Electron session is already ended (e.g., from pill), that's OK
-      if (electronResult.error && electronResult.error !== "No active session") {
-        throw new Error(electronResult.error);
+      if (isExternallyTriggered) {
+        // Triggered from pill - use the unified IPC call that handles everything
+        // (Electron session end + upload + backend summary)
+        logger.info("Ending session via pill trigger (using endSessionWithPreferences)");
+        const result = await window.consoleAPI.endSessionWithPreferences(apiPreferences);
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to end session");
+        }
+
+        // Invalidate React Query caches to refresh UI (pill flow bypasses mutation's onSuccess)
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+        logger.info("Invalidated session queries after external end");
+      } else {
+        // Triggered from Console - use the original flow
+        // 1. Stop Electron capture
+        const electronResult = await window.consoleAPI.endMonitoringSession();
+
+        // If Electron session is already ended (e.g., from pill), that's OK
+        if (electronResult.error && electronResult.error !== "No active session") {
+          throw new Error(electronResult.error);
+        }
+
+        // 2. Upload captures if any
+        if (electronResult.captures && electronResult.captures.length > 0) {
+          await uploadCaptures(sessionId, electronResult.captures);
+        }
+
+        // 3. Trigger backend end + summary generation with preferences
+        await endSessionMutation.mutateAsync({
+          sessionId,
+          preferences, // Pass preferences to backend
+        });
       }
-
-      // 2. Upload captures if any
-      if (electronResult.captures && electronResult.captures.length > 0) {
-        await uploadCaptures(sessionId, electronResult.captures);
-      }
-
-      // 3. Trigger backend end + summary generation with preferences
-      await endSessionMutation.mutateAsync({
-        sessionId,
-        preferences, // Pass preferences to backend
-      });
 
       setIsEndDialogOpen(false);
+      setIsExternallyTriggered(false); // Reset for next time
 
-      // Handle pill hiding logic
-      if (hidePillOnSessionEnd || dontAskHidePillAgain) {
-        window.consoleAPI.hidePill();
-      } else {
-        setShowSessionEndToast(true);
+      // Handle pill hiding logic (only for non-externally triggered - pill handles its own hiding)
+      if (!isExternallyTriggered) {
+        if (hidePillOnSessionEnd || dontAskHidePillAgain) {
+          window.consoleAPI.hidePill();
+        } else {
+          setShowSessionEndToast(true);
+        }
       }
 
       toast({
@@ -578,17 +614,17 @@ export default function SessionDetail() {
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-text-primary">
+            <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
               {session.name === "Work session" && session.status === "summarizing" ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="animate-spin" size={24} />
+                  <Loader2 className="animate-spin" size={20} />
                   Generating title...
                 </span>
               ) : (
                 session.name || "Untitled Session"
               )}
             </h1>
-            <p className="text-text-secondary mt-1">{formatDateTime(session.startedAt)}</p>
+            <p className="text-ink-secondary text-sm mt-1">{formatDateTime(session.startedAt)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -646,10 +682,9 @@ export default function SessionDetail() {
             session.status !== "paused" &&
             (isDelivered ? (
               <div className="flex items-center gap-2">
-                <Badge className="bg-status-success/20 text-status-success border-transparent">
-                  <CheckCircle size={14} className="mr-1" />
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium text-emerald bg-emerald/10">
                   Delivered
-                </Badge>
+                </span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -725,39 +760,30 @@ export default function SessionDetail() {
       </div>
 
       {/* Stats */}
-      <div className="flex items-center gap-6 text-sm border-b border-border-subtle pb-6">
-        <div className="flex items-center gap-2 text-text-secondary">
-          <Clock size={18} />
-          <span>
-            Duration:{" "}
-            <span className="text-text-primary font-medium">
-              {session.endedAt
-                ? formatDuration(
-                    new Date(session.startedAt),
-                    new Date(session.endedAt),
-                    session.totalPausedMs
-                  )
-                : "In progress"}
-            </span>
+      <div className="flex items-center gap-6 text-sm border-b border-stroke-subtle pb-6">
+        <span className="text-ink-secondary">
+          Duration:{" "}
+          <span className="text-ink-primary font-medium">
+            {session.endedAt
+              ? formatDuration(
+                  new Date(session.startedAt),
+                  new Date(session.endedAt),
+                  session.totalPausedMs
+                )
+              : "In progress"}
           </span>
-        </div>
-        <div className="flex items-center gap-2 text-text-secondary">
-          <Camera size={18} />
-          <span>
-            Captures:{" "}
-            <span className="text-text-primary font-medium">{session.captureCount ?? 0}</span>
-          </span>
-        </div>
+        </span>
+        <span className="text-ink-secondary">
+          Captures:{" "}
+          <span className="text-ink-primary font-medium">{session.captureCount ?? 0}</span>
+        </span>
         {session.deliveredAt && (
-          <div className="flex items-center gap-2 text-text-secondary">
-            <Send size={18} />
-            <span>
-              Delivered:{" "}
-              <span className="text-text-primary font-medium">
-                {formatDateTime(session.deliveredAt)}
-              </span>
+          <span className="text-ink-secondary">
+            Delivered:{" "}
+            <span className="text-ink-primary font-medium">
+              {formatDateTime(session.deliveredAt)}
             </span>
-          </div>
+          </span>
         )}
       </div>
 
@@ -768,32 +794,30 @@ export default function SessionDetail() {
             onClick={() => setIsStoryExpanded(!isStoryExpanded)}
             className="flex items-center gap-2 w-full text-left group"
           >
-            <BookOpen size={18} className="text-primary" />
-            <h2 className="text-lg font-semibold text-text-primary flex-1">Live Progress Story</h2>
-            <Badge variant="secondary" className="text-xs">
+            <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight flex-1">
+              Live Progress
+            </h2>
+            <span className="text-xs text-ink-tertiary tabular-nums">
               v{storyData.metadata?.version || 0}
-            </Badge>
+            </span>
             {isStoryExpanded ? (
-              <ChevronUp size={18} className="text-text-secondary group-hover:text-text-primary" />
+              <ChevronUp size={16} className="text-ink-tertiary group-hover:text-ink-primary" />
             ) : (
-              <ChevronDown
-                size={18}
-                className="text-text-secondary group-hover:text-text-primary"
-              />
+              <ChevronDown size={16} className="text-ink-tertiary group-hover:text-ink-primary" />
             )}
           </button>
 
           {isStoryExpanded && (
-            <div className="bg-background-elevated rounded-lg border border-primary/20 p-4">
+            <div className="bg-canvas-overlay rounded-xl border border-indigo/20 p-4">
               <div className="prose prose-invert prose-sm max-w-none">
                 {storyData.story.split("\n").map((paragraph, i) => (
-                  <p key={i} className="text-text-primary mb-2 last:mb-0 text-sm leading-relaxed">
+                  <p key={i} className="text-ink-primary mb-2 last:mb-0 text-sm leading-relaxed">
                     {paragraph || <br />}
                   </p>
                 ))}
               </div>
               {storyData.metadata?.lastUpdated && (
-                <div className="mt-3 pt-2 border-t border-border-subtle text-xs text-text-tertiary">
+                <div className="mt-3 pt-2 border-t border-stroke-subtle text-xs text-ink-tertiary tabular-nums">
                   Last updated: {new Date(storyData.metadata.lastUpdated).toLocaleTimeString()}
                 </div>
               )}
@@ -805,7 +829,9 @@ export default function SessionDetail() {
       {/* Summary Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-text-primary">Session Summary</h2>
+          <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight">
+            Summary
+          </h2>
           <div className="flex items-center gap-2">
             {/* DEV ONLY: Regenerate button - hidden in production */}
             {import.meta.env.DEV && session.status === "ready" && (
@@ -850,18 +876,18 @@ export default function SessionDetail() {
         </div>
 
         {summary ? (
-          <div className="bg-background-elevated rounded-lg border border-border-subtle p-6">
+          <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-6">
             <div className="prose prose-invert prose-sm max-w-none">
               {summary.split("\n").map((paragraph, i) => (
-                <p key={i} className="text-text-primary mb-3 last:mb-0">
+                <p key={i} className="text-ink-primary mb-3 last:mb-0 text-sm leading-relaxed">
                   {paragraph || <br />}
                 </p>
               ))}
             </div>
           </div>
         ) : (
-          <div className="bg-background-elevated rounded-lg border border-border-subtle p-8 text-center">
-            <p className="text-text-secondary">
+          <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-8 text-center">
+            <p className="text-sm text-ink-secondary">
               {session.status === "summarizing"
                 ? "Generating summary..."
                 : "No summary available for this session."}
@@ -870,23 +896,24 @@ export default function SessionDetail() {
         )}
       </div>
 
-      {/* Activity Timeline */}
+      {/* Workstream Timeline (new visualization) */}
+      <SessionTimeline sessionId={sessionId || ""} sessionStatus={session?.status} />
+
+      {/* Activity Timeline (original) */}
       <ActivityTimeline sessionId={sessionId || ""} sessionStatus={session?.status} />
 
       {/* Top-K Frames Gallery - Shows after session ends */}
       {session.topKFrames && session.topKFrames.length > 0 && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Image size={18} className="text-primary" />
-            <h2 className="text-xl font-semibold text-text-primary">
-              Key Frames ({session.topKFrames.length})
-            </h2>
-          </div>
+          <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight">
+            Key Frames{" "}
+            <span className="text-ink-tertiary font-normal">({session.topKFrames.length})</span>
+          </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {session.topKFrames.map((frame: any) => (
               <div
                 key={frame.id}
-                className="group relative bg-background-elevated rounded-lg border border-border-subtle overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+                className="group relative bg-canvas-overlay rounded-xl border border-stroke-subtle overflow-hidden cursor-pointer hover:border-stroke transition-colors"
                 onClick={() => setSelectedFrame(frame.id)}
               >
                 {frame.imageData ? (
@@ -896,16 +923,16 @@ export default function SessionDetail() {
                     className="w-full aspect-video object-cover"
                   />
                 ) : (
-                  <div className="w-full aspect-video bg-background-tertiary flex items-center justify-center">
-                    <Camera size={24} className="text-text-tertiary" />
+                  <div className="w-full aspect-video bg-canvas-muted flex items-center justify-center">
+                    <span className="text-sm text-ink-tertiary">No preview</span>
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-white text-xs line-clamp-2">
+                <div className="absolute inset-0 bg-gradient-to-t from-canvas-base/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute bottom-0 left-0 right-0 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-ink-primary text-xs line-clamp-2">
                     {frame.activityDescription || frame.appName || "Captured frame"}
                   </p>
-                  <p className="text-white/60 text-xs mt-1">
+                  <p className="text-ink-tertiary text-xs mt-1 tabular-nums">
                     {new Date(frame.capturedAt).toLocaleTimeString()}
                   </p>
                 </div>
@@ -917,9 +944,11 @@ export default function SessionDetail() {
 
       {/* Frame Preview Dialog */}
       <Dialog open={!!selectedFrame} onOpenChange={() => setSelectedFrame(null)}>
-        <DialogContent className="bg-background-primary border-border-subtle max-w-4xl">
+        <DialogContent className="bg-canvas-raised border-stroke-subtle max-w-4xl">
           <DialogHeader>
-            <DialogTitle className="text-text-primary">Frame Preview</DialogTitle>
+            <DialogTitle className="font-display text-base font-semibold text-ink-primary tracking-tight">
+              Frame Preview
+            </DialogTitle>
           </DialogHeader>
           {selectedFrame &&
             (() => {
@@ -931,27 +960,29 @@ export default function SessionDetail() {
                     <img
                       src={`data:image/png;base64,${frame.imageData}`}
                       alt={frame.activityDescription || "Session capture"}
-                      className="w-full rounded-lg"
+                      className="w-full rounded-xl"
                     />
                   ) : (
-                    <div className="w-full aspect-video bg-background-tertiary flex items-center justify-center rounded-lg">
-                      <Camera size={48} className="text-text-tertiary" />
+                    <div className="w-full aspect-video bg-canvas-muted flex items-center justify-center rounded-xl">
+                      <span className="text-sm text-ink-tertiary">No preview available</span>
                     </div>
                   )}
                   <div className="space-y-2">
-                    <p className="text-text-primary">
+                    <p className="text-ink-primary text-sm">
                       {frame.activityDescription || "No description available"}
                     </p>
-                    <div className="flex items-center gap-4 text-sm text-text-secondary">
+                    <div className="flex items-center gap-4 text-sm text-ink-secondary">
                       <span>{frame.appName || "Unknown app"}</span>
-                      <span>•</span>
-                      <span>{new Date(frame.capturedAt).toLocaleString()}</span>
+                      <span className="text-ink-tertiary">·</span>
+                      <span className="tabular-nums">
+                        {new Date(frame.capturedAt).toLocaleString()}
+                      </span>
                       {frame.importanceScore && (
                         <>
-                          <span>•</span>
-                          <Badge variant="secondary">
-                            Importance: {(frame.importanceScore * 100).toFixed(0)}%
-                          </Badge>
+                          <span className="text-ink-tertiary">·</span>
+                          <span className="text-indigo tabular-nums">
+                            {(frame.importanceScore * 100).toFixed(0)}%
+                          </span>
                         </>
                       )}
                     </div>
@@ -1141,7 +1172,13 @@ export default function SessionDetail() {
       {/* End Session Dialog */}
       <EndSessionDialog
         open={isEndDialogOpen}
-        onOpenChange={setIsEndDialogOpen}
+        onOpenChange={(open) => {
+          setIsEndDialogOpen(open);
+          if (!open) {
+            // Reset external trigger flag when dialog closes
+            setIsExternallyTriggered(false);
+          }
+        }}
         onConfirm={handleConfirmEndSession}
         isProcessing={isEnding}
       />

@@ -152,6 +152,10 @@ export const sessionCaptures = pgTable(
     // Flag for Top-K selected frames (uploaded to cloud)
     selectedForExport: boolean("selected_for_export").default(false),
 
+    // Workstream assignment (populated by RLM analysis)
+    workstreamId: uuid("workstream_id"), // References session_workstreams.id (FK added in workstreams.schema.ts)
+    workstreamProvisional: boolean("workstream_provisional").default(true), // True until RLM confirms
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
@@ -159,6 +163,7 @@ export const sessionCaptures = pgTable(
     importanceIdx: index("idx_captures_importance").on(table.sessionId, table.importanceScore),
     onTaskIdx: index("idx_captures_on_task").on(table.sessionId, table.onTask),
     deltaIdx: index("idx_captures_delta").on(table.sessionId, table.deltaChanged),
+    workstreamIdx: index("idx_captures_workstream").on(table.workstreamId),
   })
 );
 

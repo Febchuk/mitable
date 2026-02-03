@@ -33,7 +33,11 @@ export function useGenerateDocumentStream() {
   });
 
   const generate = useCallback(
-    async (prompt: string, docType: string) => {
+    async (
+      prompt: string,
+      docType: string,
+      options?: { sessionIds?: string[]; artifactIds?: string[] }
+    ) => {
       setState({
         isGenerating: true,
         content: "",
@@ -43,42 +47,47 @@ export function useGenerateDocumentStream() {
       });
 
       try {
-        await generateDocumentStream(prompt, docType, {
-          onProgress: (phase, message) => {
-            setState((prev) => ({
-              ...prev,
-              progress: { phase: phase as any, message },
-            }));
-          },
+        await generateDocumentStream(
+          prompt,
+          docType,
+          {
+            onProgress: (phase, message) => {
+              setState((prev) => ({
+                ...prev,
+                progress: { phase: phase as any, message },
+              }));
+            },
 
-          onChunk: (chunk) => {
-            setState((prev) => ({
-              ...prev,
-              content: prev.content + chunk,
-            }));
-          },
+            onChunk: (chunk) => {
+              setState((prev) => ({
+                ...prev,
+                content: prev.content + chunk,
+              }));
+            },
 
-          onComplete: (content, documentId) => {
-            setState((prev) => ({
-              ...prev,
-              isGenerating: false,
-              content,
-              documentId,
-              progress: { phase: "complete", message: "Document ready!" },
-            }));
+            onComplete: (content, documentId) => {
+              setState((prev) => ({
+                ...prev,
+                isGenerating: false,
+                content,
+                documentId,
+                progress: { phase: "complete", message: "Document ready!" },
+              }));
 
-            // Invalidate documents list
-            queryClient.invalidateQueries({ queryKey: documentsKeys.lists() });
-          },
+              // Invalidate documents list
+              queryClient.invalidateQueries({ queryKey: documentsKeys.lists() });
+            },
 
-          onError: (error) => {
-            setState((prev) => ({
-              ...prev,
-              isGenerating: false,
-              error,
-            }));
+            onError: (error) => {
+              setState((prev) => ({
+                ...prev,
+                isGenerating: false,
+                error,
+              }));
+            },
           },
-        });
+          options
+        );
       } catch (error) {
         setState((prev) => ({
           ...prev,

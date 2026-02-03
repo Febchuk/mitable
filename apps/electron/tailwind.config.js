@@ -27,6 +27,32 @@ export default {
           hover: "#4F46E5",
           pressed: "#4338CA",
         },
+        /* New accent system */
+        indigo: {
+          DEFAULT: "#6366F1",
+          light: "#818CF8",
+          muted: "rgba(99, 102, 241, 0.15)",
+        },
+        rose: {
+          DEFAULT: "#F472B6",
+          muted: "rgba(244, 114, 182, 0.15)",
+        },
+        emerald: {
+          DEFAULT: "#34D399",
+          muted: "rgba(52, 211, 153, 0.15)",
+        },
+        /* Text colors with new naming */
+        ink: {
+          primary: "#F4F4F5",
+          secondary: "#A1A1AA",
+          tertiary: "#52525B",
+        },
+        /* Border system */
+        stroke: {
+          subtle: "rgba(255, 255, 255, 0.06)",
+          DEFAULT: "rgba(255, 255, 255, 0.12)",
+          strong: "rgba(255, 255, 255, 0.24)",
+        },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
@@ -51,10 +77,18 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        "background-primary": "#1A1A1A",
-        "background-secondary": "#2A2A2A",
-        "background-elevated": "#3A3A3A",
-        "border-subtle": "#4A4A4A",
+        /* New design system - canvas backgrounds */
+        canvas: {
+          base: "#0C0C0E",
+          raised: "#141418",
+          overlay: "#1C1C22",
+          muted: "#24242C",
+        },
+        /* Legacy mappings for compatibility */
+        "background-primary": "#0C0C0E",
+        "background-secondary": "#141418",
+        "background-elevated": "#1C1C22",
+        "border-subtle": "rgba(255, 255, 255, 0.06)",
         "integration-card": "#3E3D3D",
         "week-inactive": "#292945",
         agent: {
@@ -101,7 +135,9 @@ export default {
         "16px": "16px",
       },
       fontFamily: {
-        sans: ["Manrope", "system-ui", "sans-serif"],
+        sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+        display: ["JetBrains Mono", "monospace"],
+        mono: ["JetBrains Mono", "monospace"],
       },
       fontSize: {
         base: "14px",
@@ -127,34 +163,63 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
         gradient: {
-          "0%, 100%": {
-            "background-position": "0% 50%",
-          },
-          "50%": {
-            "background-position": "100% 50%",
-          },
+          "0%, 100%": { "background-position": "0% 50%" },
+          "50%": { "background-position": "100% 50%" },
+        },
+        "reveal-up": {
+          from: { opacity: "0", transform: "translateY(20px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "reveal-fade": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "hover-lift": {
+          to: { transform: "translateY(-2px)" },
+        },
+        "glow-pulse": {
+          "0%, 100%": { boxShadow: "0 0 8px rgba(99, 102, 241, 0.4)" },
+          "50%": { boxShadow: "0 0 16px rgba(99, 102, 241, 0.6)" },
+        },
+        breathe: {
+          "0%, 100%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.02)" },
+        },
+        "icon-tilt": {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(3deg)" },
+        },
+        shimmer: {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         gradient: "gradient 3s ease infinite",
+        "reveal-up": "reveal-up 0.5s ease-out both",
+        "reveal-fade": "reveal-fade 0.4s ease-out both",
+        "hover-lift": "hover-lift 0.2s ease-out forwards",
+        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
+        breathe: "breathe 3s ease-in-out infinite",
+        "icon-tilt": "icon-tilt 0.2s ease-out forwards",
+        shimmer: "shimmer 2s linear infinite",
+      },
+      transitionDuration: {
+        instant: "50ms",
+        fast: "150ms",
+        normal: "250ms",
+        slow: "400ms",
+        reveal: "600ms",
       },
     },
   },

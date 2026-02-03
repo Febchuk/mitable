@@ -15,9 +15,22 @@
  */
 
 import type { SelectedWindowInfo, WatchableWindow, WatchState } from "@mitable/shared";
+import { desktopCapturer } from "electron";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
 import { isBrowserApp, parseBrowserTitle, isSystemApp } from "../utils/browserTitleParser";
 import { createLogger } from "../lib/logger";
+import { installedAppsService } from "./installedAppsService";
+
+/**
+ * Represents an app that can be added to the block list
+ */
+export interface BlockableApp {
+  normalizedName: string; // Lowercase key for matching
+  originalName: string; // Display name
+  source: "detected" | "installed" | "both"; // How the app was discovered
+  bundleId?: string; // macOS bundle identifier (if from installed apps)
+  path?: string; // Install path (if from installed apps)
+}
 
 const logger = createLogger("WindowDetection");
 // Dynamic import for get-windows (ESM-only package) - see getAllVisibleWindows()
@@ -154,13 +167,24 @@ class WindowDetectionService {
       );
       return watchableWindows;
     } catch (error) {
-      logger.error(" Failed to get windows:", error);
-      logger.error(" Error details:", {
-        name: (error as Error)?.name,
-        message: (error as Error)?.message,
-        stack: (error as Error)?.stack,
-      });
-      throw error; // Re-throw so caller can report the actual error
+      logger.warn(
+        " get-windows failed, trying desktopCapturer fallback:",
+        (error as Error)?.message
+      );
+
+      // Fallback to desktopCapturer when get-windows fails
+      try {
+        return await this.getVisibleWindowsFromDesktopCapturer();
+      } catch (fallbackError) {
+        logger.error(" desktopCapturer fallback also failed:", fallbackError);
+        logger.error(" Error details:", {
+          name: (fallbackError as Error)?.name,
+          message: (fallbackError as Error)?.message,
+          stack: (fallbackError as Error)?.stack,
+        });
+        // Return empty array as last resort - UI will show "No windows available"
+        return [];
+      }
     }
   }
 
@@ -170,6 +194,70 @@ class WindowDetectionService {
   private isMitableWindow(title: string): boolean {
     // Only exclude exact-known titles from our app to avoid false positives
     return this.MITABLE_WINDOW_TITLES.has(title);
+  }
+
+  /**
+   * Fallback window detection using Electron's desktopCapturer
+   * Used when get-windows fails (e.g., permission issues, binary failures)
+   *
+   * Note: desktopCapturer provides less metadata than get-windows but is more reliable
+   */
+  private async getVisibleWindowsFromDesktopCapturer(): Promise<WatchableWindow[]> {
+    logger.info(" Using desktopCapturer fallback for window detection");
+
+    const sources = await desktopCapturer.getSources({
+      types: ["window"],
+      fetchWindowIcons: false,
+    });
+
+    const policy = getCapturePolicy();
+    const watchableWindows: WatchableWindow[] = [];
+
+    for (const source of sources) {
+      const windowTitle = source.name;
+
+      // Skip empty titles
+      if (!windowTitle || windowTitle.trim() === "") {
+        continue;
+      }
+
+      // Skip Mitable windows
+      if (this.isMitableWindow(windowTitle)) {
+        continue;
+      }
+
+      // Extract app name from title (desktopCapturer doesn't provide app name separately)
+      // Common pattern: "Tab Title - App Name" or just "App Name"
+      const titleParts = windowTitle.split(" - ");
+      const appName = titleParts.length > 1 ? titleParts[titleParts.length - 1] : windowTitle;
+
+      // Skip system apps
+      if (isSystemApp(appName)) {
+        continue;
+      }
+
+      // Check capture policy
+      const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
+
+      // Parse browser title for better display
+      const isBrowser = isBrowserApp(appName);
+      const parsed = parseBrowserTitle(windowTitle, appName);
+
+      watchableWindows.push({
+        windowId: source.id, // desktopCapturer uses string IDs like "window:123:0"
+        appName,
+        windowTitle,
+        displayName: parsed.browserDisplayName,
+        tabTitle: isBrowser ? parsed.tabTitle : undefined,
+        isBrowser,
+        bounds: { x: 0, y: 0, width: 0, height: 0 }, // desktopCapturer doesn't provide bounds
+        isBlocked: policyDecision.blocked,
+        blockReason: policyDecision.reason,
+      });
+    }
+
+    logger.info(` desktopCapturer fallback returned ${watchableWindows.length} windows`);
+    return watchableWindows;
   }
 
   /**
@@ -392,6 +480,82 @@ class WindowDetectionService {
    */
   getOriginalAppName(normalizedAppName: string): string | undefined {
     return this.detectedApps.get(normalizedAppName.toLowerCase());
+  }
+
+  /**
+   * Get all blockable apps (merged from detected and installed)
+   * Priority: detected app names take precedence (more accurate from runtime)
+   *
+   * @param forceRefresh - Force a fresh scan of installed apps
+   * @returns Array of blockable apps sorted alphabetically
+   */
+  async getAllBlockableApps(forceRefresh = false): Promise<BlockableApp[]> {
+    const mergedApps = new Map<string, BlockableApp>();
+
+    // 1. Start with detected apps (runtime detected, most accurate names)
+    for (const [normalized, original] of this.detectedApps) {
+      mergedApps.set(normalized, {
+        normalizedName: normalized,
+        originalName: original,
+        source: "detected",
+      });
+    }
+
+    // 2. Merge installed apps
+    try {
+      const installedApps = await installedAppsService.getInstalledApps(forceRefresh);
+
+      for (const app of installedApps) {
+        const existing = mergedApps.get(app.normalizedName);
+
+        if (existing) {
+          // App exists in both - mark as "both" and keep detected name (more accurate)
+          existing.source = "both";
+          // Add additional info from installed apps
+          if (app.bundleId) existing.bundleId = app.bundleId;
+          if (app.path) existing.path = app.path;
+        } else {
+          // Only in installed apps
+          mergedApps.set(app.normalizedName, {
+            normalizedName: app.normalizedName,
+            originalName: app.name,
+            source: "installed",
+            bundleId: app.bundleId,
+            path: app.path,
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn("Error getting installed apps, using detected apps only:", error);
+    }
+
+    // 3. Filter out apps that shouldn't be blockable
+    const filteredApps = Array.from(mergedApps.values()).filter((app) => {
+      const normalized = app.normalizedName.toLowerCase();
+      // Exclude Mitable itself
+      if (normalized === "mitable" || normalized === "electron") {
+        return false;
+      }
+      // Exclude system apps
+      if (isSystemApp(app.originalName)) {
+        return false;
+      }
+      return true;
+    });
+
+    // 4. Sort alphabetically by display name
+    return filteredApps.sort((a, b) =>
+      a.originalName.toLowerCase().localeCompare(b.originalName.toLowerCase())
+    );
+  }
+
+  /**
+   * Refresh the installed apps cache
+   * Call this when user clicks "Refresh App List" button
+   */
+  async refreshInstalledApps(): Promise<void> {
+    await installedAppsService.refreshCache();
+    logger.info("Installed apps cache refreshed");
   }
 
   /**

@@ -9,3 +9,6 @@ export * from "./chats";
 
 // Billing queries
 export * from "./billing";
+
+// Artifacts queries
+export * from "./artifacts";

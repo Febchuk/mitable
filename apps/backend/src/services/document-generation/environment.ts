@@ -16,6 +16,7 @@ export interface DocumentGenerationEnvironment {
   userId: string; // CRITICAL: User ID for data isolation
   dateRange: { start: Date; end: Date } | null;
   query: string;
+  artifactIds?: string[]; // Optional artifact IDs for reference material
 }
 
 export interface SessionMetadata {
@@ -54,7 +55,8 @@ export function createDocumentEnvironment(
   organizationId: string,
   userId: string,
   query: string,
-  dateRange: { start: Date; end: Date } | null
+  dateRange: { start: Date; end: Date } | null,
+  artifactIds?: string[]
 ): DocumentGenerationEnvironment {
   return {
     sessionIds,
@@ -62,6 +64,7 @@ export function createDocumentEnvironment(
     userId,
     dateRange,
     query,
+    artifactIds,
   };
 }
 
@@ -317,4 +320,49 @@ export async function filterSessionsByPriority(
   }
 
   return prioritized;
+}
+
+export interface ArtifactReference {
+  id: string;
+  filename: string;
+  extractedText: string | null;
+  textPreview: string | null;
+}
+
+/**
+ * Get artifact content for reference material
+ */
+export async function getArtifactReferences(
+  env: DocumentGenerationEnvironment
+): Promise<ArtifactReference[]> {
+  if (!env.artifactIds || env.artifactIds.length === 0) {
+    return [];
+  }
+
+  // Note: artifacts table may not exist yet - this will fail gracefully if so
+  try {
+    const artifacts = await db
+      .select({
+        id: schema.artifacts.id,
+        filename: schema.artifacts.filename,
+        extractedText: schema.artifacts.extractedText,
+      })
+      .from(schema.artifacts)
+      .where(
+        and(
+          inArray(schema.artifacts.id, env.artifactIds),
+          eq(schema.artifacts.organizationId, env.organizationId)
+        )
+      );
+
+    return artifacts.map((a) => ({
+      id: a.id,
+      filename: a.filename,
+      extractedText: a.extractedText,
+      textPreview: a.extractedText ? a.extractedText.substring(0, 500) + "..." : null,
+    }));
+  } catch (error) {
+    console.warn("[Environment] Failed to fetch artifacts:", error);
+    return [];
+  }
 }

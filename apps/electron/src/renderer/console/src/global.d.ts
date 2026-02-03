@@ -133,6 +133,24 @@ interface ConsoleAPI {
   addBlockedApp: (userId: string, appName: string) => Promise<{ success: boolean }>;
   removeBlockedApp: (userId: string, appName: string) => Promise<{ success: boolean }>;
   getDetectedApps: () => Promise<Array<{ normalizedName: string; originalName: string }>>;
+  getAllBlockableApps: (forceRefresh?: boolean) => Promise<{
+    success: boolean;
+    apps: Array<{
+      normalizedName: string;
+      originalName: string;
+      source: "detected" | "installed" | "both";
+    }>;
+    error?: string;
+  }>;
+  refreshInstalledApps: () => Promise<{
+    success: boolean;
+    apps: Array<{
+      normalizedName: string;
+      originalName: string;
+      source: "detected" | "installed" | "both";
+    }>;
+    error?: string;
+  }>;
 
   // Notification frequency API (user-scoped)
   getNotificationFrequency: (userId: string) => Promise<number>;
@@ -141,6 +159,47 @@ interface ConsoleAPI {
   // Auto session start API (user-scoped)
   getAutoSessionStart: (userId: string) => Promise<boolean>;
   setAutoSessionStart: (userId: string, enabled: boolean) => Promise<{ success: boolean }>;
+
+  // Summary preferences API
+  getSummaryPreferences: () => Promise<{
+    detailLevel: "concise" | "verbose";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
+    alwaysAskOnSessionEnd: boolean;
+  }>;
+  setSummaryPreferences: (prefs: {
+    detailLevel?: "concise" | "verbose";
+    format?: "bullets" | "paragraphs";
+    includeScreenshots?: boolean;
+    alwaysAskOnSessionEnd?: boolean;
+  }) => Promise<{ success: boolean }>;
+  getSummaryDefaults: () => Promise<{
+    detailLevel: "concise" | "verbose";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
+  }>;
+  setSummaryDefaults: (defaults: {
+    detailLevel?: "concise" | "verbose";
+    format?: "bullets" | "paragraphs";
+    includeScreenshots?: boolean;
+  }) => Promise<{ success: boolean }>;
+  getAlwaysAskOnSessionEnd: () => Promise<boolean>;
+  setAlwaysAskOnSessionEnd: (value: boolean) => Promise<{ success: boolean }>;
+
+  // End session with preferences (called from Console after dialog confirmation)
+  endSessionWithPreferences: (preferences: {
+    detailLevel: "concise" | "verbose";
+    format: "bullets" | "paragraphs";
+    includeScreenshots: boolean;
+  }) => Promise<{
+    success: boolean;
+    sessionId?: string;
+    captureCount?: number;
+    error?: string;
+  }>;
+
+  // Listen for external trigger to show EndSessionDialog (from pill)
+  onShowEndSessionDialog: (callback: () => void) => () => void;
 
   // Hide watching pill
   hidePill: () => void;

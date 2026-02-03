@@ -4,6 +4,7 @@ export default {
   testEnvironment: "node",
   setupFiles: ["<rootDir>/jest.setup.js"],
   extensionsToTreatAsEsm: [".ts"],
+  watchman: false,
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
     "@octokit/app": "<rootDir>/__mocks__/@octokit/app.js",

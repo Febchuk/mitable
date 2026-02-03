@@ -514,3 +514,87 @@ export async function regenerateSummary(
     { method: "POST" }
   );
 }
+
+// ===========================
+// Workstream Types & API
+// ===========================
+
+export type WorkstreamColor = "violet" | "blue" | "pink" | "emerald" | "amber" | "cyan";
+
+export interface TimeSegment {
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+}
+
+export interface SessionWorkstream {
+  id: string;
+  name: string;
+  color: WorkstreamColor;
+  totalDurationMinutes: number;
+  segments: TimeSegment[];
+  appsUsed: string[];
+  captureCount: number;
+  dominantActivity: string;
+  captureIds?: string[];
+}
+
+export interface SessionStats {
+  totalTimeMinutes: number;
+  deepWorkMinutes: number;
+  deepWorkPercent: number;
+  interruptionCount: number;
+  interruptionMinutes: number;
+  longestFocusMinutes: number;
+  longestFocusWorkstream: string;
+}
+
+export interface WorkstreamResponse {
+  workstreams: SessionWorkstream[];
+  sessionStats: SessionStats;
+  sessionStartTime: string;
+  sessionEndTime: string;
+  /** How the workstreams were generated: "rlm" (AI-analyzed) or "heuristic" (pattern matching) */
+  analysisSource?: "rlm" | "heuristic";
+}
+
+/**
+ * Fetch aggregated workstreams for a session with timeline visualization data
+ * Returns workstreams grouped by logical tasks/projects with stats
+ */
+export async function fetchSessionWorkstreams(sessionId: string): Promise<WorkstreamResponse> {
+  return apiRequest<WorkstreamResponse>(`/monitoring/sessions/${sessionId}/workstreams`);
+}
+
+/**
+ * Force analyze workstream response
+ */
+export interface ForceAnalyzeWorkstreamsResponse {
+  success: boolean;
+  message: string;
+  workstreamCount: number;
+  workstreams: Array<{
+    id: string;
+    name: string;
+    color: string;
+    category: string | null;
+    summary: string | null;
+    captureCount: number;
+    totalDurationMinutes: number;
+    appsUsed: string[];
+    isProvisional: boolean;
+  }>;
+}
+
+/**
+ * Force immediate RLM analysis of workstreams
+ * Use this when opening the timeline view to ensure workstreams are up-to-date
+ */
+export async function forceAnalyzeWorkstreams(
+  sessionId: string
+): Promise<ForceAnalyzeWorkstreamsResponse> {
+  return apiRequest<ForceAnalyzeWorkstreamsResponse>(
+    `/monitoring/sessions/${sessionId}/workstreams/analyze`,
+    { method: "POST" }
+  );
+}

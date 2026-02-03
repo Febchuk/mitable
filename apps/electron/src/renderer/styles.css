@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,40 +6,66 @@
 
 @layer base {
   :root {
-    --background: 0 0% 10%; /* #1A1A1A */
-    --foreground: 0 0% 100%; /* #FFFFFF */
+    /* Background layers - warm neutrals */
+    --bg-base: #0C0C0E;
+    --bg-raised: #141418;
+    --bg-overlay: #1C1C22;
+    --bg-muted: #24242C;
 
-    --card: 240 4% 22%; /* #30303e similar to expert card color */
-    --card-foreground: 0 0% 100%;
+    /* Accent colors */
+    --accent-primary: #6366F1;
+    --accent-primary-light: #818CF8;
+    --accent-secondary: #F472B6;
+    --accent-tertiary: #34D399;
 
-    --primary: 221 83% 53%; /* #3B82F6 blue */
+    /* Text hierarchy */
+    --text-primary: #F4F4F5;
+    --text-secondary: #A1A1AA;
+    --text-tertiary: #52525B;
+
+    /* Borders */
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-default: rgba(255, 255, 255, 0.12);
+    --border-strong: rgba(255, 255, 255, 0.24);
+    --border-accent: rgba(99, 102, 241, 0.5);
+
+    /* shadcn/ui compatibility tokens */
+    --background: 240 6% 4%; /* #0C0C0E */
+    --foreground: 240 5% 96%; /* #F4F4F5 */
+
+    --card: 240 6% 8%; /* #141418 */
+    --card-foreground: 240 5% 96%;
+
+    --primary: 239 84% 67%; /* #6366F1 indigo */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 240 5% 13%; /* #1C1C22 */
+    --secondary-foreground: 240 5% 96%;
 
-    --muted: 240 4% 16%;
-    --muted-foreground: 0 0% 63%;
+    --muted: 240 5% 15%; /* #24242C */
+    --muted-foreground: 240 4% 63%;
 
-    --accent: 240 4% 22%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 240 5% 13%;
+    --accent-foreground: 240 5% 96%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 4% 29%;
-    --input: 240 4% 29%;
-    --ring: 221 83% 53%;
+    --border: 240 5% 18%;
+    --input: 240 5% 18%;
+    --ring: 239 84% 67%;
+
+    --radius: 0.625rem;
   }
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: transparent;
+  background: var(--bg-base);
 }
 
 #root {
@@ -99,4 +125,171 @@ body {
 
 .scrollbar-hidden:hover::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.4);
+}
+
+/* ========================================
+   Animation Keyframes & Utilities
+   ======================================== */
+
+/* Page load staggered reveal */
+@keyframes revealUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes revealFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Hover lift effect for cards */
+@keyframes hoverLift {
+  to {
+    transform: translateY(-2px);
+  }
+}
+
+/* Glow pulse for active indicators */
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(99, 102, 241, 0.6);
+  }
+}
+
+/* Subtle breathing animation */
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+/* Icon tilt on hover */
+@keyframes iconTilt {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+
+/* Stagger animation utility classes */
+.stagger-1 { animation: revealUp 0.5s ease-out 0.05s both; }
+.stagger-2 { animation: revealUp 0.5s ease-out 0.1s both; }
+.stagger-3 { animation: revealUp 0.5s ease-out 0.15s both; }
+.stagger-4 { animation: revealUp 0.5s ease-out 0.2s both; }
+.stagger-5 { animation: revealUp 0.5s ease-out 0.25s both; }
+.stagger-6 { animation: revealUp 0.5s ease-out 0.3s both; }
+
+/* Fade stagger variants */
+.fade-stagger-1 { animation: revealFade 0.4s ease-out 0.05s both; }
+.fade-stagger-2 { animation: revealFade 0.4s ease-out 0.1s both; }
+.fade-stagger-3 { animation: revealFade 0.4s ease-out 0.15s both; }
+
+/* Hover effect utilities */
+.hover-lift {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.hover-glow {
+  transition: box-shadow 0.2s ease-out;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+/* Active navigation glow indicator */
+.nav-glow-indicator {
+  position: relative;
+}
+
+.nav-glow-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 24px;
+  background: var(--accent-primary);
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.6);
+}
+
+/* Glass morphism utility */
+.glass {
+  background: rgba(20, 20, 24, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Noise texture overlay */
+.noise-overlay::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.02;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  z-index: 9999;
+}
+
+/* Ambient section glow */
+.section-glow::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 300px;
+  background: radial-gradient(ellipse, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Gradient card overlay */
+.card-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, transparent 50%);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Display font utility */
+.font-display {
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* Text gradient utility */
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-primary-light) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
