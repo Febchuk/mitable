@@ -1,4 +1,4 @@
-import { Layers, Users, BarChart3, Plug, Activity, FileText, CheckSquare } from "lucide-react";
+import { Layers, Users, BarChart3, Plug, Activity, FileText, CheckSquare, Paperclip } from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 import { useSubscription } from "../../hooks/queries/billing";
@@ -19,8 +19,9 @@ export default function Nav() {
     return (
       <nav className="space-y-1 px-2">
         <NavItem to="/monitoring" icon={Activity} label="Sessions" />
-        <NavItem to="/todos" icon={CheckSquare} label="Todos" />
         <NavItem to="/docs" icon={FileText} label="Docs" />
+        <NavItem to="/artefacts" icon={Paperclip} label="Artefacts" />
+        <NavItem to="/todos" icon={CheckSquare} label="Todos" />
       </nav>
     );
   }
@@ -40,8 +41,9 @@ export default function Nav() {
   // Team employee navigation
   return (
     <nav className="space-y-1 px-2">
-      <NavItem to="/docs" icon={FileText} label="Docs" />
       <NavItem to="/monitoring" icon={Activity} label="Sessions" />
+      <NavItem to="/docs" icon={FileText} label="Docs" />
+      <NavItem to="/artefacts" icon={Paperclip} label="Artefacts" />
       <NavItem to="/todos" icon={CheckSquare} label="Todos" />
     </nav>
   );

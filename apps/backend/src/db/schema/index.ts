@@ -14,6 +14,7 @@ export * from "./session-chunks.schema";
 export * from "./workstreams.schema";
 export * from "./documents.schema";
 export * from "./billing.schema";
+export * from "./artifacts.schema";
 
 // GitHub schemas
 export * from "./github/github-repos.schema";
