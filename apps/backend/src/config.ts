@@ -163,6 +163,11 @@ export const config = {
     },
   },
 
+  // Deepgram Configuration (Audio Transcription)
+  deepgram: {
+    apiKey: (process.env.DEEPGRAM_API_KEY || "").trim(),
+  },
+
   // Security
   jwtSecret: process.env.JWT_SECRET || "",
 

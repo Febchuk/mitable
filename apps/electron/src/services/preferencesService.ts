@@ -21,6 +21,12 @@ interface SummaryPreferences {
   alwaysAskOnSessionEnd: boolean; // When true, show dialog; when false, use defaults
 }
 
+interface AudioPreferences {
+  microphoneDeviceId: string | null; // null = default device
+  systemAudioEnabled: boolean;
+  systemAudioOutputId: string | null; // null = default output device
+}
+
 // Preferences schema
 interface PreferencesSchema {
   session: {
@@ -29,6 +35,7 @@ interface PreferencesSchema {
     showPillOnSessionStart: boolean;
   };
   summary: SummaryPreferences;
+  audio: AudioPreferences;
   // User-scoped preferences (keyed by userId)
   users: {
     [userId: string]: {
@@ -51,6 +58,11 @@ const defaults: PreferencesSchema = {
     format: "bullets",
     includeScreenshots: true,
     alwaysAskOnSessionEnd: true, // Default to asking for preferences
+  },
+  audio: {
+    microphoneDeviceId: null, // null = use system default
+    systemAudioEnabled: true, // Default to capturing system audio
+    systemAudioOutputId: null, // null = use system default output
   },
   users: {},
 };
@@ -266,8 +278,31 @@ class PreferencesService {
   setAlwaysAskOnSessionEnd(value: boolean): { success: boolean } {
     return this.setSummaryPreferences({ alwaysAskOnSessionEnd: value });
   }
+
+  // Audio preferences
+  getAudioPreferences(): AudioPreferences {
+    return (
+      (this.store.get("audio") as AudioPreferences) ?? {
+        microphoneDeviceId: null,
+        systemAudioEnabled: true,
+      }
+    );
+  }
+
+  setAudioPreferences(prefs: Partial<AudioPreferences>): { success: boolean } {
+    const current = this.getAudioPreferences();
+    this.store.set("audio", { ...current, ...prefs });
+    logger.info("🎤 Audio preferences updated:", prefs);
+    return { success: true };
+  }
 }
 
 // Export singleton
 export const preferencesService = new PreferencesService();
-export type { PreferencesSchema, SummaryPreferences, SummaryDetailLevel, SummaryFormat };
+export type {
+  PreferencesSchema,
+  SummaryPreferences,
+  SummaryDetailLevel,
+  SummaryFormat,
+  AudioPreferences,
+};

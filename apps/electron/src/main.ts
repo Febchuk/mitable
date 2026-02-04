@@ -17,9 +17,8 @@ import {
 } from "electron";
 import { join } from "path";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
-import { createLogger, initializeLogger } from "./lib/logger";
-import { isBlockedByPolicy } from "./services/capturePolicy";
-import { captureService } from "./services/captureService";
+import { createLogger } from "./lib/logger";
+import { audioWebSocketService } from "./services/audioWebSocketService";
 import { resolveWindowUrlForWatchSelection } from "./services/macWindowFocusService";
 import { windowDetectionService } from "./services/windowDetectionService";
 import { monitoringSessionService } from "./services/monitoringSessionService";
@@ -27,9 +26,8 @@ import { focusWindowTracker } from "./services/focusWindowTracker";
 import { authManager } from "./services/authManager";
 import { preferencesService } from "./services/preferencesService";
 import { updateService } from "./services/updateService";
-
-// Initialize logger before any other code runs
-initializeLogger();
+import { captureService } from "./services/captureService";
+import { isBlockedByPolicy } from "./services/capturePolicy";
 
 // Force dark theme for consistent vibrancy effect regardless of system settings
 nativeTheme.themeSource = "dark";
@@ -255,7 +253,7 @@ function createWatchingPillWindow() {
   const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
 
   const windowWidth = 50; // Just the pill width
-  const windowHeight = 130; // Just the pill height
+  const windowHeight = 180; // Pill height with mic button (increased from 130 to accommodate 4 buttons + rounded caps)
   const rightMargin = 5;
 
   watchingPillWindow = new BrowserWindow({
@@ -1781,6 +1779,111 @@ function setupMonitoringSessionHandlers() {
     return { success: true };
   });
 
+  // Audio recording IPC handlers
+  ipcMain.handle(IPC_CHANNELS.MONITORING_AUDIO_START, async () => {
+    monitoringLogger.info("🎤 Starting audio recording");
+
+    const sessionState = monitoringSessionService.getSessionState();
+    if (!sessionState || !sessionState.id) {
+      return {
+        success: false,
+        hasSystemAudio: false,
+        error: "No active session. Start a monitoring session first.",
+      };
+    }
+
+    // Connect WebSocket to backend for audio streaming
+    // Note: VITE_* env vars are NOT available in main process at runtime
+    const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
+    const backendUrl = app.isPackaged
+      ? PROD_API_URL
+      : process.env.VITE_API_URL || "http://localhost:3000";
+    const wsResult = await audioWebSocketService.connect(sessionState.id, backendUrl);
+
+    if (!wsResult.success) {
+      return {
+        success: false,
+        hasSystemAudio: false,
+        error: wsResult.error,
+      };
+    }
+
+    // Notify backend to start tracking audio recording duration
+    try {
+      const token = authTokens.accessToken;
+      if (token) {
+        await fetch(`${backendUrl}/api/monitoring/sessions/${sessionState.id}/audio/start`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+      }
+    } catch (error) {
+      monitoringLogger.error("Failed to notify backend of audio start:", error);
+      // Don't fail the audio recording if backend notification fails
+    }
+
+    monitoringLogger.info("✅ Audio WebSocket connected, ready for renderer to start capture");
+
+    return {
+      success: true,
+      hasSystemAudio: false, // Will be set by renderer audio service
+    };
+  });
+
+  // Handle audio chunks from renderer
+  ipcMain.on("audio-chunk", (_event, audioBuffer: ArrayBuffer) => {
+    try {
+      const sessionState = monitoringSessionService.getSessionState();
+      if (!sessionState?.id) {
+        monitoringLogger.warn("⚠️ Received audio chunk but no active session");
+        return;
+      }
+
+      // Forward audio chunk to backend via WebSocket
+      audioWebSocketService.sendAudioChunk(audioBuffer);
+    } catch (error) {
+      monitoringLogger.error("❌ Error processing audio chunk:", error);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.MONITORING_AUDIO_STOP, async () => {
+    monitoringLogger.info("🔇 Stopping audio recording");
+
+    const sessionState = monitoringSessionService.getSessionState();
+
+    // Close WebSocket connection to backend
+    audioWebSocketService.disconnect();
+
+    // Notify backend to stop tracking and accumulate duration
+    if (sessionState?.id) {
+      try {
+        const token = authTokens.accessToken;
+        // Note: VITE_* env vars are NOT available in main process at runtime
+        const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
+        const backendUrl = app.isPackaged
+          ? PROD_API_URL
+          : process.env.VITE_API_URL || "http://localhost:3000";
+        if (token) {
+          await fetch(`${backendUrl}/api/monitoring/sessions/${sessionState.id}/audio/stop`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+        }
+      } catch (error) {
+        monitoringLogger.error("Failed to notify backend of audio stop:", error);
+        // Don't fail the stop operation if backend notification fails
+      }
+    }
+
+    return { success: true };
+  });
+
   // Auto session start IPC handlers (user-scoped)
   ipcMain.handle(IPC_CHANNELS.AUTO_SESSION_START_GET, (_, userId: string) => {
     return preferencesService.getUserAutoSessionStart(userId);
@@ -1836,6 +1939,54 @@ function setupMonitoringSessionHandlers() {
   ipcMain.handle(IPC_CHANNELS.ALWAYS_ASK_ON_SESSION_END_SET, (_, value: boolean) => {
     return preferencesService.setAlwaysAskOnSessionEnd(value);
   });
+
+  // Audio preferences IPC handlers
+  ipcMain.handle(IPC_CHANNELS.AUDIO_DEVICES_ENUMERATE, async () => {
+    try {
+      // Request microphone permission first (required to enumerate devices with labels)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Now enumerate devices (labels will be available)
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices
+        .filter((device) => device.kind === "audioinput")
+        .map((device) => ({
+          deviceId: device.deviceId,
+          label: device.label || `Microphone ${device.deviceId.slice(0, 8)}`,
+          groupId: device.groupId,
+        }));
+
+      // Stop the stream since we only needed it for permissions
+      stream.getTracks().forEach((track) => track.stop());
+
+      monitoringLogger.info(`🎤 Found ${audioInputs.length} audio input devices`);
+      return { success: true, devices: audioInputs };
+    } catch (error) {
+      monitoringLogger.error("Failed to enumerate audio devices:", error);
+      return {
+        success: false,
+        devices: [],
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AUDIO_PREFERENCES_GET, () => {
+    return preferencesService.getAudioPreferences();
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.AUDIO_PREFERENCES_SET,
+    (
+      _,
+      prefs: {
+        microphoneDeviceId?: string | null;
+        systemAudioEnabled?: boolean;
+      }
+    ) => {
+      return preferencesService.setAudioPreferences(prefs);
+    }
+  );
 
   // End session with preferences (called from Console after dialog confirmation)
   ipcMain.handle(

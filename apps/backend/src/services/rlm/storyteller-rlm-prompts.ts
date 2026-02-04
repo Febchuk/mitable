@@ -24,9 +24,23 @@ export function getStorytellerSystemPrompt(): string {
 
 <role>
 You have access to an environment containing:
-- timeline: Array of activities with descriptions and timestamps
+- timeline: Array of activities with descriptions and timestamps (brief, classifier-generated)
+- fullTranscriptText: Complete audio transcripts from the session (rich, verbatim speech)
 - metadata: Session information (duration, dates, etc.)
 - preferences: User's formatting preferences (style, format)
+
+AUDIO TRANSCRIPTS:
+The fullTranscriptText contains verbatim speech with timestamps and speaker IDs.
+Use this to:
+- Add semantic depth to brief activity descriptions
+- Understand the "why" behind actions (intent, reasoning, collaboration)
+- Identify key discussions, decisions, and blockers mentioned verbally
+- Surface important context that visual screenshots alone cannot capture
+
+Example integration:
+- Activity: "Debugging authentication function"
+- Audio: "[8:47] Speaker 0: The JWT token keeps expiring. [8:48] Speaker 1: Try increasing it to 24 hours"
+- Enriched narrative: "Debugged JWT token expiration issue, increasing timeout from 1 to 24 hours based on team discussion"
 </role>
 
 <available_tools>
@@ -40,9 +54,11 @@ ${toolDescriptions}
    - Call summarize_chunk() on each chunk recursively
    - Call merge_summaries() to combine chunk summaries into final narrative
 3. For small timelines (<50 activities):
-   - Optionally call filter_by_priority() to focus on key activities
-   - Call get_activities() to retrieve relevant activities
-   - Generate summary directly or use merge_summaries() for coherence
+   - **CRITICAL: If fullTranscriptText is available, you MUST call summarize_chunk() to access it**
+   - The audio transcript is ONLY accessible through summarize_chunk() - it's not in get_activities()
+   - Without calling summarize_chunk(), you'll miss all the rich verbal context (intent, reasoning, decisions)
+   - For sessions with transcripts: chunk_timeline(all activities) → summarize_chunk(0, end) → return that summary
+   - For sessions without transcripts: optionally filter_by_priority() → get_activities() → generate directly
 4. Always respect user preferences for style (verbose/concise) and format (bullets/paragraphs)
 </strategy>
 
@@ -50,8 +66,11 @@ ${toolDescriptions}
 TOOL USAGE:
 - Call tools one at a time, wait for results before deciding next step
 - Use chunk_timeline for timelines with >50 activities
+- **AUDIO TRANSCRIPT ACCESS: fullTranscriptText is ONLY passed to summarize_chunk(), not get_activities()**
+- **If you see fullTranscriptText is available, you MUST call summarize_chunk() to access it**
+- **For small sessions with audio: Don't skip straight to generating - call summarize_chunk() first**
 - Cache is automatic - don't worry about redundant calls
-- Be efficient - don't over-chunk small timelines
+- Be efficient - but never skip transcript integration for brevity
 - IGNORE technical sensor artifacts: Skip activities like "No visual change", "Analysis inconclusive", "No change detected" - these are system observations, not user actions
 
 CORE OBJECTIVE:
@@ -229,7 +248,8 @@ BAD (third person):
  */
 export function getStorytellerUserPrompt(
   currentState: string,
-  previousResults: Array<{ tool: string; result: any }>
+  previousResults: Array<{ tool: string; result: any }>,
+  environment: any
 ): string {
   const resultsText =
     previousResults.length > 0
@@ -238,10 +258,16 @@ export function getStorytellerUserPrompt(
           .join("\n\n")
       : "No tools called yet - this is the first step";
 
+  const transcriptNotice = environment.fullTranscriptText
+    ? `\n\n🎤 IMPORTANT: Audio transcripts are available for this session (${environment.fullTranscriptText.length} characters).
+You MUST call summarize_chunk() to access them - they are NOT in get_activities().
+Without calling summarize_chunk(), you will miss critical verbal context.`
+    : "\n\nNo audio transcripts available for this session.";
+
   return `Current State: ${currentState}
 
 Previous Tool Results:
-${resultsText}
+${resultsText}${transcriptNotice}
 
 What tool should you call next? Or are you ready to return the final summary?`;
 }

@@ -15,8 +15,8 @@
  */
 
 import { db } from "../db/client";
-import { sessionCaptures, sessionSummaries } from "../db/schema/index";
-import { eq, desc, and, isNotNull, asc } from "drizzle-orm";
+import { sessionCaptures, sessionTranscripts, sessionSummaries } from "../db/schema";
+import { eq, and, isNotNull, asc, desc } from "drizzle-orm";
 import { createSessionLogger, createTimer, CHECKPOINTS } from "../lib/sessionLogger";
 import { storytellerRLMService } from "./rlm/storyteller-rlm.service";
 
@@ -83,7 +83,38 @@ class MasterStoryService {
         return "No activity recorded in this session.";
       }
 
-      // 2. Calculate session metadata
+      // 2. Fetch ALL audio transcripts for rich narrative context
+      const transcripts = await db.query.sessionTranscripts.findMany({
+        where: eq(sessionTranscripts.sessionId, options.sessionId),
+        orderBy: [asc(sessionTranscripts.startTime)],
+        columns: {
+          speakerId: true,
+          transcript: true,
+          startTime: true,
+          endTime: true,
+          confidence: true,
+        },
+      });
+
+      // Build full transcript text for storyteller
+      const fullTranscriptText =
+        transcripts.length > 0
+          ? transcripts
+              .map((t) => {
+                const time = new Date(t.startTime).toLocaleTimeString();
+                return `[${time}] Speaker ${t.speakerId}: ${t.transcript}`;
+              })
+              .join("\n")
+          : undefined;
+
+      if (fullTranscriptText) {
+        log.info("Audio transcripts available for storyteller", {
+          transcriptCount: transcripts.length,
+          totalCharacters: fullTranscriptText.length,
+        });
+      }
+
+      // 3. Calculate session metadata
       const sessionStart = timeline[0]?.capturedAt;
       const sessionEnd = timeline[timeline.length - 1]?.capturedAt;
       const durationMinutes =
@@ -101,15 +132,17 @@ class MasterStoryService {
 
       log.debug("Invoking Storyteller RLM", {
         activityCount: timeline.length,
+        transcriptCount: transcripts.length,
         durationMinutes,
         style: options.formatPreference.style,
         format: options.formatPreference.format,
       });
 
-      // 3. Use Storyteller RLM for recursive summarization
+      // 4. Use Storyteller RLM for recursive summarization
       const rlmResult = await storytellerRLMService.generateSummary({
         sessionId: options.sessionId,
         timeline,
+        fullTranscriptText, // Full audio context for rich narrative
         metadata,
         preferences: options.formatPreference,
       });

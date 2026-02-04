@@ -57,6 +57,8 @@ export const IPC_CHANNELS = {
   MONITORING_SESSION_RESET: "monitoring-session-reset", // Reset/clear session state (after external delete)
   MONITORING_CAPTURE_TAKEN: "monitoring-capture-taken", // Notify when capture is taken
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress", // Capture count update
+  MONITORING_AUDIO_START: "monitoring-audio-start", // Start audio recording for session
+  MONITORING_AUDIO_STOP: "monitoring-audio-stop", // Stop audio recording for session
 
   // Session Recovery (crash recovery)
   SESSION_GET_RECOVERABLE: "session-get-recoverable", // Get list of recoverable sessions
@@ -90,6 +92,13 @@ export const IPC_CHANNELS = {
   SUMMARY_DEFAULTS_SET: "summary-defaults-set",
   ALWAYS_ASK_ON_SESSION_END_GET: "always-ask-on-session-end-get",
   ALWAYS_ASK_ON_SESSION_END_SET: "always-ask-on-session-end-set",
+
+  // Audio preferences
+  AUDIO_DEVICES_ENUMERATE: "audio-devices-enumerate", // Get list of available microphones
+  AUDIO_PREFERENCES_GET: "audio-preferences-get", // Get audio settings
+  AUDIO_PREFERENCES_SET: "audio-preferences-set", // Save audio settings
+  AUDIO_TEST_START: "audio-test-start", // Start mic test with level monitoring
+  AUDIO_TEST_STOP: "audio-test-stop", // Stop mic test
 
   // End session dialog coordination (pill → console)
   SHOW_END_SESSION_DIALOG: "show-end-session-dialog", // Main → Console: trigger dialog

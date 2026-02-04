@@ -199,6 +199,23 @@ interface ConsoleAPI {
   getAlwaysAskOnSessionEnd: () => Promise<boolean>;
   setAlwaysAskOnSessionEnd: (value: boolean) => Promise<{ success: boolean }>;
 
+  // Audio preferences API
+  enumerateAudioDevices: () => Promise<{
+    success: boolean;
+    devices: Array<{ deviceId: string; label: string; groupId: string }>;
+    error?: string;
+  }>;
+  getAudioPreferences: () => Promise<{
+    microphoneDeviceId: string | null;
+    systemAudioEnabled: boolean;
+    systemAudioOutputId: string | null;
+  }>;
+  setAudioPreferences: (prefs: {
+    microphoneDeviceId?: string | null;
+    systemAudioEnabled?: boolean;
+    systemAudioOutputId?: string | null;
+  }) => Promise<{ success: boolean }>;
+
   // End session with preferences (called from Console after dialog confirmation)
   endSessionWithPreferences: (preferences: {
     detailLevel: "concise" | "verbose";

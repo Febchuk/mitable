@@ -61,6 +61,11 @@ export default defineConfig({
           format: "cjs", // CommonJS has native __dirname (ESM import.meta.dirname needs Node 20.11+)
           entryFileNames: "[name].cjs", // .cjs extension ensures CommonJS despite "type": "module" in package.json
         },
+        external: [
+          // WebSocket optional dependencies (native modules, not needed in Electron)
+          "bufferutil",
+          "utf-8-validate",
+        ],
       },
     },
   },

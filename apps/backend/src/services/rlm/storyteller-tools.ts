@@ -196,10 +196,15 @@ export const SUMMARIZE_CHUNK: RLMTool = {
       })
       .join("\n");
 
+    // Include audio transcripts if available
+    const transcriptSection = env.fullTranscriptText
+      ? `\n\nAudio Transcripts:\n${env.fullTranscriptText}\n\nUse the audio transcripts to enrich the summary with verbal context (why, intent, decisions mentioned).`
+      : "";
+
     const prompt = `Summarize these activities concisely (2-4 sentences max). Focus on outcomes and meaningful work.
 
 Activities:
-${activitiesText}
+${activitiesText}${transcriptSection}
 
 Summary:`;
 
@@ -209,12 +214,15 @@ Summary:`;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
+        const systemPrompt = env.fullTranscriptText
+          ? "You are a concise work summarizer with access to both visual activity logs and audio transcripts. Use the audio transcripts to understand the WHY behind actions - intent, reasoning, decisions, and context that screenshots alone cannot capture. Enrich the summary with this verbal context."
+          : "You are a concise work summarizer. Before summarizing, analyze the activities to identify patterns, outcomes, and meaningful progress. Think through what the user actually accomplished and filter out noise.";
+
         const completion = await groq.chat.completions.create({
           messages: [
             {
               role: "system",
-              content:
-                "You are a concise work summarizer. Before summarizing, analyze the activities to identify patterns, outcomes, and meaningful progress. Think through what the user actually accomplished and filter out noise.",
+              content: systemPrompt,
             },
             {
               role: "user",
@@ -314,12 +322,15 @@ Final Summary:`;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
+        const mergeSystemPrompt = env.fullTranscriptText
+          ? "You are an expert editor who combines summaries into cohesive narratives. The chunk summaries were enriched with audio transcripts showing the user's verbal explanations. Preserve this rich context (intent, reasoning, decisions) in the final narrative. Before writing, analyze the chunk summaries to identify the overall arc, key themes, and most important outcomes. Write in first person."
+          : "You are an expert editor who combines summaries into cohesive narratives. Before writing, analyze the chunk summaries to identify the overall arc, key themes, and most important outcomes. Think critically about what truly matters. Write in first person.";
+
         const completion = await groq.chat.completions.create({
           messages: [
             {
               role: "system",
-              content:
-                "You are an expert editor who combines summaries into cohesive narratives. Before writing, analyze the chunk summaries to identify the overall arc, key themes, and most important outcomes. Think critically about what truly matters. Write in first person.",
+              content: mergeSystemPrompt,
             },
             {
               role: "user",

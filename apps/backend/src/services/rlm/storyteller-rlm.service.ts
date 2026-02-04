@@ -20,6 +20,7 @@ import { createTimer } from "../../lib/sessionLogger";
 export interface StorytellerRLMInput {
   sessionId: string;
   timeline: Activity[];
+  fullTranscriptText?: string; // Complete session audio transcripts for narrative enrichment
   metadata: SessionMetadata;
   preferences: UserPreferences;
 }
@@ -61,13 +62,14 @@ class StorytellerRLMService {
     // Initialize environment
     const environment = new StorytellerEnvironment(
       input.timeline,
+      input.fullTranscriptText, // Full audio context for narrative richness
       input.metadata,
       input.preferences
     );
 
     // Build conversation — accumulated across iterations so LLM sees its own reasoning
     const systemPrompt = getStorytellerSystemPrompt();
-    const initialUserPrompt = getStorytellerUserPrompt("start", []);
+    const initialUserPrompt = getStorytellerUserPrompt("start", [], environment);
     const messages: Array<{ role: string; content: string }> = [
       { role: "system", content: systemPrompt },
       { role: "user", content: initialUserPrompt },

@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect, useCallback, useRef } from "react";
+import { useState, FormEvent, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import {
   Eye,
   EyeOff,
@@ -139,6 +139,20 @@ export default function UserProfilePage() {
   });
   const [alwaysAskOnSessionEnd, setAlwaysAskOnSessionEnd] = useState<boolean>(true);
   const [isSummaryPrefsLoading, setIsSummaryPrefsLoading] = useState(true);
+
+  // Audio preferences state
+  const [audioDevices, setAudioDevices] = useState<
+    Array<{ deviceId: string; label: string; groupId: string }>
+  >([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<
+    Array<{ deviceId: string; label: string; groupId: string }>
+  >([]);
+  const [selectedMicId, setSelectedMicId] = useState<string | null>(null);
+  const [selectedOutputId, setSelectedOutputId] = useState<string | null>(null);
+  const [systemAudioEnabled, setSystemAudioEnabled] = useState<boolean>(true);
+  const [isAudioPrefsLoading, setIsAudioPrefsLoading] = useState(true);
+  const [isMicTesting, setIsMicTesting] = useState(false);
+  const [micLevel, setMicLevel] = useState(0); // 0-100 for visual feedback
 
   // OAuth polling interval refs - for cleanup on unmount
   const linearPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -419,6 +433,255 @@ export default function UserProfilePage() {
     }
   };
 
+  // Audio preferences functions
+  const loadAudioPreferences = useCallback(async () => {
+    try {
+      setIsAudioPrefsLoading(true);
+
+      // Enumerate devices directly in renderer (where navigator.mediaDevices works)
+      try {
+        // CRITICAL: Request permission first to get device labels
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Now enumerate - labels will be available after permission granted
+        const devices = await navigator.mediaDevices.enumerateDevices();
+
+        const audioInputs = devices
+          .filter((device) => device.kind === "audioinput")
+          .map((device) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Microphone ${device.deviceId.slice(0, 8)}`,
+            groupId: device.groupId || "",
+          }));
+
+        const audioOutputs = devices
+          .filter((device) => device.kind === "audiooutput")
+          .map((device) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Speaker ${device.deviceId.slice(0, 8)}`,
+            groupId: device.groupId || "",
+          }));
+
+        // Stop the permission stream - we only needed it for labels
+        stream.getTracks().forEach((track) => track.stop());
+
+        setAudioDevices(audioInputs);
+        setAudioOutputDevices(audioOutputs);
+        logger.info(`Found ${audioInputs.length} microphones and ${audioOutputs.length} speakers`);
+      } catch (error) {
+        logger.error("Failed to enumerate audio devices:", error);
+        setAudioDevices([]);
+        setAudioOutputDevices([]);
+      }
+
+      // Load saved preferences
+      const prefs = await window.consoleAPI.getAudioPreferences();
+      setSelectedMicId(prefs.microphoneDeviceId);
+      setSelectedOutputId(prefs.systemAudioOutputId || null);
+      setSystemAudioEnabled(prefs.systemAudioEnabled);
+    } catch (error) {
+      logger.error("Error loading audio preferences:", error);
+    } finally {
+      setIsAudioPrefsLoading(false);
+    }
+  }, []);
+
+  const handleMicrophoneChange = async (deviceId: string) => {
+    try {
+      const result = await window.consoleAPI.setAudioPreferences({
+        microphoneDeviceId: deviceId === "default" ? null : deviceId,
+      });
+
+      if (result.success) {
+        setSelectedMicId(deviceId === "default" ? null : deviceId);
+        toast({
+          title: "Microphone updated",
+          description: "Your microphone preference has been saved",
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting microphone:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save microphone preference",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSystemAudioToggle = async (enabled: boolean) => {
+    try {
+      const result = await window.consoleAPI.setAudioPreferences({
+        systemAudioEnabled: enabled,
+      });
+
+      if (result.success) {
+        setSystemAudioEnabled(enabled);
+        toast({
+          title: "System audio updated",
+          description: enabled
+            ? "System audio will be captured during recordings"
+            : "Only microphone will be captured during recordings",
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting system audio:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save system audio preference",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOutputDeviceChange = async (deviceId: string) => {
+    try {
+      const result = await window.consoleAPI.setAudioPreferences({
+        systemAudioOutputId: deviceId === "default" ? null : deviceId,
+      });
+
+      if (result.success) {
+        setSelectedOutputId(deviceId === "default" ? null : deviceId);
+        const deviceLabel =
+          deviceId === "default"
+            ? "System Default"
+            : audioOutputDevices.find((d) => d.deviceId === deviceId)?.label || "Unknown";
+        toast({
+          title: "Output device updated",
+          description: `System audio will be captured from: ${deviceLabel}`,
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting output device:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save output device preference",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Mic test functionality
+  const testMicrophoneRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  const startMicTest = async () => {
+    try {
+      setIsMicTesting(true);
+
+      // Get audio stream from selected device or default
+      const constraints: MediaStreamConstraints = {
+        audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true,
+      };
+
+      logger.info("Starting mic test with constraints:", constraints);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      testMicrophoneRef.current = stream;
+
+      // Log which device is actually being used
+      const tracks = stream.getAudioTracks();
+      if (tracks.length > 0) {
+        logger.info("Using microphone:", tracks[0].label, "ID:", tracks[0].id);
+      }
+
+      // Create audio context and analyser
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      const microphone = audioContext.createMediaStreamSource(stream);
+
+      analyser.fftSize = 2048; // Larger for better resolution
+      analyser.smoothingTimeConstant = 0.3; // Smoother but still responsive
+      microphone.connect(analyser);
+
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
+      // Start monitoring audio levels using TIME DOMAIN data (amplitude)
+      const dataArray = new Uint8Array(analyser.fftSize);
+      let frameCount = 0;
+      const updateLevel = () => {
+        if (!analyserRef.current) return;
+
+        // Use getByteTimeDomainData for amplitude detection (better for voice)
+        analyserRef.current.getByteTimeDomainData(dataArray);
+
+        // Calculate RMS using raw byte values (0-255)
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i] * dataArray[i];
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+
+        // Convert to percentage (0-100) - 128 is silence, values above/below indicate sound
+        const deviation = Math.abs(rms - 128);
+        // Amplify by 25x for visible response during normal speech
+        const level = Math.min(100, Math.round((deviation / 128) * 100 * 25));
+
+        // Debug logging - log every 30 frames (~0.5 seconds)
+        frameCount++;
+        if (frameCount % 30 === 0) {
+          console.log("🎤 Audio Debug:", {
+            firstFewBytes: Array.from(dataArray.slice(0, 10)),
+            rms: rms.toFixed(2),
+            deviation: deviation.toFixed(2),
+            level,
+            min: Math.min(...dataArray),
+            max: Math.max(...dataArray),
+            average: (dataArray.reduce((a, b) => a + b, 0) / dataArray.length).toFixed(2),
+          });
+        }
+
+        setMicLevel(level);
+        animationFrameRef.current = requestAnimationFrame(updateLevel);
+      };
+
+      updateLevel();
+      logger.info("Mic test started successfully");
+    } catch (error) {
+      logger.error("Failed to start mic test:", error);
+      toast({
+        title: "Mic test failed",
+        description: "Could not access microphone. Check permissions.",
+        variant: "destructive",
+      });
+      setIsMicTesting(false);
+    }
+  };
+
+  const stopMicTest = () => {
+    // Stop animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    // Stop audio stream
+    if (testMicrophoneRef.current) {
+      testMicrophoneRef.current.getTracks().forEach((track) => track.stop());
+      testMicrophoneRef.current = null;
+    }
+
+    // Close audio context
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    analyserRef.current = null;
+    setIsMicTesting(false);
+    setMicLevel(0);
+  };
+
+  // Cleanup mic test on unmount
+  useEffect(() => {
+    return () => {
+      if (isMicTesting) {
+        stopMicTest();
+      }
+    };
+  }, [isMicTesting]);
+
   const handleSummaryDefaultChange = async (
     key: "detailLevel" | "format" | "includeScreenshots",
     value: string | boolean
@@ -488,12 +751,24 @@ export default function UserProfilePage() {
     "Learning",
   ];
 
+  // Force scroll to top before any render
+  useLayoutEffect(() => {
+    const scrollableElement = document.querySelector(".overflow-y-auto");
+    if (scrollableElement) {
+      scrollableElement.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, []);
+
   useEffect(() => {
     loadLinearStatus();
     loadGmailStatus();
     loadNotionStatus();
     loadAppVersion();
     loadUserProfile();
+    loadAudioPreferences(); // Load audio devices and preferences
     if (user?.id) {
       loadBlockList();
       loadAllBlockableApps();
@@ -508,6 +783,7 @@ export default function UserProfilePage() {
     loadNotificationFrequency,
     loadAutoSessionStart,
     loadSummaryPreferences,
+    loadAudioPreferences,
   ]);
 
   const loadUserProfile = async () => {
@@ -1842,6 +2118,190 @@ export default function UserProfilePage() {
                         />
                       )}
                     </div>
+                  </div>
+
+                  {/* Audio Settings Section */}
+                  <div className="pt-6 border-t border-border-subtle space-y-4">
+                    <div className="flex items-center gap-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-text-tertiary"
+                      >
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        <line x1="12" x2="12" y1="19" y2="22" />
+                      </svg>
+                      <h3 className="text-heading-4 text-white">Audio Recording</h3>
+                    </div>
+                    <p className="text-body-sm text-text-tertiary">
+                      Configure your microphone and system audio for session recordings
+                    </p>
+
+                    {isAudioPrefsLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                      </div>
+                    ) : (
+                      <>
+                        {/* Microphone Selection */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-text-primary">
+                            Microphone
+                          </Label>
+                          <select
+                            value={selectedMicId || "default"}
+                            onChange={(e) => handleMicrophoneChange(e.target.value)}
+                            className="w-full px-3 py-2 bg-[#2a2a2a] border border-border-subtle rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-[#323232] transition-colors [&>option]:bg-[#2a2a2a] [&>option]:text-white [&>option]:py-2"
+                            style={{
+                              colorScheme: "dark",
+                            }}
+                          >
+                            <option value="default" className="bg-[#2a2a2a] text-white">
+                              System Default (Auto-detect)
+                            </option>
+                            {audioDevices.map((device) => (
+                              <option
+                                key={device.deviceId}
+                                value={device.deviceId}
+                                className="bg-[#2a2a2a] text-white"
+                              >
+                                {device.label}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-text-tertiary">
+                            System Default will automatically use whichever microphone your computer
+                            is currently using. Select a specific device to override this behavior.
+                          </p>
+                        </div>
+
+                        {/* System Audio Toggle */}
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5 flex-1 pr-4">
+                            <Label
+                              htmlFor="system-audio-toggle"
+                              className="text-sm font-medium text-text-primary cursor-pointer"
+                            >
+                              Capture System Audio
+                            </Label>
+                            <p className="text-xs text-text-tertiary">
+                              Record audio from apps (Zoom, Slack, browser audio, etc.)
+                            </p>
+                          </div>
+                          <Switch
+                            id="system-audio-toggle"
+                            checked={systemAudioEnabled}
+                            onCheckedChange={handleSystemAudioToggle}
+                            className="flex-shrink-0"
+                          />
+                        </div>
+
+                        {/* System Audio Output Device Selection - only show when enabled */}
+                        {systemAudioEnabled && (
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-text-primary">
+                              System Audio Source
+                            </Label>
+                            <select
+                              value={selectedOutputId || "default"}
+                              onChange={(e) => handleOutputDeviceChange(e.target.value)}
+                              className="w-full px-3 py-2 bg-[#2a2a2a] border border-border-subtle rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-[#323232] transition-colors [&>option]:bg-[#2a2a2a] [&>option]:text-white [&>option]:py-2"
+                              style={{
+                                colorScheme: "dark",
+                              }}
+                            >
+                              <option value="default" className="bg-[#2a2a2a] text-white">
+                                System Default (Auto-detect)
+                              </option>
+                              {audioOutputDevices.map((device) => (
+                                <option
+                                  key={device.deviceId}
+                                  value={device.deviceId}
+                                  className="bg-[#2a2a2a] text-white"
+                                >
+                                  {device.label}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-text-tertiary">
+                              Choose which speakers/output to monitor. If your monitor speakers
+                              aren't working, select your physical speakers instead.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Mic Test Button with Level Visualization */}
+                        <div className="space-y-3 pt-2">
+                          <button
+                            onClick={() => {
+                              if (isMicTesting) {
+                                stopMicTest();
+                              } else {
+                                startMicTest();
+                              }
+                            }}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              isMicTesting
+                                ? "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40"
+                                : "bg-accent-primary hover:bg-accent-primary/90 text-white"
+                            }`}
+                          >
+                            {isMicTesting ? "Stop Testing" : "Test Microphone"}
+                          </button>
+
+                          {/* Audio Level Visualization */}
+                          {isMicTesting && (
+                            <div className="space-y-2">
+                              <p className="text-xs text-text-tertiary">
+                                Speak into your microphone to see audio levels
+                              </p>
+                              <div className="flex items-center justify-center gap-1 h-16 px-3 py-2 bg-[#1a1a1a] rounded-lg border border-border-subtle">
+                                {/* Waveform Visualization - 20 dots expanding from center */}
+                                {Array.from({ length: 20 }).map((_, i) => {
+                                  // Calculate distance from center (0 = center, 10 = edges)
+                                  const center = 10;
+                                  const distanceFromCenter = Math.abs(i - center);
+
+                                  // Convert distance to threshold (center activates first at low levels)
+                                  const threshold = (distanceFromCenter / 10) * 100;
+                                  const active = micLevel > threshold;
+
+                                  // Silent state: 4px circle
+                                  // Active state: 3px wide, stretch up to 48px tall
+                                  const isActive = active && micLevel > 5;
+                                  const barHeight = isActive
+                                    ? Math.max(8, Math.min(48, (micLevel / 100) * 48))
+                                    : 4;
+                                  const barWidth = isActive ? 3 : 4;
+
+                                  return (
+                                    <div
+                                      key={i}
+                                      className="transition-all duration-75"
+                                      style={{
+                                        width: `${barWidth}px`,
+                                        height: `${barHeight}px`,
+                                        backgroundColor: isActive ? "#10b981" : "#4b5563",
+                                        borderRadius: isActive ? "2px" : "50%",
+                                        opacity: isActive ? 1 : 0.5,
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Block List Section */}
