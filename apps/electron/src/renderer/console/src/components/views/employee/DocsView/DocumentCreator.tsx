@@ -35,6 +35,7 @@ const SUGGESTIONS = [
 ];
 
 const PHASE_ICONS: Record<string, any> = {
+  indexing_sessions: Database,
   searching_sessions: Search,
   analyzing_data: Database,
   drafting: PenTool,
@@ -43,6 +44,7 @@ const PHASE_ICONS: Record<string, any> = {
 };
 
 const PHASE_LABELS: Record<string, string> = {
+  indexing_sessions: "Indexing Sessions",
   searching_sessions: "Searching Sessions",
   analyzing_data: "Analyzing Data",
   drafting: "Drafting Document",
@@ -53,7 +55,7 @@ const PHASE_LABELS: Record<string, string> = {
 export default function DocumentCreator({ onClose }: DocumentCreatorProps) {
   const navigate = useNavigate();
   const [input, setInput] = useState("");
-  const { generate, isGenerating, content, documentId, progress, error } =
+  const { generate, reset, isGenerating, content, documentId, progress, error } =
     useGenerateDocumentStream();
 
   const handleGenerate = async () => {
@@ -241,7 +243,7 @@ export default function DocumentCreator({ onClose }: DocumentCreatorProps) {
                 <Button
                   onClick={() => {
                     setInput("");
-                    window.location.reload();
+                    reset(); // Reset hook state instead of reloading entire page
                   }}
                   variant="outline"
                   className="w-full border-border-subtle"
