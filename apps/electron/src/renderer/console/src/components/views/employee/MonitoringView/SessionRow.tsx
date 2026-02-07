@@ -15,13 +15,18 @@ interface SessionRowProps {
   style?: CSSProperties;
 }
 
-function formatTime(dateString: string): string {
+function formatSessionDateTime(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleTimeString("en-US", {
+  const formattedDate = date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  const formattedTime = date.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
   });
+  return `${formattedDate} • ${formattedTime}`;
 }
 
 // Get status config for visual treatment
@@ -87,8 +92,8 @@ export default function SessionRow({ session, onClick, style }: SessionRowProps)
       />
 
       {/* Time */}
-      <span className="w-20 flex-shrink-0 pl-2 text-sm tabular-nums text-ink-secondary">
-        {formatTime(session.startedAt)}
+      <span className="w-36 flex-shrink-0 pl-2 text-sm tabular-nums text-ink-secondary">
+        {formatSessionDateTime(session.startedAt)}
       </span>
 
       {/* Session Title */}

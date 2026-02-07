@@ -65,6 +65,9 @@ class WindowDetectionService {
   // Track if we've logged the permission warning to avoid spam
   private permissionWarningLogged = false;
 
+  // Track which RDP/Citrix windows we've already logged (to avoid spam every 2s)
+  private rdpWindowsLogged: Set<string> = new Set();
+
   // Track apps that have been detected (for block list management)
   // Key: normalized app name (lowercase), Value: original app name
   private detectedApps: Map<string, string> = new Map();
@@ -160,6 +163,48 @@ class WindowDetectionService {
           blocked: policyDecision.blocked,
           reason: policyDecision.reason,
         });
+      }
+
+      // Supplement with desktopCapturer to catch windows that get-windows misses
+      // (e.g., Citrix HDX Engine, RDP child windows)
+      try {
+        const dcSources = await desktopCapturer.getSources({
+          types: ["window"],
+          fetchWindowIcons: false,
+        });
+
+        const knownTitles = new Set(watchableWindows.map((w) => w.windowTitle));
+
+        for (const source of dcSources) {
+          const title = source.name;
+          if (!title || title.trim() === "" || knownTitles.has(title)) continue;
+          if (this.isMitableWindow(title)) continue;
+
+          const titleParts = title.split(" - ");
+          const dcAppName =
+            titleParts.length > 1 ? titleParts[titleParts.length - 1] : title;
+          if (isSystemApp(dcAppName)) continue;
+
+          const dcPolicy = isBlockedByPolicy(title, dcAppName, policy);
+          const dcIsBrowser = isBrowserApp(dcAppName);
+          const dcParsed = parseBrowserTitle(title, dcAppName);
+
+          watchableWindows.push({
+            windowId: source.id,
+            appName: dcAppName,
+            windowTitle: title,
+            displayName: dcParsed.browserDisplayName,
+            tabTitle: dcIsBrowser ? dcParsed.tabTitle : undefined,
+            isBrowser: dcIsBrowser,
+            bounds: { x: 0, y: 0, width: 0, height: 0 },
+            isBlocked: dcPolicy.blocked,
+            blockReason: dcPolicy.reason,
+          });
+
+          logger.info(` [desktopCapturer supplement] Found: ${dcAppName} - ${title.substring(0, 50)}`);
+        }
+      } catch (dcError) {
+        logger.warn(" desktopCapturer supplement failed (non-fatal):", (dcError as Error)?.message);
       }
 
       logger.info(
@@ -417,9 +462,10 @@ class WindowDetectionService {
     this.selectedWindows.clear();
     logger.info(` Cleared all ${count} windows from watch list`);
 
-    // Also clear last detected OS windows when we stop watching
+    // Also clear last detected OS windows and log tracking when we stop watching
     const lastDetectedCount = this.lastDetectedWindows.size;
     this.lastDetectedWindows.clear();
+    this.rdpWindowsLogged.clear();
     logger.info(
       `[WindowDetectionService] Cleared ${lastDetectedCount} entries from lastDetectedWindows`
     );
@@ -577,8 +623,27 @@ class WindowDetectionService {
       // Find selected windows that are no longer open
       const closedWindows: SelectedWindowInfo[] = [];
 
+      // RDP/Citrix patterns — these apps are invisible to get-windows
+      // so absence from the enumeration is NOT proof of closure
+      const rdpPatterns = ["citrix", "hdx", "wfica", "remote desktop", "mstsc", "vmware horizon", "vmconnect"];
+      const isRdpApp = (name: string) => {
+        const lower = name.toLowerCase();
+        return rdpPatterns.some((p) => lower.includes(p));
+      };
+
       for (const [windowId, windowInfo] of this.selectedWindows) {
         if (!openWindowIds.has(windowId)) {
+          // Skip RDP/Citrix — get-windows can't see them even when open
+          if (isRdpApp(windowInfo.appName)) {
+            // Log only once per window to avoid spam (checkForClosedWindows runs every 2s)
+            if (!this.rdpWindowsLogged.has(windowId)) {
+              this.rdpWindowsLogged.add(windowId);
+              logger.info(
+                `[WindowDetectionService] Keeping RDP/Citrix window (invisible to get-windows): ${windowInfo.appName} [${windowId}]`
+              );
+            }
+            continue;
+          }
           closedWindows.push(windowInfo);
           this.selectedWindows.delete(windowId);
           logger.info(

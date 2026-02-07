@@ -91,19 +91,31 @@ export default function SessionDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
+
   // Poll for updates while session is summarizing
   const { data: session, isLoading: isLoadingSession } = useSession(sessionId || "", {
     pollWhileSummarizing: true,
   });
+  const sessionStatus = optimisticStatus ?? session?.status;
   const { data: summaryData, isLoading: isLoadingSummary } = useSessionSummary(
     sessionId || "",
-    session?.status // Pass status for conditional polling
+    sessionStatus // Pass status for conditional polling
   );
   const { data: slackChannels = [], isLoading: isLoadingChannels } = useSlackChannels();
   const { data: slackUsers = [], isLoading: isLoadingUsers } = useSlackUsers();
 
+  const summary =
+    summaryData?.summary?.narrativeSummary ||
+    summaryData?.finalSummary ||
+    summaryData?.rawSummary ||
+    "";
+  const hasSummary = summary.trim().length > 0;
+  const uiStatus = hasSummary ? "ready" : sessionStatus;
+  const isEndingState = sessionStatus === "summarizing" && !hasSummary;
+
   // Fetch progressive story (polls while session is active/paused)
-  const { data: storyData } = useSessionStory(sessionId || "", session?.status);
+  const { data: storyData } = useSessionStory(sessionId || "", uiStatus);
 
   const updateSummaryMutation = useUpdateSummary();
   const deliverSummaryMutation = useDeliverSummary();
@@ -147,6 +159,29 @@ export default function SessionDetail() {
       navigate(`/monitoring/${sessionId}`, { replace: true });
     }
   }, [location.search, sessionId, navigate]);
+
+  // Show summary toast when navigated from pill with silent end-session flow
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get("summaryToast") === "true") {
+      toast({
+        title: "Session Ended",
+        description: "Generating your master story...",
+      });
+      setOptimisticStatus("summarizing");
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId || "") });
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+      // Clean up URL param (replace to avoid back button issues)
+      navigate(`/monitoring/${sessionId}`, { replace: true });
+    }
+  }, [location.search, sessionId, navigate, toast, queryClient]);
+
+  useEffect(() => {
+    if (!optimisticStatus) return;
+    if (hasSummary) {
+      setOptimisticStatus(null);
+    }
+  }, [optimisticStatus, hasSummary]);
 
   // Listen for session updates from watch pill (e.g., pause/resume)
   useEffect(() => {
@@ -411,6 +446,7 @@ export default function SessionDetail() {
   }) => {
     if (!sessionId) return;
 
+    setOptimisticStatus("summarizing");
     setIsEnding(true);
     try {
       // Map style to detailLevel for API
@@ -474,6 +510,7 @@ export default function SessionDetail() {
       });
     } catch (error) {
       logger.error("Error ending session:", error);
+      setOptimisticStatus(null);
       toast({
         title: "Error",
         description: "Failed to end session properly.",
@@ -575,13 +612,6 @@ export default function SessionDetail() {
     );
   }
 
-  // RLM summary is in summaryData.summary.narrativeSummary (from session_summaries table)
-  // Fallback to old fields for backward compatibility
-  const summary =
-    summaryData?.summary?.narrativeSummary ||
-    summaryData?.finalSummary ||
-    summaryData?.rawSummary ||
-    "";
   const isDelivered = session.deliveryStatus === "delivered";
 
   // AI Edit Mode - full screen split-pane editor
@@ -615,7 +645,7 @@ export default function SessionDetail() {
           </Button>
           <div>
             <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
-              {session.name === "Work session" && session.status === "summarizing" ? (
+              {session.name === "Work session" && uiStatus === "summarizing" ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="animate-spin" size={20} />
                   Generating title...
@@ -628,130 +658,148 @@ export default function SessionDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {session.status === "active" && (
+          {isEndingState ? (
+            <div className="flex items-center gap-2 rounded-md bg-background-elevated px-3 py-2 text-text-secondary">
+              <Loader2 className="animate-spin" size={16} />
+              Ending session...
+            </div>
+          ) : (
             <>
-              <Button
-                onClick={handlePauseSession}
-                disabled={isPauseLoading}
-                variant="outline"
-                className="gap-2"
-              >
-                {isPauseLoading ? (
-                  <Loader2 className="animate-spin" size={16} />
+              {uiStatus === "active" && (
+                <>
+                  <Button
+                    onClick={handlePauseSession}
+                    disabled={isPauseLoading}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {isPauseLoading ? (
+                      <Loader2 className="animate-spin" size={16} />
+                    ) : (
+                      <Pause size={16} />
+                    )}
+                    Pause
+                  </Button>
+                  <Button
+                    onClick={handleEndButtonClick}
+                    disabled={isEnding}
+                    className="gap-2 bg-status-error text-white hover:bg-status-error/90"
+                  >
+                    {isEnding ? (
+                      <Loader2 className="animate-spin" size={16} />
+                    ) : (
+                      <Square size={16} />
+                    )}
+                    End Session
+                  </Button>
+                </>
+              )}
+              {uiStatus === "paused" && (
+                <>
+                  <Button
+                    onClick={handleResumeSession}
+                    disabled={isPauseLoading}
+                    className="gap-2 bg-status-success text-white hover:bg-status-success/90"
+                  >
+                    {isPauseLoading ? (
+                      <Loader2 className="animate-spin" size={16} />
+                    ) : (
+                      <Play size={16} />
+                    )}
+                    Resume
+                  </Button>
+                  <Button
+                    onClick={handleEndButtonClick}
+                    disabled={isEnding}
+                    variant="outline"
+                    className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
+                  >
+                    {isEnding ? (
+                      <Loader2 className="animate-spin" size={16} />
+                    ) : (
+                      <Square size={16} />
+                    )}
+                    End Session
+                  </Button>
+                </>
+              )}
+              {uiStatus !== "active" &&
+                uiStatus !== "paused" &&
+                (isDelivered ? (
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium text-emerald bg-emerald/10">
+                      Delivered
+                    </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1 text-text-secondary hover:text-text-primary hover:bg-transparent"
+                        >
+                          <RefreshCw size={14} />
+                          Resend
+                          <ChevronDown size={14} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={handleLinearClick} disabled={!summary}>
+                          <SiLinear className="w-4 h-4 mr-2 text-[#5E6AD2]" />
+                          Send to Linear
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setIsDeliveryDialogOpen(true)}
+                          disabled={!summary}
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          Send to Slack
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setIsEmailDialogOpen(true)}
+                          disabled={!summary}
+                        >
+                          <Mail className="w-4 h-4 mr-2" />
+                          Send via Email
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 ) : (
-                  <Pause size={16} />
-                )}
-                Pause
-              </Button>
-              <Button
-                onClick={handleEndButtonClick}
-                disabled={isEnding}
-                className="gap-2 bg-status-error text-white hover:bg-status-error/90"
-              >
-                {isEnding ? <Loader2 className="animate-spin" size={16} /> : <Square size={16} />}
-                End Session
-              </Button>
-            </>
-          )}
-          {session.status === "paused" && (
-            <>
-              <Button
-                onClick={handleResumeSession}
-                disabled={isPauseLoading}
-                className="gap-2 bg-status-success text-white hover:bg-status-success/90"
-              >
-                {isPauseLoading ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Play size={16} />
-                )}
-                Resume
-              </Button>
-              <Button
-                onClick={handleEndButtonClick}
-                disabled={isEnding}
-                variant="outline"
-                className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
-              >
-                {isEnding ? <Loader2 className="animate-spin" size={16} /> : <Square size={16} />}
-                End Session
-              </Button>
-            </>
-          )}
-          {session.status !== "active" &&
-            session.status !== "paused" &&
-            (isDelivered ? (
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-full text-xs font-medium text-emerald bg-emerald/10">
-                  Delivered
-                </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                  <>
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1 text-text-secondary hover:text-text-primary hover:bg-transparent"
+                      onClick={handleLinearClick}
+                      disabled={!summary}
+                      className="gap-2 border border-[#5E6AD2] text-[#5E6AD2] bg-transparent hover:bg-[#5E6AD2]/10 focus-visible:outline-none focus-visible:ring-0"
                     >
-                      <RefreshCw size={14} />
-                      Resend
-                      <ChevronDown size={14} />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={handleLinearClick} disabled={!summary}>
-                      <SiLinear className="w-4 h-4 mr-2 text-[#5E6AD2]" />
+                      <SiLinear size={14} />
                       Send to Linear
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
+                    </Button>
+                    <Button
                       onClick={() => setIsDeliveryDialogOpen(true)}
                       disabled={!summary}
+                      className="gap-2 bg-primary text-white hover:bg-primary/90"
                     >
-                      <Send className="w-4 h-4 mr-2" />
+                      <Send size={16} />
                       Send to Slack
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
+                    </Button>
+                    <Button
                       onClick={() => setIsEmailDialogOpen(true)}
                       disabled={!summary}
+                      variant="outline"
+                      className="gap-2"
                     >
-                      <Mail className="w-4 h-4 mr-2" />
+                      <Mail size={16} />
                       Send via Email
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ) : (
-              <>
-                <Button
-                  onClick={handleLinearClick}
-                  disabled={!summary}
-                  className="gap-2 border border-[#5E6AD2] text-[#5E6AD2] bg-transparent hover:bg-[#5E6AD2]/10 focus-visible:outline-none focus-visible:ring-0"
-                >
-                  <SiLinear size={14} />
-                  Send to Linear
-                </Button>
-                <Button
-                  onClick={() => setIsDeliveryDialogOpen(true)}
-                  disabled={!summary}
-                  className="gap-2 bg-primary text-white hover:bg-primary/90"
-                >
-                  <Send size={16} />
-                  Send to Slack
-                </Button>
-                <Button
-                  onClick={() => setIsEmailDialogOpen(true)}
-                  disabled={!summary}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  <Mail size={16} />
-                  Send via Email
-                </Button>
-              </>
-            ))}
+                    </Button>
+                  </>
+                ))}
+            </>
+          )}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsDeleteDialogOpen(true)}
+            disabled={isEndingState}
             className="text-status-error hover:text-status-error hover:bg-status-error/10"
           >
             <Trash2 size={18} />
@@ -788,7 +836,7 @@ export default function SessionDetail() {
       </div>
 
       {/* Progressive Story Section - Shows during active/paused sessions */}
-      {storyData?.story && (session?.status === "active" || session?.status === "paused") && (
+      {storyData?.story && (uiStatus === "active" || uiStatus === "paused") && (
         <div className="space-y-3">
           <button
             onClick={() => setIsStoryExpanded(!isStoryExpanded)}
@@ -834,7 +882,7 @@ export default function SessionDetail() {
           </h2>
           <div className="flex items-center gap-2">
             {/* DEV ONLY: Regenerate button - hidden in production */}
-            {import.meta.env.DEV && session.status === "ready" && (
+            {import.meta.env.DEV && uiStatus === "ready" && (
               <Button
                 variant="ghost"
                 onClick={async () => {
@@ -888,7 +936,7 @@ export default function SessionDetail() {
         ) : (
           <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-8 text-center">
             <p className="text-sm text-ink-secondary">
-              {session.status === "summarizing"
+              {uiStatus === "summarizing"
                 ? "Generating summary..."
                 : "No summary available for this session."}
             </p>
@@ -897,10 +945,10 @@ export default function SessionDetail() {
       </div>
 
       {/* Workstream Timeline (new visualization) */}
-      <SessionTimeline sessionId={sessionId || ""} sessionStatus={session?.status} />
+      <SessionTimeline sessionId={sessionId || ""} sessionStatus={sessionStatus} />
 
       {/* Activity Timeline (original) */}
-      <ActivityTimeline sessionId={sessionId || ""} sessionStatus={session?.status} />
+      <ActivityTimeline sessionId={sessionId || ""} sessionStatus={sessionStatus} />
 
       {/* Top-K Frames Gallery - Shows after session ends */}
       {session.topKFrames && session.topKFrames.length > 0 && (

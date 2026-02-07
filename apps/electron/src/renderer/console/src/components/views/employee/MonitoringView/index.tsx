@@ -15,12 +15,34 @@ import { Input } from "@/components/ui/input";
 import SessionRow from "./SessionRow";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
 
-// Group sessions by date category
+// Group sessions by date category (calendar week based on user locale)
+function getFirstDayOfWeek(): number {
+  try {
+    const locale = new Intl.Locale(Intl.DateTimeFormat().resolvedOptions().locale);
+    const firstDay = (locale as { weekInfo?: { firstDay?: number } }).weekInfo?.firstDay;
+    if (typeof firstDay === "number") {
+      return firstDay === 7 ? 0 : firstDay; // 7 (Sunday) -> 0
+    }
+  } catch {
+    // Fall through to default
+  }
+  return 1; // Default to Monday if locale week info is unavailable
+}
+
+function getStartOfWeek(date: Date, firstDayOfWeek: number): Date {
+  const dayIndex = date.getDay(); // 0 (Sun) -> 6 (Sat)
+  const diff = (dayIndex - firstDayOfWeek + 7) % 7;
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  start.setDate(start.getDate() - diff);
+  return start;
+}
+
 function groupSessionsByDate(sessions: SessionListItem[]) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 86400000);
-  const weekAgo = new Date(today.getTime() - 7 * 86400000);
+  const firstDayOfWeek = getFirstDayOfWeek();
+  const weekStart = getStartOfWeek(today, firstDayOfWeek);
 
   const groups: { label: string; sessions: SessionListItem[] }[] = [
     { label: "Today", sessions: [] },
@@ -41,7 +63,7 @@ function groupSessionsByDate(sessions: SessionListItem[]) {
       groups[0].sessions.push(session);
     } else if (sessionDay.getTime() >= yesterday.getTime()) {
       groups[1].sessions.push(session);
-    } else if (sessionDay.getTime() >= weekAgo.getTime()) {
+    } else if (sessionDay.getTime() >= weekStart.getTime()) {
       groups[2].sessions.push(session);
     } else {
       groups[3].sessions.push(session);

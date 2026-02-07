@@ -22,6 +22,7 @@ export const IPC_CHANNELS = {
   AUTH_GET_TOKEN: "auth-get-token",
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
+  AUTH_SESSION_RESTORED: "auth-session-restored", // Main → Renderer: push tokens restored from keychain on startup
 
   // User context (cross-window user info sharing)
   USER_CONTEXT_SET: "user-context-set",
@@ -29,6 +30,7 @@ export const IPC_CHANNELS = {
 
   // Navigation (cross-window routing)
   NAVIGATE_TO_ACTIVE_SESSION: "navigate-to-active-session",
+  NAVIGATE_TO_SESSION_DETAIL: "navigate-to-session-detail",
 
   // Watching Pill system (Update Buddy)
   WATCHING_PILL_TOGGLE: "watching-pill-toggle",

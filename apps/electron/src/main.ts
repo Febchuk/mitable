@@ -62,6 +62,10 @@ let notificationAutoHideTimer: NodeJS.Timeout | null = null;
 let eyeDropdownLastHidden = 0;
 let menuDropdownLastHidden = 0;
 
+// Track whether dropdown webContents have finished loading (first-open data send timing)
+let eyeDropdownReady = false;
+let menuDropdownReady = false;
+
 // Interval for checking if watched windows are still open
 let closedWindowCheckInterval: NodeJS.Timeout | null = null;
 
@@ -382,6 +386,11 @@ function createWatchingPillEyeDropdown() {
 
   watchingPillEyeDropdown.on("closed", () => {
     watchingPillEyeDropdown = null;
+    eyeDropdownReady = false;
+  });
+
+  watchingPillEyeDropdown.webContents.once("did-finish-load", () => {
+    eyeDropdownReady = true;
   });
 
   if (!app.isPackaged) {
@@ -437,6 +446,11 @@ function createWatchingPillMenuDropdown() {
 
   watchingPillMenuDropdown.on("closed", () => {
     watchingPillMenuDropdown = null;
+    menuDropdownReady = false;
+  });
+
+  watchingPillMenuDropdown.webContents.once("did-finish-load", () => {
+    menuDropdownReady = true;
   });
 
   if (!app.isPackaged) {
@@ -679,12 +693,16 @@ function setupIPC() {
     authTokens.accessToken = accessToken;
     authTokens.refreshToken = refreshToken;
 
-    // Update centralized auth manager (used by services like monitoringSessionService)
-    authManager.setTokens(accessToken, refreshToken);
+    // Update centralized auth manager + persist refresh token to OS keychain
+    const userCtx = currentUserContext
+      ? { orgId: currentUserContext.organizationId, userId: currentUserContext.userId }
+      : undefined;
 
-    // Confirm token is now available in authManager
-    authLogger.info(" Auth manager token state after sync:", {
-      managerHasToken: !!authManager.getAccessToken(),
+    authManager.setTokens(accessToken, refreshToken, userCtx).then(() => {
+      authLogger.info(" Auth manager token state after sync:", {
+        managerHasToken: !!authManager.getAccessToken(),
+        persistedToKeychain: !!userCtx,
+      });
     });
 
     // Broadcast token update to all windows
@@ -708,8 +726,16 @@ function setupIPC() {
     authTokens.accessToken = null;
     authTokens.refreshToken = null;
 
-    // Clear centralized auth manager
-    authManager.clearTokens();
+    // Clear centralized auth manager + keychain
+    const userCtx = currentUserContext
+      ? { orgId: currentUserContext.organizationId, userId: currentUserContext.userId }
+      : undefined;
+
+    authManager.clearTokens(userCtx).then(() => {
+      authLogger.info(" Auth manager and keychain cleared");
+    });
+
+    currentUserContext = null;
 
     // Broadcast token clear to all windows
     const allWindows = [consoleWindow, watchingPillWindow];
@@ -778,39 +804,47 @@ function setupIPC() {
         height: 280,
       });
 
-      // Get selected windows synchronously (fast) and show dropdown immediately with loading state
-      const selectedWindows = windowDetectionService.getSelectedWindows();
+      // Helper: send initial + async data to the eye dropdown
+      const sendEyeData = async () => {
+        if (!watchingPillEyeDropdown || watchingPillEyeDropdown.isDestroyed()) return;
 
-      // Send initial data with loading state - dropdown appears immediately
-      watchingPillEyeDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
-        type: "eye",
-        selectedWindows,
-        availableWindows: [],
-        isLoading: true,
-      });
+        // Send initial data with loading state
+        const selectedWindows = windowDetectionService.getSelectedWindows();
+        watchingPillEyeDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
+          type: "eye",
+          selectedWindows,
+          availableWindows: [],
+          isLoading: true,
+        });
 
-      // Show dropdown immediately - no waiting for window list
+        // Fetch available windows asynchronously, then update
+        let availableWindows: WatchableWindow[] = [];
+        try {
+          availableWindows = await windowDetectionService.getAllVisibleWindows();
+        } catch (error) {
+          watchingPillLogger.error(" Failed to get visible windows:", error);
+        }
+
+        if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
+          watchingPillEyeDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
+            type: "eye",
+            selectedWindows: windowDetectionService.getSelectedWindows(),
+            availableWindows,
+            isLoading: false,
+          });
+        }
+      };
+
+      // Show dropdown immediately
       watchingPillEyeDropdown.show();
       watchingPillEyeDropdown.focus();
 
-      // Fetch available windows asynchronously, then update dropdown
-      // Wrap getAllVisibleWindows in try-catch since get-windows can fail
-      // (e.g., permission issues, binary not found)
-      let availableWindows: WatchableWindow[] = [];
-      try {
-        availableWindows = await windowDetectionService.getAllVisibleWindows();
-      } catch (error) {
-        watchingPillLogger.error(" Failed to get visible windows:", error);
-        // Continue with empty available windows - user can still see selected ones
-      }
-
-      // Send updated data with available windows (loading complete)
-      if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
-        watchingPillEyeDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
-          type: "eye",
-          selectedWindows: windowDetectionService.getSelectedWindows(), // Refresh in case changed
-          availableWindows,
-          isLoading: false,
+      // Defer data send until renderer is ready (first open) or send immediately (re-open)
+      if (eyeDropdownReady) {
+        sendEyeData();
+      } else {
+        watchingPillEyeDropdown.webContents.once("did-finish-load", () => {
+          sendEyeData();
         });
       }
     }
@@ -858,18 +892,30 @@ function setupIPC() {
         height: 100,
       });
 
-      // Get session state and send to dropdown
-      const sessionState = monitoringSessionService.getSessionState();
-      const selectedWindows = windowDetectionService.getSelectedWindows();
+      // Helper: send session data to the menu dropdown
+      const sendMenuData = () => {
+        if (!watchingPillMenuDropdown || watchingPillMenuDropdown.isDestroyed()) return;
+        const sessionState = monitoringSessionService.getSessionState();
+        const selectedWindows = windowDetectionService.getSelectedWindows();
+        watchingPillMenuDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
+          type: "menu",
+          sessionState,
+          selectedWindows,
+        });
+      };
 
-      watchingPillMenuDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
-        type: "menu",
-        sessionState,
-        selectedWindows,
-      });
-
+      // Show dropdown immediately
       watchingPillMenuDropdown.show();
       watchingPillMenuDropdown.focus();
+
+      // Defer data send until renderer is ready (first open) or send immediately (re-open)
+      if (menuDropdownReady) {
+        sendMenuData();
+      } else {
+        watchingPillMenuDropdown.webContents.once("did-finish-load", () => {
+          sendMenuData();
+        });
+      }
     }
   });
 
@@ -947,15 +993,40 @@ function setupIPC() {
           // Check if user wants to be asked for summary preferences
           const alwaysAsk = preferencesService.getAlwaysAskOnSessionEnd();
 
-          if (alwaysAsk) {
-            // Open Console and trigger the EndSessionDialog
-            monitoringLogger.info(" Always ask is enabled - showing Console with dialog");
+          const sessionState = monitoringSessionService.getSessionState();
+          if (!sessionState?.id) {
+            monitoringLogger.warn(" No active session found for end-session action");
+            return { success: false, error: "No active session" };
+          }
+
+          const sessionId = sessionState.id;
+
+          const sendToConsole = (send: () => void) => {
+            if (!consoleWindow || consoleWindow.isDestroyed()) {
+              createConsoleWindow();
+            }
+
             if (consoleWindow && !consoleWindow.isDestroyed()) {
               consoleWindow.show();
               consoleWindow.focus();
-              // Send event to Console to show EndSessionDialog
-              consoleWindow.webContents.send(IPC_CHANNELS.SHOW_END_SESSION_DIALOG);
+
+              if (consoleWindow.webContents.isLoading()) {
+                consoleWindow.webContents.once("did-finish-load", send);
+              } else {
+                send();
+              }
             }
+          };
+
+          if (alwaysAsk) {
+            // Open Console and trigger the EndSessionDialog
+            monitoringLogger.info(" Always ask is enabled - showing Console with dialog");
+            sendToConsole(() => {
+              consoleWindow?.webContents.send(IPC_CHANNELS.NAVIGATE_TO_SESSION_DETAIL, {
+                sessionId,
+                openEndDialog: true,
+              });
+            });
             return { success: true, dialogTriggered: true };
           }
 
@@ -963,52 +1034,64 @@ function setupIPC() {
           monitoringLogger.info(" Using stored summary defaults (dialog disabled)");
           const summaryDefaults = preferencesService.getSummaryDefaults();
 
-          // 1. End Electron-side capture loop and get captures
-          const result = await monitoringSessionService.endSession();
+          sendToConsole(() => {
+            consoleWindow?.webContents.send(IPC_CHANNELS.NAVIGATE_TO_SESSION_DETAIL, {
+              sessionId,
+              showSummaryToast: true,
+            });
+          });
 
-          if (!result.success || !result.sessionId) {
-            return result;
-          }
+          const runEndSession = async () => {
+            // 1. End Electron-side capture loop and get captures
+            const result = await monitoringSessionService.endSession();
 
-          // 2. Upload captures and end backend session with defaults
-          try {
-            // Upload captures if any exist
-            if (result.captures && result.captures.length > 0) {
-              monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
-              await authManager.authenticatedFetch(
-                `/api/monitoring/sessions/${result.sessionId}/captures`,
-                {
-                  method: "POST",
-                  body: JSON.stringify({ captures: result.captures }),
-                }
-              );
+            if (!result.success || !result.sessionId) {
+              return result;
             }
 
-            // End backend session with stored preferences
-            monitoringLogger.info(` Triggering backend summarization with defaults`);
-            await authManager.authenticatedFetch(
-              `/api/monitoring/sessions/${result.sessionId}/end`,
-              {
-                method: "POST",
-                body: JSON.stringify({
-                  preferences: {
-                    detailLevel: summaryDefaults.detailLevel,
-                    format: summaryDefaults.format,
-                    includeScreenshots: summaryDefaults.includeScreenshots,
-                  },
-                }),
+            // 2. Upload captures and end backend session with defaults
+            try {
+              // Upload captures if any exist
+              if (result.captures && result.captures.length > 0) {
+                monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
+                await authManager.authenticatedFetch(
+                  `/api/monitoring/sessions/${result.sessionId}/captures`,
+                  {
+                    method: "POST",
+                    body: JSON.stringify({ captures: result.captures }),
+                  }
+                );
               }
-            );
-          } catch (error) {
-            monitoringLogger.error(" Error:", error);
-          }
 
-          // Hide watching pill after successful end
-          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-            watchingPillWindow.hide();
-          }
+              // End backend session with stored preferences
+              monitoringLogger.info(` Triggering backend summarization with defaults`);
+              await authManager.authenticatedFetch(
+                `/api/monitoring/sessions/${result.sessionId}/end`,
+                {
+                  method: "POST",
+                  body: JSON.stringify({
+                    preferences: {
+                      detailLevel: summaryDefaults.detailLevel,
+                      format: summaryDefaults.format,
+                      includeScreenshots: summaryDefaults.includeScreenshots,
+                    },
+                  }),
+                }
+              );
+            } catch (error) {
+              monitoringLogger.error(" Error:", error);
+            }
 
-          return result;
+            // Hide watching pill after successful end
+            if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+              watchingPillWindow.hide();
+            }
+
+            return result;
+          };
+
+          void runEndSession();
+          return { success: true, background: true };
         }
         case "show-console": {
           if (consoleWindow && !consoleWindow.isDestroyed()) {
@@ -1047,6 +1130,19 @@ function setupIPC() {
     (_event, user: { userId: string; organizationId: string }) => {
       consoleLogger.info(" Set:", user);
       currentUserContext = user;
+
+      // If tokens are already in memory but weren't persisted to keychain
+      // (because user context wasn't available yet), persist now.
+      if (authTokens.refreshToken) {
+        authManager
+          .setTokens(authTokens.accessToken!, authTokens.refreshToken, {
+            orgId: user.organizationId,
+            userId: user.userId,
+          })
+          .then(() => {
+            authLogger.info("Refresh token persisted to keychain after user context set");
+          });
+      }
     }
   );
 
@@ -2142,6 +2238,52 @@ app.whenReady().then(async () => {
 
   setupIPC();
   registerGlobalShortcuts();
+
+  // Restore auth session from OS keychain (survives app restarts)
+  try {
+    const restored = await authManager.restoreSession();
+    if (restored) {
+      authLogger.info("Session restored from keychain on startup", {
+        userId: restored.userId,
+        orgId: restored.organizationId,
+      });
+
+      // Populate in-memory token cache
+      authTokens.accessToken = restored.accessToken;
+      authTokens.refreshToken = restored.refreshToken;
+
+      // Restore user context so subsequent IPC handlers can persist to keychain
+      currentUserContext = {
+        userId: restored.userId,
+        organizationId: restored.organizationId,
+      };
+
+      // Push restored tokens to the console renderer once it's ready
+      const pushTokensToConsole = () => {
+        if (consoleWindow && !consoleWindow.isDestroyed()) {
+          consoleWindow.webContents.send(IPC_CHANNELS.AUTH_SESSION_RESTORED, {
+            accessToken: restored.accessToken,
+            refreshToken: restored.refreshToken,
+          });
+          authLogger.info("Restored tokens pushed to console renderer");
+        }
+      };
+
+      // Console may still be loading — wait for dom-ready then push
+      if (consoleWindow && !consoleWindow.isDestroyed()) {
+        if (consoleWindow.webContents.isLoading()) {
+          consoleWindow.webContents.once("did-finish-load", pushTokensToConsole);
+        } else {
+          // Already loaded (unlikely at this point but safe)
+          pushTokensToConsole();
+        }
+      }
+    } else {
+      authLogger.info("No session to restore — user will need to log in");
+    }
+  } catch (error) {
+    authLogger.error("Session restore failed on startup:", error);
+  }
 
   // Setup powerMonitor listeners for auto session start
   setupPowerMonitor();

@@ -89,6 +89,7 @@ files:
   - "node_modules/active-win/**/*"
   - "node_modules/msgpackr-extract/**/*"
   - "node_modules/electron-log/**/*"
+  - "node_modules/keytar/**/*"
   # Exclude everything else
   - "!src"
   - "!**/*.{ts,tsx,map}"
@@ -102,6 +103,7 @@ asarUnpack:
   - "node_modules/get-windows/**/*"
   - "node_modules/active-win/**/*"
   - "node_modules/msgpackr-extract/**/*"
+  - "node_modules/keytar/**/*"
 
 # Build artifact configuration
 artifactName: "${productName}-${version}-${arch}.${ext}"

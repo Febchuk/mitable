@@ -3,16 +3,35 @@
  *
  * Centralized auth token storage for the Electron main process.
  * Used by services that need to make authenticated API calls.
+ *
+ * Token strategy:
+ * - Access token  → memory only (short-lived, refreshed frequently)
+ * - Refresh token → OS keychain via keychainService (survives app restarts)
+ *
+ * On startup, `restoreSession()` retrieves the refresh token from the
+ * keychain, calls /auth/refresh, and populates the in-memory access token
+ * so all main-process services work immediately — no re-login required.
  */
 
 import { app } from "electron";
+import { keychainService } from "./keychainService";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger("AuthManager");
 
 // Production API URL (Railway) - must match renderer config
 const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
 
+export interface RestoredSession {
+  accessToken: string;
+  refreshToken: string;
+  userId: string;
+  organizationId: string;
+}
+
 class AuthManager {
   private accessToken: string | null = null;
-  private _refreshToken: string | null = null; // Stored for future refresh logic
+  private _refreshToken: string | null = null;
   private apiBaseUrl: string;
 
   constructor() {
@@ -24,19 +43,36 @@ class AuthManager {
   }
 
   /**
-   * Set auth tokens (called from IPC handler in main.ts)
+   * Set auth tokens in memory (called from IPC handler in main.ts).
+   * Optionally persists the refresh token to the OS keychain when
+   * orgId + userId are provided.
    */
-  setTokens(accessToken: string, refreshToken: string): void {
+  async setTokens(
+    accessToken: string,
+    refreshToken: string,
+    userContext?: { orgId: string; userId: string }
+  ): Promise<void> {
     this.accessToken = accessToken;
     this._refreshToken = refreshToken;
+
+    if (userContext) {
+      await keychainService.saveRefreshToken(userContext.orgId, userContext.userId, refreshToken);
+    }
   }
 
   /**
-   * Clear auth tokens (called on logout)
+   * Clear auth tokens from memory AND from the OS keychain.
    */
-  clearTokens(): void {
+  async clearTokens(userContext?: { orgId: string; userId: string }): Promise<void> {
     this.accessToken = null;
     this._refreshToken = null;
+
+    if (userContext) {
+      await keychainService.clearRefreshToken(userContext.orgId, userContext.userId);
+    } else {
+      // No specific user — wipe all stored credentials
+      await keychainService.clearAll();
+    }
   }
 
   /**
@@ -47,7 +83,7 @@ class AuthManager {
   }
 
   /**
-   * Get current refresh token (for future token refresh logic)
+   * Get current refresh token
    */
   getRefreshToken(): string | null {
     return this._refreshToken;
@@ -58,6 +94,99 @@ class AuthManager {
    */
   getApiBaseUrl(): string {
     return this.apiBaseUrl;
+  }
+
+  /**
+   * Attempt to restore a session from the OS keychain on startup.
+   *
+   * 1. Find all stored Mitable credentials in the keychain
+   * 2. Pick the first one (single-user desktop app)
+   * 3. Call /auth/refresh with the stored refresh token
+   * 4. On success → populate memory tokens and return session info
+   * 5. On failure → clear stale credential and return null
+   */
+  async restoreSession(): Promise<RestoredSession | null> {
+    logger.info("Attempting session restore from keychain…");
+
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY_MS = 2000;
+
+    try {
+      const credentials = await keychainService.findAllCredentials();
+
+      if (credentials.length === 0) {
+        logger.info("No stored credentials — fresh start");
+        return null;
+      }
+
+      // Use the first credential (single-user assumption)
+      const { account, password: storedRefreshToken } = credentials[0];
+      const [orgId, userId] = account.split(":");
+
+      if (!orgId || !userId || !storedRefreshToken) {
+        logger.warn("Malformed keychain credential, clearing:", { account });
+        await keychainService.clearAll();
+        return null;
+      }
+
+      logger.info("Found keychain credential, refreshing…", { account });
+
+      // Retry loop: backend may not be up yet during startup
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const response = await fetch(`${this.apiBaseUrl}/api/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh_token: storedRefreshToken }),
+          });
+
+          if (!response.ok) {
+            // Real auth error — token is invalid, clear and stop
+            logger.warn("Refresh failed, clearing stale credential", {
+              status: response.status,
+              account,
+            });
+            await keychainService.clearRefreshToken(orgId, userId);
+            return null;
+          }
+
+          const data = await response.json();
+          const newAccessToken: string = data.session.access_token;
+          const newRefreshToken: string = data.session.refresh_token;
+
+          // Populate memory
+          this.accessToken = newAccessToken;
+          this._refreshToken = newRefreshToken;
+
+          // Persist the rotated refresh token back to keychain
+          await keychainService.saveRefreshToken(orgId, userId, newRefreshToken);
+
+          logger.info("Session restored successfully from keychain", { account });
+
+          return {
+            accessToken: newAccessToken,
+            refreshToken: newRefreshToken,
+            userId,
+            organizationId: orgId,
+          };
+        } catch (fetchError) {
+          // Network error (server not reachable) — retry
+          logger.warn(
+            `Session restore attempt ${attempt}/${MAX_RETRIES} failed (network), retrying in ${RETRY_DELAY_MS}ms…`
+          );
+          if (attempt < MAX_RETRIES) {
+            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+          }
+        }
+      }
+
+      // All retries exhausted — don't clear keychain, server may come up later
+      logger.warn("Session restore: all retries exhausted, will try again on next launch");
+      return null;
+    } catch (error) {
+      logger.error("Session restore failed:", error);
+      return null;
+    }
   }
 
   /**
