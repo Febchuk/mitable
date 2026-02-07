@@ -645,7 +645,7 @@ export default function SessionDetail() {
           </Button>
           <div>
             <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
-              {session.name === "Work session" && uiStatus === "summarizing" ? (
+              {session.name === "Work session" && uiStatus !== "active" && uiStatus !== "paused" ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="animate-spin" size={20} />
                   Generating title...

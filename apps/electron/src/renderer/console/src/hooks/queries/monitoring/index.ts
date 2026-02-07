@@ -54,9 +54,15 @@ export function useSession(sessionId: string, options?: { pollWhileSummarizing?:
       };
     },
     enabled: !!user && !!sessionId,
-    // Poll every 2 seconds while session is being summarized
+    // Poll every 2 seconds while session is being summarized OR title hasn't been generated yet
     refetchInterval: options?.pollWhileSummarizing
-      ? (query) => (query.state.data?.status === "summarizing" ? 2000 : false)
+      ? (query) => {
+          const data = query.state.data;
+          if (!data) return false;
+          const isSummarizing = data.status === "summarizing";
+          const hasDefaultName = data.name === "Work session";
+          return isSummarizing || hasDefaultName ? 2000 : false;
+        }
       : false,
   });
 }
