@@ -8,7 +8,8 @@
 
 import { db } from "../../db/client.js";
 import * as schema from "../../db/schema/index.js";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, asc } from "drizzle-orm";
+import { artifactEmbeddingService } from "../artifact-embedding.service.js";
 
 export interface DocumentGenerationEnvironment {
   sessionIds: string[];
@@ -168,6 +169,37 @@ export async function getSessionTimeline(
     }
   }
 
+  // Hybrid fallback: if no chunks, query raw sessionCaptures directly
+  if (activities.length === 0) {
+    const rawCaptures = await db
+      .select({
+        capturedAt: schema.sessionCaptures.capturedAt,
+        appName: schema.sessionCaptures.appName,
+        windowTitle: schema.sessionCaptures.windowTitle,
+        activityDescription: schema.sessionCaptures.activityDescription,
+      })
+      .from(schema.sessionCaptures)
+      .where(
+        and(
+          eq(schema.sessionCaptures.sessionId, sessionId),
+          isNotNull(schema.sessionCaptures.activityDescription)
+        )
+      )
+      .orderBy(asc(schema.sessionCaptures.capturedAt))
+      .limit(limit || 100);
+
+    for (const capture of rawCaptures) {
+      activities.push({
+        timestamp: new Date(capture.capturedAt),
+        actionType: "activity",
+        application: capture.appName || null,
+        windowTitle: capture.windowTitle || null,
+        url: null,
+        description: capture.activityDescription || "Activity detected",
+      });
+    }
+  }
+
   return limit ? activities.slice(0, limit) : activities;
 }
 
@@ -228,10 +260,21 @@ export async function getSessionSummary(sessionId: string): Promise<string | nul
     )
     .orderBy(schema.sessionChunks.chunkIndex);
 
-  if (chunks.length === 0) return null;
+  if (chunks.length > 0) {
+    return chunks.map((c) => c.text).join("\n\n");
+  }
 
-  // Combine all summary chunks
-  return chunks.map((c) => c.text).join("\n\n");
+  // Hybrid fallback: if no chunks, use raw summary from monitoringSessions
+  const [session] = await db
+    .select({
+      finalSummary: schema.monitoringSessions.finalSummary,
+      rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+    })
+    .from(schema.monitoringSessions)
+    .where(eq(schema.monitoringSessions.id, sessionId))
+    .limit(1);
+
+  return session?.finalSummary || session?.rawActivitySummary || null;
 }
 
 /**
@@ -344,7 +387,6 @@ export async function getArtifactReferences(
     return [];
   }
 
-  // Note: artifacts table may not exist yet - this will fail gracefully if so
   try {
     const artifacts = await db
       .select({
@@ -368,6 +410,43 @@ export async function getArtifactReferences(
     }));
   } catch (error) {
     console.warn("[Environment] Failed to fetch artifacts:", error);
+    return [];
+  }
+}
+
+export interface ArtifactSearchResult {
+  id: string;
+  filename: string;
+  text: string;
+  score: number;
+  artifactId: string;
+}
+
+/**
+ * Search artifacts by semantic similarity to a query.
+ * Uses Pinecone embeddings for artifact chunks.
+ */
+export async function searchArtifacts(
+  env: DocumentGenerationEnvironment,
+  query: string,
+  topK = 5
+): Promise<ArtifactSearchResult[]> {
+  try {
+    const results = await artifactEmbeddingService.queryRelevant(query, {
+      organizationId: env.organizationId,
+      artifactIds: env.artifactIds,
+      topK,
+    });
+
+    return results.map((r) => ({
+      id: r.id,
+      filename: r.filename,
+      text: r.text,
+      score: r.score,
+      artifactId: r.artifactId,
+    }));
+  } catch (error) {
+    console.warn("[Environment] Artifact search failed:", error);
     return [];
   }
 }

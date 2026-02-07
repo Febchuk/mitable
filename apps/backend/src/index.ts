@@ -14,6 +14,10 @@ import { vectorService } from "./services/vector.service.js";
 import { piiRedactionService } from "./services/pii-redaction.service.js";
 import { socketService } from "./services/socket.service.js";
 import { setupWorkstreamSocketEmitter } from "./services/workstream-socket-emitter.js";
+import { db } from "./db/client.js";
+import * as schema from "./db/schema/index.js";
+import { isNotNull, and } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 async function startServer() {
   // Validate environment variables
@@ -70,6 +74,22 @@ async function startServer() {
   // Set up workstream event emitter to broadcast via WebSocket
   setupWorkstreamSocketEmitter();
 
+  // Startup cleanup: clear stale imageData from sessions that ended >1 hour ago
+  // This catches any images missed due to server restarts (replaces fragile setTimeout)
+  cleanupStaleImageData().catch((err) =>
+    logger.warn({ err }, "Startup imageData cleanup failed (non-fatal)")
+  );
+
+  // Periodic cleanup every 30 minutes
+  setInterval(
+    () => {
+      cleanupStaleImageData().catch((err) =>
+        logger.warn({ err }, "Periodic imageData cleanup failed (non-fatal)")
+      );
+    },
+    30 * 60 * 1000
+  );
+
   // Start server
   httpServer.listen(config.port, () => {
     logger.info(
@@ -78,6 +98,29 @@ async function startServer() {
     );
     logger.info("WebSocket server ready for real-time workstream updates");
   });
+}
+
+/**
+ * Clear imageData from session captures where session ended > 1 hour ago.
+ * Runs on startup and every 30 minutes to catch images missed by in-memory setTimeout.
+ */
+async function cleanupStaleImageData() {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+  await db
+    .update(schema.sessionCaptures)
+    .set({ imageData: null })
+    .where(
+      and(
+        isNotNull(schema.sessionCaptures.imageData),
+        sql`${schema.sessionCaptures.sessionId} IN (
+          SELECT id FROM monitoring_sessions
+          WHERE ended_at IS NOT NULL AND ended_at < ${oneHourAgo}
+        )`
+      )
+    );
+
+  logger.info("Stale imageData cleanup completed");
 }
 
 // Graceful shutdown

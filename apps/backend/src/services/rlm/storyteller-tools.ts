@@ -203,45 +203,58 @@ ${activitiesText}
 
 Summary:`;
 
-    // Call LLM for summarization
+    // Call LLM for summarization with retry
     const groq = new Groq({ apiKey: config.groq.apiKey });
+    const MAX_RETRIES = 3;
 
-    try {
-      const completion = await groq.chat.completions.create({
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a concise work summarizer. Before summarizing, analyze the activities to identify patterns, outcomes, and meaningful progress. Think through what the user actually accomplished and filter out noise.",
-          },
-          {
-            role: "user",
-            content: `${prompt}\n\nFirst, analyze these activities and identify: (1) actual outcomes and completions, (2) collaboration and communication, (3) research and learning. Then write a concise summary focusing on meaningful work.`,
-          },
-        ],
-        model: "openai/gpt-oss-120b",
-        temperature: 0.2,
-        max_tokens: 800,
-      });
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const completion = await groq.chat.completions.create({
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a concise work summarizer. Before summarizing, analyze the activities to identify patterns, outcomes, and meaningful progress. Think through what the user actually accomplished and filter out noise.",
+            },
+            {
+              role: "user",
+              content: `${prompt}\n\nFirst, analyze these activities and identify: (1) actual outcomes and completions, (2) collaboration and communication, (3) research and learning. Then write a concise summary focusing on meaningful work.`,
+            },
+          ],
+          model: "openai/gpt-oss-120b",
+          temperature: 0.2,
+          max_tokens: 800,
+        });
 
-      const summary = completion.choices[0]?.message?.content || "Failed to generate summary";
+        const summary = completion.choices[0]?.message?.content || "Failed to generate summary";
 
-      // Cache the result
-      env.setCache(cacheKey, { summary, cached: false });
+        // Cache the result
+        env.setCache(cacheKey, { summary, cached: false });
 
-      log.debug("Generated chunk summary", {
-        chunkIndex,
-        activityCount: activities.length,
-        summaryLength: summary.length,
-      });
+        log.debug("Generated chunk summary", {
+          chunkIndex,
+          activityCount: activities.length,
+          summaryLength: summary.length,
+        });
 
-      return { summary, cached: false };
-    } catch (error) {
-      log.error("Failed to summarize chunk", {
-        chunkIndex,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
+        return { summary, cached: false };
+      } catch (error) {
+        log.warn("Chunk summarization attempt failed", {
+          chunkIndex,
+          attempt,
+          maxRetries: MAX_RETRIES,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        if (attempt < MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt)); // Exponential backoff
+        } else {
+          log.error("All retries exhausted for chunk summarization", { chunkIndex });
+          // Return a fallback summary from raw activities instead of throwing
+          const fallback = activities.map((a) => a.activityDescription).join("; ");
+          return { summary: fallback, cached: false, fallback: true };
+        }
+      }
     }
   },
 };
@@ -297,38 +310,50 @@ ${summariesText}
 Final Summary:`;
 
     const groq = new Groq({ apiKey: config.groq.apiKey });
+    const MAX_RETRIES = 3;
 
-    try {
-      const completion = await groq.chat.completions.create({
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an expert editor who combines summaries into cohesive narratives. Before writing, analyze the chunk summaries to identify the overall arc, key themes, and most important outcomes. Think critically about what truly matters. Write in first person.",
-          },
-          {
-            role: "user",
-            content: `${prompt}\n\nFirst, reason through: What was the main focus? What were the actual outcomes? What patterns emerge across chunks? Then write the final summary with this understanding.`,
-          },
-        ],
-        model: "openai/gpt-oss-120b",
-        temperature: 0.2,
-        max_tokens: env.preferences.style === "verbose" ? 2000 : 1000,
-      });
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const completion = await groq.chat.completions.create({
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an expert editor who combines summaries into cohesive narratives. Before writing, analyze the chunk summaries to identify the overall arc, key themes, and most important outcomes. Think critically about what truly matters. Write in first person.",
+            },
+            {
+              role: "user",
+              content: `${prompt}\n\nFirst, reason through: What was the main focus? What were the actual outcomes? What patterns emerge across chunks? Then write the final summary with this understanding.`,
+            },
+          ],
+          model: "openai/gpt-oss-120b",
+          temperature: 0.2,
+          max_tokens: env.preferences.style === "verbose" ? 2000 : 1000,
+        });
 
-      const finalSummary = completion.choices[0]?.message?.content || "Failed to merge summaries";
+        const finalSummary = completion.choices[0]?.message?.content || "Failed to merge summaries";
 
-      log.debug("Merged summaries", {
-        chunkCount: summaries.length,
-        finalLength: finalSummary.length,
-      });
+        log.debug("Merged summaries", {
+          chunkCount: summaries.length,
+          finalLength: finalSummary.length,
+        });
 
-      return finalSummary;
-    } catch (error) {
-      log.error("Failed to merge summaries", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
+        return finalSummary;
+      } catch (error) {
+        log.warn("Merge summaries attempt failed", {
+          attempt,
+          maxRetries: MAX_RETRIES,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        if (attempt < MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        } else {
+          log.error("All retries exhausted for merge summaries");
+          // Fallback: concatenate chunk summaries directly
+          return summaries.join("\n\n");
+        }
+      }
     }
   },
 };

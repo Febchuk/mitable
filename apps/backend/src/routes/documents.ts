@@ -912,6 +912,17 @@ router.post("/generate", requireAuth, async (req: Request, res: Response): Promi
       return;
     }
 
+    if (session.ingestionStatus !== "completed") {
+      res.status(409).json({
+        error: "Conflict",
+        message:
+          session.ingestionStatus === "ingesting"
+            ? "Session is still being processed. Please wait a moment and try again."
+            : "Session data has not been indexed yet. Please try again shortly.",
+      });
+      return;
+    }
+
     // Import doc generation service
     const { docGenerationService } = await import("../services/doc-generation.service.js");
 
