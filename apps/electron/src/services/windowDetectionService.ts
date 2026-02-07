@@ -181,8 +181,7 @@ class WindowDetectionService {
           if (this.isMitableWindow(title)) continue;
 
           const titleParts = title.split(" - ");
-          const dcAppName =
-            titleParts.length > 1 ? titleParts[titleParts.length - 1] : title;
+          const dcAppName = titleParts.length > 1 ? titleParts[titleParts.length - 1] : title;
           if (isSystemApp(dcAppName)) continue;
 
           const dcPolicy = isBlockedByPolicy(title, dcAppName, policy);
@@ -201,7 +200,9 @@ class WindowDetectionService {
             blockReason: dcPolicy.reason,
           });
 
-          logger.info(` [desktopCapturer supplement] Found: ${dcAppName} - ${title.substring(0, 50)}`);
+          logger.info(
+            ` [desktopCapturer supplement] Found: ${dcAppName} - ${title.substring(0, 50)}`
+          );
         }
       } catch (dcError) {
         logger.warn(" desktopCapturer supplement failed (non-fatal):", (dcError as Error)?.message);
@@ -625,7 +626,15 @@ class WindowDetectionService {
 
       // RDP/Citrix patterns — these apps are invisible to get-windows
       // so absence from the enumeration is NOT proof of closure
-      const rdpPatterns = ["citrix", "hdx", "wfica", "remote desktop", "mstsc", "vmware horizon", "vmconnect"];
+      const rdpPatterns = [
+        "citrix",
+        "hdx",
+        "wfica",
+        "remote desktop",
+        "mstsc",
+        "vmware horizon",
+        "vmconnect",
+      ];
       const isRdpApp = (name: string) => {
         const lower = name.toLowerCase();
         return rdpPatterns.some((p) => lower.includes(p));
