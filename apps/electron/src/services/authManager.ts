@@ -109,7 +109,7 @@ class AuthManager {
     logger.info("Attempting session restore from keychain…");
 
     const MAX_RETRIES = 5;
-    const RETRY_DELAY_MS = 2000;
+    const RETRY_DELAY_MS = 3000; // 5 × 3s = 15s total window
 
     try {
       const credentials = await keychainService.findAllCredentials();
@@ -131,7 +131,9 @@ class AuthManager {
 
       logger.info("Found keychain credential, refreshing…", { account });
 
-      // Retry loop: backend may not be up yet during startup
+      let lastStatus: number | null = null;
+
+      // Retry loop: backend or its Supabase connection may not be ready yet
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
           const response = await fetch(`${this.apiBaseUrl}/api/auth/refresh`, {
@@ -140,48 +142,60 @@ class AuthManager {
             body: JSON.stringify({ refresh_token: storedRefreshToken }),
           });
 
-          if (!response.ok) {
-            // Real auth error — token is invalid, clear and stop
-            logger.warn("Refresh failed, clearing stale credential", {
-              status: response.status,
+          if (response.ok) {
+            const data = await response.json();
+            const newAccessToken: string = data.session.access_token;
+            const newRefreshToken: string = data.session.refresh_token;
+
+            // Populate memory
+            this.accessToken = newAccessToken;
+            this._refreshToken = newRefreshToken;
+
+            // Persist the rotated refresh token back to keychain
+            await keychainService.saveRefreshToken(orgId, userId, newRefreshToken);
+
+            logger.info("Session restored successfully from keychain", {
               account,
+              attempt,
             });
-            await keychainService.clearRefreshToken(orgId, userId);
-            return null;
+
+            return {
+              accessToken: newAccessToken,
+              refreshToken: newRefreshToken,
+              userId,
+              organizationId: orgId,
+            };
           }
 
-          const data = await response.json();
-          const newAccessToken: string = data.session.access_token;
-          const newRefreshToken: string = data.session.refresh_token;
-
-          // Populate memory
-          this.accessToken = newAccessToken;
-          this._refreshToken = newRefreshToken;
-
-          // Persist the rotated refresh token back to keychain
-          await keychainService.saveRefreshToken(orgId, userId, newRefreshToken);
-
-          logger.info("Session restored successfully from keychain", { account });
-
-          return {
-            accessToken: newAccessToken,
-            refreshToken: newRefreshToken,
-            userId,
-            organizationId: orgId,
-          };
+          // Non-ok response — backend may still be initializing Supabase
+          lastStatus = response.status;
+          logger.warn(
+            `Session restore attempt ${attempt}/${MAX_RETRIES} got HTTP ${response.status}, retrying in ${RETRY_DELAY_MS}ms…`
+          );
         } catch (fetchError) {
           // Network error (server not reachable) — retry
+          lastStatus = null;
           logger.warn(
             `Session restore attempt ${attempt}/${MAX_RETRIES} failed (network), retrying in ${RETRY_DELAY_MS}ms…`
           );
-          if (attempt < MAX_RETRIES) {
-            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-          }
+        }
+
+        if (attempt < MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
         }
       }
 
-      // All retries exhausted — don't clear keychain, server may come up later
-      logger.warn("Session restore: all retries exhausted, will try again on next launch");
+      // All retries exhausted
+      if (lastStatus === 401) {
+        // Consistent auth failure after all retries — token is genuinely invalid
+        logger.warn("Refresh failed after all retries, clearing stale credential", {
+          account,
+        });
+        await keychainService.clearRefreshToken(orgId, userId);
+      } else {
+        // Network or server errors — keep keychain, server may come up later
+        logger.warn("Session restore: all retries exhausted, will try again on next launch");
+      }
       return null;
     } catch (error) {
       logger.error("Session restore failed:", error);
