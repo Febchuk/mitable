@@ -3,19 +3,67 @@
  *
  * Captures microphone + system audio using Web Audio API
  * Sends PCM16 stereo chunks to main process via IPC
+ *
+ * Uses AudioWorklet for off-main-thread processing (replaces deprecated ScriptProcessorNode)
  */
+
+// AudioWorklet processor source — inlined as Blob URL to avoid file-serving issues in Electron
+const WORKLET_SOURCE = `
+class PCM16StereoProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this._chunkCount = 0;
+  }
+
+  process(inputs) {
+    const input = inputs[0];
+    if (!input || input.length < 2) return true;
+
+    const left = input[0];
+    const right = input[1];
+    if (!left || left.length === 0) return true;
+
+    // Convert Float32 stereo to interleaved Int16 PCM
+    const pcm16 = new Int16Array(left.length * 2);
+    for (let i = 0; i < left.length; i++) {
+      const l = Math.max(-1, Math.min(1, left[i]));
+      const r = Math.max(-1, Math.min(1, right[i] || 0));
+      pcm16[i * 2] = l < 0 ? l * 0x8000 : l * 0x7FFF;
+      pcm16[i * 2 + 1] = r < 0 ? r * 0x8000 : r * 0x7FFF;
+    }
+
+    // Transfer buffer to main thread (zero-copy)
+    this.port.postMessage(pcm16.buffer, [pcm16.buffer]);
+    return true;
+  }
+}
+
+registerProcessor('pcm16-stereo-processor', PCM16StereoProcessor);
+`;
 
 interface AudioCaptureState {
   sessionId: string;
   micStream: MediaStream | null;
   systemStream: MediaStream | null;
   audioContext: AudioContext | null;
-  processor: ScriptProcessorNode | null;
+  workletNode: AudioWorkletNode | null;
   isCapturing: boolean;
 }
 
 class AudioCaptureService {
   private captureState: AudioCaptureState | null = null;
+  private workletBlobUrl: string | null = null;
+
+  /**
+   * Create a Blob URL for the AudioWorklet processor module
+   */
+  private getWorkletUrl(): string {
+    if (!this.workletBlobUrl) {
+      const blob = new Blob([WORKLET_SOURCE], { type: "application/javascript" });
+      this.workletBlobUrl = URL.createObjectURL(blob);
+    }
+    return this.workletBlobUrl;
+  }
 
   /**
    * Start capturing audio and send chunks via IPC
@@ -93,43 +141,29 @@ class AudioCaptureService {
         silenceNode.start();
       }
 
-      // Create destination
-      const destination = audioContext.createMediaStreamDestination();
-      merger.connect(destination);
-      const stereoStream = destination.stream;
+      // Step 4: Register AudioWorklet and create processor node
+      await audioContext.audioWorklet.addModule(this.getWorkletUrl());
 
-      // Step 4: Extract PCM16 with ScriptProcessor
-      const bufferSize = 4096;
-      const processor = audioContext.createScriptProcessor(bufferSize, 2, 2);
+      const workletNode = new AudioWorkletNode(audioContext, "pcm16-stereo-processor", {
+        numberOfInputs: 1,
+        numberOfOutputs: 0, // No audio output needed — we only extract data
+        channelCount: 2,
+        channelCountMode: "explicit",
+      });
 
-      const stereoSource = audioContext.createMediaStreamSource(stereoStream);
-      stereoSource.connect(processor);
-      processor.connect(audioContext.destination);
-
+      // Receive PCM16 buffers from the worklet thread
       let chunkCount = 0;
-      processor.onaudioprocess = (event) => {
-        const left = event.inputBuffer.getChannelData(0);
-        const right = event.inputBuffer.getChannelData(1);
-
-        // Convert to interleaved stereo PCM16
-        const pcm16 = new Int16Array(left.length * 2);
-
-        for (let i = 0; i < left.length; i++) {
-          const l = Math.max(-1, Math.min(1, left[i]));
-          const r = Math.max(-1, Math.min(1, right[i]));
-
-          pcm16[i * 2] = l < 0 ? l * 0x8000 : l * 0x7fff;
-          pcm16[i * 2 + 1] = r < 0 ? r * 0x8000 : r * 0x7fff;
-        }
-
-        // Send to main process via IPC
-        window.watchingPillAPI?.sendAudioChunk(pcm16.buffer);
+      workletNode.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
+        window.watchingPillAPI?.sendAudioChunk(event.data);
 
         chunkCount++;
         if (chunkCount % 50 === 0) {
-          console.log(`📊 Sent ${chunkCount} audio chunks (${pcm16.buffer.byteLength} bytes each)`);
+          console.log(`📊 Sent ${chunkCount} audio chunks (${event.data.byteLength} bytes each)`);
         }
       };
+
+      // Connect: merger → workletNode (no output connection needed)
+      merger.connect(workletNode);
 
       // Save state
       this.captureState = {
@@ -137,11 +171,11 @@ class AudioCaptureService {
         micStream,
         systemStream,
         audioContext,
-        processor,
+        workletNode,
         isCapturing: true,
       };
 
-      console.log("✅ Audio capture started", {
+      console.log("✅ Audio capture started (AudioWorklet)", {
         sessionId,
         hasSystemAudio: !!systemStream,
         sampleRate: audioContext.sampleRate,
@@ -177,8 +211,9 @@ class AudioCaptureService {
       this.captureState.micStream?.getTracks().forEach((track) => track.stop());
       this.captureState.systemStream?.getTracks().forEach((track) => track.stop());
 
-      if (this.captureState.processor) {
-        this.captureState.processor.disconnect();
+      if (this.captureState.workletNode) {
+        this.captureState.workletNode.port.close();
+        this.captureState.workletNode.disconnect();
       }
 
       if (this.captureState.audioContext) {

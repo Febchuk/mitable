@@ -14,7 +14,9 @@
 
 // Force Deepgram SDK to use ws library instead of Undici WebSocket
 // This prevents Undici from swallowing handshake errors (401, 400, etc.)
+// Scoped: save original, restore after client creation
 import WS from "ws";
+const _originalWebSocket = (globalThis as any).WebSocket;
 (globalThis as any).WebSocket = WS as any;
 
 import { createClient, LiveTranscriptionEvents } from "@deepgram/sdk";
@@ -27,6 +29,8 @@ import { config } from "../config.js";
 // Types & Interfaces
 // ===========================
 
+const PERIODIC_SAVE_INTERVAL_MS = 30_000; // Save transcripts every 30 seconds
+
 interface TranscriptionSession {
   sessionId: string;
   connection: any; // Deepgram LiveConnection
@@ -34,6 +38,9 @@ interface TranscriptionSession {
   startedAt: Date;
   accumulatedText: string; // Accumulate all transcripts
   speakerSegments: Array<{ speakerId: number; text: string; timestamp: number }>; // Track speaker changes
+  lastSavedSegmentIndex: number; // Track which segments have been persisted
+  periodicSaveTimer: NodeJS.Timeout | null; // Timer for crash-resilient periodic saves
+  segmentStartTime: Date; // Start time of current unsaved segment
 }
 
 // ===========================
@@ -58,6 +65,10 @@ class DeepgramTranscriptionService {
         : "***";
 
     this.deepgram = createClient(config.deepgram.apiKey);
+    // Restore original WebSocket after Deepgram client is created
+    if (_originalWebSocket) {
+      (globalThis as any).WebSocket = _originalWebSocket;
+    }
     logger.info(`✅ Deepgram client initialized with key: ${maskedKey}`);
   }
 
@@ -173,18 +184,37 @@ class DeepgramTranscriptionService {
       // Handle connection closed
       connection.on(LiveTranscriptionEvents.Close, () => {
         logger.info(`🔌 Deepgram connection closed for session: ${sessionId}`);
+        const closedSession = this.sessions.get(sessionId);
+        if (closedSession?.periodicSaveTimer) {
+          clearInterval(closedSession.periodicSaveTimer);
+        }
         this.sessions.delete(sessionId);
       });
+
+      const now = new Date();
 
       // Store session state
       this.sessions.set(sessionId, {
         sessionId,
         connection,
         isActive: true,
-        startedAt: new Date(),
+        startedAt: now,
         accumulatedText: "",
         speakerSegments: [],
+        lastSavedSegmentIndex: 0,
+        periodicSaveTimer: null,
+        segmentStartTime: now,
       });
+
+      // Start periodic save timer for crash resilience
+      const timer = setInterval(() => {
+        this.saveAccumulatedTranscript(sessionId).catch((err) => {
+          logger.error({ err }, `❌ Periodic transcript save failed for session ${sessionId}`);
+        });
+      }, PERIODIC_SAVE_INTERVAL_MS);
+
+      const session = this.sessions.get(sessionId)!;
+      session.periodicSaveTimer = timer;
 
       logger.info(`✅ Transcription started for session: ${sessionId}`);
 
@@ -219,6 +249,52 @@ class DeepgramTranscriptionService {
   /**
    * Stop transcription for a session
    */
+  /**
+   * Save unsaved accumulated transcript segments to database
+   * Called periodically and on stop for crash resilience
+   */
+  private async saveAccumulatedTranscript(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    const unsavedSegments = session.speakerSegments.slice(session.lastSavedSegmentIndex);
+    if (unsavedSegments.length === 0) return;
+
+    // Build text from unsaved segments only
+    const unsavedText = unsavedSegments
+      .map((s) => s.text)
+      .join(" ")
+      .trim();
+    if (unsavedText.length === 0) return;
+
+    // Determine primary speaker for this batch
+    const speakerCounts = new Map<number, number>();
+    unsavedSegments.forEach((seg) => {
+      speakerCounts.set(seg.speakerId, (speakerCounts.get(seg.speakerId) || 0) + 1);
+    });
+    const primarySpeaker =
+      Array.from(speakerCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 0;
+
+    const now = new Date();
+
+    await db.insert(sessionTranscripts).values({
+      sessionId,
+      speakerId: primarySpeaker,
+      transcript: unsavedText,
+      startTime: session.segmentStartTime,
+      endTime: now,
+      confidence: 0.9, // Deepgram Nova-2 typical confidence
+    });
+
+    // Mark these segments as saved
+    session.lastSavedSegmentIndex = session.speakerSegments.length;
+    session.segmentStartTime = now;
+
+    logger.info(
+      `💾 Periodic save for session ${sessionId}: ${unsavedText.length} chars, ${unsavedSegments.length} segments`
+    );
+  }
+
   async stopTranscription(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
 
@@ -230,31 +306,19 @@ class DeepgramTranscriptionService {
     try {
       logger.info(`🛑 Stopping transcription for session: ${sessionId}`);
 
-      // Save accumulated transcript to database
-      if (session.accumulatedText.trim().length > 0) {
-        // Determine primary speaker (most common speaker ID)
-        const speakerCounts = new Map<number, number>();
-        session.speakerSegments.forEach((seg) => {
-          speakerCounts.set(seg.speakerId, (speakerCounts.get(seg.speakerId) || 0) + 1);
-        });
-        const primarySpeaker =
-          Array.from(speakerCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 0;
-
-        const sessionDuration = (new Date().getTime() - session.startedAt.getTime()) / 1000;
-
-        await db.insert(sessionTranscripts).values({
-          sessionId,
-          speakerId: primarySpeaker,
-          transcript: session.accumulatedText.trim(),
-          startTime: session.startedAt,
-          endTime: new Date(),
-          confidence: 1.0, // Average confidence would be better, but this is simpler
-        });
-
-        logger.info(
-          `✅ Saved full transcript for session ${sessionId}: ${session.accumulatedText.length} characters, ${session.speakerSegments.length} segments, ${sessionDuration.toFixed(1)}s duration`
-        );
+      // Clear periodic save timer
+      if (session.periodicSaveTimer) {
+        clearInterval(session.periodicSaveTimer);
+        session.periodicSaveTimer = null;
       }
+
+      // Save any remaining unsaved transcript
+      await this.saveAccumulatedTranscript(sessionId);
+
+      const sessionDuration = (new Date().getTime() - session.startedAt.getTime()) / 1000;
+      logger.info(
+        `✅ Final transcript saved for session ${sessionId}: ${session.accumulatedText.length} total chars, ${session.speakerSegments.length} total segments, ${sessionDuration.toFixed(1)}s duration`
+      );
 
       // Close Deepgram connection
       if (session.connection) {

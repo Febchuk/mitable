@@ -13,6 +13,7 @@ const IPC_CHANNELS = {
   MONITORING_SESSION_FINALIZE: "monitoring-session-finalize",
   MONITORING_AUDIO_START: "monitoring-audio-start",
   MONITORING_AUDIO_STOP: "monitoring-audio-stop",
+  MONITORING_AUDIO_FORCE_STOP: "monitoring-audio-force-stop",
   WATCH_WINDOWS_GET_ALL: "watch-windows-get-all",
   WATCH_WINDOWS_GET_SELECTED: "watch-windows-get-selected",
   WATCH_WINDOW_SELECT: "watch-window-select",
@@ -211,6 +212,13 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
   sendAudioChunk: (audioBuffer: ArrayBuffer): void => {
     ipcRenderer.send("audio-chunk", audioBuffer);
   },
+
+  // Main → Renderer: force stop AudioWorklet when session ends without explicit audio stop
+  onForceStopAudio: (callback: () => void): (() => void) => {
+    const handler = () => callback();
+    ipcRenderer.on(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP, handler);
+  },
 });
 
 // Type declarations for renderer
@@ -302,6 +310,7 @@ declare global {
       }>;
       stopAudioRecording: () => Promise<{ success: boolean }>;
       sendAudioChunk: (audioBuffer: ArrayBuffer) => void;
+      onForceStopAudio: (callback: () => void) => () => void;
     };
   }
 }

@@ -82,6 +82,54 @@ const authTokens: {
   refreshToken: null,
 };
 
+// Throttle for "no active session" audio chunk warnings (avoid log spam)
+let lastAudioChunkWarnAt = 0;
+// Flag to silently drop audio chunks after cleanup (renderer may lag behind)
+let audioCleanupDone = false;
+
+/**
+ * Stop audio recording infrastructure: disconnect WS, notify backend, tell renderer to kill AudioWorklet.
+ * Called from all session-end paths so audio doesn't keep streaming after the session is gone.
+ */
+async function cleanupAudioRecording(sessionId?: string): Promise<void> {
+  // Mark cleanup done so audio-chunk handler silently drops incoming chunks
+  audioCleanupDone = true;
+
+  // 1. Disconnect the backend WebSocket (stops forwarding chunks)
+  audioWebSocketService.disconnect();
+
+  // 2. Tell the WatchingPill renderer to stop its AudioWorklet (stops IPC flood)
+  if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+    watchingPillWindow.webContents.send(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP);
+  }
+
+  // 3. Notify backend to stop tracking audio duration
+  if (sessionId) {
+    try {
+      const token = authTokens.accessToken;
+      const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
+      const backendUrl = app.isPackaged
+        ? PROD_API_URL
+        : process.env.VITE_API_URL || "http://localhost:3000";
+      if (token) {
+        await fetch(`${backendUrl}/api/monitoring/sessions/${sessionId}/audio/stop`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+      }
+    } catch (error) {
+      monitoringLogger.error("Failed to notify backend of audio stop during cleanup:", error);
+    }
+  }
+
+  monitoringLogger.info(
+    "🔇 Audio recording cleaned up" + (sessionId ? ` for session ${sessionId}` : "")
+  );
+}
+
 function isBoundsVisible(bounds: Electron.Rectangle): boolean {
   const displays = screen.getAllDisplays();
   return displays.some((display) => {
@@ -1039,6 +1087,10 @@ function setupIPC() {
           });
 
           const runEndSession = async () => {
+            // 0. Stop audio recording before ending session (prevents runaway AudioWorklet)
+            const preEndState = monitoringSessionService.getSessionState();
+            await cleanupAudioRecording(preEndState?.id);
+
             // 1. End Electron-side capture loop and get captures
             const result = await monitoringSessionService.endSession();
 
@@ -1580,6 +1632,11 @@ function setupMonitoringSessionHandlers() {
   // End the active session
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_END, async () => {
     monitoringLogger.info(" Ending session");
+
+    // Stop audio recording before ending session (prevents runaway AudioWorklet)
+    const preEndState = monitoringSessionService.getSessionState();
+    await cleanupAudioRecording(preEndState?.id);
+
     const result = await monitoringSessionService.endSession();
 
     // Only hide watching pill if preference is enabled
@@ -1783,6 +1840,9 @@ function setupMonitoringSessionHandlers() {
   ipcMain.handle(IPC_CHANNELS.MONITORING_AUDIO_START, async () => {
     monitoringLogger.info("🎤 Starting audio recording");
 
+    // Reset cleanup flag so audio chunks are processed again
+    audioCleanupDone = false;
+
     const sessionState = monitoringSessionService.getSessionState();
     if (!sessionState || !sessionState.id) {
       return {
@@ -1793,12 +1853,21 @@ function setupMonitoringSessionHandlers() {
     }
 
     // Connect WebSocket to backend for audio streaming
+    const token = authTokens.accessToken;
+    if (!token) {
+      return {
+        success: false,
+        hasSystemAudio: false,
+        error: "No auth token available. Please log in first.",
+      };
+    }
+
     // Note: VITE_* env vars are NOT available in main process at runtime
     const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
     const backendUrl = app.isPackaged
       ? PROD_API_URL
       : process.env.VITE_API_URL || "http://localhost:3000";
-    const wsResult = await audioWebSocketService.connect(sessionState.id, backendUrl);
+    const wsResult = await audioWebSocketService.connect(sessionState.id, backendUrl, token);
 
     if (!wsResult.success) {
       return {
@@ -1836,9 +1905,20 @@ function setupMonitoringSessionHandlers() {
   // Handle audio chunks from renderer
   ipcMain.on("audio-chunk", (_event, audioBuffer: ArrayBuffer) => {
     try {
+      // After cleanup, silently discard all chunks (renderer AudioWorklet may still be running)
+      if (audioCleanupDone) {
+        return;
+      }
+
       const sessionState = monitoringSessionService.getSessionState();
       if (!sessionState?.id) {
-        monitoringLogger.warn("⚠️ Received audio chunk but no active session");
+        const now = Date.now();
+        if (now - lastAudioChunkWarnAt > 5000) {
+          monitoringLogger.warn(
+            "⚠️ Received audio chunk but no active session (throttled, suppressing for 5s)"
+          );
+          lastAudioChunkWarnAt = now;
+        }
         return;
       }
 
@@ -1941,23 +2021,29 @@ function setupMonitoringSessionHandlers() {
   });
 
   // Audio preferences IPC handlers
+  // NOTE: navigator.mediaDevices is NOT available in Electron's main process.
+  // We delegate device enumeration to the console renderer via webContents.executeJavaScript().
   ipcMain.handle(IPC_CHANNELS.AUDIO_DEVICES_ENUMERATE, async () => {
     try {
-      // Request microphone permission first (required to enumerate devices with labels)
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!consoleWindow || consoleWindow.isDestroyed()) {
+        return { success: false, devices: [], error: "Console window not available" };
+      }
 
-      // Now enumerate devices (labels will be available)
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioInputs = devices
-        .filter((device) => device.kind === "audioinput")
-        .map((device) => ({
-          deviceId: device.deviceId,
-          label: device.label || `Microphone ${device.deviceId.slice(0, 8)}`,
-          groupId: device.groupId,
-        }));
-
-      // Stop the stream since we only needed it for permissions
-      stream.getTracks().forEach((track) => track.stop());
+      const audioInputs = await consoleWindow.webContents.executeJavaScript(`
+        (async () => {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const inputs = devices
+              .filter(d => d.kind === 'audioinput')
+              .map(d => ({ deviceId: d.deviceId, label: d.label || 'Microphone ' + d.deviceId.slice(0, 8), groupId: d.groupId }));
+            stream.getTracks().forEach(t => t.stop());
+            return inputs;
+          } catch (e) {
+            return [];
+          }
+        })()
+      `);
 
       monitoringLogger.info(`🎤 Found ${audioInputs.length} audio input devices`);
       return { success: true, devices: audioInputs };
@@ -2000,6 +2086,10 @@ function setupMonitoringSessionHandlers() {
       }
     ) => {
       monitoringLogger.info(" End session with preferences requested:", preferences);
+
+      // Stop audio recording before ending session (prevents runaway AudioWorklet)
+      const preEndState = monitoringSessionService.getSessionState();
+      await cleanupAudioRecording(preEndState?.id);
 
       // End Electron-side capture loop and get captures
       const result = await monitoringSessionService.endSession();
@@ -2389,6 +2479,29 @@ app.whenReady().then(async () => {
   setupIPC();
   registerGlobalShortcuts();
 
+  // In dev mode, wait for the backend to be reachable before making any network calls.
+  // Both processes start together via `npm run dev`, so the backend may still be initializing.
+  if (!app.isPackaged) {
+    const backendUrl = process.env.VITE_API_URL || "http://localhost:3000";
+    const MAX_WAIT = 30_000; // 30s max
+    const POLL_MS = 1_000;
+    const startWait = Date.now();
+    authLogger.info(`Waiting for backend at ${backendUrl}/health …`);
+
+    while (Date.now() - startWait < MAX_WAIT) {
+      try {
+        const res = await fetch(`${backendUrl}/health`, { signal: AbortSignal.timeout(2000) });
+        if (res.ok) {
+          authLogger.info(`Backend ready (${Date.now() - startWait}ms)`);
+          break;
+        }
+      } catch {
+        // not ready yet
+      }
+      await new Promise((r) => setTimeout(r, POLL_MS));
+    }
+  }
+
   // Restore auth session from OS keychain (survives app restarts)
   try {
     const restored = await authManager.restoreSession();
@@ -2498,6 +2611,9 @@ app.on("before-quit", async (event) => {
     isQuitting = true;
 
     shutdownLogger.info(" Ending active session before quit...");
+
+    // Stop audio recording before ending session
+    await cleanupAudioRecording(sessionState.id);
 
     try {
       // End local session and get captures

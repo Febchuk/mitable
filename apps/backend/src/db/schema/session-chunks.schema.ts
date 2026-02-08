@@ -30,7 +30,7 @@ export const sessionChunks = pgTable(
     // Chunk metadata
     chunkIndex: integer("chunk_index").notNull(),
     chunkType: text("chunk_type", {
-      enum: ["classifier", "storyteller_summary", "storyteller_timeline"],
+      enum: ["classifier", "storyteller_summary", "storyteller_timeline", "transcript"],
     }).notNull(),
 
     // Content and embedding

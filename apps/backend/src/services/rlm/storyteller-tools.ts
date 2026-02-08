@@ -5,10 +5,81 @@
  * Each tool is focused and type-safe - no arbitrary code execution.
  */
 
-import Groq from "groq-sdk";
+import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { config } from "../../config";
 import { StorytellerEnvironment } from "./storyteller-environment";
 import { createSessionLogger } from "../../lib/sessionLogger";
+// Shared Anthropic client for tool sub-calls (Claude Sonnet 4.5 with thinking)
+let anthropicClient: Anthropic | null = null;
+if (config.anthropic.apiKey) {
+  anthropicClient = new Anthropic({ apiKey: config.anthropic.apiKey });
+}
+
+// DeepSeek R1 fallback client (OpenAI-compatible)
+let deepseekClient: OpenAI | null = null;
+if (config.deepseek.apiKey) {
+  deepseekClient = new OpenAI({
+    apiKey: config.deepseek.apiKey,
+    baseURL: "https://api.deepseek.com",
+  });
+}
+
+/**
+ * Call Claude Sonnet 4.5 with extended thinking for high-quality summarization.
+ * Falls back to DeepSeek R1 (reasoning model) if Anthropic fails.
+ */
+async function callSummarizationLLM(
+  systemPrompt: string,
+  userPrompt: string,
+  maxOutputTokens: number
+): Promise<string> {
+  if (anthropicClient) {
+    try {
+      const response = await anthropicClient.messages.create({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: maxOutputTokens + 5000, // Extra headroom for thinking tokens
+        thinking: {
+          type: "enabled",
+          budget_tokens: 3000, // Let Claude reason before summarizing
+        },
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+
+      for (const block of response.content) {
+        if (block.type === "text") {
+          return block.text;
+        }
+      }
+      throw new Error("No text block in Claude response");
+    } catch (error) {
+      console.warn(
+        "[storyteller-tools] Claude sub-call failed at runtime — falling back to DeepSeek R1:",
+        String(error)
+      );
+      // Disable Anthropic for the rest of this process to avoid repeated failures
+      anthropicClient = null;
+    }
+  }
+
+  // DeepSeek R1 fallback (reasoning model with built-in chain-of-thought)
+  if (!deepseekClient) {
+    throw new Error(
+      "No LLM available for summarization — both ANTHROPIC_API_KEY and DEEPSEEK_API_KEY are missing"
+    );
+  }
+
+  const completion = await deepseekClient.chat.completions.create({
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    model: "deepseek-reasoner",
+    max_tokens: maxOutputTokens,
+  });
+  return completion.choices[0]?.message?.content || "Failed to generate summary";
+}
 
 export interface RLMToolParameter {
   name: string;
@@ -209,32 +280,17 @@ ${activitiesText}${transcriptSection}
 Summary:`;
 
     // Call LLM for summarization with retry
-    const groq = new Groq({ apiKey: config.groq.apiKey });
     const MAX_RETRIES = 3;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const systemPrompt = env.fullTranscriptText
-          ? "You are a concise work summarizer with access to both visual activity logs and audio transcripts. Use the audio transcripts to understand the WHY behind actions - intent, reasoning, decisions, and context that screenshots alone cannot capture. Enrich the summary with this verbal context."
-          : "You are a concise work summarizer. Before summarizing, analyze the activities to identify patterns, outcomes, and meaningful progress. Think through what the user actually accomplished and filter out noise.";
+          ? "You are a concise work summarizer with access to both visual activity logs and audio transcripts. Use the audio transcripts to understand the WHY behind actions. CRITICAL: Your summary MUST ONLY mention apps, websites, and actions that appear in the provided activity list. NEVER invent or substitute different apps, people, or tasks. If activities show casual browsing, say so — do NOT fabricate professional work."
+          : "You are a concise work summarizer. CRITICAL: Your summary MUST ONLY mention apps, websites, and actions that appear in the provided activity list. NEVER invent or substitute different apps, people, or tasks. If activities show casual browsing, say so — do NOT fabricate professional work.";
 
-        const completion = await groq.chat.completions.create({
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt,
-            },
-            {
-              role: "user",
-              content: `${prompt}\n\nFirst, analyze these activities and identify: (1) actual outcomes and completions, (2) collaboration and communication, (3) research and learning. Then write a concise summary focusing on meaningful work.`,
-            },
-          ],
-          model: "openai/gpt-oss-120b",
-          temperature: 0.2,
-          max_tokens: 800,
-        });
+        const userPrompt = `${prompt}\n\nIMPORTANT: Only reference the specific apps, websites, and actions listed above. Do NOT add information not present in the activities. Write in first person.`;
 
-        const summary = completion.choices[0]?.message?.content || "Failed to generate summary";
+        const summary = await callSummarizationLLM(systemPrompt, userPrompt, 800);
 
         // Cache the result
         env.setCache(cacheKey, { summary, cached: false });
@@ -317,32 +373,18 @@ ${summariesText}
 
 Final Summary:`;
 
-    const groq = new Groq({ apiKey: config.groq.apiKey });
     const MAX_RETRIES = 3;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const mergeSystemPrompt = env.fullTranscriptText
-          ? "You are an expert editor who combines summaries into cohesive narratives. The chunk summaries were enriched with audio transcripts showing the user's verbal explanations. Preserve this rich context (intent, reasoning, decisions) in the final narrative. Before writing, analyze the chunk summaries to identify the overall arc, key themes, and most important outcomes. Write in first person."
-          : "You are an expert editor who combines summaries into cohesive narratives. Before writing, analyze the chunk summaries to identify the overall arc, key themes, and most important outcomes. Think critically about what truly matters. Write in first person.";
+          ? "You are an expert editor who combines summaries into cohesive narratives. Preserve verbal context (intent, reasoning, decisions) in the final narrative. CRITICAL: Only mention apps, websites, people, and actions that appear in the chunk summaries below. NEVER invent details. Write in first person."
+          : "You are an expert editor who combines summaries into cohesive narratives. CRITICAL: Only mention apps, websites, people, and actions that appear in the chunk summaries below. NEVER invent details. Write in first person.";
 
-        const completion = await groq.chat.completions.create({
-          messages: [
-            {
-              role: "system",
-              content: mergeSystemPrompt,
-            },
-            {
-              role: "user",
-              content: `${prompt}\n\nFirst, reason through: What was the main focus? What were the actual outcomes? What patterns emerge across chunks? Then write the final summary with this understanding.`,
-            },
-          ],
-          model: "openai/gpt-oss-120b",
-          temperature: 0.2,
-          max_tokens: env.preferences.style === "verbose" ? 2000 : 1000,
-        });
+        const userPrompt = `${prompt}\n\nIMPORTANT: Only reference apps, websites, and actions mentioned in the chunk summaries above. Do NOT add information not present. Write in first person.`;
 
-        const finalSummary = completion.choices[0]?.message?.content || "Failed to merge summaries";
+        const maxTokens = env.preferences.style === "verbose" ? 2000 : 1000;
+        const finalSummary = await callSummarizationLLM(mergeSystemPrompt, userPrompt, maxTokens);
 
         log.debug("Merged summaries", {
           chunkCount: summaries.length,

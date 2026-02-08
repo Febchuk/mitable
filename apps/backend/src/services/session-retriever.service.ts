@@ -20,7 +20,7 @@ export interface SessionChunkResult {
   chunkId: string;
   sessionId: string;
   sessionName: string | null;
-  chunkType: "classifier" | "storyteller_summary" | "storyteller_timeline";
+  chunkType: "classifier" | "storyteller_summary" | "storyteller_timeline" | "transcript";
   chunkIndex: number;
   text: string;
   metadata: {
@@ -44,7 +44,7 @@ export interface SessionSearchParams {
   organizationId: string;
   userId: string; // REQUIRED: Filter to user's sessions only (prevents data leakage)
   sessionIds?: string[]; // Filter to specific sessions
-  chunkTypes?: Array<"classifier" | "storyteller_summary" | "storyteller_timeline">; // Filter by chunk type
+  chunkTypes?: Array<"classifier" | "storyteller_summary" | "storyteller_timeline" | "transcript">; // Filter by chunk type
   dateRange?: { start: Date; end: Date }; // Filter sessions by date range
   topK?: number;
   minSimilarity?: number;

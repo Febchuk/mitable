@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MoreVertical, Eye, EyeOff, Mic, MicOff } from "lucide-react";
 import LogoIcon from "@/assets/logo-icon.svg";
 import type { MonitoringSessionState, SelectedWindowInfo } from "@mitable/shared";
@@ -16,6 +16,8 @@ export default function App() {
   // Audio recording state
   const [audioRecordingEnabled, setAudioRecordingEnabled] = useState(false);
   const [audioRecordingActive, setAudioRecordingActive] = useState(false);
+  // Ref mirrors audioRecordingActive so closures always see the current value
+  const audioRecordingActiveRef = useRef(false);
 
   // Track which dropdown is open (for UI state only)
   const [eyeDropdownOpen, setEyeDropdownOpen] = useState(false);
@@ -49,9 +51,9 @@ export default function App() {
       logger.info(" Session update:", state);
       setSessionState(state);
 
-      // If session ended, stop audio capture
+      // If session ended, stop audio capture (use ref to avoid stale closure)
       if (
-        audioRecordingActive &&
+        audioRecordingActiveRef.current &&
         (!state || (state.status !== "active" && state.status !== "paused"))
       ) {
         logger.info("🔇 Session ended, stopping audio capture");
@@ -60,6 +62,7 @@ export default function App() {
         await window.watchingPillAPI?.stopAudioRecording();
         setAudioRecordingEnabled(false);
         setAudioRecordingActive(false);
+        audioRecordingActiveRef.current = false;
       }
     });
 
@@ -77,11 +80,22 @@ export default function App() {
       setMenuDropdownOpen(false);
     });
 
+    // Main process forces audio stop when session ends without explicit mic toggle
+    const unsubForceStopAudio = window.watchingPillAPI.onForceStopAudio(async () => {
+      logger.info("🔇 Force-stop audio received from main process");
+      const { audioCaptureService } = await import("./services/audioCapture");
+      await audioCaptureService.stopCapture();
+      setAudioRecordingEnabled(false);
+      setAudioRecordingActive(false);
+      audioRecordingActiveRef.current = false;
+    });
+
     return () => {
       unsubSession();
       unsubWindows();
       unsubEyeClose();
       unsubMenuClose();
+      unsubForceStopAudio();
     };
   }, []);
 
@@ -126,6 +140,7 @@ export default function App() {
 
       logger.info("✅ Audio recording started", { hasSystemAudio: captureResult.hasSystemAudio });
       setAudioRecordingActive(true);
+      audioRecordingActiveRef.current = true;
     } else {
       // Stop audio recording
       logger.info("🔇 Disabling audio recording");
@@ -137,6 +152,7 @@ export default function App() {
       // Stop main WebSocket
       await window.watchingPillAPI?.stopAudioRecording();
       setAudioRecordingActive(false);
+      audioRecordingActiveRef.current = false;
     }
   };
 

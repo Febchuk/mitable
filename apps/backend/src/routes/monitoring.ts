@@ -704,18 +704,22 @@ router.post(
                   await import("../services/session-title.service.js");
                 const aiTitle = await sessionTitleService.generateTitle(id);
 
-                // Update session name if AI generated a valid title
-                if (aiTitle && aiTitle !== "Work session") {
-                  await db
-                    .update(schema.monitoringSessions)
-                    .set({ name: aiTitle })
-                    .where(eq(schema.monitoringSessions.id, id));
-                  log.info("Session title generated", { sessionId: id, title: aiTitle });
-                }
+                // Always set session name so UI doesn't stay stuck on "Generating title..."
+                const finalTitle = aiTitle && aiTitle.trim().length > 0 ? aiTitle : "Work session";
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ name: finalTitle })
+                  .where(eq(schema.monitoringSessions.id, id));
+                log.info("Session title generated", { sessionId: id, title: finalTitle });
               } catch (error) {
                 log.error("Session title generation failed", {
                   error: error instanceof Error ? error.message : String(error),
                 });
+                // Still set a fallback name so UI doesn't hang
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ name: "Work session" })
+                  .where(eq(schema.monitoringSessions.id, id));
               }
             })(),
             // Generate master story

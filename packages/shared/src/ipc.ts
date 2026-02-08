@@ -59,6 +59,7 @@ export const IPC_CHANNELS = {
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress", // Capture count update
   MONITORING_AUDIO_START: "monitoring-audio-start", // Start audio recording for session
   MONITORING_AUDIO_STOP: "monitoring-audio-stop", // Stop audio recording for session
+  MONITORING_AUDIO_FORCE_STOP: "monitoring-audio-force-stop", // Main → Renderer: force stop AudioWorklet on session end
 
   // Session Recovery (crash recovery)
   SESSION_GET_RECOVERABLE: "session-get-recoverable", // Get list of recoverable sessions

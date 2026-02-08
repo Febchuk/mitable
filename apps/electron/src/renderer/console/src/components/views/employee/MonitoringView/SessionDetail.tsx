@@ -91,7 +91,13 @@ export default function SessionDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
+  // Initialize from URL params synchronously so the first render already shows
+  // "Ending session..." when arriving from the pill (avoids flash of active UI)
+  const [optimisticStatus, setOptimisticStatus] = useState<string | null>(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("summaryToast") === "true") return "summarizing";
+    return null;
+  });
 
   // Poll for updates while session is summarizing
   const { data: session, isLoading: isLoadingSession } = useSession(sessionId || "", {
@@ -142,7 +148,6 @@ export default function SessionDetail() {
 
   // End Session Dialog State
   const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
-  const [isEnding, setIsEnding] = useState(false);
   const [isExternallyTriggered, setIsExternallyTriggered] = useState(false); // Track if triggered from pill
 
   // Preferences for hide pill on session end
@@ -178,10 +183,28 @@ export default function SessionDetail() {
 
   useEffect(() => {
     if (!optimisticStatus) return;
-    if (hasSummary) {
+    // Clear optimistic status only when:
+    // 1. Summary data has arrived, OR
+    // 2. Backend has moved PAST "summarizing" to a terminal state (e.g. "ready")
+    // Do NOT clear when session is still "active"/"paused" — that's the cached
+    // pre-end state before the backend has processed the end request.
+    const backendStatus = session?.status;
+    const backendPastSummarizing =
+      backendStatus &&
+      backendStatus !== "active" &&
+      backendStatus !== "paused" &&
+      backendStatus !== "summarizing";
+
+    if (hasSummary || backendPastSummarizing) {
       setOptimisticStatus(null);
+      // Force-refetch summary when session exits "summarizing" but we don't have data yet.
+      // Without this, summary polling stops (status is no longer "summarizing") while
+      // the cached response is stale from before the summary was saved.
+      if (!hasSummary && sessionId) {
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.summary(sessionId) });
+      }
     }
-  }, [optimisticStatus, hasSummary]);
+  }, [optimisticStatus, hasSummary, session?.status, sessionId, queryClient]);
 
   // Listen for session updates from watch pill (e.g., pause/resume)
   useEffect(() => {
@@ -446,17 +469,36 @@ export default function SessionDetail() {
   }) => {
     if (!sessionId) return;
 
+    // Immediately close dialog and show "Ending session..." in the main UI
     setOptimisticStatus("summarizing");
-    setIsEnding(true);
-    try {
-      // Map style to detailLevel for API
-      const apiPreferences = {
-        detailLevel: preferences.style as "verbose" | "concise",
-        format: preferences.format,
-        includeScreenshots: preferences.includeScreenshots,
-      };
+    setIsEndDialogOpen(false);
+    const wasExternallyTriggered = isExternallyTriggered;
+    setIsExternallyTriggered(false);
 
-      if (isExternallyTriggered) {
+    toast({
+      title: "Session Ended",
+      description: "Generating your master story...",
+    });
+
+    // Handle pill hiding logic (only for non-externally triggered - pill handles its own hiding)
+    if (!wasExternallyTriggered) {
+      if (hidePillOnSessionEnd || dontAskHidePillAgain) {
+        window.consoleAPI.hidePill();
+      } else {
+        setShowSessionEndToast(true);
+      }
+    }
+
+    // Map style to detailLevel for API
+    const apiPreferences = {
+      detailLevel: preferences.style as "verbose" | "concise",
+      format: preferences.format,
+      includeScreenshots: preferences.includeScreenshots,
+    };
+
+    // Run async work in background (dialog already closed, UI shows "Ending session...")
+    try {
+      if (wasExternallyTriggered) {
         // Triggered from pill - use the unified IPC call that handles everything
         // (Electron session end + upload + backend summary)
         logger.info("Ending session via pill trigger (using endSessionWithPreferences)");
@@ -491,23 +533,6 @@ export default function SessionDetail() {
           preferences, // Pass preferences to backend
         });
       }
-
-      setIsEndDialogOpen(false);
-      setIsExternallyTriggered(false); // Reset for next time
-
-      // Handle pill hiding logic (only for non-externally triggered - pill handles its own hiding)
-      if (!isExternallyTriggered) {
-        if (hidePillOnSessionEnd || dontAskHidePillAgain) {
-          window.consoleAPI.hidePill();
-        } else {
-          setShowSessionEndToast(true);
-        }
-      }
-
-      toast({
-        title: "Session Ended",
-        description: "Generating your master story...",
-      });
     } catch (error) {
       logger.error("Error ending session:", error);
       setOptimisticStatus(null);
@@ -516,8 +541,6 @@ export default function SessionDetail() {
         description: "Failed to end session properly.",
         variant: "destructive",
       });
-    } finally {
-      setIsEnding(false);
     }
   };
 
@@ -594,6 +617,38 @@ export default function SessionDetail() {
   };
 
   if (isLoadingSession || isLoadingSummary) {
+    // When arriving from pill end-session, show "Ending session..." immediately
+    // instead of a generic spinner while data loads (~500-600ms)
+    if (optimisticStatus === "summarizing") {
+      return (
+        <div className="p-8 space-y-6 app-no-drag">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/monitoring")}
+                className="text-text-secondary hover:text-text-primary hover:bg-background-elevated"
+              >
+                <ArrowLeft size={20} />
+              </Button>
+              <div>
+                <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="animate-spin" size={20} />
+                    Generating title...
+                  </span>
+                </h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-md bg-background-elevated px-3 py-2 text-text-secondary">
+              <Loader2 className="animate-spin" size={16} />
+              Ending session...
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="p-8 flex items-center justify-center">
         <Loader2 className="animate-spin text-text-secondary" size={32} />
@@ -645,13 +700,13 @@ export default function SessionDetail() {
           </Button>
           <div>
             <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
-              {session.name === "Work session" && uiStatus !== "active" && uiStatus !== "paused" ? (
+              {!session.name && isEndingState ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="animate-spin" size={20} />
                   Generating title...
                 </span>
               ) : (
-                session.name || "Untitled Session"
+                session.name || "Work session"
               )}
             </h1>
             <p className="text-ink-secondary text-sm mt-1">{formatDateTime(session.startedAt)}</p>
@@ -682,14 +737,9 @@ export default function SessionDetail() {
                   </Button>
                   <Button
                     onClick={handleEndButtonClick}
-                    disabled={isEnding}
                     className="gap-2 bg-status-error text-white hover:bg-status-error/90"
                   >
-                    {isEnding ? (
-                      <Loader2 className="animate-spin" size={16} />
-                    ) : (
-                      <Square size={16} />
-                    )}
+                    <Square size={16} />
                     End Session
                   </Button>
                 </>
@@ -710,15 +760,10 @@ export default function SessionDetail() {
                   </Button>
                   <Button
                     onClick={handleEndButtonClick}
-                    disabled={isEnding}
                     variant="outline"
                     className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
                   >
-                    {isEnding ? (
-                      <Loader2 className="animate-spin" size={16} />
-                    ) : (
-                      <Square size={16} />
-                    )}
+                    <Square size={16} />
                     End Session
                   </Button>
                 </>
@@ -1228,7 +1273,7 @@ export default function SessionDetail() {
           }
         }}
         onConfirm={handleConfirmEndSession}
-        isProcessing={isEnding}
+        isProcessing={false}
       />
 
       {/* Session End Toast */}

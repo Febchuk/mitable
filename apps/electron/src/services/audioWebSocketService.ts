@@ -18,6 +18,8 @@ const logger = createLogger("AudioWebSocket");
 
 interface AudioConnectionState {
   sessionId: string;
+  backendUrl: string;
+  token: string;
   ws: WebSocket | null;
   isConnected: boolean;
   reconnectAttempts: number;
@@ -37,7 +39,8 @@ class AudioWebSocketService {
    */
   async connect(
     sessionId: string,
-    backendUrl: string
+    backendUrl: string,
+    token: string
   ): Promise<{
     success: boolean;
     error?: string;
@@ -52,10 +55,15 @@ class AudioWebSocketService {
     logger.info(`[AudioWebSocket] Connecting to backend: ${backendUrl}/audio-stream/${sessionId}`);
 
     try {
-      const ws = new WebSocket(`${backendUrl}/audio-stream/${sessionId}`);
+      const wsUrl = backendUrl.replace(/^http/, "ws");
+      const ws = new WebSocket(
+        `${wsUrl}/audio-stream/${sessionId}?token=${encodeURIComponent(token)}`
+      );
 
       this.connection = {
         sessionId,
+        backendUrl,
+        token,
         ws,
         isConnected: false,
         reconnectAttempts: 0,
@@ -164,8 +172,7 @@ class AudioWebSocketService {
 
     setTimeout(() => {
       if (this.connection) {
-        const backendUrl = process.env.VITE_API_URL || "http://localhost:3000";
-        this.connect(this.connection.sessionId, backendUrl);
+        this.connect(this.connection.sessionId, this.connection.backendUrl, this.connection.token);
       }
     }, this.RECONNECT_DELAY_MS);
   }

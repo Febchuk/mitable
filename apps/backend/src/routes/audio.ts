@@ -6,7 +6,9 @@
 
 import { Router } from "express";
 import { WebSocketServer, WebSocket } from "ws";
+import { URL } from "url";
 import { deepgramTranscriptionService } from "../services/deepgramTranscriptionService.js";
+import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -21,17 +23,52 @@ const audioConnections = new Map<string, WebSocket>();
 export function initializeAudioWebSocket(server: any) {
   const wss = new WebSocketServer({
     server,
-    // Don't set a fixed path - we need to accept /audio-stream/:sessionId
-    verifyClient: (info: { origin: string; secure: boolean; req: any }) => {
-      // Accept any connection that starts with /audio-stream/
+    verifyClient: async (
+      info: { origin: string; secure: boolean; req: any },
+      callback: (result: boolean, code?: number, message?: string) => void
+    ) => {
       const url = info.req.url || "";
-      return url.startsWith("/audio-stream/");
+      if (!url.startsWith("/audio-stream/")) {
+        callback(false, 404, "Not found");
+        return;
+      }
+
+      // Extract token from query param: /audio-stream/:sessionId?token=xxx
+      try {
+        const parsedUrl = new URL(url, "http://localhost");
+        const token = parsedUrl.searchParams.get("token");
+
+        if (!token) {
+          logger.warn("❌ Audio WebSocket rejected: No auth token");
+          callback(false, 401, "Authentication required");
+          return;
+        }
+
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser(token);
+        if (error || !user) {
+          logger.warn("❌ Audio WebSocket rejected: Invalid token");
+          callback(false, 401, "Invalid or expired token");
+          return;
+        }
+
+        // Attach user to request for use in connection handler
+        (info.req as any).authenticatedUserId = user.id;
+        callback(true);
+      } catch (error) {
+        logger.error({ err: error }, "❌ Audio WebSocket auth error");
+        callback(false, 500, "Authentication failed");
+      }
     },
   });
 
   wss.on("connection", (ws, req) => {
-    // Extract session ID from URL path: /audio-stream/:sessionId
-    const sessionId = req.url?.split("/").pop();
+    // Extract session ID from URL path (strip query params)
+    const urlPath = (req.url || "").split("?")[0];
+    const sessionId = urlPath.split("/").pop();
+    const userId = (req as any).authenticatedUserId;
 
     if (!sessionId) {
       logger.warn("❌ Audio WebSocket connection rejected: No session ID");
@@ -39,7 +76,7 @@ export function initializeAudioWebSocket(server: any) {
       return;
     }
 
-    logger.info(`🎤 Audio WebSocket connected for session: ${sessionId}`);
+    logger.info(`🎤 Audio WebSocket connected for session: ${sessionId} (user: ${userId})`);
     audioConnections.set(sessionId, ws);
 
     // Start Deepgram transcription for this session

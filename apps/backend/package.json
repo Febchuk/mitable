@@ -33,6 +33,7 @@
     "migrate:0024": "tsx src/scripts/run-migration-0024.ts",
     "migrate:0025": "tsx src/scripts/run-migration-0025.ts",
     "migrate:0026": "tsx src/scripts/run-migration-0026.ts",
+    "migrate:0033": "tsx src/scripts/run-migration-0033.ts",
     "migrate:persona-fields": "tsx src/scripts/run-migration-add-persona-fields.ts",
     "test-search": "tsx src/scripts/test-search.ts",
     "sync-slack": "tsx src/scripts/sync-slack.ts",
@@ -43,6 +44,7 @@
     "video-to-session": "tsx src/scripts/video-to-session.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
     "@babel/parser": "^7.28.5",
     "@deepgram/sdk": "^4.11.3",
     "@google/generative-ai": "^0.24.1",
