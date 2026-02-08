@@ -95,6 +95,7 @@ class SessionTitleService {
       const activitySummary = this.buildActivitySummary(validActivities);
 
       // 3. Generate title using AI
+      // Note: Using openai/gpt-oss-120b for improved title quality over llama-3.3-70b-versatile
       const completion = await this.groq.chat.completions.create({
         model: "openai/gpt-oss-120b",
         messages: [

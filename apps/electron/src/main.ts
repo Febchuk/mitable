@@ -721,19 +721,18 @@ function setupIPC() {
   });
 
   // Console clears tokens on logout
-  ipcMain.on(IPC_CHANNELS.AUTH_CLEAR, () => {
+  ipcMain.on(IPC_CHANNELS.AUTH_CLEAR, async () => {
     authLogger.info(" Tokens cleared");
     authTokens.accessToken = null;
     authTokens.refreshToken = null;
 
-    // Clear centralized auth manager + keychain
+    // Clear centralized auth manager + keychain (await to ensure keychain is cleared before app exit)
     const userCtx = currentUserContext
       ? { orgId: currentUserContext.organizationId, userId: currentUserContext.userId }
       : undefined;
 
-    authManager.clearTokens(userCtx).then(() => {
-      authLogger.info(" Auth manager and keychain cleared");
-    });
+    await authManager.clearTokens(userCtx);
+    authLogger.info(" Auth manager and keychain cleared");
 
     currentUserContext = null;
 
