@@ -140,6 +140,41 @@ export const DOCUMENT_GENERATION_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_artifact_content",
+      description:
+        "Get the extracted text content of uploaded artifacts (PDFs, DOCX, TXT, MD files). Only works if artifact IDs were provided.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_artifacts",
+      description:
+        "Search uploaded artifacts by semantic similarity to a query. Finds relevant passages from PDFs, documents, and text files in the user's organization.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query to find relevant artifact content",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of results (default: 5)",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 /**
@@ -246,20 +281,17 @@ export async function executeToolCall(
       }
 
       case "get_all_summaries": {
-        const summaries: Array<{ sessionId: string; sessionName: string; summary: string | null }> =
-          [];
+        // Fetch metadata once instead of per-session (was N+1 query)
+        const allMetadata = await env.getSessionsMetadata(environment);
 
-        for (const sessionId of environment.sessionIds) {
-          const summary = await env.getSessionSummary(sessionId);
-          const metadata = await env.getSessionsMetadata(environment);
-          const sessionName = metadata.find((s) => s.id === sessionId)?.name || "Unnamed Session";
-
-          summaries.push({
-            sessionId,
-            sessionName,
-            summary,
-          });
-        }
+        const summaries = await Promise.all(
+          environment.sessionIds.map(async (sessionId) => {
+            const summary = await env.getSessionSummary(sessionId);
+            const sessionName =
+              allMetadata.find((s) => s.id === sessionId)?.name || "Unnamed Session";
+            return { sessionId, sessionName, summary };
+          })
+        );
 
         result = {
           totalSessions: summaries.length,
@@ -288,6 +320,54 @@ export async function executeToolCall(
             date: s.startedAt.toLocaleDateString(),
           })),
         };
+        break;
+      }
+
+      case "get_artifact_content": {
+        const artifacts = await env.getArtifactReferences(environment);
+
+        if (artifacts.length === 0) {
+          result = {
+            message: "No artifacts available. The user did not attach any documents.",
+            artifacts: [],
+          };
+        } else {
+          result = {
+            artifactCount: artifacts.length,
+            artifacts: artifacts.map((a) => ({
+              id: a.id,
+              filename: a.filename,
+              hasText: !!a.extractedText,
+              // Return full text (capped at 8000 chars per artifact to stay within token limits)
+              content: a.extractedText
+                ? a.extractedText.substring(0, 8000)
+                : "[No text extracted - this may be an image file]",
+            })),
+          };
+        }
+        break;
+      }
+
+      case "search_artifacts": {
+        const { query: searchQuery, limit: searchLimit = 5 } = args;
+        const searchResults = await env.searchArtifacts(environment, searchQuery, searchLimit);
+
+        if (searchResults.length === 0) {
+          result = {
+            message:
+              "No relevant artifacts found. The organization may not have uploaded documents, or none matched the query.",
+            results: [],
+          };
+        } else {
+          result = {
+            resultCount: searchResults.length,
+            results: searchResults.map((r) => ({
+              filename: r.filename,
+              relevanceScore: r.score.toFixed(3),
+              excerpt: r.text,
+            })),
+          };
+        }
         break;
       }
 

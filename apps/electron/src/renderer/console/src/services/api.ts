@@ -57,7 +57,13 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
         logger.info(" Token refreshed, request retried successfully");
       } catch (refreshError) {
         logger.error(" Token refresh failed:", refreshError);
-        // Refresh failed - clear tokens and redirect to login
+        // Only clear tokens on real auth errors, not network failures
+        if (
+          refreshError instanceof TypeError &&
+          /failed to fetch|network/i.test(refreshError.message)
+        ) {
+          throw new Error("Backend unreachable. Please try again.");
+        }
         authService.clearTokens();
         window.location.href = "/login";
         throw new Error("Session expired. Please log in again.");

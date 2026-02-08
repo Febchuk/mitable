@@ -43,6 +43,7 @@ const IPC_CHANNELS = {
   SESSION_SHOW_RECOVERY_DIALOG: "session-show-recovery-dialog",
   // Navigation
   NAVIGATE_TO_ACTIVE_SESSION: "navigate-to-active-session",
+  NAVIGATE_TO_SESSION_DETAIL: "navigate-to-session-detail",
   // Preferences
   PREFERENCES_GET: "preferences-get",
   PREFERENCES_SET: "preferences-set",
@@ -71,6 +72,8 @@ const IPC_CHANNELS = {
   END_SESSION_WITH_PREFERENCES: "end-session-with-preferences",
   // Watching pill
   WATCHING_PILL_HIDE: "watching-pill-hide",
+  // Auth session restore (main → renderer on startup)
+  AUTH_SESSION_RESTORED: "auth-session-restored",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -134,6 +137,20 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       IPC_CHANNELS.AUTH_TOKEN_UPDATED,
       (_event: IpcRendererEvent, token: string | null) => callback(token)
     );
+  },
+  // Auth session restore - main process pushes tokens recovered from OS keychain on startup
+  onSessionRestored: (
+    callback: (tokens: { accessToken: string; refreshToken: string }) => void
+  ): (() => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      tokens: { accessToken: string; refreshToken: string }
+    ) => {
+      logger.info(" Session restored from keychain, tokens received");
+      callback(tokens);
+    };
+    ipcRenderer.on(IPC_CHANNELS.AUTH_SESSION_RESTORED, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AUTH_SESSION_RESTORED, handler);
   },
 
   // User context - Share userId/orgId with main process for cross-window access
@@ -257,6 +274,25 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       logger.info(" Navigate to active session received");
       callback();
     });
+  },
+
+  // Navigation - Navigate to a specific session detail with optional flags
+  onNavigateToSessionDetail: (
+    callback: (payload: {
+      sessionId: string;
+      openEndDialog?: boolean;
+      showSummaryToast?: boolean;
+    }) => void
+  ) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      payload: { sessionId: string; openEndDialog?: boolean; showSummaryToast?: boolean }
+    ) => {
+      logger.info(" Navigate to session detail received", payload);
+      callback(payload);
+    };
+    ipcRenderer.on(IPC_CHANNELS.NAVIGATE_TO_SESSION_DETAIL, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.NAVIGATE_TO_SESSION_DETAIL, handler);
   },
 
   // Update notifications

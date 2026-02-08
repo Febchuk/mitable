@@ -143,7 +143,38 @@ class DocGenerationStreamService {
         sessionName: string;
         chunkCount: number;
       }> = [];
-      console.log(`[DocGenerationStream] Found ${sessionIds.length} relevant sessions`);
+      console.log(`[DocGenerationStream] Found ${sessionIds.length} relevant sessions via RAG`);
+
+      // Hybrid: merge un-indexed sessions from the date range into results.
+      // The environment tools have fallbacks to query raw DB data for these.
+      if (dateRange) {
+        const indexedSet = new Set(sessionIds);
+        const unindexedSessions = await db
+          .select({
+            id: schema.monitoringSessions.id,
+            name: schema.monitoringSessions.name,
+          })
+          .from(schema.monitoringSessions)
+          .where(
+            and(
+              eq(schema.monitoringSessions.organizationId, organizationId),
+              eq(schema.monitoringSessions.userId, userId),
+              gte(schema.monitoringSessions.startedAt, dateRange.start),
+              lte(schema.monitoringSessions.startedAt, dateRange.end),
+              sql`${schema.monitoringSessions.status} IN ('ready', 'delivered')`,
+              sql`${schema.monitoringSessions.ingestionStatus} != 'completed'`
+            )
+          )
+          .limit(20);
+
+        const newIds = unindexedSessions.filter((s) => !indexedSet.has(s.id));
+        if (newIds.length > 0) {
+          console.log(
+            `[DocGenerationStream] Adding ${newIds.length} un-indexed sessions via hybrid fallback`
+          );
+          sessionIds.push(...newIds.map((s) => s.id));
+        }
+      }
 
       // If hint session IDs provided, prioritize them
       if (hintSessionIds && hintSessionIds.length > 0) {
@@ -318,12 +349,37 @@ class DocGenerationStreamService {
         }));
       }
 
-      // Phase 3: Create RLM environment
+      // Phase 3: Auto-discover relevant artifacts + Create RLM environment
       yield {
         type: "progress",
         phase: "analyzing_data",
-        message: "Creating analysis environment...",
+        message: "Searching for relevant reference documents...",
       } as ProgressEvent;
+
+      // Merge explicitly provided artifact IDs with auto-discovered ones
+      const allArtifactIds = artifactIds ? [...artifactIds] : [];
+      try {
+        const { artifactEmbeddingService } =
+          await import("../services/artifact-embedding.service.js");
+        const relevantArtifacts = await artifactEmbeddingService.queryRelevant(prompt, {
+          organizationId,
+          topK: 5,
+        });
+        const discoveredIds = relevantArtifacts
+          .filter((a) => a.score >= 0.4) // Only include meaningfully relevant artifacts
+          .map((a) => a.artifactId);
+        const existingSet = new Set(allArtifactIds);
+        const newIds = discoveredIds.filter((id) => !existingSet.has(id));
+        if (newIds.length > 0) {
+          allArtifactIds.push(...newIds);
+          console.log(
+            `[DocGenerationStream] Auto-discovered ${newIds.length} relevant artifact(s)`
+          );
+        }
+      } catch (error) {
+        // Non-fatal: artifact search may fail if Pinecone is unavailable
+        console.warn("[DocGenerationStream] Artifact auto-discovery failed:", error);
+      }
 
       const environment = createDocumentEnvironment(
         sessionIds,
@@ -331,7 +387,7 @@ class DocGenerationStreamService {
         userId, // CRITICAL: Pass userId to prevent data leakage
         prompt,
         dateRange || null,
-        artifactIds // Optional artifact IDs for reference material
+        allArtifactIds.length > 0 ? allArtifactIds : undefined
       );
 
       // Phase 4: Run RLM agent with tool-calling loop

@@ -51,6 +51,23 @@ const MITABLE_WINDOW_TITLES = new Set([
   "Watch Button",
 ]);
 
+// RDP/Citrix app name patterns — these windows are invisible to get-windows
+// and can't be re-added manually, so they must be exempt from TTL cleanup
+const REMOTE_DESKTOP_PATTERNS = [
+  "citrix",
+  "hdx",
+  "wfica",
+  "remote desktop",
+  "mstsc",
+  "vmware horizon",
+  "vmconnect",
+];
+
+function isRemoteDesktopApp(appName: string): boolean {
+  const lower = appName.toLowerCase();
+  return REMOTE_DESKTOP_PATTERNS.some((p) => lower.includes(p));
+}
+
 /**
  * Normalize app name by removing OS-specific extensions
  * This ensures cross-platform matching works correctly
@@ -188,6 +205,9 @@ class FocusWindowTracker {
     this.lastActiveWindowId = null;
     this.onWindowsChanged = null;
 
+    // Clear selected windows so checkForClosedWindows becomes a no-op
+    windowDetectionService.clearAll();
+
     logger.info(" Stopped tracking focused windows");
   }
 
@@ -247,9 +267,13 @@ class FocusWindowTracker {
 
       this.lastActiveWindowId = windowId;
 
-      // Skip windows with no title
+      // Skip windows with no title (except RDP/Citrix which may have empty titles)
       if (!windowTitle || windowTitle.trim() === "") {
-        return;
+        if (!isRemoteDesktopApp(appName)) {
+          return;
+        }
+        // Use the app name as the title for RDP/Citrix windows
+        logger.info(` Allowing empty-title RDP/Citrix window: ${appName}`);
       }
 
       // Check if window should be excluded (Mitable, Spotify, or policy-blocked)
@@ -274,11 +298,14 @@ class FocusWindowTracker {
       ];
       const isBrowser = browserApps.includes(appName);
 
+      // For RDP/Citrix with empty titles, use appName as fallback
+      const effectiveTitle = windowTitle || appName;
+
       // Add or refresh the window
       this.addOrRefreshWindow({
         windowId,
         appName,
-        windowTitle,
+        windowTitle: effectiveTitle,
         displayName: appName,
         tabTitle: isBrowser ? windowTitle : undefined,
         isBrowser,
@@ -297,16 +324,30 @@ class FocusWindowTracker {
     const existingWindow = this.trackedWindows.get(window.windowId);
 
     if (existingWindow) {
-      // Refresh TTL
+      // Same OS window — just refresh TTL and title
       existingWindow.lastFocusedAt = now;
       existingWindow.expiresAt = now + WINDOW_TTL_MS;
-      existingWindow.windowTitle = window.windowTitle; // Update title (e.g., browser tab change)
+      existingWindow.windowTitle = window.windowTitle;
       existingWindow.tabTitle = window.tabTitle;
 
       logger.info(
         ` Refreshed TTL for window: ${window.appName} (${window.windowTitle.substring(0, 40)}...)`
       );
     } else {
+      // Different OS window — check if we already track another window for the same app
+      // (e.g., Chrome main window vs DevTools, Windsurf editor vs terminal panel).
+      // Replace the old entry so the badge count stays at one-per-app.
+      for (const [existingId, existingWin] of this.trackedWindows) {
+        if (existingWin.appName === window.appName) {
+          this.trackedWindows.delete(existingId);
+          windowDetectionService.removeWindow(existingId);
+          logger.info(
+            ` Replacing tracked window for ${window.appName}: ${existingId} → ${window.windowId}`
+          );
+          break;
+        }
+      }
+
       // Add new window
       const trackedWindow: TrackedWindow = {
         ...window,
@@ -343,6 +384,14 @@ class FocusWindowTracker {
 
     for (const [windowId, window] of this.trackedWindows) {
       if (window.expiresAt <= now) {
+        // Never auto-expire RDP/Citrix windows — they can't be re-added
+        // because get-windows can't enumerate them
+        if (isRemoteDesktopApp(window.appName)) {
+          logger.info(
+            ` Keeping RDP/Citrix window past TTL: ${window.appName} (${window.windowTitle.substring(0, 40)})`
+          );
+          continue;
+        }
         expiredWindowIds.push(windowId);
       }
     }
@@ -372,13 +421,15 @@ class FocusWindowTracker {
   private notifyWindowsChanged(): void {
     const windows = this.getTrackedWindows();
 
-    // Call the callback if set
+    // Call the callback if set (updates session config)
     if (this.onWindowsChanged) {
       this.onWindowsChanged(windows);
     }
 
-    // Also broadcast to all Electron windows
-    this.broadcastWindowsUpdate(windows);
+    // Broadcast windowDetectionService as the single source of truth for UI
+    // (avoids divergence between focus tracker's internal map and the service)
+    const uiWindows = windowDetectionService.getSelectedWindows();
+    this.broadcastWindowsUpdate(uiWindows);
   }
 
   /**

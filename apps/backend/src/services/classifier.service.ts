@@ -1,6 +1,6 @@
 import { db } from "../db/client";
 import { users, sessionCaptures } from "../db/schema";
-import { eq, asc, and, isNotNull } from "drizzle-orm";
+import { eq, asc, desc, and, isNotNull } from "drizzle-orm";
 import { createSessionLogger } from "../lib/sessionLogger";
 import { classifierRLMService } from "./classifier-rlm/classifier-rlm.service";
 
@@ -75,21 +75,21 @@ class ClassifierService {
 
       // 2. Fetch Recent History (Last 5 valid activities)
       // We look for captures that HAVE an activityDescription already
-      // Order by capturedAt ascending to get chronological order directly
+      // Order by capturedAt descending to get the MOST RECENT 5, then reverse for chronological order
       const historyCaptures = await db.query.sessionCaptures.findMany({
         where: and(
           eq(sessionCaptures.sessionId, input.sessionId),
           isNotNull(sessionCaptures.activityDescription)
         ),
-        orderBy: [asc(sessionCaptures.capturedAt)],
+        orderBy: [desc(sessionCaptures.capturedAt)],
         limit: 5,
         columns: {
           activityDescription: true,
         },
       });
 
-      // History is already in chronological order [oldest ... newest]
-      const history = historyCaptures.map((c) => c.activityDescription as string);
+      // Reverse to chronological order [oldest ... newest]
+      const history = historyCaptures.reverse().map((c) => c.activityDescription as string);
 
       // Fetch previous delta for temporal reasoning (N-1 frame)
       let previousDelta = input.previousDelta;

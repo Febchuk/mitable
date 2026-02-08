@@ -89,8 +89,22 @@ function NavigationHandler() {
       }
     });
 
+    const unsubscribeSessionDetail = window.consoleAPI.onNavigateToSessionDetail?.((payload) => {
+      logger.info(" Navigating to session detail:", payload);
+      const params = new URLSearchParams();
+      if (payload.openEndDialog) {
+        params.set("openEndDialog", "true");
+      }
+      if (payload.showSummaryToast) {
+        params.set("summaryToast", "true");
+      }
+      const query = params.toString();
+      navigate(`/monitoring/${payload.sessionId}${query ? `?${query}` : ""}`);
+    });
+
     return () => {
       unsubscribeEndDialog?.();
+      unsubscribeSessionDetail?.();
     };
   }, [navigate]);
 

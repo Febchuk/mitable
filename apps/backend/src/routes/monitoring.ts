@@ -688,35 +688,44 @@ router.post(
             includeScreenshots: false,
           };
 
-      // Generate AI title and story in parallel (async, don't block response)
-      Promise.all([
-        // Generate session title from activity timeline
-        (async () => {
-          try {
-            const { sessionTitleService } = await import("../services/session-title.service.js");
-            const aiTitle = await sessionTitleService.generateTitle(id);
+      // Wait briefly for in-flight analyze-frame requests to complete before querying activities.
+      // The Electron client fires analyzeFrameAsync calls that may still be writing
+      // activityDescription to the DB when the end request arrives.
+      const SETTLE_DELAY_MS = 5000;
 
-            // Update session name if AI generated a valid title
-            if (aiTitle && aiTitle !== "Work session") {
-              await db
-                .update(schema.monitoringSessions)
-                .set({ name: aiTitle })
-                .where(eq(schema.monitoringSessions.id, id));
-              log.info("Session title generated", { sessionId: id, title: aiTitle });
-            }
-          } catch (error) {
-            log.error("Session title generation failed", {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
-        })(),
-        // Generate master story
-        masterStoryService.generateStory({
-          sessionId: id,
-          userId,
-          formatPreference,
-        }),
-      ])
+      // Generate AI title and story in parallel (async, don't block response)
+      new Promise((r) => setTimeout(r, SETTLE_DELAY_MS))
+        .then(() =>
+          Promise.all([
+            // Generate session title from activity timeline
+            (async () => {
+              try {
+                const { sessionTitleService } =
+                  await import("../services/session-title.service.js");
+                const aiTitle = await sessionTitleService.generateTitle(id);
+
+                // Update session name if AI generated a valid title
+                if (aiTitle && aiTitle !== "Work session") {
+                  await db
+                    .update(schema.monitoringSessions)
+                    .set({ name: aiTitle })
+                    .where(eq(schema.monitoringSessions.id, id));
+                  log.info("Session title generated", { sessionId: id, title: aiTitle });
+                }
+              } catch (error) {
+                log.error("Session title generation failed", {
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+            })(),
+            // Generate master story
+            masterStoryService.generateStory({
+              sessionId: id,
+              userId,
+              formatPreference,
+            }),
+          ])
+        )
         .then(async () => {
           log.info("Session end processing completed", { sessionId: id });
           // Update status to ready after successful story generation
@@ -797,7 +806,7 @@ router.post(
         success: true,
         session: {
           id: updated.id,
-          status: "ready", // Updated after mock summary
+          status: "summarizing",
           startedAt: updated.startedAt,
           endedAt: updated.endedAt,
           duration: {

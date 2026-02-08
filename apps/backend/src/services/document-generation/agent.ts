@@ -158,9 +158,13 @@ ${environment.dateRange ? `- Date range: ${environment.dateRange.start.toLocaleD
 - get_sessions_overview: Get high-level overview of all sessions
 - get_session_timeline: Get detailed timeline for a specific session
 - get_session_summary: Get narrative summary for a session
+- get_all_summaries: Get summaries for all sessions at once
 - get_time_breakdown: Get application usage breakdown
 - get_top_applications: Get top apps by time spent
 - filter_sessions_by_priority: Filter sessions by priority (high/medium/low)
+- get_artifact_content: Get full text of uploaded reference documents (PDFs, DOCX, etc.)
+- search_artifacts: Search uploaded documents by semantic similarity to find relevant passages
+${environment.artifactIds && environment.artifactIds.length > 0 ? `\n**Attached Artifacts:** ${environment.artifactIds.length} document(s) were attached as reference material. Use get_artifact_content to read them.` : ""}
 
 **Document Type Guidance:**
 ${docTypeInstructions}
@@ -174,7 +178,8 @@ ${docTypeInstructions}
 **Important:**
 - Call tools to gather data BEFORE generating content
 - Use multiple tool calls to get a complete picture
-- Base your document ONLY on actual session data (no hallucination)
+- Base your document ONLY on actual session data and artifact content (no hallucination)
+- If the user's request could benefit from uploaded documents, use search_artifacts to find relevant content
 - When you have enough information, generate the complete document
 
 Begin by examining the session data using the available tools.`;

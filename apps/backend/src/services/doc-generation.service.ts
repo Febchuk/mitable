@@ -437,10 +437,12 @@ Revised document:`;
     // Build context from chunks
     const sessionContext = sessionRetrieverService.buildDocumentContext(sessionMap);
 
-    // Extract key activities and accomplishments from chunks
+    // Extract key activities, accomplishments, and blockers
     const keyActivities = this.extractActivities(chunks);
     const accomplishments = this.extractAccomplishments(chunks);
-    const blockers: string[] = []; // TODO: Extract from metadata if needed
+    const blockers: string[] = Array.isArray(session.blockers)
+      ? (session.blockers as string[])
+      : [];
 
     return {
       summary: sessionContext,

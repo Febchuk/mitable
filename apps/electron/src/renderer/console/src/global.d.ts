@@ -30,10 +30,23 @@ interface ConsoleAPI {
   // Active session navigation (from native notification click)
   onNavigateToActiveSession: (callback: () => void) => void;
 
+  // Navigate to a specific session detail with optional flags
+  onNavigateToSessionDetail: (
+    callback: (payload: {
+      sessionId: string;
+      openEndDialog?: boolean;
+      showSummaryToast?: boolean;
+    }) => void
+  ) => () => void;
+
   // Auth management
   setAuthTokens: (accessToken: string, refreshToken: string) => void;
   clearAuthTokens: () => void;
   onAuthTokenUpdated: (callback: (token: string | null) => void) => void;
+  // Auth session restore - main process pushes tokens recovered from OS keychain on startup
+  onSessionRestored: (
+    callback: (tokens: { accessToken: string; refreshToken: string }) => void
+  ) => (() => void) | undefined;
 
   // User context - share userId/orgId with main process for cross-window access
   setCurrentUser: (user: { userId: string; organizationId: string }) => void;

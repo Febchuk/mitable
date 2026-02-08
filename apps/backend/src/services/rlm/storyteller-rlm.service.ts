@@ -31,7 +31,7 @@ export interface StorytellerRLMResult {
   executionTimeMs: number;
 }
 
-interface ToolCallResult {
+interface ToolCallRecord {
   tool: string;
   result: any;
 }
@@ -65,20 +65,27 @@ class StorytellerRLMService {
       input.preferences
     );
 
-    // Track execution state
-    const toolCallHistory: ToolCallResult[] = [];
+    // Build conversation — accumulated across iterations so LLM sees its own reasoning
+    const systemPrompt = getStorytellerSystemPrompt();
+    const initialUserPrompt = getStorytellerUserPrompt("start", []);
+    const messages: Array<{ role: string; content: string }> = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: initialUserPrompt },
+    ];
+
+    // Track execution state (toolCallHistory kept for fallback extraction)
+    const toolCallHistory: ToolCallRecord[] = [];
     let iterations = 0;
     let finalSummary = "";
 
     while (iterations < this.maxIterations) {
       iterations++;
 
-      // Get LLM decision on next tool to call
-      const llmResponse = await this.getLLMDecision(
-        environment,
-        toolCallHistory,
-        iterations === 1 ? "start" : "continue"
-      );
+      // Get LLM decision using accumulated conversation
+      const llmResponse = await this.getLLMDecision(messages);
+
+      // Append assistant response to conversation
+      messages.push({ role: "assistant", content: JSON.stringify(llmResponse) });
 
       // Check if LLM is done
       if (llmResponse.done && llmResponse.summary) {
@@ -97,6 +104,12 @@ class StorytellerRLMService {
         toolCallHistory.push({
           tool: llmResponse.tool,
           result: toolResult,
+        });
+
+        // Append tool result as user message so LLM sees it next iteration
+        messages.push({
+          role: "user",
+          content: `Tool "${llmResponse.tool}" returned:\n${JSON.stringify(toolResult, null, 2)}\n\nContinue with the next step of your plan.`,
         });
       } else {
         break;
@@ -122,18 +135,10 @@ class StorytellerRLMService {
    * Get LLM decision on which tool to call next
    */
   private async getLLMDecision(
-    _environment: StorytellerEnvironment,
-    toolCallHistory: ToolCallResult[],
-    state: string
+    messages: Array<{ role: string; content: string }>
   ): Promise<LLMResponse> {
-    const systemPrompt = getStorytellerSystemPrompt();
-    const userPrompt = getStorytellerUserPrompt(state, toolCallHistory);
-
     const completion = await this.groq.chat.completions.create({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
+      messages: messages as any,
       model: "openai/gpt-oss-120b",
       temperature: 0.1, // Low temp for consistent tool selection
       response_format: { type: "json_object" },
@@ -174,7 +179,7 @@ class StorytellerRLMService {
   /**
    * Calculate recursion depth from tool call history
    */
-  private calculateRecursionDepth(toolCallHistory: ToolCallResult[]): number {
+  private calculateRecursionDepth(toolCallHistory: ToolCallRecord[]): number {
     const summarizeChunkCalls = toolCallHistory.filter((t) => t.tool === "summarize_chunk");
     return summarizeChunkCalls.length;
   }
@@ -182,7 +187,7 @@ class StorytellerRLMService {
   /**
    * Fallback: Extract summary from tool history if LLM didn't complete
    */
-  private extractFallbackSummary(toolCallHistory: ToolCallResult[]): string {
+  private extractFallbackSummary(toolCallHistory: ToolCallRecord[]): string {
     // Look for merge_summaries result
     const mergeResult = toolCallHistory
       .slice()

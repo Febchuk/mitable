@@ -66,11 +66,6 @@ export interface ClassifierRLMResult {
   executionTimeMs: number;
 }
 
-interface ToolCallResult {
-  tool: string;
-  result: any;
-}
-
 interface LLMResponse {
   tool?: string;
   parameters?: any;
@@ -112,8 +107,19 @@ class ClassifierRLMService {
     // Initialize environment
     const environment = new ClassifierEnvironment(context);
 
+    // Build conversation — accumulated across iterations so LLM sees its own reasoning
+    const systemPrompt = getClassifierSystemPrompt();
+    const initialUserPrompt = getClassifierUserPrompt(
+      `Classify this screen change: "${input.deltaDescription}"`,
+      []
+    );
+    const messages: Array<{ role: string; content: string }> = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: initialUserPrompt },
+    ];
+
     // Track execution state
-    const toolCallHistory: ToolCallResult[] = [];
+    let toolCallCount = 0;
     let iterations = 0;
     let finalClassification: ClassifierRLMResult | null = null;
 
@@ -121,14 +127,17 @@ class ClassifierRLMService {
       while (iterations < this.maxIterations) {
         iterations++;
 
-        // Get LLM decision on next tool to call
-        const llmResponse = await this.getLLMDecision(toolCallHistory, input.deltaDescription);
+        // Get LLM decision using accumulated conversation
+        const llmResponse = await this.getLLMDecision(messages);
+
+        // Append assistant response to conversation
+        messages.push({ role: "assistant", content: JSON.stringify(llmResponse) });
 
         // Check if LLM is done
         if (llmResponse.done && llmResponse.classification) {
           finalClassification = this.parseClassification(
             llmResponse.classification,
-            toolCallHistory.length,
+            toolCallCount,
             timer.elapsed()
           );
           break;
@@ -143,10 +152,12 @@ class ClassifierRLMService {
           }
 
           const result = await tool.execute(llmResponse.parameters || {}, environment);
+          toolCallCount++;
 
-          toolCallHistory.push({
-            tool: llmResponse.tool,
-            result,
+          // Append tool result as user message so LLM sees it next iteration
+          messages.push({
+            role: "user",
+            content: `Tool "${llmResponse.tool}" returned:\n${JSON.stringify(result, null, 2)}\n\nWhat should you do next? Or are you ready to return your final classification?`,
           });
         } else {
           break;
@@ -156,7 +167,7 @@ class ClassifierRLMService {
       if (!finalClassification) {
         finalClassification = this.createFallbackClassification(
           input.deltaDescription,
-          toolCallHistory.length,
+          toolCallCount,
           timer.elapsed()
         );
       }
@@ -166,7 +177,7 @@ class ClassifierRLMService {
       // Fallback on error
       return this.createFallbackClassification(
         input.deltaDescription,
-        toolCallHistory.length,
+        toolCallCount,
         timer.elapsed()
       );
     }
@@ -176,20 +187,10 @@ class ClassifierRLMService {
    * Get LLM decision on what to do next
    */
   private async getLLMDecision(
-    previousResults: ToolCallResult[],
-    deltaDescription: string
+    messages: Array<{ role: string; content: string }>
   ): Promise<LLMResponse> {
-    const systemPrompt = getClassifierSystemPrompt();
-    const userPrompt = getClassifierUserPrompt(
-      `Classify this screen change: "${deltaDescription}"`,
-      previousResults
-    );
-
     const completion = await this.groq.chat.completions.create({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
+      messages: messages as any,
       model: "openai/gpt-oss-120b",
       temperature: 0.05, // Cognition not creativity - low temp for deterministic reasoning
       response_format: { type: "json_object" },

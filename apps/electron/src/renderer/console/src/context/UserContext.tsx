@@ -5,6 +5,11 @@ import { createLogger } from "../../../lib/logger";
 
 const logger = createLogger("UserContext");
 
+/** True for fetch failures (server unreachable) vs real HTTP errors */
+function isNetworkError(error: unknown): boolean {
+  return error instanceof TypeError && /failed to fetch|network/i.test(error.message);
+}
+
 interface UserContextType {
   user: User | null;
   isLoading: boolean;
@@ -21,39 +26,55 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // Helper: given an access token, fetch user profile and populate state
+  const hydrateUser = async (accessToken: string) => {
+    const response = await authService.getMe(accessToken);
+    setUser({
+      id: response.profile.id,
+      name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
+      firstName: response.profile.firstName || "",
+      email: response.profile.email || undefined,
+      avatarUrl: response.profile.avatarUrl || undefined,
+      currentWeek: response.profile.currentWeek || 1,
+      role: response.profile.role,
+      originalRole: response.profile.role,
+      organizationId: response.profile.organizationId || "",
+    });
+    setIsAuthenticated(true);
+
+    // Share user context with main process for cross-window access (WatchingPill, etc.)
+    if (window.consoleAPI?.setCurrentUser) {
+      window.consoleAPI.setCurrentUser({
+        userId: response.profile.id,
+        organizationId: response.profile.organizationId || "",
+      });
+    }
+  };
+
   // Load user from token on mount
   useEffect(() => {
     const loadUser = async () => {
       const token = authService.getAccessToken();
 
       if (!token) {
-        setIsLoading(false);
+        // No token in localStorage — wait briefly for main process to push
+        // restored tokens from OS keychain before giving up
+        logger.info("No local token, waiting for keychain restore…");
+        setTimeout(() => {
+          // If still not authenticated after delay, stop loading
+          setIsLoading((prev) => {
+            // Only clear loading if we haven't been authenticated by the restore listener
+            if (!authService.getAccessToken()) {
+              return false;
+            }
+            return prev;
+          });
+        }, 2500);
         return;
       }
 
       try {
-        const response = await authService.getMe(token);
-
-        setUser({
-          id: response.profile.id,
-          name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
-          firstName: response.profile.firstName || "",
-          email: response.profile.email || undefined,
-          avatarUrl: response.profile.avatarUrl || undefined,
-          currentWeek: response.profile.currentWeek || 1,
-          role: response.profile.role,
-          originalRole: response.profile.role,
-          organizationId: response.profile.organizationId || "",
-        });
-        setIsAuthenticated(true);
-
-        // Share user context with main process for cross-window access (WatchingPill, etc.)
-        if (window.consoleAPI?.setCurrentUser) {
-          window.consoleAPI.setCurrentUser({
-            userId: response.profile.id,
-            organizationId: response.profile.organizationId || "",
-          });
-        }
+        await hydrateUser(token);
 
         // Broadcast token to main process for cross-window sharing (Agent pill, etc.)
         const refreshToken = authService.getRefreshToken();
@@ -62,6 +83,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         logger.error("Failed to load user:", error);
+
+        // Network error (backend not up yet) — keep tokens and wait for restore
+        if (isNetworkError(error)) {
+          logger.info("Backend unreachable, preserving tokens for later restore");
+          return;
+        }
+
         // Token might be expired, try to refresh
         const refreshToken = authService.getRefreshToken();
         if (refreshToken) {
@@ -71,30 +99,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
               refreshResponse.session.access_token,
               refreshResponse.session.refresh_token
             );
-            // Try loading user again with new token
-            const response = await authService.getMe(refreshResponse.session.access_token);
-            setUser({
-              id: response.profile.id,
-              name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
-              firstName: response.profile.firstName || "",
-              avatarUrl: response.profile.avatarUrl || undefined,
-              currentWeek: response.profile.currentWeek || 1,
-              role: response.profile.role,
-              originalRole: response.profile.role,
-              organizationId: response.profile.organizationId || "",
-            });
-            setIsAuthenticated(true);
-
-            // Share user context with main process for cross-window access (WatchingPill, etc.)
-            if (window.consoleAPI?.setCurrentUser) {
-              window.consoleAPI.setCurrentUser({
-                userId: response.profile.id,
-                organizationId: response.profile.organizationId || "",
-              });
-            }
+            await hydrateUser(refreshResponse.session.access_token);
           } catch (refreshError) {
             logger.error("Failed to refresh token:", refreshError);
-            authService.clearTokens();
+            if (!isNetworkError(refreshError)) {
+              authService.clearTokens();
+            } else {
+              logger.info("Backend unreachable during refresh, preserving tokens");
+            }
           }
         } else {
           authService.clearTokens();
@@ -105,6 +117,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
     };
 
     loadUser();
+  }, []);
+
+  // Listen for session restore from main process (keychain → IPC push)
+  // This handles the case where localStorage was cleared but the OS keychain
+  // still has a valid refresh token.
+  useEffect(() => {
+    if (!window.consoleAPI?.onSessionRestored) return;
+
+    const unsubscribe = window.consoleAPI.onSessionRestored(async (tokens) => {
+      logger.info("Received restored tokens from main process");
+
+      // Persist to localStorage so all renderer services can use them
+      authService.saveTokens(tokens.accessToken, tokens.refreshToken);
+
+      try {
+        await hydrateUser(tokens.accessToken);
+        logger.info("User hydrated from keychain-restored tokens");
+      } catch (error) {
+        logger.error("Failed to hydrate user from restored tokens:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    });
+
+    return () => unsubscribe?.();
   }, []);
 
   // Background token refresh - keeps sessions alive for long-running usage
@@ -124,10 +161,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
         logger.info("Token refreshed successfully");
       } catch (error) {
         logger.error("Background token refresh failed:", error);
-        // Silent logout on refresh failure
-        authService.clearTokens();
-        setUser(null);
-        setIsAuthenticated(false);
+        // Only logout on real auth errors, not network blips
+        if (!isNetworkError(error)) {
+          authService.clearTokens();
+          setUser(null);
+          setIsAuthenticated(false);
+        }
       }
     }, REFRESH_INTERVAL);
 
@@ -137,6 +176,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const updateUser = (newUser: User) => {
     setUser(newUser);
     setIsAuthenticated(true);
+
+    // Share user context with main process (triggers keychain persist for refresh token)
+    if (window.consoleAPI?.setCurrentUser) {
+      window.consoleAPI.setCurrentUser({
+        userId: newUser.id,
+        organizationId: newUser.organizationId || "",
+      });
+    }
   };
 
   const logout = async () => {
