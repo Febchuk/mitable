@@ -207,21 +207,22 @@ export default function SessionDetail() {
     }
   }, [optimisticStatus, hasSummary, session?.status, sessionId, queryClient]);
 
-  // Show toast when summarization reaches "writing_summary" so user knows they can do other stuff
-  const [hasShownWritingToast, setHasShownWritingToast] = useState(false);
+  // Show native notification when summarization reaches "writing_summary"
+  const [hasShownWritingNotif, setHasShownWritingNotif] = useState(false);
   useEffect(() => {
-    if (session?.summarizationProgress === "writing_summary" && !hasShownWritingToast) {
-      setHasShownWritingToast(true);
-      toast({
+    if (session?.summarizationProgress === "writing_summary" && !hasShownWritingNotif) {
+      setHasShownWritingNotif(true);
+      window.consoleAPI?.showNotification?.({
         title: "Summary is being written",
-        description: "Feel free to navigate away — we'll have it ready when you come back.",
-        duration: 6000,
+        message: "Feel free to do other stuff — we'll have it ready when you come back.",
+        actions: [{ id: "dismiss", label: "Got it", primary: true }],
+        timeout: 8000,
       });
     }
     if (session?.status !== "summarizing") {
-      setHasShownWritingToast(false);
+      setHasShownWritingNotif(false);
     }
-  }, [session?.summarizationProgress, session?.status, hasShownWritingToast, toast]);
+  }, [session?.summarizationProgress, session?.status, hasShownWritingNotif]);
 
   // Listen for session updates from watch pill (e.g., pause/resume)
   useEffect(() => {
