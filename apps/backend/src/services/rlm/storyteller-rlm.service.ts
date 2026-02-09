@@ -204,7 +204,7 @@ class StorytellerRLMService {
         escape = false;
         continue;
       }
-      if (ch === '\\' && inString) {
+      if (ch === "\\" && inString) {
         escape = true;
         continue;
       }
@@ -214,10 +214,10 @@ class StorytellerRLMService {
       }
       if (inString) continue;
 
-      if (ch === '{') {
+      if (ch === "{") {
         if (depth === 0) start = i;
         depth++;
-      } else if (ch === '}') {
+      } else if (ch === "}") {
         depth--;
         if (depth === 0 && start >= 0) {
           try {

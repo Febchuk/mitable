@@ -97,10 +97,7 @@ class SessionTitleService {
       let cappedActivities = validActivities;
       if (validActivities.length > MAX_ACTIVITIES) {
         // Take first 20 + last 10 for representative sample
-        cappedActivities = [
-          ...validActivities.slice(0, 20),
-          ...validActivities.slice(-10),
-        ];
+        cappedActivities = [...validActivities.slice(0, 20), ...validActivities.slice(-10)];
       }
 
       const activitySummary = this.buildActivitySummary(cappedActivities);

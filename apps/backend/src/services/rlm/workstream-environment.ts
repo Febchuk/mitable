@@ -146,9 +146,7 @@ export class WorkstreamEnvironment {
         minute: "2-digit",
       }),
       appName: c.appName,
-      windowTitle: c.windowTitle
-        ? c.windowTitle.substring(0, 60)
-        : null,
+      windowTitle: c.windowTitle ? c.windowTitle.substring(0, 60) : null,
       activity: c.activityDescription,
       assignedTo: this.assignments.get(c.id) || null,
     }));
@@ -157,11 +155,7 @@ export class WorkstreamEnvironment {
   /**
    * Tool: create_workstream
    */
-  createWorkstream(
-    name: string,
-    summary: string,
-    category: string
-  ): { id: string; name: string } {
+  createWorkstream(name: string, summary: string, category: string): { id: string; name: string } {
     const id = `NEW:${this.nextTempId++}`;
     this.workstreams.set(id, {
       id,

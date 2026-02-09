@@ -53,8 +53,7 @@ export const GET_CAPTURES: WorkstreamRLMTool = {
 
 export const CREATE_WORKSTREAM: WorkstreamRLMTool = {
   name: "create_workstream",
-  description:
-    "Create a new workstream. Returns the workstream ID for use in assign_captures.",
+  description: "Create a new workstream. Returns the workstream ID for use in assign_captures.",
   parameters: [
     {
       name: "name",
@@ -71,13 +70,11 @@ export const CREATE_WORKSTREAM: WorkstreamRLMTool = {
     {
       name: "category",
       type: "string",
-      description:
-        "One of: development, communication, meeting, research, design, review, other",
+      description: "One of: development, communication, meeting, research, design, review, other",
       required: true,
     },
   ],
-  execute: (params, env) =>
-    env.createWorkstream(params.name, params.summary, params.category),
+  execute: (params, env) => env.createWorkstream(params.name, params.summary, params.category),
 };
 
 export const ASSIGN_CAPTURES: WorkstreamRLMTool = {
@@ -98,8 +95,7 @@ export const ASSIGN_CAPTURES: WorkstreamRLMTool = {
       required: true,
     },
   ],
-  execute: (params, env) =>
-    env.assignCaptures(params.workstreamId, params.captureIds),
+  execute: (params, env) => env.assignCaptures(params.workstreamId, params.captureIds),
 };
 
 export const UPDATE_WORKSTREAM: WorkstreamRLMTool = {
@@ -163,8 +159,7 @@ export const MERGE_WORKSTREAMS: WorkstreamRLMTool = {
       required: true,
     },
   ],
-  execute: (params, env) =>
-    env.mergeWorkstreams(params.fromId, params.intoId, params.reason),
+  execute: (params, env) => env.mergeWorkstreams(params.fromId, params.intoId, params.reason),
 };
 
 export const LIST_WORKSTREAMS: WorkstreamRLMTool = {
@@ -185,8 +180,6 @@ export const WORKSTREAM_RLM_TOOLS: WorkstreamRLMTool[] = [
   LIST_WORKSTREAMS,
 ];
 
-export function getWorkstreamToolByName(
-  name: string
-): WorkstreamRLMTool | undefined {
+export function getWorkstreamToolByName(name: string): WorkstreamRLMTool | undefined {
   return WORKSTREAM_RLM_TOOLS.find((tool) => tool.name === name);
 }
