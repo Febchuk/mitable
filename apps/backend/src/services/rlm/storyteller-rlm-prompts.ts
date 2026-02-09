@@ -140,7 +140,10 @@ These rules apply to ALL task types:
 </rules>
 
 <output_format>
-Return a JSON object with your tool call:
+CRITICAL: Return EXACTLY ONE JSON object per response. Never output multiple JSON objects.
+Do NOT try to batch or combine multiple tool calls — one tool call, then wait for the result.
+
+For a tool call, return:
 {
   "tool": "tool_name",
   "parameters": { ... },
@@ -152,6 +155,8 @@ When you have the final summary ready, return:
   "done": true,
   "summary": "The final narrative summary in FIRST PERSON"
 }
+
+NEVER output more than one JSON object. NEVER concatenate tool calls.
 
 EXAMPLES (4-Mode Contract):
 

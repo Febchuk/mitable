@@ -92,7 +92,18 @@ class SessionTitleService {
           a.activityDescription !== null
       );
 
-      const activitySummary = this.buildActivitySummary(validActivities);
+      // Cap activities to prevent prompt overflow on large sessions (60-100+ captures)
+      const MAX_ACTIVITIES = 30;
+      let cappedActivities = validActivities;
+      if (validActivities.length > MAX_ACTIVITIES) {
+        // Take first 20 + last 10 for representative sample
+        cappedActivities = [
+          ...validActivities.slice(0, 20),
+          ...validActivities.slice(-10),
+        ];
+      }
+
+      const activitySummary = this.buildActivitySummary(cappedActivities);
 
       // 3. Generate title using AI
       // Note: Using openai/gpt-oss-120b for improved title quality over llama-3.3-70b-versatile
@@ -103,7 +114,7 @@ class SessionTitleService {
           { role: "user", content: activitySummary },
         ],
         temperature: 0.7,
-        max_tokens: 50,
+        max_tokens: 100,
       });
 
       const title = completion.choices[0]?.message?.content?.trim();

@@ -141,7 +141,11 @@ class StorytellerRLMService {
       messages: messages as any,
       model: "openai/gpt-oss-120b",
       temperature: 0.1, // Low temp for consistent tool selection
-      response_format: { type: "json_object" },
+      max_tokens: 2048, // Enough for one tool call, prevents batching overflow
+      // NOTE: response_format: { type: "json_object" } removed — it causes
+      // Groq 400 json_validate_failed when the model tries to batch multiple
+      // tool calls into one response (concatenated JSON objects = invalid JSON).
+      // We parse JSON manually with robust extraction below.
     });
 
     const content = completion.choices[0]?.message?.content;
@@ -149,12 +153,82 @@ class StorytellerRLMService {
       throw new Error("Empty response from LLM");
     }
 
-    try {
-      const parsed = JSON.parse(content) as LLMResponse;
-      return parsed;
-    } catch (e) {
-      throw new Error(`Failed to parse LLM response: ${content}`);
+    return this.parseToolCallResponse(content);
+  }
+
+  /**
+   * Parse LLM response into a tool call or final summary.
+   * Handles markdown code fences and concatenated JSON objects
+   * (e.g., model outputs {...}{...} instead of one object).
+   */
+  private parseToolCallResponse(raw: string): LLMResponse {
+    // Strip markdown code fences
+    let cleaned = raw.trim();
+    if (cleaned.startsWith("```json")) {
+      cleaned = cleaned.slice(7);
+    } else if (cleaned.startsWith("```")) {
+      cleaned = cleaned.slice(3);
     }
+    if (cleaned.endsWith("```")) {
+      cleaned = cleaned.slice(0, -3);
+    }
+    cleaned = cleaned.trim();
+
+    // Try direct parse first
+    try {
+      return JSON.parse(cleaned) as LLMResponse;
+    } catch {
+      // If direct parse fails, extract first complete JSON object
+      const firstObj = this.extractFirstJsonObject(cleaned);
+      if (firstObj) {
+        return firstObj;
+      }
+      throw new Error(`Failed to parse LLM response: ${cleaned.substring(0, 200)}`);
+    }
+  }
+
+  /**
+   * Extract the first complete JSON object from a string that may contain
+   * concatenated JSON objects (e.g., {...}{...} from model batching).
+   */
+  private extractFirstJsonObject(text: string): LLMResponse | null {
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escape = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === '\\' && inString) {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+
+      if (ch === '{') {
+        if (depth === 0) start = i;
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0 && start >= 0) {
+          try {
+            return JSON.parse(text.substring(start, i + 1)) as LLMResponse;
+          } catch {
+            start = -1;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   /**
