@@ -577,6 +577,7 @@ function createNotificationWindow() {
 function showNotification(config: NotificationConfig) {
   // Windows: use native Notification API (custom BrowserWindow doesn't render on Windows)
   if (process.platform === "win32") {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Notification: ElectronNotification } = require("electron");
     const notif = new ElectronNotification({
       toastXml: `<toast><visual><binding template="ToastText02"><text id="1">${config.title}</text><text id="2">${config.message}</text></binding></visual></toast>`,
