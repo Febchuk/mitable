@@ -47,7 +47,9 @@ export default function ConsoleLayout() {
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-gradient-to-b from-indigo/5 to-transparent pointer-events-none rounded-t-2xl" />
 
               <ScrollArea className="h-full w-full relative">
-                <Outlet />
+                <div className="max-w-full overflow-x-hidden">
+                  <Outlet />
+                </div>
               </ScrollArea>
             </div>
           </div>

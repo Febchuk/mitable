@@ -972,7 +972,10 @@ export default function SessionDetail() {
           <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-6">
             <div className="prose prose-invert prose-sm max-w-none break-words">
               {summary.split("\n").map((paragraph, i) => (
-                <p key={i} className="text-ink-primary mb-3 last:mb-0 text-sm leading-relaxed break-words">
+                <p
+                  key={i}
+                  className="text-ink-primary mb-3 last:mb-0 text-sm leading-relaxed break-words"
+                >
                   {paragraph || <br />}
                 </p>
               ))}
