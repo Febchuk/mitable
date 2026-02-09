@@ -4,7 +4,9 @@
  * Generates concise, descriptive session titles from activity timeline data.
  */
 
-import Groq from "groq-sdk";
+import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
+import { config } from "../config";
 import { db } from "../db/client";
 import { sessionCaptures } from "../db/schema/index";
 import { eq, and, isNotNull, asc } from "drizzle-orm";
@@ -49,14 +51,24 @@ Return ONLY the title text, nothing else. No quotes, no punctuation at the end.
 </output_format>`;
 
 class SessionTitleService {
-  private groq: Groq;
+  private anthropic: Anthropic | null = null;
+  private deepseek: OpenAI | null = null;
 
   constructor() {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      throw new Error("GROQ_API_KEY environment variable is required");
+    if (config.anthropic.apiKey) {
+      this.anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
     }
-    this.groq = new Groq({ apiKey });
+    if (config.deepseek.apiKey) {
+      this.deepseek = new OpenAI({
+        apiKey: config.deepseek.apiKey,
+        baseURL: "https://api.deepseek.com",
+      });
+    }
+    if (!this.anthropic && !this.deepseek) {
+      logger.warn(
+        "No LLM configured for title generation (need ANTHROPIC_API_KEY or DEEPSEEK_API_KEY)"
+      );
+    }
   }
 
   /**
@@ -92,21 +104,18 @@ class SessionTitleService {
           a.activityDescription !== null
       );
 
-      const activitySummary = this.buildActivitySummary(validActivities);
+      // Cap activities to prevent prompt overflow on large sessions (60-100+ captures)
+      const MAX_ACTIVITIES = 30;
+      let cappedActivities = validActivities;
+      if (validActivities.length > MAX_ACTIVITIES) {
+        // Take first 20 + last 10 for representative sample
+        cappedActivities = [...validActivities.slice(0, 20), ...validActivities.slice(-10)];
+      }
 
-      // 3. Generate title using AI
-      // Note: Using openai/gpt-oss-120b for improved title quality over llama-3.3-70b-versatile
-      const completion = await this.groq.chat.completions.create({
-        model: "openai/gpt-oss-120b",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: activitySummary },
-        ],
-        temperature: 0.7,
-        max_tokens: 50,
-      });
+      const activitySummary = this.buildActivitySummary(cappedActivities);
 
-      const title = completion.choices[0]?.message?.content?.trim();
+      // 3. Generate title using AI (Claude primary, DeepSeek fallback)
+      const title = await this.callLLM(activitySummary);
 
       if (!title || title.length === 0) {
         logger.warn(`AI returned empty title for session ${sessionId}`);
@@ -132,6 +141,56 @@ class SessionTitleService {
       );
       return "Work session"; // Fallback to default
     }
+  }
+
+  /**
+   * Call LLM for title generation.
+   * Claude Sonnet 4.5 (primary, no extended thinking needed for titles).
+   * DeepSeek chat (fallback).
+   */
+  private async callLLM(activitySummary: string): Promise<string> {
+    // Try Claude first
+    if (this.anthropic) {
+      try {
+        const response = await this.anthropic.messages.create({
+          model: "claude-sonnet-4-5-20250929",
+          max_tokens: 50,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: activitySummary }],
+        });
+
+        for (const block of response.content) {
+          if (block.type === "text") {
+            logger.info("✅ Title generated via Claude Sonnet 4.5");
+            return block.text.trim();
+          }
+        }
+        throw new Error("No text block in Claude response");
+      } catch (error) {
+        logger.warn(`Claude title generation failed, falling back to DeepSeek: ${String(error)}`);
+      }
+    }
+
+    // DeepSeek fallback
+    if (this.deepseek) {
+      const completion = await this.deepseek.chat.completions.create({
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: activitySummary },
+        ],
+        temperature: 0.7,
+        max_tokens: 50,
+      });
+
+      const title = completion.choices[0]?.message?.content?.trim();
+      if (title) {
+        logger.info("⚠️ Title generated via DeepSeek (fallback)");
+        return title;
+      }
+    }
+
+    throw new Error("No LLM available for title generation");
   }
 
   /**

@@ -43,13 +43,19 @@ Your job is to INTEGRATE these interpretations into a final classification.
    - What was happening before?
    - What changed?
    - Does the timing make sense?
+   - **AUDIO CONTEXT**: If audio transcripts are available, they provide crucial semantic meaning
+     * "Let me debug this function" + screenshot of code editor → debugging, not just typing
+     * "I'll share this with the team" + screenshot of Slack → intentional communication
+     * No audio + typing → default to conservative viewing/editing verbs
 
 2. Call analyze_evidence() to understand user actions
    - Was content typed or just viewed?
    - Was content pasted or authored?
    - Was this navigation or creation?
 
-3. Propose your classification based on integration of context + evidence
+3. Propose your classification based on integration of context + evidence + audio
+   - Use audio to disambiguate intent when visual evidence is ambiguous
+   - Audio provides the "why" - use it to upgrade generic actions to specific activities
 
 4. Call verify_classification(your_proposed_activity) to sanity-check
    - Does it match the evidence?

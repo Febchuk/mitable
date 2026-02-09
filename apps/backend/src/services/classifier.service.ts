@@ -1,6 +1,6 @@
 import { db } from "../db/client";
-import { users, sessionCaptures } from "../db/schema";
-import { eq, asc, desc, and, isNotNull } from "drizzle-orm";
+import { users, sessionCaptures, sessionTranscripts } from "../db/schema";
+import { eq, asc, desc, and, isNotNull, gte, lte } from "drizzle-orm";
 import { createSessionLogger } from "../lib/sessionLogger";
 import { classifierRLMService } from "./classifier-rlm/classifier-rlm.service";
 
@@ -9,6 +9,7 @@ export interface ClassifierInput {
   sessionId: string;
   deltaDescription: string;
   frameId: string;
+  captureTimestamp?: Date; // Timestamp of screenshot for audio context matching
   windowInfo?: {
     appName: string;
     windowTitle: string;
@@ -91,6 +92,45 @@ class ClassifierService {
       // Reverse to chronological order [oldest ... newest]
       const history = historyCaptures.reverse().map((c) => c.activityDescription as string);
 
+      // 3. Fetch Audio Transcripts (±5 seconds around capture time)
+      let audioContext: string | undefined;
+      if (input.captureTimestamp) {
+        const windowMs = 5000; // ±5 seconds
+        const captureTime = input.captureTimestamp;
+        const startWindow = new Date(captureTime.getTime() - windowMs);
+        const endWindow = new Date(captureTime.getTime() + windowMs);
+
+        const transcripts = await db.query.sessionTranscripts.findMany({
+          where: and(
+            eq(sessionTranscripts.sessionId, input.sessionId),
+            gte(sessionTranscripts.startTime, startWindow),
+            lte(sessionTranscripts.endTime, endWindow)
+          ),
+          orderBy: [asc(sessionTranscripts.startTime)],
+          columns: {
+            speakerId: true,
+            transcript: true,
+            startTime: true,
+            confidence: true,
+          },
+        });
+
+        // Build audio context string if transcripts exist
+        if (transcripts.length > 0) {
+          audioContext = transcripts
+            .map((t) => {
+              const time = new Date(t.startTime).toLocaleTimeString();
+              return `[${time}] Speaker ${t.speakerId}: ${t.transcript}`;
+            })
+            .join("\n");
+
+          log.info("Audio context found for classification", {
+            frameId: input.frameId,
+            transcriptCount: transcripts.length,
+          });
+        }
+      }
+
       // Fetch previous delta for temporal reasoning (N-1 frame)
       let previousDelta = input.previousDelta;
       const timeElapsedSec = input.timeElapsedSec;
@@ -124,6 +164,7 @@ class ClassifierService {
         sessionId: input.sessionId,
         frameId: input.frameId,
         deltaDescription: input.deltaDescription,
+        audioContext, // Audio transcripts from ±5 seconds around screenshot
         windowInfo: input.windowInfo,
         intervalEvidence: input.intervalEvidence,
         previousDelta,

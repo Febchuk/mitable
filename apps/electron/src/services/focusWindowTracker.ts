@@ -167,17 +167,30 @@ class FocusWindowTracker {
     // Immediately capture the current active window
     await this.checkActiveWindow();
 
-    // Start polling for active window changes
+    // Fast initial polling burst (500ms for first 6s) to quickly detect
+    // the user switching from Mitable Console to their work window
+    const BURST_INTERVAL_MS = 500;
+    const BURST_DURATION_MS = 6000;
+    const burstStart = Date.now();
+
     this.pollTimer = setInterval(() => {
       this.checkActiveWindow();
-    }, POLL_INTERVAL_MS);
+
+      // After burst period, switch to normal polling interval
+      if (Date.now() - burstStart > BURST_DURATION_MS && this.pollTimer) {
+        clearInterval(this.pollTimer);
+        this.pollTimer = setInterval(() => {
+          this.checkActiveWindow();
+        }, POLL_INTERVAL_MS);
+      }
+    }, BURST_INTERVAL_MS);
 
     // Start cleanup timer for expired windows
     this.cleanupTimer = setInterval(() => {
       this.cleanupExpiredWindows();
     }, CLEANUP_INTERVAL_MS);
 
-    logger.info(" Started tracking focused windows");
+    logger.info(" Started tracking focused windows (fast burst for 6s)");
   }
 
   /**
@@ -295,6 +308,8 @@ class FocusWindowTracker {
         "Arc",
         "Microsoft Edge",
         "Brave Browser",
+        "Opera",
+        "Opera GX",
       ];
       const isBrowser = browserApps.includes(appName);
 

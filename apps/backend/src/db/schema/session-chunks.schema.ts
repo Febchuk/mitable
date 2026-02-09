@@ -25,12 +25,12 @@ export const sessionChunks = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id), // Added in migration 0028 for efficient user filtering
+      .references(() => users.id, { onDelete: "cascade" }), // Added in migration 0028 for efficient user filtering
 
     // Chunk metadata
     chunkIndex: integer("chunk_index").notNull(),
     chunkType: text("chunk_type", {
-      enum: ["classifier", "storyteller_summary", "storyteller_timeline"],
+      enum: ["classifier", "storyteller_summary", "storyteller_timeline", "transcript"],
     }).notNull(),
 
     // Content and embedding

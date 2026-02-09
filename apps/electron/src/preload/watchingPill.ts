@@ -11,6 +11,9 @@ const IPC_CHANNELS = {
   MONITORING_SESSION_UPDATE: "monitoring-session-update",
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress",
   MONITORING_SESSION_FINALIZE: "monitoring-session-finalize",
+  MONITORING_AUDIO_START: "monitoring-audio-start",
+  MONITORING_AUDIO_STOP: "monitoring-audio-stop",
+  MONITORING_AUDIO_FORCE_STOP: "monitoring-audio-force-stop",
   WATCH_WINDOWS_GET_ALL: "watch-windows-get-all",
   WATCH_WINDOWS_GET_SELECTED: "watch-windows-get-selected",
   WATCH_WINDOW_SELECT: "watch-window-select",
@@ -194,6 +197,28 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
     }>
   ): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_FINALIZE, sessionId, captures),
+
+  // ===========================
+  // Audio Recording
+  // ===========================
+
+  startAudioRecording: (): Promise<{ success: boolean; hasSystemAudio: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_AUDIO_START),
+
+  stopAudioRecording: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_AUDIO_STOP),
+
+  // Send audio chunk to main process
+  sendAudioChunk: (audioBuffer: ArrayBuffer): void => {
+    ipcRenderer.send("audio-chunk", audioBuffer);
+  },
+
+  // Main → Renderer: force stop AudioWorklet when session ends without explicit audio stop
+  onForceStopAudio: (callback: () => void): (() => void) => {
+    const handler = () => callback();
+    ipcRenderer.on(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP, handler);
+  },
 });
 
 // Type declarations for renderer
@@ -276,6 +301,16 @@ declare global {
           screenshotHash?: string;
         }>
       ) => Promise<{ success: boolean; error?: string }>;
+
+      // Audio recording
+      startAudioRecording: () => Promise<{
+        success: boolean;
+        hasSystemAudio: boolean;
+        error?: string;
+      }>;
+      stopAudioRecording: () => Promise<{ success: boolean }>;
+      sendAudioChunk: (audioBuffer: ArrayBuffer) => void;
+      onForceStopAudio: (callback: () => void) => () => void;
     };
   }
 }

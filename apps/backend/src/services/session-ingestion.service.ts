@@ -7,7 +7,7 @@
 
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { SessionChunkingService } from "./session-chunking.service.js";
 import { embeddingService } from "./embedding.service.js";
 
@@ -60,6 +60,20 @@ export class SessionIngestionService {
 
       console.log(`[SessionIngestion] Summary ${summary ? "found" : "not found"}`);
 
+      // 3b. Fetch audio transcripts (may not exist)
+      const transcripts = await db
+        .select({
+          transcript: schema.sessionTranscripts.transcript,
+          speakerId: schema.sessionTranscripts.speakerId,
+          startTime: schema.sessionTranscripts.startTime,
+          endTime: schema.sessionTranscripts.endTime,
+        })
+        .from(schema.sessionTranscripts)
+        .where(eq(schema.sessionTranscripts.sessionId, sessionId))
+        .orderBy(asc(schema.sessionTranscripts.startTime));
+
+      console.log(`[SessionIngestion] Found ${transcripts.length} transcript rows`);
+
       // 4. Check if already ingested
       const existingChunks = await db
         .select()
@@ -80,7 +94,8 @@ export class SessionIngestionService {
         session.startedAt,
         session.endedAt,
         captures,
-        summary
+        summary,
+        transcripts.length > 0 ? transcripts : undefined
       );
 
       console.log(`[SessionIngestion] Created ${chunks.length} chunks`);

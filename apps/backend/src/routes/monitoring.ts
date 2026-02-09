@@ -704,18 +704,22 @@ router.post(
                   await import("../services/session-title.service.js");
                 const aiTitle = await sessionTitleService.generateTitle(id);
 
-                // Update session name if AI generated a valid title
-                if (aiTitle && aiTitle !== "Work session") {
-                  await db
-                    .update(schema.monitoringSessions)
-                    .set({ name: aiTitle })
-                    .where(eq(schema.monitoringSessions.id, id));
-                  log.info("Session title generated", { sessionId: id, title: aiTitle });
-                }
+                // Always set session name so UI doesn't stay stuck on "Generating title..."
+                const finalTitle = aiTitle && aiTitle.trim().length > 0 ? aiTitle : "Work session";
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ name: finalTitle })
+                  .where(eq(schema.monitoringSessions.id, id));
+                log.info("Session title generated", { sessionId: id, title: finalTitle });
               } catch (error) {
                 log.error("Session title generation failed", {
                   error: error instanceof Error ? error.message : String(error),
                 });
+                // Still set a fallback name so UI doesn't hang
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ name: "Work session" })
+                  .where(eq(schema.monitoringSessions.id, id));
               }
             })(),
             // Generate master story
@@ -1186,6 +1190,7 @@ router.post(
             sessionId: id,
             deltaDescription: analysisResult.changeDescription,
             frameId,
+            captureTimestamp: new Date(), // Current timestamp for audio context matching
             windowInfo: {
               appName: windowInfo.appName,
               windowTitle: windowInfo.windowTitle,
@@ -2445,5 +2450,121 @@ router.delete("/sessions/:id", requireAuth, async (req: Request, res: Response):
     });
   }
 });
+
+/**
+ * POST /api/monitoring/sessions/:id/audio/start
+ * Start audio recording tracking for a session
+ */
+router.post(
+  "/sessions/:id/audio/start",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({ error: "Not Found", message: "Session not found" });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({ error: "Forbidden", message: "Not authorized" });
+        return;
+      }
+
+      // Start audio recording tracking
+      await db
+        .update(schema.monitoringSessions)
+        .set({
+          audioRecordingStartedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.monitoringSessions.id, id));
+
+      logger.info({ sessionId: id }, "Audio recording started");
+
+      res.json({ success: true, startedAt: new Date().toISOString() });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error starting audio recording"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to start audio recording",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/monitoring/sessions/:id/audio/stop
+ * Stop audio recording tracking and accumulate duration
+ */
+router.post(
+  "/sessions/:id/audio/stop",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({ error: "Not Found", message: "Session not found" });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({ error: "Forbidden", message: "Not authorized" });
+        return;
+      }
+
+      // Calculate duration if recording was active
+      let newTotalMs = session.audioRecordingTotalMs || 0;
+      if (session.audioRecordingStartedAt) {
+        const duration = Date.now() - new Date(session.audioRecordingStartedAt).getTime();
+        newTotalMs += duration;
+      }
+
+      // Stop audio recording tracking
+      await db
+        .update(schema.monitoringSessions)
+        .set({
+          audioRecordingStartedAt: null,
+          audioRecordingTotalMs: newTotalMs,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.monitoringSessions.id, id));
+
+      logger.info({ sessionId: id, totalMs: newTotalMs }, "Audio recording stopped");
+
+      res.json({ success: true, totalMs: newTotalMs });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error stopping audio recording"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to stop audio recording",
+      });
+    }
+  }
+);
 
 export default router;

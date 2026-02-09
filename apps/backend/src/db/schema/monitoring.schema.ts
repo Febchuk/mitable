@@ -73,6 +73,10 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
   totalPausedMs: integer("total_paused_ms").notNull().default(0), // Cumulative pause duration
   endedAt: timestamp("ended_at"),
 
+  // Audio recording tracking
+  audioRecordingStartedAt: timestamp("audio_recording_started_at"), // When audio recording was last started (null when not recording)
+  audioRecordingTotalMs: integer("audio_recording_total_ms").notNull().default(0), // Cumulative audio recording duration
+
   // Summary (populated at session end)
   rawActivitySummary: text("raw_activity_summary"), // Initial AI-generated summary
   finalSummary: text("final_summary"), // User-edited final summary
@@ -291,3 +295,40 @@ export interface FrameAnalysisResult {
   importanceScore: number;
   importanceReason: string | null;
 }
+
+/**
+ * Session Transcripts (Audio Transcription via Deepgram)
+ *
+ * Stores real-time audio transcripts from monitoring sessions.
+ * Includes speaker diarization to differentiate between multiple speakers.
+ */
+export const sessionTranscripts = pgTable(
+  "session_transcripts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => monitoringSessions.id, { onDelete: "cascade" }),
+
+    // Speaker identification (from Deepgram diarization)
+    speakerId: integer("speaker_id").notNull(), // 0, 1, 2, etc.
+
+    // Transcript content
+    transcript: text("transcript").notNull(),
+
+    // Timing information
+    startTime: timestamp("start_time", { withTimezone: true }).notNull(),
+    endTime: timestamp("end_time", { withTimezone: true }).notNull(),
+
+    // Confidence score from Deepgram
+    confidence: real("confidence").notNull(),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    // Index for querying transcripts by session
+    sessionIdIdx: index("session_transcripts_session_id_idx").on(table.sessionId),
+    // Index for time-based queries
+    timeIdx: index("session_transcripts_time_idx").on(table.sessionId, table.startTime),
+  })
+);

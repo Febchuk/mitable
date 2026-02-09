@@ -54,9 +54,14 @@ interface GetWindowsResult {
   memoryUsage?: number;
 }
 
+// Extended window info with tracking metadata
+interface TrackedWindowInfo extends SelectedWindowInfo {
+  lastSeenAt: number; // Timestamp when window was last detected by get-windows or active-win
+}
+
 class WindowDetectionService {
   // Track which windows user has selected to watch
-  private selectedWindows: Map<string, SelectedWindowInfo> = new Map();
+  private selectedWindows: Map<string, TrackedWindowInfo> = new Map();
   // Note: isWatching is derived from selectedWindows.size > 0 (no separate flag)
 
   // Last detected OS windows keyed by windowId (stringified)
@@ -110,19 +115,35 @@ class WindowDetectionService {
 
         // Track last seen metadata for later lookups (e.g., watch selection)
         this.lastDetectedWindows.set(windowId, window);
+
+        const appName = window.owner.name;
+        const windowTitle = window.title;
+
+        // Log ALL windows for debugging (especially Citrix/RDP)
+        logger.info(
+          `[WindowDetectionService] Window: ID=${windowId}, App="${appName}", Title="${windowTitle}"`
+        );
+
         // Skip Mitable's own windows
         if (this.isMitableWindow(window.title)) {
           logger.info(` Skipping Mitable window: ${window.title}`);
           continue;
         }
 
-        // Skip windows with no title (system windows, etc.)
-        if (!window.title || window.title.trim() === "") {
+        // Check if it's a remote desktop app (Citrix, RDP, etc.)
+        const isRemoteDesktopApp =
+          appName.toLowerCase().includes("citrix") ||
+          appName.toLowerCase().includes("hdx") ||
+          appName.toLowerCase().includes("wfica") ||
+          appName.toLowerCase().includes("remote desktop") ||
+          appName.toLowerCase().includes("mstsc") ||
+          windowTitle.toLowerCase().includes("remote desktop");
+
+        // Skip windows with no title UNLESS it's a remote desktop app
+        if ((!windowTitle || windowTitle.trim() === "") && !isRemoteDesktopApp) {
+          logger.info(`[WindowDetectionService] Skipping window with empty title: ${appName}`);
           continue;
         }
-
-        const appName = window.owner.name;
-        const windowTitle = window.title;
 
         // Skip system apps (Finder, Notification Center, etc.)
         if (isSystemApp(appName)) {
@@ -374,6 +395,11 @@ class WindowDetectionService {
    */
   addWindow(window: SelectedWindowInfo): boolean {
     if (this.selectedWindows.has(window.windowId)) {
+      // Window already exists, just update lastSeenAt
+      const existing = this.selectedWindows.get(window.windowId);
+      if (existing) {
+        existing.lastSeenAt = Date.now();
+      }
       return false;
     }
 
@@ -386,7 +412,12 @@ class WindowDetectionService {
       return false;
     }
 
-    this.selectedWindows.set(window.windowId, window);
+    // Add window with lastSeenAt timestamp
+    const trackedWindow: TrackedWindowInfo = {
+      ...window,
+      lastSeenAt: Date.now(),
+    };
+    this.selectedWindows.set(window.windowId, trackedWindow);
     logger.info(
       `[WindowDetectionService] Added window to watch list: ${window.appName} (${window.windowTitle}) [${window.windowId}]`
     );
@@ -415,7 +446,15 @@ class WindowDetectionService {
    * @returns Array of window info currently being watched
    */
   getSelectedWindows(): SelectedWindowInfo[] {
-    return Array.from(this.selectedWindows.values());
+    // Strip lastSeenAt metadata before returning
+    return Array.from(this.selectedWindows.values()).map((w) => ({
+      windowId: w.windowId,
+      appName: w.appName,
+      windowTitle: w.windowTitle,
+      displayName: w.displayName,
+      tabTitle: w.tabTitle,
+      isBrowser: w.isBrowser,
+    }));
   }
 
   /**
@@ -608,6 +647,15 @@ class WindowDetectionService {
   /**
    * Check for closed windows and remove them from watch list
    * Returns the list of windows that were removed (closed)
+   *
+   * NOTE: We no longer auto-remove windows based on get-windows enumeration failures.
+   * Windows stay in the watch list until:
+   * 1. User manually removes them (X button)
+   * 2. Focus tracker's TTL expires (10 minutes for auto-tracked windows)
+   *
+   * This prevents false removals when:
+   * - User interacts with Mitable UI (watch pill dropdown) causing brief focus shifts
+   * - get-windows has intermittent enumeration issues with Citrix/RDP/VM windows
    */
   async checkForClosedWindows(): Promise<SelectedWindowInfo[]> {
     if (this.selectedWindows.size === 0) {
@@ -661,12 +709,7 @@ class WindowDetectionService {
         }
       }
 
-      if (closedWindows.length > 0) {
-        logger.info(
-          `[WindowDetectionService] Removed ${closedWindows.length} closed windows, now watching ${this.selectedWindows.size}`
-        );
-      }
-
+      // Never auto-remove windows - they stay until manually removed or focus tracker TTL expires
       return closedWindows;
     } catch (error) {
       // Only log once to avoid spam (permission issues will persist)

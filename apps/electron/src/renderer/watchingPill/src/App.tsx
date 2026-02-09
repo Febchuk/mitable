@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { MoreVertical, Eye, EyeOff } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { MoreVertical, Eye, EyeOff, Mic, MicOff } from "lucide-react";
 import LogoIcon from "@/assets/logo-icon.svg";
 import type { MonitoringSessionState, SelectedWindowInfo } from "@mitable/shared";
 import { createLogger } from "../../lib/logger";
@@ -12,6 +12,12 @@ export default function App() {
 
   // Window management (for badge count)
   const [selectedWindows, setSelectedWindows] = useState<SelectedWindowInfo[]>([]);
+
+  // Audio recording state
+  const [audioRecordingEnabled, setAudioRecordingEnabled] = useState(false);
+  const [audioRecordingActive, setAudioRecordingActive] = useState(false);
+  // Ref mirrors audioRecordingActive so closures always see the current value
+  const audioRecordingActiveRef = useRef(false);
 
   // Track which dropdown is open (for UI state only)
   const [eyeDropdownOpen, setEyeDropdownOpen] = useState(false);
@@ -41,9 +47,23 @@ export default function App() {
     });
 
     // Subscribe to updates
-    const unsubSession = window.watchingPillAPI.onSessionUpdate((state) => {
+    const unsubSession = window.watchingPillAPI.onSessionUpdate(async (state) => {
       logger.info(" Session update:", state);
       setSessionState(state);
+
+      // If session ended, stop audio capture (use ref to avoid stale closure)
+      if (
+        audioRecordingActiveRef.current &&
+        (!state || (state.status !== "active" && state.status !== "paused"))
+      ) {
+        logger.info("🔇 Session ended, stopping audio capture");
+        const { audioCaptureService } = await import("./services/audioCapture");
+        await audioCaptureService.stopCapture();
+        await window.watchingPillAPI?.stopAudioRecording();
+        setAudioRecordingEnabled(false);
+        setAudioRecordingActive(false);
+        audioRecordingActiveRef.current = false;
+      }
     });
 
     const unsubWindows = window.watchingPillAPI.onWindowsUpdated((windows) => {
@@ -60,11 +80,22 @@ export default function App() {
       setMenuDropdownOpen(false);
     });
 
+    // Main process forces audio stop when session ends without explicit mic toggle
+    const unsubForceStopAudio = window.watchingPillAPI.onForceStopAudio(async () => {
+      logger.info("🔇 Force-stop audio received from main process");
+      const { audioCaptureService } = await import("./services/audioCapture");
+      await audioCaptureService.stopCapture();
+      setAudioRecordingEnabled(false);
+      setAudioRecordingActive(false);
+      audioRecordingActiveRef.current = false;
+    });
+
     return () => {
       unsubSession();
       unsubWindows();
       unsubEyeClose();
       unsubMenuClose();
+      unsubForceStopAudio();
     };
   }, []);
 
@@ -78,10 +109,57 @@ export default function App() {
     await window.watchingPillAPI?.showMenuDropdown();
   };
 
+  // Microphone button toggles audio recording
+  const handleMicClick = async () => {
+    const newState = !audioRecordingEnabled;
+    setAudioRecordingEnabled(newState);
+
+    if (newState) {
+      // Start audio recording
+      logger.info("🎤 Enabling audio recording");
+
+      // Step 1: Connect WebSocket in main process
+      const result = await window.watchingPillAPI?.startAudioRecording();
+
+      if (!result?.success) {
+        logger.error("❌ Failed to start audio recording:", result?.error);
+        setAudioRecordingEnabled(false);
+        return;
+      }
+
+      // Step 2: Start audio capture in renderer
+      const { audioCaptureService } = await import("./services/audioCapture");
+      const captureResult = await audioCaptureService.startCapture(sessionState?.id || "");
+
+      if (!captureResult.success) {
+        logger.error("❌ Failed to start audio capture:", captureResult.error);
+        await window.watchingPillAPI?.stopAudioRecording();
+        setAudioRecordingEnabled(false);
+        return;
+      }
+
+      logger.info("✅ Audio recording started", { hasSystemAudio: captureResult.hasSystemAudio });
+      setAudioRecordingActive(true);
+      audioRecordingActiveRef.current = true;
+    } else {
+      // Stop audio recording
+      logger.info("🔇 Disabling audio recording");
+
+      // Stop renderer capture
+      const { audioCaptureService } = await import("./services/audioCapture");
+      await audioCaptureService.stopCapture();
+
+      // Stop main WebSocket
+      await window.watchingPillAPI?.stopAudioRecording();
+      setAudioRecordingActive(false);
+      audioRecordingActiveRef.current = false;
+    }
+  };
+
   return (
     <div className="h-full w-full flex items-center justify-center app-drag">
       {/* Vertical Pill Container */}
-      <div className="flex flex-col items-center bg-[#1A1A1A]/95 backdrop-blur-lg rounded-full shadow-2xl border border-white/10 py-2 px-1.5 gap-1.5">
+      <div className="flex flex-col items-center bg-[#1A1A1A]/95 backdrop-blur-lg rounded-[28px] shadow-2xl border border-white/10 py-3 px-2 gap-1.5">
         {/* Top: Mitable Logo with status indicator */}
         <div className="relative w-6 h-6 flex items-center justify-center">
           <img
@@ -125,6 +203,27 @@ export default function App() {
             </>
           ) : (
             <EyeOff size={12} />
+          )}
+        </button>
+
+        {/* Divider */}
+        <div className="w-5 h-px bg-white/10" />
+
+        {/* Microphone Button - Audio Recording Toggle */}
+        <button
+          onClick={handleMicClick}
+          className={`relative w-6 h-6 flex items-center justify-center rounded-full transition-all app-no-drag ${
+            audioRecordingEnabled
+              ? "bg-red-500/30 text-white hover:bg-red-500/40 active:bg-red-500/50 active:scale-95"
+              : "hover:bg-white/10 active:bg-white/20 active:scale-95 text-white/70"
+          }`}
+          aria-label={audioRecordingEnabled ? "Stop audio recording" : "Start audio recording"}
+        >
+          {audioRecordingEnabled ? <Mic size={12} /> : <MicOff size={12} />}
+
+          {/* Recording indicator - pulsing red dot */}
+          {audioRecordingActive && (
+            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
           )}
         </button>
 

@@ -56,6 +56,7 @@ export class StorytellerEnvironment {
 
   constructor(
     public readonly timeline: Activity[],
+    public readonly fullTranscriptText: string | undefined, // Complete audio transcripts for rich narrative
     public readonly metadata: SessionMetadata,
     public readonly preferences: UserPreferences
   ) {}

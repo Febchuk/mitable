@@ -48,7 +48,7 @@ export default function SwimlanesTimeline({
   return (
     <div className={`relative ${className}`}>
       {/* Time axis labels */}
-      <div className="relative h-6 mb-2 ml-[140px]">
+      <div className="relative h-6 mb-2 ml-[100px] sm:ml-[140px]">
         {timeLabels.map((label, index) => (
           <span
             key={index}
@@ -124,7 +124,7 @@ function SwimlaneRow({
     >
       {/* Workstream label */}
       <div
-        className="w-[120px] flex-shrink-0 truncate text-sm font-medium text-ink-primary"
+        className="w-[80px] sm:w-[120px] flex-shrink-0 truncate text-sm font-medium text-ink-primary"
         title={workstream.name}
       >
         <span className={`inline-block w-2 h-2 rounded-full mr-2 ${colorClasses.bg}`} />

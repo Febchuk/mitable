@@ -18,6 +18,7 @@ import { db } from "./db/client.js";
 import * as schema from "./db/schema/index.js";
 import { isNotNull, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import { initializeAudioWebSocket } from "./routes/audio.js";
 
 async function startServer() {
   // Validate environment variables
@@ -70,6 +71,9 @@ async function startServer() {
   // Create HTTP server and initialize Socket.IO
   const httpServer = createServer(app);
   socketService.initialize(httpServer);
+
+  // Initialize audio WebSocket for Deepgram transcription
+  initializeAudioWebSocket(httpServer);
 
   // Set up workstream event emitter to broadcast via WebSocket
   setupWorkstreamSocketEmitter();

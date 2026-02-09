@@ -17,6 +17,7 @@ export interface ClassifierRLMInput {
   sessionId: string;
   frameId: string;
   deltaDescription: string;
+  audioContext?: string; // Transcripts from ±5 seconds around screenshot
   windowInfo?: {
     appName: string;
     windowTitle: string;
@@ -94,6 +95,7 @@ class ClassifierRLMService {
       sessionId: input.sessionId,
       frameId: input.frameId,
       currentDelta: input.deltaDescription,
+      audioContext: input.audioContext, // Audio transcripts from ±5 seconds around screenshot
       windowInfo: input.windowInfo,
       intervalEvidence: input.intervalEvidence,
       previousDeltas: input.previousDelta

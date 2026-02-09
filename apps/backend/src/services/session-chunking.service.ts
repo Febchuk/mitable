@@ -73,7 +73,38 @@ export interface StorytellerTimelineChunk {
   };
 }
 
-export type SessionChunk = ClassifierChunk | StorytellerSummaryChunk | StorytellerTimelineChunk;
+/**
+ * Transcript chunk - raw audio transcript segments for semantic search
+ */
+export interface TranscriptChunk {
+  chunkType: "transcript";
+  chunkIndex: number;
+  text: string;
+  metadata: {
+    timeRange: {
+      start: string;
+      end: string;
+    };
+    speakerIds: number[];
+    segmentCount: number;
+  };
+}
+
+/**
+ * Transcript row shape expected by the chunker
+ */
+export interface TranscriptRow {
+  transcript: string;
+  speakerId: number;
+  startTime: Date;
+  endTime: Date;
+}
+
+export type SessionChunk =
+  | ClassifierChunk
+  | StorytellerSummaryChunk
+  | StorytellerTimelineChunk
+  | TranscriptChunk;
 
 export class SessionChunkingService {
   private static readonly MAX_CHUNK_TOKENS = 800;
@@ -89,7 +120,8 @@ export class SessionChunkingService {
     sessionStart: Date,
     sessionEnd: Date | null,
     captures: SessionCapture[],
-    summary: SessionSummary | null
+    summary: SessionSummary | null,
+    transcripts?: TranscriptRow[]
   ): Promise<SessionChunk[]> {
     const chunks: SessionChunk[] = [];
 
@@ -109,7 +141,13 @@ export class SessionChunkingService {
       chunks.push(...summaryChunks);
     }
 
-    // 3. Optional: Chunk storyteller timeline (if needed for detailed activity queries)
+    // 3. Chunk audio transcripts (if available)
+    if (transcripts && transcripts.length > 0) {
+      const transcriptChunks = await this.chunkTranscripts(sessionName, sessionStart, transcripts);
+      chunks.push(...transcriptChunks);
+    }
+
+    // 4. Optional: Chunk storyteller timeline (if needed for detailed activity queries)
     // const timelineChunks = await this.chunkStorytellerTimeline(sessionStart, captures);
     // chunks.push(...timelineChunks);
 
@@ -437,6 +475,101 @@ export class SessionChunkingService {
       text: secondText,
       metadata: this.extractClassifierMetadata(secondHalf),
     });
+
+    return chunks;
+  }
+
+  /**
+   * Chunk audio transcripts using token-budget, sentence-aware splitting.
+   * Concatenates all transcript rows ordered by time, then splits at sentence
+   * boundaries within the ~800 token budget. Each chunk retains the time range
+   * and speaker IDs of its constituent rows for metadata.
+   */
+  private static async chunkTranscripts(
+    sessionName: string | null,
+    sessionStart: Date,
+    transcripts: TranscriptRow[]
+  ): Promise<TranscriptChunk[]> {
+    const chunks: TranscriptChunk[] = [];
+
+    // Sort by start time
+    const sorted = [...transcripts].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+
+    // Build full transcript text with speaker labels and timestamps
+    const annotatedSegments: Array<{
+      text: string;
+      speakerId: number;
+      startTime: Date;
+      endTime: Date;
+    }> = [];
+
+    for (const row of sorted) {
+      const time = row.startTime.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      annotatedSegments.push({
+        text: `[${time}] Speaker ${row.speakerId}: ${row.transcript}`,
+        speakerId: row.speakerId,
+        startTime: row.startTime,
+        endTime: row.endTime,
+      });
+    }
+
+    // Build header
+    const header = `Session: ${sessionName || "Unnamed Session"}\nDate: ${sessionStart.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}\nAudio Transcript:\n`;
+    const headerTokens = this.countTokens(header);
+    const budgetPerChunk = this.MAX_CHUNK_TOKENS - headerTokens;
+
+    // Split by sentence boundaries within token budget
+    let currentText = "";
+    let currentSpeakers = new Set<number>();
+    let currentStartTime: Date | null = null;
+    let currentEndTime: Date | null = null;
+    let currentSegmentCount = 0;
+    let chunkIndex = 0;
+
+    const flushChunk = () => {
+      if (currentText.trim().length === 0 || !currentStartTime || !currentEndTime) return;
+
+      chunks.push({
+        chunkType: "transcript",
+        chunkIndex: chunkIndex++,
+        text: header + currentText.trim(),
+        metadata: {
+          timeRange: {
+            start: currentStartTime.toISOString(),
+            end: currentEndTime.toISOString(),
+          },
+          speakerIds: Array.from(currentSpeakers).sort(),
+          segmentCount: currentSegmentCount,
+        },
+      });
+
+      currentText = "";
+      currentSpeakers = new Set<number>();
+      currentStartTime = null;
+      currentEndTime = null;
+      currentSegmentCount = 0;
+    };
+
+    for (const segment of annotatedSegments) {
+      const testText = currentText ? `${currentText}\n${segment.text}` : segment.text;
+      const testTokens = this.countTokens(testText);
+
+      if (testTokens > budgetPerChunk && currentText.length > 0) {
+        flushChunk();
+      }
+
+      currentText = currentText ? `${currentText}\n${segment.text}` : segment.text;
+      currentSpeakers.add(segment.speakerId);
+      if (!currentStartTime) currentStartTime = segment.startTime;
+      currentEndTime = segment.endTime;
+      currentSegmentCount++;
+    }
+
+    // Flush remaining
+    flushChunk();
 
     return chunks;
   }

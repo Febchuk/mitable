@@ -37,17 +37,19 @@ export default function ConsoleLayout() {
         {/* Custom Title Bar - Spans full width */}
         <TitleBar />
 
-        <div className="flex-1 flex overflow-hidden relative">
+        <div className="flex-1 flex min-h-0 overflow-hidden relative">
           <Sidebar />
 
           {/* Main Content Area - Floating Card Style with ambient glow */}
-          <div className="flex-1 flex flex-col h-full pb-3 pr-3 overflow-hidden">
-            <div className="flex-1 overflow-hidden rounded-2xl shadow-2xl border border-stroke-subtle bg-canvas-raised relative flex flex-col">
+          <div className="flex-1 min-w-0 flex flex-col h-full pb-3 pr-3 overflow-hidden">
+            <div className="flex-1 min-w-0 overflow-hidden rounded-2xl shadow-2xl border border-stroke-subtle bg-canvas-raised relative flex flex-col">
               {/* Ambient glow effect */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-gradient-to-b from-indigo/5 to-transparent pointer-events-none rounded-t-2xl" />
 
               <ScrollArea className="h-full w-full relative">
-                <Outlet />
+                <div className="max-w-full overflow-x-hidden">
+                  <Outlet />
+                </div>
               </ScrollArea>
             </div>
           </div>

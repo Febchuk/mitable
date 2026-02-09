@@ -221,3 +221,13 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #5A5A5A;
 }
+
+/* Force vertical-only scrolling in ScrollArea — Radix uses display:table on
+   the viewport's inner child to measure content width for horizontal scrolling.
+   Override both the viewport overflow and the child display to prevent horizontal expansion. */
+[data-radix-scroll-area-viewport] {
+  overflow-x: hidden !important;
+}
+[data-radix-scroll-area-viewport] > div {
+  display: block !important;
+}

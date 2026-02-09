@@ -62,6 +62,16 @@ export const config = {
     temperature: parseFloat(process.env.GROQ_TEMPERATURE || "0.7"),
   },
 
+  // Anthropic Configuration (for Storyteller summarization — Claude Sonnet 4.5 with extended thinking)
+  anthropic: {
+    apiKey: (process.env.ANTHROPIC_API_KEY || "").trim(),
+  },
+
+  // DeepSeek Configuration (fallback for Storyteller — DeepSeek R1 reasoning model)
+  deepseek: {
+    apiKey: (process.env.DEEPSEEK_API_KEY || "").trim(),
+  },
+
   // Pinecone Configuration
   pinecone: {
     apiKey: (process.env.PINECONE_API_KEY || "").trim(),
@@ -161,6 +171,11 @@ export const config = {
         "unlimited_storage",
       ],
     },
+  },
+
+  // Deepgram Configuration (Audio Transcription)
+  deepgram: {
+    apiKey: (process.env.DEEPGRAM_API_KEY || "").trim(),
   },
 
   // Security

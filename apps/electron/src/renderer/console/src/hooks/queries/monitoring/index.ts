@@ -54,14 +54,18 @@ export function useSession(sessionId: string, options?: { pollWhileSummarizing?:
       };
     },
     enabled: !!user && !!sessionId,
-    // Poll every 2 seconds while session is being summarized OR title hasn't been generated yet
+    // Poll to detect status transitions:
+    //   active/paused → 5s  (detect external session end from pill)
+    //   summarizing   → 2s  (wait for summary + title)
+    //   ready/other   → stop
     refetchInterval: options?.pollWhileSummarizing
       ? (query) => {
           const data = query.state.data;
           if (!data) return false;
-          const isSummarizing = data.status === "summarizing";
-          const hasDefaultName = data.name === "Work session";
-          return isSummarizing || hasDefaultName ? 2000 : false;
+          const status = data.status;
+          if (status === "summarizing") return 2000;
+          if (status === "active" || status === "paused") return 5000;
+          return false;
         }
       : false,
   });

@@ -67,6 +67,12 @@ const IPC_CHANNELS = {
   SUMMARY_DEFAULTS_SET: "summary-defaults-set",
   ALWAYS_ASK_ON_SESSION_END_GET: "always-ask-on-session-end-get",
   ALWAYS_ASK_ON_SESSION_END_SET: "always-ask-on-session-end-set",
+  // Audio preferences
+  AUDIO_DEVICES_ENUMERATE: "audio-devices-enumerate",
+  AUDIO_PREFERENCES_GET: "audio-preferences-get",
+  AUDIO_PREFERENCES_SET: "audio-preferences-set",
+  AUDIO_TEST_START: "audio-test-start",
+  AUDIO_TEST_STOP: "audio-test-stop",
   // End session dialog coordination
   SHOW_END_SESSION_DIALOG: "show-end-session-dialog",
   END_SESSION_WITH_PREFERENCES: "end-session-with-preferences",
@@ -455,6 +461,24 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   setAlwaysAskOnSessionEnd: (value: boolean): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.ALWAYS_ASK_ON_SESSION_END_SET, value),
+
+  // Audio preferences
+  enumerateAudioDevices: (): Promise<{
+    success: boolean;
+    devices: Array<{ deviceId: string; label: string; groupId: string }>;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.AUDIO_DEVICES_ENUMERATE),
+
+  getAudioPreferences: (): Promise<{
+    microphoneDeviceId: string | null;
+    systemAudioEnabled: boolean;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.AUDIO_PREFERENCES_GET),
+
+  setAudioPreferences: (prefs: {
+    microphoneDeviceId?: string | null;
+    systemAudioEnabled?: boolean;
+  }): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AUDIO_PREFERENCES_SET, prefs),
 
   // End session with preferences (called from Console after dialog confirmation)
   endSessionWithPreferences: (preferences: {
