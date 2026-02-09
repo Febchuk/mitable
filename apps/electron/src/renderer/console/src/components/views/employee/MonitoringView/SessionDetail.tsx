@@ -714,133 +714,125 @@ export default function SessionDetail() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {isEndingState ? (
-            <div className="flex items-center gap-2 rounded-md bg-background-elevated px-3 py-2 text-text-secondary">
-              <Loader2 className="animate-spin" size={16} />
-              Ending session...
-            </div>
-          ) : (
+          {uiStatus === "active" && (
             <>
-              {uiStatus === "active" && (
-                <>
-                  <Button
-                    onClick={handlePauseSession}
-                    disabled={isPauseLoading}
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    {isPauseLoading ? (
-                      <Loader2 className="animate-spin" size={16} />
-                    ) : (
-                      <Pause size={16} />
-                    )}
-                    Pause
-                  </Button>
-                  <Button
-                    onClick={handleEndButtonClick}
-                    className="gap-2 bg-status-error text-white hover:bg-status-error/90"
-                  >
-                    <Square size={16} />
-                    End Session
-                  </Button>
-                </>
-              )}
-              {uiStatus === "paused" && (
-                <>
-                  <Button
-                    onClick={handleResumeSession}
-                    disabled={isPauseLoading}
-                    className="gap-2 bg-status-success text-white hover:bg-status-success/90"
-                  >
-                    {isPauseLoading ? (
-                      <Loader2 className="animate-spin" size={16} />
-                    ) : (
-                      <Play size={16} />
-                    )}
-                    Resume
-                  </Button>
-                  <Button
-                    onClick={handleEndButtonClick}
-                    variant="outline"
-                    className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
-                  >
-                    <Square size={16} />
-                    End Session
-                  </Button>
-                </>
-              )}
-              {uiStatus !== "active" &&
-                uiStatus !== "paused" &&
-                (isDelivered ? (
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-medium text-emerald bg-emerald/10">
-                      Delivered
-                    </span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1 text-text-secondary hover:text-text-primary hover:bg-transparent"
-                        >
-                          <RefreshCw size={14} />
-                          Resend
-                          <ChevronDown size={14} />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onClick={handleLinearClick} disabled={!summary}>
-                          <SiLinear className="w-4 h-4 mr-2 text-[#5E6AD2]" />
-                          Send to Linear
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setIsDeliveryDialogOpen(true)}
-                          disabled={!summary}
-                        >
-                          <Send className="w-4 h-4 mr-2" />
-                          Send to Slack
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setIsEmailDialogOpen(true)}
-                          disabled={!summary}
-                        >
-                          <Mail className="w-4 h-4 mr-2" />
-                          Send via Email
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+              <Button
+                onClick={handlePauseSession}
+                disabled={isPauseLoading}
+                variant="outline"
+                className="gap-2"
+              >
+                {isPauseLoading ? (
+                  <Loader2 className="animate-spin" size={16} />
                 ) : (
-                  <>
-                    <Button
-                      onClick={handleLinearClick}
-                      disabled={!summary}
-                      className="gap-2 border border-[#5E6AD2] text-[#5E6AD2] bg-transparent hover:bg-[#5E6AD2]/10 focus-visible:outline-none focus-visible:ring-0"
-                    >
-                      <SiLinear size={14} />
-                      Send to Linear
-                    </Button>
-                    <Button
-                      onClick={() => setIsDeliveryDialogOpen(true)}
-                      disabled={!summary}
-                      className="gap-2 bg-primary text-white hover:bg-primary/90"
-                    >
-                      <Send size={16} />
-                      Send to Slack
-                    </Button>
-                    <Button
-                      onClick={() => setIsEmailDialogOpen(true)}
-                      disabled={!summary}
-                      variant="outline"
-                      className="gap-2"
-                    >
-                      <Mail size={16} />
-                      Send via Email
-                    </Button>
-                  </>
-                ))}
+                  <Pause size={16} />
+                )}
+                Pause
+              </Button>
+              <Button
+                onClick={handleEndButtonClick}
+                className="gap-2 bg-status-error text-white hover:bg-status-error/90"
+              >
+                <Square size={16} />
+                End Session
+              </Button>
             </>
           )}
+          {uiStatus === "paused" && (
+            <>
+              <Button
+                onClick={handleResumeSession}
+                disabled={isPauseLoading}
+                className="gap-2 bg-status-success text-white hover:bg-status-success/90"
+              >
+                {isPauseLoading ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <Play size={16} />
+                )}
+                Resume
+              </Button>
+              <Button
+                onClick={handleEndButtonClick}
+                variant="outline"
+                className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
+              >
+                <Square size={16} />
+                End Session
+              </Button>
+            </>
+          )}
+          {uiStatus !== "active" &&
+            uiStatus !== "paused" &&
+            !isEndingState &&
+            (isDelivered ? (
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium text-emerald bg-emerald/10">
+                  Delivered
+                </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 text-text-secondary hover:text-text-primary hover:bg-transparent"
+                    >
+                      <RefreshCw size={14} />
+                      Resend
+                      <ChevronDown size={14} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleLinearClick} disabled={!summary}>
+                      <SiLinear className="w-4 h-4 mr-2 text-[#5E6AD2]" />
+                      Send to Linear
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsDeliveryDialogOpen(true)}
+                      disabled={!summary}
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Send to Slack
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsEmailDialogOpen(true)}
+                      disabled={!summary}
+                    >
+                      <Mail className="w-4 h-4 mr-2" />
+                      Send via Email
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : (
+              <>
+                <Button
+                  onClick={handleLinearClick}
+                  disabled={!summary}
+                  className="gap-2 border border-[#5E6AD2] text-[#5E6AD2] bg-transparent hover:bg-[#5E6AD2]/10 focus-visible:outline-none focus-visible:ring-0"
+                >
+                  <SiLinear size={14} />
+                  Send to Linear
+                </Button>
+                <Button
+                  onClick={() => setIsDeliveryDialogOpen(true)}
+                  disabled={!summary}
+                  className="gap-2 bg-primary text-white hover:bg-primary/90"
+                >
+                  <Send size={16} />
+                  Send to Slack
+                </Button>
+                <Button
+                  onClick={() => setIsEmailDialogOpen(true)}
+                  disabled={!summary}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Mail size={16} />
+                  Send via Email
+                </Button>
+              </>
+            ))}
           <Button
             variant="ghost"
             size="icon"
