@@ -575,6 +575,18 @@ function createNotificationWindow() {
 }
 
 function showNotification(config: NotificationConfig) {
+  // Windows: use native Notification API (custom BrowserWindow doesn't render on Windows)
+  if (process.platform === "win32") {
+    const { Notification: ElectronNotification } = require("electron");
+    const notif = new ElectronNotification({
+      toastXml: `<toast><visual><binding template="ToastText02"><text id="1">${config.title}</text><text id="2">${config.message}</text></binding></visual></toast>`,
+    });
+    notif.show();
+    notificationLogger.info(" Showing Windows native notification:", config.title);
+    return;
+  }
+
+  // macOS: use custom BrowserWindow notification
   // Create window if it doesn't exist
   if (!notificationWindow || notificationWindow.isDestroyed()) {
     createNotificationWindow();
@@ -2458,6 +2470,11 @@ app.whenReady().then(async () => {
     consoleLogger.info(" Another instance is already running. Quitting...");
     app.quit();
     return;
+  }
+
+  // Set App User Model ID for Windows native notifications
+  if (process.platform === "win32") {
+    app.setAppUserModelId("com.mitable.app");
   }
 
   app.on("second-instance", () => {
