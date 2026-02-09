@@ -17,6 +17,7 @@ export interface ClassifierRLMInput {
   sessionId: string;
   frameId: string;
   deltaDescription: string;
+  sceneContext?: string | null; // Scene context from sensor (meeting participants, screen sharing, app environment)
   audioContext?: string; // Transcripts from ±5 seconds around screenshot
   windowInfo?: {
     appName: string;
@@ -95,6 +96,7 @@ class ClassifierRLMService {
       sessionId: input.sessionId,
       frameId: input.frameId,
       currentDelta: input.deltaDescription,
+      sceneContext: input.sceneContext || undefined,
       audioContext: input.audioContext, // Audio transcripts from ±5 seconds around screenshot
       windowInfo: input.windowInfo,
       intervalEvidence: input.intervalEvidence,

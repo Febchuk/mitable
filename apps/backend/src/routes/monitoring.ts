@@ -1213,6 +1213,7 @@ router.post(
             userId,
             sessionId: id,
             deltaDescription: analysisResult.changeDescription,
+            sceneContext: analysisResult.sceneContext,
             frameId,
             captureTimestamp: new Date(), // Current timestamp for audio context matching
             windowInfo: {

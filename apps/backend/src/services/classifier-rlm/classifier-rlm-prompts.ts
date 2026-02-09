@@ -43,6 +43,11 @@ Your job is to INTEGRATE these interpretations into a final classification.
    - What was happening before?
    - What changed?
    - Does the timing make sense?
+   - **SCENE CONTEXT**: If sceneContext is provided, it tells you about the environment:
+     * Who is on screen (meeting participants, presenters)
+     * Whether this is a screen share from someone else (they are performing, user is watching)
+     * Application environment (remote desktop, IDE project, browser context)
+     * If someone else is presenting/sharing their screen, the visible actions belong to THEM, not the user
    - **AUDIO CONTEXT**: If audio transcripts are available, they provide crucial semantic meaning
      * "Let me debug this function" + screenshot of code editor → debugging, not just typing
      * "I'll share this with the team" + screenshot of Slack → intentional communication
@@ -52,10 +57,12 @@ Your job is to INTEGRATE these interpretations into a final classification.
    - Was content typed or just viewed?
    - Was content pasted or authored?
    - Was this navigation or creation?
+   - **CRITICAL**: If sceneContext says someone else is presenting AND the user has low keyboard/mouse activity,
+     the user is WATCHING, not performing. Use observing/watching verbs regardless of what the delta shows.
 
-3. Propose your classification based on integration of context + evidence + audio
+3. Propose your classification based on integration of context + evidence + audio + scene
    - Use audio to disambiguate intent when visual evidence is ambiguous
-   - Audio provides the "why" - use it to upgrade generic actions to specific activities
+   - Use sceneContext to determine WHO is performing the action
 
 4. Call verify_classification(your_proposed_activity) to sanity-check
    - Does it match the evidence?
@@ -64,6 +71,21 @@ Your job is to INTEGRATE these interpretations into a final classification.
 
 5. Adjust if needed and return final classification
 </strategy>
+
+<screen_share_rules>
+SCREEN SHARE / MEETING ATTRIBUTION:
+When sceneContext indicates someone else is sharing their screen or presenting:
+- The visible actions on screen belong to the PRESENTER, not the user
+- Use attribution verbs: "Observed [presenter name] doing X", "Watched [name] navigate to Y"
+- The user's actual activity is WATCHING/PARTICIPATING in the meeting
+- Evidence (keyboard=0, clicks=0) confirms the user is observing, not performing
+- Do NOT write "edited X" or "navigated to Y" — write "Observed [name] editing X"
+- Include the presenter's name if visible in the sceneContext
+
+When sceneContext indicates the user's own screen (or no sceneContext):
+- Normal attribution — the user is performing the action
+- Classify as usual with standard verbs
+</screen_share_rules>
 
 <rules>
 - Call tools one at a time, wait for results before deciding next step

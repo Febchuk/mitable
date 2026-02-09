@@ -105,9 +105,13 @@ export default function SessionDetail() {
     pollWhileSummarizing: true,
   });
   const sessionStatus = optimisticStatus ?? session?.status;
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [preRegenerateSummary, setPreRegenerateSummary] = useState<string | null>(null);
+  // Derive uiStatus early so we can pass it to useSessionSummary for polling
+  const summaryStatusForPolling = isRegenerating ? "summarizing" : sessionStatus;
   const { data: summaryData, isLoading: isLoadingSummary } = useSessionSummary(
     sessionId || "",
-    sessionStatus // Pass status for conditional polling
+    summaryStatusForPolling // Polls every 2s when "summarizing" (including during regeneration)
   );
   const { data: slackChannels = [], isLoading: isLoadingChannels } = useSlackChannels();
   const { data: slackUsers = [], isLoading: isLoadingUsers } = useSlackUsers();
@@ -118,7 +122,27 @@ export default function SessionDetail() {
     summaryData?.rawSummary ||
     "";
   const hasSummary = summary.trim().length > 0;
-  const uiStatus = hasSummary ? "ready" : sessionStatus;
+  const uiStatus = isRegenerating ? "summarizing" : hasSummary ? "ready" : sessionStatus;
+
+  // When regenerating, detect when the summary actually changes (new summary arrived)
+  useEffect(() => {
+    if (isRegenerating && hasSummary && preRegenerateSummary && summary !== preRegenerateSummary) {
+      setIsRegenerating(false);
+      setPreRegenerateSummary(null);
+      toast({ title: "Summary regenerated!", duration: 3000 });
+    }
+  }, [isRegenerating, hasSummary, summary, preRegenerateSummary]);
+
+  // Safety timeout: stop regenerating after 90 seconds regardless
+  useEffect(() => {
+    if (!isRegenerating) return;
+    const timeout = setTimeout(() => {
+      setIsRegenerating(false);
+      setPreRegenerateSummary(null);
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.summary(sessionId!) });
+    }, 90_000);
+    return () => clearTimeout(timeout);
+  }, [isRegenerating]);
   const isEndingState = sessionStatus === "summarizing" && !hasSummary;
 
   // Fetch progressive story (polls while session is active/paused)
@@ -944,12 +968,15 @@ export default function SessionDetail() {
                   try {
                     const { regenerateSummary } =
                       await import("@/console/src/services/monitoringService");
+                    setPreRegenerateSummary(summary);
+                    setIsRegenerating(true);
                     await regenerateSummary(sessionId!);
                     toast({
                       title: "Regenerating summary...",
-                      description: "This may take a few seconds.",
-                      duration: 3000,
+                      description: "This may take up to 30 seconds.",
+                      duration: 5000,
                     });
+                    // Start polling by invalidating queries — useSessionSummary polls when status is "summarizing"
                     queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId!) });
                   } catch (err) {
                     toast({
@@ -978,7 +1005,11 @@ export default function SessionDetail() {
           </div>
         </div>
 
-        {summary ? (
+        {isRegenerating ? (
+          <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-8 text-center">
+            <SummarizationProgress progress={session.summarizationProgress ?? null} />
+          </div>
+        ) : summary ? (
           <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-6">
             <div className="prose prose-invert prose-sm max-w-none break-words">
               {summary.split("\n").map((paragraph, i) => (

@@ -55,6 +55,7 @@ export const GET_CONTEXT: RLMTool = {
         : null,
       curr: {
         delta: context.currentDelta,
+        sceneContext: context.sceneContext || null,
         window: context.windowInfo || { app: "Unknown", title: "Unknown" },
         timestamp: new Date().toISOString(),
       },

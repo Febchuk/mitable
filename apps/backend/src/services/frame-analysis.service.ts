@@ -61,6 +61,7 @@ export interface FrameAnalysisResult {
   deltaChanged: boolean;
   changeType: ChangeType;
   changeDescription: string; // The "Literal Delta"
+  sceneContext: string | null; // Contextual observations (meeting participants, screen sharing, app environment)
 
   // Metadata
   confidence: number;
@@ -87,6 +88,7 @@ interface SensorResponse {
   changed: boolean;
   change_type: ChangeType;
   description: string;
+  context: string | null;
 }
 
 class FrameAnalysisService {
@@ -129,7 +131,9 @@ class FrameAnalysisService {
       if (!sensorData) {
         log.warn("Failed to parse sensor response", {
           frameId: input.frameId,
-          responsePreview: visionResult.content.slice(0, 200),
+          appName: input.windowInfo.appName,
+          responseLength: visionResult.content.length,
+          responsePreview: visionResult.content.slice(0, 500),
         });
         return this.createFallbackResult(input, visionResult);
       }
@@ -141,6 +145,7 @@ class FrameAnalysisService {
         deltaChanged: sensorData.changed,
         changeType: sensorData.change_type,
         changeDescription: sensorData.description,
+        sceneContext: sensorData.context,
 
         // Metadata
         confidence: 0.9, // Sensor is usually high confidence on literal changes
@@ -192,8 +197,34 @@ class FrameAnalysisService {
    */
   private parseSensorResponse(rawResponse: string): SensorResponse | null {
     try {
-      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return null;
+      // Strip markdown code fences (```json ... ``` or ``` ... ```)
+      const cleaned = rawResponse
+        .replace(/^```(?:json)?\s*\n?/gm, "")
+        .replace(/\n?```\s*$/gm, "")
+        .trim();
+
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+
+      // If no JSON found, check if Gemini returned a text-only "no change" response
+      if (!jsonMatch) {
+        const lower = cleaned.toLowerCase();
+        if (
+          lower.includes("identical") ||
+          lower.includes("no change") ||
+          lower.includes("no visual") ||
+          lower.includes("no difference") ||
+          lower.includes("same as") ||
+          cleaned.length === 0
+        ) {
+          return {
+            changed: false,
+            change_type: "none",
+            description: "No visual change detected",
+            context: null,
+          };
+        }
+        return null;
+      }
 
       const parsed = JSON.parse(jsonMatch[0]);
 
@@ -201,6 +232,7 @@ class FrameAnalysisService {
         changed: typeof parsed.changed === "boolean" ? parsed.changed : false,
         change_type: parsed.change_type || "none",
         description: parsed.description || "No visual change detected",
+        context: parsed.context || null,
       };
     } catch (e) {
       return null;
@@ -213,6 +245,7 @@ class FrameAnalysisService {
       deltaChanged: true,
       changeType: "none",
       changeDescription: "Session started (First frame)",
+      sceneContext: null,
       confidence: 1.0,
       analysisLatencyMs: 0,
       model: "system",
@@ -241,6 +274,7 @@ class FrameAnalysisService {
       deltaChanged: false,
       changeType: "none",
       changeDescription: "Analysis inconclusive",
+      sceneContext: null,
       confidence: 0.5,
       analysisLatencyMs: visionResult.latencyMs,
       model: visionResult.model,
