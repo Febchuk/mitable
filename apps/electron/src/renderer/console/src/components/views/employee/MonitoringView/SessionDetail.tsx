@@ -207,6 +207,22 @@ export default function SessionDetail() {
     }
   }, [optimisticStatus, hasSummary, session?.status, sessionId, queryClient]);
 
+  // Show toast when summarization reaches "writing_summary" so user knows they can do other stuff
+  const [hasShownWritingToast, setHasShownWritingToast] = useState(false);
+  useEffect(() => {
+    if (session?.summarizationProgress === "writing_summary" && !hasShownWritingToast) {
+      setHasShownWritingToast(true);
+      toast({
+        title: "Summary is being written",
+        description: "Feel free to navigate away — we'll have it ready when you come back.",
+        duration: 6000,
+      });
+    }
+    if (session?.status !== "summarizing") {
+      setHasShownWritingToast(false);
+    }
+  }, [session?.summarizationProgress, session?.status, hasShownWritingToast, toast]);
+
   // Listen for session updates from watch pill (e.g., pause/resume)
   useEffect(() => {
     if (!sessionId) return;
