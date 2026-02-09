@@ -642,6 +642,9 @@ router.post(
 
       const activeDurationMs = endTime.getTime() - startTime - totalPausedMs;
 
+      // Clean up in-memory workstream analysis state (session is ending, no more captures)
+      workstreamRLMService.cleanupSession(id);
+
       // Update session status
       const [updated] = await db
         .update(schema.monitoringSessions)
@@ -1123,6 +1126,19 @@ router.post(
         res.status(403).json({
           error: "Forbidden",
           message: "You do not have permission to access this session",
+        });
+        return;
+      }
+
+      // Reject captures for sessions that are no longer active
+      if (
+        session.status !== "active" &&
+        session.status !== "paused" &&
+        session.status !== "summarizing"
+      ) {
+        res.status(409).json({
+          error: "Conflict",
+          message: `Session is already ${session.status}. Cannot accept new captures.`,
         });
         return;
       }
