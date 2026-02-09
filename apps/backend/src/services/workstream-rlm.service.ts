@@ -15,9 +15,10 @@ import { logger } from "../lib/logger.js";
 import {
   getWorkstreamSystemPrompt,
   getWorkstreamUserPrompt,
-  parseWorkstreamAnalysisResponse,
   type WorkstreamAnalysisResult,
 } from "./rlm/workstream-rlm-prompts.js";
+import { WorkstreamEnvironment } from "./rlm/workstream-environment.js";
+import { getWorkstreamToolByName } from "./rlm/workstream-tools.js";
 import type { WorkstreamCategory, AnalysisTriggerReason } from "../db/schema/workstreams.schema.js";
 
 // Color palette for workstreams
@@ -65,9 +66,10 @@ const CONFIG = {
   captureThreshold: 10, // Trigger after 10 new captures
   timeThresholdMs: 180000, // Trigger after 3 minutes (180000ms)
   minIntervalMs: 60000, // Minimum 60s between analyses (debounce)
-  model: "llama-3.3-70b-versatile", // Groq model for analysis (upgraded from decommissioned 3.1)
-  maxTokens: 2000,
+  model: "llama-3.3-70b-versatile", // Groq model for RLM tool-call loop
+  maxTokens: 1024, // Per-iteration token limit (one tool call per response)
   temperature: 0.2,
+  maxIterations: 25, // Safety limit for RLM loop (typical: 10-18 iterations)
 };
 
 /**
@@ -256,13 +258,14 @@ class WorkstreamRLMService extends EventEmitter {
   }
 
   /**
-   * Run RLM analysis for a session
-   * When forceMode=true, fetches ALL captures regardless of previous assignments
+   * Run RLM analysis for a session using iterative tool-calling loop.
+   * The LLM pages through captures via environment tools instead of
+   * receiving everything in one massive prompt.
    */
   private async runAnalysis(
     sessionId: string,
     triggerReason: AnalysisTriggerReason,
-    forceMode?: boolean
+    _forceMode?: boolean
   ): Promise<void> {
     const state = this.getOrCreateState(sessionId);
     state.isAnalyzing = true;
@@ -276,7 +279,6 @@ class WorkstreamRLMService extends EventEmitter {
         .where(eq(schema.monitoringSessions.id, sessionId))
         .limit(1);
 
-      // Allow analysis for ended sessions too (for regeneration)
       if (!session) {
         logger.debug({ sessionId }, "[WorkstreamRLM] Session not found, skipping");
         return;
@@ -290,14 +292,7 @@ class WorkstreamRLMService extends EventEmitter {
         return;
       }
 
-      // 2. Fetch ALL captures for this session
-      // RLM should always reconsider all data holistically, not incrementally
-      // This ensures semantic grouping can see relationships across all activities
-      logger.info(
-        { sessionId, forceMode, lastAnalysisNumber: state.lastAnalysisNumber },
-        "[WorkstreamRLM] Fetching ALL captures for holistic analysis"
-      );
-
+      // 2. Fetch ALL captures (loaded into environment, NOT into prompt)
       const captures = await db
         .select({
           id: schema.sessionCaptures.id,
@@ -312,7 +307,7 @@ class WorkstreamRLMService extends EventEmitter {
         .orderBy(asc(schema.sessionCaptures.sequenceNumber));
 
       if (captures.length === 0) {
-        logger.debug({ sessionId }, "[WorkstreamRLM] No new captures to analyze");
+        logger.debug({ sessionId }, "[WorkstreamRLM] No captures to analyze");
         return;
       }
 
@@ -328,18 +323,16 @@ class WorkstreamRLMService extends EventEmitter {
         );
 
       // 4. Calculate session duration
-      const sessionStart = session.startedAt;
       const now = new Date();
-      const durationMinutes = Math.round((now.getTime() - sessionStart.getTime()) / (1000 * 60));
+      const durationMinutes = Math.round(
+        (now.getTime() - session.startedAt.getTime()) / (1000 * 60)
+      );
 
-      // 5. Build and send RLM prompt
-      const analysisNumber = state.lastAnalysisNumber + 1;
-
-      const systemPrompt = getWorkstreamSystemPrompt();
-      const userPrompt = getWorkstreamUserPrompt(
+      // 5. Initialize environment (captures live here, NOT in the prompt)
+      const environment = new WorkstreamEnvironment(
         captures.map((c) => ({
           id: c.id,
-          capturedAt: c.capturedAt.toISOString(),
+          capturedAt: c.capturedAt,
           appName: c.appName,
           windowTitle: c.windowTitle,
           activityDescription: c.activityDescription,
@@ -347,60 +340,97 @@ class WorkstreamRLMService extends EventEmitter {
         existingWorkstreams.map((w) => ({
           id: w.id,
           name: w.name,
-          captureCount: w.captureCount,
-          appsUsed: w.appsUsed || [],
           summary: w.summary,
           category: w.category,
+          captureCount: w.captureCount,
+          appsUsed: w.appsUsed || [],
         })),
-        {
-          sessionId,
-          linearIssueTitle: session.linearIssueTitle,
-          durationMinutes,
-          analysisNumber,
-        }
+        { sessionId, linearIssueTitle: session.linearIssueTitle, durationMinutes }
       );
 
-      logger.debug(
+      // 6. Build RLM conversation
+      const analysisNumber = state.lastAnalysisNumber + 1;
+      const systemPrompt = getWorkstreamSystemPrompt();
+      const userPrompt = getWorkstreamUserPrompt();
+
+      const messages: Array<{ role: string; content: string }> = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ];
+
+      logger.info(
         {
           sessionId,
           captureCount: captures.length,
           existingWorkstreams: existingWorkstreams.length,
+          analysisNumber,
         },
-        "[WorkstreamRLM] Calling LLM"
+        "[WorkstreamRLM] Starting iterative analysis"
       );
 
-      const completion = await this.groq.chat.completions.create({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        model: CONFIG.model,
-        temperature: CONFIG.temperature,
-        max_tokens: CONFIG.maxTokens,
-        response_format: { type: "json_object" },
-      });
+      // 7. RLM loop — LLM calls tools iteratively
+      let iterations = 0;
+      let toolCalls = 0;
 
-      const content = completion.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error("Empty response from LLM");
+      while (iterations < CONFIG.maxIterations) {
+        iterations++;
+
+        const llmResponse = await this.getLLMDecision(messages);
+
+        // Append assistant response to conversation
+        messages.push({ role: "assistant", content: JSON.stringify(llmResponse) });
+
+        // Check if done
+        if (llmResponse.done) {
+          break;
+        }
+
+        // Execute the tool
+        if (llmResponse.tool && llmResponse.parameters !== undefined) {
+          const tool = getWorkstreamToolByName(llmResponse.tool);
+          if (!tool) {
+            // Tell the LLM the tool doesn't exist
+            messages.push({
+              role: "user",
+              content: `Error: Unknown tool "${llmResponse.tool}". Use one of the available tools.`,
+            });
+            continue;
+          }
+
+          const toolResult = tool.execute(llmResponse.parameters, environment);
+          toolCalls++;
+
+          messages.push({
+            role: "user",
+            content: `Tool "${llmResponse.tool}" returned:\n${JSON.stringify(toolResult, null, 2)}\n\nContinue with the next step.`,
+          });
+        } else {
+          // No tool call and not done — break to avoid infinite loop
+          break;
+        }
       }
 
-      // 6. Parse response
-      const analysisResult = parseWorkstreamAnalysisResponse(content);
+      // 8. Get results from environment and apply to DB
+      const envResults = environment.getResults();
+      const analysisResult: WorkstreamAnalysisResult = {
+        assignments: envResults.assignments,
+        newWorkstreams: envResults.newWorkstreams,
+        updates: envResults.updates,
+        merges: envResults.merges,
+      };
 
-      // 7. Apply updates to database
       const updates = await this.applyAnalysisResults(sessionId, analysisResult, state);
 
-      // 8. Log analysis
+      // 9. Log analysis
       const executionTimeMs = Date.now() - startTime;
+      const envStats = environment.getAssignmentStats();
+
       await db.insert(schema.workstreamAnalysisLog).values({
         sessionId,
         analysisNumber,
         triggerReason,
         capturesAnalyzed: captures.length,
         modelUsed: CONFIG.model,
-        promptTokens: completion.usage?.prompt_tokens,
-        completionTokens: completion.usage?.completion_tokens,
         executionTimeMs,
         workstreamsCreated: updates.created,
         workstreamsMerged: updates.merged,
@@ -408,12 +438,12 @@ class WorkstreamRLMService extends EventEmitter {
         success: true,
       });
 
-      // 9. Update state
+      // 10. Update state
       state.lastAnalysisAt = Date.now();
       state.lastAnalysisNumber = analysisNumber;
       state.capturesSinceLastAnalysis = 0;
 
-      // 10. Emit update event for WebSocket
+      // 11. Emit update event for WebSocket
       const updatedWorkstreams = await db
         .select()
         .from(schema.sessionWorkstreams)
@@ -436,9 +466,13 @@ class WorkstreamRLMService extends EventEmitter {
           sessionId,
           analysisNumber,
           capturesAnalyzed: captures.length,
+          iterations,
+          toolCalls,
+          assigned: envStats.assignedCaptures,
+          unassigned: envStats.unassignedCaptures,
+          workstreams: envStats.workstreamCount,
           workstreamsCreated: updates.created,
           workstreamsMerged: updates.merged,
-          capturesAssigned: updates.assigned,
           executionTimeMs,
         },
         "[WorkstreamRLM] Analysis completed"
@@ -466,6 +500,92 @@ class WorkstreamRLMService extends EventEmitter {
     } finally {
       state.isAnalyzing = false;
     }
+  }
+
+  /**
+   * Get LLM decision on which tool to call next.
+   * No response_format: json_object — we parse manually to avoid
+   * Groq json_validate_failed errors.
+   */
+  private async getLLMDecision(
+    messages: Array<{ role: string; content: string }>
+  ): Promise<{ tool?: string; parameters?: any; reasoning?: string; done?: boolean }> {
+    const completion = await this.groq.chat.completions.create({
+      messages: messages as any,
+      model: CONFIG.model,
+      temperature: CONFIG.temperature,
+      max_tokens: CONFIG.maxTokens,
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("Empty response from LLM");
+    }
+
+    return this.parseToolCallResponse(content);
+  }
+
+  /**
+   * Parse LLM response into a tool call or done signal.
+   * Handles markdown code fences and concatenated JSON objects.
+   */
+  private parseToolCallResponse(raw: string): {
+    tool?: string;
+    parameters?: any;
+    reasoning?: string;
+    done?: boolean;
+  } {
+    let cleaned = raw.trim();
+    if (cleaned.startsWith("```json")) {
+      cleaned = cleaned.slice(7);
+    } else if (cleaned.startsWith("```")) {
+      cleaned = cleaned.slice(3);
+    }
+    if (cleaned.endsWith("```")) {
+      cleaned = cleaned.slice(0, -3);
+    }
+    cleaned = cleaned.trim();
+
+    try {
+      return JSON.parse(cleaned);
+    } catch {
+      const firstObj = this.extractFirstJsonObject(cleaned);
+      if (firstObj) return firstObj;
+      throw new Error(`Failed to parse LLM response: ${cleaned.substring(0, 200)}`);
+    }
+  }
+
+  /**
+   * Extract the first complete JSON object from potentially concatenated output.
+   */
+  private extractFirstJsonObject(text: string): any | null {
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escape = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) { escape = false; continue; }
+      if (ch === '\\' && inString) { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+
+      if (ch === '{') {
+        if (depth === 0) start = i;
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0 && start >= 0) {
+          try {
+            return JSON.parse(text.substring(start, i + 1));
+          } catch {
+            start = -1;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   /**

@@ -224,18 +224,7 @@ class StorytellerRLMService {
       throw new Error("Empty text response from Claude");
     }
 
-    try {
-      // Claude may wrap JSON in markdown code fences — strip them
-      const cleaned = textContent
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      const parsed = JSON.parse(cleaned) as LLMResponse;
-      return parsed;
-    } catch (e) {
-      logger.error({ raw: textContent }, "Failed to parse Claude response as JSON");
-      throw new Error(`Failed to parse Claude response: ${textContent.substring(0, 200)}`);
-    }
+    return this.parseToolCallResponse(textContent);
   }
 
   /**
@@ -272,21 +261,79 @@ class StorytellerRLMService {
       throw new Error("Empty response from DeepSeek R1");
     }
 
-    try {
-      // DeepSeek may wrap JSON in markdown code fences — strip them
-      const cleaned = content
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      const parsed = JSON.parse(cleaned) as LLMResponse;
-      return parsed;
-    } catch (e) {
-      logger.error(
-        { raw: content.substring(0, 300) },
-        "Failed to parse DeepSeek R1 response as JSON"
-      );
-      throw new Error(`Failed to parse DeepSeek R1 response: ${content.substring(0, 200)}`);
+    return this.parseToolCallResponse(content);
+  }
+
+  /**
+   * Parse LLM response into a tool call or final summary.
+   * Handles markdown code fences and concatenated JSON objects
+   * (e.g., model outputs {...}{...} instead of one object).
+   */
+  private parseToolCallResponse(raw: string): LLMResponse {
+    let cleaned = raw.trim();
+    if (cleaned.startsWith("```json")) {
+      cleaned = cleaned.slice(7);
+    } else if (cleaned.startsWith("```")) {
+      cleaned = cleaned.slice(3);
     }
+    if (cleaned.endsWith("```")) {
+      cleaned = cleaned.slice(0, -3);
+    }
+    cleaned = cleaned.trim();
+
+    try {
+      return JSON.parse(cleaned) as LLMResponse;
+    } catch {
+      const firstObj = this.extractFirstJsonObject(cleaned);
+      if (firstObj) {
+        return firstObj;
+      }
+      throw new Error(`Failed to parse LLM response: ${cleaned.substring(0, 200)}`);
+    }
+  }
+
+  /**
+   * Extract the first complete JSON object from a string that may contain
+   * concatenated JSON objects (e.g., {...}{...} from model batching).
+   */
+  private extractFirstJsonObject(text: string): LLMResponse | null {
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escape = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === '\\' && inString) {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+
+      if (ch === '{') {
+        if (depth === 0) start = i;
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0 && start >= 0) {
+          try {
+            return JSON.parse(text.substring(start, i + 1)) as LLMResponse;
+          } catch {
+            start = -1;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   /**

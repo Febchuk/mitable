@@ -1,238 +1,100 @@
 /**
  * Workstream RLM Prompts
  *
- * Prompt templates for workstream detection and analysis.
+ * Prompt templates for the Workstream RLM tool-calling loop.
+ * The LLM pages through captures iteratively and builds up workstreams
+ * using environment tools, matching the Storyteller/Classifier RLM pattern.
  */
 
-interface CaptureForPrompt {
-  id: string;
-  capturedAt: string;
-  appName: string | null;
-  windowTitle: string | null;
-  activityDescription: string | null;
-}
-
-interface WorkstreamForPrompt {
-  id: string;
-  name: string;
-  captureCount: number;
-  appsUsed: string[];
-  summary: string | null;
-  category: string | null;
-}
-
-interface SessionContextForPrompt {
-  sessionId: string;
-  linearIssueTitle: string | null;
-  durationMinutes: number;
-  analysisNumber: number;
-}
+import { WORKSTREAM_RLM_TOOLS } from "./workstream-tools";
 
 /**
- * Build the system prompt for workstream analysis
+ * Build the system prompt for workstream RLM analysis
  */
 export function getWorkstreamSystemPrompt(): string {
-  return `You are an AI that analyzes work sessions to identify logical workstreams.
+  const toolDescriptions = WORKSTREAM_RLM_TOOLS.map((tool) => {
+    const params = tool.parameters
+      .map((p) => `${p.name}: ${p.type}${p.required ? " (required)" : " (optional)"}`)
+      .join(", ");
+    return `- ${tool.name}(${params || "no parameters"}): ${tool.description}`;
+  }).join("\n");
+
+  return `You are a Workstream RLM assistant. Your task is to analyze session captures and group them into logical workstreams using the available tools.
 
 A "workstream" is a coherent unit of work that may span multiple applications. For example:
-- "JWT Authentication Implementation" might span VS Code (coding), Terminal (testing), and Chrome (research)
+- "JWT Authentication Implementation" might span VS Code, Terminal, and Chrome
 - "Communications" groups all Slack, email, and messaging activity
 - "Design Review" might span Figma and Slack
-- "Y Combinator Application Research" might span multiple browser tabs about YC, application tips, successful founders
 
-Your job is to analyze activity and group it into meaningful workstreams.
+<available_tools>
+${toolDescriptions}
+</available_tools>
 
-RULES:
-1. MERGE activities that are clearly part of the same task
-2. Keep Communications (Slack, email, etc.) as separate workstreams
-3. Keep Meetings (Zoom, Meet, etc.) as separate workstreams
-4. Use descriptive names based on the actual work being done
-5. Aim for 2-6 workstreams per session (consolidate AGGRESSIVELY if needed)
-6. Consider temporal proximity - activities close in time are often related
+<strategy>
+1. ALWAYS start by calling get_session_overview() to understand the session size
+2. Page through ALL captures using get_captures(start, end) — process one page at a time
+3. For each page of captures:
+   - Identify which workstream each capture belongs to
+   - Create new workstreams as needed with create_workstream()
+   - Assign captures with assign_captures()
+4. After processing all pages, call list_workstreams() to review
+5. Merge overlapping workstreams with merge_workstreams() if needed
+6. Return { "done": true } when satisfied
+</strategy>
 
-SEMANTIC GROUPING RULES (CRITICAL):
-7. EXTRACT key topics/keywords from window titles and activity descriptions
-   - Look for repeated words, phrases, or themes across activities
-   - Examples: "Y Combinator", "authentication", "database", "React", "deployment"
-8. GROUP activities with overlapping topics/keywords into ONE workstream
-   - Multiple articles about "Y Combinator Application" = ONE workstream
-   - Multiple files related to "auth" = ONE workstream
-9. For RESEARCH activities (browser tabs), be AGGRESSIVE about consolidation
-   - Multiple Google searches on same topic = ONE "Research: [Topic]" workstream
-   - Reading documentation for same technology = ONE workstream
-10. Look for SEMANTIC similarity, not just exact matches
-    - "YC", "Y Combinator", "YCombinator" = SAME topic
-    - "auth", "authentication", "login", "JWT" = SAME topic
-    - "db", "database", "postgres", "SQL" = SAME topic
-11. When in doubt, CONSOLIDATE rather than create separate workstreams
-    - Prefer fewer, more meaningful workstreams over many fragmented ones
+<rules>
+TOOL USAGE:
+- Call ONE tool at a time, wait for results before deciding next step
+- Page through captures in order: (0,25), (25,50), (50,75), etc.
+- You MUST process ALL pages — do not skip captures
 
-You must respond with valid JSON matching the exact schema specified.`;
+GROUPING RULES:
+- Aim for 2-6 workstreams per session (consolidate AGGRESSIVELY)
+- MERGE activities that are clearly part of the same task
+- Keep Communications (Slack, email) as separate workstreams
+- Keep Meetings (Zoom, Meet) as separate workstreams
+- Use descriptive names based on actual work, not just app names
+- Consider temporal proximity — activities close in time are often related
+
+SEMANTIC GROUPING:
+- Look for repeated keywords/themes across activities
+- "YC", "Y Combinator" = SAME topic
+- "auth", "authentication", "login", "JWT" = SAME topic
+- Multiple browser tabs on same topic = ONE research workstream
+- When in doubt, CONSOLIDATE rather than create separate workstreams
+
+CATEGORIES (pick one per workstream):
+development, communication, meeting, research, design, review, other
+</rules>
+
+<output_format>
+CRITICAL: Return EXACTLY ONE JSON object per response. Never batch multiple tool calls.
+
+For a tool call:
+{
+  "tool": "tool_name",
+  "parameters": { ... },
+  "reasoning": "Brief explanation"
+}
+
+When finished:
+{
+  "done": true
+}
+
+NEVER output more than one JSON object per response.
+</output_format>`;
 }
 
 /**
- * Build the user prompt for incremental workstream analysis
+ * Build the initial user prompt for the workstream RLM loop
  */
-export function getWorkstreamUserPrompt(
-  newCaptures: CaptureForPrompt[],
-  existingWorkstreams: WorkstreamForPrompt[],
-  context: SessionContextForPrompt
-): string {
-  const formattedCaptures = newCaptures
-    .map((c, i) => {
-      const time = new Date(c.capturedAt).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      return `[${i + 1}] ${time} | ${c.appName || "Unknown"} | ${c.windowTitle || "No title"}
-    Activity: ${c.activityDescription || "No description"}
-    ID: ${c.id}`;
-    })
-    .join("\n\n");
+export function getWorkstreamUserPrompt(): string {
+  return `Analyze this session's captures and group them into logical workstreams.
 
-  const formattedWorkstreams =
-    existingWorkstreams.length > 0
-      ? existingWorkstreams
-          .map(
-            (w) => `- "${w.name}" (ID: ${w.id})
-    Captures: ${w.captureCount}
-    Apps: ${w.appsUsed.join(", ") || "None"}
-    Summary: ${w.summary || "No summary yet"}
-    Category: ${w.category || "other"}`
-          )
-          .join("\n\n")
-      : "No existing workstreams yet.";
+Start by calling get_session_overview() to understand the session, then page through all captures and assign them to workstreams.
 
-  return `## Session Context
-- Session Goal: ${context.linearIssueTitle || "General work session"}
-- Duration: ${context.durationMinutes} minutes
-- Analysis #${context.analysisNumber}
-
-## Current Workstreams
-${formattedWorkstreams}
-
-## Activities to Analyze
-${formattedCaptures}
-
-## IMPORTANT: Semantic Grouping Instructions
-Look for SEMANTIC RELATIONSHIPS between ALL activities shown above.
-- If multiple window titles contain similar keywords or topics (like "Y Combinator", "Application", "Tips", "Guide"), they should be grouped into a SINGLE workstream
-- Generate a DESCRIPTIVE name like "Y Combinator Application Research" - NOT just the window title
-- DO NOT create separate workstreams for:
-  - Multiple browser tabs on the same topic
-  - Different articles about the same subject
-  - Research that's clearly about one theme
-  - Code files that are part of the same feature
-
-## Instructions
-Analyze the activities and:
-1. Assign each to the most appropriate workstream (existing or new)
-2. MERGE workstreams that should be combined (same topic, same theme, same project)
-3. Update workstream names/summaries to be descriptive of the ACTUAL work, not just app names
-4. Aim for 2-6 final workstreams maximum - consolidate aggressively!
-
-## Required Output Format
-Respond with ONLY valid JSON matching this exact structure:
-
-{
-  "assignments": {
-    "<capture_id>": "<workstream_id OR 'NEW:Workstream Name'>"
-  },
-  "updates": {
-    "<existing_workstream_id>": {
-      "name": "Updated name (or same)",
-      "summary": "Updated summary",
-      "category": "development|communication|meeting|research|design|review|other"
-    }
-  },
-  "newWorkstreams": [
-    {
-      "tempId": "NEW:Workstream Name",
-      "name": "Descriptive Workstream Name",
-      "summary": "Brief summary of what this workstream involves",
-      "category": "development|communication|meeting|research|design|review|other"
-    }
-  ],
-  "merges": [
-    {
-      "fromId": "<workstream_id_to_merge>",
-      "intoId": "<target_workstream_id>",
-      "reason": "Brief reason for merge"
-    }
-  ]
-}
-
-Important:
-- Every capture ID must appear in "assignments"
-- Use "NEW:Name" syntax for assigning to a new workstream
-- Each new workstream referenced in assignments must be defined in "newWorkstreams"
-- Only include "merges" if workstreams should be combined
-- Only include "updates" for workstreams that need changes`;
-}
-
-/**
- * Build prompt for final session analysis (more thorough)
- */
-export function getFinalAnalysisPrompt(
-  allCaptures: CaptureForPrompt[],
-  existingWorkstreams: WorkstreamForPrompt[],
-  context: SessionContextForPrompt
-): string {
-  const formattedCaptures = allCaptures
-    .map((c, i) => {
-      const time = new Date(c.capturedAt).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      return `[${i + 1}] ${time} | ${c.appName || "Unknown"} | ${c.windowTitle?.slice(0, 50) || "No title"}
-    Activity: ${c.activityDescription || "No description"}`;
-    })
-    .join("\n");
-
-  const formattedWorkstreams = existingWorkstreams
-    .map((w) => `- "${w.name}" (${w.captureCount} captures, ${w.category || "other"})`)
-    .join("\n");
-
-  return `## Final Session Analysis
-
-This is the FINAL analysis for session ${context.sessionId}.
-Review ALL activities and produce the definitive workstream assignments.
-
-Session Goal: ${context.linearIssueTitle || "General work session"}
-Total Duration: ${context.durationMinutes} minutes
-Total Activities: ${allCaptures.length}
-
-## Current Workstreams
-${formattedWorkstreams || "None yet"}
-
-## All Session Activities (Chronological)
-${formattedCaptures}
-
-## Instructions for Final Analysis
-1. Review ALL activities holistically
-2. Consolidate related workstreams (aim for 2-5 final workstreams)
-3. Generate polished summaries for each workstream
-4. Ensure every activity is assigned appropriately
-
-## Required Output Format
-{
-  "workstreams": [
-    {
-      "id": "<existing_id or NEW:Name>",
-      "name": "Final polished name",
-      "summary": "Comprehensive summary of accomplishments",
-      "category": "development|communication|meeting|research|design|review|other",
-      "captureIds": ["id1", "id2", ...]
-    }
-  ],
-  "merges": [
-    {
-      "fromId": "<workstream_to_merge>",
-      "intoId": "<target_workstream>",
-      "reason": "Reason"
-    }
-  ]
-}`;
+What tool should you call first?`;
 }
 
 /**
