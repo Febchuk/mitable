@@ -686,20 +686,20 @@ export default function SessionDetail() {
   }
 
   return (
-    <div className="p-8 space-y-6 app-no-drag">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 app-no-drag min-w-0">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate("/monitoring")}
-            className="text-text-secondary hover:text-text-primary hover:bg-background-elevated"
+            className="text-text-secondary hover:text-text-primary hover:bg-background-elevated flex-shrink-0"
           >
             <ArrowLeft size={20} />
           </Button>
-          <div>
-            <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight truncate">
               {!session.name && isEndingState ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="animate-spin" size={20} />
@@ -712,7 +712,7 @@ export default function SessionDetail() {
             <p className="text-ink-secondary text-sm mt-1">{formatDateTime(session.startedAt)}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isEndingState ? (
             <div className="flex items-center gap-2 rounded-md bg-background-elevated px-3 py-2 text-text-secondary">
               <Loader2 className="animate-spin" size={16} />
@@ -853,7 +853,7 @@ export default function SessionDetail() {
       </div>
 
       {/* Stats */}
-      <div className="flex items-center gap-6 text-sm border-b border-stroke-subtle pb-6">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm border-b border-stroke-subtle pb-6">
         <span className="text-ink-secondary">
           Duration:{" "}
           <span className="text-ink-primary font-medium">
@@ -970,9 +970,9 @@ export default function SessionDetail() {
 
         {summary ? (
           <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-6">
-            <div className="prose prose-invert prose-sm max-w-none">
+            <div className="prose prose-invert prose-sm max-w-none break-words">
               {summary.split("\n").map((paragraph, i) => (
-                <p key={i} className="text-ink-primary mb-3 last:mb-0 text-sm leading-relaxed">
+                <p key={i} className="text-ink-primary mb-3 last:mb-0 text-sm leading-relaxed break-words">
                   {paragraph || <br />}
                 </p>
               ))}

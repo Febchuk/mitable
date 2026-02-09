@@ -566,15 +566,24 @@ class WorkstreamRLMService extends EventEmitter {
 
     for (let i = 0; i < text.length; i++) {
       const ch = text[i];
-      if (escape) { escape = false; continue; }
-      if (ch === '\\' && inString) { escape = true; continue; }
-      if (ch === '"') { inString = !inString; continue; }
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\" && inString) {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
       if (inString) continue;
 
-      if (ch === '{') {
+      if (ch === "{") {
         if (depth === 0) start = i;
         depth++;
-      } else if (ch === '}') {
+      } else if (ch === "}") {
         depth--;
         if (depth === 0 && start >= 0) {
           try {
