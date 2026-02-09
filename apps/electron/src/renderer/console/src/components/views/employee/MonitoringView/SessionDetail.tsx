@@ -69,6 +69,7 @@ import LinearUpdateDialog from "./LinearUpdateDialog";
 import ActivityTimeline from "./ActivityTimeline";
 import SessionTimeline from "./SessionTimeline";
 import EndSessionDialog from "./EndSessionDialog"; // Import the new dialog
+import SummarizationProgress from "./SummarizationProgress";
 import { SiLinear } from "react-icons/si";
 
 function formatDateTime(dateString: string | null): string {
@@ -983,11 +984,11 @@ export default function SessionDetail() {
           </div>
         ) : (
           <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-8 text-center">
-            <p className="text-sm text-ink-secondary">
-              {uiStatus === "summarizing"
-                ? "Generating summary..."
-                : "No summary available for this session."}
-            </p>
+            {uiStatus === "summarizing" ? (
+              <SummarizationProgress progress={session.summarizationProgress ?? null} />
+            ) : (
+              <p className="text-sm text-ink-secondary">No summary available for this session.</p>
+            )}
           </div>
         )}
       </div>

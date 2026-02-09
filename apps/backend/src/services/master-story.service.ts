@@ -15,7 +15,12 @@
  */
 
 import { db } from "../db/client";
-import { sessionCaptures, sessionTranscripts, sessionSummaries } from "../db/schema";
+import {
+  monitoringSessions,
+  sessionCaptures,
+  sessionTranscripts,
+  sessionSummaries,
+} from "../db/schema";
 import { eq, and, isNotNull, asc, desc } from "drizzle-orm";
 import { createSessionLogger, createTimer, CHECKPOINTS } from "../lib/sessionLogger";
 import { storytellerRLMService } from "./rlm/storyteller-rlm.service";
@@ -138,7 +143,12 @@ class MasterStoryService {
         format: options.formatPreference.format,
       });
 
-      // 4. Use Storyteller RLM for recursive summarization
+      // 4. Update progress: writing_summary (RLM is now generating)
+      await db
+        .update(monitoringSessions)
+        .set({ summarizationProgress: "writing_summary" })
+        .where(eq(monitoringSessions.id, options.sessionId));
+
       const rlmResult = await storytellerRLMService.generateSummary({
         sessionId: options.sessionId,
         timeline,
@@ -154,7 +164,13 @@ class MasterStoryService {
         summaryLength: rlmResult.summary.length,
       });
 
-      // 4. Save Summary to DB
+      // 5. Update progress: finalizing
+      await db
+        .update(monitoringSessions)
+        .set({ summarizationProgress: "finalizing" })
+        .where(eq(monitoringSessions.id, options.sessionId));
+
+      // 6. Save Summary to DB
       await db.insert(sessionSummaries).values({
         sessionId: options.sessionId,
         version: 2, // v2 = RLM architecture

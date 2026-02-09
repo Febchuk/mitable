@@ -77,6 +77,10 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
   audioRecordingStartedAt: timestamp("audio_recording_started_at"), // When audio recording was last started (null when not recording)
   audioRecordingTotalMs: integer("audio_recording_total_ms").notNull().default(0), // Cumulative audio recording duration
 
+  // Summarization progress tracking (step-based progress for UI)
+  summarizationProgress: varchar("summarization_progress", { length: 50 }),
+  // Steps: null | 'generating_title' | 'analyzing_activities' | 'writing_summary' | 'finalizing'
+
   // Summary (populated at session end)
   rawActivitySummary: text("raw_activity_summary"), // Initial AI-generated summary
   finalSummary: text("final_summary"), // User-edited final summary

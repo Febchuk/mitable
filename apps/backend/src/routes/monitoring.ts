@@ -267,6 +267,7 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
         id: schema.monitoringSessions.id,
         name: schema.monitoringSessions.name,
         status: schema.monitoringSessions.status,
+        summarizationProgress: schema.monitoringSessions.summarizationProgress,
         selectedWindows: schema.monitoringSessions.selectedWindows,
         startedAt: schema.monitoringSessions.startedAt,
         endedAt: schema.monitoringSessions.endedAt,
@@ -646,6 +647,7 @@ router.post(
         .update(schema.monitoringSessions)
         .set({
           status: "summarizing",
+          summarizationProgress: "generating_title",
           endedAt: endTime,
           totalPausedMs,
           updatedAt: endTime,
@@ -723,11 +725,17 @@ router.post(
               }
             })(),
             // Generate master story
-            masterStoryService.generateStory({
-              sessionId: id,
-              userId,
-              formatPreference,
-            }),
+            (async () => {
+              await db
+                .update(schema.monitoringSessions)
+                .set({ summarizationProgress: "analyzing_activities" })
+                .where(eq(schema.monitoringSessions.id, id));
+              return masterStoryService.generateStory({
+                sessionId: id,
+                userId,
+                formatPreference,
+              });
+            })(),
           ])
         )
         .then(async () => {
@@ -735,7 +743,7 @@ router.post(
           // Update status to ready after successful story generation
           await db
             .update(schema.monitoringSessions)
-            .set({ status: "ready", ingestionStatus: "ingesting" })
+            .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
           // Trigger session ingestion (chunk + embed session data)
@@ -764,7 +772,7 @@ router.post(
           // Update status to indicate completion (even without story)
           await db
             .update(schema.monitoringSessions)
-            .set({ status: "ready", ingestionStatus: "ingesting" })
+            .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
           // Trigger session ingestion (chunk + embed session data)
