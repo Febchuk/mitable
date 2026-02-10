@@ -1,4 +1,4 @@
-import { Layers, Users, BarChart3, Plug, Activity, FileText, Paperclip } from "lucide-react";
+import { Layers, Users, BarChart3, Plug, FileText, Paperclip, CalendarDays, Target } from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 import { useSubscription } from "../../hooks/queries/billing";
@@ -20,7 +20,8 @@ export default function Nav() {
     // Personal account navigation - unified view
     return (
       <nav className="space-y-1 px-2">
-        <NavItem to="/monitoring" icon={Activity} label="Sessions" />
+        <NavItem to="/calendar" icon={CalendarDays} label="Calendar" />
+        <NavItem to="/monitoring" icon={Target} label="Sessions" />
         <NavItem to="/docs" icon={FileText} label={labels.docs} />
         <NavItem to="/artefacts" icon={Paperclip} label={labels.artifacts} />
         {/* <NavItem to="/todos" icon={CheckSquare} label="Todos" /> */}
@@ -43,7 +44,8 @@ export default function Nav() {
   // Team employee navigation
   return (
     <nav className="space-y-1 px-2">
-      <NavItem to="/monitoring" icon={Activity} label="Sessions" />
+      <NavItem to="/calendar" icon={CalendarDays} label="Calendar" />
+      <NavItem to="/monitoring" icon={Target} label="Sessions" />
       <NavItem to="/docs" icon={FileText} label={labels.docs} />
       <NavItem to="/artefacts" icon={Paperclip} label={labels.artifacts} />
       {/* <NavItem to="/todos" icon={CheckSquare} label="Todos" /> */}

@@ -22,6 +22,7 @@ import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
+import CalendarView from "./components/views/employee/CalendarView";
 import { monitoringKeys } from "./hooks/queries/monitoring";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
@@ -139,9 +140,9 @@ function MonitoringSessionHandler() {
   return null;
 }
 
-// Default route - all users start at Sessions (/monitoring)
+// Default route - all users start at Calendar (/calendar)
 function DefaultRoute() {
-  return <Navigate to="/monitoring" replace />;
+  return <Navigate to="/calendar" replace />;
 }
 
 // Protected route wrapper - redirects to login if not authenticated
@@ -226,7 +227,9 @@ function App() {
                   <Route path="docs/:docId" element={<DocDetail />} />
                   <Route path="artefacts" element={<ArtifactsView />} />
                   <Route path="todos" element={<TodosView />} />
-                  {/* Monitoring Routes */}
+                  {/* Calendar/Journal Routes (Passive Tracking) */}
+                  <Route path="calendar" element={<CalendarView />} />
+                  {/* Focused Sessions Routes */}
                   <Route path="monitoring" element={<MonitoringView />} />
                   <Route path="monitoring/:sessionId" element={<SessionDetail />} />
                   <Route path="profile" element={<UserProfilePage />} />
