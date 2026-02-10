@@ -18,6 +18,12 @@ export interface MonitoringSession {
   id: string;
   name: string | null;
   status: "active" | "paused" | "ended" | "summarizing" | "ready" | "delivered";
+  summarizationProgress:
+    | "generating_title"
+    | "analyzing_activities"
+    | "writing_summary"
+    | "finalizing"
+    | null;
   captureIntervalMs: number;
   selectedWindows: SelectedWindowInfo[];
   startedAt: string;
@@ -40,6 +46,7 @@ export interface SessionListItem {
   id: string;
   name: string | null;
   status: string;
+  summarizationProgress: string | null;
   startedAt: string;
   endedAt: string | null;
   captureCount: number;

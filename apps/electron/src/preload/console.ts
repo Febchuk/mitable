@@ -80,6 +80,8 @@ const IPC_CHANNELS = {
   WATCHING_PILL_HIDE: "watching-pill-hide",
   // Auth session restore (main → renderer on startup)
   AUTH_SESSION_RESTORED: "auth-session-restored",
+  // Native notifications
+  NOTIFICATION_SHOW: "notification-show",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -506,6 +508,14 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   // Hide watching pill
   hidePill: () => ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE),
+
+  // Show native notification (outside the app window)
+  showNotification: (config: {
+    title: string;
+    message: string;
+    actions: Array<{ id: string; label: string; primary?: boolean }>;
+    timeout?: number;
+  }): Promise<{ success: boolean }> => ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_SHOW, config),
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

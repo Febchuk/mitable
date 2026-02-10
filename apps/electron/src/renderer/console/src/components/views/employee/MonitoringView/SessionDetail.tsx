@@ -69,6 +69,7 @@ import LinearUpdateDialog from "./LinearUpdateDialog";
 import ActivityTimeline from "./ActivityTimeline";
 import SessionTimeline from "./SessionTimeline";
 import EndSessionDialog from "./EndSessionDialog"; // Import the new dialog
+import SummarizationProgress from "./SummarizationProgress";
 import { SiLinear } from "react-icons/si";
 
 function formatDateTime(dateString: string | null): string {
@@ -205,6 +206,23 @@ export default function SessionDetail() {
       }
     }
   }, [optimisticStatus, hasSummary, session?.status, sessionId, queryClient]);
+
+  // Show native notification when summarization reaches "writing_summary"
+  const [hasShownWritingNotif, setHasShownWritingNotif] = useState(false);
+  useEffect(() => {
+    if (session?.summarizationProgress === "writing_summary" && !hasShownWritingNotif) {
+      setHasShownWritingNotif(true);
+      window.consoleAPI?.showNotification?.({
+        title: "Summary is being written",
+        message: "Feel free to do other stuff — we'll have it ready when you come back.",
+        actions: [{ id: "dismiss", label: "Got it", primary: true }],
+        timeout: 8000,
+      });
+    }
+    if (session?.status !== "summarizing") {
+      setHasShownWritingNotif(false);
+    }
+  }, [session?.summarizationProgress, session?.status, hasShownWritingNotif]);
 
   // Listen for session updates from watch pill (e.g., pause/resume)
   useEffect(() => {
@@ -713,133 +731,125 @@ export default function SessionDetail() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {isEndingState ? (
-            <div className="flex items-center gap-2 rounded-md bg-background-elevated px-3 py-2 text-text-secondary">
-              <Loader2 className="animate-spin" size={16} />
-              Ending session...
-            </div>
-          ) : (
+          {uiStatus === "active" && (
             <>
-              {uiStatus === "active" && (
-                <>
-                  <Button
-                    onClick={handlePauseSession}
-                    disabled={isPauseLoading}
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    {isPauseLoading ? (
-                      <Loader2 className="animate-spin" size={16} />
-                    ) : (
-                      <Pause size={16} />
-                    )}
-                    Pause
-                  </Button>
-                  <Button
-                    onClick={handleEndButtonClick}
-                    className="gap-2 bg-status-error text-white hover:bg-status-error/90"
-                  >
-                    <Square size={16} />
-                    End Session
-                  </Button>
-                </>
-              )}
-              {uiStatus === "paused" && (
-                <>
-                  <Button
-                    onClick={handleResumeSession}
-                    disabled={isPauseLoading}
-                    className="gap-2 bg-status-success text-white hover:bg-status-success/90"
-                  >
-                    {isPauseLoading ? (
-                      <Loader2 className="animate-spin" size={16} />
-                    ) : (
-                      <Play size={16} />
-                    )}
-                    Resume
-                  </Button>
-                  <Button
-                    onClick={handleEndButtonClick}
-                    variant="outline"
-                    className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
-                  >
-                    <Square size={16} />
-                    End Session
-                  </Button>
-                </>
-              )}
-              {uiStatus !== "active" &&
-                uiStatus !== "paused" &&
-                (isDelivered ? (
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-medium text-emerald bg-emerald/10">
-                      Delivered
-                    </span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1 text-text-secondary hover:text-text-primary hover:bg-transparent"
-                        >
-                          <RefreshCw size={14} />
-                          Resend
-                          <ChevronDown size={14} />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onClick={handleLinearClick} disabled={!summary}>
-                          <SiLinear className="w-4 h-4 mr-2 text-[#5E6AD2]" />
-                          Send to Linear
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setIsDeliveryDialogOpen(true)}
-                          disabled={!summary}
-                        >
-                          <Send className="w-4 h-4 mr-2" />
-                          Send to Slack
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setIsEmailDialogOpen(true)}
-                          disabled={!summary}
-                        >
-                          <Mail className="w-4 h-4 mr-2" />
-                          Send via Email
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+              <Button
+                onClick={handlePauseSession}
+                disabled={isPauseLoading}
+                variant="outline"
+                className="gap-2"
+              >
+                {isPauseLoading ? (
+                  <Loader2 className="animate-spin" size={16} />
                 ) : (
-                  <>
-                    <Button
-                      onClick={handleLinearClick}
-                      disabled={!summary}
-                      className="gap-2 border border-[#5E6AD2] text-[#5E6AD2] bg-transparent hover:bg-[#5E6AD2]/10 focus-visible:outline-none focus-visible:ring-0"
-                    >
-                      <SiLinear size={14} />
-                      Send to Linear
-                    </Button>
-                    <Button
-                      onClick={() => setIsDeliveryDialogOpen(true)}
-                      disabled={!summary}
-                      className="gap-2 bg-primary text-white hover:bg-primary/90"
-                    >
-                      <Send size={16} />
-                      Send to Slack
-                    </Button>
-                    <Button
-                      onClick={() => setIsEmailDialogOpen(true)}
-                      disabled={!summary}
-                      variant="outline"
-                      className="gap-2"
-                    >
-                      <Mail size={16} />
-                      Send via Email
-                    </Button>
-                  </>
-                ))}
+                  <Pause size={16} />
+                )}
+                Pause
+              </Button>
+              <Button
+                onClick={handleEndButtonClick}
+                className="gap-2 bg-status-error text-white hover:bg-status-error/90"
+              >
+                <Square size={16} />
+                End Session
+              </Button>
             </>
           )}
+          {uiStatus === "paused" && (
+            <>
+              <Button
+                onClick={handleResumeSession}
+                disabled={isPauseLoading}
+                className="gap-2 bg-status-success text-white hover:bg-status-success/90"
+              >
+                {isPauseLoading ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <Play size={16} />
+                )}
+                Resume
+              </Button>
+              <Button
+                onClick={handleEndButtonClick}
+                variant="outline"
+                className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
+              >
+                <Square size={16} />
+                End Session
+              </Button>
+            </>
+          )}
+          {uiStatus !== "active" &&
+            uiStatus !== "paused" &&
+            !isEndingState &&
+            (isDelivered ? (
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium text-emerald bg-emerald/10">
+                  Delivered
+                </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 text-text-secondary hover:text-text-primary hover:bg-transparent"
+                    >
+                      <RefreshCw size={14} />
+                      Resend
+                      <ChevronDown size={14} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleLinearClick} disabled={!summary}>
+                      <SiLinear className="w-4 h-4 mr-2 text-[#5E6AD2]" />
+                      Send to Linear
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsDeliveryDialogOpen(true)}
+                      disabled={!summary}
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Send to Slack
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsEmailDialogOpen(true)}
+                      disabled={!summary}
+                    >
+                      <Mail className="w-4 h-4 mr-2" />
+                      Send via Email
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : (
+              <>
+                <Button
+                  onClick={handleLinearClick}
+                  disabled={!summary}
+                  className="gap-2 border border-[#5E6AD2] text-[#5E6AD2] bg-transparent hover:bg-[#5E6AD2]/10 focus-visible:outline-none focus-visible:ring-0"
+                >
+                  <SiLinear size={14} />
+                  Send to Linear
+                </Button>
+                <Button
+                  onClick={() => setIsDeliveryDialogOpen(true)}
+                  disabled={!summary}
+                  className="gap-2 bg-primary text-white hover:bg-primary/90"
+                >
+                  <Send size={16} />
+                  Send to Slack
+                </Button>
+                <Button
+                  onClick={() => setIsEmailDialogOpen(true)}
+                  disabled={!summary}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Mail size={16} />
+                  Send via Email
+                </Button>
+              </>
+            ))}
           <Button
             variant="ghost"
             size="icon"
@@ -983,11 +993,11 @@ export default function SessionDetail() {
           </div>
         ) : (
           <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-8 text-center">
-            <p className="text-sm text-ink-secondary">
-              {uiStatus === "summarizing"
-                ? "Generating summary..."
-                : "No summary available for this session."}
-            </p>
+            {uiStatus === "summarizing" ? (
+              <SummarizationProgress progress={session.summarizationProgress ?? null} />
+            ) : (
+              <p className="text-sm text-ink-secondary">No summary available for this session.</p>
+            )}
           </div>
         )}
       </div>

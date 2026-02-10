@@ -233,6 +233,14 @@ interface ConsoleAPI {
 
   // Hide watching pill
   hidePill: () => void;
+
+  // Show native notification (outside the app window)
+  showNotification: (config: {
+    title: string;
+    message: string;
+    actions: Array<{ id: string; label: string; primary?: boolean }>;
+    timeout?: number;
+  }) => Promise<{ success: boolean }>;
 }
 
 declare global {

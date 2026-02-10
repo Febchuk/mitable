@@ -267,6 +267,7 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
         id: schema.monitoringSessions.id,
         name: schema.monitoringSessions.name,
         status: schema.monitoringSessions.status,
+        summarizationProgress: schema.monitoringSessions.summarizationProgress,
         selectedWindows: schema.monitoringSessions.selectedWindows,
         startedAt: schema.monitoringSessions.startedAt,
         endedAt: schema.monitoringSessions.endedAt,
@@ -641,11 +642,15 @@ router.post(
 
       const activeDurationMs = endTime.getTime() - startTime - totalPausedMs;
 
+      // Clean up in-memory workstream analysis state (session is ending, no more captures)
+      workstreamRLMService.cleanupSession(id);
+
       // Update session status
       const [updated] = await db
         .update(schema.monitoringSessions)
         .set({
           status: "summarizing",
+          summarizationProgress: "generating_title",
           endedAt: endTime,
           totalPausedMs,
           updatedAt: endTime,
@@ -723,11 +728,17 @@ router.post(
               }
             })(),
             // Generate master story
-            masterStoryService.generateStory({
-              sessionId: id,
-              userId,
-              formatPreference,
-            }),
+            (async () => {
+              await db
+                .update(schema.monitoringSessions)
+                .set({ summarizationProgress: "analyzing_activities" })
+                .where(eq(schema.monitoringSessions.id, id));
+              return masterStoryService.generateStory({
+                sessionId: id,
+                userId,
+                formatPreference,
+              });
+            })(),
           ])
         )
         .then(async () => {
@@ -735,7 +746,7 @@ router.post(
           // Update status to ready after successful story generation
           await db
             .update(schema.monitoringSessions)
-            .set({ status: "ready", ingestionStatus: "ingesting" })
+            .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
           // Trigger session ingestion (chunk + embed session data)
@@ -764,7 +775,7 @@ router.post(
           // Update status to indicate completion (even without story)
           await db
             .update(schema.monitoringSessions)
-            .set({ status: "ready", ingestionStatus: "ingesting" })
+            .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
           // Trigger session ingestion (chunk + embed session data)
@@ -1115,6 +1126,19 @@ router.post(
         res.status(403).json({
           error: "Forbidden",
           message: "You do not have permission to access this session",
+        });
+        return;
+      }
+
+      // Reject captures for sessions that are no longer active
+      if (
+        session.status !== "active" &&
+        session.status !== "paused" &&
+        session.status !== "summarizing"
+      ) {
+        res.status(409).json({
+          error: "Conflict",
+          message: `Session is already ${session.status}. Cannot accept new captures.`,
         });
         return;
       }
