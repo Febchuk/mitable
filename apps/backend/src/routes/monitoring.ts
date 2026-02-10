@@ -736,8 +736,7 @@ router.post(
                 .where(eq(schema.sessionCaptures.sessionId, id));
             } catch (cleanupError) {
               log.error("Failed to clear imageData", {
-                error:
-                  cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+                error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
               });
             }
           },
