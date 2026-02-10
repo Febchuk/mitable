@@ -67,6 +67,16 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
   selectedWindows: jsonb("selected_windows").notNull().default("[]"),
   // Array of: { windowId: string, appName: string, windowTitle: string }
 
+  // Intermediate summary configuration (real-time updates during active sessions)
+  intermediateSummaryIntervalMs: integer("intermediate_summary_interval_ms")
+    .notNull()
+    .default(1800000), // Default 30 minutes
+  intermediateSummaryEnabled: boolean("intermediate_summary_enabled").notNull().default(true),
+  lastIntermediateSummaryAt: timestamp("last_intermediate_summary_at"),
+  intermediateSummary: text("intermediate_summary"),
+  intermediateSummaryStatus: varchar("intermediate_summary_status", { length: 50 }),
+  // States: null | 'generating' | 'completed' | 'failed'
+
   // Timing
   startedAt: timestamp("started_at").defaultNow().notNull(),
   pausedAt: timestamp("paused_at"), // Last pause timestamp

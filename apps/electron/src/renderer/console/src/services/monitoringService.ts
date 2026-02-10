@@ -263,6 +263,17 @@ export async function fetchSessionSummary(sessionId: string): Promise<SessionSum
 }
 
 /**
+ * Intermediate summary info for live sessions
+ */
+export interface IntermediateSummaryInfo {
+  content: string | null;
+  lastUpdatedAt: string | null;
+  status: "generating" | "completed" | "failed" | null;
+  intervalMs: number;
+  enabled: boolean;
+}
+
+/**
  * Story response type
  */
 export interface SessionStory {
@@ -273,6 +284,7 @@ export interface SessionStory {
     lastUpdated: string | null;
     totalTokens: number;
   };
+  intermediateSummary: IntermediateSummaryInfo | null;
 }
 
 /**
@@ -604,4 +616,54 @@ export async function forceAnalyzeWorkstreams(
     `/monitoring/sessions/${sessionId}/workstreams/analyze`,
     { method: "POST" }
   );
+}
+
+// ===========================
+// Intermediate Summary API
+// ===========================
+
+export interface TriggerIntermediateSummaryResponse {
+  success: boolean;
+  summary: string;
+  generatedAt: string;
+  activityCount: number;
+  executionTimeMs: number;
+}
+
+/**
+ * Force trigger intermediate summary generation for an active session
+ */
+export async function triggerIntermediateSummary(
+  sessionId: string
+): Promise<TriggerIntermediateSummaryResponse> {
+  return apiRequest<TriggerIntermediateSummaryResponse>(
+    `/monitoring/sessions/${sessionId}/intermediate-summary`,
+    { method: "POST" }
+  );
+}
+
+export interface SessionSettings {
+  intermediateSummaryIntervalMs: number;
+  intermediateSummaryEnabled: boolean;
+}
+
+export interface UpdateSessionSettingsResponse {
+  success: boolean;
+  settings: SessionSettings;
+}
+
+/**
+ * Update session settings (including intermediate summary configuration)
+ */
+export async function updateSessionSettings(
+  sessionId: string,
+  settings: {
+    intermediateSummaryIntervalMs?: number;
+    intermediateSummaryEnabled?: boolean;
+  }
+): Promise<UpdateSessionSettingsResponse> {
+  return apiRequest<UpdateSessionSettingsResponse>(`/monitoring/sessions/${sessionId}/settings`, {
+    method: "PATCH",
+    body: JSON.stringify(settings),
+  });
 }
