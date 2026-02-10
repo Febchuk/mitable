@@ -801,9 +801,27 @@ authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
+    // Fetch organization settings for variant information
+    const [organization] = await db
+      .select({
+        id: schema.organizations.id,
+        name: schema.organizations.name,
+        settings: schema.organizations.settings,
+      })
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, userProfile.organizationId))
+      .limit(1);
+
     res.json({
       user: req.user,
       profile: userProfile,
+      organization: organization
+        ? {
+            id: organization.id,
+            name: organization.name,
+            settings: organization.settings || {},
+          }
+        : null,
     });
   } catch (error) {
     console.error("Get user profile error:", error);

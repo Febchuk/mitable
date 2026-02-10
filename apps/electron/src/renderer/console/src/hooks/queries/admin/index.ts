@@ -8,3 +8,4 @@ export { useConnectIntegration } from "./useConnectIntegration";
 export { useDisconnectIntegration } from "./useDisconnectIntegration";
 export { useSyncIntegration } from "./useSyncIntegration";
 export { useUpdateIntegrationSettings } from "./useUpdateIntegrationSettings";
+export { useOrganizationSettings, useUpdateOrganizationSettings } from "./useOrganizationSettings";

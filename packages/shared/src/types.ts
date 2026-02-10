@@ -256,3 +256,69 @@ export interface MonitoringDeliveryResult {
   messageTs?: string; // Slack message timestamp
   error?: string;
 }
+
+// ============================================
+// Organization Variant Types
+// ============================================
+
+/**
+ * Organization variants for regional customization.
+ * - "global": Default terminology (Docs, Artifacts)
+ * - "nigeria": Nigeria-specific terminology (Reports, Uploads)
+ */
+export type OrgVariant = "global" | "nigeria";
+
+/**
+ * Organization settings stored in the settings JSONB column.
+ */
+export interface OrgSettings {
+  variant?: OrgVariant;
+  // Future: branding, feature flags, etc.
+}
+
+/**
+ * Label mappings per variant for UI text.
+ * Use with useVariant() hook in frontend.
+ */
+export const VARIANT_LABELS = {
+  global: {
+    // Navigation
+    docs: "Docs",
+    artifacts: "Artefacts",
+    // Document labels
+    documents: "Documents",
+    document: "Document",
+    createDocument: "Create Document",
+    generateDocument: "Generate Document",
+    loadingDocuments: "Loading documents...",
+    errorLoadingDocuments: "Error loading documents",
+    noDocumentsYet: "No documents yet",
+    // Artifact labels
+    artifact: "Artefact",
+    uploadArtifact: "Upload Artefact",
+    loadingArtifacts: "Loading artefacts...",
+    errorLoadingArtifacts: "Error loading artefacts",
+    noArtifactsYet: "No artefacts yet",
+  },
+  nigeria: {
+    // Navigation
+    docs: "Reports",
+    artifacts: "Uploads",
+    // Document labels (now "Reports")
+    documents: "Reports",
+    document: "Report",
+    createDocument: "Create Report",
+    generateDocument: "Generate Report",
+    loadingDocuments: "Loading reports...",
+    errorLoadingDocuments: "Error loading reports",
+    noDocumentsYet: "No reports yet",
+    // Artifact labels (now "Uploads")
+    artifact: "Upload",
+    uploadArtifact: "Upload File",
+    loadingArtifacts: "Loading uploads...",
+    errorLoadingArtifacts: "Error loading uploads",
+    noArtifactsYet: "No uploads yet",
+  },
+} as const;
+
+export type VariantLabels = (typeof VARIANT_LABELS)[OrgVariant];

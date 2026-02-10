@@ -19,6 +19,7 @@ import {
   Plus,
   FileText,
   Search,
+  Globe,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import Button from "../components/ui/Button";
@@ -32,6 +33,18 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
+import {
+  useOrganizationSettings,
+  useUpdateOrganizationSettings,
+} from "@/console/src/hooks/queries/admin";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { OrgVariant } from "@mitable/shared";
 import { createLogger } from "../../../lib/logger";
 import { API_BASE_URL } from "../lib/config";
 import MultiSelectPicker from "../components/shared/MultiSelectPicker/index";
@@ -105,6 +118,26 @@ export default function UserProfilePage() {
     isLoading: isPreferencesLoading,
     updatePreference,
   } = usePreferences();
+
+  // Organization settings hooks (admin only)
+  const isAdmin = user?.role === "admin";
+  const { data: orgSettings, isLoading: isOrgSettingsLoading } = useOrganizationSettings();
+  const { mutate: updateOrgSettings, isPending: isUpdatingOrgSettings } =
+    useUpdateOrganizationSettings();
+  const currentVariant = orgSettings?.settings?.variant || "global";
+
+  const VARIANT_OPTIONS: { value: OrgVariant; label: string; description: string }[] = [
+    {
+      value: "global",
+      label: "Global (Default)",
+      description: "Standard terminology: Docs, Artefacts",
+    },
+    {
+      value: "nigeria",
+      label: "Nigeria",
+      description: "Regional terminology: Reports, Uploads",
+    },
+  ];
 
   // Block list state
   const [blockedApps, setBlockedApps] = useState<string[]>([]);
@@ -2475,6 +2508,92 @@ export default function UserProfilePage() {
                     )}
                   </div>
                 </div>
+
+                {/* Organization Settings Section (Admin Only) */}
+                {isAdmin && (
+                  <div className="bg-background-secondary rounded-xl border border-border-subtle p-6 mt-6">
+                    <div className="space-y-6">
+                      <div className="pb-4 border-b border-border-subtle">
+                        <h2 className="text-heading-4 text-white">Organization Settings</h2>
+                        <p className="text-body-sm text-text-tertiary mt-1">
+                          Configure settings that apply to all users in your organization
+                        </p>
+                      </div>
+
+                      {/* Region Variant Selector */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+                            <Globe size={18} className="text-emerald-400" />
+                          </div>
+                          <div className="space-y-0.5">
+                            <Label className="text-sm font-medium text-text-primary">
+                              Region Variant
+                            </Label>
+                            <p className="text-xs text-text-tertiary">
+                              Customize UI labels based on your region. Changes terminology for
+                              Documents and Artifacts across the application.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          {isOrgSettingsLoading ? (
+                            <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                          ) : (
+                            <Select
+                              value={currentVariant}
+                              onValueChange={(v) => {
+                                updateOrgSettings(
+                                  { variant: v as OrgVariant },
+                                  {
+                                    onSuccess: () => {
+                                      toast({
+                                        title: "Region updated",
+                                        description: `UI labels changed to ${v === "nigeria" ? "Nigeria" : "Global"} variant`,
+                                      });
+                                    },
+                                    onError: () => {
+                                      toast({
+                                        title: "Error",
+                                        description: "Failed to update region setting",
+                                        variant: "destructive",
+                                      });
+                                    },
+                                  }
+                                );
+                              }}
+                              disabled={isUpdatingOrgSettings}
+                            >
+                              <SelectTrigger className="w-[200px] h-10 text-sm bg-background-elevated border-border-subtle">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {VARIANT_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    <div>
+                                      <span className="font-medium">{option.label}</span>
+                                      <p className="text-xs text-text-tertiary">
+                                        {option.description}
+                                      </p>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Info note */}
+                      <p className="text-xs text-text-tertiary bg-background-elevated rounded-lg p-3 border border-border-subtle">
+                        <span className="font-medium text-text-secondary">Note:</span> Changing the
+                        region variant will update UI labels for all users in your organization.
+                        Underlying data and functionality remain the same.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

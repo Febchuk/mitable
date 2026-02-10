@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useState } from "react
 import { authService } from "../services/authService";
 import type { User } from "../types";
 import { createLogger } from "../../../lib/logger";
+import type { OrgSettings } from "@mitable/shared";
 
 const logger = createLogger("UserContext");
 
@@ -10,11 +11,19 @@ function isNetworkError(error: unknown): boolean {
   return error instanceof TypeError && /failed to fetch|network/i.test(error.message);
 }
 
+interface Organization {
+  id: string;
+  name: string;
+  settings: OrgSettings;
+}
+
 interface UserContextType {
   user: User | null;
+  organization: Organization | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   updateUser: (user: User) => void;
+  updateOrganization: (org: Organization) => void;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
 }
@@ -23,6 +32,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -40,6 +50,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
       originalRole: response.profile.role,
       organizationId: response.profile.organizationId || "",
     });
+
+    // Set organization if returned from API
+    if (response.organization) {
+      setOrganization({
+        id: response.organization.id,
+        name: response.organization.name,
+        settings: response.organization.settings || {},
+      });
+    }
+
     setIsAuthenticated(true);
 
     // Share user context with main process for cross-window access (WatchingPill, etc.)
@@ -186,6 +206,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateOrganization = (org: Organization) => {
+    setOrganization(org);
+  };
+
   const logout = async () => {
     const token = authService.getAccessToken();
     if (token) {
@@ -197,6 +221,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
     authService.clearTokens();
     setUser(null);
+    setOrganization(null);
     setIsAuthenticated(false);
   };
 
@@ -212,7 +237,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   return (
     <UserContext.Provider
-      value={{ user, isLoading, isAuthenticated, updateUser, logout, refreshAuth }}
+      value={{
+        user,
+        organization,
+        isLoading,
+        isAuthenticated,
+        updateUser,
+        updateOrganization,
+        logout,
+        refreshAuth,
+      }}
     >
       {children}
     </UserContext.Provider>
