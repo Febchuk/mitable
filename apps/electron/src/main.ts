@@ -32,6 +32,11 @@ import { isBlockedByPolicy } from "./services/capturePolicy";
 // Force dark theme for consistent vibrancy effect regardless of system settings
 nativeTheme.themeSource = "dark";
 
+// Register mitable:// protocol for Windows native notification action buttons
+if (process.platform === "win32") {
+  app.setAsDefaultProtocolClient("mitable");
+}
+
 // Create loggers for different modules in main process
 const consoleLogger = createLogger("Console");
 const watchingPillLogger = createLogger("WatchingPill");
@@ -575,19 +580,53 @@ function createNotificationWindow() {
 }
 
 function showNotification(config: NotificationConfig) {
-  // Windows: use native Notification API (custom BrowserWindow doesn't render on Windows)
+  // Windows: use native toast notification for OS integration (Action Center)
   if (process.platform === "win32") {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { Notification: ElectronNotification } = require("electron");
-    const notif = new ElectronNotification({
-      toastXml: `<toast><visual><binding template="ToastText02"><text id="1">${config.title}</text><text id="2">${config.message}</text></binding></visual></toast>`,
-    });
-    notif.show();
-    notificationLogger.info(" Showing Windows native notification:", config.title);
+    showNativeWindowsNotification(config);
     return;
   }
 
   // macOS: use custom BrowserWindow notification
+  showCustomNotification(config);
+}
+
+function showNativeWindowsNotification(config: NotificationConfig) {
+  // Build action buttons XML
+  const actionsXml = config.actions
+    .map(
+      (action) =>
+        `<action content="${escapeXml(action.label)}" activationType="protocol" arguments="mitable://${action.id}" />`
+    )
+    .join("\n        ");
+
+  const toastXml = `
+<toast launch="mitable://focus" activationType="protocol">
+  <visual>
+    <binding template="ToastText02">
+      <text id="1">${escapeXml(config.title)}</text>
+      <text id="2">${escapeXml(config.message)}</text>
+    </binding>
+  </visual>
+  <actions>
+    ${actionsXml}
+  </actions>
+</toast>`.trim();
+
+  const notification = new Notification({ toastXml });
+  notification.show();
+  notificationLogger.info("Native Windows notification shown:", config.title);
+}
+
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function showCustomNotification(config: NotificationConfig) {
   // Create window if it doesn't exist
   if (!notificationWindow || notificationWindow.isDestroyed()) {
     createNotificationWindow();
@@ -599,7 +638,7 @@ function showNotification(config: NotificationConfig) {
     notificationWindow.webContents.send(IPC_CHANNELS.NOTIFICATION_DATA, config);
     notificationWindow.showInactive(); // Don't steal focus or affect other windows
 
-    notificationLogger.info(" Showing notification:", config.title);
+    notificationLogger.info("Showing custom notification:", config.title);
 
     // Set up auto-hide timer (as backup, renderer also handles this)
     if (config.timeout && config.timeout > 0) {
@@ -625,6 +664,25 @@ function hideNotification() {
   }
 }
 
+// Shared handler for notification actions (used by both Windows protocol and macOS IPC)
+function handleNotificationAction(actionId: string) {
+  switch (actionId) {
+    case "turn-on":
+    case "focus":
+      // Show console and navigate to start session
+      if (consoleWindow && !consoleWindow.isDestroyed()) {
+        consoleWindow.show();
+        consoleWindow.focus();
+      }
+      break;
+    case "dismiss":
+      // No-op — notification already dismissed
+      break;
+    default:
+      notificationLogger.warn("Unknown notification action:", actionId);
+  }
+}
+
 // Start periodic notification timer (prompts user to turn on monitoring)
 function startNotificationTimer() {
   // Get user's preferred notification frequency (defaults to 30 minutes)
@@ -635,7 +693,7 @@ function startNotificationTimer() {
     );
   }
   const NOTIFICATION_INTERVAL = notificationFrequencyMinutes * 60 * 1000; // Convert minutes to milliseconds
-  // const NOTIFICATION_INTERVAL = 0.5 * 60 * 1000; // 0.5 minutes for testing
+  // const NOTIFICATION_INTERVAL = 10 * 1000; // 10 seconds for testing
 
   if (notificationTimer) {
     clearInterval(notificationTimer);
@@ -1313,26 +1371,11 @@ function setupNotificationHandlers() {
     hideNotification();
   });
 
-  // Handle notification action button clicks
+  // Handle notification action button clicks (from custom macOS notification)
   ipcMain.on(IPC_CHANNELS.NOTIFICATION_ACTION, async (_, actionId: string) => {
-    notificationLogger.info(" Notification action:", actionId);
+    notificationLogger.info("Notification action (IPC):", actionId);
     hideNotification();
-
-    switch (actionId) {
-      case "turn-on":
-        // Show console and navigate to start session
-        if (consoleWindow && !consoleWindow.isDestroyed()) {
-          consoleWindow.show();
-          consoleWindow.focus();
-          // Optionally: send navigation event to go to session start
-        }
-        break;
-      case "dismiss":
-        // Just hide - already handled above
-        break;
-      default:
-        notificationLogger.warn(" Unknown notification action:", actionId);
-    }
+    handleNotificationAction(actionId);
   });
 
   ipcLogger.info(" Notification handlers registered successfully");
@@ -2473,13 +2516,22 @@ app.whenReady().then(async () => {
     return;
   }
 
-  // Set App User Model ID for Windows native notifications
+  // Set App User Model ID for Windows notification center integration
   if (process.platform === "win32") {
     app.setAppUserModelId("com.mitable.app");
   }
 
-  app.on("second-instance", () => {
-    // Someone tried to run a second instance, we should focus our window.
+  app.on("second-instance", (_event, commandLine) => {
+    // Check for mitable:// protocol URL from Windows notification action clicks
+    const protocolUrl = commandLine.find((arg) => arg.startsWith("mitable://"));
+    if (protocolUrl) {
+      const actionId = protocolUrl.replace("mitable://", "").replace(/\/$/, "");
+      notificationLogger.info("Protocol action received:", actionId);
+      handleNotificationAction(actionId);
+      return;
+    }
+
+    // Default: focus the console window
     if (consoleWindow) {
       if (consoleWindow.isMinimized()) consoleWindow.restore();
       consoleWindow.show();
