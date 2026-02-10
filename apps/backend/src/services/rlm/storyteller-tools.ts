@@ -284,11 +284,13 @@ Summary:`;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const systemPrompt = env.fullTranscriptText
-          ? "You are a concise work summarizer with access to both visual activity logs and audio transcripts. Use the audio transcripts to understand the WHY behind actions. CRITICAL: Your summary MUST ONLY mention apps, websites, and actions that appear in the provided activity list. NEVER invent or substitute different apps, people, or tasks. If activities show casual browsing, say so — do NOT fabricate professional work."
-          : "You are a concise work summarizer. CRITICAL: Your summary MUST ONLY mention apps, websites, and actions that appear in the provided activity list. NEVER invent or substitute different apps, people, or tasks. If activities show casual browsing, say so — do NOT fabricate professional work.";
+        const attributionRule = `ATTRIBUTION: Activities starting with "Observed [Name]..." mean someone ELSE performed that action (e.g. on a shared screen or meeting). Preserve that attribution — write "Mark debugged X" NOT "I debugged X". For the user's own actions, write in first person ("I").`;
 
-        const userPrompt = `${prompt}\n\nIMPORTANT: Only reference the specific apps, websites, and actions listed above. Do NOT add information not present in the activities. Write in first person.`;
+        const systemPrompt = env.fullTranscriptText
+          ? `You are a concise work summarizer with access to both visual activity logs and audio transcripts. Use the audio transcripts to understand the WHY behind actions. ${attributionRule} CRITICAL: Your summary MUST ONLY mention apps, websites, and actions that appear in the provided activity list. NEVER invent or substitute different apps, people, or tasks. If activities show casual browsing, say so — do NOT fabricate professional work.`
+          : `You are a concise work summarizer. ${attributionRule} CRITICAL: Your summary MUST ONLY mention apps, websites, and actions that appear in the provided activity list. NEVER invent or substitute different apps, people, or tasks. If activities show casual browsing, say so — do NOT fabricate professional work.`;
+
+        const userPrompt = `${prompt}\n\nIMPORTANT: Only reference the specific apps, websites, and actions listed above. Do NOT add information not present in the activities. Write the user's own actions in first person. For activities starting with "Observed [Name]...", attribute them to that person (e.g. "Mark configured X"), NOT to "I".`;
 
         const summary = await callSummarizationLLM(systemPrompt, userPrompt, 800);
 
@@ -377,11 +379,13 @@ Final Summary:`;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const mergeSystemPrompt = env.fullTranscriptText
-          ? "You are an expert editor who combines summaries into cohesive narratives. Preserve verbal context (intent, reasoning, decisions) in the final narrative. CRITICAL: Only mention apps, websites, people, and actions that appear in the chunk summaries below. NEVER invent details. Write in first person."
-          : "You are an expert editor who combines summaries into cohesive narratives. CRITICAL: Only mention apps, websites, people, and actions that appear in the chunk summaries below. NEVER invent details. Write in first person.";
+        const mergeAttributionRule = `ATTRIBUTION: If chunk summaries mention someone else performing actions (e.g. "Mark debugged X"), preserve that attribution in the final narrative. Only the user's own actions should be in first person ("I"). Collaborative sessions should naturally weave both perspectives.`;
 
-        const userPrompt = `${prompt}\n\nIMPORTANT: Only reference apps, websites, and actions mentioned in the chunk summaries above. Do NOT add information not present. Write in first person.`;
+        const mergeSystemPrompt = env.fullTranscriptText
+          ? `You are an expert editor who combines summaries into cohesive narratives. Preserve verbal context (intent, reasoning, decisions) in the final narrative. ${mergeAttributionRule} CRITICAL: Only mention apps, websites, people, and actions that appear in the chunk summaries below. NEVER invent details.`
+          : `You are an expert editor who combines summaries into cohesive narratives. ${mergeAttributionRule} CRITICAL: Only mention apps, websites, people, and actions that appear in the chunk summaries below. NEVER invent details.`;
+
+        const userPrompt = `${prompt}\n\nIMPORTANT: Only reference apps, websites, and actions mentioned in the chunk summaries above. Do NOT add information not present. Write the user's own actions in first person. Preserve attribution for other people's actions (e.g. "Mark resolved X").`;
 
         const maxTokens = env.preferences.style === "verbose" ? 2000 : 1000;
         const finalSummary = await callSummarizationLLM(mergeSystemPrompt, userPrompt, maxTokens);

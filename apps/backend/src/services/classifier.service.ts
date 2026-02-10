@@ -8,6 +8,7 @@ export interface ClassifierInput {
   userId: string;
   sessionId: string;
   deltaDescription: string;
+  sceneContext?: string | null; // Scene context from sensor (meeting participants, screen sharing, app environment)
   frameId: string;
   captureTimestamp?: Date; // Timestamp of screenshot for audio context matching
   windowInfo?: {
@@ -164,6 +165,7 @@ class ClassifierService {
         sessionId: input.sessionId,
         frameId: input.frameId,
         deltaDescription: input.deltaDescription,
+        sceneContext: input.sceneContext,
         audioContext, // Audio transcripts from ±5 seconds around screenshot
         windowInfo: input.windowInfo,
         intervalEvidence: input.intervalEvidence,

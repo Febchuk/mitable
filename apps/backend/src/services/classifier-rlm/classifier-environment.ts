@@ -9,6 +9,7 @@ export interface ClassifierContext {
   sessionId: string;
   frameId: string;
   currentDelta: string;
+  sceneContext?: string; // Scene context from sensor (meeting participants, screen sharing, app environment)
   audioContext?: string; // Audio transcripts from ±5 seconds around screenshot
   windowInfo?: {
     appName: string;
@@ -68,6 +69,7 @@ export class ClassifierEnvironment {
   getContext() {
     return {
       currentDelta: this.context.currentDelta,
+      sceneContext: this.context.sceneContext,
       audioContext: this.context.audioContext,
       previousDeltas: this.context.previousDeltas || [],
       recentHistory: this.context.recentHistory || [],

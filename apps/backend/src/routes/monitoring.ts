@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eq, sql, desc, and, inArray, isNull } from "drizzle-orm";
+import { eq, sql, desc, and, inArray, isNull, isNotNull } from "drizzle-orm";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -679,6 +679,88 @@ router.post(
         totalPausedMs,
       });
 
+      // Short-session guard: skip storyteller if not enough data
+      const MIN_DURATION_MS = 3 * 60 * 1000; // 3 minutes
+      const MIN_CLASSIFIED_CAPTURES = 5;
+
+      const [{ count: classifiedCount }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.sessionCaptures)
+        .where(
+          and(
+            eq(schema.sessionCaptures.sessionId, id),
+            isNotNull(schema.sessionCaptures.activityDescription)
+          )
+        );
+
+      if (activeDurationMs < MIN_DURATION_MS || classifiedCount < MIN_CLASSIFIED_CAPTURES) {
+        log.info("Session too short for meaningful summary", {
+          activeDurationMs,
+          classifiedCount,
+          minDurationMs: MIN_DURATION_MS,
+          minClassifiedCaptures: MIN_CLASSIFIED_CAPTURES,
+        });
+
+        const friendlyMessage =
+          "This session was too short to generate a meaningful summary. " +
+          "For the best results, sessions should be at least 3 minutes long " +
+          "with enough screen activity for analysis.";
+
+        // Save friendly message as summary
+        await db.insert(schema.sessionSummaries).values({
+          sessionId: id,
+          version: 1,
+          summaryType: "master_story",
+          narrativeSummary: friendlyMessage,
+          modelUsed: "guard:short_session",
+          generationTimeMs: 0,
+        });
+
+        // Update status to ready (skip storyteller entirely)
+        await db
+          .update(schema.monitoringSessions)
+          .set({
+            status: "ready",
+            summarizationProgress: null,
+            name: "Short session",
+          })
+          .where(eq(schema.monitoringSessions.id, id));
+
+        // Schedule cleanup of imageData after 1 hour
+        setTimeout(
+          async () => {
+            try {
+              await db
+                .update(schema.sessionCaptures)
+                .set({ imageData: null })
+                .where(eq(schema.sessionCaptures.sessionId, id));
+            } catch (cleanupError) {
+              log.error("Failed to clear imageData", {
+                error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+              });
+            }
+          },
+          60 * 60 * 1000
+        );
+
+        res.json({
+          success: true,
+          session: {
+            id: updated.id,
+            status: "ready",
+            startedAt: updated.startedAt,
+            endedAt: updated.endedAt,
+            duration: {
+              totalMs: endTime.getTime() - startTime,
+              activeMs: activeDurationMs,
+              pausedMs: totalPausedMs,
+            },
+            captureCount,
+          },
+        });
+        return;
+      }
+
       // Trigger async story generation using the new 3-step pipeline (don't await - let it run in background)
       // Transform frontend preferences (detailLevel) to service format (style)
       const formatPreference = preferences
@@ -1213,6 +1295,7 @@ router.post(
             userId,
             sessionId: id,
             deltaDescription: analysisResult.changeDescription,
+            sceneContext: analysisResult.sceneContext,
             frameId,
             captureTimestamp: new Date(), // Current timestamp for audio context matching
             windowInfo: {
