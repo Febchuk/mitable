@@ -19,6 +19,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Sync version from tag
+        run: |
+          # Extract version from tag (removes 'v' prefix)
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "Setting version to $VERSION"
+          # Update package.json version
+          cd apps/electron
+          npm version $VERSION --no-git-tag-version --allow-same-version
+          cat package.json | grep '"version"'
+
       - name: Setup Python (for native modules)
         uses: actions/setup-python@v5
         with:
@@ -97,6 +107,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Sync version from tag
+        shell: bash
+        run: |
+          # Extract version from tag (removes 'v' prefix)
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "Setting version to $VERSION"
+          # Update package.json version
+          cd apps/electron
+          npm version $VERSION --no-git-tag-version --allow-same-version
+          cat package.json | grep '"version"'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
