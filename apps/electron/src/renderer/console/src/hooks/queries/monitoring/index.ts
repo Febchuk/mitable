@@ -251,3 +251,41 @@ export function useReviseSummary() {
     }) => monitoringService.reviseSummary(sessionId, instruction, currentSummary),
   });
 }
+
+/**
+ * Trigger intermediate summary generation mutation
+ */
+export function useTriggerIntermediateSummary() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sessionId: string) => monitoringService.triggerIntermediateSummary(sessionId),
+    onSuccess: (_, sessionId) => {
+      // Invalidate story query to show new summary
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.story(sessionId) });
+    },
+  });
+}
+
+/**
+ * Update session settings mutation
+ */
+export function useUpdateSessionSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      sessionId,
+      settings,
+    }: {
+      sessionId: string;
+      settings: {
+        intermediateSummaryIntervalMs?: number;
+        intermediateSummaryEnabled?: boolean;
+      };
+    }) => monitoringService.updateSessionSettings(sessionId, settings),
+    onSuccess: (_, { sessionId }) => {
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+    },
+  });
+}

@@ -417,3 +417,59 @@ export async function createTemplate(
     throw error;
   }
 }
+
+// ============================================
+// Organization Settings
+// ============================================
+
+export interface OrganizationSettings {
+  id: string;
+  name: string;
+  domain?: string | null;
+  settings: {
+    variant?: "global" | "nigeria";
+  };
+}
+
+export interface OrganizationSettingsResponse {
+  success: boolean;
+  organization: OrganizationSettings;
+}
+
+/**
+ * Fetch organization settings (admin only)
+ */
+export async function fetchOrganizationSettings(): Promise<OrganizationSettings> {
+  try {
+    const response = await apiRequest<OrganizationSettingsResponse>("/admin/organization/settings");
+    return response.organization;
+  } catch (error) {
+    logger.error("Error fetching organization settings:", error);
+    throw error;
+  }
+}
+
+export interface UpdateOrganizationSettingsPayload {
+  variant?: "global" | "nigeria";
+}
+
+/**
+ * Update organization settings (admin only)
+ */
+export async function updateOrganizationSettings(
+  payload: UpdateOrganizationSettingsPayload
+): Promise<OrganizationSettings> {
+  try {
+    const response = await apiRequest<OrganizationSettingsResponse>(
+      "/admin/organization/settings",
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }
+    );
+    return response.organization;
+  } catch (error) {
+    logger.error("Error updating organization settings:", error);
+    throw error;
+  }
+}

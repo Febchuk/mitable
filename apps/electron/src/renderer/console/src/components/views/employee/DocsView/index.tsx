@@ -3,6 +3,7 @@
  *
  * Main view for knowledge base documentation.
  * Features a hero section and chronological timeline of documents.
+ * Uses variant labels for Nigeria-specific terminology (Reports vs Docs).
  */
 
 import { useState, useMemo } from "react";
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import DocRow from "./DocRow";
 import CreateDocumentModal from "./dialogs/CreateDocumentModal";
+import { useVariant } from "@/console/src/context/VariantContext";
 import type { DocType, DocStatus, Document } from "@mitable/shared";
 
 // Group documents by date category
@@ -55,6 +57,7 @@ function groupDocumentsByDate(documents: Document[]) {
 
 export default function DocsView() {
   const navigate = useNavigate();
+  const { labels } = useVariant();
   const [searchQuery, setSearchQuery] = useState("");
   const [docTypeFilter, setDocTypeFilter] = useState<DocType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<DocStatus | "all">("all");
@@ -88,7 +91,7 @@ export default function DocsView() {
           <div className="relative">
             <div className="w-12 h-12 rounded-full border-2 border-indigo/20 border-t-indigo animate-spin" />
           </div>
-          <span className="text-ink-tertiary text-sm font-medium">Loading documents...</span>
+          <span className="text-ink-tertiary text-sm font-medium">{labels.loadingDocuments}</span>
         </div>
       </div>
     );
@@ -97,7 +100,7 @@ export default function DocsView() {
   if (error) {
     return (
       <div className="p-8">
-        <div className="text-center text-red-400">Error loading documents</div>
+        <div className="text-center text-red-400">{labels.errorLoadingDocuments}</div>
       </div>
     );
   }
@@ -115,7 +118,7 @@ export default function DocsView() {
           <div className="flex items-end justify-between mb-8">
             <div>
               <h1 className="font-display text-3xl font-semibold text-ink-primary tracking-tight">
-                Docs
+                {labels.docs}
               </h1>
               <p className="text-ink-tertiary mt-1 text-sm">
                 {documents.length} total · {publishedCount} published · {draftCount} drafts
@@ -207,7 +210,7 @@ export default function DocsView() {
               </div>
               <div className="flex-1">
                 <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
-                  Create Document
+                  {labels.createDocument}
                 </h3>
                 <p className="text-ink-tertiary text-sm mt-0.5">
                   Generate from your work or start blank
@@ -264,7 +267,7 @@ export default function DocsView() {
               <FileText size={28} className="text-ink-tertiary" />
             </div>
             <h3 className="font-display text-lg font-medium text-ink-primary mb-1">
-              {searchQuery || hasActiveFilters ? "No matches" : "No documents yet"}
+              {searchQuery || hasActiveFilters ? "No matches" : labels.noDocumentsYet}
             </h3>
             <p className="text-ink-tertiary text-sm max-w-xs mx-auto">
               {searchQuery || hasActiveFilters

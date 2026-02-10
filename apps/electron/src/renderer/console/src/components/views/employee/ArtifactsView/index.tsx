@@ -3,6 +3,7 @@
  *
  * Main view for uploaded artifacts (PDFs, DOCX, TXT, images).
  * Features a hero section and chronological timeline of artifacts.
+ * Uses variant labels for Nigeria-specific terminology (Uploads vs Artefacts).
  */
 
 import { useState, useMemo } from "react";
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import ArtifactRow from "./ArtifactRow";
 import UploadArtifactModal from "./dialogs/UploadArtifactModal";
+import { useVariant } from "@/console/src/context/VariantContext";
 import type { Artifact } from "@/console/src/services/artifactsService";
 
 type FileTypeFilter = "all" | "pdf" | "docx" | "txt" | "image";
@@ -68,6 +70,7 @@ function groupArtifactsByDate(artifacts: Artifact[]) {
 }
 
 export default function ArtifactsView() {
+  const { labels } = useVariant();
   const [searchQuery, setSearchQuery] = useState("");
   const [fileTypeFilter, setFileTypeFilter] = useState<FileTypeFilter>("all");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -135,7 +138,7 @@ export default function ArtifactsView() {
           <div className="relative">
             <div className="w-12 h-12 rounded-full border-2 border-indigo/20 border-t-indigo animate-spin" />
           </div>
-          <span className="text-ink-tertiary text-sm font-medium">Loading artefacts...</span>
+          <span className="text-ink-tertiary text-sm font-medium">{labels.loadingArtifacts}</span>
         </div>
       </div>
     );
@@ -144,7 +147,7 @@ export default function ArtifactsView() {
   if (error) {
     return (
       <div className="p-8">
-        <div className="text-center text-red-400">Error loading artefacts</div>
+        <div className="text-center text-red-400">{labels.errorLoadingArtifacts}</div>
       </div>
     );
   }
@@ -162,7 +165,7 @@ export default function ArtifactsView() {
           <div className="flex items-end justify-between mb-8">
             <div>
               <h1 className="font-display text-3xl font-semibold text-ink-primary tracking-tight">
-                Artefacts
+                {labels.artifacts}
               </h1>
               <p className="text-ink-tertiary mt-1 text-sm">
                 {stats.total} total · {stats.processed} processed · {stats.pending} pending
@@ -238,7 +241,7 @@ export default function ArtifactsView() {
               </div>
               <div className="flex-1">
                 <h3 className="font-display text-base font-semibold text-ink-primary tracking-tight">
-                  Upload Artefact
+                  {labels.uploadArtifact}
                 </h3>
                 <p className="text-ink-tertiary text-sm mt-0.5">Drop files or click to browse</p>
               </div>
@@ -294,7 +297,7 @@ export default function ArtifactsView() {
               <Paperclip size={28} className="text-ink-tertiary" />
             </div>
             <h3 className="font-display text-lg font-medium text-ink-primary mb-1">
-              {searchQuery || hasActiveFilters ? "No matches" : "No artefacts yet"}
+              {searchQuery || hasActiveFilters ? "No matches" : labels.noArtifactsYet}
             </h3>
             <p className="text-ink-tertiary text-sm max-w-xs mx-auto">
               {searchQuery || hasActiveFilters

@@ -34,6 +34,11 @@ export interface AuthResponse {
     startDate: string | null;
     status: "active" | "inactive";
   };
+  organization?: {
+    id: string;
+    name: string;
+    settings: Record<string, unknown>;
+  };
 }
 
 export interface AuthError {
@@ -51,7 +56,12 @@ export interface OrganizationSignupData {
   organizationDomain?: string;
 }
 
-export interface OrganizationSignupResponse extends AuthResponse {
+export interface OrganizationSignupResponse {
+  success?: boolean;
+  message?: string;
+  user: AuthResponse["user"];
+  session: AuthResponse["session"];
+  profile: AuthResponse["profile"];
   organization: {
     id: string;
     name: string;

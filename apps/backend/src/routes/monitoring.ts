@@ -15,6 +15,7 @@ import { searchService } from "../services/search.service.js";
 import { SessionIngestionService } from "../services/session-ingestion.service.js";
 import { workstreamAggregationService } from "../services/workstream-aggregation.service.js";
 import { workstreamRLMService } from "../services/workstream-rlm.service.js";
+import { intermediateSummaryService } from "../services/intermediate-summary.service.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { logger } from "../lib/logger";
@@ -1119,6 +1120,9 @@ router.post(
         hasAnalyzedFrames: captures.some((c: any) => c.deltaChanged !== undefined),
       });
 
+      // Trigger intermediate summary check (non-blocking)
+      intermediateSummaryService.checkAndTriggerIfNeeded(id);
+
       res.json({
         success: true,
         insertedCount: insertedCaptures.length,
@@ -2085,14 +2089,30 @@ router.get(
       const story = await masterStoryService.getCurrentStory(id);
       const metadata = await masterStoryService.getStoryMetadata(id);
 
+      // For active/paused sessions, return intermediate summary if available
+      const isLiveSession = session.status === "active" || session.status === "paused";
+      const intermediateSummary = isLiveSession ? session.intermediateSummary : null;
+      const lastIntermediateSummaryAt = isLiveSession ? session.lastIntermediateSummaryAt : null;
+      const intermediateSummaryStatus = isLiveSession ? session.intermediateSummaryStatus : null;
+
       res.json({
-        story: story || "",
+        story: story || intermediateSummary || "",
         metadata: metadata || {
           version: 0,
-          length: 0,
-          lastUpdated: null,
+          length: intermediateSummary?.length || 0,
+          lastUpdated: lastIntermediateSummaryAt || null,
           totalTokens: 0,
         },
+        // Include intermediate summary specific fields for live sessions
+        intermediateSummary: isLiveSession
+          ? {
+              content: intermediateSummary || null,
+              lastUpdatedAt: lastIntermediateSummaryAt || null,
+              status: intermediateSummaryStatus || null,
+              intervalMs: session.intermediateSummaryIntervalMs,
+              enabled: session.intermediateSummaryEnabled,
+            }
+          : null,
       });
     } catch (error) {
       logger.error(
@@ -2669,6 +2689,151 @@ router.post(
       res.status(500).json({
         error: "Internal Server Error",
         message: "Failed to stop audio recording",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/monitoring/sessions/:id/intermediate-summary
+ * Force trigger intermediate summary generation
+ */
+router.post(
+  "/sessions/:id/intermediate-summary",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({ error: "Not Found", message: "Session not found" });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({ error: "Forbidden", message: "Not authorized" });
+        return;
+      }
+
+      // Only allow for active/paused sessions
+      if (session.status !== "active" && session.status !== "paused") {
+        res.status(400).json({
+          error: "Bad Request",
+          message: `Cannot generate intermediate summary for session with status: ${session.status}`,
+        });
+        return;
+      }
+
+      logger.info({ sessionId: id }, "Force triggering intermediate summary");
+
+      const result = await intermediateSummaryService.generateIntermediateSummary(id, true);
+
+      res.json({
+        success: true,
+        summary: result.summary,
+        generatedAt: result.generatedAt.toISOString(),
+        activityCount: result.activityCount,
+        executionTimeMs: result.executionTimeMs,
+      });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error generating intermediate summary"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to generate intermediate summary",
+      });
+    }
+  }
+);
+
+/**
+ * PATCH /api/monitoring/sessions/:id/settings
+ * Update session settings (including intermediate summary configuration)
+ */
+router.patch(
+  "/sessions/:id/settings",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const {
+      intermediateSummaryIntervalMs,
+      intermediateSummaryEnabled,
+    }: {
+      intermediateSummaryIntervalMs?: number;
+      intermediateSummaryEnabled?: boolean;
+    } = req.body;
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({ error: "Not Found", message: "Session not found" });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({ error: "Forbidden", message: "Not authorized" });
+        return;
+      }
+
+      // Validate interval if provided
+      if (intermediateSummaryIntervalMs !== undefined) {
+        const validIntervals = [900000, 1800000, 2700000, 3600000]; // 15, 30, 45, 60 minutes
+        if (!validIntervals.includes(intermediateSummaryIntervalMs)) {
+          res.status(400).json({
+            error: "Bad Request",
+            message: `Invalid interval. Must be one of: ${validIntervals.map((i) => i / 60000 + " minutes").join(", ")}`,
+          });
+          return;
+        }
+      }
+
+      await intermediateSummaryService.updateSettings(id, {
+        intermediateSummaryIntervalMs,
+        intermediateSummaryEnabled,
+      });
+
+      // Fetch updated session
+      const [updatedSession] = await db
+        .select({
+          intermediateSummaryIntervalMs: schema.monitoringSessions.intermediateSummaryIntervalMs,
+          intermediateSummaryEnabled: schema.monitoringSessions.intermediateSummaryEnabled,
+        })
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      res.json({
+        success: true,
+        settings: {
+          intermediateSummaryIntervalMs: updatedSession.intermediateSummaryIntervalMs,
+          intermediateSummaryEnabled: updatedSession.intermediateSummaryEnabled,
+        },
+      });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), sessionId: id },
+        "[Monitoring] Error updating session settings"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to update session settings",
       });
     }
   }

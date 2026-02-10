@@ -2,10 +2,12 @@ import { Layers, Users, BarChart3, Plug, Activity, FileText, Paperclip } from "l
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 import { useSubscription } from "../../hooks/queries/billing";
+import { useVariant } from "../../context/VariantContext";
 
 export default function Nav() {
   const { user } = useUser();
   const { data: subscriptionData } = useSubscription();
+  const { labels } = useVariant();
 
   const isAdmin = user?.role === "admin";
   const tier = subscriptionData?.subscription?.tier;
@@ -19,8 +21,8 @@ export default function Nav() {
     return (
       <nav className="space-y-1 px-2">
         <NavItem to="/monitoring" icon={Activity} label="Sessions" />
-        <NavItem to="/docs" icon={FileText} label="Docs" />
-        <NavItem to="/artefacts" icon={Paperclip} label="Artefacts" />
+        <NavItem to="/docs" icon={FileText} label={labels.docs} />
+        <NavItem to="/artefacts" icon={Paperclip} label={labels.artifacts} />
         {/* <NavItem to="/todos" icon={CheckSquare} label="Todos" /> */}
       </nav>
     );
@@ -42,8 +44,8 @@ export default function Nav() {
   return (
     <nav className="space-y-1 px-2">
       <NavItem to="/monitoring" icon={Activity} label="Sessions" />
-      <NavItem to="/docs" icon={FileText} label="Docs" />
-      <NavItem to="/artefacts" icon={Paperclip} label="Artefacts" />
+      <NavItem to="/docs" icon={FileText} label={labels.docs} />
+      <NavItem to="/artefacts" icon={Paperclip} label={labels.artifacts} />
       {/* <NavItem to="/todos" icon={CheckSquare} label="Todos" /> */}
     </nav>
   );

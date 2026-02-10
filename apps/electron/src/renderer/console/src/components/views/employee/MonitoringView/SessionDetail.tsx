@@ -23,6 +23,7 @@ import {
   useSlackUsers,
   useReviseSummary,
   useUpdateSession,
+  useTriggerIntermediateSummary,
   monitoringKeys,
 } from "@/console/src/hooks/queries/monitoring";
 import {
@@ -66,7 +67,7 @@ import RecipientSelector from "@/console/src/components/shared/RecipientSelector
 import { SessionEndToast } from "@/console/src/components/shared/SessionEndToast";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import LinearUpdateDialog from "./LinearUpdateDialog";
-import ActivityTimeline from "./ActivityTimeline";
+// import ActivityTimeline from "./ActivityTimeline";
 import SessionTimeline from "./SessionTimeline";
 import EndSessionDialog from "./EndSessionDialog"; // Import the new dialog
 import SummarizationProgress from "./SummarizationProgress";
@@ -154,6 +155,7 @@ export default function SessionDetail() {
   const endSessionMutation = useEndSession();
   const reviseSummaryMutation = useReviseSummary();
   const updateSessionMutation = useUpdateSession();
+  const triggerIntermediateSummaryMutation = useTriggerIntermediateSummary();
 
   const [isAIEditMode, setIsAIEditMode] = useState(false);
   const [isPauseLoading, setIsPauseLoading] = useState(false);
@@ -162,7 +164,7 @@ export default function SessionDetail() {
   const [emailInput, setEmailInput] = useState("");
   const [isLinearDialogOpen, setIsLinearDialogOpen] = useState(false);
   const [isStoryExpanded, setIsStoryExpanded] = useState(true);
-  const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
+  // const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
   const [gmailStatus, setGmailStatus] = useState<{
     connected: boolean;
     email: string | null;
@@ -915,37 +917,116 @@ export default function SessionDetail() {
       </div>
 
       {/* Progressive Story Section - Shows during active/paused sessions */}
-      {storyData?.story && (uiStatus === "active" || uiStatus === "paused") && (
+      {(uiStatus === "active" || uiStatus === "paused") && (
         <div className="space-y-3">
-          <button
-            onClick={() => setIsStoryExpanded(!isStoryExpanded)}
-            className="flex items-center gap-2 w-full text-left group"
-          >
-            <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight flex-1">
-              Live Progress
-            </h2>
-            <span className="text-xs text-ink-tertiary tabular-nums">
-              v{storyData.metadata?.version || 0}
-            </span>
-            {isStoryExpanded ? (
-              <ChevronUp size={16} className="text-ink-tertiary group-hover:text-ink-primary" />
-            ) : (
-              <ChevronDown size={16} className="text-ink-tertiary group-hover:text-ink-primary" />
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsStoryExpanded(!isStoryExpanded)}
+              className="flex items-center gap-2 flex-1 text-left group"
+            >
+              <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight">
+                Live Progress
+              </h2>
+              {storyData?.intermediateSummary?.enabled && (
+                <span className="text-xs text-ink-tertiary">
+                  (updates every{" "}
+                  {Math.round((storyData.intermediateSummary.intervalMs || 1800000) / 60000)}m)
+                </span>
+              )}
+              <div className="flex-1" />
+              {storyData?.metadata?.version ? (
+                <span className="text-xs text-ink-tertiary tabular-nums">
+                  v{storyData.metadata.version}
+                </span>
+              ) : null}
+              {isStoryExpanded ? (
+                <ChevronUp size={16} className="text-ink-tertiary group-hover:text-ink-primary" />
+              ) : (
+                <ChevronDown size={16} className="text-ink-tertiary group-hover:text-ink-primary" />
+              )}
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                triggerIntermediateSummaryMutation.mutate(sessionId!, {
+                  onSuccess: () => {
+                    toast({
+                      title: "Progress updated",
+                      description: "Live progress has been refreshed.",
+                      duration: 3000,
+                    });
+                  },
+                  onError: (error) => {
+                    toast({
+                      title: "Update failed",
+                      description:
+                        error instanceof Error ? error.message : "Failed to update progress",
+                      variant: "destructive",
+                    });
+                  },
+                });
+              }}
+              disabled={
+                triggerIntermediateSummaryMutation.isPending ||
+                storyData?.intermediateSummary?.status === "generating"
+              }
+              className="gap-1.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+            >
+              {triggerIntermediateSummaryMutation.isPending ||
+              storyData?.intermediateSummary?.status === "generating" ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={14} />
+                  Update Now
+                </>
+              )}
+            </Button>
+          </div>
 
           {isStoryExpanded && (
             <div className="bg-canvas-overlay rounded-xl border border-indigo/20 p-4">
-              <div className="prose prose-invert prose-sm max-w-none">
-                {storyData.story.split("\n").map((paragraph, i) => (
-                  <p key={i} className="text-ink-primary mb-2 last:mb-0 text-sm leading-relaxed">
-                    {paragraph || <br />}
-                  </p>
-                ))}
-              </div>
-              {storyData.metadata?.lastUpdated && (
-                <div className="mt-3 pt-2 border-t border-stroke-subtle text-xs text-ink-tertiary tabular-nums">
-                  Last updated: {new Date(storyData.metadata.lastUpdated).toLocaleTimeString()}
+              {storyData?.story ? (
+                <>
+                  <div className="prose prose-invert prose-sm max-w-none">
+                    {storyData.story.split("\n").map((paragraph, i) => (
+                      <p
+                        key={i}
+                        className="text-ink-primary mb-2 last:mb-0 text-sm leading-relaxed"
+                      >
+                        {paragraph || <br />}
+                      </p>
+                    ))}
+                  </div>
+                  {(storyData.metadata?.lastUpdated ||
+                    storyData.intermediateSummary?.lastUpdatedAt) && (
+                    <div className="mt-3 pt-2 border-t border-stroke-subtle text-xs text-ink-tertiary tabular-nums">
+                      Last updated:{" "}
+                      {new Date(
+                        storyData.intermediateSummary?.lastUpdatedAt ||
+                          storyData.metadata?.lastUpdated ||
+                          ""
+                      ).toLocaleTimeString()}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  {triggerIntermediateSummaryMutation.isPending ||
+                  storyData?.intermediateSummary?.status === "generating" ? (
+                    <div className="flex items-center justify-center gap-2 text-ink-secondary">
+                      <Loader2 size={16} className="animate-spin" />
+                      <span className="text-sm">Generating progress summary...</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-ink-secondary">
+                      No progress summary yet. Click "Update Now" to generate one.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -1036,10 +1117,10 @@ export default function SessionDetail() {
       {/* Workstream Timeline (new visualization) */}
       <SessionTimeline sessionId={sessionId || ""} sessionStatus={sessionStatus} />
 
-      {/* Activity Timeline (original) */}
-      <ActivityTimeline sessionId={sessionId || ""} sessionStatus={sessionStatus} />
+      {/* Activity Timeline (original) - commented out */}
+      {/* <ActivityTimeline sessionId={sessionId || ""} sessionStatus={sessionStatus} /> */}
 
-      {/* Top-K Frames Gallery - Shows after session ends */}
+      {/* Top-K Frames Gallery - commented out
       {session.topKFrames && session.topKFrames.length > 0 && (
         <div className="space-y-4">
           <h2 className="font-display text-base font-semibold text-ink-primary tracking-tight">
@@ -1078,8 +1159,9 @@ export default function SessionDetail() {
           </div>
         </div>
       )}
+      */}
 
-      {/* Frame Preview Dialog */}
+      {/* Frame Preview Dialog - commented out
       <Dialog open={!!selectedFrame} onOpenChange={() => setSelectedFrame(null)}>
         <DialogContent className="bg-canvas-raised border-stroke-subtle max-w-4xl">
           <DialogHeader>
@@ -1129,6 +1211,7 @@ export default function SessionDetail() {
             })()}
         </DialogContent>
       </Dialog>
+      */}
 
       {/* Delivery Dialog */}
       <Dialog open={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen}>

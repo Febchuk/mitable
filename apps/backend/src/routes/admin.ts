@@ -2440,4 +2440,266 @@ router.patch(
   }
 );
 
+/**
+ * @openapi
+ * /admin/organization/settings:
+ *   get:
+ *     tags:
+ *       - Admin - Organization
+ *     summary: Get organization settings
+ *     description: Retrieve organization settings including variant. Admin access required.
+ *     responses:
+ *       200:
+ *         description: Organization settings retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 organization:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     name:
+ *                       type: string
+ *                     settings:
+ *                       type: object
+ *                       properties:
+ *                         variant:
+ *                           type: string
+ *                           enum: [global, nigeria]
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get(
+  "/organization/settings",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Admin access required",
+          },
+        });
+        return;
+      }
+
+      // Fetch organization
+      const [organization] = await db
+        .select({
+          id: schema.organizations.id,
+          name: schema.organizations.name,
+          domain: schema.organizations.domain,
+          settings: schema.organizations.settings,
+        })
+        .from(schema.organizations)
+        .where(eq(schema.organizations.id, currentUser.organizationId))
+        .limit(1);
+
+      if (!organization) {
+        res.status(404).json({
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "Organization not found",
+          },
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        organization: {
+          id: organization.id,
+          name: organization.name,
+          domain: organization.domain,
+          settings: organization.settings || {},
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching organization settings:", error);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Failed to fetch organization settings",
+        },
+      });
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /admin/organization/settings:
+ *   patch:
+ *     tags:
+ *       - Admin - Organization
+ *     summary: Update organization settings
+ *     description: Update organization settings including variant. Admin access required.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               variant:
+ *                 type: string
+ *                 enum: [global, nigeria]
+ *                 description: Organization UI variant for regional terminology
+ *     responses:
+ *       200:
+ *         description: Organization settings updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 organization:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     name:
+ *                       type: string
+ *                     settings:
+ *                       type: object
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ *     security:
+ *       - BearerAuth: []
+ */
+router.patch(
+  "/organization/settings",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const { variant } = req.body;
+
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Admin access required",
+          },
+        });
+        return;
+      }
+
+      // Validate variant if provided
+      const validVariants = ["global", "nigeria"];
+      if (variant !== undefined && !validVariants.includes(variant)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Invalid variant. Must be one of: ${validVariants.join(", ")}`,
+          },
+        });
+        return;
+      }
+
+      // Fetch current organization settings
+      const [organization] = await db
+        .select()
+        .from(schema.organizations)
+        .where(eq(schema.organizations.id, currentUser.organizationId))
+        .limit(1);
+
+      if (!organization) {
+        res.status(404).json({
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "Organization not found",
+          },
+        });
+        return;
+      }
+
+      // Merge new settings with existing
+      const currentSettings = (organization.settings as Record<string, unknown>) || {};
+      const updatedSettings = {
+        ...currentSettings,
+        ...(variant !== undefined && { variant }),
+      };
+
+      // Update organization settings
+      const [updatedOrg] = await db
+        .update(schema.organizations)
+        .set({
+          settings: updatedSettings,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.organizations.id, currentUser.organizationId))
+        .returning({
+          id: schema.organizations.id,
+          name: schema.organizations.name,
+          domain: schema.organizations.domain,
+          settings: schema.organizations.settings,
+        });
+
+      res.json({
+        success: true,
+        organization: {
+          id: updatedOrg.id,
+          name: updatedOrg.name,
+          domain: updatedOrg.domain,
+          settings: updatedOrg.settings,
+        },
+      });
+    } catch (error) {
+      console.error("Error updating organization settings:", error);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Failed to update organization settings",
+        },
+      });
+    }
+  }
+);
+
 export default router;
