@@ -5,21 +5,28 @@
  * Shows day-level view with week navigation and work blocks.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   Calendar,
   Sparkles,
-  Settings,
-  Target,
+  MoreVertical,
   Plus,
+  Send,
   X,
+  Target,
+  Check,
+  Mail,
+  MessageSquare,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import { mockDays, getMockWeekDays } from "./mockData";
 import DayCard from "./DayCard";
 import DaySummary from "./DaySummary";
 import WorkBlockList from "./WorkBlockList";
+import type { WorkBlock } from "./types";
 
 // Helper functions
 function getStartOfWeek(date: Date): Date {
@@ -75,12 +82,66 @@ function formatDayHeader(date: Date): string {
   });
 }
 
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function formatDuration(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours === 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
+// Generate recap content from selected blocks
+function generateRecapContent(blocks: WorkBlock[]): string {
+  if (blocks.length === 0) return "";
+
+  const totalMinutes = blocks.reduce((acc, b) => acc + b.duration, 0);
+
+  let content = `**Work Update** (${formatDuration(totalMinutes)} total)\n\n`;
+
+  blocks.forEach((block, idx) => {
+    const timeRange = `${formatTime(block.startTime)} - ${block.endTime ? formatTime(block.endTime) : "ongoing"}`;
+    content += `**Block ${idx + 1}** (${timeRange}, ${formatDuration(block.duration)})\n`;
+    if (block.goal) {
+      content += `Goal: ${block.goal}\n`;
+    }
+    content += `${block.summary}\n\n`;
+  });
+
+  return content.trim();
+}
+
 export default function CalendarView() {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
+
+  // Menu and dialog states
+  const [showMenu, setShowMenu] = useState(false);
   const [showNewBlockDialog, setShowNewBlockDialog] = useState(false);
+  const [showSendUpdateDialog, setShowSendUpdateDialog] = useState(false);
   const [newBlockGoal, setNewBlockGoal] = useState("");
+  const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
+
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Get week days with activity data
   const weekDays = useMemo(() => getMockWeekDays(weekStart), [weekStart]);
@@ -101,12 +162,38 @@ export default function CalendarView() {
   // Check if current week is this week
   const isCurrentWeek = isSameDay(weekStart, getStartOfWeek(today));
 
+  // Check if there's an active work block
+  const hasActiveBlock = selectedDay.workBlocks.some((b) => b.isActive);
+
+  // Initialize selected blocks when opening send update dialog
+  const openSendUpdateDialog = () => {
+    // Default select all blocks from today
+    const todayBlockIds = new Set(selectedDay.workBlocks.map((b) => b.id));
+    setSelectedBlockIds(todayBlockIds);
+    setShowSendUpdateDialog(true);
+    setShowMenu(false);
+  };
+
+  // Toggle block selection
+  const toggleBlockSelection = (blockId: string) => {
+    const next = new Set(selectedBlockIds);
+    if (next.has(blockId)) {
+      next.delete(blockId);
+    } else {
+      next.add(blockId);
+    }
+    setSelectedBlockIds(next);
+  };
+
+  // Get selected blocks
+  const selectedBlocks = selectedDay.workBlocks.filter((b) => selectedBlockIds.has(b.id));
+  const recapContent = generateRecapContent(selectedBlocks);
+
   // Navigate weeks
   const goToPreviousWeek = () => {
     const newStart = new Date(weekStart);
     newStart.setDate(newStart.getDate() - 7);
     setWeekStart(newStart);
-    // Also select the same day of week in the new week
     const dayOffset = Math.floor(
       (selectedDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)
     );
@@ -132,15 +219,17 @@ export default function CalendarView() {
     setSelectedDate(today);
   };
 
-  // Check if there's an active work block
-  const hasActiveBlock = selectedDay.workBlocks.some((b) => b.isActive);
-
-  // Handle starting a new block
+  // Handle actions
   const handleStartNewBlock = () => {
-    // In real implementation, this would call the backend to start a new work block
     console.log("Starting new block with goal:", newBlockGoal || "(no goal)");
     setShowNewBlockDialog(false);
     setNewBlockGoal("");
+  };
+
+  const handleSendUpdate = (destination: "slack" | "gmail" | "copy" | "linear") => {
+    console.log(`Sending update to ${destination}:`, recapContent);
+    // In real implementation, would send to the selected destination
+    setShowSendUpdateDialog(false);
   };
 
   return (
@@ -172,20 +261,37 @@ export default function CalendarView() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Start New Block button */}
+            {/* Three-dot menu */}
+            <div className="relative" ref={menuRef}>
               <button
-                onClick={() => setShowNewBlockDialog(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo text-white font-medium text-sm hover:bg-indigo/90 transition-colors"
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
               >
-                <Plus size={16} />
-                Start New Block
+                <MoreVertical size={20} />
               </button>
 
-              {/* Settings */}
-              <button className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-secondary transition-colors">
-                <Settings size={18} />
-              </button>
+              {showMenu && (
+                <div className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-50">
+                  <button
+                    onClick={openSendUpdateDialog}
+                    disabled={selectedDay.workBlocks.length === 0}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Send size={16} className="text-indigo" />
+                    <span className="text-sm text-ink-primary">Send Update</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNewBlockDialog(true);
+                      setShowMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle"
+                  >
+                    <Plus size={16} className="text-ink-tertiary" />
+                    <span className="text-sm text-ink-primary">Start New Block</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -243,7 +349,7 @@ export default function CalendarView() {
       {/* ═══════════════════════════════════════════════════════════════════
           DAY DETAIL - Selected day content
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="px-8 pb-8">
+      <div className="px-8 pb-24">
         <div className="stagger-2">
           {/* Day header */}
           <div className="flex items-center justify-between mb-4 pt-4 border-t border-stroke-subtle">
@@ -305,15 +411,11 @@ export default function CalendarView() {
           ═══════════════════════════════════════════════════════════════════ */}
       {showNewBlockDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowNewBlockDialog(false)}
           />
-
-          {/* Dialog */}
           <div className="relative bg-canvas-overlay rounded-2xl border border-stroke-subtle shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-stroke-subtle">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-indigo/10">
@@ -336,7 +438,6 @@ export default function CalendarView() {
               </button>
             </div>
 
-            {/* Content */}
             <div className="px-6 py-5 space-y-4">
               <div>
                 <label
@@ -354,33 +455,9 @@ export default function CalendarView() {
                   className="w-full px-4 py-3 rounded-lg bg-canvas-muted border border-stroke-subtle text-ink-primary placeholder:text-ink-tertiary focus:outline-none focus:border-indigo focus:ring-1 focus:ring-indigo/20 transition-all"
                   autoFocus
                 />
-                <p className="mt-2 text-xs text-ink-tertiary">
-                  Setting a goal helps track progress and generates better summaries.
-                </p>
-              </div>
-
-              <div className="bg-canvas-muted/50 rounded-lg p-4 border border-stroke-subtle/50">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary mb-2">
-                  What happens next
-                </h4>
-                <ul className="space-y-2 text-sm text-ink-secondary">
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald mt-0.5">•</span>
-                    A new work block starts immediately
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald mt-0.5">•</span>
-                    Activity is captured until you go idle for 30+ minutes
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald mt-0.5">•</span>
-                    Block is marked as a focused session with your goal
-                  </li>
-                </ul>
               </div>
             </div>
 
-            {/* Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-stroke-subtle bg-canvas-muted/30">
               <button
                 onClick={() => setShowNewBlockDialog(false)}
@@ -395,6 +472,159 @@ export default function CalendarView() {
                 <Plus size={16} />
                 Start Block
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SEND UPDATE DIALOG
+          ═══════════════════════════════════════════════════════════════════ */}
+      {showSendUpdateDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowSendUpdateDialog(false)}
+          />
+          <div className="relative bg-canvas-overlay rounded-2xl border border-stroke-subtle shadow-2xl w-full max-w-2xl mx-4 overflow-hidden max-h-[85vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-stroke-subtle flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-indigo/10">
+                  <Send size={18} className="text-indigo" />
+                </div>
+                <div>
+                  <h3 className="font-display text-lg font-semibold text-ink-primary">
+                    Send Update
+                  </h3>
+                  <p className="text-xs text-ink-tertiary">
+                    Share your work progress
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSendUpdateDialog(false)}
+                className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Block selection */}
+              <div className="px-6 py-4 border-b border-stroke-subtle">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary mb-3">
+                  Select work blocks to include
+                </h4>
+                <div className="space-y-2">
+                  {selectedDay.workBlocks.map((block, idx) => (
+                    <button
+                      key={block.id}
+                      onClick={() => toggleBlockSelection(block.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
+                        selectedBlockIds.has(block.id)
+                          ? "border-indigo bg-indigo/5"
+                          : "border-stroke-subtle hover:border-stroke"
+                      }`}
+                    >
+                      <div
+                        className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${
+                          selectedBlockIds.has(block.id)
+                            ? "bg-indigo text-white"
+                            : "border border-stroke-subtle"
+                        }`}
+                      >
+                        {selectedBlockIds.has(block.id) && <Check size={14} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-ink-primary">
+                            Block {idx + 1}
+                          </span>
+                          <span className="text-xs text-ink-tertiary">
+                            {formatTime(block.startTime)} - {block.endTime ? formatTime(block.endTime) : "now"}
+                          </span>
+                          <span className="text-xs text-ink-tertiary">
+                            ({formatDuration(block.duration)})
+                          </span>
+                          {block.isFocusedSession && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo/10 text-indigo">
+                              Focused
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-ink-secondary truncate mt-0.5">
+                          {block.summary}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Preview */}
+              <div className="px-6 py-4">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary mb-3">
+                  Update Preview
+                </h4>
+                <div className="rounded-lg border border-stroke-subtle bg-canvas-muted/30 p-4">
+                  {selectedBlocks.length > 0 ? (
+                    <div className="prose prose-sm prose-invert max-w-none">
+                      <pre className="whitespace-pre-wrap text-sm text-ink-secondary font-sans">
+                        {recapContent}
+                      </pre>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-ink-tertiary text-center py-4">
+                      Select at least one block to generate an update
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer - Send options */}
+            <div className="px-6 py-4 border-t border-stroke-subtle bg-canvas-muted/30 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-ink-tertiary">
+                  {selectedBlocks.length} block{selectedBlocks.length !== 1 ? "s" : ""} selected
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSendUpdate("copy")}
+                    disabled={selectedBlocks.length === 0}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:bg-canvas-muted text-ink-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Copy size={16} />
+                    <span className="text-sm">Copy</span>
+                  </button>
+                  <button
+                    onClick={() => handleSendUpdate("slack")}
+                    disabled={selectedBlocks.length === 0}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:bg-canvas-muted text-ink-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <MessageSquare size={16} />
+                    <span className="text-sm">Slack</span>
+                  </button>
+                  <button
+                    onClick={() => handleSendUpdate("gmail")}
+                    disabled={selectedBlocks.length === 0}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:bg-canvas-muted text-ink-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Mail size={16} />
+                    <span className="text-sm">Gmail</span>
+                  </button>
+                  <button
+                    onClick={() => handleSendUpdate("linear")}
+                    disabled={selectedBlocks.length === 0}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo text-white font-medium text-sm hover:bg-indigo/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ExternalLink size={16} />
+                    <span>Linear</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

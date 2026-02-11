@@ -1,4 +1,4 @@
-import { Layers, Users, BarChart3, Plug, FileText, Paperclip, CalendarDays, Target } from "lucide-react";
+import { Layers, Users, BarChart3, Plug, FileText, Paperclip, CalendarDays, Target, History } from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 import { useSubscription } from "../../hooks/queries/billing";
@@ -21,6 +21,7 @@ export default function Nav() {
     return (
       <nav className="space-y-1 px-2">
         <NavItem to="/calendar" icon={CalendarDays} label="Calendar" />
+        <NavItem to="/recaps" icon={History} label="Recaps" />
         <NavItem to="/monitoring" icon={Target} label="Sessions" />
         <NavItem to="/docs" icon={FileText} label={labels.docs} />
         <NavItem to="/artefacts" icon={Paperclip} label={labels.artifacts} />
@@ -45,6 +46,7 @@ export default function Nav() {
   return (
     <nav className="space-y-1 px-2">
       <NavItem to="/calendar" icon={CalendarDays} label="Calendar" />
+      <NavItem to="/recaps" icon={History} label="Recaps" />
       <NavItem to="/monitoring" icon={Target} label="Sessions" />
       <NavItem to="/docs" icon={FileText} label={labels.docs} />
       <NavItem to="/artefacts" icon={Paperclip} label={labels.artifacts} />

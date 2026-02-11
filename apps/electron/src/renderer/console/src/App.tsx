@@ -23,6 +23,7 @@ import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
 import CalendarView from "./components/views/employee/CalendarView";
+import RecapsView from "./components/views/employee/RecapsView";
 import { monitoringKeys } from "./hooks/queries/monitoring";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
@@ -229,6 +230,7 @@ function App() {
                   <Route path="todos" element={<TodosView />} />
                   {/* Calendar/Journal Routes (Passive Tracking) */}
                   <Route path="calendar" element={<CalendarView />} />
+                  <Route path="recaps" element={<RecapsView />} />
                   {/* Focused Sessions Routes */}
                   <Route path="monitoring" element={<MonitoringView />} />
                   <Route path="monitoring/:sessionId" element={<SessionDetail />} />
