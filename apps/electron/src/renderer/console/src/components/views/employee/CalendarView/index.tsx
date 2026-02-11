@@ -17,11 +17,15 @@ import {
   FileText,
   X,
   Target,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { mockDays, getMockWeekDays } from "./mockData";
 import DayCard from "./DayCard";
 import DaySummary from "./DaySummary";
 import WorkBlockList from "./WorkBlockList";
+import WeekGridView from "./WeekGridView";
+import type { WorkBlock, ActivityDay } from "./types";
 
 // Helper functions
 function getStartOfWeek(date: Date): Date {
@@ -77,11 +81,14 @@ function formatDayHeader(date: Date): string {
   });
 }
 
+type ViewMode = "day" | "week";
+
 export default function CalendarView() {
   const navigate = useNavigate();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
+  const [viewMode, setViewMode] = useState<ViewMode>("day");
 
   // Menu and dialog states
   const [showMenu, setShowMenu] = useState(false);
@@ -167,6 +174,12 @@ export default function CalendarView() {
     setNewBlockGoal("");
   };
 
+  // Handle clicking a block in week grid view
+  const handleBlockClick = (_block: WorkBlock, day: ActivityDay) => {
+    setSelectedDate(day.date);
+    setViewMode("day");
+  };
+
   return (
     <div className="min-h-full app-no-drag">
       {/* ═══════════════════════════════════════════════════════════════════
@@ -230,7 +243,7 @@ export default function CalendarView() {
             </div>
           </div>
 
-          {/* Week navigation */}
+          {/* Week navigation and view toggle */}
           <div className="flex items-center gap-4 mb-4">
             <button
               onClick={goToPreviousWeek}
@@ -253,6 +266,32 @@ export default function CalendarView() {
               )}
             </div>
 
+            {/* View toggle */}
+            <div className="flex items-center rounded-lg border border-stroke-subtle overflow-hidden">
+              <button
+                onClick={() => setViewMode("day")}
+                className={`p-2 transition-colors ${
+                  viewMode === "day"
+                    ? "bg-indigo/10 text-indigo"
+                    : "text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted"
+                }`}
+                title="Day view"
+              >
+                <List size={16} />
+              </button>
+              <button
+                onClick={() => setViewMode("week")}
+                className={`p-2 transition-colors border-l border-stroke-subtle ${
+                  viewMode === "week"
+                    ? "bg-indigo/10 text-indigo"
+                    : "text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted"
+                }`}
+                title="Week grid view"
+              >
+                <LayoutGrid size={16} />
+              </button>
+            </div>
+
             <button
               onClick={goToNextWeek}
               disabled={isCurrentWeek}
@@ -266,50 +305,66 @@ export default function CalendarView() {
             </button>
           </div>
 
-          {/* Week day cards */}
-          <div className="flex items-center gap-2 justify-center">
-            {weekDays.map((day) => (
-              <DayCard
-                key={day.id}
-                day={day}
-                isSelected={isSameDay(day.date, selectedDate)}
-                isToday={isSameDay(day.date, today)}
-                onClick={() => setSelectedDate(day.date)}
-              />
-            ))}
-          </div>
+          {/* Week day cards - only shown in day view */}
+          {viewMode === "day" && (
+            <div className="flex items-center gap-2 justify-center">
+              {weekDays.map((day) => (
+                <DayCard
+                  key={day.id}
+                  day={day}
+                  isSelected={isSameDay(day.date, selectedDate)}
+                  isToday={isSameDay(day.date, today)}
+                  onClick={() => setSelectedDate(day.date)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════
-          DAY DETAIL - Selected day content
+          MAIN CONTENT - Day view or Week grid view
           ═══════════════════════════════════════════════════════════════════ */}
       <div className="px-8 pb-24">
-        <div className="stagger-2">
-          {/* Day header */}
-          <div className="flex items-center justify-between mb-4 pt-4 border-t border-stroke-subtle">
-            <h2 className="font-display text-xl font-semibold text-ink-primary">
-              {formatDayHeader(selectedDate)}
-            </h2>
-
-            {/* AI Summary button */}
-            {selectedDay.workBlocks.length > 0 && (
-              <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:border-indigo/30 hover:bg-indigo/5 text-ink-secondary hover:text-indigo transition-all">
-                <Sparkles size={16} />
-                <span className="text-sm font-medium">Regenerate Summary</span>
-              </button>
-            )}
+        {viewMode === "week" ? (
+          /* Week Grid View */
+          <div className="stagger-2">
+            <WeekGridView
+              weekDays={weekDays}
+              onBlockClick={handleBlockClick}
+            />
+            <p className="text-xs text-ink-tertiary text-center mt-4">
+              Click a block to view details
+            </p>
           </div>
+        ) : (
+          /* Day View */
+          <div className="stagger-2">
+            {/* Day header */}
+            <div className="flex items-center justify-between mb-4 pt-4 border-t border-stroke-subtle">
+              <h2 className="font-display text-xl font-semibold text-ink-primary">
+                {formatDayHeader(selectedDate)}
+              </h2>
 
-          {/* Day Summary with toggle */}
-          <DaySummary day={selectedDay} />
+              {/* AI Summary button */}
+              {selectedDay.workBlocks.length > 0 && (
+                <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:border-indigo/30 hover:bg-indigo/5 text-ink-secondary hover:text-indigo transition-all">
+                  <Sparkles size={16} />
+                  <span className="text-sm font-medium">Regenerate Summary</span>
+                </button>
+              )}
+            </div>
 
-          {/* Work blocks */}
-          <WorkBlockList
-            blocks={selectedDay.workBlocks}
-            totalWorkTime={selectedDay.totalWorkTime}
-          />
-        </div>
+            {/* Day Summary with toggle */}
+            <DaySummary day={selectedDay} />
+
+            {/* Work blocks */}
+            <WorkBlockList
+              blocks={selectedDay.workBlocks}
+              totalWorkTime={selectedDay.totalWorkTime}
+            />
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════
