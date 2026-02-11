@@ -8,6 +8,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import type { SessionCapture } from "@/console/src/services/monitoringService";
+import { getLocale } from "@/console/src/lib/date";
 
 interface TimelineEntryProps {
   capture: SessionCapture;
@@ -16,10 +17,9 @@ interface TimelineEntryProps {
 
 function formatTime(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleTimeString("en-US", {
+  return date.toLocaleTimeString(getLocale(), {
     hour: "numeric",
     minute: "2-digit",
-    hour12: true,
   });
 }
 

@@ -6,6 +6,7 @@ import {
   type LinearConnectedUser,
 } from "@/console/src/services/adminService";
 import { Loader2, Users } from "lucide-react";
+import { getLocale } from "@/console/src/lib/date";
 
 interface LinearUsersDialogProps {
   open: boolean;
@@ -47,7 +48,7 @@ export default function LinearUsersDialog({ open, onOpenChange }: LinearUsersDia
 
   const formatDate = (date?: Date) => {
     if (!date) return "Unknown";
-    return new Date(date).toLocaleDateString("en-US", {
+    return new Date(date).toLocaleDateString(getLocale(), {
       month: "short",
       day: "numeric",
       year: "numeric",

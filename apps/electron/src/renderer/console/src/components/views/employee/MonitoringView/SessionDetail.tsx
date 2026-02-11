@@ -72,11 +72,12 @@ import SessionTimeline from "./SessionTimeline";
 import EndSessionDialog from "./EndSessionDialog"; // Import the new dialog
 import SummarizationProgress from "./SummarizationProgress";
 import { SiLinear } from "react-icons/si";
+import { getLocale } from "@/console/src/lib/date";
 
 function formatDateTime(dateString: string | null): string {
   if (!dateString) return "N/A";
   const date = new Date(dateString);
-  return date.toLocaleString("en-US", {
+  return date.toLocaleString(getLocale(), {
     weekday: "short",
     month: "short",
     day: "numeric",

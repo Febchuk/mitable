@@ -9,6 +9,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { TimelineGroup as TimelineGroupType } from "@/console/src/hooks/useTimelineTransform";
 import TimelineEntry from "./TimelineEntry";
+import { getLocale } from "@/console/src/lib/date";
 
 interface TimelineGroupProps {
   group: TimelineGroupType;
@@ -20,10 +21,9 @@ function formatTimeRange(startTime: string, endTime: string): string {
   const end = new Date(endTime);
 
   const formatTime = (date: Date) =>
-    date.toLocaleTimeString("en-US", {
+    date.toLocaleTimeString(getLocale(), {
       hour: "numeric",
       minute: "2-digit",
-      hour12: true,
     });
 
   // If start and end are the same (single capture), just show start time

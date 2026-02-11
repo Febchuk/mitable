@@ -2,6 +2,8 @@
  * Duration formatting utilities for Session Timeline
  */
 
+import { getLocale } from "@/console/src/lib/date";
+
 /**
  * Format duration in minutes to human-readable string
  * @param minutes - Duration in minutes
@@ -49,10 +51,9 @@ export function formatTimeRange(startTime: string, endTime: string): string {
   const end = new Date(endTime);
 
   const formatTime = (date: Date) =>
-    date.toLocaleTimeString("en-US", {
+    date.toLocaleTimeString(getLocale(), {
       hour: "numeric",
       minute: "2-digit",
-      hour12: true,
     });
 
   // If same time (or very close), just show one
@@ -72,10 +73,9 @@ export function formatTimeRange(startTime: string, endTime: string): string {
  */
 export function formatTime(timestamp: string): string {
   const date = new Date(timestamp);
-  return date.toLocaleTimeString("en-US", {
+  return date.toLocaleTimeString(getLocale(), {
     hour: "numeric",
     minute: "2-digit",
-    hour12: true,
   });
 }
 
@@ -86,7 +86,7 @@ export function formatTime(timestamp: string): string {
  */
 export function formatTimeShort(timestamp: string): string {
   const date = new Date(timestamp);
-  return date.toLocaleTimeString("en-US", {
+  return date.toLocaleTimeString(getLocale(), {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -194,10 +194,9 @@ export function generateTimeLabels(
     const date = new Date(timestamp);
 
     labels.push({
-      time: date.toLocaleTimeString("en-US", {
+      time: date.toLocaleTimeString(getLocale(), {
         hour: "numeric",
         minute: "2-digit",
-        hour12: true,
       }),
       position,
     });

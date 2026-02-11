@@ -8,6 +8,7 @@
 import { CSSProperties } from "react";
 import { ChevronRight } from "lucide-react";
 import type { Document, DocType, DocStatus } from "@mitable/shared";
+import { getLocale } from "@/console/src/lib/date";
 
 interface DocRowProps {
   document: Document;
@@ -38,10 +39,9 @@ const STATUS_CONFIG: Record<DocStatus, { bgClass: string; textClass: string }> =
 
 function formatTime(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleTimeString("en-US", {
+  return date.toLocaleTimeString(getLocale(), {
     hour: "numeric",
     minute: "2-digit",
-    hour12: true,
   });
 }
 

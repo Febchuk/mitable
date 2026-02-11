@@ -7,6 +7,7 @@
 import { Clock, Camera, Send, CheckCircle, AlertCircle, Pause, Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
+import { formatDateWithWeekday, formatTime } from "@/console/src/lib/date";
 
 interface SessionCardProps {
   session: SessionListItem;
@@ -14,21 +15,11 @@ interface SessionCardProps {
 }
 
 function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+  return formatDateWithWeekday(dateString);
 }
 
-function formatTime(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+function formatSessionTime(dateString: string): string {
+  return formatTime(dateString);
 }
 
 function getStatusBadge(status: string, deliveryStatus: string | null) {
@@ -95,7 +86,7 @@ export default function SessionCard({ session, onClick }: SessionCardProps) {
               : session.name || "Untitled Session"}
           </h3>
           <p className="text-text-secondary text-sm">
-            {formatDate(session.startedAt)} at {formatTime(session.startedAt)}
+            {formatDate(session.startedAt)} at {formatSessionTime(session.startedAt)}
           </p>
         </div>
         {getStatusBadge(session.status, session.deliveryStatus)}
