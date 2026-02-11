@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { mockDays, getMockWeekDays } from "./mockData";
 import DayCard from "./DayCard";
+import DaySummary from "./DaySummary";
 import WorkBlockList from "./WorkBlockList";
 
 // Helper functions
@@ -245,26 +246,22 @@ export default function CalendarView() {
       <div className="px-8 pb-8">
         <div className="stagger-2">
           {/* Day header */}
-          <div className="flex items-center justify-between mb-6 pt-4 border-t border-stroke-subtle">
-            <div>
-              <h2 className="font-display text-xl font-semibold text-ink-primary">
-                {formatDayHeader(selectedDate)}
-              </h2>
-              {selectedDay.summary && (
-                <p className="text-ink-secondary text-sm mt-1 max-w-2xl">
-                  {selectedDay.summary}
-                </p>
-              )}
-            </div>
+          <div className="flex items-center justify-between mb-4 pt-4 border-t border-stroke-subtle">
+            <h2 className="font-display text-xl font-semibold text-ink-primary">
+              {formatDayHeader(selectedDate)}
+            </h2>
 
             {/* AI Summary button */}
             {selectedDay.workBlocks.length > 0 && (
               <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:border-indigo/30 hover:bg-indigo/5 text-ink-secondary hover:text-indigo transition-all">
                 <Sparkles size={16} />
-                <span className="text-sm font-medium">Generate Summary</span>
+                <span className="text-sm font-medium">Regenerate Summary</span>
               </button>
             )}
           </div>
+
+          {/* Day Summary with toggle */}
+          <DaySummary day={selectedDay} />
 
           {/* Work blocks */}
           <WorkBlockList
