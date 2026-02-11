@@ -2,7 +2,7 @@
  * DayCard
  *
  * Day summary card for the week navigation header.
- * Uses GitHub-style heatmap with green shading based on activity level.
+ * GitHub-style heatmap: darker green = more activity, white text for contrast.
  */
 
 import type { ActivityDay } from "./types";
@@ -31,19 +31,19 @@ function formatDuration(minutes: number): string {
   return `${hours}h`;
 }
 
-// GitHub-style activity levels (5 levels like contribution graph)
-// Returns opacity value for the green overlay
-function getActivityOpacity(minutes: number): number {
-  if (minutes === 0) return 0;
-  if (minutes < 60) return 0.1;   // < 1h - barely visible
-  if (minutes < 180) return 0.2;  // < 3h - light
-  if (minutes < 360) return 0.35; // < 6h - medium
-  if (minutes < 480) return 0.5;  // < 8h - heavy
-  return 0.65;                     // 8h+ - max intensity
+// Activity level determines which shade of green to use
+// Returns: [bgClass, needsLightText]
+function getActivityStyle(minutes: number): { bg: string; light: boolean } {
+  if (minutes === 0) return { bg: "bg-canvas-overlay/40", light: false };
+  if (minutes < 60) return { bg: "bg-emerald-900/20", light: false };      // < 1h - subtle
+  if (minutes < 180) return { bg: "bg-emerald-700/40", light: false };     // < 3h - light
+  if (minutes < 360) return { bg: "bg-emerald-600/70", light: true };      // < 6h - medium
+  if (minutes < 480) return { bg: "bg-emerald-600/90", light: true };      // < 8h - heavy
+  return { bg: "bg-emerald-500", light: true };                             // 8h+ - vivid
 }
 
 export default function DayCard({ day, isSelected, isToday, onClick }: DayCardProps) {
-  const activityOpacity = getActivityOpacity(day.totalWorkTime);
+  const { bg: activityBg, light: useLightText } = getActivityStyle(day.totalWorkTime);
   const hasActivity = day.totalWorkTime > 0;
 
   return (
@@ -52,65 +52,68 @@ export default function DayCard({ day, isSelected, isToday, onClick }: DayCardPr
       className={`
         relative flex flex-col items-center justify-center min-w-[72px] h-[80px] rounded-xl
         transition-all duration-200 group overflow-hidden
+        ${activityBg}
         ${
           isSelected
-            ? "border-2 border-indigo shadow-lg shadow-indigo/10"
-            : "border border-stroke-subtle/50 hover:border-stroke-subtle"
+            ? "ring-2 ring-indigo ring-offset-2 ring-offset-canvas-base"
+            : "hover:ring-1 hover:ring-stroke-subtle"
         }
       `}
     >
-      {/* Activity heatmap background layer */}
-      <div
-        className="absolute inset-0 bg-emerald transition-opacity duration-200"
-        style={{ opacity: isSelected ? activityOpacity * 0.7 : activityOpacity }}
-      />
-
-      {/* Base background (shows through when no activity) */}
-      {!hasActivity && (
-        <div className="absolute inset-0 bg-canvas-overlay/30" />
+      {/* Subtle inner glow for depth on active days */}
+      {hasActivity && (
+        <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
       )}
 
-      {/* Content layer */}
+      {/* Content */}
       <div className="relative z-10 flex flex-col items-center">
-        {/* Today indicator */}
-        {isToday && !isSelected && (
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-indigo" />
+        {/* Today dot indicator */}
+        {isToday && (
+          <div className={`absolute -top-2.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${
+            useLightText ? "bg-white" : "bg-indigo"
+          }`} />
         )}
 
         {/* Day name */}
         <span
-          className={`text-xs font-medium uppercase tracking-wider ${
+          className={`text-[10px] font-semibold uppercase tracking-widest ${
             isSelected
               ? "text-indigo"
-              : isToday
-                ? "text-indigo"
-                : hasActivity
-                  ? "text-emerald-900/70"
+              : useLightText
+                ? "text-white/70"
+                : isToday
+                  ? "text-indigo"
                   : "text-ink-tertiary"
           }`}
         >
           {formatDayName(day.date)}
         </span>
 
-        {/* Day number */}
+        {/* Day number - the hero */}
         <span
-          className={`text-xl font-semibold mt-0.5 ${
+          className={`text-2xl font-bold leading-none mt-1 ${
             isSelected
               ? "text-ink-primary"
-              : hasActivity
-                ? "text-emerald-900"
+              : useLightText
+                ? "text-white"
                 : isToday
                   ? "text-ink-primary"
-                  : "text-ink-secondary"
+                  : hasActivity
+                    ? "text-ink-primary"
+                    : "text-ink-secondary"
           }`}
         >
           {formatDayNumber(day.date)}
         </span>
 
-        {/* Duration label */}
+        {/* Duration */}
         <span
-          className={`text-[10px] font-medium mt-1 tabular-nums ${
-            hasActivity ? "text-emerald-900/60" : "text-ink-tertiary/40"
+          className={`text-[10px] font-medium mt-1.5 tabular-nums ${
+            useLightText
+              ? "text-white/60"
+              : hasActivity
+                ? "text-ink-secondary"
+                : "text-ink-tertiary/50"
           }`}
         >
           {hasActivity ? formatDuration(day.totalWorkTime) : "—"}
