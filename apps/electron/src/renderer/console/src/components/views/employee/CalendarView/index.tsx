@@ -13,6 +13,8 @@ import {
   Sparkles,
   Settings,
   Target,
+  Plus,
+  X,
 } from "lucide-react";
 import { mockDays, getMockWeekDays } from "./mockData";
 import DayCard from "./DayCard";
@@ -76,6 +78,8 @@ export default function CalendarView() {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
+  const [showNewBlockDialog, setShowNewBlockDialog] = useState(false);
+  const [newBlockGoal, setNewBlockGoal] = useState("");
 
   // Get week days with activity data
   const weekDays = useMemo(() => getMockWeekDays(weekStart), [weekStart]);
@@ -130,6 +134,14 @@ export default function CalendarView() {
   // Check if there's an active work block
   const hasActiveBlock = selectedDay.workBlocks.some((b) => b.isActive);
 
+  // Handle starting a new block
+  const handleStartNewBlock = () => {
+    // In real implementation, this would call the backend to start a new work block
+    console.log("Starting new block with goal:", newBlockGoal || "(no goal)");
+    setShowNewBlockDialog(false);
+    setNewBlockGoal("");
+  };
+
   return (
     <div className="min-h-full app-no-drag">
       {/* ═══════════════════════════════════════════════════════════════════
@@ -160,12 +172,13 @@ export default function CalendarView() {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Start Focused Session button */}
+              {/* Start New Block button */}
               <button
+                onClick={() => setShowNewBlockDialog(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo text-white font-medium text-sm hover:bg-indigo/90 transition-colors"
               >
-                <Target size={16} />
-                Start Focused Session
+                <Plus size={16} />
+                Start New Block
               </button>
 
               {/* Settings */}
@@ -289,6 +302,106 @@ export default function CalendarView() {
           </div>
         </div>
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          NEW BLOCK DIALOG
+          ═══════════════════════════════════════════════════════════════════ */}
+      {showNewBlockDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowNewBlockDialog(false)}
+          />
+
+          {/* Dialog */}
+          <div className="relative bg-canvas-overlay rounded-2xl border border-stroke-subtle shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-stroke-subtle">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-indigo/10">
+                  <Target size={18} className="text-indigo" />
+                </div>
+                <div>
+                  <h3 className="font-display text-lg font-semibold text-ink-primary">
+                    Start New Block
+                  </h3>
+                  <p className="text-xs text-ink-tertiary">
+                    Begin a focused work session
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowNewBlockDialog(false)}
+                className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label
+                  htmlFor="goal-input"
+                  className="block text-sm font-medium text-ink-secondary mb-2"
+                >
+                  What are you working on? (optional)
+                </label>
+                <input
+                  id="goal-input"
+                  type="text"
+                  value={newBlockGoal}
+                  onChange={(e) => setNewBlockGoal(e.target.value)}
+                  placeholder="e.g., Complete Calendar UI prototype"
+                  className="w-full px-4 py-3 rounded-lg bg-canvas-muted border border-stroke-subtle text-ink-primary placeholder:text-ink-tertiary focus:outline-none focus:border-indigo focus:ring-1 focus:ring-indigo/20 transition-all"
+                  autoFocus
+                />
+                <p className="mt-2 text-xs text-ink-tertiary">
+                  Setting a goal helps track progress and generates better summaries.
+                </p>
+              </div>
+
+              <div className="bg-canvas-muted/50 rounded-lg p-4 border border-stroke-subtle/50">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary mb-2">
+                  What happens next
+                </h4>
+                <ul className="space-y-2 text-sm text-ink-secondary">
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald mt-0.5">•</span>
+                    A new work block starts immediately
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald mt-0.5">•</span>
+                    Activity is captured until you go idle for 30+ minutes
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald mt-0.5">•</span>
+                    Block is marked as a focused session with your goal
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-stroke-subtle bg-canvas-muted/30">
+              <button
+                onClick={() => setShowNewBlockDialog(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-ink-secondary hover:bg-canvas-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStartNewBlock}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo text-white font-medium text-sm hover:bg-indigo/90 transition-colors"
+              >
+                <Plus size={16} />
+                Start Block
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

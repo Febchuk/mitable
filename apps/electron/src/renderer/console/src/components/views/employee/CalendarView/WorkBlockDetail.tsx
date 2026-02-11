@@ -12,6 +12,7 @@ import {
   Coffee,
   Activity,
   BarChart3,
+  Target,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
 import CaptureTimeline from "./CaptureTimeline";
@@ -113,6 +114,12 @@ export default function WorkBlockDetail({
               <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
                 Block {blockNumber}
               </span>
+              {block.isFocusedSession && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo/20 text-indigo text-[10px] font-semibold uppercase tracking-wider">
+                  <Target size={10} />
+                  Focused
+                </span>
+              )}
               {block.isActive && (
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald/20 text-emerald text-[10px] font-semibold uppercase tracking-wider">
                   <span className="relative flex h-1.5 w-1.5">
@@ -130,6 +137,12 @@ export default function WorkBlockDetail({
 
           {/* Summary preview */}
           <div className="flex-1 min-w-0">
+            {block.goal && (
+              <div className="flex items-center gap-1.5 mb-1">
+                <Target size={12} className="text-indigo" />
+                <span className="text-xs font-medium text-indigo">{block.goal}</span>
+              </div>
+            )}
             <p className="text-sm text-ink-primary line-clamp-2">{block.summary}</p>
           </div>
 
