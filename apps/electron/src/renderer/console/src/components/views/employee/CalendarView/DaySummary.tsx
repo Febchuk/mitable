@@ -1,8 +1,8 @@
 /**
  * DaySummary
  *
- * Day summary with toggle between brief and detailed views.
- * Shows activity breakdown, key documents, and timeline in detailed mode.
+ * Day summary with toggle between prose and list views.
+ * Prose shows a paragraph summary, List shows bullet points with details.
  */
 
 import { useState, useMemo } from "react";
@@ -16,9 +16,8 @@ import {
   BookOpen,
   Video,
   MoreHorizontal,
-  ArrowRight,
-  FolderOpen,
-  TrendingUp,
+  AlignLeft,
+  List,
 } from "lucide-react";
 import type { ActivityDay, ActivityType, WorkBlock } from "./types";
 
@@ -95,15 +94,7 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-// Analyze day's captures for detailed summary
+// Analyze day's captures for list summary
 function analyzeDayActivity(blocks: WorkBlock[]) {
   const activityTime: Record<ActivityType, number> = {
     coding: 0,
@@ -118,8 +109,8 @@ function analyzeDayActivity(blocks: WorkBlock[]) {
   };
 
   const documentFrequency: Record<string, { count: number; app: string }> = {};
-  const contextSwitches: { time: Date; from: string; to: string }[] = [];
   const projectTime: Record<string, number> = {};
+  let contextSwitchCount = 0;
 
   blocks.forEach((block) => {
     block.captures.forEach((capture) => {
@@ -139,13 +130,9 @@ function analyzeDayActivity(blocks: WorkBlock[]) {
         projectTime[capture.projectContext] = (projectTime[capture.projectContext] || 0) + 0.5;
       }
 
-      // Track context switches
-      if (capture.isContextSwitch && capture.switchedFrom) {
-        contextSwitches.push({
-          time: capture.timestamp,
-          from: capture.switchedFrom,
-          to: capture.appName,
-        });
+      // Count context switches
+      if (capture.isContextSwitch) {
+        contextSwitchCount++;
       }
     });
   });
@@ -163,25 +150,112 @@ function analyzeDayActivity(blocks: WorkBlock[]) {
   // Top documents
   const topDocuments = Object.entries(documentFrequency)
     .sort((a, b) => b[1].count - a[1].count)
-    .slice(0, 5)
-    .map(([name, data]) => ({ name, app: data.app, count: data.count }));
+    .slice(0, 3)
+    .map(([name, data]) => ({ name, app: data.app }));
 
   // Top projects
   const topProjects = Object.entries(projectTime)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
+    .slice(0, 2)
     .map(([name, time]) => ({ name, minutes: Math.round(time) }));
 
-  // Sample context switches (first 5)
-  const sampleSwitches = contextSwitches.slice(0, 8);
+  return { sortedActivities, topDocuments, topProjects, contextSwitchCount };
+}
 
-  return { sortedActivities, topDocuments, topProjects, sampleSwitches, totalSwitches: contextSwitches.length };
+// Generate list items from analysis
+function generateListItems(day: ActivityDay, analysis: ReturnType<typeof analyzeDayActivity>) {
+  const items: { icon: typeof Code; color: string; bgColor: string; text: string }[] = [];
+
+  // Work blocks summary
+  const focusedBlocks = day.workBlocks.filter((b) => b.isFocusedSession);
+  if (day.workBlocks.length > 0) {
+    items.push({
+      icon: Code,
+      color: "text-indigo",
+      bgColor: "bg-indigo/10",
+      text: `${day.workBlocks.length} work block${day.workBlocks.length !== 1 ? "s" : ""} totaling ${formatDuration(day.totalWorkTime)}${focusedBlocks.length > 0 ? ` (${focusedBlocks.length} focused)` : ""}`,
+    });
+  }
+
+  // Top activity
+  if (analysis.sortedActivities.length > 0) {
+    const top = analysis.sortedActivities[0];
+    const config = activityConfig[top.type];
+    items.push({
+      icon: config.icon,
+      color: config.color,
+      bgColor: config.bgColor,
+      text: `Primary activity: ${config.label} (${top.percentage}% of time, ${formatDuration(top.minutes)})`,
+    });
+  }
+
+  // Secondary activities
+  if (analysis.sortedActivities.length > 1) {
+    const secondary = analysis.sortedActivities.slice(1, 3);
+    const secondaryText = secondary
+      .map((a) => `${activityConfig[a.type].label} ${a.percentage}%`)
+      .join(", ");
+    items.push({
+      icon: MoreHorizontal,
+      color: "text-ink-tertiary",
+      bgColor: "bg-canvas-muted",
+      text: `Also: ${secondaryText}`,
+    });
+  }
+
+  // Top documents
+  if (analysis.topDocuments.length > 0) {
+    const docList = analysis.topDocuments.map((d) => d.name).join(", ");
+    items.push({
+      icon: FileText,
+      color: "text-emerald-400",
+      bgColor: "bg-emerald-500/10",
+      text: `Key files: ${docList}`,
+    });
+  }
+
+  // Projects
+  if (analysis.topProjects.length > 0) {
+    const projectList = analysis.topProjects
+      .map((p) => `${p.name} (${formatDuration(p.minutes)})`)
+      .join(", ");
+    items.push({
+      icon: Code,
+      color: "text-blue-400",
+      bgColor: "bg-blue-500/10",
+      text: `Projects: ${projectList}`,
+    });
+  }
+
+  // Context switches
+  if (analysis.contextSwitchCount > 0) {
+    items.push({
+      icon: MessageSquare,
+      color: "text-purple-400",
+      bgColor: "bg-purple-500/10",
+      text: `${analysis.contextSwitchCount} context switches between apps`,
+    });
+  }
+
+  // Goals from focused sessions
+  const goals = day.workBlocks.filter((b) => b.goal).map((b) => b.goal);
+  if (goals.length > 0) {
+    items.push({
+      icon: Code,
+      color: "text-indigo",
+      bgColor: "bg-indigo/10",
+      text: `Goals: ${goals.join("; ")}`,
+    });
+  }
+
+  return items;
 }
 
 export default function DaySummary({ day }: DaySummaryProps) {
-  const [viewMode, setViewMode] = useState<"brief" | "detailed">("brief");
+  const [viewMode, setViewMode] = useState<"prose" | "list">("prose");
 
   const analysis = useMemo(() => analyzeDayActivity(day.workBlocks), [day.workBlocks]);
+  const listItems = useMemo(() => generateListItems(day, analysis), [day, analysis]);
 
   if (day.workBlocks.length === 0) {
     return null;
@@ -194,189 +268,59 @@ export default function DaySummary({ day }: DaySummaryProps) {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
           Day Summary
         </h3>
-        <div className="flex items-center rounded-lg bg-canvas-muted p-0.5">
+        <div className="flex items-center gap-1 rounded-lg bg-canvas-muted p-0.5">
           <button
-            onClick={() => setViewMode("brief")}
-            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-              viewMode === "brief"
+            onClick={() => setViewMode("prose")}
+            className={`p-1.5 rounded transition-colors ${
+              viewMode === "prose"
                 ? "bg-canvas-overlay text-ink-primary shadow-sm"
                 : "text-ink-tertiary hover:text-ink-secondary"
             }`}
+            title="Prose view"
           >
-            Brief
+            <AlignLeft size={14} />
           </button>
           <button
-            onClick={() => setViewMode("detailed")}
-            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-              viewMode === "detailed"
+            onClick={() => setViewMode("list")}
+            className={`p-1.5 rounded transition-colors ${
+              viewMode === "list"
                 ? "bg-canvas-overlay text-ink-primary shadow-sm"
                 : "text-ink-tertiary hover:text-ink-secondary"
             }`}
+            title="List view"
           >
-            Detailed
+            <List size={14} />
           </button>
         </div>
       </div>
 
-      {viewMode === "brief" ? (
-        /* Brief view - just the summary text */
-        <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-4">
+      <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-4">
+        {viewMode === "prose" ? (
+          /* Prose view - paragraph summary */
           <p className="text-sm text-ink-secondary leading-relaxed">
             {day.summary || "No summary available for this day."}
           </p>
-        </div>
-      ) : (
-        /* Detailed view - full breakdown */
-        <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 overflow-hidden">
-          {/* Summary text */}
-          <div className="p-4 border-b border-stroke-subtle">
-            <p className="text-sm text-ink-secondary leading-relaxed">
-              {day.summary || "No summary available for this day."}
-            </p>
-          </div>
-
-          {/* Activity breakdown */}
-          <div className="p-4 border-b border-stroke-subtle">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp size={14} className="text-ink-tertiary" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-                Activity Breakdown
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {analysis.sortedActivities.slice(0, 6).map((activity) => {
-                const config = activityConfig[activity.type];
-                const Icon = config.icon;
-                return (
+        ) : (
+          /* List view - bullet points with icons */
+          <ul className="space-y-2.5">
+            {listItems.map((item, idx) => {
+              const Icon = item.icon;
+              return (
+                <li key={idx} className="flex items-start gap-3">
                   <div
-                    key={activity.type}
-                    className="flex items-center gap-3 p-2 rounded-lg bg-canvas-muted/50"
+                    className={`flex-shrink-0 p-1 rounded ${item.bgColor} ${item.color} mt-0.5`}
                   >
-                    <div className={`p-1.5 rounded-lg ${config.bgColor} ${config.color}`}>
-                      <Icon size={14} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-ink-primary">
-                          {config.label}
-                        </span>
-                        <span className="text-xs text-ink-tertiary tabular-nums">
-                          {activity.percentage}%
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="flex-1 h-1.5 bg-canvas-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${config.bgColor.replace("/10", "")}`}
-                            style={{ width: `${activity.percentage}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-ink-tertiary tabular-nums w-10 text-right">
-                          {formatDuration(activity.minutes)}
-                        </span>
-                      </div>
-                    </div>
+                    <Icon size={12} />
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Key documents */}
-          {analysis.topDocuments.length > 0 && (
-            <div className="p-4 border-b border-stroke-subtle">
-              <div className="flex items-center gap-2 mb-3">
-                <FileText size={14} className="text-ink-tertiary" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-                  Key Documents
-                </span>
-              </div>
-              <div className="space-y-2">
-                {analysis.topDocuments.map((doc, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-3 text-sm"
-                  >
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-canvas-muted text-ink-secondary">
-                      {doc.app}
-                    </span>
-                    <span className="flex-1 text-ink-primary truncate">{doc.name}</span>
-                    <span className="text-xs text-ink-tertiary tabular-nums">
-                      {doc.count} times
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Projects */}
-          {analysis.topProjects.length > 0 && (
-            <div className="p-4 border-b border-stroke-subtle">
-              <div className="flex items-center gap-2 mb-3">
-                <FolderOpen size={14} className="text-ink-tertiary" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-                  Projects
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {analysis.topProjects.map((project, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-canvas-muted/50 border border-stroke-subtle/50"
-                  >
-                    <span className="text-sm text-ink-primary">{project.name}</span>
-                    <span className="text-xs text-ink-tertiary tabular-nums">
-                      {formatDuration(project.minutes)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Context switches timeline */}
-          {analysis.sampleSwitches.length > 0 && (
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <ArrowRight size={14} className="text-ink-tertiary" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-                    Context Switches
+                  <span className="text-sm text-ink-secondary leading-relaxed">
+                    {item.text}
                   </span>
-                </div>
-                <span className="text-xs text-ink-tertiary">
-                  {analysis.totalSwitches} total
-                </span>
-              </div>
-              <div className="space-y-2">
-                {analysis.sampleSwitches.map((sw, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 text-xs"
-                  >
-                    <span className="w-16 text-ink-tertiary tabular-nums flex-shrink-0">
-                      {formatTime(sw.time)}
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded bg-canvas-muted text-ink-secondary font-medium">
-                      {sw.from}
-                    </span>
-                    <ArrowRight size={10} className="text-ink-tertiary" />
-                    <span className="px-1.5 py-0.5 rounded bg-canvas-muted text-ink-secondary font-medium">
-                      {sw.to}
-                    </span>
-                  </div>
-                ))}
-                {analysis.totalSwitches > analysis.sampleSwitches.length && (
-                  <p className="text-xs text-ink-tertiary/70 mt-2">
-                    + {analysis.totalSwitches - analysis.sampleSwitches.length} more switches
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
