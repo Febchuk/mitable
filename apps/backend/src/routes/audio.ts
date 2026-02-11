@@ -17,6 +17,18 @@ const router = Router();
 const audioConnections = new Map<string, WebSocket>();
 
 /**
+ * Close the audio WebSocket for a session (called from session-end routes)
+ */
+export function closeAudioConnection(sessionId: string): void {
+  const ws = audioConnections.get(sessionId);
+  if (ws) {
+    logger.info(`🔌 Closing audio WebSocket for ended session: ${sessionId}`);
+    ws.close(1000, "Session ended");
+    audioConnections.delete(sessionId);
+  }
+}
+
+/**
  * Initialize WebSocket server for audio streaming
  * This should be called from index.ts when setting up the HTTP server
  */
@@ -94,6 +106,12 @@ export function initializeAudioWebSocket(server: any) {
     // Handle incoming audio chunks
     ws.on("message", (data: Buffer) => {
       try {
+        // If Deepgram session is gone (closed/errored), close the WebSocket to stop the flood
+        if (!deepgramTranscriptionService.isActive(sessionId)) {
+          logger.info(`🔌 Closing audio WebSocket: Deepgram session ended for ${sessionId}`);
+          ws.close(1000, "Transcription session ended");
+          return;
+        }
         // Forward audio chunk to Deepgram
         deepgramTranscriptionService.sendAudioChunk(sessionId, data);
       } catch (error) {

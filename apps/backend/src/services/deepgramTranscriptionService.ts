@@ -48,6 +48,8 @@ interface TranscriptionSession {
 // ===========================
 
 class DeepgramTranscriptionService {
+  // Track which sessions have already logged the "no active session" warning
+  private warnedSessions = new Set<string>();
   private deepgram: any;
   private sessions: Map<string, TranscriptionSession> = new Map();
 
@@ -235,7 +237,15 @@ class DeepgramTranscriptionService {
     const session = this.sessions.get(sessionId);
 
     if (!session || !session.isActive) {
-      logger.warn(`⚠️ Cannot send audio: No active session for ${sessionId}`);
+      // Throttle: log once per session to avoid flooding logs
+      if (!this.warnedSessions.has(sessionId)) {
+        logger.warn(
+          `⚠️ Cannot send audio: No active session for ${sessionId} (further warnings suppressed)`
+        );
+        this.warnedSessions.add(sessionId);
+        // Clean up after 5 minutes to avoid memory leak
+        setTimeout(() => this.warnedSessions.delete(sessionId), 5 * 60 * 1000);
+      }
       return;
     }
 
