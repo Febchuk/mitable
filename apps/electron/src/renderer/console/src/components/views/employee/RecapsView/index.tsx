@@ -6,6 +6,7 @@
  */
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   History,
   Send,
@@ -21,6 +22,8 @@ import {
   Check,
   MoreHorizontal,
   Trash2,
+  Plus,
+  Pencil,
 } from "lucide-react";
 
 // Recap destination types
@@ -205,9 +208,10 @@ const destinationConfig: Record<
 // Recap card component
 interface RecapCardProps {
   recap: Recap;
+  onEdit: () => void;
 }
 
-function RecapCard({ recap }: RecapCardProps) {
+function RecapCard({ recap, onEdit }: RecapCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
@@ -274,10 +278,20 @@ function RecapCard({ recap }: RecapCardProps) {
             <div className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-10">
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(recap.content);
+                  onEdit();
                   setShowMenu(false);
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-canvas-muted transition-colors"
+              >
+                <Pencil size={14} className="text-ink-tertiary" />
+                <span className="text-sm text-ink-primary">Edit recap</span>
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(recap.content);
+                  setShowMenu(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle"
               >
                 <Copy size={14} className="text-ink-tertiary" />
                 <span className="text-sm text-ink-primary">Copy content</span>
@@ -373,6 +387,7 @@ function RecapCard({ recap }: RecapCardProps) {
 }
 
 export default function RecapsView() {
+  const navigate = useNavigate();
   const [recaps] = useState<Recap[]>(mockRecaps);
 
   // Group recaps by date
@@ -397,18 +412,27 @@ export default function RecapsView() {
       {/* Header */}
       <div className="px-8 pt-8 pb-6">
         <div className="stagger-1">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl bg-indigo/10">
-              <History size={20} className="text-indigo" />
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-indigo/10">
+                <History size={20} className="text-indigo" />
+              </div>
+              <div>
+                <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
+                  Recaps
+                </h1>
+                <p className="text-ink-tertiary text-sm">
+                  History of shared work updates
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
-                Recaps
-              </h1>
-              <p className="text-ink-tertiary text-sm">
-                History of shared work updates
-              </p>
-            </div>
+            <button
+              onClick={() => navigate("/recaps/new")}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo text-white font-medium text-sm hover:bg-indigo/90 transition-colors"
+            >
+              <Plus size={16} />
+              <span>Create Recap</span>
+            </button>
           </div>
         </div>
       </div>
@@ -453,7 +477,11 @@ export default function RecapsView() {
                   {/* Recaps for this date */}
                   <div className="space-y-3">
                     {dayRecaps.map((recap) => (
-                      <RecapCard key={recap.id} recap={recap} />
+                      <RecapCard
+                        key={recap.id}
+                        recap={recap}
+                        onEdit={() => navigate(`/recaps/${recap.id}`)}
+                      />
                     ))}
                   </div>
                 </div>

@@ -24,6 +24,7 @@ import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
 import CalendarView from "./components/views/employee/CalendarView";
 import RecapsView from "./components/views/employee/RecapsView";
+import RecapDetail from "./components/views/employee/RecapsView/RecapDetail";
 import { monitoringKeys } from "./hooks/queries/monitoring";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
@@ -231,6 +232,7 @@ function App() {
                   {/* Calendar/Journal Routes (Passive Tracking) */}
                   <Route path="calendar" element={<CalendarView />} />
                   <Route path="recaps" element={<RecapsView />} />
+                  <Route path="recaps/:recapId" element={<RecapDetail />} />
                   {/* Focused Sessions Routes */}
                   <Route path="monitoring" element={<MonitoringView />} />
                   <Route path="monitoring/:sessionId" element={<SessionDetail />} />
