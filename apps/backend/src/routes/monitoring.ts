@@ -18,6 +18,7 @@ import { workstreamRLMService } from "../services/workstream-rlm.service.js";
 import { intermediateSummaryService } from "../services/intermediate-summary.service.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
+import { closeAudioConnection } from "./audio.js";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -679,6 +680,9 @@ router.post(
         activeDurationMs,
         totalPausedMs,
       });
+
+      // Proactively close audio WebSocket to stop orphaned audio chunks
+      closeAudioConnection(id);
 
       // Short-session guard: skip storyteller if not enough data
       const MIN_DURATION_MS = 3 * 60 * 1000; // 3 minutes
