@@ -1,0 +1,344 @@
+/**
+ * Calendar Theme Override
+ *
+ * Scoped overrides for the untitledui Calendar component to match
+ * Mitable's dark design system. Uses .mitable-calendar wrapper scope.
+ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   SCOPED CALENDAR THEME
+   All overrides are scoped to .mitable-calendar wrapper
+   ═══════════════════════════════════════════════════════════════════ */
+
+.mitable-calendar {
+  /* CSS custom properties for the calendar */
+  --cal-bg-base: #0C0C0E;
+  --cal-bg-raised: #141418;
+  --cal-bg-overlay: #1C1C22;
+  --cal-bg-muted: #24242C;
+  --cal-stroke-subtle: rgba(255, 255, 255, 0.06);
+  --cal-stroke-default: rgba(255, 255, 255, 0.12);
+  --cal-ink-primary: #F4F4F5;
+  --cal-ink-secondary: #A1A1AA;
+  --cal-ink-tertiary: #52525B;
+  --cal-indigo: #6366F1;
+  --cal-indigo-light: #818CF8;
+  --cal-emerald: #34D399;
+}
+
+/* Calendar container */
+.mitable-calendar [role="application"][aria-label="Calendar"] {
+  background-color: var(--cal-bg-base) !important;
+  border: 1px solid var(--cal-stroke-subtle) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 8px 48px rgba(0, 0, 0, 0.2) !important;
+  --tw-ring-shadow: none !important;
+}
+
+/* Background overrides */
+.mitable-calendar .bg-primary {
+  background-color: var(--cal-bg-base) !important;
+}
+
+.mitable-calendar .bg-primary_hover {
+  background-color: var(--cal-bg-raised) !important;
+}
+
+.mitable-calendar .bg-secondary {
+  background-color: var(--cal-bg-raised) !important;
+}
+
+.mitable-calendar .bg-secondary_subtle {
+  background-color: var(--cal-bg-base) !important;
+}
+
+.mitable-calendar .bg-active {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+}
+
+.mitable-calendar .bg-brand-solid {
+  background-color: var(--cal-indigo) !important;
+}
+
+/* Border overrides */
+.mitable-calendar .border-secondary {
+  border-color: var(--cal-stroke-subtle) !important;
+}
+
+.mitable-calendar .border-primary {
+  border-color: var(--cal-stroke-default) !important;
+}
+
+/* Before pseudo-element borders */
+.mitable-calendar [class*="before:border-secondary"]::before {
+  border-color: var(--cal-stroke-subtle) !important;
+}
+
+.mitable-calendar [class*="before:border-r"]::before,
+.mitable-calendar [class*="before:border-b"]::before {
+  border-color: var(--cal-stroke-subtle) !important;
+}
+
+/* Text color overrides */
+.mitable-calendar .text-primary {
+  color: var(--cal-ink-primary) !important;
+}
+
+.mitable-calendar .text-secondary {
+  color: var(--cal-ink-secondary) !important;
+}
+
+.mitable-calendar .text-tertiary {
+  color: var(--cal-ink-tertiary) !important;
+}
+
+.mitable-calendar .text-quaternary {
+  color: var(--cal-ink-tertiary) !important;
+}
+
+.mitable-calendar .text-fg-quaternary {
+  color: var(--cal-ink-tertiary) !important;
+}
+
+/* Ring overrides */
+.mitable-calendar .ring-secondary {
+  --tw-ring-color: var(--cal-stroke-subtle) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EVENT COLOR OVERRIDES (Dark Mode)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Gray events */
+.mitable-calendar .bg-utility-gray-50 {
+  background-color: rgba(161, 161, 170, 0.1) !important;
+}
+.mitable-calendar .bg-utility-gray-100 {
+  background-color: rgba(161, 161, 170, 0.15) !important;
+}
+.mitable-calendar .ring-utility-gray-200 {
+  --tw-ring-color: rgba(161, 161, 170, 0.2) !important;
+}
+.mitable-calendar .text-utility-gray-600,
+.mitable-calendar .text-utility-gray-700 {
+  color: #A1A1AA !important;
+}
+.mitable-calendar .bg-utility-gray-500 {
+  background-color: #71717A !important;
+}
+
+/* Brand/Indigo events */
+.mitable-calendar .bg-utility-brand-50,
+.mitable-calendar .bg-utility-indigo-50 {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+}
+.mitable-calendar .bg-utility-brand-100,
+.mitable-calendar .bg-utility-indigo-100 {
+  background-color: rgba(99, 102, 241, 0.25) !important;
+}
+.mitable-calendar .ring-utility-brand-200,
+.mitable-calendar .ring-utility-indigo-200 {
+  --tw-ring-color: rgba(99, 102, 241, 0.3) !important;
+}
+.mitable-calendar .text-utility-brand-600,
+.mitable-calendar .text-utility-brand-700,
+.mitable-calendar .text-utility-indigo-600,
+.mitable-calendar .text-utility-indigo-700 {
+  color: #818CF8 !important;
+}
+.mitable-calendar .bg-utility-brand-500,
+.mitable-calendar .bg-utility-indigo-500 {
+  background-color: #6366F1 !important;
+}
+
+/* Green/Success events */
+.mitable-calendar .bg-utility-green-50 {
+  background-color: rgba(52, 211, 153, 0.15) !important;
+}
+.mitable-calendar .bg-utility-green-100 {
+  background-color: rgba(52, 211, 153, 0.25) !important;
+}
+.mitable-calendar .ring-utility-green-200 {
+  --tw-ring-color: rgba(52, 211, 153, 0.3) !important;
+}
+.mitable-calendar .text-utility-green-600,
+.mitable-calendar .text-utility-green-700 {
+  color: #34D399 !important;
+}
+.mitable-calendar .bg-utility-green-500 {
+  background-color: #34D399 !important;
+}
+
+/* Blue events */
+.mitable-calendar .bg-utility-blue-50 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+}
+.mitable-calendar .bg-utility-blue-100 {
+  background-color: rgba(59, 130, 246, 0.25) !important;
+}
+.mitable-calendar .ring-utility-blue-200 {
+  --tw-ring-color: rgba(59, 130, 246, 0.3) !important;
+}
+.mitable-calendar .text-utility-blue-600,
+.mitable-calendar .text-utility-blue-700 {
+  color: #60A5FA !important;
+}
+.mitable-calendar .bg-utility-blue-500 {
+  background-color: #3B82F6 !important;
+}
+
+/* Purple events */
+.mitable-calendar .bg-utility-purple-50 {
+  background-color: rgba(168, 85, 247, 0.15) !important;
+}
+.mitable-calendar .bg-utility-purple-100 {
+  background-color: rgba(168, 85, 247, 0.25) !important;
+}
+.mitable-calendar .ring-utility-purple-200 {
+  --tw-ring-color: rgba(168, 85, 247, 0.3) !important;
+}
+.mitable-calendar .text-utility-purple-600,
+.mitable-calendar .text-utility-purple-700 {
+  color: #C084FC !important;
+}
+.mitable-calendar .bg-utility-purple-500 {
+  background-color: #A855F7 !important;
+}
+
+/* Pink events */
+.mitable-calendar .bg-utility-pink-50 {
+  background-color: rgba(244, 114, 182, 0.15) !important;
+}
+.mitable-calendar .bg-utility-pink-100 {
+  background-color: rgba(244, 114, 182, 0.25) !important;
+}
+.mitable-calendar .ring-utility-pink-200 {
+  --tw-ring-color: rgba(244, 114, 182, 0.3) !important;
+}
+.mitable-calendar .text-utility-pink-600,
+.mitable-calendar .text-utility-pink-700 {
+  color: #F472B6 !important;
+}
+.mitable-calendar .bg-utility-pink-500 {
+  background-color: #EC4899 !important;
+}
+
+/* Orange events */
+.mitable-calendar .bg-utility-orange-50 {
+  background-color: rgba(251, 146, 60, 0.15) !important;
+}
+.mitable-calendar .bg-utility-orange-100 {
+  background-color: rgba(251, 146, 60, 0.25) !important;
+}
+.mitable-calendar .ring-utility-orange-200 {
+  --tw-ring-color: rgba(251, 146, 60, 0.3) !important;
+}
+.mitable-calendar .text-utility-orange-600,
+.mitable-calendar .text-utility-orange-700 {
+  color: #FB923C !important;
+}
+.mitable-calendar .bg-utility-orange-500 {
+  background-color: #F97316 !important;
+}
+
+/* Yellow events */
+.mitable-calendar .bg-utility-yellow-50 {
+  background-color: rgba(250, 204, 21, 0.15) !important;
+}
+.mitable-calendar .bg-utility-yellow-100 {
+  background-color: rgba(250, 204, 21, 0.25) !important;
+}
+.mitable-calendar .ring-utility-yellow-200 {
+  --tw-ring-color: rgba(250, 204, 21, 0.3) !important;
+}
+.mitable-calendar .text-utility-yellow-600,
+.mitable-calendar .text-utility-yellow-700 {
+  color: #FDE047 !important;
+}
+.mitable-calendar .bg-utility-yellow-500 {
+  background-color: #FACC15 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BUTTON OVERRIDES
+   ═══════════════════════════════════════════════════════════════════ */
+
+.mitable-calendar button[class*="bg-primary"] {
+  background-color: var(--cal-indigo) !important;
+  color: white !important;
+}
+
+.mitable-calendar button[class*="bg-primary"]:hover {
+  background-color: #4F46E5 !important;
+}
+
+.mitable-calendar button[class*="color-tertiary"],
+.mitable-calendar button[class*="color-secondary"] {
+  background-color: var(--cal-bg-muted) !important;
+  border-color: var(--cal-stroke-subtle) !important;
+  color: var(--cal-ink-secondary) !important;
+}
+
+.mitable-calendar button[class*="color-tertiary"]:hover,
+.mitable-calendar button[class*="color-secondary"]:hover {
+  background-color: var(--cal-bg-overlay) !important;
+  color: var(--cal-ink-primary) !important;
+}
+
+/* Button group */
+.mitable-calendar [class*="ButtonGroup"] {
+  background-color: var(--cal-bg-muted) !important;
+  border-color: var(--cal-stroke-subtle) !important;
+}
+
+.mitable-calendar [class*="ButtonGroup"] button {
+  background-color: transparent !important;
+  border-color: var(--cal-stroke-subtle) !important;
+  color: var(--cal-ink-secondary) !important;
+}
+
+.mitable-calendar [class*="ButtonGroup"] button:hover {
+  background-color: var(--cal-bg-overlay) !important;
+  color: var(--cal-ink-primary) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SCROLLBAR STYLING
+   ═══════════════════════════════════════════════════════════════════ */
+
+.mitable-calendar *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.mitable-calendar *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mitable-calendar *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.mitable-calendar *::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SHADOW & DEPTH REFINEMENTS
+   ═══════════════════════════════════════════════════════════════════ */
+
+.mitable-calendar .shadow-sm {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+.mitable-calendar .shadow-xs {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Remove default ring styling */
+.mitable-calendar .ring {
+  --tw-ring-shadow: none !important;
+}

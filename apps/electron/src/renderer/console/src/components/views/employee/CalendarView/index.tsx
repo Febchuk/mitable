@@ -346,7 +346,7 @@ export default function CalendarView() {
       <div className="px-8 pb-24">
         {viewMode === "week" ? (
           /* Week Grid View - Using untitledui Calendar */
-          <div className="stagger-2 h-[700px]">
+          <div className="stagger-2 h-[700px] mitable-calendar">
             <UntitledCalendar
               events={calendarEvents}
               view="week"
