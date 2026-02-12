@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  CalendarDays,
   Sparkles,
   MoreVertical,
   Plus,
@@ -30,9 +31,8 @@ import type { ActivityDay } from "./types";
 // Helper functions
 function getStartOfWeek(date: Date): Date {
   const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Monday start
-  d.setDate(diff);
+  const day = d.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  d.setDate(d.getDate() - day); // Go back to Sunday
   d.setHours(0, 0, 0, 0);
   return d;
 }
@@ -51,6 +51,13 @@ function isSameDay(date1: Date, date2: Date): boolean {
   );
 }
 
+function isSameMonth(date1: Date, date2: Date): boolean {
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth()
+  );
+}
+
 function formatDateRange(start: Date, end: Date): string {
   const startMonth = start.toLocaleDateString("en-US", { month: "short" });
   const endMonth = end.toLocaleDateString("en-US", { month: "short" });
@@ -62,6 +69,10 @@ function formatDateRange(start: Date, end: Date): string {
     return `${startMonth} ${startDay} - ${endDay}, ${year}`;
   }
   return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+}
+
+function formatMonthYear(date: Date): string {
+  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
 function formatDayHeader(date: Date): string {
@@ -102,14 +113,14 @@ function workBlocksToCalendarEvents(days: ActivityDay[]): CalendarEvent[] {
   return events;
 }
 
-type ViewMode = "day" | "week";
+type ViewMode = "detail" | "week" | "month";
 
 export default function CalendarView() {
   const navigate = useNavigate();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
-  const [viewMode, setViewMode] = useState<ViewMode>("day");
+  const [viewMode, setViewMode] = useState<ViewMode>("detail");
 
   // Menu and dialog states
   const [showMenu, setShowMenu] = useState(false);
@@ -148,8 +159,10 @@ export default function CalendarView() {
     };
   }, [selectedDate]);
 
-  // Check if current week is this week
+  // Check navigation constraints
   const isCurrentWeek = isSameDay(weekStart, getStartOfWeek(today));
+  const isCurrentMonth = isSameMonth(selectedDate, today);
+  const canNavigateNext = viewMode === "month" ? !isCurrentMonth : !isCurrentWeek;
 
   // Check if there's an active work block
   const hasActiveBlock = selectedDay.workBlocks.some((b) => b.isActive);
@@ -161,34 +174,56 @@ export default function CalendarView() {
     setShowMenu(false);
   };
 
-  // Navigate weeks
-  const goToPreviousWeek = () => {
-    const newStart = new Date(weekStart);
-    newStart.setDate(newStart.getDate() - 7);
-    setWeekStart(newStart);
-    const dayOffset = Math.floor(
-      (selectedDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const newSelected = new Date(newStart);
-    newSelected.setDate(newSelected.getDate() + dayOffset);
-    setSelectedDate(newSelected);
+  // Navigate based on view mode
+  const goToPrevious = () => {
+    if (viewMode === "month") {
+      const newDate = new Date(selectedDate);
+      newDate.setMonth(newDate.getMonth() - 1);
+      setSelectedDate(newDate);
+      setWeekStart(getStartOfWeek(newDate));
+    } else {
+      const newStart = new Date(weekStart);
+      newStart.setDate(newStart.getDate() - 7);
+      setWeekStart(newStart);
+      const dayOffset = Math.floor(
+        (selectedDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      const newSelected = new Date(newStart);
+      newSelected.setDate(newSelected.getDate() + dayOffset);
+      setSelectedDate(newSelected);
+    }
   };
 
-  const goToNextWeek = () => {
-    const newStart = new Date(weekStart);
-    newStart.setDate(newStart.getDate() + 7);
-    setWeekStart(newStart);
-    const dayOffset = Math.floor(
-      (selectedDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const newSelected = new Date(newStart);
-    newSelected.setDate(newSelected.getDate() + dayOffset);
-    setSelectedDate(newSelected);
+  const goToNext = () => {
+    if (viewMode === "month") {
+      const newDate = new Date(selectedDate);
+      newDate.setMonth(newDate.getMonth() + 1);
+      setSelectedDate(newDate);
+      setWeekStart(getStartOfWeek(newDate));
+    } else {
+      const newStart = new Date(weekStart);
+      newStart.setDate(newStart.getDate() + 7);
+      setWeekStart(newStart);
+      const dayOffset = Math.floor(
+        (selectedDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      const newSelected = new Date(newStart);
+      newSelected.setDate(newSelected.getDate() + dayOffset);
+      setSelectedDate(newSelected);
+    }
   };
 
   const goToToday = () => {
     setWeekStart(getStartOfWeek(today));
     setSelectedDate(today);
+  };
+
+  // Get the display text for the current period
+  const getPeriodDisplay = () => {
+    if (viewMode === "month") {
+      return formatMonthYear(selectedDate);
+    }
+    return formatDateRange(weekStart, getEndOfWeek(weekStart));
   };
 
   // Handle actions
@@ -198,12 +233,15 @@ export default function CalendarView() {
     setNewBlockGoal("");
   };
 
+  // Is this a calendar grid view (week or month)?
+  const isGridView = viewMode === "week" || viewMode === "month";
+
   return (
-    <div className="min-h-full app-no-drag">
+    <div className={`app-no-drag ${isGridView ? "h-full flex flex-col overflow-hidden" : "h-full overflow-auto"}`}>
       {/* ═══════════════════════════════════════════════════════════════════
-          HEADER - Week Navigation
+          HEADER - Navigation and View Controls
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="px-8 pt-8 pb-4">
+      <div className={`px-8 pt-8 pb-4 ${isGridView ? "flex-shrink-0" : ""}`}>
         <div className="stagger-1">
           {/* Title and actions row */}
           <div className="flex items-center justify-between mb-6">
@@ -227,44 +265,87 @@ export default function CalendarView() {
               </div>
             </div>
 
-            {/* Three-dot menu */}
-            <div className="relative" ref={menuRef}>
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
-              >
-                <MoreVertical size={20} />
-              </button>
+            {/* View toggle and menu */}
+            <div className="flex items-center gap-3">
+              {/* View mode toggle */}
+              <div className="flex items-center rounded-lg border border-stroke-subtle overflow-hidden">
+                <button
+                  onClick={() => setViewMode("detail")}
+                  className={`px-3 py-2 text-xs font-medium transition-colors ${
+                    viewMode === "detail"
+                      ? "bg-indigo/10 text-indigo"
+                      : "text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted"
+                  }`}
+                  title="Detail view"
+                >
+                  <List size={14} className="inline mr-1.5" />
+                  Detail
+                </button>
+                <button
+                  onClick={() => setViewMode("week")}
+                  className={`px-3 py-2 text-xs font-medium transition-colors border-l border-stroke-subtle ${
+                    viewMode === "week"
+                      ? "bg-indigo/10 text-indigo"
+                      : "text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted"
+                  }`}
+                  title="Week view"
+                >
+                  <LayoutGrid size={14} className="inline mr-1.5" />
+                  Week
+                </button>
+                <button
+                  onClick={() => setViewMode("month")}
+                  className={`px-3 py-2 text-xs font-medium transition-colors border-l border-stroke-subtle ${
+                    viewMode === "month"
+                      ? "bg-indigo/10 text-indigo"
+                      : "text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted"
+                  }`}
+                  title="Month view"
+                >
+                  <CalendarDays size={14} className="inline mr-1.5" />
+                  Month
+                </button>
+              </div>
 
-              {showMenu && (
-                <div className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-50">
-                  <button
-                    onClick={handleCreateRecap}
-                    disabled={selectedDay.workBlocks.length === 0}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <FileText size={16} className="text-indigo" />
-                    <span className="text-sm text-ink-primary">Create Recap</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowNewBlockDialog(true);
-                      setShowMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle"
-                  >
-                    <Plus size={16} className="text-ink-tertiary" />
-                    <span className="text-sm text-ink-primary">Start New Block</span>
-                  </button>
-                </div>
-              )}
+              {/* Three-dot menu */}
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
+                >
+                  <MoreVertical size={20} />
+                </button>
+
+                {showMenu && (
+                  <div className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-50">
+                    <button
+                      onClick={handleCreateRecap}
+                      disabled={selectedDay.workBlocks.length === 0}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FileText size={16} className="text-indigo" />
+                      <span className="text-sm text-ink-primary">Create Recap</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowNewBlockDialog(true);
+                        setShowMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle"
+                    >
+                      <Plus size={16} className="text-ink-tertiary" />
+                      <span className="text-sm text-ink-primary">Start New Block</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Week navigation and view toggle */}
+          {/* Navigation strip */}
           <div className="flex items-center gap-4 mb-4">
             <button
-              onClick={goToPreviousWeek}
+              onClick={goToPrevious}
               className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
             >
               <ChevronLeft size={20} />
@@ -272,9 +353,9 @@ export default function CalendarView() {
 
             <div className="flex-1 flex items-center justify-center gap-3">
               <span className="text-sm font-medium text-ink-primary">
-                {formatDateRange(weekStart, getEndOfWeek(weekStart))}
+                {getPeriodDisplay()}
               </span>
-              {!isCurrentWeek && (
+              {((viewMode !== "month" && !isCurrentWeek) || (viewMode === "month" && !isCurrentMonth)) && (
                 <button
                   onClick={goToToday}
                   className="px-2 py-1 text-xs font-medium text-indigo hover:bg-indigo/10 rounded transition-colors"
@@ -284,37 +365,11 @@ export default function CalendarView() {
               )}
             </div>
 
-            {/* View toggle */}
-            <div className="flex items-center rounded-lg border border-stroke-subtle overflow-hidden">
-              <button
-                onClick={() => setViewMode("day")}
-                className={`p-2 transition-colors ${
-                  viewMode === "day"
-                    ? "bg-indigo/10 text-indigo"
-                    : "text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted"
-                }`}
-                title="Day view"
-              >
-                <List size={16} />
-              </button>
-              <button
-                onClick={() => setViewMode("week")}
-                className={`p-2 transition-colors border-l border-stroke-subtle ${
-                  viewMode === "week"
-                    ? "bg-indigo/10 text-indigo"
-                    : "text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted"
-                }`}
-                title="Week grid view"
-              >
-                <LayoutGrid size={16} />
-              </button>
-            </div>
-
             <button
-              onClick={goToNextWeek}
-              disabled={isCurrentWeek}
+              onClick={goToNext}
+              disabled={!canNavigateNext}
               className={`p-2 rounded-lg transition-colors ${
-                isCurrentWeek
+                !canNavigateNext
                   ? "text-ink-tertiary/30 cursor-not-allowed"
                   : "hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary"
               }`}
@@ -323,8 +378,8 @@ export default function CalendarView() {
             </button>
           </div>
 
-          {/* Week day cards - only shown in day view */}
-          {viewMode === "day" && (
+          {/* Week day cards - only shown in detail view */}
+          {viewMode === "detail" && (
             <div className="flex items-center gap-2 justify-center">
               {weekDays.map((day) => (
                 <DayCard
@@ -341,19 +396,28 @@ export default function CalendarView() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════
-          MAIN CONTENT - Day view or Week grid view
+          MAIN CONTENT - Detail view or Calendar grid view
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="px-8 pb-24">
-        {viewMode === "week" ? (
-          /* Week Grid View - Using untitledui Calendar */
-          <div className="stagger-2 h-[700px] mitable-calendar">
+      <div className={`px-8 ${isGridView ? "flex-1 flex flex-col min-h-0 pb-4" : "pb-8"}`}>
+        {isGridView ? (
+          /* Calendar Grid View - Using untitledui Calendar */
+          <div className="stagger-2 flex-1 min-h-0 flex flex-col mitable-calendar">
             <UntitledCalendar
               events={calendarEvents}
-              view="week"
+              view={viewMode}
+              currentDate={selectedDate}
+              hideHeader={true}
+              className="flex-1 min-h-0"
+              onEventClick={(event) => {
+                // Switch to detail view and set the date to the event's date
+                setSelectedDate(event.start);
+                setWeekStart(getStartOfWeek(event.start));
+                setViewMode("detail");
+              }}
             />
           </div>
         ) : (
-          /* Day View */
+          /* Detail View */
           <div className="stagger-2">
             {/* Day header */}
             <div className="flex items-center justify-between mb-4 pt-4 border-t border-stroke-subtle">
@@ -380,35 +444,6 @@ export default function CalendarView() {
             />
           </div>
         )}
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-          PASSIVE TRACKING STATUS BAR (at bottom)
-          ═══════════════════════════════════════════════════════════════════ */}
-      <div className="fixed bottom-0 left-0 right-0 px-8 py-3 bg-canvas-base/95 backdrop-blur-sm border-t border-stroke-subtle">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${hasActiveBlock ? "bg-emerald animate-pulse" : "bg-ink-tertiary"}`} />
-              <span className="text-sm text-ink-secondary">
-                {hasActiveBlock ? "Tracking active" : "Tracking paused"}
-              </span>
-            </div>
-            <span className="text-ink-tertiary">·</span>
-            <span className="text-sm text-ink-tertiary">
-              30 min idle threshold
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-ink-tertiary">
-              0 apps excluded
-            </span>
-            <button className="text-xs text-indigo hover:text-indigo/80 transition-colors">
-              Configure
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════

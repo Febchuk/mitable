@@ -115,9 +115,10 @@ interface PositionedEventProps {
     totalOverlapping: number; // To potentially calculate width more dynamically later
     setSelectedDate: (date: CalendarDate) => void;
     timeFormatter: DateFormatter;
+    onEventClick?: (event: ZonedEvent) => void;
 }
 
-const PositionedEvent = ({ event, dayStart, timeZone, slotHeight, overlapIndex, setSelectedDate, timeFormatter }: PositionedEventProps) => {
+const PositionedEvent = ({ event, dayStart, timeZone, slotHeight, overlapIndex, setSelectedDate, timeFormatter, onEventClick }: PositionedEventProps) => {
     const formatTime = (dateTime: ZonedDateTime) => timeFormatter.format(dateTime.toDate());
 
     const startZoned = event.start;
@@ -146,14 +147,17 @@ const PositionedEvent = ({ event, dayStart, timeZone, slotHeight, overlapIndex, 
     return (
         <div
             key={event.id}
-            className="absolute w-full px-1.5 py-1.5"
+            className="absolute w-full px-1.5 py-1.5 cursor-pointer"
             style={{
                 top: `${top}px`,
                 height: `${height}px`,
                 left: `${horizontalOffset}px`,
                 zIndex: overlapIndex,
             }}
-            onClick={() => setSelectedDate(toCalendarDate(startZoned))}
+            onClick={() => {
+                setSelectedDate(toCalendarDate(startZoned));
+                onEventClick?.(event);
+            }}
         >
             <CalendarDwViewEvent label={event.title} supportingText={supportingText} color={event.color} withDot={event.dot} />
         </div>
@@ -171,6 +175,7 @@ interface MonthViewProps {
     shortWeekdayFormatter: DateFormatter;
     timeFormatter: DateFormatter;
     className?: string;
+    onEventClick?: (event: ZonedEvent) => void;
 }
 
 const MonthView = ({
@@ -184,6 +189,7 @@ const MonthView = ({
     shortWeekdayFormatter,
     timeFormatter, // Needed for formatTime inside
     className,
+    onEventClick,
 }: MonthViewProps) => {
     const monthStart = startOfMonth(currentMonthDate);
     const monthEnd = endOfMonth(currentMonthDate);
@@ -487,7 +493,15 @@ const MonthView = ({
                                             : undefined;
 
                                     return (
-                                        <div key={event.id} style={spanStyle} className={cx(!isCurrentMonthFlag && "opacity-60")}>
+                                        <div
+                                            key={event.id}
+                                            style={spanStyle}
+                                            className={cx("cursor-pointer", !isCurrentMonthFlag && "opacity-60")}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onEventClick?.(event);
+                                            }}
+                                        >
                                             <CalendarMonthViewEvent
                                                 label={event.title}
                                                 collapseOnMobile={true}
@@ -551,9 +565,10 @@ interface MobileSingleDayGridProps {
     setSelectedDate: (date: CalendarDate | null) => void;
     timeFormatter: DateFormatter;
     className?: string;
+    onEventClick?: (event: ZonedEvent) => void;
 }
 
-const MobileSingleDayGrid = ({ dayToDisplay, dayEvents, timeZone, setSelectedDate, timeFormatter, className }: MobileSingleDayGridProps) => {
+const MobileSingleDayGrid = ({ dayToDisplay, dayEvents, timeZone, setSelectedDate, timeFormatter, className, onEventClick }: MobileSingleDayGridProps) => {
     const dayStart = useMemo(() => getStartOfDay(dayToDisplay, timeZone), [dayToDisplay, timeZone]); // Calculate once
 
     return (
@@ -580,6 +595,7 @@ const MobileSingleDayGrid = ({ dayToDisplay, dayEvents, timeZone, setSelectedDat
                         totalOverlapping={totalOverlapping}
                         setSelectedDate={setSelectedDate}
                         timeFormatter={timeFormatter}
+                        onEventClick={onEventClick}
                     />
                 );
             })}
@@ -595,9 +611,10 @@ interface WeekViewDayProps {
     slotHeight: number;
     setSelectedDate: (date: CalendarDate | null) => void;
     timeFormatter: DateFormatter;
+    onEventClick?: (event: ZonedEvent) => void;
 }
 
-const WeekViewDay = ({ day, isLastDay, visibleEvents, timeZone, slotHeight, setSelectedDate, timeFormatter }: WeekViewDayProps) => {
+const WeekViewDay = ({ day, isLastDay, visibleEvents, timeZone, slotHeight, setSelectedDate, timeFormatter, onEventClick }: WeekViewDayProps) => {
     const dateKey = day.toString();
     const dayEvents = useMemo(() => getEventsForDay(visibleEvents, day, timeZone), [visibleEvents, day, timeZone]);
     const dayStart = useMemo(() => getStartOfDay(day, timeZone), [day, timeZone]);
@@ -624,6 +641,7 @@ const WeekViewDay = ({ day, isLastDay, visibleEvents, timeZone, slotHeight, setS
                             totalOverlapping={totalOverlapping}
                             setSelectedDate={setSelectedDate}
                             timeFormatter={timeFormatter}
+                            onEventClick={onEventClick}
                         />
                     );
                 })}
@@ -645,6 +663,7 @@ interface WeekViewProps {
     hourOnlyFormatter: DateFormatter;
     className?: string;
     view?: string;
+    onEventClick?: (event: ZonedEvent) => void;
 }
 
 const WeekView = ({
@@ -660,6 +679,7 @@ const WeekView = ({
     hourOnlyFormatter,
     className,
     view,
+    onEventClick,
 }: WeekViewProps) => {
     const currentWeekStart = startOfWeek(currentMonthDate, locale);
     const currentWeekEnd = endOfWeek(currentMonthDate, locale);
@@ -772,6 +792,7 @@ const WeekView = ({
                                 slotHeight={SLOT_HEIGHT}
                                 setSelectedDate={setSelectedDate}
                                 timeFormatter={timeFormatter}
+                                onEventClick={onEventClick}
                             />
                         );
                     })}
@@ -797,6 +818,7 @@ interface DayViewProps {
     hourOnlyFormatter: DateFormatter;
     className?: string;
     view?: string;
+    onEventClick?: (event: ZonedEvent) => void;
 }
 
 const DayView = ({
@@ -812,6 +834,7 @@ const DayView = ({
     selectedDate,
     className,
     view,
+    onEventClick,
 }: DayViewProps) => {
     const currentWeekStart = startOfWeek(dayToDisplay, locale);
     const currentWeekEnd = endOfWeek(dayToDisplay, locale);
@@ -925,6 +948,7 @@ const DayView = ({
                         currentTime={currentTime}
                         setSelectedDate={setSelectedDate}
                         timeFormatter={timeFormatter}
+                        onEventClick={onEventClick}
                     />
                     {showTimeMarker && <CalendarTimeMarker style={{ top: `${timeMarkerTop}px` }}>{formatTime(localCurrentTime)}</CalendarTimeMarker>}
                 </div>
@@ -1049,9 +1073,15 @@ interface CalendarProps {
     events: CalendarEvent[];
     view?: "month" | "week" | "day";
     className?: string;
+    /** Hide the calendar header (for external control) */
+    hideHeader?: boolean;
+    /** Controlled current date */
+    currentDate?: Date;
+    /** Callback when an event is clicked */
+    onEventClick?: (event: CalendarEvent) => void;
 }
 
-export const Calendar = ({ events, view: defaultView = "month", className }: CalendarProps) => {
+export const Calendar = ({ events, view: defaultView = "month", className, hideHeader = false, currentDate, onEventClick }: CalendarProps) => {
     const { locale } = useLocale();
     const timeZone = useMemo(() => getLocalTimeZone(), []);
 
@@ -1060,10 +1090,26 @@ export const Calendar = ({ events, view: defaultView = "month", className }: Cal
     const fullDateFormatter = useDateFormatter({ weekday: "long", month: "long", day: "numeric", year: "numeric" });
     const hourOnlyFormatter = useDateFormatter({ hour: "numeric", hour12: true });
 
-    const [currentMonthDate, setCurrentMonthDate] = useState(() => today(timeZone));
-    const [selectedDate, setSelectedDate] = useState<CalendarDate | null>(currentMonthDate);
+    // Convert controlled date to CalendarDate if provided
+    const controlledDate = currentDate ? new CalendarDate(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate()) : null;
+
+    const [currentMonthDate, setCurrentMonthDate] = useState(() => controlledDate || today(timeZone));
+    const [selectedDate, setSelectedDate] = useState<CalendarDate | null>(controlledDate || today(timeZone));
     const [view, setView] = useState<string>(defaultView);
     const [currentTime, setCurrentTime] = useState(() => now(timeZone));
+
+    // Sync with controlled date
+    useEffect(() => {
+        if (controlledDate) {
+            setCurrentMonthDate(controlledDate);
+            setSelectedDate(controlledDate);
+        }
+    }, [currentDate]);
+
+    // Sync with external view prop
+    useEffect(() => {
+        setView(defaultView);
+    }, [defaultView]);
 
     useEffect(() => {
         const intervalId = setInterval(() => {
@@ -1118,25 +1164,36 @@ export const Calendar = ({ events, view: defaultView = "month", className }: Cal
 
     const dayToDisplay = selectedDate || currentMonthDate;
 
+    // Convert ZonedEvent to CalendarEvent for the callback
+    const handleEventClick = onEventClick
+        ? (zonedEvent: ZonedEvent) => {
+              const originalEvent = events.find((e) => e.id === zonedEvent.id);
+              if (originalEvent) {
+                  onEventClick(originalEvent);
+              }
+          }
+        : undefined;
+
     return (
         <div
             role="application"
             aria-label="Calendar"
             className={cx(
                 "flex flex-col overflow-hidden rounded-xl bg-canvas-base border border-stroke-subtle",
-                view === "month" ? "h-full md:min-h-[912px]" : "h-[912px]",
                 className,
             )}
         >
-            <CalendarHeader
-                date={headerDate}
-                selectedView={view}
-                onSelectionChange={setView}
-                viewOptions={viewOptions}
-                onClickPrev={() => handleNavigate("PREV")}
-                onClickNext={() => handleNavigate("NEXT")}
-                onClickToday={() => handleNavigate("TODAY")}
-            />
+            {!hideHeader && (
+                <CalendarHeader
+                    date={headerDate}
+                    selectedView={view}
+                    onSelectionChange={setView}
+                    viewOptions={viewOptions}
+                    onClickPrev={() => handleNavigate("PREV")}
+                    onClickNext={() => handleNavigate("NEXT")}
+                    onClickToday={() => handleNavigate("TODAY")}
+                />
+            )}
             <main className="flex flex-1 overflow-hidden">
                 {view === "month" && (
                     <MonthView
@@ -1149,6 +1206,7 @@ export const Calendar = ({ events, view: defaultView = "month", className }: Cal
                         fullDateFormatter={fullDateFormatter}
                         shortWeekdayFormatter={shortWeekdayFormatter}
                         timeFormatter={timeFormatter}
+                        onEventClick={handleEventClick}
                     />
                 )}
                 {view === "week" && (
@@ -1166,6 +1224,7 @@ export const Calendar = ({ events, view: defaultView = "month", className }: Cal
                             hourOnlyFormatter={hourOnlyFormatter}
                             view={view}
                             className="md:hidden"
+                            onEventClick={handleEventClick}
                         />
 
                         <WeekView
@@ -1181,6 +1240,7 @@ export const Calendar = ({ events, view: defaultView = "month", className }: Cal
                             hourOnlyFormatter={hourOnlyFormatter}
                             view={view}
                             className="max-md:hidden"
+                            onEventClick={handleEventClick}
                         />
                     </>
                 )}
@@ -1197,6 +1257,7 @@ export const Calendar = ({ events, view: defaultView = "month", className }: Cal
                         timeFormatter={timeFormatter}
                         hourOnlyFormatter={hourOnlyFormatter}
                         view={view}
+                        onEventClick={handleEventClick}
                     />
                 )}
             </main>
