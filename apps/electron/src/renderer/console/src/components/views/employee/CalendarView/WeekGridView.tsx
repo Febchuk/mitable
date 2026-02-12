@@ -19,6 +19,7 @@ const START_HOUR = 6; // 6 AM
 const END_HOUR = 22; // 10 PM
 const HOUR_HEIGHT = 48; // pixels per hour
 const TOTAL_HOURS = END_HOUR - START_HOUR;
+const HEADER_HEIGHT = 88; // Fixed header height for alignment
 
 // Get position and height for a work block
 function getBlockStyle(block: WorkBlock): { top: number; height: number } | null {
@@ -160,17 +161,18 @@ function DayColumn({
 
   return (
     <div className="flex-1 min-w-[100px] border-r border-stroke-subtle last:border-r-0">
-      {/* Day header */}
+      {/* Day header - fixed height for grid alignment */}
       <div
-        className={`sticky top-0 z-10 px-2 py-3 text-center border-b border-stroke-subtle ${
+        className={`sticky top-0 z-10 px-2 text-center border-b border-stroke-subtle flex flex-col items-center justify-center ${
           isToday ? "bg-indigo/5" : "bg-canvas-base"
         }`}
+        style={{ height: HEADER_HEIGHT }}
       >
         <div className="text-[10px] font-medium text-ink-tertiary uppercase tracking-wider">
           {dayName}
         </div>
         <div
-          className={`mt-1 w-8 h-8 mx-auto flex items-center justify-center rounded-full text-sm font-semibold ${
+          className={`mt-1 w-8 h-8 flex items-center justify-center rounded-full text-sm font-semibold ${
             isToday
               ? "bg-indigo text-white"
               : "text-ink-primary"
@@ -224,8 +226,8 @@ export default function WeekGridView({ weekDays, onBlockClick }: WeekGridViewPro
       <div className="flex relative">
         {/* Time column */}
         <div className="w-14 shrink-0 border-r border-stroke-subtle bg-canvas-overlay/50 relative z-10">
-          {/* Header spacer */}
-          <div className="h-[76px] border-b border-stroke-subtle bg-canvas-base" />
+          {/* Header spacer - matches day column header height */}
+          <div className="border-b border-stroke-subtle bg-canvas-base" style={{ height: HEADER_HEIGHT }} />
 
           {/* Time labels */}
           <div className="relative" style={{ height: TOTAL_HOURS * HOUR_HEIGHT }}>
@@ -264,7 +266,7 @@ export default function WeekGridView({ weekDays, onBlockClick }: WeekGridViewPro
       {/* Hour grid lines (behind everything) */}
       <div
         className="absolute left-14 right-0 pointer-events-none"
-        style={{ top: 76, height: TOTAL_HOURS * HOUR_HEIGHT }}
+        style={{ top: HEADER_HEIGHT, height: TOTAL_HOURS * HOUR_HEIGHT }}
       >
         {Array.from({ length: TOTAL_HOURS + 1 }).map((_, idx) => (
           <div
