@@ -15,6 +15,8 @@ export * from "./workstreams.schema";
 export * from "./documents.schema";
 export * from "./billing.schema";
 export * from "./artifacts.schema";
+export * from "./user-memories.schema";
+export * from "./session-refinement-chats.schema";
 
 // GitHub schemas
 export * from "./github/github-repos.schema";

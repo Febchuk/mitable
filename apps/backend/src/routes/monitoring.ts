@@ -16,6 +16,7 @@ import { SessionIngestionService } from "../services/session-ingestion.service.j
 import { workstreamAggregationService } from "../services/workstream-aggregation.service.js";
 import { workstreamRLMService } from "../services/workstream-rlm.service.js";
 import { intermediateSummaryService } from "../services/intermediate-summary.service.js";
+import { summaryRefinementService } from "../services/summary-refinement.service.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { closeAudioConnection } from "./audio.js";
@@ -2284,6 +2285,175 @@ router.post(
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to revise summary",
+      });
+    }
+  }
+);
+
+/**
+ * PUT /api/monitoring/sessions/:id/summary/chat/save
+ * Save chat messages without calling AI (e.g., after applying a suggestion)
+ */
+router.put(
+  "/sessions/:id/summary/chat/save",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { messages } = req.body;
+
+    if (!messages || !Array.isArray(messages)) {
+      res.status(400).json({ error: "Bad Request", message: "messages array is required" });
+      return;
+    }
+
+    try {
+      await db
+        .insert(schema.sessionRefinementChats)
+        .values({ sessionId: id, userId, messages })
+        .onConflictDoUpdate({
+          target: [schema.sessionRefinementChats.sessionId, schema.sessionRefinementChats.userId],
+          set: { messages, updatedAt: new Date() },
+        });
+
+      res.json({ saved: true });
+    } catch (error) {
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to save chat" });
+    }
+  }
+);
+
+/**
+ * GET /api/monitoring/sessions/:id/summary/chat
+ * Load persisted refinement chat history for a session
+ */
+router.get(
+  "/sessions/:id/summary/chat",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+
+    try {
+      const chat = await db.query.sessionRefinementChats.findFirst({
+        where: and(
+          eq(schema.sessionRefinementChats.sessionId, id),
+          eq(schema.sessionRefinementChats.userId, userId)
+        ),
+      });
+
+      res.json({
+        messages: chat?.messages ?? [],
+        updatedAt: chat?.updatedAt ?? null,
+      });
+    } catch (error) {
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.error("Error loading refinement chat", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to load chat history",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/monitoring/sessions/:id/summary/chat
+ * Conversational summary refinement with AI
+ */
+router.post(
+  "/sessions/:id/summary/chat",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const organizationId = req.organizationId!;
+    const { id } = req.params;
+    const { messages, currentSummary } = req.body;
+
+    if (!messages || !Array.isArray(messages) || !currentSummary) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "messages (array) and currentSummary are required",
+      });
+      return;
+    }
+
+    try {
+      // Verify ownership
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({ error: "Not Found", message: "Session not found" });
+        return;
+      }
+
+      if (session.userId !== userId) {
+        res.status(403).json({ error: "Forbidden", message: "Not your session" });
+        return;
+      }
+
+      const result = await summaryRefinementService.refine({
+        sessionId: id,
+        userId,
+        orgId: organizationId,
+        messages,
+        currentSummary,
+      });
+
+      // Build full conversation with timestamps for persistence
+      const updatedMessages = [
+        ...messages.map((m: any) => ({
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp || new Date().toISOString(),
+        })),
+        {
+          role: "assistant",
+          content: result.suggestedEdit
+            ? `${result.message}\n\n<summary>${result.suggestedEdit}</summary>`
+            : result.message,
+          timestamp: new Date().toISOString(),
+        },
+      ];
+
+      // Upsert chat history (one chat per session per user)
+      await db
+        .insert(schema.sessionRefinementChats)
+        .values({
+          sessionId: id,
+          userId,
+          messages: updatedMessages,
+        })
+        .onConflictDoUpdate({
+          target: [schema.sessionRefinementChats.sessionId, schema.sessionRefinementChats.userId],
+          set: {
+            messages: updatedMessages,
+            updatedAt: new Date(),
+          },
+        });
+
+      const log = createSessionLogger({ sessionId: id, userId });
+      log.info("Summary refinement chat", {
+        messageCount: messages.length,
+        hasSuggestedEdit: !!result.suggestedEdit,
+        toolCallCount: result.toolCallCount,
+      });
+
+      res.json(result);
+    } catch (error) {
+      const log = createSessionLogger({ sessionId: req.params.id, userId });
+      log.error("Error in summary refinement chat", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to refine summary",
       });
     }
   }

@@ -35,21 +35,15 @@ export default function RichTextEditor({
     onChange(value);
   };
 
-  // Quill toolbar configuration
+  // Simplified toolbar — clean, Notion-inspired
   const modules = {
-    toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      ["bold", "italic", "underline", "strike"],
-      [{ list: "ordered" }, { list: "bullet" }],
-      ["link"],
-      ["clean"],
-    ],
+    toolbar: [["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], ["link"]],
   };
 
-  const formats = ["header", "bold", "italic", "underline", "strike", "list", "bullet", "link"];
+  const formats = ["header", "bold", "italic", "underline", "list", "bullet", "link"];
 
   return (
-    <div className="h-full flex flex-col quill-dark-theme">
+    <div className="h-full flex flex-col quill-editor-clean">
       <ReactQuill
         ref={quillRef}
         theme="snow"
@@ -59,7 +53,7 @@ export default function RichTextEditor({
         formats={formats}
         placeholder={placeholder}
         readOnly={disabled}
-        className="h-full flex flex-col [&_.ql-container]:flex-1 [&_.ql-editor]:h-full [&_.ql-editor]:text-text-primary [&_.ql-editor]:bg-background-elevated [&_.ql-toolbar]:bg-background-elevated [&_.ql-toolbar]:border-border-subtle [&_.ql-container]:border-border-subtle [&_.ql-stroke]:stroke-text-secondary [&_.ql-fill]:fill-text-secondary [&_.ql-picker-label]:text-text-secondary [&_.ql-editor]:placeholder:text-text-tertiary [&_.ql-toolbar_.ql-active]:text-primary [&_.ql-toolbar_.ql-active_.ql-stroke]:stroke-primary [&_.ql-toolbar_.ql-active_.ql-fill]:fill-primary"
+        className="h-full flex flex-col [&_.ql-container]:flex-1 [&_.ql-editor]:h-full [&_.ql-editor]:overflow-y-auto"
       />
     </div>
   );

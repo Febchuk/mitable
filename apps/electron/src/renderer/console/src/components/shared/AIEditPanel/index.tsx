@@ -6,51 +6,93 @@
  * Right side: AI chat panel for revisions (40%)
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Save, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { marked } from "marked";
+import TurndownService from "turndown";
 import TextEditor from "./TextEditor";
 import AIChatPanel from "./AIChatPanel";
+
+const turndown = new TurndownService({
+  headingStyle: "atx",
+  bulletListMarker: "-",
+  codeBlockStyle: "fenced",
+});
 
 interface AIEditPanelProps {
   title: string;
   subtitle?: string;
   initialContent: string;
   onSave: (content: string) => Promise<void>;
+  onAutoSave?: (content: string) => Promise<void>; // Save without closing editor
   onCancel: () => void;
   onRevise: (instruction: string, currentContent: string) => Promise<{ suggestion: string }>;
   placeholder?: string;
   contextLabel?: string; // e.g., "session summary"
+  sessionId?: string; // When provided, enables conversational refinement
 }
+
+// Configure marked for clean HTML output
+marked.setOptions({ breaks: true, gfm: true });
 
 export default function AIEditPanel({
   title,
   subtitle,
   initialContent,
   onSave,
+  onAutoSave,
   onCancel,
   onRevise,
   placeholder = "Write your content here...",
   contextLabel = "content",
+  sessionId,
 }: AIEditPanelProps) {
-  const [content, setContent] = useState(initialContent);
+  const [content, setContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  // Convert initial markdown → HTML for Quill on mount
+  useEffect(() => {
+    const result = marked.parse(initialContent);
+    if (result instanceof Promise) {
+      result.then((html: string) => setContent(html));
+    } else {
+      setContent(result);
+    }
+  }, [initialContent]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onSave(content);
+      // Convert Quill HTML → markdown before saving
+      const markdown = turndown.turndown(content);
+      await onSave(markdown);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleApplySuggestion = (suggestion: string) => {
-    setContent(suggestion);
+    // Convert markdown → HTML for Quill editor display
+    const result = marked.parse(suggestion);
+    const applyHtml = (html: string) => {
+      setContent(html);
+      // Auto-save the raw MARKDOWN to DB (not HTML)
+      // Session detail page uses ReactMarkdown which expects markdown
+      if (onAutoSave) {
+        onAutoSave(suggestion).catch(() => {});
+      }
+    };
+
+    if (result instanceof Promise) {
+      result.then(applyHtml);
+    } else {
+      applyHtml(result);
+    }
   };
 
   return (
-    <div className="h-full flex flex-col bg-background-primary">
+    <div className="h-[calc(100vh-3rem)] flex flex-col bg-background-primary overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
         <div className="flex items-center gap-4">
@@ -99,9 +141,9 @@ export default function AIEditPanel({
       </div>
 
       {/* Split Pane Content */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Left: Text Editor (60%) */}
-        <div className="w-3/5 border-r border-border-subtle">
+        <div className="w-3/5 border-r border-border-subtle overflow-hidden">
           <TextEditor
             content={content}
             onChange={setContent}
@@ -111,12 +153,13 @@ export default function AIEditPanel({
         </div>
 
         {/* Right: AI Chat Panel (40%) */}
-        <div className="w-2/5 p-4">
+        <div className="w-2/5 p-4 overflow-hidden">
           <AIChatPanel
             currentContent={content}
             onApplySuggestion={handleApplySuggestion}
             onRevise={onRevise}
             contextLabel={contextLabel}
+            sessionId={sessionId}
           />
         </div>
       </div>

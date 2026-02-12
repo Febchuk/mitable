@@ -231,3 +231,165 @@
 [data-radix-scroll-area-viewport] > div {
   display: block !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Quill Rich Text Editor — Notion-inspired dark theme
+   ═══════════════════════════════════════════════════════════════════ */
+
+.quill-editor-clean .ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 8px 16px;
+  background: transparent;
+}
+
+.quill-editor-clean .ql-toolbar .ql-formats {
+  margin-right: 12px;
+}
+
+.quill-editor-clean .ql-toolbar button {
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.quill-editor-clean .ql-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.quill-editor-clean .ql-toolbar button.ql-active {
+  background: rgba(124, 101, 246, 0.15);
+}
+
+.quill-editor-clean .ql-toolbar .ql-stroke {
+  stroke: rgba(255, 255, 255, 0.5);
+}
+
+.quill-editor-clean .ql-toolbar .ql-fill {
+  fill: rgba(255, 255, 255, 0.5);
+}
+
+.quill-editor-clean .ql-toolbar .ql-picker-label {
+  color: rgba(255, 255, 255, 0.5);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.quill-editor-clean .ql-toolbar .ql-picker-label:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.quill-editor-clean .ql-toolbar .ql-picker-options {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.quill-editor-clean .ql-toolbar .ql-picker-item {
+  color: rgba(255, 255, 255, 0.7);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.quill-editor-clean .ql-toolbar .ql-picker-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.quill-editor-clean .ql-toolbar button.ql-active .ql-stroke,
+.quill-editor-clean .ql-toolbar .ql-picker-label.ql-active .ql-stroke {
+  stroke: #7c65f6;
+}
+
+.quill-editor-clean .ql-toolbar button.ql-active .ql-fill,
+.quill-editor-clean .ql-toolbar .ql-picker-label.ql-active .ql-fill {
+  fill: #7c65f6;
+}
+
+.quill-editor-clean .ql-container.ql-snow {
+  border: none;
+  font-family: "Manrope", system-ui, sans-serif;
+}
+
+.quill-editor-clean .ql-editor {
+  padding: 32px 48px;
+  font-size: 15px;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.88);
+  background: transparent;
+  caret-color: #7c65f6;
+}
+
+.quill-editor-clean .ql-editor.ql-blank::before {
+  color: rgba(255, 255, 255, 0.25);
+  font-style: normal;
+  left: 48px;
+  right: 48px;
+}
+
+.quill-editor-clean .ql-editor h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin-bottom: 0.5em;
+  color: white;
+}
+
+.quill-editor-clean .ql-editor h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-bottom: 0.4em;
+  color: white;
+}
+
+.quill-editor-clean .ql-editor h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin-bottom: 0.3em;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.quill-editor-clean .ql-editor p {
+  margin-bottom: 0.8em;
+}
+
+.quill-editor-clean .ql-editor ul,
+.quill-editor-clean .ql-editor ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.8em;
+}
+
+.quill-editor-clean .ql-editor li {
+  margin-bottom: 0.3em;
+}
+
+.quill-editor-clean .ql-editor a {
+  color: #7c65f6;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.quill-editor-clean .ql-editor strong {
+  font-weight: 600;
+  color: white;
+}
+
+/* Tooltip overrides */
+.quill-editor-clean .ql-tooltip {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: white;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.quill-editor-clean .ql-tooltip input[type="text"] {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: white;
+}
