@@ -2,7 +2,7 @@
  * DayCard
  *
  * Day summary card for the week navigation header.
- * GitHub-style heatmap: darker green = more activity, white text for contrast.
+ * Shows date, total work time, and activity indicator.
  */
 
 import type { ActivityDay } from "./types";
@@ -23,27 +23,24 @@ function formatDayNumber(date: Date): string {
 }
 
 function formatDuration(minutes: number): string {
-  if (minutes === 0) return "";
+  if (minutes === 0) return "-";
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   if (hours === 0) return `${mins}m`;
   if (mins === 0) return `${hours}h`;
-  return `${hours}h`;
+  return `${hours}h ${mins}m`;
 }
 
-// Activity level determines which shade of green to use
-// Soft, transparent greens - dark text always for legibility
-function getActivityBg(minutes: number): string {
-  if (minutes === 0) return "bg-canvas-overlay/40";
-  if (minutes < 60) return "bg-emerald/5";       // < 1h - whisper
-  if (minutes < 180) return "bg-emerald/10";     // < 3h - hint
-  if (minutes < 360) return "bg-emerald/20";     // < 6h - soft
-  if (minutes < 480) return "bg-emerald/30";     // < 8h - medium
-  return "bg-emerald/40";                         // 8h+ - full (still soft)
+// Activity level based on work time
+function getActivityLevel(minutes: number): "none" | "light" | "medium" | "heavy" {
+  if (minutes === 0) return "none";
+  if (minutes < 180) return "light"; // < 3h
+  if (minutes < 360) return "medium"; // < 6h
+  return "heavy"; // 6h+
 }
 
 export default function DayCard({ day, isSelected, isToday, onClick }: DayCardProps) {
-  const activityBg = getActivityBg(day.totalWorkTime);
+  const activityLevel = getActivityLevel(day.totalWorkTime);
   const hasActivity = day.totalWorkTime > 0;
 
   return (
@@ -51,24 +48,23 @@ export default function DayCard({ day, isSelected, isToday, onClick }: DayCardPr
       onClick={onClick}
       className={`
         relative flex flex-col items-center justify-center min-w-[72px] h-[80px] rounded-xl
-        transition-all duration-200
-        ${activityBg}
+        transition-all duration-200 group
         ${
           isSelected
-            ? "ring-2 ring-indigo ring-offset-2 ring-offset-canvas-base"
-            : "hover:ring-1 hover:ring-stroke-subtle"
+            ? "bg-indigo/20 border-2 border-indigo shadow-lg shadow-indigo/10"
+            : "bg-canvas-overlay/50 border border-transparent hover:bg-canvas-overlay hover:border-stroke-subtle"
         }
       `}
     >
-      {/* Today dot indicator */}
-      {isToday && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo" />
+      {/* Today indicator */}
+      {isToday && !isSelected && (
+        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-indigo" />
       )}
 
       {/* Day name */}
       <span
-        className={`text-[10px] font-semibold uppercase tracking-widest ${
-          isSelected || isToday ? "text-indigo" : "text-ink-tertiary"
+        className={`text-xs font-medium uppercase tracking-wider ${
+          isSelected ? "text-indigo" : isToday ? "text-indigo" : "text-ink-tertiary"
         }`}
       >
         {formatDayName(day.date)}
@@ -76,21 +72,35 @@ export default function DayCard({ day, isSelected, isToday, onClick }: DayCardPr
 
       {/* Day number */}
       <span
-        className={`text-2xl font-bold leading-none mt-1 ${
-          isSelected || isToday ? "text-ink-primary" : hasActivity ? "text-ink-primary" : "text-ink-secondary"
+        className={`text-xl font-semibold mt-0.5 ${
+          isSelected ? "text-ink-primary" : isToday ? "text-ink-primary" : "text-ink-secondary"
         }`}
       >
         {formatDayNumber(day.date)}
       </span>
 
-      {/* Duration */}
-      <span
-        className={`text-[10px] font-medium mt-1.5 tabular-nums ${
-          hasActivity ? "text-ink-secondary" : "text-ink-tertiary/50"
-        }`}
-      >
-        {hasActivity ? formatDuration(day.totalWorkTime) : "—"}
-      </span>
+      {/* Activity indicator / duration */}
+      <div className="mt-1 flex items-center gap-1">
+        {hasActivity ? (
+          <>
+            {/* Activity dot */}
+            <div
+              className={`w-1.5 h-1.5 rounded-full ${
+                activityLevel === "heavy"
+                  ? "bg-emerald"
+                  : activityLevel === "medium"
+                    ? "bg-amber-400"
+                    : "bg-ink-tertiary"
+              }`}
+            />
+            <span className="text-[10px] text-ink-tertiary font-medium tabular-nums">
+              {formatDuration(day.totalWorkTime)}
+            </span>
+          </>
+        ) : (
+          <span className="text-[10px] text-ink-tertiary/50">-</span>
+        )}
+      </div>
     </button>
   );
 }

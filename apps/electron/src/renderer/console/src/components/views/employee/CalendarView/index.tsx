@@ -24,8 +24,8 @@ import { mockDays, getMockWeekDays } from "./mockData";
 import DayCard from "./DayCard";
 import DaySummary from "./DaySummary";
 import WorkBlockList from "./WorkBlockList";
-import WeekGridView from "./WeekGridView";
-import type { WorkBlock, ActivityDay } from "./types";
+import { Calendar as UntitledCalendar, type CalendarEvent } from "@/components/application/calendar/calendar";
+import type { ActivityDay } from "./types";
 
 // Helper functions
 function getStartOfWeek(date: Date): Date {
@@ -81,6 +81,27 @@ function formatDayHeader(date: Date): string {
   });
 }
 
+// Convert WorkBlocks to CalendarEvents for the untitledui Calendar
+function workBlocksToCalendarEvents(days: ActivityDay[]): CalendarEvent[] {
+  const events: CalendarEvent[] = [];
+
+  days.forEach((day) => {
+    day.workBlocks.forEach((block) => {
+      const endTime = block.endTime || new Date();
+      events.push({
+        id: block.id,
+        title: block.goal || block.appBreakdown[0]?.app || "Work Block",
+        start: new Date(block.startTime),
+        end: new Date(endTime),
+        color: block.isActive ? "green" : block.isFocusedSession ? "brand" : "gray",
+        dot: block.isActive,
+      });
+    });
+  });
+
+  return events;
+}
+
 type ViewMode = "day" | "week";
 
 export default function CalendarView() {
@@ -110,6 +131,9 @@ export default function CalendarView() {
 
   // Get week days with activity data
   const weekDays = useMemo(() => getMockWeekDays(weekStart), [weekStart]);
+
+  // Convert all mock days to calendar events for the Calendar component
+  const calendarEvents = useMemo(() => workBlocksToCalendarEvents(mockDays), []);
 
   // Get selected day data
   const selectedDay = useMemo(() => {
@@ -172,12 +196,6 @@ export default function CalendarView() {
     console.log("Starting new block with goal:", newBlockGoal || "(no goal)");
     setShowNewBlockDialog(false);
     setNewBlockGoal("");
-  };
-
-  // Handle clicking a block in week grid view
-  const handleBlockClick = (_block: WorkBlock, day: ActivityDay) => {
-    setSelectedDate(day.date);
-    setViewMode("day");
   };
 
   return (
@@ -327,15 +345,12 @@ export default function CalendarView() {
           ═══════════════════════════════════════════════════════════════════ */}
       <div className="px-8 pb-24">
         {viewMode === "week" ? (
-          /* Week Grid View */
-          <div className="stagger-2">
-            <WeekGridView
-              weekDays={weekDays}
-              onBlockClick={handleBlockClick}
+          /* Week Grid View - Using untitledui Calendar */
+          <div className="stagger-2 h-[700px]">
+            <UntitledCalendar
+              events={calendarEvents}
+              view="week"
             />
-            <p className="text-xs text-ink-tertiary text-center mt-4">
-              Click a block to view details
-            </p>
           </div>
         ) : (
           /* Day View */
