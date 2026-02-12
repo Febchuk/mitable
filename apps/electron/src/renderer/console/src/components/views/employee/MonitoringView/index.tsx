@@ -120,7 +120,7 @@ export default function MonitoringView() {
   }
 
   return (
-    <div className="min-h-full app-no-drag">
+    <div className="h-full overflow-y-auto app-no-drag">
       {/* ═══════════════════════════════════════════════════════════════════
           HERO SECTION - Start Session CTA
           ═══════════════════════════════════════════════════════════════════ */}

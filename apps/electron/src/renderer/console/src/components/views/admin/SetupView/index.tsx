@@ -62,7 +62,7 @@ export default function SetupView() {
   }
 
   return (
-    <div className="min-h-full app-no-drag">
+    <div className="h-full overflow-y-auto app-no-drag">
       <div className="px-8 pt-8 pb-6">
         <div className="stagger-1">
           {/* Header */}

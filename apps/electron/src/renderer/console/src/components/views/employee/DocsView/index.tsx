@@ -108,7 +108,7 @@ export default function DocsView() {
   const hasActiveFilters = docTypeFilter !== "all" || statusFilter !== "all";
 
   return (
-    <div className="min-h-full app-no-drag">
+    <div className="h-full overflow-y-auto app-no-drag">
       {/* ═══════════════════════════════════════════════════════════════════
           HERO SECTION - Create/Generate Document CTAs
           ═══════════════════════════════════════════════════════════════════ */}

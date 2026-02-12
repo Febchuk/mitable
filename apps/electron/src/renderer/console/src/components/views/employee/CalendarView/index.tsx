@@ -170,7 +170,8 @@ export default function CalendarView() {
   // Navigate to create recap with all blocks pre-selected
   const handleCreateRecap = () => {
     const blockIds = selectedDay.workBlocks.map((b) => b.id).join(",");
-    navigate(`/recaps/new?blocks=${blockIds}`);
+    const dateStr = selectedDay.date.toISOString().split("T")[0];
+    navigate(`/recaps/new?blocks=${blockIds}&date=${dateStr}`);
     setShowMenu(false);
   };
 

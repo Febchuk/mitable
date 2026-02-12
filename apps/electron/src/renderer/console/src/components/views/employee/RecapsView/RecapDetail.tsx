@@ -19,6 +19,10 @@ import {
   Loader2,
   Clock,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Calendar,
 } from "lucide-react";
 
 // Types
@@ -57,6 +61,45 @@ function formatDuration(minutes: number): string {
   if (hours === 0) return `${mins}m`;
   if (mins === 0) return `${hours}h`;
   return `${hours}h ${mins}m`;
+}
+
+function formatDate(date: Date): string {
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatShortDate(date: Date): string {
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getDateKey(date: Date): string {
+  return date.toISOString().split("T")[0];
+}
+
+function isSameDay(date1: Date, date2: Date): boolean {
+  return getDateKey(date1) === getDateKey(date2);
+}
+
+function getDaysWithBlocks(blocks: RecapBlock[]): Date[] {
+  const dayMap = new Map<string, Date>();
+  blocks.forEach((block) => {
+    const key = getDateKey(block.startTime);
+    if (!dayMap.has(key)) {
+      dayMap.set(key, new Date(block.startTime));
+    }
+  });
+  return Array.from(dayMap.values()).sort((a, b) => b.getTime() - a.getTime());
+}
+
+function getBlocksForDay(blocks: RecapBlock[], day: Date): RecapBlock[] {
+  return blocks.filter((block) => isSameDay(block.startTime, day));
 }
 
 // Destination config
@@ -105,15 +148,16 @@ const lengthOptions: { value: RecapLength; label: string }[] = [
   { value: "comprehensive", label: "Full" },
 ];
 
-// Mock blocks data
-const mockBlocks: RecapBlock[] = [
+// Mock blocks data - organized by day for realistic browsing
+const mockAllBlocks: RecapBlock[] = [
+  // Today
   {
     id: "b1",
     startTime: new Date(Date.now() - 3 * 60 * 60 * 1000),
     endTime: new Date(Date.now() - 1 * 60 * 60 * 1000),
     duration: 120,
     summary:
-      "Built the main CalendarView component with week navigation and day selection. Implemented work block cards with expandable details and capture timeline. Added prose/list toggle for day summary.",
+      "Built the main CalendarView component with week navigation and day selection. Implemented work block cards with expandable details and capture timeline.",
     goal: "Complete Calendar UI prototype",
     isFocusedSession: true,
   },
@@ -125,6 +169,58 @@ const mockBlocks: RecapBlock[] = [
     summary:
       "Reviewed PR feedback and addressed comments. Updated component styling for better consistency with design system.",
     isFocusedSession: false,
+  },
+  // Yesterday
+  {
+    id: "b3",
+    startTime: new Date(Date.now() - 24 * 60 * 60 * 1000 - 5 * 60 * 60 * 1000),
+    endTime: new Date(Date.now() - 24 * 60 * 60 * 1000 - 3 * 60 * 60 * 1000),
+    duration: 120,
+    summary:
+      "Set up the RecapsView routing and created the initial component structure. Integrated with the navigation system.",
+    goal: "Scaffold Recaps feature",
+    isFocusedSession: true,
+  },
+  {
+    id: "b4",
+    startTime: new Date(Date.now() - 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000),
+    endTime: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    duration: 90,
+    summary:
+      "Added placeholder content and mock data for development. Connected to the sidebar navigation.",
+    goal: "Recaps navigation setup",
+    isFocusedSession: false,
+  },
+  // 2 days ago
+  {
+    id: "b5",
+    startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 6 * 60 * 60 * 1000),
+    endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 3 * 60 * 60 * 1000),
+    duration: 180,
+    summary:
+      "Implemented the core monitoring service with screen capture integration. Added event listeners for application focus changes.",
+    goal: "Build monitoring backend",
+    isFocusedSession: true,
+  },
+  {
+    id: "b6",
+    startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000),
+    endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 1 * 60 * 60 * 1000),
+    duration: 60,
+    summary:
+      "Fixed idle detection bugs and improved event handling. Tested cross-platform behavior.",
+    isFocusedSession: false,
+  },
+  // 3 days ago
+  {
+    id: "b7",
+    startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 - 4 * 60 * 60 * 1000),
+    endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000),
+    duration: 120,
+    summary:
+      "Designed the database schema for work sessions and recaps. Created migration files and seed data.",
+    goal: "Database design",
+    isFocusedSession: true,
   },
 ];
 
@@ -183,12 +279,14 @@ export default function RecapDetail() {
 
   const isNew = recapId === "new";
   const blockIdsParam = searchParams.get("blocks");
+  const dateParam = searchParams.get("date");
   const initialBlockIds = blockIdsParam ? blockIdsParam.split(",") : [];
+  const initialDate = dateParam ? new Date(dateParam + "T12:00:00") : null;
 
   // State
-  const [blocks] = useState<RecapBlock[]>(mockBlocks);
+  const [allBlocks] = useState<RecapBlock[]>(mockAllBlocks);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(
-    new Set(initialBlockIds.length > 0 ? initialBlockIds : mockBlocks.map((b) => b.id))
+    new Set(initialBlockIds.length > 0 ? initialBlockIds : [])
   );
   const [tone, setTone] = useState<RecapTone>("professional");
   const [length, setLength] = useState<RecapLength>("standard");
@@ -199,7 +297,23 @@ export default function RecapDetail() {
   const [showToneMenu, setShowToneMenu] = useState(false);
   const [showLengthMenu, setShowLengthMenu] = useState(false);
 
-  const selectedBlocks = blocks.filter((b) => selectedBlockIds.has(b.id));
+  // Day browsing state - auto-open to the date passed from calendar
+  const availableDays = getDaysWithBlocks(allBlocks);
+  const [browsingDay, setBrowsingDay] = useState<Date | null>(() => {
+    // If coming from calendar with a date, auto-open that day
+    if (initialDate && initialBlockIds.length > 0) {
+      return initialDate;
+    }
+    return null;
+  });
+  const browsingDayIndex = browsingDay
+    ? availableDays.findIndex((d) => isSameDay(d, browsingDay))
+    : -1;
+  const blocksForBrowsingDay = browsingDay
+    ? getBlocksForDay(allBlocks, browsingDay)
+    : [];
+
+  const selectedBlocks = allBlocks.filter((b) => selectedBlockIds.has(b.id));
   const totalDuration = selectedBlocks.reduce((acc, b) => acc + b.duration, 0);
 
   // Generate content when settings change
@@ -245,7 +359,7 @@ export default function RecapDetail() {
     deliveries.some((d) => d.destination === destination && d.status === "sent");
 
   return (
-    <div className="min-h-full app-no-drag">
+    <div className="h-full overflow-y-auto app-no-drag">
       {/* Header */}
       <div className="px-8 pt-8 pb-6">
         <div className="stagger-1">
@@ -291,61 +405,213 @@ export default function RecapDetail() {
       {/* Main content */}
       <div className="px-8 pb-8">
         <div className="stagger-2 space-y-6">
-          {/* Blocks selection */}
+          {/* Browse blocks by day */}
           <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50">
             <div className="flex items-center justify-between px-4 py-3 border-b border-stroke-subtle">
               <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-                Include Blocks
+                Add Blocks from Day
               </span>
-              <span className="text-xs text-ink-tertiary tabular-nums">
-                {selectedBlocks.length}/{blocks.length} selected
-              </span>
+              {browsingDay && (
+                <button
+                  onClick={() => setBrowsingDay(null)}
+                  className="text-xs text-ink-tertiary hover:text-ink-primary transition-colors"
+                >
+                  Close
+                </button>
+              )}
             </div>
-            <div className="p-4 space-y-2">
-              {blocks.map((block, idx) => {
-                const isSelected = selectedBlockIds.has(block.id);
-                return (
-                  <button
-                    key={block.id}
-                    onClick={() => toggleBlock(block.id)}
-                    className={`w-full flex items-start gap-3 p-3 rounded-lg text-left transition-all ${
-                      isSelected
-                        ? "bg-indigo/10 ring-1 ring-indigo/30"
-                        : "hover:bg-canvas-muted/50"
-                    }`}
-                  >
-                    <div
-                      className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
-                        isSelected ? "bg-indigo" : "border border-stroke"
-                      }`}
+            <div className="p-4">
+              {/* Day selector */}
+              {!browsingDay ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {availableDays.map((day) => {
+                    const dayBlocks = getBlocksForDay(allBlocks, day);
+                    const selectedFromDay = dayBlocks.filter((b) =>
+                      selectedBlockIds.has(b.id)
+                    ).length;
+                    const isToday = isSameDay(day, new Date());
+
+                    return (
+                      <button
+                        key={getDateKey(day)}
+                        onClick={() => setBrowsingDay(day)}
+                        className="flex items-center gap-3 p-3 rounded-lg text-left hover:bg-canvas-muted/50 transition-colors border border-stroke-subtle"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-canvas-muted flex items-center justify-center flex-shrink-0">
+                          <Calendar size={18} className="text-ink-tertiary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-ink-primary">
+                              {formatShortDate(day)}
+                            </span>
+                            {isToday && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-emerald/20 text-emerald text-[10px] font-semibold">
+                                Today
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-ink-tertiary mt-0.5">
+                            {dayBlocks.length} block{dayBlocks.length !== 1 ? "s" : ""}
+                            {selectedFromDay > 0 && (
+                              <span className="text-indigo"> · {selectedFromDay} added</span>
+                            )}
+                          </p>
+                        </div>
+                        <ChevronRight size={16} className="text-ink-tertiary" />
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Day detail view */
+                <div>
+                  {/* Day navigation */}
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      onClick={() => {
+                        if (browsingDayIndex < availableDays.length - 1) {
+                          setBrowsingDay(availableDays[browsingDayIndex + 1]);
+                        }
+                      }}
+                      disabled={browsingDayIndex >= availableDays.length - 1}
+                      className="p-1.5 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      {isSelected && <Check size={10} className="text-white" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-ink-primary">
-                          Block {idx + 1}
-                        </span>
-                        <span className="text-xs text-ink-tertiary tabular-nums">
-                          {formatDuration(block.duration)}
-                        </span>
-                        {block.isFocusedSession && (
-                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo/20 text-indigo text-[10px] font-semibold">
-                            <Target size={8} />
-                            Focused
-                          </span>
-                        )}
-                      </div>
-                      {block.goal && (
-                        <p className="text-xs text-indigo mt-0.5">{block.goal}</p>
-                      )}
-                      <p className="text-xs text-ink-tertiary mt-1 line-clamp-2">
-                        {block.summary}
+                      <ChevronLeft size={18} />
+                    </button>
+                    <div className="text-center">
+                      <span className="text-sm font-medium text-ink-primary">
+                        {formatShortDate(browsingDay)}
+                      </span>
+                      <p className="text-xs text-ink-tertiary">
+                        {blocksForBrowsingDay.length} block{blocksForBrowsingDay.length !== 1 ? "s" : ""}
                       </p>
                     </div>
-                  </button>
-                );
-              })}
+                    <button
+                      onClick={() => {
+                        if (browsingDayIndex > 0) {
+                          setBrowsingDay(availableDays[browsingDayIndex - 1]);
+                        }
+                      }}
+                      disabled={browsingDayIndex <= 0}
+                      className="p-1.5 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+
+                  {/* Blocks for this day */}
+                  <div className="space-y-2">
+                    {blocksForBrowsingDay.map((block) => {
+                      const isSelected = selectedBlockIds.has(block.id);
+                      return (
+                        <button
+                          key={block.id}
+                          onClick={() => toggleBlock(block.id)}
+                          className={`w-full flex items-start gap-3 p-3 rounded-lg text-left transition-all ${
+                            isSelected
+                              ? "bg-indigo/10 ring-1 ring-indigo/30"
+                              : "hover:bg-canvas-muted/50 border border-stroke-subtle"
+                          }`}
+                        >
+                          <div
+                            className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
+                              isSelected ? "bg-indigo" : "border border-stroke"
+                            }`}
+                          >
+                            {isSelected ? (
+                              <Check size={10} className="text-white" />
+                            ) : (
+                              <Plus size={10} className="text-ink-tertiary" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-ink-tertiary tabular-nums">
+                                {formatTime(block.startTime)} – {block.endTime ? formatTime(block.endTime) : "now"}
+                              </span>
+                              <span className="text-xs text-ink-tertiary">
+                                · {formatDuration(block.duration)}
+                              </span>
+                              {block.isFocusedSession && (
+                                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo/20 text-indigo text-[10px] font-semibold">
+                                  <Target size={8} />
+                                  Focused
+                                </span>
+                              )}
+                            </div>
+                            {block.goal && (
+                              <p className="text-sm font-medium text-ink-primary mt-1">
+                                {block.goal}
+                              </p>
+                            )}
+                            <p className="text-xs text-ink-tertiary mt-1 line-clamp-2">
+                              {block.summary}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Selected blocks */}
+          <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-stroke-subtle">
+              <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
+                Selected Blocks
+              </span>
+              <span className="text-xs text-ink-tertiary tabular-nums">
+                {selectedBlocks.length} block{selectedBlocks.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="p-4">
+              {selectedBlocks.length === 0 ? (
+                <p className="text-sm text-ink-tertiary text-center py-4">
+                  No blocks selected. Browse days above to add blocks.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedBlocks.map((block, idx) => (
+                    <div
+                      key={block.id}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-indigo/10 ring-1 ring-indigo/30"
+                    >
+                      <button
+                        onClick={() => toggleBlock(block.id)}
+                        className="mt-0.5 w-4 h-4 rounded bg-indigo flex items-center justify-center flex-shrink-0 hover:bg-indigo/80 transition-colors"
+                      >
+                        <Check size={10} className="text-white" />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-ink-primary">
+                            Block {idx + 1}
+                          </span>
+                          <span className="text-xs text-ink-tertiary tabular-nums">
+                            {formatDuration(block.duration)} · {formatDate(block.startTime)}
+                          </span>
+                          {block.isFocusedSession && (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo/20 text-indigo text-[10px] font-semibold">
+                              <Target size={8} />
+                              Focused
+                            </span>
+                          )}
+                        </div>
+                        {block.goal && (
+                          <p className="text-xs text-indigo mt-0.5">{block.goal}</p>
+                        )}
+                        <p className="text-xs text-ink-tertiary mt-1 line-clamp-2">
+                          {block.summary}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
