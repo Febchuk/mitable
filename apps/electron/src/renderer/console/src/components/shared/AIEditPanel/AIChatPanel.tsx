@@ -6,7 +6,7 @@
  */
 
 import { useState, useRef, useEffect } from "react";
-import { ArrowUp, Wand2, Check } from "lucide-react";
+import { ArrowUp, Check } from "lucide-react";
 import logoIconSvg from "../../../../../assets/logo-icon.svg";
 import { Button } from "@/components/ui/button";
 import {
@@ -165,6 +165,33 @@ export default function AIChatPanel({
 
       // Remove typing indicator and add real message
       setMessages((prev) => prev.filter((m) => m.id !== typingId).concat(assistantMessage));
+
+      // Auto-apply suggestion if present (no manual button click needed)
+      if (assistantMessage.suggestedEdit) {
+        onApplySuggestion(assistantMessage.suggestedEdit);
+        // Mark as applied immediately
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMessage.id ? { ...m, suggestedEdit: undefined, applied: true } : m
+          )
+        );
+        // Persist: strip <summary> so it doesn't reappear on reload
+        if (sessionId) {
+          chatHistoryRef.current = chatHistoryRef.current.map((m) => {
+            if (
+              m.role === "assistant" &&
+              m.content.includes(`<summary>${assistantMessage.suggestedEdit}</summary>`)
+            ) {
+              return {
+                ...m,
+                content: m.content.replace(/<summary>[\s\S]*?<\/summary>/, "").trim(),
+              };
+            }
+            return m;
+          });
+          saveRefinementChat(sessionId, chatHistoryRef.current).catch(() => {});
+        }
+      }
     } catch (error) {
       // Handle error
       const errorMessage: Message = {
@@ -175,25 +202,6 @@ export default function AIChatPanel({
       setMessages((prev) => prev.filter((m) => m.id !== typingId).concat(errorMessage));
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleApply = (messageId: string, suggestedEdit: string) => {
-    onApplySuggestion(suggestedEdit);
-    // Mark the message as applied (removes button, shows checkmark)
-    setMessages((prev) =>
-      prev.map((m) => (m.id === messageId ? { ...m, suggestedEdit: undefined, applied: true } : m))
-    );
-
-    // Persist: strip <summary> from the applied message so it doesn't reappear on reload
-    if (sessionId) {
-      chatHistoryRef.current = chatHistoryRef.current.map((m) => {
-        if (m.role === "assistant" && m.content.includes(`<summary>${suggestedEdit}</summary>`)) {
-          return { ...m, content: m.content.replace(/<summary>[\s\S]*?<\/summary>/, "").trim() };
-        }
-        return m;
-      });
-      saveRefinementChat(sessionId, chatHistoryRef.current).catch(() => {});
     }
   };
 
@@ -249,20 +257,7 @@ export default function AIChatPanel({
                   )}
                 </div>
 
-                {/* Apply suggestion button or applied checkmark */}
-                {message.suggestedEdit && !message.isTyping && (
-                  <div className="mt-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleApply(message.id, message.suggestedEdit!)}
-                      className="gap-2 text-xs h-7 border-primary/30 hover:bg-primary/10 hover:text-primary"
-                    >
-                      <Wand2 size={12} />
-                      Apply suggestion
-                    </Button>
-                  </div>
-                )}
+                {/* Applied checkmark (suggestions are auto-applied) */}
                 {message.applied && (
                   <div className="mt-2 flex items-center gap-1.5 text-xs text-green-400">
                     <Check size={12} />
