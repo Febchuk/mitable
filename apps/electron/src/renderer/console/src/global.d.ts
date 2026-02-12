@@ -173,6 +173,13 @@ interface ConsoleAPI {
   getAutoSessionStart: (userId: string) => Promise<boolean>;
   setAutoSessionStart: (userId: string, enabled: boolean) => Promise<{ success: boolean }>;
 
+  // Pill display mode API (user-scoped)
+  getPillDisplayMode: (userId: string) => Promise<"compact" | "expanded">;
+  setPillDisplayMode: (
+    userId: string,
+    mode: "compact" | "expanded"
+  ) => Promise<{ success: boolean }>;
+
   // Summary preferences API
   getSummaryPreferences: () => Promise<{
     detailLevel: "concise" | "verbose";

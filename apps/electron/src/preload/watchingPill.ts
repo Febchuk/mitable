@@ -28,6 +28,9 @@ const IPC_CHANNELS = {
   SHOW_CONSOLE: "show-console",
   USER_CONTEXT_GET: "user-context-get",
   CREATE_BACKEND_SESSION: "create-backend-session",
+  PILL_DISPLAY_MODE_GET: "pill-display-mode-get",
+  PILL_DISPLAY_MODE_SET: "pill-display-mode-set",
+  PILL_DISPLAY_MODE_CHANGED: "pill-display-mode-changed",
 } as const;
 
 // Session start config type
@@ -219,6 +222,16 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
     ipcRenderer.on(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP, handler);
   },
+
+  // Pill display mode
+  getPillDisplayMode: (userId: string): Promise<"compact" | "expanded"> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PILL_DISPLAY_MODE_GET, userId),
+
+  onPillDisplayModeChanged: (callback: (mode: "compact" | "expanded") => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, mode: "compact" | "expanded") => callback(mode);
+    ipcRenderer.on(IPC_CHANNELS.PILL_DISPLAY_MODE_CHANGED, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.PILL_DISPLAY_MODE_CHANGED, handler);
+  },
 });
 
 // Type declarations for renderer
@@ -311,6 +324,10 @@ declare global {
       stopAudioRecording: () => Promise<{ success: boolean }>;
       sendAudioChunk: (audioBuffer: ArrayBuffer) => void;
       onForceStopAudio: (callback: () => void) => () => void;
+
+      // Pill display mode
+      getPillDisplayMode: (userId: string) => Promise<"compact" | "expanded">;
+      onPillDisplayModeChanged: (callback: (mode: "compact" | "expanded") => void) => () => void;
     };
   }
 }

@@ -101,6 +101,11 @@ export const IPC_CHANNELS = {
   AUDIO_TEST_START: "audio-test-start", // Start mic test with level monitoring
   AUDIO_TEST_STOP: "audio-test-stop", // Stop mic test
 
+  // Pill display mode preference
+  PILL_DISPLAY_MODE_GET: "pill-display-mode-get",
+  PILL_DISPLAY_MODE_SET: "pill-display-mode-set",
+  PILL_DISPLAY_MODE_CHANGED: "pill-display-mode-changed",
+
   // End session dialog coordination (pill → console)
   SHOW_END_SESSION_DIALOG: "show-end-session-dialog", // Main → Console: trigger dialog
   END_SESSION_WITH_PREFERENCES: "end-session-with-preferences", // Console → Main: end with prefs

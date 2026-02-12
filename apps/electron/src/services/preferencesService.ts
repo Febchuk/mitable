@@ -279,6 +279,21 @@ class PreferencesService {
     return this.setSummaryPreferences({ alwaysAskOnSessionEnd: value });
   }
 
+  // Pill display mode preference (user-scoped)
+  getUserPillDisplayMode(userId: string): "compact" | "expanded" {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    return userPrefs.pillDisplayMode ?? "compact";
+  }
+
+  setUserPillDisplayMode(userId: string, mode: "compact" | "expanded"): void {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    this.store.set(`users.${userId}`, {
+      ...userPrefs,
+      pillDisplayMode: mode,
+    });
+    logger.info(` Pill display mode for user ${userId} set to: ${mode}`);
+  }
+
   // Audio preferences
   getAudioPreferences(): AudioPreferences {
     return (

@@ -2132,6 +2132,26 @@ function setupMonitoringSessionHandlers() {
     }
   );
 
+  // Pill display mode preference
+  ipcMain.handle(IPC_CHANNELS.PILL_DISPLAY_MODE_GET, (_, userId: string) => {
+    return preferencesService.getUserPillDisplayMode(userId);
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.PILL_DISPLAY_MODE_SET,
+    (_, userId: string, mode: "compact" | "expanded") => {
+      preferencesService.setUserPillDisplayMode(userId, mode);
+      // Notify the watching pill window immediately
+      const allWindows = BrowserWindow.getAllWindows();
+      for (const win of allWindows) {
+        if (!win.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.PILL_DISPLAY_MODE_CHANGED, mode);
+        }
+      }
+      return { success: true };
+    }
+  );
+
   // End session with preferences (called from Console after dialog confirmation)
   ipcMain.handle(
     IPC_CHANNELS.END_SESSION_WITH_PREFERENCES,

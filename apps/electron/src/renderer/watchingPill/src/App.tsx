@@ -25,6 +25,7 @@ export default function App() {
 
   // Collapsed/expanded pill state
   const [isExpanded, setIsExpanded] = useState(false);
+  const [pillMode, setPillMode] = useState<"compact" | "expanded">("compact");
   const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Derived state
@@ -49,6 +50,16 @@ export default function App() {
     window.watchingPillAPI.getSelectedWindows().then((windows) => {
       logger.info(" Initial selected windows:", windows);
       setSelectedWindows(windows);
+    });
+
+    // Load pill display mode preference
+    window.watchingPillAPI.getCurrentUser().then((user) => {
+      if (user?.userId) {
+        window.watchingPillAPI.getPillDisplayMode(user.userId).then((mode) => {
+          setPillMode(mode);
+          if (mode === "expanded") setIsExpanded(true);
+        });
+      }
     });
 
     // Subscribe to updates
@@ -87,12 +98,19 @@ export default function App() {
 
     // Main process forces audio stop when session ends without explicit mic toggle
     const unsubForceStopAudio = window.watchingPillAPI.onForceStopAudio(async () => {
-      logger.info("🔇 Force-stop audio received from main process");
+      logger.info("\uD83D\uDD07 Force-stop audio received from main process");
       const { audioCaptureService } = await import("./services/audioCapture");
       await audioCaptureService.stopCapture();
       setAudioRecordingEnabled(false);
       setAudioRecordingActive(false);
       audioRecordingActiveRef.current = false;
+    });
+
+    // Listen for pill display mode changes from settings
+    const unsubPillMode = window.watchingPillAPI.onPillDisplayModeChanged((mode) => {
+      logger.info(" Pill display mode changed:", mode);
+      setPillMode(mode);
+      if (mode === "expanded") setIsExpanded(true);
     });
 
     return () => {
@@ -101,6 +119,7 @@ export default function App() {
       unsubEyeClose();
       unsubMenuClose();
       unsubForceStopAudio();
+      unsubPillMode();
     };
   }, []);
 
@@ -114,6 +133,8 @@ export default function App() {
   };
 
   const handleMouseLeave = () => {
+    // Never collapse if user prefers always-expanded mode
+    if (pillMode === "expanded") return;
     // Don't collapse if a dropdown is open
     if (eyeDropdownOpen || menuDropdownOpen) return;
     collapseTimerRef.current = setTimeout(() => {
@@ -123,6 +144,8 @@ export default function App() {
 
   // Keep expanded while dropdowns are open, collapse when they close
   useEffect(() => {
+    // Never collapse in expanded mode
+    if (pillMode === "expanded") return;
     if (!isDropdownOpen && !isExpanded) return;
     if (!isDropdownOpen) {
       // Dropdown just closed — start collapse timer
@@ -133,7 +156,7 @@ export default function App() {
     return () => {
       if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
     };
-  }, [isDropdownOpen]);
+  }, [isDropdownOpen, pillMode]);
 
   // Click logo opens console
   const handleLogoClick = () => {

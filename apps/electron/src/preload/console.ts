@@ -60,6 +60,8 @@ const IPC_CHANNELS = {
   NOTIFICATION_FREQUENCY_SET: "notification-frequency-set",
   AUTO_SESSION_START_GET: "auto-session-start-get",
   AUTO_SESSION_START_SET: "auto-session-start-set",
+  PILL_DISPLAY_MODE_GET: "pill-display-mode-get",
+  PILL_DISPLAY_MODE_SET: "pill-display-mode-set",
   // Summary preferences
   SUMMARY_PREFERENCES_GET: "summary-preferences-get",
   SUMMARY_PREFERENCES_SET: "summary-preferences-set",
@@ -428,6 +430,16 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   setAutoSessionStart: (userId: string, enabled: boolean): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.AUTO_SESSION_START_SET, userId, enabled),
+
+  // Pill display mode API (user-scoped)
+  getPillDisplayMode: (userId: string): Promise<"compact" | "expanded"> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PILL_DISPLAY_MODE_GET, userId),
+
+  setPillDisplayMode: (
+    userId: string,
+    mode: "compact" | "expanded"
+  ): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PILL_DISPLAY_MODE_SET, userId, mode),
 
   // Summary preferences API
   getSummaryPreferences: (): Promise<{
