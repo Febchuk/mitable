@@ -233,153 +233,111 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Quill Rich Text Editor — Notion-inspired dark theme
+   MDXEditor — Dark theme
    ═══════════════════════════════════════════════════════════════════ */
 
-.quill-editor-clean .ql-toolbar.ql-snow {
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 8px 16px;
+/* Wrapper layout */
+.mdx-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mdx-editor-wrapper .mdxeditor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   background: transparent;
+  font-family: "Manrope", system-ui, sans-serif;
 }
 
-.quill-editor-clean .ql-toolbar .ql-formats {
-  margin-right: 12px;
+/* Editor content wrapper must scroll, not grow */
+.mdx-editor-wrapper .mdxeditor > div:last-child {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
-.quill-editor-clean .ql-toolbar button {
-  width: 28px;
-  height: 28px;
-  padding: 4px;
+/* Toolbar */
+.dark-editor [role="toolbar"] {
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 4px 12px;
+  flex-shrink: 0;
+}
+
+.dark-editor [role="toolbar"] button {
+  color: rgba(255, 255, 255, 0.5);
   border-radius: 4px;
   transition: background 0.15s ease;
 }
 
-.quill-editor-clean .ql-toolbar button:hover {
+.dark-editor [role="toolbar"] button:hover {
   background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
 }
 
-.quill-editor-clean .ql-toolbar button.ql-active {
+.dark-editor [role="toolbar"] button[data-state="on"],
+.dark-editor [role="toolbar"] button[aria-pressed="true"] {
   background: rgba(124, 101, 246, 0.15);
+  color: #7c65f6;
 }
 
-.quill-editor-clean .ql-toolbar .ql-stroke {
-  stroke: rgba(255, 255, 255, 0.5);
-}
-
-.quill-editor-clean .ql-toolbar .ql-fill {
-  fill: rgba(255, 255, 255, 0.5);
-}
-
-.quill-editor-clean .ql-toolbar .ql-picker-label {
-  color: rgba(255, 255, 255, 0.5);
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 2px 8px;
-}
-
-.quill-editor-clean .ql-toolbar .ql-picker-label:hover {
+.dark-editor [role="toolbar"] [data-orientation="vertical"] {
   background: rgba(255, 255, 255, 0.08);
+  width: 1px;
+  margin: 4px 6px;
 }
 
-.quill-editor-clean .ql-toolbar .ql-picker-options {
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 4px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-.quill-editor-clean .ql-toolbar .ql-picker-item {
-  color: rgba(255, 255, 255, 0.7);
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.quill-editor-clean .ql-toolbar .ql-picker-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: white;
-}
-
-.quill-editor-clean .ql-toolbar button.ql-active .ql-stroke,
-.quill-editor-clean .ql-toolbar .ql-picker-label.ql-active .ql-stroke {
-  stroke: #7c65f6;
-}
-
-.quill-editor-clean .ql-toolbar button.ql-active .ql-fill,
-.quill-editor-clean .ql-toolbar .ql-picker-label.ql-active .ql-fill {
-  fill: #7c65f6;
-}
-
-.quill-editor-clean .ql-container.ql-snow {
-  border: none;
-  font-family: "Manrope", system-ui, sans-serif;
-}
-
-.quill-editor-clean .ql-editor {
-  padding: 32px 48px;
-  font-size: 15px;
-  line-height: 1.8;
-  color: rgba(255, 255, 255, 0.88);
-  background: transparent;
+/* Content area */
+.dark-editor [contenteditable] {
+  flex: 1;
+  overflow-y: auto;
   caret-color: #7c65f6;
+  color: rgba(255, 255, 255, 0.88);
 }
 
-.quill-editor-clean .ql-editor.ql-blank::before {
-  color: rgba(255, 255, 255, 0.25);
-  font-style: normal;
-  left: 48px;
-  right: 48px;
+.dark-editor [contenteditable]:focus {
+  outline: none;
 }
 
-.quill-editor-clean .ql-editor h1 {
-  font-size: 2em;
-  font-weight: 700;
-  margin-bottom: 0.5em;
+/* Placeholder */
+.dark-editor [data-lexical-editor] p.PlaygroundEditorTheme__paragraph::before,
+.dark-editor .mdxeditor-rich-text-editor [data-placeholder]::before {
+  color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* Typography inside editor */
+.dark-editor [contenteditable] h1 {
   color: white;
 }
-
-.quill-editor-clean .ql-editor h2 {
-  font-size: 1.5em;
-  font-weight: 600;
-  margin-bottom: 0.4em;
+.dark-editor [contenteditable] h2 {
   color: white;
 }
-
-.quill-editor-clean .ql-editor h3 {
-  font-size: 1.25em;
-  font-weight: 600;
-  margin-bottom: 0.3em;
+.dark-editor [contenteditable] h3 {
   color: rgba(255, 255, 255, 0.95);
 }
-
-.quill-editor-clean .ql-editor p {
-  margin-bottom: 0.8em;
+.dark-editor [contenteditable] strong {
+  font-weight: 600;
+  color: white;
 }
-
-.quill-editor-clean .ql-editor ul,
-.quill-editor-clean .ql-editor ol {
-  padding-left: 1.5em;
-  margin-bottom: 0.8em;
-}
-
-.quill-editor-clean .ql-editor li {
-  margin-bottom: 0.3em;
-}
-
-.quill-editor-clean .ql-editor a {
+.dark-editor [contenteditable] a {
   color: #7c65f6;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-
-.quill-editor-clean .ql-editor strong {
-  font-weight: 600;
-  color: white;
+.dark-editor [contenteditable] ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+}
+.dark-editor [contenteditable] ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
 }
 
-/* Tooltip overrides */
-.quill-editor-clean .ql-tooltip {
+/* Link dialog */
+.dark-editor [role="dialog"] {
   background: #1a1a1a;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -387,7 +345,7 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
-.quill-editor-clean .ql-tooltip input[type="text"] {
+.dark-editor [role="dialog"] input {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;

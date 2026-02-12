@@ -6,19 +6,11 @@
  * Right side: AI chat panel for revisions (40%)
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowLeft, Save, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { marked } from "marked";
-import TurndownService from "turndown";
 import TextEditor from "./TextEditor";
 import AIChatPanel from "./AIChatPanel";
-
-const turndown = new TurndownService({
-  headingStyle: "atx",
-  bulletListMarker: "-",
-  codeBlockStyle: "fenced",
-});
 
 interface AIEditPanelProps {
   title: string;
@@ -33,9 +25,6 @@ interface AIEditPanelProps {
   sessionId?: string; // When provided, enables conversational refinement
 }
 
-// Configure marked for clean HTML output
-marked.setOptions({ breaks: true, gfm: true });
-
 export default function AIEditPanel({
   title,
   subtitle,
@@ -48,46 +37,22 @@ export default function AIEditPanel({
   contextLabel = "content",
   sessionId,
 }: AIEditPanelProps) {
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState(initialContent);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Convert initial markdown → HTML for Quill on mount
-  useEffect(() => {
-    const result = marked.parse(initialContent);
-    if (result instanceof Promise) {
-      result.then((html: string) => setContent(html));
-    } else {
-      setContent(result);
-    }
-  }, [initialContent]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Convert Quill HTML → markdown before saving
-      const markdown = turndown.turndown(content);
-      await onSave(markdown);
+      await onSave(content);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleApplySuggestion = (suggestion: string) => {
-    // Convert markdown → HTML for Quill editor display
-    const result = marked.parse(suggestion);
-    const applyHtml = (html: string) => {
-      setContent(html);
-      // Auto-save the raw MARKDOWN to DB (not HTML)
-      // Session detail page uses ReactMarkdown which expects markdown
-      if (onAutoSave) {
-        onAutoSave(suggestion).catch(() => {});
-      }
-    };
-
-    if (result instanceof Promise) {
-      result.then(applyHtml);
-    } else {
-      applyHtml(result);
+    setContent(suggestion);
+    if (onAutoSave) {
+      onAutoSave(suggestion).catch(() => {});
     }
   };
 
