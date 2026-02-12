@@ -158,10 +158,20 @@ export function isBlockedByPolicy(
   }
 
   // Check 3: User's custom block list (if userId provided)
+  // Uses bidirectional substring matching so "www.plaync100.net version 2.0.0.0"
+  // blocks a window whose app name is just "plaync100.net" and vice-versa.
   if (userId) {
     const normalizedAppName = normalizeAppName(app).toLowerCase();
+    const normalizedTitle = title.toLowerCase();
     const userBlockedApps = preferencesService.getUserBlockedApps(userId);
-    if (userBlockedApps.includes(normalizedAppName)) {
+    const isUserBlocked = userBlockedApps.some(
+      (blocked) =>
+        normalizedAppName.includes(blocked) ||
+        blocked.includes(normalizedAppName) ||
+        normalizedTitle.includes(blocked) ||
+        blocked.includes(normalizedTitle)
+    );
+    if (isUserBlocked) {
       return { blocked: true, reason: "App blocked by user preference" };
     }
   }

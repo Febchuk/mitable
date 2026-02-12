@@ -1835,11 +1835,13 @@ function setupMonitoringSessionHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_SET, (_, userId: string, blockedApps: string[]) => {
     preferencesService.setUserBlockedApps(userId, blockedApps);
+    focusWindowTracker.removeBlockedWindows();
     return { success: true };
   });
 
   ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_ADD, (_, userId: string, appName: string) => {
     preferencesService.addUserBlockedApp(userId, appName);
+    focusWindowTracker.removeBlockedWindows();
     return { success: true };
   });
 
