@@ -10,8 +10,9 @@ export const CalendarDwViewCell = (props: HTMLAttributes<HTMLDivElement>) => {
         <div
             {...props}
             className={cx(
-                "group relative flex h-12 flex-col bg-primary p-1.5 hover:bg-primary_hover",
-                "before:pointer-events-none before:absolute before:inset-0 before:border-r before:border-b before:border-secondary",
+                "group relative flex h-12 flex-col p-1.5",
+                "bg-canvas-base hover:bg-canvas-raised",
+                "before:pointer-events-none before:absolute before:inset-0 before:border-r before:border-b before:border-stroke-subtle",
                 props.className,
             )}
         >

@@ -509,8 +509,8 @@ const MonthView = ({
             </div>
 
             {targetDateForFooter && (
-                <div className="border-t border-secondary px-4 py-5 md:hidden">
-                    <h3 className="text-sm font-semibold text-primary">{fullDateFormatter.format(targetDateForFooter.toDate(timeZone))}</h3>
+                <div className="border-t border-stroke-subtle px-4 py-5 md:hidden">
+                    <h3 className="text-sm font-semibold text-ink-primary">{fullDateFormatter.format(targetDateForFooter.toDate(timeZone))}</h3>
 
                     {eventsForFooter.length > 0 && (
                         <div className="mt-4 flex flex-col gap-1.5">
@@ -603,8 +603,8 @@ const WeekViewDay = ({ day, isLastDay, visibleEvents, timeZone, slotHeight, setS
     const dayStart = useMemo(() => getStartOfDay(day, timeZone), [day, timeZone]);
 
     return (
-        <div className="flex flex-col border-secondary">
-            <div className="relative flex-1 bg-primary" style={{ minHeight: `${48 * slotHeight}px` }}>
+        <div className="flex flex-col border-stroke-subtle">
+            <div className="relative flex-1 bg-canvas-base" style={{ minHeight: `${48 * slotHeight}px` }}>
                 {Array.from({ length: 48 }).map((_, slotIndex) => (
                     <CalendarDwViewCell key={`slot-${dateKey}-${slotIndex}`} className={cx("last:before:border-b-0", isLastDay && "before:border-r-0")} />
                 ))}
@@ -726,8 +726,8 @@ const WeekView = ({
     }, [view, earliestEventTimeInWeek, currentMonthDate]);
 
     return (
-        <div className={cx("flex flex-1 flex-col overflow-auto", className)}>
-            <div className="sticky top-0 z-10 grid grid-cols-7 bg-primary pl-18 shadow-sm dark:border-b dark:border-secondary">
+        <div className={cx("flex flex-1 flex-col overflow-auto bg-canvas-base", className)}>
+            <div className="sticky top-0 z-10 grid grid-cols-7 bg-canvas-raised pl-18 border-b border-stroke-subtle">
                 {days.map((day) => {
                     const isTodayFlag = isDateToday(day, timeZone);
                     const dayToHighlight =
@@ -750,7 +750,7 @@ const WeekView = ({
 
             <div ref={scrollContainerRef} className="relative flex flex-1 overflow-y-auto">
                 {/* Time Gutter */}
-                <div className="flex h-max w-18 flex-col border-r border-secondary">
+                <div className="flex h-max w-18 flex-col border-r border-stroke-subtle">
                     {hours.map((hour) => {
                         const time = new CalendarDateTime(currentWeekStart.year, currentWeekStart.month, currentWeekStart.day, hour);
                         const timeString = hourOnlyFormatter.format(toZoned(time, timeZone).toDate());
@@ -886,8 +886,8 @@ const DayView = ({
     }, [view, earliestEventTime, dayToDisplay]);
 
     return (
-        <div className={cx("flex flex-1 flex-col overflow-auto", className)}>
-            <div className="sticky top-0 z-20 grid grid-cols-7 bg-primary shadow-sm md:hidden dark:border-b dark:border-secondary">
+        <div className={cx("flex flex-1 flex-col overflow-auto bg-canvas-base", className)}>
+            <div className="sticky top-0 z-20 grid grid-cols-7 bg-canvas-raised md:hidden border-b border-stroke-subtle">
                 {days.map((day) => {
                     const isTodayFlag = isDateToday(day, timeZone);
                     const dayToHighlight =
@@ -910,7 +910,7 @@ const DayView = ({
 
             <div className="flex h-full flex-1">
                 <div ref={scrollContainerRef} className="relative flex h-full flex-1 overflow-auto">
-                    <div className="flex h-max w-14 flex-col border-r border-secondary md:w-18">
+                    <div className="flex h-max w-14 flex-col border-r border-stroke-subtle md:w-18">
                         {hours.map((hour) => {
                             const time = new CalendarDateTime(dayToDisplay.year, dayToDisplay.month, dayToDisplay.day, hour);
                             const timeString = hourOnlyFormatter.format(toZoned(time, timeZone).toDate());
@@ -929,7 +929,7 @@ const DayView = ({
                     {showTimeMarker && <CalendarTimeMarker style={{ top: `${timeMarkerTop}px` }}>{formatTime(localCurrentTime)}</CalendarTimeMarker>}
                 </div>
 
-                <div className="sticky top-0 hidden h-full w-82 flex-col overflow-auto border-l border-secondary mask-b-from-94% lg:flex">
+                <div className="sticky top-0 hidden h-full w-82 flex-col overflow-auto border-l border-stroke-subtle mask-b-from-94% lg:flex bg-canvas-raised">
                     <AriaCalendar aria-label="Calendar" className="px-6 py-5" value={selectedDate} onChange={(value) => setSelectedDate(value)}>
                         <header className="mb-3 flex items-center justify-between">
                             <Button slot="previous" iconLeading={ChevronLeft} size="sm" color="tertiary" className="size-8" />
@@ -941,7 +941,7 @@ const DayView = ({
                             <AriaCalendarGridHeader className="border-b-4 border-transparent">
                                 {(day) => (
                                     <AriaCalendarHeaderCell className="p-0">
-                                        <div className="flex size-10 items-center justify-center text-sm font-medium text-secondary">{day.slice(0, 2)}</div>
+                                        <div className="flex size-10 items-center justify-center text-sm font-medium text-ink-secondary">{day.slice(0, 2)}</div>
                                     </AriaCalendarHeaderCell>
                                 )}
                             </AriaCalendarGridHeader>
@@ -951,10 +951,10 @@ const DayView = ({
                         </AriaCalendarGrid>
                     </AriaCalendar>
 
-                    <div className="flex flex-col gap-5 border-t border-secondary px-6 py-5">
+                    <div className="flex flex-col gap-5 border-t border-stroke-subtle px-6 py-5">
                         <div className="flex flex-col gap-2">
                             <section className="flex w-full justify-between">
-                                <p className="text-md font-semibold text-primary">Product demo</p>
+                                <p className="text-md font-semibold text-ink-primary">Product demo</p>
                                 <div className="-mt-2 -mr-2 flex gap-0.5">
                                     <ButtonUtility size="xs" color="tertiary" tooltip="Copy link" icon={Copy01} />
                                     <ButtonUtility size="xs" color="tertiary" tooltip="Delete" icon={Trash01} />
@@ -963,16 +963,16 @@ const DayView = ({
                             </section>
                             <section className="flex flex-col gap-1.5">
                                 <div className="flex items-center gap-1.5">
-                                    <CalendarIcon className="size-4 text-fg-quaternary" />
-                                    <p className="text-sm text-tertiary">Friday, Jan 10, 2025</p>
+                                    <CalendarIcon className="size-4 text-ink-tertiary" />
+                                    <p className="text-sm text-ink-tertiary">Friday, Jan 10, 2025</p>
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                    <Clock className="size-4 text-fg-quaternary" />
-                                    <p className="text-sm text-tertiary">1:30 PM - 3:30 PM</p>
+                                    <Clock className="size-4 text-ink-tertiary" />
+                                    <p className="text-sm text-ink-tertiary">1:30 PM - 3:30 PM</p>
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                    <BellRinging01 className="size-4 text-fg-quaternary" />
-                                    <p className="text-sm text-tertiary">10 min before</p>
+                                    <BellRinging01 className="size-4 text-ink-tertiary" />
+                                    <p className="text-sm text-ink-tertiary">10 min before</p>
                                 </div>
                             </section>
                         </div>
@@ -980,52 +980,52 @@ const DayView = ({
                             <section className="flex gap-2">
                                 <section className="flex flex-row -space-x-2">
                                     <Avatar
-                                        className="ring-[1.5px] ring-bg-primary"
+                                        className="ring-[1.5px] ring-canvas-base"
                                         src="https://www.untitledui.com/images/avatars/sienna-hewitt?fm=webp&q=80"
                                         alt="Sienna Hewitt"
                                         size="sm"
                                     />
                                     <Avatar
-                                        className="ring-[1.5px] ring-bg-primary"
+                                        className="ring-[1.5px] ring-canvas-base"
                                         src="https://www.untitledui.com/images/avatars/ammar-foley?fm=webp&q=80"
                                         alt="Ammar Foley"
                                         size="sm"
                                     />
                                     <Avatar
-                                        className="ring-[1.5px] ring-bg-primary"
+                                        className="ring-[1.5px] ring-canvas-base"
                                         src="https://www.untitledui.com/images/avatars/pippa-wilkinson?fm=webp&q=80"
                                         alt="Pippa Wilkinson"
                                         size="sm"
                                     />
                                     <Avatar
-                                        className="ring-[1.5px] ring-bg-primary"
+                                        className="ring-[1.5px] ring-canvas-base"
                                         src="https://www.untitledui.com/images/avatars/olly-schroeder?fm=webp&q=80"
                                         alt="Olly Schroeder"
                                         size="sm"
                                     />
                                     <Avatar
-                                        className="ring-[1.5px] ring-bg-primary"
+                                        className="ring-[1.5px] ring-canvas-base"
                                         src="https://www.untitledui.com/images/avatars/mathilde-lewis?fm=webp&q=80"
                                         alt="Mathilde Lewis"
                                         size="sm"
                                     />
-                                    <Avatar className="ring-[1.5px] ring-bg-primary" initials="OR" size="sm" />
+                                    <Avatar className="ring-[1.5px] ring-canvas-base" initials="OR" size="sm" />
                                 </section>
                                 <AvatarAddButton size="sm" />
                             </section>
 
                             <section className="flex items-center gap-2">
-                                <p className="text-sm font-semibold text-primary">6 guests</p>
-                                <span className="h-[13px] border-l border-primary" />
-                                <p className="text-sm text-tertiary">5 yes</p>
-                                <span className="h-[13px] border-l border-primary" />
-                                <p className="text-sm text-tertiary">1 awaiting</p>
+                                <p className="text-sm font-semibold text-ink-primary">6 guests</p>
+                                <span className="h-[13px] border-l border-stroke-subtle" />
+                                <p className="text-sm text-ink-tertiary">5 yes</p>
+                                <span className="h-[13px] border-l border-stroke-subtle" />
+                                <p className="text-sm text-ink-tertiary">1 awaiting</p>
                             </section>
                         </div>
 
                         <section className="flex flex-col gap-2">
-                            <p className="text-sm font-semibold text-primary">About this event</p>
-                            <div className="text-sm text-tertiary">
+                            <p className="text-sm font-semibold text-ink-primary">About this event</p>
+                            <div className="text-sm text-ink-tertiary">
                                 <p>Sienna is inviting you to a scheduled Zoom meeting.</p>
                                 <br />
                                 <p>Topic: Product demo for the new dashboard and Q&A session.</p>
@@ -1123,7 +1123,7 @@ export const Calendar = ({ events, view: defaultView = "month", className }: Cal
             role="application"
             aria-label="Calendar"
             className={cx(
-                "flex flex-col overflow-hidden rounded-xl bg-primary shadow-xs ring ring-secondary",
+                "flex flex-col overflow-hidden rounded-xl bg-canvas-base border border-stroke-subtle",
                 view === "month" ? "h-full md:min-h-[912px]" : "h-[912px]",
                 className,
             )}

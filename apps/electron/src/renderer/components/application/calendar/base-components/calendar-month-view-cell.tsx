@@ -16,24 +16,25 @@ export const CalendarMonthViewCell = ({ isDisabled, children, className, day, st
         <div
             {...props}
             className={cx(
-                "group relative flex flex-col gap-1.5 bg-primary p-1.5 hover:bg-primary_hover max-md:min-h-22 md:gap-1 md:p-2",
-                "before:pointer-events-none before:absolute before:inset-0 before:border-r before:border-b before:border-secondary",
-                isDisabled ? "pointer-events-none bg-secondary_subtle" : "cursor-pointer",
+                "group relative flex flex-col gap-1.5 p-1.5 max-md:min-h-22 md:gap-1 md:p-2",
+                "bg-canvas-base hover:bg-canvas-raised",
+                "before:pointer-events-none before:absolute before:inset-0 before:border-r before:border-b before:border-stroke-subtle",
+                isDisabled ? "pointer-events-none bg-canvas-muted/50" : "cursor-pointer",
                 className,
             )}
         >
             {!isDisabled && (
                 <div className="absolute right-1.5 bottom-1.5 z-10 hidden group-hover:inline-flex">
-                    <Button aria-label="Add event" size="sm" iconLeading={Plus} color="secondary" className="size-7 text-fg-quaternary" />
+                    <Button aria-label="Add event" size="sm" iconLeading={Plus} color="secondary" className="size-7 text-ink-tertiary" />
                 </div>
             )}
 
             <span
                 className={cx(
-                    "flex size-6 items-center justify-center rounded-full text-xs font-semibold text-secondary",
-                    state === "selected" && "bg-brand-solid text-white",
-                    state === "current" && "bg-active",
-                    isDisabled && "text-disabled",
+                    "flex size-6 items-center justify-center rounded-full text-xs font-semibold text-ink-secondary",
+                    state === "selected" && "bg-indigo text-white",
+                    state === "current" && "bg-indigo/20 text-indigo-light",
+                    isDisabled && "text-ink-tertiary/50",
                 )}
             >
                 {day}

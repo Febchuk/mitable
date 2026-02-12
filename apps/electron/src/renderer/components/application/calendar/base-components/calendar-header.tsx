@@ -32,7 +32,7 @@ export const CalendarHeader = ({ date, selectedView, onSelectionChange, viewOpti
 
         if (selectedView === "month") {
             return (
-                <span className="text-sm text-tertiary">
+                <span className="text-sm text-ink-tertiary">
                     {new Date(date.getFullYear(), date.getMonth(), 1).toLocaleDateString(locale, dateFormatOptions)}
                     {" – "}
                     {new Date(date.getFullYear(), date.getMonth() + 1, 0).toLocaleDateString(locale, dateFormatOptions)}
@@ -46,7 +46,7 @@ export const CalendarHeader = ({ date, selectedView, onSelectionChange, viewOpti
             const weekEndDate = endOfWeek(calendarDate, locale);
 
             return (
-                <span className="text-sm text-tertiary">
+                <span className="text-sm text-ink-tertiary">
                     {weekStartDate.toDate(timeZone).toLocaleDateString(locale, dateFormatOptions)}
                     {" – "}
                     {weekEndDate.toDate(timeZone).toLocaleDateString(locale, dateFormatOptions)}
@@ -54,15 +54,15 @@ export const CalendarHeader = ({ date, selectedView, onSelectionChange, viewOpti
             );
         }
 
-        return <span className="text-sm text-tertiary">{date.toLocaleString(locale, { weekday: "long" })}</span>;
+        return <span className="text-sm text-ink-tertiary">{date.toLocaleString(locale, { weekday: "long" })}</span>;
     };
 
     return (
-        <div className="relative flex flex-col items-start justify-between gap-4 bg-primary px-4 py-5 md:flex-row md:px-6">
+        <div className="relative flex flex-col items-start justify-between gap-4 bg-canvas-raised px-4 py-5 md:flex-row md:px-6">
             <div className="flex items-start gap-3">
                 <CalendarDateIcon day={date.getDate()} month={date.toLocaleString(locale, { month: "short" }).toUpperCase()} className="max-md:hidden" />
                 <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2 text-lg font-semibold text-primary">
+                    <div className="flex items-center gap-2 text-lg font-semibold text-ink-primary">
                         {date.toLocaleString(locale, { month: "long" })} {date.getFullYear()}
                         <Badge size="sm" color="gray" type="modern">
                             Week {Math.ceil(date.getDate() / 7)}
@@ -90,7 +90,7 @@ export const CalendarHeader = ({ date, selectedView, onSelectionChange, viewOpti
                 </Button>
             </div>
 
-            <div className="pointer-events-none absolute bottom-0 left-0 w-full border-t border-secondary"></div>
+            <div className="pointer-events-none absolute bottom-0 left-0 w-full border-t border-stroke-subtle"></div>
         </div>
     );
 };

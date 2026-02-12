@@ -15,18 +15,19 @@ export const CalendarColumnHeader = ({ state, weekDay, day, className, onClick }
         <div
             onClick={onClick}
             className={cx(
-                "relative flex w-full flex-col items-center justify-center gap-1.5 bg-primary p-2 md:flex-row md:gap-1",
-                "before:pointer-events-none before:absolute before:inset-0 before:border-secondary not-last:before:border-r",
+                "relative flex w-full flex-col items-center justify-center gap-1.5 p-2 md:flex-row md:gap-1",
+                "bg-canvas-raised",
+                "before:pointer-events-none before:absolute before:inset-0 before:border-stroke-subtle not-last:before:border-r",
                 className,
             )}
         >
-            <span className="text-xs font-medium text-quaternary">{weekDay}</span>
+            <span className="text-xs font-medium text-ink-tertiary">{weekDay}</span>
             {typeof day === "number" && (
                 <span
                     className={cx(
-                        "flex h-6 items-center justify-center text-xs font-semibold text-secondary",
-                        state === "selected" && "w-6 rounded-full bg-brand-solid text-white",
-                        state === "current" && "w-6 rounded-full bg-active",
+                        "flex h-6 items-center justify-center text-xs font-semibold text-ink-secondary",
+                        state === "selected" && "w-6 rounded-full bg-indigo text-white",
+                        state === "current" && "w-6 rounded-full bg-indigo/20 text-indigo-light",
                     )}
                 >
                     {day}
