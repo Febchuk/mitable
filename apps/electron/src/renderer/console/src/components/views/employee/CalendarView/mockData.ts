@@ -274,6 +274,7 @@ const todayMorningBlock: WorkBlock = {
     { app: "Chrome", minutes: 35, percentage: 23 },
     { app: "Terminal", minutes: 20, percentage: 14 },
   ],
+  status: "ended",
 };
 
 const todayAfternoonBlock: WorkBlock = {
@@ -293,6 +294,7 @@ const todayAfternoonBlock: WorkBlock = {
   isActive: true,
   isFocusedSession: true,
   goal: "Complete CalendarView prototype UI",
+  status: "active",
 };
 
 const today: ActivityDay = {
@@ -326,6 +328,7 @@ const yesterdayBlock1: WorkBlock = {
     { app: "Chrome", minutes: 70, percentage: 33 },
     { app: "Slack", minutes: 50, percentage: 24 },
   ],
+  status: "ended",
 };
 
 const yesterdayBlock2: WorkBlock = {
@@ -344,6 +347,7 @@ const yesterdayBlock2: WorkBlock = {
   ],
   isFocusedSession: true,
   goal: "Complete PR reviews for Sprint 23",
+  status: "ended",
 };
 
 const yesterdayBlock3: WorkBlock = {
@@ -360,6 +364,7 @@ const yesterdayBlock3: WorkBlock = {
     { app: "Chrome", minutes: 30, percentage: 33 },
     { app: "Slack", minutes: 20, percentage: 22 },
   ],
+  status: "ended",
 };
 
 const yesterday: ActivityDay = {
@@ -394,6 +399,7 @@ const twoDaysAgoBlock1: WorkBlock = {
     { app: "Terminal", minutes: 35, percentage: 23 },
     { app: "Chrome", minutes: 15, percentage: 10 },
   ],
+  status: "ended",
 };
 
 const twoDaysAgoBlock2: WorkBlock = {
@@ -410,6 +416,7 @@ const twoDaysAgoBlock2: WorkBlock = {
     { app: "Slack", minutes: 40, percentage: 24 },
     { app: "Chrome", minutes: 25, percentage: 15 },
   ],
+  status: "ended",
 };
 
 const twoDaysAgo: ActivityDay = {
@@ -450,6 +457,7 @@ const threeDaysAgo: ActivityDay = {
         { app: "Slack", minutes: 35, percentage: 19 },
         { app: "Chrome", minutes: 25, percentage: 14 },
       ],
+      status: "ended",
     },
     {
       id: "wb-3days-2",
@@ -465,6 +473,7 @@ const threeDaysAgo: ActivityDay = {
         { app: "Notion", minutes: 60, percentage: 30 },
         { app: "Chrome", minutes: 30, percentage: 15 },
       ],
+      status: "ended",
     },
   ],
   summary:
@@ -497,6 +506,7 @@ const fourDaysAgo: ActivityDay = {
         { app: "Chrome", minutes: 60, percentage: 33 },
         { app: "Notion", minutes: 40, percentage: 22 },
       ],
+      status: "ended",
     },
   ],
   summary: "Light meeting-focused day. Team sync and planning sessions.",
@@ -528,6 +538,7 @@ const fiveDaysAgo: ActivityDay = {
       ],
       isFocusedSession: true,
       goal: "Refactor captureService for passive tracking",
+      status: "ended",
     },
     {
       id: "wb-5days-2",
@@ -542,6 +553,7 @@ const fiveDaysAgo: ActivityDay = {
         { app: "Chrome", minutes: 40, percentage: 22 },
         { app: "Terminal", minutes: 20, percentage: 11 },
       ],
+      status: "ended",
     },
   ],
   summary:
@@ -573,6 +585,7 @@ const sixDaysAgo: ActivityDay = {
         { app: "VS Code", minutes: 60, percentage: 33 },
         { app: "Slack", minutes: 30, percentage: 17 },
       ],
+      status: "ended",
     },
     {
       id: "wb-6days-2",
@@ -588,6 +601,7 @@ const sixDaysAgo: ActivityDay = {
         { app: "Terminal", minutes: 50, percentage: 28 },
         { app: "Chrome", minutes: 30, percentage: 16 },
       ],
+      status: "ended",
     },
   ],
   summary: "Maintenance day focused on code review and bug fixes. Successful hotfix deployment.",

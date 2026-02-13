@@ -32,6 +32,27 @@ export interface Capture {
   switchedFrom?: string; // What app/context they switched from
 }
 
+/**
+ * WorkBlock status - aligns with MonitoringSession status
+ */
+export type WorkBlockStatus =
+  | "active"
+  | "paused"
+  | "ended"
+  | "summarizing"
+  | "ready"
+  | "delivered";
+
+/**
+ * Delivery channel for block summaries (via Recaps)
+ */
+export type DeliveryChannel = "slack" | "email" | "linear";
+
+/**
+ * Delivery status for block summaries
+ */
+export type DeliveryStatus = "pending" | "sent" | "failed";
+
 export interface WorkBlock {
   id: string;
   startTime: Date;
@@ -44,6 +65,15 @@ export interface WorkBlock {
   isActive?: boolean;
   isFocusedSession?: boolean; // True if user explicitly started this block
   goal?: string; // Optional goal for focused sessions
+
+  // Session-aligned fields (from MonitoringSession migration)
+  name?: string; // Optional block name
+  status: WorkBlockStatus;
+  deliveryStatus?: DeliveryStatus;
+  deliveryChannel?: DeliveryChannel;
+  deliveredAt?: Date;
+  rawActivitySummary?: string; // AI-generated raw summary
+  finalSummary?: string; // User-edited final summary
 }
 
 export interface ActivityDay {

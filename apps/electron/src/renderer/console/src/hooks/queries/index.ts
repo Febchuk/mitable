@@ -12,3 +12,9 @@ export * from "./billing";
 
 // Artifacts queries
 export * from "./artifacts";
+
+// Calendar queries (transforms sessions → work blocks)
+export * from "./calendar";
+
+// Monitoring queries (sessions)
+export * from "./monitoring";

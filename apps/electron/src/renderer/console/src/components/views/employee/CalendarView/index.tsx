@@ -3,6 +3,11 @@
  *
  * Main calendar/journal view for passive activity tracking.
  * Shows day-level view with week navigation and work blocks.
+ *
+ * Data flow:
+ * - Uses real session data from backend via useCalendarDays hook
+ * - Falls back to mock data in development when no real sessions exist
+ * - Sessions are transformed into WorkBlocks with status tracking
  */
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -20,6 +25,8 @@ import {
   Target,
   LayoutGrid,
   List,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { mockDays, getMockWeekDays } from "./mockData";
 import DayCard from "./DayCard";
@@ -27,6 +34,7 @@ import DaySummary from "./DaySummary";
 import WorkBlockList from "./WorkBlockList";
 import { Calendar as UntitledCalendar, type CalendarEvent } from "@/components/application/calendar/calendar";
 import type { ActivityDay } from "./types";
+import { useCalendarDays } from "../../../../hooks/queries/calendar";
 
 // Helper functions
 function getStartOfWeek(date: Date): Date {
@@ -129,6 +137,17 @@ export default function CalendarView() {
 
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Fetch real data from backend
+  const {
+    data: realDays,
+    isLoading: isLoadingDays,
+    error: daysError,
+  } = useCalendarDays();
+
+  // Use real data if available, fall back to mock data for development
+  const useMockData = !realDays || realDays.length === 0;
+  const allDays = useMockData ? mockDays : realDays;
+
   // Close menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -141,23 +160,55 @@ export default function CalendarView() {
   }, []);
 
   // Get week days with activity data
-  const weekDays = useMemo(() => getMockWeekDays(weekStart), [weekStart]);
+  const weekDays = useMemo(() => {
+    if (useMockData) {
+      return getMockWeekDays(weekStart);
+    }
 
-  // Convert all mock days to calendar events for the Calendar component
-  const calendarEvents = useMemo(() => workBlocksToCalendarEvents(mockDays), []);
+    // Build week days from real data
+    const days: ActivityDay[] = [];
+    const current = new Date(weekStart);
+
+    for (let i = 0; i < 7; i++) {
+      const existingDay = allDays.find((d) => isSameDay(d.date, current));
+
+      if (existingDay) {
+        days.push(existingDay);
+      } else {
+        // Create empty day placeholder
+        days.push({
+          id: `day-empty-${current.toISOString()}`,
+          date: new Date(current),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          totalWorkTime: 0,
+          workBlocks: [],
+          summary: "",
+          topApps: [],
+        });
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    return days;
+  }, [weekStart, useMockData, allDays]);
+
+  // Convert all days to calendar events for the Calendar component
+  const calendarEvents = useMemo(() => workBlocksToCalendarEvents(allDays), [allDays]);
 
   // Get selected day data
   const selectedDay = useMemo(() => {
-    return mockDays.find((day) => isSameDay(day.date, selectedDate)) || {
-      id: "empty",
-      date: selectedDate,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      totalWorkTime: 0,
-      workBlocks: [],
-      summary: "",
-      topApps: [],
-    };
-  }, [selectedDate]);
+    return (
+      allDays.find((day) => isSameDay(day.date, selectedDate)) || {
+        id: "empty",
+        date: selectedDate,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        totalWorkTime: 0,
+        workBlocks: [],
+        summary: "",
+        topApps: [],
+      }
+    );
+  }, [selectedDate, allDays]);
 
   // Check navigation constraints
   const isCurrentWeek = isSameDay(weekStart, getStartOfWeek(today));
@@ -400,50 +451,84 @@ export default function CalendarView() {
           MAIN CONTENT - Detail view or Calendar grid view
           ═══════════════════════════════════════════════════════════════════ */}
       <div className={`px-8 ${isGridView ? "flex-1 flex flex-col min-h-0 pb-4" : "pb-8"}`}>
-        {isGridView ? (
-          /* Calendar Grid View - Using untitledui Calendar */
-          <div className="stagger-2 flex-1 min-h-0 flex flex-col mitable-calendar">
-            <UntitledCalendar
-              events={calendarEvents}
-              view={viewMode}
-              currentDate={selectedDate}
-              hideHeader={true}
-              className="flex-1 min-h-0"
-              onEventClick={(event) => {
-                // Switch to detail view and set the date to the event's date
-                setSelectedDate(event.start);
-                setWeekStart(getStartOfWeek(event.start));
-                setViewMode("detail");
-              }}
-            />
+        {/* Loading State */}
+        {isLoadingDays && !useMockData && (
+          <div className="flex flex-col items-center justify-center py-16">
+            <Loader2 size={32} className="text-indigo animate-spin mb-4" />
+            <p className="text-ink-tertiary text-sm">Loading activity data...</p>
           </div>
-        ) : (
-          /* Detail View */
-          <div className="stagger-2">
-            {/* Day header */}
-            <div className="flex items-center justify-between mb-4 pt-4 border-t border-stroke-subtle">
-              <h2 className="font-display text-xl font-semibold text-ink-primary">
-                {formatDayHeader(selectedDate)}
-              </h2>
+        )}
 
-              {/* AI Summary button */}
-              {selectedDay.workBlocks.length > 0 && (
-                <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:border-indigo/30 hover:bg-indigo/5 text-ink-secondary hover:text-indigo transition-all">
-                  <Sparkles size={16} />
-                  <span className="text-sm font-medium">Regenerate Summary</span>
-                </button>
-              )}
+        {/* Error State */}
+        {daysError && !useMockData && (
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="p-3 rounded-full bg-rose/10 mb-4">
+              <AlertCircle size={24} className="text-rose" />
             </div>
-
-            {/* Day Summary with toggle */}
-            <DaySummary day={selectedDay} />
-
-            {/* Work blocks */}
-            <WorkBlockList
-              blocks={selectedDay.workBlocks}
-              totalWorkTime={selectedDay.totalWorkTime}
-            />
+            <p className="text-ink-primary font-medium mb-1">Failed to load activity data</p>
+            <p className="text-ink-tertiary text-sm">
+              {daysError instanceof Error ? daysError.message : "An error occurred"}
+            </p>
           </div>
+        )}
+
+        {/* Data Source Indicator (dev only) */}
+        {useMockData && !isLoadingDays && (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-amber/10 border border-amber/20 text-amber text-xs flex items-center gap-2">
+            <AlertCircle size={14} />
+            <span>Showing mock data - no sessions found</span>
+          </div>
+        )}
+
+        {/* Main Content */}
+        {(!isLoadingDays || useMockData) && !daysError && (
+          <>
+            {isGridView ? (
+              /* Calendar Grid View - Using untitledui Calendar */
+              <div className="stagger-2 flex-1 min-h-0 flex flex-col mitable-calendar">
+                <UntitledCalendar
+                  events={calendarEvents}
+                  view={viewMode}
+                  currentDate={selectedDate}
+                  hideHeader={true}
+                  className="flex-1 min-h-0"
+                  onEventClick={(event) => {
+                    // Switch to detail view and set the date to the event's date
+                    setSelectedDate(event.start);
+                    setWeekStart(getStartOfWeek(event.start));
+                    setViewMode("detail");
+                  }}
+                />
+              </div>
+            ) : (
+              /* Detail View */
+              <div className="stagger-2">
+                {/* Day header */}
+                <div className="flex items-center justify-between mb-4 pt-4 border-t border-stroke-subtle">
+                  <h2 className="font-display text-xl font-semibold text-ink-primary">
+                    {formatDayHeader(selectedDate)}
+                  </h2>
+
+                  {/* AI Summary button */}
+                  {selectedDay.workBlocks.length > 0 && (
+                    <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:border-indigo/30 hover:bg-indigo/5 text-ink-secondary hover:text-indigo transition-all">
+                      <Sparkles size={16} />
+                      <span className="text-sm font-medium">Regenerate Summary</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Day Summary with toggle */}
+                <DaySummary day={selectedDay} />
+
+                {/* Work blocks */}
+                <WorkBlockList
+                  blocks={selectedDay.workBlocks}
+                  totalWorkTime={selectedDay.totalWorkTime}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
 

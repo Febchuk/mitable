@@ -11,6 +11,7 @@ import WorkBlockDetail from "./WorkBlockDetail";
 interface WorkBlockListProps {
   blocks: WorkBlock[];
   totalWorkTime: number;
+  onBlockDelete?: (blockId: string) => void;
 }
 
 function formatDuration(minutes: number): string {
@@ -21,7 +22,7 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-export default function WorkBlockList({ blocks, totalWorkTime }: WorkBlockListProps) {
+export default function WorkBlockList({ blocks, totalWorkTime, onBlockDelete }: WorkBlockListProps) {
   if (blocks.length === 0) {
     return (
       <div className="py-16 text-center">
@@ -100,6 +101,7 @@ export default function WorkBlockList({ blocks, totalWorkTime }: WorkBlockListPr
             block={block}
             blockNumber={index + 1}
             defaultExpanded={block.isActive || (index === blocks.length - 1 && blocks.length <= 3)}
+            onDelete={onBlockDelete}
           />
         ))}
       </div>

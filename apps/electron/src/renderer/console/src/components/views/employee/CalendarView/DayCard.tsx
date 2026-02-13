@@ -43,6 +43,13 @@ export default function DayCard({ day, isSelected, isToday, onClick }: DayCardPr
   const activityLevel = getActivityLevel(day.totalWorkTime);
   const hasActivity = day.totalWorkTime > 0;
 
+  // Check for active/paused/summarizing blocks
+  const hasActiveBlock = day.workBlocks.some(
+    (b) => b.status === "active" || b.isActive
+  );
+  const hasPausedBlock = day.workBlocks.some((b) => b.status === "paused");
+  const hasSummarizingBlock = day.workBlocks.some((b) => b.status === "summarizing");
+
   return (
     <button
       onClick={onClick}
@@ -83,16 +90,27 @@ export default function DayCard({ day, isSelected, isToday, onClick }: DayCardPr
       <div className="mt-1 flex items-center gap-1">
         {hasActivity ? (
           <>
-            {/* Activity dot */}
-            <div
-              className={`w-1.5 h-1.5 rounded-full ${
-                activityLevel === "heavy"
-                  ? "bg-emerald"
-                  : activityLevel === "medium"
-                    ? "bg-amber-400"
-                    : "bg-ink-tertiary"
-              }`}
-            />
+            {/* Status-aware activity dot */}
+            {hasActiveBlock ? (
+              <div className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald"></span>
+              </div>
+            ) : hasPausedBlock ? (
+              <div className="w-2 h-2 rounded-full bg-amber" />
+            ) : hasSummarizingBlock ? (
+              <div className="w-2 h-2 rounded-full bg-indigo animate-pulse" />
+            ) : (
+              <div
+                className={`w-1.5 h-1.5 rounded-full ${
+                  activityLevel === "heavy"
+                    ? "bg-emerald"
+                    : activityLevel === "medium"
+                      ? "bg-amber-400"
+                      : "bg-ink-tertiary"
+                }`}
+              />
+            )}
             <span className="text-[10px] text-ink-tertiary font-medium tabular-nums">
               {formatDuration(day.totalWorkTime)}
             </span>

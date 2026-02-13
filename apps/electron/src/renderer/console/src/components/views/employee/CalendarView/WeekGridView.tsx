@@ -62,15 +62,45 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-// Get block color based on type
+// Get block color based on status and type
 function getBlockColors(block: WorkBlock): { bg: string; border: string; text: string } {
-  if (block.isActive) {
+  // Status-based colors (priority over type)
+  if (block.status === "active" || block.isActive) {
     return {
       bg: "bg-emerald/20",
       border: "border-emerald/40",
       text: "text-emerald",
     };
   }
+  if (block.status === "paused") {
+    return {
+      bg: "bg-amber/20",
+      border: "border-amber/40",
+      text: "text-amber",
+    };
+  }
+  if (block.status === "summarizing") {
+    return {
+      bg: "bg-indigo/20",
+      border: "border-indigo/40",
+      text: "text-indigo",
+    };
+  }
+  if (block.status === "delivered") {
+    return {
+      bg: "bg-violet/20",
+      border: "border-violet/40",
+      text: "text-violet",
+    };
+  }
+  if (block.status === "ready") {
+    return {
+      bg: "bg-cyan/20",
+      border: "border-cyan/40",
+      text: "text-cyan",
+    };
+  }
+  // Type-based colors (for ended blocks)
   if (block.isFocusedSession) {
     return {
       bg: "bg-indigo/20",
@@ -135,10 +165,20 @@ function BlockItem({
           </div>
         )}
 
-        {/* Active indicator */}
-        {block.isActive && (
+        {/* Status indicator */}
+        {(block.status === "active" || block.isActive) && (
           <div className="absolute top-2 right-2">
             <div className="w-2 h-2 rounded-full bg-emerald animate-pulse" />
+          </div>
+        )}
+        {block.status === "paused" && (
+          <div className="absolute top-2 right-2">
+            <div className="w-2 h-2 rounded-full bg-amber" />
+          </div>
+        )}
+        {block.status === "summarizing" && (
+          <div className="absolute top-2 right-2">
+            <div className="w-2 h-2 rounded-full bg-indigo animate-pulse" />
           </div>
         )}
       </div>

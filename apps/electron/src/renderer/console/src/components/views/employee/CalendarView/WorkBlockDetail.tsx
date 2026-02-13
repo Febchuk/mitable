@@ -2,9 +2,11 @@
  * WorkBlockDetail
  *
  * Expandable work block card showing summary, app breakdown, and captures.
+ * Supports block status display and recap actions.
  */
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ChevronDown,
   ChevronRight,
@@ -13,14 +15,23 @@ import {
   Activity,
   BarChart3,
   Target,
+  MoreVertical,
+  FileText,
+  Trash2,
+  Loader2,
+  Send,
+  Pause,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
 import CaptureTimeline from "./CaptureTimeline";
+import { useBlockDetail } from "../../../../hooks/queries/calendar";
+import { useDeleteSession } from "../../../../hooks/queries/monitoring";
 
 interface WorkBlockDetailProps {
   block: WorkBlock;
   blockNumber: number;
   defaultExpanded?: boolean;
+  onDelete?: (blockId: string) => void;
 }
 
 function formatTime(date: Date): string {
@@ -64,16 +75,74 @@ function getAppColor(appName: string): string {
   return appColors[appName] || "bg-gray-500";
 }
 
+// Status badge colors
+function getStatusColor(status: WorkBlock["status"]): { bg: string; text: string } {
+  const colors: Record<WorkBlock["status"], { bg: string; text: string }> = {
+    active: { bg: "bg-emerald/20", text: "text-emerald" },
+    paused: { bg: "bg-amber/20", text: "text-amber" },
+    ended: { bg: "bg-gray-500/20", text: "text-ink-tertiary" },
+    summarizing: { bg: "bg-indigo/20", text: "text-indigo" },
+    ready: { bg: "bg-cyan/20", text: "text-cyan" },
+    delivered: { bg: "bg-violet/20", text: "text-violet" },
+  };
+  return colors[status] || colors.ended;
+}
+
 export default function WorkBlockDetail({
   block,
   blockNumber,
   defaultExpanded = false,
+  onDelete,
 }: WorkBlockDetailProps) {
+  const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [showCaptures, setShowCaptures] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Fetch full block details (includes summary) on demand
+  const { data: blockDetail, isLoading: isLoadingDetail } = useBlockDetail(block.id, {
+    enabled: isExpanded,
+  });
+
+  // Delete mutation
+  const deleteSession = useDeleteSession();
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const idleGapLabel = formatIdleGap(block.idleGapBefore);
   const timeRange = `${formatTime(block.startTime)} - ${block.endTime ? formatTime(block.endTime) : "now"}`;
+
+  // Get summary from block detail if available
+  const displaySummary = blockDetail?.finalSummary || blockDetail?.rawActivitySummary || block.summary;
+
+  // Handle creating a recap from this block
+  const handleCreateRecap = () => {
+    const dateStr = block.startTime.toISOString().split("T")[0];
+    navigate(`/recaps/new?blocks=${block.id}&date=${dateStr}`);
+    setShowMenu(false);
+  };
+
+  // Handle deleting this block
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this block?")) return;
+    try {
+      await deleteSession.mutateAsync(block.id);
+      onDelete?.(block.id);
+    } catch (error) {
+      console.error("Failed to delete block:", error);
+    }
+    setShowMenu(false);
+  };
 
   return (
     <div className="group">
@@ -143,7 +212,7 @@ export default function WorkBlockDetail({
                 <span className="text-xs font-medium text-indigo">{block.goal}</span>
               </div>
             )}
-            <p className="text-sm text-ink-primary line-clamp-2">{block.summary}</p>
+            <p className="text-sm text-ink-primary line-clamp-2">{displaySummary || "No summary yet"}</p>
           </div>
 
           {/* Duration */}
@@ -159,11 +228,118 @@ export default function WorkBlockDetail({
             <Activity size={14} />
             <span className="text-sm tabular-nums">{block.captures.length}</span>
           </div>
+
+          {/* Status badge */}
+          {block.status && block.status !== "ended" && (
+            <div
+              className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${getStatusColor(block.status).bg} ${getStatusColor(block.status).text}`}
+            >
+              {block.status === "active" && (
+                <span className="flex items-center gap-1">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald"></span>
+                  </span>
+                  Active
+                </span>
+              )}
+              {block.status === "paused" && (
+                <span className="flex items-center gap-1">
+                  <Pause size={10} />
+                  Paused
+                </span>
+              )}
+              {block.status === "summarizing" && (
+                <span className="flex items-center gap-1">
+                  <Loader2 size={10} className="animate-spin" />
+                  Summarizing
+                </span>
+              )}
+              {block.status === "ready" && "Ready"}
+              {block.status === "delivered" && (
+                <span className="flex items-center gap-1">
+                  <Send size={10} />
+                  Delivered
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Block menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu(!showMenu);
+              }}
+              className="p-1.5 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors opacity-0 group-hover:opacity-100"
+            >
+              <MoreVertical size={16} />
+            </button>
+
+            {showMenu && (
+              <div className="absolute right-0 top-full mt-1 w-40 rounded-xl border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-50">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCreateRecap();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-canvas-muted transition-colors"
+                >
+                  <FileText size={14} className="text-indigo" />
+                  <span className="text-sm text-ink-primary">Create Recap</span>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete();
+                  }}
+                  disabled={deleteSession.isPending}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle text-rose disabled:opacity-50"
+                >
+                  {deleteSession.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
+                  <span className="text-sm">Delete Block</span>
+                </button>
+              </div>
+            )}
+          </div>
         </button>
 
         {/* Expanded content */}
         {isExpanded && (
           <div className="border-t border-stroke-subtle">
+            {/* Full Summary */}
+            {(displaySummary || isLoadingDetail) && (
+              <div className="p-4 border-b border-stroke-subtle">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText size={14} className="text-ink-tertiary" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
+                    Summary
+                  </span>
+                  {isLoadingDetail && (
+                    <Loader2 size={12} className="text-ink-tertiary animate-spin" />
+                  )}
+                </div>
+                <p className="text-sm text-ink-secondary leading-relaxed">
+                  {displaySummary || "Loading..."}
+                </p>
+                {/* Create Recap action */}
+                {block.status !== "active" && block.status !== "paused" && (
+                  <button
+                    onClick={handleCreateRecap}
+                    className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-indigo/30 bg-indigo/5 text-indigo text-sm font-medium hover:bg-indigo/10 transition-colors"
+                  >
+                    <FileText size={14} />
+                    Create Recap from this block
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* App breakdown */}
             <div className="p-4">
               <div className="flex items-center gap-2 mb-3">
