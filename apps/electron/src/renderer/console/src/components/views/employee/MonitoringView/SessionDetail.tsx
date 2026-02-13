@@ -75,6 +75,7 @@ import EndSessionDialog from "./EndSessionDialog"; // Import the new dialog
 import SummarizationProgress from "./SummarizationProgress";
 import { SiLinear } from "react-icons/si";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -133,7 +134,7 @@ export default function SessionDetail() {
   const summaryHtml = useMemo(() => {
     if (!summary) return "";
     const result = marked.parse(summary);
-    return typeof result === "string" ? result : "";
+    return typeof result === "string" ? DOMPurify.sanitize(result) : "";
   }, [summary]);
   const uiStatus = isRegenerating ? "summarizing" : hasSummary ? "ready" : sessionStatus;
 

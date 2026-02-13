@@ -52,6 +52,7 @@ export default function AIChatPanel({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Track conversation history for the conversational endpoint
   const chatHistoryRef = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
 
@@ -114,12 +115,9 @@ export default function AIChatPanel({
     setIsLoading(true);
 
     // Reset textarea height back to single line
-    const textarea = document.querySelector<HTMLTextAreaElement>(
-      "textarea[placeholder='Ask AI to help edit...']"
-    );
-    if (textarea) {
-      textarea.style.height = "auto";
-      textarea.style.overflowY = "hidden";
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.overflowY = "hidden";
     }
 
     // Add typing indicator
@@ -281,6 +279,7 @@ export default function AIChatPanel({
           className="flex gap-2"
         >
           <textarea
+            ref={textareaRef}
             rows={1}
             value={input}
             onChange={(e) => {

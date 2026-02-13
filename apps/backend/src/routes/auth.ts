@@ -1371,8 +1371,8 @@ authRouter.get("/reset-password", (_req: Request, res: Response) => {
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
-    const SUPABASE_URL = "${config.supabase.url}";
-    const SUPABASE_ANON_KEY = "${config.supabase.anonKey}";
+    const SUPABASE_URL = ${JSON.stringify(config.supabase.url)};
+    const SUPABASE_ANON_KEY = ${JSON.stringify(config.supabase.anonKey)};
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const form = document.getElementById('form');

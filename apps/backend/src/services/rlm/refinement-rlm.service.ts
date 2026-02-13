@@ -167,7 +167,6 @@ class RefinementRLMService {
           { error: String(error) },
           "Claude refinement failed — falling back to DeepSeek"
         );
-        this.anthropic = null;
       }
     }
 
