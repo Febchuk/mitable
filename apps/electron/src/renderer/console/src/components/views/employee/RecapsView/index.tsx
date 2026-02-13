@@ -219,7 +219,7 @@ function RecapCard({ recap, onEdit }: RecapCardProps) {
   const DestIcon = destConfig.icon;
 
   return (
-    <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 overflow-hidden transition-all hover:border-stroke">
+    <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 transition-all hover:border-stroke">
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
