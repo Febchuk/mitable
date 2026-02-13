@@ -178,6 +178,9 @@ export const config = {
     apiKey: (process.env.DEEPGRAM_API_KEY || "").trim(),
   },
 
+  // Backend URL (used for password reset redirects, etc.)
+  backendUrl: (process.env.BACKEND_URL || `http://localhost:${PORT}`).trim(),
+
   // Security
   jwtSecret: process.env.JWT_SECRET || "",
 

@@ -472,7 +472,7 @@ export async function getMonitoringSessionState(): Promise<MonitoringSessionStat
 }
 
 /**
- * Request AI revision of a session summary
+ * Request AI revision of a session summary (legacy single-shot)
  */
 export async function reviseSummary(
   sessionId: string,
@@ -482,6 +482,45 @@ export async function reviseSummary(
   return apiRequest(`/monitoring/sessions/${sessionId}/summary/revise`, {
     method: "POST",
     body: JSON.stringify({ instruction, currentSummary }),
+  });
+}
+
+/**
+ * Save refinement chat messages (without calling AI)
+ */
+export async function saveRefinementChat(
+  sessionId: string,
+  messages: { role: "user" | "assistant"; content: string; timestamp?: string }[]
+): Promise<void> {
+  return apiRequest(`/monitoring/sessions/${sessionId}/summary/chat/save`, {
+    method: "PUT",
+    body: JSON.stringify({ messages }),
+  });
+}
+
+/**
+ * Load persisted refinement chat history for a session
+ */
+export async function loadRefinementChat(sessionId: string): Promise<{
+  messages: { role: "user" | "assistant"; content: string; timestamp: string }[];
+  updatedAt: string | null;
+}> {
+  return apiRequest(`/monitoring/sessions/${sessionId}/summary/chat`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Conversational summary refinement with AI
+ */
+export async function chatRefineSummary(
+  sessionId: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+  currentSummary: string
+): Promise<{ message: string; suggestedEdit: string | null; toolCallCount: number }> {
+  return apiRequest(`/monitoring/sessions/${sessionId}/summary/chat`, {
+    method: "POST",
+    body: JSON.stringify({ messages, currentSummary }),
   });
 }
 

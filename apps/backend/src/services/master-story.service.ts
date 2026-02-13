@@ -143,7 +143,13 @@ class MasterStoryService {
         format: options.formatPreference.format,
       });
 
-      // 4. Update progress: writing_summary (RLM is now generating)
+      // 4a. Update progress: applying_preferences
+      await db
+        .update(monitoringSessions)
+        .set({ summarizationProgress: "applying_preferences" })
+        .where(eq(monitoringSessions.id, options.sessionId));
+
+      // 4b. Update progress: writing_summary (RLM is now generating)
       await db
         .update(monitoringSessions)
         .set({ summarizationProgress: "writing_summary" })

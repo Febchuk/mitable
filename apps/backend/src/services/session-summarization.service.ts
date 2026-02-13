@@ -21,7 +21,7 @@ import { promises as fs } from "fs";
 import { config } from "../config";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, desc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { masterStoryService } from "./master-story.service";
 import {
   createSessionLogger,
@@ -380,6 +380,31 @@ class SessionSummarizationService {
       inputHash,
     });
 
+    // Look up user preferences from user_memories
+    const session = await db.query.monitoringSessions.findFirst({
+      where: eq(schema.monitoringSessions.id, sessionId),
+      columns: { userId: true },
+    });
+
+    let userPrefsBlock = "";
+    if (session?.userId) {
+      const prefs = await db.query.userMemories.findMany({
+        where: and(
+          eq(schema.userMemories.userId, session.userId),
+          eq(schema.userMemories.category, "summary_style")
+        ),
+        columns: { content: true },
+      });
+
+      if (prefs.length > 0) {
+        const prefsList = prefs.map((p) => `- ${p.content}`).join("\n");
+        userPrefsBlock = `\n<user_preferences>\nThe user has saved the following summary style preferences. You MUST apply ALL of them:\n${prefsList}\n</user_preferences>\n`;
+        log.debug("Applying user preferences to summary", {
+          preferencesCount: prefs.length,
+        });
+      }
+    }
+
     // Use Groq to extract structured data from the master story
     const prompt = `<task>
 Extract structured information from a work session narrative written in first person. Transform the detailed narrative into a concise, delivery-ready summary with key insights.
@@ -390,7 +415,7 @@ Extract structured information from a work session narrative written in first pe
 ${masterStory}
 </master_story>
 </input>
-
+${userPrefsBlock}
 <instructions>
 <summary_requirements>
 - Length: Under 10 sentences

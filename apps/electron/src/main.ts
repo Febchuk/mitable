@@ -1835,11 +1835,13 @@ function setupMonitoringSessionHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_SET, (_, userId: string, blockedApps: string[]) => {
     preferencesService.setUserBlockedApps(userId, blockedApps);
+    focusWindowTracker.removeBlockedWindows();
     return { success: true };
   });
 
   ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_ADD, (_, userId: string, appName: string) => {
     preferencesService.addUserBlockedApp(userId, appName);
+    focusWindowTracker.removeBlockedWindows();
     return { success: true };
   });
 
@@ -2127,6 +2129,26 @@ function setupMonitoringSessionHandlers() {
       }
     ) => {
       return preferencesService.setAudioPreferences(prefs);
+    }
+  );
+
+  // Pill display mode preference
+  ipcMain.handle(IPC_CHANNELS.PILL_DISPLAY_MODE_GET, (_, userId: string) => {
+    return preferencesService.getUserPillDisplayMode(userId);
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.PILL_DISPLAY_MODE_SET,
+    (_, userId: string, mode: "compact" | "expanded") => {
+      preferencesService.setUserPillDisplayMode(userId, mode);
+      // Notify the watching pill window immediately
+      const allWindows = BrowserWindow.getAllWindows();
+      for (const win of allWindows) {
+        if (!win.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.PILL_DISPLAY_MODE_CHANGED, mode);
+        }
+      }
+      return { success: true };
     }
   );
 

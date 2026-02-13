@@ -391,9 +391,45 @@ class FocusWindowTracker {
   }
 
   /**
+   * Remove tracked windows that are now on the user's block list.
+   * Called from the periodic cleanup loop and immediately when block list changes.
+   */
+  removeBlockedWindows(): void {
+    if (!this.isTracking) return;
+
+    const policy = getCapturePolicy();
+    const removedIds: string[] = [];
+
+    for (const [windowId, window] of this.trackedWindows) {
+      const exclusion = shouldExcludeWindow(
+        window.windowTitle,
+        window.appName,
+        policy,
+        this.currentUserId
+      );
+      if (exclusion.excluded) {
+        removedIds.push(windowId);
+        logger.info(` Evicting newly-blocked window: ${window.appName} (${exclusion.reason})`);
+      }
+    }
+
+    if (removedIds.length === 0) return;
+
+    for (const id of removedIds) {
+      this.trackedWindows.delete(id);
+      windowDetectionService.removeWindow(id);
+    }
+
+    this.notifyWindowsChanged();
+  }
+
+  /**
    * Remove expired windows from tracking
    */
   private cleanupExpiredWindows(): void {
+    // Also re-check block list so mid-session changes take effect
+    this.removeBlockedWindows();
+
     const now = Date.now();
     const expiredWindowIds: string[] = [];
 

@@ -17,10 +17,12 @@ interface AIEditPanelProps {
   subtitle?: string;
   initialContent: string;
   onSave: (content: string) => Promise<void>;
+  onAutoSave?: (content: string) => Promise<void>; // Save without closing editor
   onCancel: () => void;
   onRevise: (instruction: string, currentContent: string) => Promise<{ suggestion: string }>;
   placeholder?: string;
   contextLabel?: string; // e.g., "session summary"
+  sessionId?: string; // When provided, enables conversational refinement
 }
 
 export default function AIEditPanel({
@@ -28,10 +30,12 @@ export default function AIEditPanel({
   subtitle,
   initialContent,
   onSave,
+  onAutoSave,
   onCancel,
   onRevise,
   placeholder = "Write your content here...",
   contextLabel = "content",
+  sessionId,
 }: AIEditPanelProps) {
   const [content, setContent] = useState(initialContent);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,10 +51,13 @@ export default function AIEditPanel({
 
   const handleApplySuggestion = (suggestion: string) => {
     setContent(suggestion);
+    if (onAutoSave) {
+      onAutoSave(suggestion).catch(() => {});
+    }
   };
 
   return (
-    <div className="h-full flex flex-col bg-background-primary">
+    <div className="h-[calc(100vh-3rem)] flex flex-col bg-background-primary overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
         <div className="flex items-center gap-4">
@@ -99,9 +106,9 @@ export default function AIEditPanel({
       </div>
 
       {/* Split Pane Content */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Left: Text Editor (60%) */}
-        <div className="w-3/5 border-r border-border-subtle">
+        <div className="w-3/5 border-r border-border-subtle overflow-hidden">
           <TextEditor
             content={content}
             onChange={setContent}
@@ -111,12 +118,13 @@ export default function AIEditPanel({
         </div>
 
         {/* Right: AI Chat Panel (40%) */}
-        <div className="w-2/5 p-4">
+        <div className="w-2/5 p-4 overflow-hidden">
           <AIChatPanel
             currentContent={content}
             onApplySuggestion={handleApplySuggestion}
             onRevise={onRevise}
             contextLabel={contextLabel}
+            sessionId={sessionId}
           />
         </div>
       </div>

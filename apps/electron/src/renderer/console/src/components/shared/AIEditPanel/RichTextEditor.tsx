@@ -1,13 +1,28 @@
 /**
  * RichTextEditor
  *
- * Quill-based rich text editor with Word-like toolbar.
- * Supports formatting: bold, italic, underline, strikethrough, lists, headings, links.
+ * MDXEditor-based rich text editor with clean toolbar.
+ * Native markdown input/output — no HTML conversion needed.
  */
 
-import { useEffect, useRef, useState } from "react";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
+import { useRef, useEffect } from "react";
+import {
+  MDXEditor,
+  MDXEditorMethods,
+  headingsPlugin,
+  listsPlugin,
+  quotePlugin,
+  thematicBreakPlugin,
+  linkPlugin,
+  linkDialogPlugin,
+  toolbarPlugin,
+  BoldItalicUnderlineToggles,
+  ListsToggle,
+  CreateLink,
+  Separator,
+  markdownShortcutPlugin,
+} from "@mdxeditor/editor";
+import "@mdxeditor/editor/style.css";
 
 interface RichTextEditorProps {
   content: string;
@@ -22,44 +37,43 @@ export default function RichTextEditor({
   placeholder = "Write your content here...",
   disabled = false,
 }: RichTextEditorProps) {
-  const quillRef = useRef<ReactQuill>(null);
-  const [editorValue, setEditorValue] = useState(content);
+  const editorRef = useRef<MDXEditorMethods>(null);
 
-  // Sync external changes (like AI suggestions)
+  // Sync external changes (like AI suggestions) via ref
   useEffect(() => {
-    setEditorValue(content);
+    editorRef.current?.setMarkdown(content);
   }, [content]);
 
-  const handleChange = (value: string) => {
-    setEditorValue(value);
-    onChange(value);
-  };
-
-  // Quill toolbar configuration
-  const modules = {
-    toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      ["bold", "italic", "underline", "strike"],
-      [{ list: "ordered" }, { list: "bullet" }],
-      ["link"],
-      ["clean"],
-    ],
-  };
-
-  const formats = ["header", "bold", "italic", "underline", "strike", "list", "bullet", "link"];
-
   return (
-    <div className="h-full flex flex-col quill-dark-theme">
-      <ReactQuill
-        ref={quillRef}
-        theme="snow"
-        value={editorValue}
-        onChange={handleChange}
-        modules={modules}
-        formats={formats}
+    <div className="h-full flex flex-col mdx-editor-wrapper">
+      <MDXEditor
+        ref={editorRef}
+        markdown={content}
+        onChange={onChange}
         placeholder={placeholder}
         readOnly={disabled}
-        className="h-full flex flex-col [&_.ql-container]:flex-1 [&_.ql-editor]:h-full [&_.ql-editor]:text-text-primary [&_.ql-editor]:bg-background-elevated [&_.ql-toolbar]:bg-background-elevated [&_.ql-toolbar]:border-border-subtle [&_.ql-container]:border-border-subtle [&_.ql-stroke]:stroke-text-secondary [&_.ql-fill]:fill-text-secondary [&_.ql-picker-label]:text-text-secondary [&_.ql-editor]:placeholder:text-text-tertiary [&_.ql-toolbar_.ql-active]:text-primary [&_.ql-toolbar_.ql-active_.ql-stroke]:stroke-primary [&_.ql-toolbar_.ql-active_.ql-fill]:fill-primary"
+        className="dark-theme dark-editor h-full"
+        contentEditableClassName="prose prose-invert prose-sm max-w-none px-6 py-4 min-h-full focus:outline-none"
+        plugins={[
+          headingsPlugin(),
+          listsPlugin(),
+          quotePlugin(),
+          thematicBreakPlugin(),
+          linkPlugin(),
+          linkDialogPlugin(),
+          markdownShortcutPlugin(),
+          toolbarPlugin({
+            toolbarContents: () => (
+              <>
+                <BoldItalicUnderlineToggles />
+                <Separator />
+                <ListsToggle />
+                <Separator />
+                <CreateLink />
+              </>
+            ),
+          }),
+        ]}
       />
     </div>
   );

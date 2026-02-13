@@ -129,7 +129,8 @@ class CaptureService {
    */
   async captureVisibleWindows(
     saveToFile: boolean = false,
-    allowedWindowIds?: string[]
+    allowedWindowIds?: string[],
+    userId?: string
   ): Promise<MultiWindowCaptureResult> {
     try {
       // STEP 1: Capture all window sources (includes ALL windows - unavoidable)
@@ -163,7 +164,13 @@ class CaptureService {
         // Source name format is usually "AppName - Window Title" or just "Window Title"
         const appNameMatch = source.name.split(" - ")[0] || source.name;
 
-        const policyDecision = isBlockedByPolicy(source.name, appNameMatch, policy);
+        const policyDecision = isBlockedByPolicy(
+          source.name,
+          appNameMatch,
+          policy,
+          undefined,
+          userId
+        );
 
         if (policyDecision.blocked) {
           // Add to blocked list (metadata only, discard thumbnail)

@@ -21,15 +21,13 @@ export default function TextEditor({
   disabled = false,
 }: TextEditorProps) {
   return (
-    <div className="h-full flex flex-col p-4">
-      <div className="flex-1 overflow-hidden">
-        <RichTextEditor
-          content={content}
-          onChange={onChange}
-          placeholder={placeholder}
-          disabled={disabled}
-        />
-      </div>
+    <div className="h-full flex flex-col">
+      <RichTextEditor
+        content={content}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
     </div>
   );
 }

@@ -667,7 +667,11 @@ class MonitoringSessionService {
 
     try {
       // Use existing capture service with dynamically tracked windows
-      const result = await captureService.captureVisibleWindows(false, trackedWindowIds);
+      const result = await captureService.captureVisibleWindows(
+        false,
+        trackedWindowIds,
+        this.activeSession.config.userId
+      );
 
       if (!result.success) {
         logger.warn(" Capture failed:", result.error);

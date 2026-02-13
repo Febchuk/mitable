@@ -5,7 +5,7 @@
  * Shows summary, allows editing, and provides delivery options.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createLogger } from "../../../../../../lib/logger";
 
@@ -45,6 +45,8 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,7 +74,11 @@ import SessionTimeline from "./SessionTimeline";
 import EndSessionDialog from "./EndSessionDialog"; // Import the new dialog
 import SummarizationProgress from "./SummarizationProgress";
 import { SiLinear } from "react-icons/si";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import { getLocale } from "@/console/src/lib/date";
+
+marked.setOptions({ breaks: true, gfm: true });
 
 function formatDateTime(dateString: string | null): string {
   if (!dateString) return "N/A";
@@ -124,6 +130,13 @@ export default function SessionDetail() {
     summaryData?.rawSummary ||
     "";
   const hasSummary = summary.trim().length > 0;
+
+  // Convert markdown → HTML once using marked (same renderer as the editor)
+  const summaryHtml = useMemo(() => {
+    if (!summary) return "";
+    const result = marked.parse(summary);
+    return typeof result === "string" ? DOMPurify.sanitize(result) : "";
+  }, [summary]);
   const uiStatus = isRegenerating ? "summarizing" : hasSummary ? "ready" : sessionStatus;
 
   // When regenerating, detect when the summary actually changes (new summary arrived)
@@ -173,6 +186,7 @@ export default function SessionDetail() {
   }>({ connected: false, email: null, loading: true });
   const [isConnectingGmail, setIsConnectingGmail] = useState(false);
   const [showSessionEndToast, setShowSessionEndToast] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   // End Session Dialog State
   const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
@@ -722,10 +736,15 @@ export default function SessionDetail() {
         subtitle={session.name || "Work Session"}
         initialContent={summary}
         onSave={handleSaveSummary}
+        onAutoSave={async (content: string) => {
+          if (!sessionId) return;
+          await updateSummaryMutation.mutateAsync({ sessionId, summary: content });
+        }}
         onCancel={() => setIsAIEditMode(false)}
         onRevise={handleRevise}
         placeholder="Edit your session summary..."
         contextLabel="session summary"
+        sessionId={sessionId}
       />
     );
   }
@@ -903,10 +922,6 @@ export default function SessionDetail() {
               : "In progress"}
           </span>
         </span>
-        <span className="text-ink-secondary">
-          Captures:{" "}
-          <span className="text-ink-primary font-medium">{session.captureCount ?? 0}</span>
-        </span>
         {session.deliveredAt && (
           <span className="text-ink-secondary">
             Delivered:{" "}
@@ -1074,6 +1089,21 @@ export default function SessionDetail() {
                 Regenerate (Dev)
               </Button>
             )}
+            {summary && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  navigator.clipboard.writeText(summary);
+                  setIsCopied(true);
+                  toast({ title: "Copied to clipboard", duration: 2000 });
+                  setTimeout(() => setIsCopied(false), 2000);
+                }}
+                className="gap-2 text-text-secondary hover:text-text-primary hover:bg-background-elevated"
+              >
+                {isCopied ? <Check size={16} /> : <Copy size={16} />}
+                {isCopied ? "Copied" : "Copy"}
+              </Button>
+            )}
             {!isDelivered && summary && (
               <Button
                 variant="ghost"
@@ -1092,16 +1122,9 @@ export default function SessionDetail() {
             <SummarizationProgress progress={session.summarizationProgress ?? null} />
           </div>
         ) : summary ? (
-          <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-6">
-            <div className="prose prose-invert prose-sm max-w-none break-words">
-              {summary.split("\n").map((paragraph, i) => (
-                <p
-                  key={i}
-                  className="text-ink-primary mb-3 last:mb-0 text-sm leading-relaxed break-words"
-                >
-                  {paragraph || <br />}
-                </p>
-              ))}
+          <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-6 max-h-[400px] overflow-y-auto">
+            <div className="prose prose-invert prose-sm max-w-none break-words [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:text-white [&_h1]:mb-3 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-white [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-white/90 [&_h3]:mb-2 [&_p]:text-ink-primary [&_p]:text-sm [&_p]:leading-relaxed [&_p]:mb-3 [&_ul]:pl-5 [&_ul]:mb-3 [&_ul]:list-disc [&_ol]:pl-5 [&_ol]:mb-3 [&_ol]:list-decimal [&_li]:text-ink-primary [&_li]:text-sm [&_li]:leading-relaxed [&_li]:mb-1 [&_li]:marker:text-ink-tertiary [&_strong]:text-white [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:text-primary/80 [&_hr]:border-stroke-subtle [&_hr]:my-4 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/30 [&_blockquote]:pl-4 [&_blockquote]:text-ink-secondary [&_blockquote]:italic [&_code]:bg-white/5 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-primary">
+              <div dangerouslySetInnerHTML={{ __html: summaryHtml }} />
             </div>
           </div>
         ) : (

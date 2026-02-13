@@ -160,6 +160,10 @@ export default function UserProfilePage() {
   const [autoSessionStart, setAutoSessionStart] = useState<boolean>(false);
   const [isAutoSessionStartLoading, setIsAutoSessionStartLoading] = useState(true);
 
+  // Pill display mode state
+  const [pillDisplayMode, setPillDisplayMode] = useState<"compact" | "expanded">("compact");
+  const [isPillDisplayModeLoading, setIsPillDisplayModeLoading] = useState(true);
+
   // Summary preferences state
   const [summaryDefaults, setSummaryDefaults] = useState<{
     detailLevel: "concise" | "verbose";
@@ -419,6 +423,44 @@ export default function UserProfilePage() {
       toast({
         title: "Error",
         description: "Failed to save auto session start preference.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Pill display mode functions
+  const loadPillDisplayMode = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setIsPillDisplayModeLoading(true);
+      const mode = await window.consoleAPI.getPillDisplayMode(user.id);
+      setPillDisplayMode(mode);
+    } catch (error) {
+      logger.error("Error loading pill display mode:", error);
+    } finally {
+      setIsPillDisplayModeLoading(false);
+    }
+  }, [user?.id]);
+
+  const handlePillDisplayModeChange = async (mode: "compact" | "expanded") => {
+    if (!user?.id) return;
+    try {
+      const result = await window.consoleAPI.setPillDisplayMode(user.id, mode);
+      if (result.success) {
+        setPillDisplayMode(mode);
+        toast({
+          title: "Preference saved",
+          description:
+            mode === "expanded"
+              ? "Watching pill will always show all controls."
+              : "Watching pill will be compact and expand on hover.",
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting pill display mode:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save pill display mode.",
         variant: "destructive",
       });
     }
@@ -807,6 +849,7 @@ export default function UserProfilePage() {
       loadAllBlockableApps();
       loadNotificationFrequency();
       loadAutoSessionStart();
+      loadPillDisplayMode();
       loadSummaryPreferences();
     }
   }, [
@@ -815,6 +858,7 @@ export default function UserProfilePage() {
     loadAllBlockableApps,
     loadNotificationFrequency,
     loadAutoSessionStart,
+    loadPillDisplayMode,
     loadSummaryPreferences,
     loadAudioPreferences,
   ]);
@@ -1936,6 +1980,34 @@ export default function UserProfilePage() {
                             });
                           }
                         }}
+                        className="flex-shrink-0"
+                      />
+                    )}
+                  </div>
+
+                  {/* Pill Display Mode Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label
+                        htmlFor="pill-display-mode"
+                        className="text-sm font-medium text-text-primary cursor-pointer"
+                      >
+                        Always Show Expanded Pill
+                      </Label>
+                      <p className="text-xs text-text-tertiary">
+                        Keep the watching pill fully expanded with all controls visible instead of
+                        compact mode
+                      </p>
+                    </div>
+                    {isPillDisplayModeLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                    ) : (
+                      <Switch
+                        id="pill-display-mode"
+                        checked={pillDisplayMode === "expanded"}
+                        onCheckedChange={(checked) =>
+                          handlePillDisplayModeChange(checked ? "expanded" : "compact")
+                        }
                         className="flex-shrink-0"
                       />
                     )}

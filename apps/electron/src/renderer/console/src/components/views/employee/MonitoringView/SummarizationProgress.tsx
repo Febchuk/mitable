@@ -2,8 +2,9 @@ import { Loader2 } from "lucide-react";
 
 const STEPS = [
   { key: "generating_title", label: "Generating title...", percent: 15 },
-  { key: "analyzing_activities", label: "Analyzing activities...", percent: 40 },
-  { key: "writing_summary", label: "Writing summary...", percent: 70 },
+  { key: "analyzing_activities", label: "Analyzing activities...", percent: 35 },
+  { key: "applying_preferences", label: "Applying preferences...", percent: 55 },
+  { key: "writing_summary", label: "Writing summary...", percent: 75 },
   { key: "finalizing", label: "Almost done...", percent: 90 },
 ] as const;
 
