@@ -18,10 +18,6 @@ function formatDate(dateString: string): string {
   return formatDateWithWeekday(dateString);
 }
 
-function formatSessionTime(dateString: string): string {
-  return formatTime(dateString);
-}
-
 function getStatusBadge(status: string, deliveryStatus: string | null) {
   if (deliveryStatus === "delivered") {
     return (
@@ -86,7 +82,7 @@ export default function SessionCard({ session, onClick }: SessionCardProps) {
               : session.name || "Untitled Session"}
           </h3>
           <p className="text-text-secondary text-sm">
-            {formatDate(session.startedAt)} at {formatSessionTime(session.startedAt)}
+            {formatDate(session.startedAt)} at {formatTime(session.startedAt)}
           </p>
         </div>
         {getStatusBadge(session.status, session.deliveryStatus)}

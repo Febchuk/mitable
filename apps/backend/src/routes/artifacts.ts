@@ -55,7 +55,9 @@ function inferMimeType(file: Express.Multer.File): string {
   if (ALLOWED_MIME_TYPES.includes(file.mimetype as AllowedMimeType)) {
     return file.mimetype;
   }
-  const ext = file.originalname.slice(file.originalname.lastIndexOf(".")).toLowerCase();
+  const dotIdx = file.originalname.lastIndexOf(".");
+  if (dotIdx === -1) return file.mimetype;
+  const ext = file.originalname.slice(dotIdx).toLowerCase();
   return EXT_TO_MIME[ext] || file.mimetype;
 }
 
