@@ -38,6 +38,29 @@ interface MulterFile {
 // Request with multer file (using type intersection to avoid extends issues)
 type RequestWithFile = Request & { file?: MulterFile };
 
+// Extension → MIME fallback for platforms that send application/octet-stream
+const EXT_TO_MIME: Record<string, AllowedMimeType> = {
+  ".pdf": "application/pdf",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".txt": "text/plain",
+  ".md": "text/markdown",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+};
+
+function inferMimeType(file: Express.Multer.File): string {
+  if (ALLOWED_MIME_TYPES.includes(file.mimetype as AllowedMimeType)) {
+    return file.mimetype;
+  }
+  const dotIdx = file.originalname.lastIndexOf(".");
+  if (dotIdx === -1) return file.mimetype;
+  const ext = file.originalname.slice(dotIdx).toLowerCase();
+  return EXT_TO_MIME[ext] || file.mimetype;
+}
+
 // Configure multer for file uploads (memory storage)
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -45,7 +68,9 @@ const upload = multer({
     fileSize: MAX_FILE_SIZE_BYTES,
   },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIME_TYPES.includes(file.mimetype as AllowedMimeType)) {
+    const resolved = inferMimeType(file);
+    if (ALLOWED_MIME_TYPES.includes(resolved as AllowedMimeType)) {
+      file.mimetype = resolved; // fix for downstream extraction
       cb(null, true);
     } else {
       cb(

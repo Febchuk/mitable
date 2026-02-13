@@ -8,6 +8,7 @@
 import { CSSProperties } from "react";
 import { ChevronRight } from "lucide-react";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
+import { formatDateTime } from "@/console/src/lib/date";
 
 interface SessionRowProps {
   session: SessionListItem;
@@ -16,17 +17,7 @@ interface SessionRowProps {
 }
 
 function formatSessionDateTime(dateString: string): string {
-  const date = new Date(dateString);
-  const formattedDate = date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-  const formattedTime = date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-  return `${formattedDate} • ${formattedTime}`;
+  return formatDateTime(dateString);
 }
 
 // Get status config for visual treatment

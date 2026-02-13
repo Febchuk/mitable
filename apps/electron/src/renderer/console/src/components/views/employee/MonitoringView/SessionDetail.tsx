@@ -76,13 +76,14 @@ import SummarizationProgress from "./SummarizationProgress";
 import { SiLinear } from "react-icons/si";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import { getLocale } from "@/console/src/lib/date";
 
 marked.setOptions({ breaks: true, gfm: true });
 
 function formatDateTime(dateString: string | null): string {
   if (!dateString) return "N/A";
   const date = new Date(dateString);
-  return date.toLocaleString("en-US", {
+  return date.toLocaleString(getLocale(), {
     weekday: "short",
     month: "short",
     day: "numeric",

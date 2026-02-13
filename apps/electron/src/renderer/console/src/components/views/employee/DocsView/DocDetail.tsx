@@ -13,6 +13,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { createLogger } from "../../../../../../lib/logger";
+import { getLocale } from "@/console/src/lib/date";
 
 const logger = createLogger("DocDetail");
 import {
@@ -528,7 +529,7 @@ export default function DocDetail() {
               <span>
                 Updated:{" "}
                 <span className="text-text-primary">
-                  {new Date(document.updatedAt).toLocaleDateString("en-US", {
+                  {new Date(document.updatedAt).toLocaleDateString(getLocale(), {
                     month: "short",
                     day: "numeric",
                     hour: "numeric",

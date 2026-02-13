@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { createLogger } from "../../../../../../lib/logger";
+import { getLocale } from "@/console/src/lib/date";
 
 const logger = createLogger("TemplateDetail");
 
@@ -78,7 +79,11 @@ export default function TemplateDetail() {
 
   const formatDate = (dateString: Date | string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return date.toLocaleDateString(getLocale(), {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
   if (loading) {

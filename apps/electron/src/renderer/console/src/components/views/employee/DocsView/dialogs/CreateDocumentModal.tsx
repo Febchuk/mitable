@@ -20,6 +20,7 @@ import { useSessions } from "@/console/src/hooks/queries/monitoring";
 import { useArtifacts } from "@/console/src/hooks/queries/artifacts";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
 import type { Artifact } from "@/console/src/services/artifactsService";
+import { getLocale } from "@/console/src/lib/date";
 
 interface CreateDocumentModalProps {
   open: boolean;
@@ -51,9 +52,9 @@ function formatRelativeDate(dateString: string): string {
   } else if (dateDay.getTime() >= yesterday.getTime()) {
     return "Yesterday";
   } else if (dateDay.getTime() >= weekAgo.getTime()) {
-    return date.toLocaleDateString("en-US", { weekday: "short" });
+    return date.toLocaleDateString(getLocale(), { weekday: "short" });
   } else {
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return date.toLocaleDateString(getLocale(), { month: "short", day: "numeric" });
   }
 }
 

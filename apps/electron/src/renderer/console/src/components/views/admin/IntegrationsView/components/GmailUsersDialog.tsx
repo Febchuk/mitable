@@ -7,6 +7,7 @@ import {
 } from "@/console/src/services/adminService";
 import { Loader2 } from "lucide-react";
 import { SiGmail } from "react-icons/si";
+import { getLocale } from "@/console/src/lib/date";
 
 interface GmailUsersDialogProps {
   open: boolean;
@@ -48,7 +49,7 @@ export default function GmailUsersDialog({ open, onOpenChange }: GmailUsersDialo
 
   const formatDate = (date?: Date) => {
     if (!date) return "Unknown";
-    return new Date(date).toLocaleDateString("en-US", {
+    return new Date(date).toLocaleDateString(getLocale(), {
       month: "short",
       day: "numeric",
       year: "numeric",
