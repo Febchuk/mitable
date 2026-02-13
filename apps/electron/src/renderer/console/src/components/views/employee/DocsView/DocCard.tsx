@@ -7,6 +7,7 @@
 import { FileText, BookOpen, AlertCircle, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Document, DocType, DocStatus } from "@mitable/shared";
+import { getLocale } from "@/console/src/lib/date";
 
 interface DocCardProps {
   document: Document;
@@ -30,7 +31,7 @@ export default function DocCard({ document, onClick }: DocCardProps) {
   const statusColor = DOC_STATUS_COLORS[document.status as DocStatus] || DOC_STATUS_COLORS.draft;
 
   // Format date
-  const formattedDate = new Date(document.updatedAt).toLocaleDateString("en-US", {
+  const formattedDate = new Date(document.updatedAt).toLocaleDateString(getLocale(), {
     month: "short",
     day: "numeric",
     year: "numeric",

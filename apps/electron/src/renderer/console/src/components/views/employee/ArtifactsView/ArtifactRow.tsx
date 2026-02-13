@@ -8,6 +8,7 @@
 import { CSSProperties, useState } from "react";
 import { ChevronRight, Trash2, Loader2, Check, Clock, AlertTriangle, Minus } from "lucide-react";
 import type { Artifact, ExtractionStatus } from "@/console/src/services/artifactsService";
+import { getLocale } from "@/console/src/lib/date";
 
 interface ArtifactRowProps {
   artifact: Artifact;
@@ -70,10 +71,9 @@ const STATUS_CONFIG: Record<
 
 function formatTime(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleTimeString("en-US", {
+  return date.toLocaleTimeString(getLocale(), {
     hour: "numeric",
     minute: "2-digit",
-    hour12: true,
   });
 }
 
