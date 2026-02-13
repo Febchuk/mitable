@@ -6,6 +6,7 @@ import * as schema from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import { subscriptionService } from "../services/subscription.service.js";
 import { usageService } from "../services/usage.service.js";
+import { config } from "../config.js";
 
 export const authRouter = Router();
 
@@ -1306,6 +1307,140 @@ authRouter.post("/change-password", requireAuth, async (req: Request, res: Respo
  *         $ref: '#/components/responses/InternalError'
  *     security: []
  */
+authRouter.get("/reset-password", (_req: Request, res: Response) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password — Mitable</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a; color: #e5e5e5;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 1rem;
+    }
+    .card {
+      background: #171717; border: 1px solid #262626; border-radius: 12px;
+      padding: 2.5rem; width: 100%; max-width: 420px;
+    }
+    h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; color: #fff; }
+    p.subtitle { font-size: 0.875rem; color: #a3a3a3; margin-bottom: 1.5rem; }
+    label { display: block; font-size: 0.8125rem; font-weight: 500; margin-bottom: 0.375rem; color: #d4d4d4; }
+    input[type="password"] {
+      width: 100%; padding: 0.625rem 0.75rem; background: #0a0a0a;
+      border: 1px solid #404040; border-radius: 8px; color: #fff;
+      font-size: 0.875rem; outline: none; transition: border-color 0.15s;
+    }
+    input[type="password"]:focus { border-color: #3b82f6; }
+    .field { margin-bottom: 1rem; }
+    .error-text { color: #ef4444; font-size: 0.8125rem; margin-top: 0.25rem; display: none; }
+    button {
+      width: 100%; padding: 0.625rem; background: #3b82f6; color: #fff;
+      border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 500;
+      cursor: pointer; transition: background 0.15s;
+    }
+    button:hover { background: #2563eb; }
+    button:disabled { background: #1e3a5f; cursor: not-allowed; }
+    .message { padding: 0.75rem; border-radius: 8px; font-size: 0.8125rem; margin-bottom: 1rem; display: none; }
+    .message.error { background: #2d1215; border: 1px solid #7f1d1d; color: #fca5a5; display: block; }
+    .message.success { background: #052e16; border: 1px solid #14532d; color: #86efac; display: block; }
+    .logo { font-size: 1.25rem; font-weight: 700; color: #3b82f6; margin-bottom: 1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Mitable</div>
+    <h1>Set New Password</h1>
+    <p class="subtitle">Enter your new password below.</p>
+    <div id="msg" class="message"></div>
+    <form id="form">
+      <div class="field">
+        <label for="password">New Password</label>
+        <input type="password" id="password" placeholder="At least 6 characters" minlength="6" required />
+      </div>
+      <div class="field">
+        <label for="confirm">Confirm Password</label>
+        <input type="password" id="confirm" placeholder="Re-enter password" required />
+        <div class="error-text" id="matchErr">Passwords do not match</div>
+      </div>
+      <button type="submit" id="btn">Update Password</button>
+    </form>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = "${config.supabase.url}";
+    const SUPABASE_ANON_KEY = "${config.supabase.anonKey}";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const form = document.getElementById('form');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('btn');
+    const matchErr = document.getElementById('matchErr');
+
+    function showMsg(text, type) {
+      msg.textContent = text;
+      msg.className = 'message ' + type;
+    }
+
+    // Parse hash fragment for access_token and refresh_token
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (!accessToken) {
+      showMsg('Invalid or expired reset link. Please request a new one.', 'error');
+      form.style.display = 'none';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pw = document.getElementById('password').value;
+      const confirm = document.getElementById('confirm').value;
+
+      matchErr.style.display = 'none';
+      if (pw !== confirm) {
+        matchErr.style.display = 'block';
+        return;
+      }
+      if (pw.length < 6) {
+        showMsg('Password must be at least 6 characters.', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Updating...';
+
+      try {
+        // Set the session from the recovery token
+        const { error: sessionErr } = await sb.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (sessionErr) throw sessionErr;
+
+        // Update the password
+        const { error: updateErr } = await sb.auth.updateUser({ password: pw });
+        if (updateErr) throw updateErr;
+
+        showMsg('Password updated successfully! You can now log in with your new password.', 'success');
+        form.style.display = 'none';
+      } catch (err) {
+        showMsg(err.message || 'Failed to update password. The link may have expired.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Update Password';
+      }
+    });
+  </script>
+</body>
+</html>`;
+  res.setHeader("Content-Type", "text/html");
+  res.send(html);
+});
+
 authRouter.post("/forgot-password", async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
@@ -1322,7 +1457,7 @@ authRouter.post("/forgot-password", async (req: Request, res: Response) => {
     // Send password reset email
     // Supabase handles the case where email doesn't exist securely
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password`,
+      redirectTo: `${config.backendUrl}/api/auth/reset-password`,
     });
 
     if (error) {

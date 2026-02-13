@@ -8,6 +8,7 @@ import { extractNotionPageId } from "../utils/notion-url-parser.js";
 import { notionService } from "../services/notion.service.js";
 import { llmService } from "../services/llm.service.js";
 import { encryptionService } from "../services/encryption.service.js";
+import { config } from "../config.js";
 
 const router = Router();
 
@@ -1560,7 +1561,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
       try {
         // Use Supabase's password reset flow to send a secure password setup email
         const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-          redirectTo: `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password`,
+          redirectTo: `${config.backendUrl}/api/auth/reset-password`,
         });
 
         if (resetError) {
