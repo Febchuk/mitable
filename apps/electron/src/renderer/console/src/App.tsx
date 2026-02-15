@@ -40,6 +40,8 @@ import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
 import TemplatesView from "./components/views/admin/TemplatesView";
 import CreateTemplate from "./components/views/admin/TemplatesView/CreateTemplate";
 import TemplateDetail from "./components/views/admin/TemplatesView/TemplateDetail";
+import AskView from "./components/views/admin/AskView";
+import AskDemoView from "./components/views/admin/AskDemoView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
 import { useEffect } from "react";
@@ -238,6 +240,8 @@ function App() {
                       <Route path="people" element={<PeopleView />} />
                       <Route path="people/new" element={<AddNewUser />} />
                       <Route path="people/:id" element={<PersonDetail />} />
+                      <Route path="ask" element={<AskView />} />
+                      <Route path="ask-demo" element={<AskDemoView />} />
                       <Route path="templates" element={<TemplatesView />} />
                       <Route path="templates/:id" element={<TemplateDetail />} />
                       <Route path="templates/new" element={<CreateTemplate />} />
