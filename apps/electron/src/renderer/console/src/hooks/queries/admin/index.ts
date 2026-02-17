@@ -9,3 +9,6 @@ export { useDisconnectIntegration } from "./useDisconnectIntegration";
 export { useSyncIntegration } from "./useSyncIntegration";
 export { useUpdateIntegrationSettings } from "./useUpdateIntegrationSettings";
 export { useOrganizationSettings, useUpdateOrganizationSettings } from "./useOrganizationSettings";
+export { useDashboardMetrics } from "./useDashboardMetrics";
+export { useDashboardPeople } from "./useDashboardPeople";
+export { useDashboardPersonDetail } from "./useDashboardPersonDetail";

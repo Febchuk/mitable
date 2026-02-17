@@ -1,9 +1,17 @@
-import { useState } from "react";
-import { Send, Sparkles, X } from "lucide-react";
-import type { ChatMessage } from "./mockData";
+import { useState, useRef, useEffect } from "react";
+import { Send, Sparkles, X, Loader2 } from "lucide-react";
+import { sendDashboardChat } from "@/console/src/services/adminService";
+import type { DashboardPeriod } from "@/console/src/services/adminService";
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
 
 interface ChatPanelProps {
-  messages: ChatMessage[];
+  period: DashboardPeriod;
   onClose?: () => void;
 }
 
@@ -38,13 +46,88 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   );
 }
 
-export default function ChatPanel({ messages, onClose }: ChatPanelProps) {
-  const [input, setInput] = useState("");
+function TypingIndicator() {
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm bg-canvas-overlay border border-stroke-subtle">
+        <div className="flex items-center gap-1.5 mb-1">
+          <Sparkles size={12} className="text-indigo-light" />
+          <span className="text-[10px] font-semibold text-indigo-light uppercase tracking-wider">
+            Mitable AI
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 py-1">
+          <Loader2 size={14} className="animate-spin text-text-tertiary" />
+          <span className="text-xs text-text-tertiary">Analyzing your data...</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
+const WELCOME_MESSAGE: ChatMessage = {
+  id: "welcome",
+  role: "assistant",
+  content: "Welcome to your dashboard. I can help you understand trends, drill into any metric, or compare time periods. Ask me anything about your team's activity data.",
+  timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+};
+
+export default function ChatPanel({ period, onClose }: ChatPanelProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [messages, isLoading]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Static prototype — no actual submission
+    const text = input.trim();
+    if (!text || isLoading) return;
+
+    const now = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: text,
+      timestamp: now,
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setIsLoading(true);
+
+    try {
+      // Build message history for the API (exclude welcome, only role+content)
+      const apiMessages = [...messages.filter((m) => m.id !== "welcome"), userMsg].map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const response = await sendDashboardChat(apiMessages, period);
+
+      const aiMsg: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        role: "assistant",
+        content: response.message,
+        timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+      };
+
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (error) {
+      const errorMsg: ChatMessage = {
+        id: `error-${Date.now()}`,
+        role: "assistant",
+        content: "Sorry, I couldn't process that request. Please try again.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -75,6 +158,8 @@ export default function ChatPanel({ messages, onClose }: ChatPanelProps) {
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
         ))}
+        {isLoading && <TypingIndicator />}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
@@ -86,10 +171,12 @@ export default function ChatPanel({ messages, onClose }: ChatPanelProps) {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about your team..."
             className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
+            disabled={isLoading}
           />
           <button
             type="submit"
-            className="p-1.5 rounded-md text-text-tertiary hover:text-indigo-light hover:bg-indigo/10 transition-colors"
+            disabled={isLoading || !input.trim()}
+            className="p-1.5 rounded-md text-text-tertiary hover:text-indigo-light hover:bg-indigo/10 transition-colors disabled:opacity-30"
           >
             <Send size={14} />
           </button>

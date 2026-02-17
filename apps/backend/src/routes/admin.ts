@@ -417,7 +417,7 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
           eq(schema.users.organizationId, currentUser.organizationId)
         )
       )
-      .orderBy(desc(schema.users.createdAt));
+      .orderBy(schema.users.lastName, schema.users.firstName);
 
     // Calculate progress for each user
     const usersWithProgress = await Promise.all(

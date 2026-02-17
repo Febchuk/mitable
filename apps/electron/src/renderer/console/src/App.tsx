@@ -41,7 +41,6 @@ import TemplatesView from "./components/views/admin/TemplatesView";
 import CreateTemplate from "./components/views/admin/TemplatesView/CreateTemplate";
 import TemplateDetail from "./components/views/admin/TemplatesView/TemplateDetail";
 import AskView from "./components/views/admin/AskView";
-import AskDemoView from "./components/views/admin/AskDemoView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
 import { useEffect } from "react";
@@ -146,6 +145,7 @@ function MonitoringSessionHandler() {
   return null;
 }
 
+<<<<<<< HEAD
 // Default route - start at monitoring (calendar may be gated)
 function DefaultRoute() {
   return <Navigate to="/monitoring" replace />;
@@ -164,6 +164,13 @@ function FeatureGate({
     return <Navigate to="/monitoring" replace />;
   }
   return <>{children}</>;
+=======
+// Default route - admin users start at Dashboard, everyone else at Calendar
+function DefaultRoute() {
+  const { user } = useUser();
+  const defaultPath = user?.role === "admin" ? "/dashboard" : "/calendar";
+  return <Navigate to={defaultPath} replace />;
+>>>>>>> a4c912c ((update)Mostly functional admin panel for dev)
 }
 
 // Protected route wrapper - redirects to login if not authenticated
@@ -224,7 +231,6 @@ function App() {
                     <Route path="/signup-organization" element={<SignupOrganizationPage />} />
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
-
                     {/* Protected routes */}
                     <Route
                       path="/"

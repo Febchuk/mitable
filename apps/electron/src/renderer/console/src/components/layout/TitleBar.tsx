@@ -35,11 +35,14 @@ export default function TitleBar() {
         originalRole: user.originalRole ?? user.role,
       });
 
+      // Persist mode so it survives app restarts
+      localStorage.setItem("mitable:lastMode", role);
+
       // Auto-navigate to appropriate default view
       if (role === "admin") {
         navigate("/dashboard");
       } else {
-        navigate("/docs");
+        navigate("/calendar");
       }
     }
   };

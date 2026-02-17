@@ -473,3 +473,249 @@ export async function updateOrganizationSettings(
     throw error;
   }
 }
+
+// ============================================
+// Dashboard Analytics (from cron pipeline)
+// ============================================
+
+export type DashboardPeriod = "today" | "week" | "month" | "ytd";
+
+export interface DashboardMetrics {
+  period: string;
+  hasData: boolean;
+  metrics: {
+    avgWorkMinutes: number;
+    avgMeetingMinutes: number;
+    avgActiveMinutes: number;
+    avgWorkPercentage: number;
+    avgMeetingPercentage: number;
+    totalUsersTracked: number;
+    totalTeamWorkMinutes: number;
+    totalTeamMeetingMinutes: number;
+  };
+  activityDistribution: Array<{ category: string; percentage: number; totalMinutes: number }>;
+  topApps: Array<{ app: string; totalMinutes: number; userCount: number }>;
+  userSummaries: Array<{
+    userId: string;
+    name: string;
+    activeMinutes: number;
+    workPct: number;
+    meetingPct: number;
+  }>;
+  dailyTrend: Array<{
+    date: string;
+    avgActiveMinutes: number;
+    avgWorkMinutes: number;
+    avgMeetingMinutes: number;
+    usersTracked: number;
+  }>;
+}
+
+export interface DashboardPerson {
+  userId: string;
+  name: string;
+  email?: string;
+  role?: string;
+  jobTitle?: string;
+  avatarUrl?: string | null;
+  totalWorkMinutes: number;
+  totalMeetingMinutes: number;
+  totalActiveMinutes: number;
+  workPercentage: number;
+  meetingPercentage: number;
+  daySummary: string | null;
+  keyAccomplishments: string[];
+  categoryBreakdown: Array<{ category: string; percentage: number; minutes: number }>;
+  appBreakdown: Array<{ app: string; minutes: number }>;
+  daysTracked: number;
+}
+
+export interface ActivityBlock {
+  id: string;
+  type: "work" | "meeting";
+  name: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  description: string | null;
+  apps: string[];
+  category: string | null;
+  participants?: string[];
+  sequenceNumber: number;
+}
+
+export interface DashboardPersonDetail {
+  period: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    jobTitle: string | null;
+    avatarUrl: string | null;
+  };
+  summary: {
+    totalWorkMinutes: number;
+    totalMeetingMinutes: number;
+    totalActiveMinutes: number;
+    workPercentage: number;
+    meetingPercentage: number;
+    daysTracked: number;
+  };
+  dailyActivities: Array<{
+    date: string;
+    totalWorkMinutes: number;
+    totalMeetingMinutes: number;
+    totalActiveMinutes: number;
+    workPercentage: number;
+    meetingPercentage: number;
+    daySummary: string | null;
+    keyAccomplishments: string[];
+    categoryBreakdown: any;
+    appBreakdown: any;
+  }>;
+  blocks: ActivityBlock[];
+  blocksByDate: Record<string, ActivityBlock[]>;
+}
+
+/**
+ * Fetch org-wide dashboard metrics (admin only)
+ */
+export async function fetchDashboardMetrics(
+  period: DashboardPeriod = "today"
+): Promise<DashboardMetrics> {
+  try {
+    const response = await apiRequest<DashboardMetrics>(
+      `/admin/dashboard?period=${period}`
+    );
+    return response;
+  } catch (error) {
+    logger.error("Error fetching dashboard metrics:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch per-user activity list for People tab (admin only)
+ */
+export async function fetchDashboardPeople(
+  period: DashboardPeriod = "today"
+): Promise<DashboardPerson[]> {
+  try {
+    const response = await apiRequest<{ period: string; people: DashboardPerson[] }>(
+      `/admin/dashboard/people?period=${period}`
+    );
+    return response.people;
+  } catch (error) {
+    logger.error("Error fetching dashboard people:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch detailed activity for a specific user (admin only)
+ */
+export async function fetchDashboardPersonDetail(
+  userId: string,
+  period: DashboardPeriod = "today"
+): Promise<DashboardPersonDetail> {
+  try {
+    const response = await apiRequest<DashboardPersonDetail>(
+      `/admin/dashboard/people/${userId}?period=${period}`
+    );
+    return response;
+  } catch (error) {
+    logger.error("Error fetching person activity detail:", error);
+    throw error;
+  }
+}
+
+// ── Ask Threads CRUD ──────────────────────────────────────────
+
+export interface AskThread {
+  id: string;
+  userId: string;
+  organizationId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AskMessageRow {
+  id: string;
+  threadId: string;
+  role: "user" | "assistant";
+  content: string;
+  reportTitle: string | null;
+  reportSubtitle: string | null;
+  reportHtml: string | null;
+  createdAt: string;
+}
+
+export async function fetchAskThreads(): Promise<AskThread[]> {
+  try {
+    return await apiRequest<AskThread[]>("/admin/ask/threads");
+  } catch (error) {
+    logger.error("Error fetching ask threads:", error);
+    throw error;
+  }
+}
+
+export async function fetchAskThreadMessages(threadId: string): Promise<AskMessageRow[]> {
+  try {
+    return await apiRequest<AskMessageRow[]>(`/admin/ask/threads/${threadId}/messages`);
+  } catch (error) {
+    logger.error("Error fetching thread messages:", error);
+    throw error;
+  }
+}
+
+export async function deleteAskThread(threadId: string): Promise<void> {
+  try {
+    await apiRequest(`/admin/ask/threads/${threadId}`, { method: "DELETE" });
+  } catch (error) {
+    logger.error("Error deleting ask thread:", error);
+    throw error;
+  }
+}
+
+export async function sendAskChat(
+  message: string,
+  threadId?: string
+): Promise<{ message: string; threadId: string; report?: { title: string; subtitle: string; html: string } }> {
+  try {
+    const response = await apiRequest<{ message: string; threadId: string; report?: { title: string; subtitle: string; html: string } }>(
+      "/admin/ask/chat",
+      {
+        method: "POST",
+        body: JSON.stringify({ message, threadId }),
+      }
+    );
+    return response;
+  } catch (error) {
+    logger.error("Error in ask chat:", error);
+    throw error;
+  }
+}
+
+/**
+ * Send a chat message to the dashboard AI assistant (admin only)
+ */
+export async function sendDashboardChat(
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  period: DashboardPeriod = "month"
+): Promise<{ message: string }> {
+  try {
+    const response = await apiRequest<{ message: string }>(
+      "/admin/dashboard/chat",
+      {
+        method: "POST",
+        body: JSON.stringify({ messages, period }),
+      }
+    );
+    return response;
+  } catch (error) {
+    logger.error("Error in dashboard chat:", error);
+    throw error;
+  }
+}

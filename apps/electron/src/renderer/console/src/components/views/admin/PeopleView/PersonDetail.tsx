@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, MessageSquare, Clock, Video, Zap, Calendar } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useDashboardPersonDetail } from "@/console/src/hooks/queries/admin";
+import type { DashboardPeriod, DashboardPersonDetail as PersonDetailData } from "@/console/src/services/adminService";
 
-// ── Mock data for the prototype ───────────────────────────────
-
-interface MockUser {
+interface PersonViewModel {
   name: string;
   role: string;
   email: string;
@@ -22,209 +22,95 @@ interface MockUser {
 
 type TimeRange = "day" | "week" | "month" | "ytd";
 
-function getMockUser(id: string, range: TimeRange): MockUser {
-  const names = [
-    "Billy TheKid",
-    "Mike Jones",
-    "Maya Johnson",
-    "Ethan Miller",
-    "Olivia Davis",
-    "Daniel Brown",
-    "Sophie Anderson",
-    "James Wilson",
-  ];
-  const roles = [
-    "Forward Deployed Engineer",
-    "Forward Deployed Engineer",
-    "Product Designer",
-    "Backend Engineer",
-    "Customer Success",
-    "Data Analyst",
-    "Frontend Engineer",
-    "Sales Lead",
-  ];
-  const moods = [
-    { label: "Focused", color: "bg-emerald/15 text-emerald" },
-    { label: "Collaborative", color: "bg-indigo/15 text-indigo-light" },
-    { label: "Meeting-heavy", color: "bg-yellow-500/15 text-yellow-400" },
-  ];
+const CATEGORY_COLORS: Record<string, string> = {
+  development: "#6366F1",
+  communication: "#F472B6",
+  research: "#F59E0B",
+  design: "#818CF8",
+  review: "#34D399",
+  documentation: "#60A5FA",
+  other: "#A1A1A1",
+};
 
-  const idx = Math.abs(id.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % names.length;
-  const moodIdx = idx % moods.length;
+function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange): PersonViewModel {
+  const u = api.user;
+  const s = api.summary;
+  const workHours = Math.round((s.totalWorkMinutes / 60) * 10) / 10;
+  const meetingHours = Math.round((s.totalMeetingMinutes / 60) * 10) / 10;
+  const activeHours = Math.round((s.totalActiveMinutes / 60) * 10) / 10;
 
-  const multiplier = { day: 1, week: 5, month: 20, ytd: 120 }[range];
-  const periodLabel = { day: "today", week: "this week", month: "this month", ytd: "year to date" }[
-    range
-  ];
-  const focusBase = 3.5 + ((idx * 0.3) % 2);
+  const periodLabel = { day: "today", week: "this week", month: "this month", ytd: "year to date" }[range];
+  const moodLabel = s.meetingPercentage > 50 ? "Meeting-heavy" : s.workPercentage > 70 ? "Focused" : "Collaborative";
+  const moodColor = s.meetingPercentage > 50
+    ? "bg-yellow-500/15 text-yellow-400"
+    : s.workPercentage > 70
+      ? "bg-emerald/15 text-emerald"
+      : "bg-indigo/15 text-indigo-light";
 
-  const trendData: Record<TimeRange, MockUser["weeklyTrend"]> = {
-    day: [
-      { day: "9am", focus: 0.8 + (idx % 1), meetings: 0.5, other: 0.3 },
-      { day: "10am", focus: 1.2, meetings: 0.2, other: 0.4 },
-      { day: "11am", focus: 0.5, meetings: 1.0 + (idx % 0.5), other: 0.2 },
-      { day: "12pm", focus: 0.3, meetings: 0, other: 0.8 },
-      { day: "1pm", focus: 0.9, meetings: 0.5, other: 0.3 },
-      { day: "2pm", focus: 1.1 + (idx % 0.8), meetings: 0.2, other: 0.4 },
-      { day: "3pm", focus: 0.8, meetings: 0.3, other: 0.2 },
-    ],
-    week: [
-      { day: "Mon", focus: 3.2 + (idx % 2), meetings: 1.5, other: 2.1 },
-      { day: "Tue", focus: 4.1 + (idx % 1.5), meetings: 1.0, other: 1.8 },
-      { day: "Wed", focus: 2.8, meetings: 2.5 + (idx % 1), other: 1.5 },
-      { day: "Thu", focus: 3.9 + (idx % 1.2), meetings: 1.2, other: 2.0 },
-      { day: "Fri", focus: 3.0, meetings: 0.8, other: 1.2 },
-    ],
-    month: [
-      { day: "Wk 1", focus: 18 + (idx % 4), meetings: 6.5, other: 8 },
-      { day: "Wk 2", focus: 20 + (idx % 3), meetings: 5.8, other: 7.5 },
-      { day: "Wk 3", focus: 17, meetings: 8.2 + (idx % 2), other: 6.8 },
-      { day: "Wk 4", focus: 19 + (idx % 2), meetings: 6.0, other: 7.2 },
-    ],
-    ytd: [
-      { day: "Jan", focus: 78 + (idx % 10), meetings: 28, other: 34 },
-      { day: "Feb", focus: 72, meetings: 32 + (idx % 5), other: 30 },
-      { day: "Mar", focus: 85 + (idx % 8), meetings: 26, other: 36 },
-      { day: "Apr", focus: 80, meetings: 30, other: 32 + (idx % 4) },
-      { day: "May", focus: 88 + (idx % 6), meetings: 24, other: 35 },
-      { day: "Jun", focus: 82, meetings: 28 + (idx % 3), other: 33 },
-    ],
-  };
+  const activities = (api.dailyActivities[0]?.categoryBreakdown || []).map((c: any) => ({
+    id: c.category,
+    label: c.category.charAt(0).toUpperCase() + c.category.slice(1),
+    hours: Math.round((c.minutes / 60) * 10) / 10,
+    color: CATEGORY_COLORS[c.category] || CATEGORY_COLORS.other,
+  }));
+  if (activities.length === 0) {
+    activities.push(
+      { id: "work", label: "Work", hours: workHours, color: "#6366F1" },
+      { id: "meetings", label: "Meetings", hours: meetingHours, color: "#F59E0B" }
+    );
+  }
 
-  const highlightsData: Record<TimeRange, MockUser["highlights"]> = {
-    day: [
-      { time: "2:30 PM", text: "Completed API documentation for payment module", type: "doc" },
-      { time: "11:00 AM", text: "Sprint planning — discussed Q1 priorities", type: "meeting" },
-      { time: "9:15 AM", text: "Resolved 3 customer tickets (billing issues)", type: "support" },
-    ],
-    week: [
-      {
-        time: "Today, 2:30 PM",
-        text: "Completed API documentation for payment module",
-        type: "doc",
-      },
-      {
-        time: "Today, 11:00 AM",
-        text: "Sprint planning — discussed Q1 priorities",
-        type: "meeting",
-      },
-      {
-        time: "Today, 9:15 AM",
-        text: "Resolved 3 customer tickets (billing issues)",
-        type: "support",
-      },
-      {
-        time: "Yesterday, 4:00 PM",
-        text: "Reviewed PR #482 — caching layer refactor",
-        type: "code",
-      },
-      {
-        time: "Yesterday, 1:30 PM",
-        text: "Wrote incident post-mortem for outage #12",
-        type: "doc",
-      },
-      {
-        time: "Tue, 10:00 AM",
-        text: "1:1 with manager — career growth discussion",
-        type: "meeting",
-      },
-    ],
-    month: [
-      { time: "This week", text: "Completed API docs v2 and payment module spec", type: "doc" },
-      { time: "This week", text: "Resolved 12 support tickets across 3 clients", type: "support" },
-      {
-        time: "Last week",
-        text: "Led sprint retro — identified 4 process improvements",
-        type: "meeting",
-      },
-      { time: "Last week", text: "Reviewed 8 PRs including auth refactor", type: "code" },
-      { time: "2 weeks ago", text: "Wrote onboarding guide for new engineers", type: "doc" },
-      { time: "3 weeks ago", text: "Presented Q4 metrics to leadership", type: "meeting" },
-    ],
-    ytd: [
-      {
-        time: "This month",
-        text: "Completed API docs v2, payment module, and auth specs",
-        type: "doc",
-      },
-      { time: "This month", text: "Resolved 38 support tickets — best month yet", type: "support" },
-      { time: "Last month", text: "Led 2 sprint retros and quarterly planning", type: "meeting" },
-      { time: "Last month", text: "Reviewed 22 PRs including 3 major refactors", type: "code" },
-      { time: "Q1", text: "Published 8 internal docs and 2 runbooks", type: "doc" },
-      { time: "Q1", text: "Onboarded 2 new team members", type: "meeting" },
-    ],
-  };
+  const trend: PersonViewModel["weeklyTrend"] = api.dailyActivities.map((d) => ({
+    day: d.date,
+    focus: Math.round((d.totalWorkMinutes / 60) * 10) / 10,
+    meetings: Math.round((d.totalMeetingMinutes / 60) * 10) / 10,
+    other: 0,
+  })).reverse();
 
-  const topicMultiplier = { day: 1, week: 1, month: 4, ytd: 24 }[range];
+  const highlights: PersonViewModel["highlights"] = [...api.blocks]
+    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+    .slice(0, 10)
+    .map((b) => ({
+      time: new Date(b.startTime).toLocaleDateString([], { month: "short", day: "numeric" }) +
+        ", " + new Date(b.startTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+      text: b.description || b.name,
+      type: b.type === "meeting" ? "meeting" as const : "doc" as const,
+    }));
+
+  const topTopics: PersonViewModel["topTopics"] = (api.dailyActivities[0]?.categoryBreakdown || [])
+    .slice(0, 4)
+    .map((c: any) => ({
+      label: c.category.charAt(0).toUpperCase() + c.category.slice(1),
+      count: Math.round(c.minutes / 30),
+    }));
 
   return {
-    name: names[idx],
-    role: roles[idx],
-    email: `${names[idx].toLowerCase().replace(" ", ".")}@company.com`,
-    startDate: "Sep 2024",
-    lastActive: "5 min ago",
-    mood: moods[moodIdx].label,
-    moodColor: moods[moodIdx].color,
+    name: u.name,
+    role: u.role || "Employee",
+    email: u.email,
+    startDate: "—",
+    lastActive: s.daysTracked > 0 ? "Today" : "—",
+    mood: moodLabel,
+    moodColor,
     metrics: [
-      { label: "Avg Focus Time", value: `${focusBase.toFixed(1)}h`, sub: `per day ${periodLabel}` },
-      {
-        label: "Docs Created",
-        value: `${Math.round(((2 + (idx % 5)) * multiplier) / 5)}`,
-        sub: periodLabel,
-      },
-      {
-        label: "Meetings Attended",
-        value: `${Math.round(((4 + (idx % 6)) * multiplier) / 5)}`,
-        sub: periodLabel,
-      },
-      {
-        label: "Questions Asked",
-        value: `${Math.round(((1 + (idx % 4)) * multiplier) / 5)}`,
-        sub: `to Mitable AI ${periodLabel}`,
-      },
+      { label: "Avg Focus Time", value: `${workHours}h`, sub: `per day ${periodLabel}` },
+      { label: "Active Time", value: `${activeHours}h`, sub: periodLabel },
+      { label: "Meeting Time", value: `${meetingHours}h`, sub: periodLabel },
+      { label: "Days Tracked", value: `${s.daysTracked}`, sub: periodLabel },
     ],
-    activities: [
-      {
-        id: "technical-writing",
-        label: "Technical Writing",
-        hours: +(((8.5 + (idx % 4)) * multiplier) / 5).toFixed(1),
-        color: "#6366F1",
-      },
-      {
-        id: "customer-support",
-        label: "Customer Support",
-        hours: +(((5.2 + (idx % 3)) * multiplier) / 5).toFixed(1),
-        color: "#F472B6",
-      },
-      {
-        id: "sprint-planning",
-        label: "Sprint Planning",
-        hours: +(((3.8 + (idx % 2)) * multiplier) / 5).toFixed(1),
-        color: "#F59E0B",
-      },
-      {
-        id: "code-review",
-        label: "Code Review",
-        hours: +(((2.5 + (idx % 3)) * multiplier) / 5).toFixed(1),
-        color: "#818CF8",
-      },
-      {
-        id: "bug-triage",
-        label: "Bug Triage",
-        hours: +(((1.8 + (idx % 2)) * multiplier) / 5).toFixed(1),
-        color: "#34D399",
-      },
-    ],
-    weeklyTrend: trendData[range],
-    highlights: highlightsData[range],
-    topTopics: [
-      { label: "API Documentation", count: 12 * topicMultiplier },
-      { label: "Payment Integration", count: 8 * topicMultiplier },
-      { label: "Sprint Ceremonies", count: 6 * topicMultiplier },
-      { label: "Customer Billing", count: 5 * topicMultiplier },
-    ],
+    activities,
+    weeklyTrend: trend.length > 0 ? trend : [{ day: "—", focus: 0, meetings: 0, other: 0 }],
+    highlights: highlights.length > 0 ? highlights : [{ time: "—", text: "No activity blocks yet", type: "doc" }],
+    topTopics: topTopics.length > 0 ? topTopics : [{ label: "No data", count: 0 }],
   };
 }
+
+const timeRangeToPeriod: Record<TimeRange, DashboardPeriod> = {
+  day: "today",
+  week: "week",
+  month: "month",
+  ytd: "ytd",
+};
 
 const highlightIcons: Record<string, typeof FileText> = {
   doc: FileText,
@@ -267,9 +153,37 @@ const timeRangeLabels: Record<TimeRange, string> = {
 export default function PersonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [timeRange, setTimeRange] = useState<TimeRange>("week");
+  const [timeRange, setTimeRange] = useState<TimeRange>("month");
 
-  const person = getMockUser(id || "default", timeRange);
+  const { data: apiDetail } = useDashboardPersonDetail(id || "", timeRangeToPeriod[timeRange]);
+
+  const person = useMemo(() => {
+    if (apiDetail) {
+      return transformApiToPersonViewModel(apiDetail, timeRange);
+    }
+    return null;
+  }, [apiDetail, timeRange]);
+
+  if (!person) {
+    return (
+      <div className="h-screen overflow-y-auto p-8 pb-16 space-y-6">
+        <button
+          onClick={() => navigate("/people")}
+          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
+        >
+          <ArrowLeft size={16} />
+          <span className="text-sm">Back to People</span>
+        </button>
+        <div className="flex items-center justify-center py-24">
+          <div className="text-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto mb-3" />
+            <p className="text-sm text-text-secondary">Loading activity data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const totalActivityHours = person.activities.reduce((s, a) => s + a.hours, 0);
 
   return (
@@ -362,14 +276,14 @@ export default function PersonDetail() {
           <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
           <h3 className="relative text-sm font-semibold text-text-primary mb-4">
             Activity Breakdown
-            <span className="text-text-secondary font-normal ml-2">This Week</span>
+            <span className="text-text-secondary font-normal ml-2">{timeRangeLabels[timeRange]}</span>
           </h3>
           <div className="relative flex h-3 rounded-full overflow-hidden mb-4">
             {person.activities.map((a) => (
               <div
                 key={a.id}
                 style={{
-                  width: `${(a.hours / totalActivityHours) * 100}%`,
+                  width: `${totalActivityHours > 0 ? (a.hours / totalActivityHours) * 100 : 0}%`,
                   backgroundColor: a.color,
                 }}
               />
@@ -388,7 +302,7 @@ export default function PersonDetail() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-text-secondary">{a.hours}h</span>
                   <span className="text-[10px] text-text-tertiary w-7 text-right">
-                    {Math.round((a.hours / totalActivityHours) * 100)}%
+                    {totalActivityHours > 0 ? Math.round((a.hours / totalActivityHours) * 100) : 0}%
                   </span>
                 </div>
               </div>
@@ -459,7 +373,7 @@ export default function PersonDetail() {
             Recent Work
             <span className="text-text-secondary font-normal ml-2">What they've been doing</span>
           </h3>
-          <div className="relative space-y-1">
+          <div className="relative space-y-1 max-h-[280px] overflow-y-auto pr-1">
             {person.highlights.map((h, i) => {
               const Icon = highlightIcons[h.type] || Clock;
               const colorClass = highlightColors[h.type] || "text-text-secondary bg-canvas-overlay";
@@ -502,7 +416,7 @@ export default function PersonDetail() {
                   <div className="h-1.5 rounded-full bg-canvas-overlay overflow-hidden">
                     <div
                       className="h-full rounded-full bg-indigo transition-all duration-normal"
-                      style={{ width: `${(topic.count / maxCount) * 100}%` }}
+                      style={{ width: `${maxCount > 0 ? (topic.count / maxCount) * 100 : 0}%` }}
                     />
                   </div>
                 </div>

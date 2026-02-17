@@ -39,6 +39,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
   // Helper: given an access token, fetch user profile and populate state
   const hydrateUser = async (accessToken: string) => {
     const response = await authService.getMe(accessToken);
+    // Restore last-used mode if the user is an admin who previously switched
+    const dbRole = response.profile.role;
+    const savedMode = localStorage.getItem("mitable:lastMode") as "admin" | "employee" | null;
+    const effectiveRole = dbRole === "admin" && savedMode ? savedMode : dbRole;
+
     setUser({
       id: response.profile.id,
       name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
@@ -46,8 +51,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       email: response.profile.email || undefined,
       avatarUrl: response.profile.avatarUrl || undefined,
       currentWeek: response.profile.currentWeek || 1,
-      role: response.profile.role,
-      originalRole: response.profile.role,
+      role: effectiveRole,
+      originalRole: dbRole,
       organizationId: response.profile.organizationId || "",
     });
 

@@ -1,57 +1,39 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowUp, Sparkles, ChevronDown, Plus, MessageSquare } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { ArrowUp, Sparkles, ChevronDown, Plus, Trash2, FileText, Download, X, Bold, Italic, Underline, List, ListOrdered, Link } from "lucide-react";
+import {
+  sendAskChat,
+  fetchAskThreads,
+  fetchAskThreadMessages,
+  deleteAskThread,
+  type AskThread,
+  type AskMessageRow,
+} from "@/console/src/services/adminService";
 
 // ── Types ─────────────────────────────────────────────────────
+interface ReportData {
+  title: string;
+  subtitle: string;
+  html: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  reportCard?: { title: string; subtitle: string };
+  reportHtml?: string;
 }
 
-interface SerializedMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
-}
-
-interface Thread {
-  id: string;
-  title: string;
-  messages: SerializedMessage[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ── LocalStorage helpers ──────────────────────────────────────
-const STORAGE_KEY = "mitable-ask-threads";
-
-function loadThreads(): Thread[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveThreads(threads: Thread[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(threads));
-}
-
-function threadTitle(messages: SerializedMessage[]): string {
-  const first = messages.find((m) => m.role === "user");
-  if (!first) return "New conversation";
-  return first.content.length > 40 ? first.content.slice(0, 40) + "…" : first.content;
-}
-
-function serializeMessages(msgs: Message[]): SerializedMessage[] {
-  return msgs.map((m) => ({ ...m, timestamp: m.timestamp.toISOString() }));
-}
-
-function deserializeMessages(msgs: SerializedMessage[]): Message[] {
-  return msgs.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
+function dbToMessage(row: AskMessageRow): Message {
+  return {
+    id: row.id,
+    role: row.role,
+    content: row.content,
+    timestamp: new Date(row.createdAt),
+    reportCard: row.reportTitle ? { title: row.reportTitle, subtitle: row.reportSubtitle || "" } : undefined,
+    reportHtml: row.reportHtml || undefined,
+  };
 }
 
 // ── Suggestion chips ──────────────────────────────────────────
@@ -70,94 +52,218 @@ const suggestionChips: { label: string; prompt: string }[] = [
   },
 ];
 
-// ── Mock AI responses ─────────────────────────────────────────
-const mockResponses: Record<string, string> = {
-  default: `Based on the data I have access to, here's what I can tell you:
+// ── PDF Export ────────────────────────────────────────────────
+function exportReportAsPdf(html: string, title: string) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return;
+  printWindow.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.6; }
+  h2 { font-size: 22px; margin-bottom: 4px; }
+  h3 { font-size: 15px; margin-top: 24px; margin-bottom: 8px; }
+  p { font-size: 13px; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 12px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e5e5e5; }
+  th { font-weight: 600; background: #f8f8f8; }
+  ul, ol { font-size: 13px; padding-left: 24px; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 600; }
+  @media print { body { margin: 20px; } }
+</style></head><body>${html}</body></html>`);
+  printWindow.document.close();
+  setTimeout(() => { printWindow.print(); }, 300);
+}
 
-**Org Overview (This Week)**
-- Average focus time across the team: **4.2h/day**
-- Meeting load: **1.8h/day** (↓ 12% from last week)
-- Most active contributor: **Billy TheKid** — 10.5h of technical writing
-- Needs attention: **Sophie Anderson** is still ramping up — 0 docs created, 8 questions asked
+// ── Report Editor ─────────────────────────────────────────────
+function ToolbarBtn({ icon: Icon }: { icon: typeof Bold }) {
+  return (
+    <button className="w-7 h-7 rounded flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-canvas-muted/50 transition-colors">
+      <Icon size={14} />
+    </button>
+  );
+}
 
-Would you like me to drill into any of these areas?`,
-};
+// Strip inline styles from LLM HTML so our CSS takes full control.
+// Preserves green/red color values used for metrics (positive/negative indicators).
+function sanitizeReportHtml(raw: string): string {
+  return raw
+    // Remove entire style attributes (inline styles override our CSS)
+    .replace(/\s*style="[^"]*"/gi, "")
+    .replace(/\s*style='[^']*'/gi, "")
+    // Remove font tags the LLM sometimes wraps things in
+    .replace(/<\/?font[^>]*>/gi, "")
+    // Remove explicit width/max-width on divs
+    .replace(/\s*width="[^"]*"/gi, "")
+    .replace(/\s*bgcolor="[^"]*"/gi, "");
+}
 
-function getMockResponse(query: string): string {
-  const q = query.toLowerCase();
+function ReportEditor({ html, title, onClose }: { html: string; title: string; onClose: () => void }) {
+  const cleanHtml = sanitizeReportHtml(html);
 
-  if (q.includes("compare") || q.includes("vs")) {
-    return `**Comparison: Ethan Miller vs Sophie Anderson**
+  return (
+    <div className="flex flex-col h-full bg-canvas-default">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-stroke-subtle shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <FileText size={14} className="text-indigo-light" />
+            <span className="text-xs font-medium text-text-primary">Report</span>
+          </div>
+          <div className="h-4 w-px bg-stroke-subtle" />
+          <div className="flex items-center gap-0.5">
+            <ToolbarBtn icon={Bold} />
+            <ToolbarBtn icon={Italic} />
+            <ToolbarBtn icon={Underline} />
+          </div>
+          <div className="h-4 w-px bg-stroke-subtle" />
+          <div className="flex items-center gap-0.5">
+            <ToolbarBtn icon={List} />
+            <ToolbarBtn icon={ListOrdered} />
+          </div>
+          <div className="h-4 w-px bg-stroke-subtle" />
+          <ToolbarBtn icon={Link} />
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportReportAsPdf(html, title)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo text-white text-xs font-medium hover:bg-indigo/90 transition-colors"
+          >
+            <Download size={12} />
+            Export PDF
+          </button>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-canvas-muted/50 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      </div>
 
-| Metric | Ethan Miller | Sophie Anderson | Org Avg |
-|--------|-------------|-----------------|---------|
-| Focus Time | 3.8h/day | 5.3h/day | 4.2h/day |
-| Docs Created | 2 this week | 3 this week | 2.4 |
-| Meetings | 7 this week | 4 this week | 5.2 |
-| Top Activity | Lead Follow-ups (40%) | Technical Writing (44%) | — |
-| Mood | Collaborative | Focused | — |
+      {/* Report document */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-[780px] mx-auto py-8 px-6">
+          <div
+            className="report-content rounded-xl border border-stroke-subtle bg-canvas-raised px-10 py-8 min-h-[600px]
+              [&_*]:text-text-primary
+              [&_h1]:text-xl [&_h1]:font-bold [&_h1]:text-white [&_h1]:mb-2 [&_h1]:pb-3 [&_h1]:border-b [&_h1]:border-indigo/30
+              [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-white [&_h2]:mb-2 [&_h2]:mt-8 [&_h2]:pb-1.5 [&_h2]:border-b [&_h2]:border-stroke-subtle
+              [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-white [&_h3]:mt-5 [&_h3]:mb-2
+              [&_p]:text-[13px] [&_p]:text-text-primary [&_p]:leading-relaxed [&_p]:mb-3
+              [&_ul]:text-[13px] [&_ul]:text-text-primary [&_ul]:space-y-1.5 [&_ul]:mb-4 [&_ul]:pl-5 [&_ul]:list-disc
+              [&_ol]:text-[13px] [&_ol]:text-text-primary [&_ol]:space-y-1.5 [&_ol]:mb-4 [&_ol]:pl-5 [&_ol]:list-decimal
+              [&_li]:leading-relaxed
+              [&_strong]:text-white [&_strong]:font-semibold
+              [&_em]:text-indigo-light
+              [&_table]:text-xs [&_table]:w-full [&_table]:mb-6 [&_table]:border-collapse [&_table]:border [&_table]:border-stroke-subtle [&_table]:rounded-lg [&_table]:overflow-hidden
+              [&_thead]:bg-canvas-muted/50
+              [&_th]:text-left [&_th]:py-2.5 [&_th]:px-3 [&_th]:text-text-secondary [&_th]:font-semibold [&_th]:text-xs [&_th]:border-b [&_th]:border-stroke-subtle
+              [&_td]:py-2.5 [&_td]:px-3 [&_td]:text-text-primary [&_td]:text-xs [&_td]:border-b [&_td]:border-stroke-subtle/50
+              [&_tr:nth-child(even)]:bg-canvas-muted/20
+              [&_div]:text-text-primary"
+            contentEditable
+            suppressContentEditableWarning
+            dangerouslySetInnerHTML={{ __html: cleanHtml }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-**Key Insight:** Sophie is outperforming on focus time (+26% vs org avg) but Ethan is more meeting-heavy. Ethan's strength is cross-team collaboration — he's spending significant time on lead follow-ups, which is expected for his role.
+// ── Lightweight markdown → HTML ───────────────────────────────
+function mdToHtml(md: string): string {
+  const lines = md.split("\n");
+  const out: string[] = [];
+  let inUl = false;
+  let inOl = false;
+  let inTable = false;
 
-**Recommendation:** Ethan might benefit from more protected focus blocks. His meeting load is 35% above average.`;
+  const closeLists = () => {
+    if (inUl) { out.push("</ul>"); inUl = false; }
+    if (inOl) { out.push("</ol>"); inOl = false; }
+  };
+  const closeTable = () => {
+    if (inTable) { out.push("</tbody></table>"); inTable = false; }
+  };
+
+  // Escape HTML entities so raw HTML from LLM doesn't render
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Inline formatting: bold, italic, code (applied AFTER escaping)
+  const inlineFmt = (s: string) =>
+    esc(s)
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      .replace(/`(.+?)`/g, '<code style="background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px;font-size:0.85em">$1</code>');
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Table rows
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      closeLists();
+      const cells = trimmed.split("|").filter(Boolean).map((c) => c.trim());
+      // Skip separator rows (|---|---|)
+      if (cells.every((c) => /^[-:]+$/.test(c))) {
+        continue;
+      }
+      if (!inTable) {
+        out.push('<table><thead><tr>');
+        cells.forEach((c) => out.push(`<th>${inlineFmt(c)}</th>`));
+        out.push('</tr></thead><tbody>');
+        inTable = true;
+        continue;
+      }
+      out.push("<tr>");
+      cells.forEach((c) => out.push(`<td>${inlineFmt(c)}</td>`));
+      out.push("</tr>");
+      continue;
+    }
+    closeTable();
+
+    // Headings
+    if (trimmed.startsWith("### ")) { closeLists(); out.push(`<h3>${inlineFmt(trimmed.slice(4))}</h3>`); continue; }
+    if (trimmed.startsWith("## ")) { closeLists(); out.push(`<h2>${inlineFmt(trimmed.slice(3))}</h2>`); continue; }
+    if (trimmed.startsWith("# ")) { closeLists(); out.push(`<h1>${inlineFmt(trimmed.slice(2))}</h1>`); continue; }
+
+    // Unordered list
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      closeTable();
+      if (inOl) { out.push("</ol>"); inOl = false; }
+      if (!inUl) { out.push("<ul>"); inUl = true; }
+      out.push(`<li>${inlineFmt(trimmed.slice(2))}</li>`);
+      continue;
+    }
+
+    // Ordered list
+    const olMatch = trimmed.match(/^(\d+)\.\s(.+)/);
+    if (olMatch) {
+      closeTable();
+      if (inUl) { out.push("</ul>"); inUl = false; }
+      if (!inOl) { out.push("<ol>"); inOl = true; }
+      out.push(`<li>${inlineFmt(olMatch[2])}</li>`);
+      continue;
+    }
+
+    closeLists();
+
+    // Empty line
+    if (trimmed === "") { continue; }
+
+    // Regular paragraph
+    out.push(`<p>${inlineFmt(trimmed)}</p>`);
   }
 
-  if (q.includes("trend") || q.includes("improvement") || q.includes("improve")) {
-    return `**Focus Time Trends — Last 30 Days**
-
-📈 **Most Improved:**
-1. **Daniel Brown** — Focus time up **+42%** (2.8h → 4.0h/day). Shifted from meetings to report writing.
-2. **Olivia Davis** — Up **+28%** after completing onboarding. Now averaging 3.5h/day on bug triage.
-3. **Billy TheKid** — Steady at **4.5h/day**, consistently the highest on the team.
-
-📉 **Declining:**
-1. **Maya Johnson** — Down **-18%** this month. Sprint planning overhead has increased.
-2. **James Wilson** — Down **-12%**. More time in customer support escalations.
-
-**Pattern:** The team's overall focus time is trending up (+8% month-over-month), driven primarily by engineers finishing onboarding.`;
-  }
-
-  if (q.includes("health") || q.includes("burnout") || q.includes("risk") || q.includes("behind")) {
-    return `**Team Health Check — Engineering**
-
-🟢 **Healthy (4 members):**
-- Billy TheKid, Daniel Brown, Olivia Davis, Sophie Anderson
-- All above org average in focus time, meeting load within normal range
-
-🟡 **Watch (2 members):**
-- **Maya Johnson** — Meeting-heavy flag for 2 consecutive weeks. Sprint planning consuming 55% of her time.
-- **James Wilson** — Support ticket volume spiked 3x this week. Risk of context-switching fatigue.
-
-🔴 **Needs Attention (1 member):**
-- **Sophie Anderson** — Ramping up, 0 docs created but 8 questions asked to Mitable AI. This is normal for week 2 but worth checking in.
-
-**Org Comparison:**
-- Engineering avg focus: **4.2h/day** (org avg: 3.8h)
-- Engineering meeting load: **1.8h/day** (org avg: 2.1h)
-- Engineering is **10% more focused** than the rest of the org.`;
-  }
-
-  if (q.includes("meeting") || q.includes("deep work") || q.includes("percentage")) {
-    return `**Time Allocation Analysis — This Week vs Last Month**
-
-| Category | This Week | Last Month Avg | Change |
-|----------|-----------|----------------|--------|
-| Deep Focus | **58%** (4.2h/day) | 52% (3.7h/day) | ↑ +6% |
-| Meetings | **25%** (1.8h/day) | 29% (2.1h/day) | ↓ -4% |
-| Support/Ops | **12%** (0.9h/day) | 14% (1.0h/day) | ↓ -2% |
-| Other | **5%** (0.4h/day) | 5% (0.4h/day) | — |
-
-**Insight:** The team is trending toward more focus time and fewer meetings. This aligns with the "No Meeting Wednesdays" policy introduced 3 weeks ago — Wednesdays now show **+40% focus time** compared to before.
-
-**Top meeting consumers:** Maya Johnson (55%), Mike Jones (45%), Ethan Miller (38%)
-**Most focused:** Sophie Anderson (72%), Billy TheKid (68%), Daniel Brown (65%)`;
-  }
-
-  return mockResponses.default;
+  closeLists();
+  closeTable();
+  return out.join("");
 }
 
 // ── Components ────────────────────────────────────────────────
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, onOpenReport }: { message: Message; onOpenReport?: () => void }) {
   const isUser = message.role === "user";
 
   return (
@@ -178,56 +284,48 @@ function MessageBubble({ message }: { message: Message }) {
               : "bg-canvas-raised border border-stroke-subtle text-text-primary rounded-bl-sm"
           }`}
         >
-          <div className="prose prose-sm prose-invert max-w-none [&_table]:text-xs [&_table]:w-full [&_th]:text-left [&_th]:py-1 [&_th]:pr-4 [&_td]:py-1 [&_td]:pr-4 [&_strong]:text-text-primary [&_h2]:text-base [&_h2]:mt-3 [&_h2]:mb-1">
-            {message.content.split("\n").map((line, i) => {
-              if (line.startsWith("| ") && line.endsWith(" |")) {
-                const cells = line
-                  .split("|")
-                  .filter(Boolean)
-                  .map((c) => c.trim());
-                if (cells.every((c) => c.match(/^-+$/))) return null;
-                const isHeader = i > 0 && message.content.split("\n")[i + 1]?.includes("---");
-                return (
-                  <div key={i} className="flex gap-0 text-xs">
-                    {cells.map((cell, j) => (
-                      <div
-                        key={j}
-                        className={`flex-1 py-1 ${isHeader ? "font-semibold text-text-secondary" : ""}`}
-                      >
-                        {cell}
-                      </div>
-                    ))}
-                  </div>
-                );
-              }
-              if (line.startsWith("**") && line.endsWith("**")) {
-                return (
-                  <p key={i} className="font-semibold mt-2 mb-1">
-                    {line.replace(/\*\*/g, "")}
-                  </p>
-                );
-              }
-              if (
-                line.startsWith("- ") ||
-                line.startsWith("1. ") ||
-                line.startsWith("2. ") ||
-                line.startsWith("3. ")
-              ) {
-                return (
-                  <p key={i} className="ml-2 my-0.5">
-                    {line}
-                  </p>
-                );
-              }
-              if (line.trim() === "") return <br key={i} />;
-              return (
-                <p key={i} className="my-0.5">
-                  {line}
-                </p>
-              );
-            })}
-          </div>
+          {isUser ? (
+            <p>{message.content}</p>
+          ) : (
+            <div
+              className="prose prose-sm prose-invert max-w-none
+                [&_h1]:text-lg [&_h1]:font-bold [&_h1]:text-text-primary [&_h1]:mt-3 [&_h1]:mb-1
+                [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-text-primary [&_h2]:mt-3 [&_h2]:mb-1
+                [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-text-primary [&_h3]:mt-2.5 [&_h3]:mb-1
+                [&_p]:my-1 [&_p]:leading-relaxed
+                [&_strong]:text-text-primary [&_strong]:font-semibold
+                [&_em]:italic
+                [&_ul]:my-1 [&_ul]:ml-4 [&_ul]:list-disc
+                [&_ol]:my-1 [&_ol]:ml-4 [&_ol]:list-decimal
+                [&_li]:my-0.5 [&_li]:leading-relaxed
+                [&_table]:text-xs [&_table]:w-full [&_table]:my-2 [&_table]:border-collapse
+                [&_th]:text-left [&_th]:py-1.5 [&_th]:px-2 [&_th]:font-semibold [&_th]:text-text-secondary [&_th]:border-b [&_th]:border-stroke-subtle
+                [&_td]:py-1.5 [&_td]:px-2 [&_td]:border-b [&_td]:border-stroke-subtle/50
+                [&_code]:text-indigo-light"
+              dangerouslySetInnerHTML={{ __html: mdToHtml(message.content) }}
+            />
+          )}
         </div>
+
+        {message.reportCard && (
+          <button
+            onClick={onOpenReport}
+            className="mt-2 flex items-center gap-3 w-full rounded-lg border border-indigo/20 bg-indigo/5 px-4 py-3 text-left hover:bg-indigo/10 hover:border-indigo/30 transition-all group"
+          >
+            <div className="w-9 h-9 rounded-lg bg-indigo/20 flex items-center justify-center shrink-0">
+              <FileText size={16} className="text-indigo-light" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text-primary truncate">
+                {message.reportCard.title}
+              </p>
+              <p className="text-[11px] text-text-tertiary">
+                {message.reportCard.subtitle} — Click to open
+              </p>
+            </div>
+          </button>
+        )}
+
         <p className={`text-[10px] text-text-tertiary mt-1 ${isUser ? "text-right" : ""}`}>
           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </p>
@@ -242,11 +340,13 @@ function ThreadDropdown({
   activeThreadId,
   onSelect,
   onNew,
+  onDelete,
 }: {
-  threads: Thread[];
+  threads: AskThread[];
   activeThreadId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
+  onDelete: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -304,24 +404,34 @@ function ThreadDropdown({
                     day: "numeric",
                   });
                   return (
-                    <button
+                    <div
                       key={thread.id}
-                      onClick={() => {
-                        onSelect(thread.id);
-                        setOpen(false);
-                      }}
-                      className={`flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors ${
+                      className={`flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors group ${
                         isActive
                           ? "bg-indigo/10 text-text-primary"
                           : "text-text-secondary hover:text-text-primary hover:bg-canvas-muted/30"
                       }`}
                     >
-                      <MessageSquare size={12} className="shrink-0 opacity-50" />
-                      <div className="flex-1 min-w-0">
+                      <button
+                        onClick={() => {
+                          onSelect(thread.id);
+                          setOpen(false);
+                        }}
+                        className="flex-1 min-w-0 text-left"
+                      >
                         <p className="text-sm truncate">{thread.title}</p>
                         <p className="text-[10px] text-text-tertiary">{timeStr}</p>
-                      </div>
-                    </button>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(thread.id);
+                        }}
+                        className="shrink-0 opacity-0 group-hover:opacity-100 w-6 h-6 rounded flex items-center justify-center text-text-tertiary hover:text-red-400 hover:bg-red-400/10 transition-all"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   );
                 })}
             </div>
@@ -339,60 +449,80 @@ function ThreadDropdown({
 }
 
 export default function AskView() {
-  const [threads, setThreads] = useState<Thread[]>(() => loadThreads());
+  const [threads, setThreads] = useState<AskThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [activeReport, setActiveReport] = useState<ReportData | null>(null);
+  const [activeReportMsgId, setActiveReportMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Load threads from API on mount
+  useEffect(() => {
+    fetchAskThreads()
+      .then(setThreads)
+      .catch(() => {});
+  }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const persistThread = useCallback((threadId: string, msgs: Message[]) => {
-    setThreads((prev) => {
-      const serialized = serializeMessages(msgs);
-      const existing = prev.find((t) => t.id === threadId);
-      let updated: Thread[];
-      if (existing) {
-        updated = prev.map((t) =>
-          t.id === threadId
-            ? {
-                ...t,
-                messages: serialized,
-                title: threadTitle(serialized),
-                updatedAt: new Date().toISOString(),
-              }
-            : t
-        );
-      } else {
-        const now = new Date().toISOString();
-        updated = [
-          ...prev,
-          {
-            id: threadId,
-            title: threadTitle(serialized),
-            messages: serialized,
-            createdAt: now,
-            updatedAt: now,
-          },
-        ];
+  const openReport = (msg: Message) => {
+    if (msg.reportHtml && msg.reportCard) {
+      // Toggle: if same report is already open, close it
+      if (editorOpen && activeReportMsgId === msg.id) {
+        setEditorOpen(false);
+        setActiveReport(null);
+        setActiveReportMsgId(null);
+        // Scroll to the report message after closing
+        setTimeout(() => {
+          msgRefs.current[msg.id]?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 50);
+        return;
       }
-      saveThreads(updated);
-      return updated;
-    });
-  }, []);
+      setActiveReport({ title: msg.reportCard.title, subtitle: msg.reportCard.subtitle, html: msg.reportHtml });
+      setActiveReportMsgId(msg.id);
+      setEditorOpen(true);
+      // Scroll chat to the report message after layout updates
+      setTimeout(() => {
+        msgRefs.current[msg.id]?.scrollIntoView({ behavior: "smooth", block: "end" });
+      }, 100);
+    }
+  };
 
-  const handleSend = (text?: string) => {
+  const closeEditor = () => {
+    const msgId = activeReportMsgId;
+    setEditorOpen(false);
+    setActiveReport(null);
+    setActiveReportMsgId(null);
+    if (msgId) {
+      setTimeout(() => {
+        msgRefs.current[msgId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    }
+  };
+
+  const refreshThreads = async () => {
+    try {
+      const updated = await fetchAskThreads();
+      setThreads(updated);
+    } catch {}
+  };
+
+  const handleSend = async (text?: string) => {
     const content = text || input.trim();
-    if (!content) return;
+    if (!content || isTyping) return;
 
+    // Optimistic user message
     const userMsg: Message = {
       id: `user-${Date.now()}`,
       role: "user",
@@ -400,44 +530,54 @@ export default function AskView() {
       timestamp: new Date(),
     };
 
-    // If no active thread, create one
-    const threadId = activeThreadId || `thread-${Date.now()}`;
-    if (!activeThreadId) setActiveThreadId(threadId);
-
-    const nextMessages = [...messages, userMsg];
-    setMessages(nextMessages);
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
 
-    persistThread(threadId, nextMessages);
+    try {
+      const response = await sendAskChat(content, activeThreadId || undefined);
 
-    // Simulate AI response delay
-    setTimeout(
-      () => {
-        const aiMsg: Message = {
-          id: `ai-${Date.now()}`,
-          role: "assistant",
-          content: getMockResponse(content),
-          timestamp: new Date(),
-        };
-        setMessages((prev) => {
-          const withAi = [...prev, aiMsg];
-          persistThread(threadId, withAi);
-          return withAi;
-        });
-        setIsTyping(false);
-      },
-      1200 + Math.random() * 800
-    );
+      // If this was a new thread, set the thread ID
+      if (!activeThreadId) {
+        setActiveThreadId(response.threadId);
+      }
+
+      const aiMsg: Message = {
+        id: `ai-${Date.now()}`,
+        role: "assistant",
+        content: response.message,
+        timestamp: new Date(),
+        reportCard: response.report
+          ? { title: response.report.title, subtitle: response.report.subtitle }
+          : undefined,
+        reportHtml: response.report?.html,
+      };
+
+      setMessages((prev) => [...prev, aiMsg]);
+      refreshThreads();
+    } catch {
+      const errMsg: Message = {
+        id: `error-${Date.now()}`,
+        role: "assistant",
+        content: "Sorry, I couldn't process that request. Please try again.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errMsg]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
-  const handleSelectThread = (id: string) => {
-    const thread = threads.find((t) => t.id === id);
-    if (!thread) return;
+  const handleSelectThread = async (id: string) => {
     setActiveThreadId(id);
-    setMessages(deserializeMessages(thread.messages));
     setInput("");
     setIsTyping(false);
+    try {
+      const rows = await fetchAskThreadMessages(id);
+      setMessages(rows.map(dbToMessage));
+    } catch {
+      setMessages([]);
+    }
   };
 
   const handleNewConversation = () => {
@@ -445,6 +585,18 @@ export default function AskView() {
     setMessages([]);
     setInput("");
     setIsTyping(false);
+  };
+
+  const handleDeleteThread = async (id: string) => {
+    try {
+      await deleteAskThread(id);
+      setThreads((prev) => prev.filter((t) => t.id !== id));
+      if (activeThreadId === id) {
+        setActiveThreadId(null);
+        setMessages([]);
+        setInput("");
+      }
+    } catch {}
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -463,6 +615,7 @@ export default function AskView() {
         activeThreadId={activeThreadId}
         onSelect={handleSelectThread}
         onNew={handleNewConversation}
+        onDelete={handleDeleteThread}
       />
     </div>
   );
@@ -477,12 +630,14 @@ export default function AskView() {
           onKeyDown={handleKeyDown}
           placeholder="Ask anything about your team..."
           rows={1}
-          className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-tertiary py-2.5 resize-none outline-none max-h-[80px] min-h-[36px]"
-          style={{ height: "36px" }}
+          className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-tertiary py-2.5 resize-none outline-none max-h-[108px] min-h-[36px]"
+          style={{ height: "36px", overflow: "hidden" }}
           onInput={(e) => {
             const target = e.target as HTMLTextAreaElement;
             target.style.height = "36px";
-            target.style.height = Math.min(target.scrollHeight, 80) + "px";
+            const newHeight = Math.min(target.scrollHeight, 108);
+            target.style.height = newHeight + "px";
+            target.style.overflow = newHeight >= 108 ? "auto" : "hidden";
           }}
         />
         <button
@@ -502,7 +657,7 @@ export default function AskView() {
 
   if (isEmpty) {
     return (
-      <div className="relative flex flex-col items-center justify-center h-screen px-8">
+      <div className="relative flex flex-col items-center justify-center min-h-[calc(100vh-80px)] px-8">
         {threadPicker}
 
         <div className="w-12 h-12 rounded-2xl bg-indigo/10 flex items-center justify-center mb-4">
@@ -535,15 +690,20 @@ export default function AskView() {
     );
   }
 
-  return (
-    <div className="relative flex flex-col h-screen">
-      {threadPicker}
+  const chatPanel = (
+    <div className={`relative flex flex-col ${editorOpen ? "h-full" : "min-h-[calc(100vh-80px)]"}`}>
+      {!editorOpen && threadPicker}
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-8 pt-14">
-        <div className="max-w-3xl mx-auto py-4">
+      <div className="flex-1 overflow-y-auto px-6 pt-14">
+        <div className={`${editorOpen ? "max-w-none" : "max-w-3xl"} mx-auto py-4`}>
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
+            <div key={msg.id} ref={(el) => { msgRefs.current[msg.id] = el; }}>
+              <MessageBubble
+                message={msg}
+                onOpenReport={msg.reportCard ? () => openReport(msg) : undefined}
+              />
+            </div>
           ))}
           {isTyping && (
             <div className="flex items-center gap-2 mb-4">
@@ -571,7 +731,35 @@ export default function AskView() {
       </div>
 
       {/* Input pinned to bottom */}
-      <div className="flex-shrink-0 px-8 pb-8 pt-4">{inputBox}</div>
+      <div className="flex-shrink-0 px-6 pb-6 pt-3">{inputBox}</div>
     </div>
   );
+
+  // Split-pane layout when report editor is open
+  if (editorOpen && activeReport) {
+    return (
+      <div className="flex h-[calc(100vh-48px)] overflow-hidden">
+        {/* Editor — left 60% */}
+        <div className="w-[60%] h-full overflow-hidden">
+          <ReportEditor
+            html={activeReport.html}
+            title={activeReport.title}
+            onClose={closeEditor}
+          />
+        </div>
+        {/* Chat — right 40% */}
+        <div className="w-[40%] h-full border-l border-stroke-subtle bg-canvas-default/50 flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-stroke-subtle shrink-0">
+            <p className="text-xs font-medium text-text-secondary">AI Assistant</p>
+            <p className="text-[10px] text-text-tertiary">Ask me to refine the report</p>
+          </div>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {chatPanel}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return chatPanel;
 }
