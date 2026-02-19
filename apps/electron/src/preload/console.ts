@@ -84,9 +84,16 @@ const IPC_CHANNELS = {
   AUTH_SESSION_RESTORED: "auth-session-restored",
   // Native notifications
   NOTIFICATION_SHOW: "notification-show",
+  // PDF Export
+  EXPORT_PDF: "export-pdf",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
+  // PDF Export
+  exportPdf: async (html: string, title: string): Promise<{ success: boolean; filePath?: string; error?: string }> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.EXPORT_PDF, { html, title });
+  },
+
   // Screenshot capture - multi-window capture with policy filtering
   captureScreenshot: async (): Promise<MultiWindowCaptureResult> => {
     logger.info(" Multi-window captureScreenshot() called from renderer");

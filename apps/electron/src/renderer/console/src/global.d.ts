@@ -8,6 +8,9 @@ import type {
 } from "@mitable/shared";
 
 interface ConsoleAPI {
+  // PDF Export
+  exportPdf: (html: string, title: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+
   // Screenshot capture - multi-window capture with policy filtering
   captureScreenshot: () => Promise<MultiWindowCaptureResult>;
 

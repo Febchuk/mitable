@@ -21,6 +21,8 @@ import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { closeAudioConnection } from "./audio.js";
 import { logger } from "../lib/logger";
+import { scheduleInactivityRollup, cancelInactivityRollup } from "../cron/jobs/inactivity-trigger";
+import { classifySession } from "../services/session-classification.service";
 
 const router = Router();
 
@@ -217,6 +219,9 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       windowCount: initialWindows.length,
       hasRelatedDocs: !!relatedDocsContext,
     });
+
+    // Cancel any pending inactivity rollup — user is starting a new session
+    cancelInactivityRollup(userId);
 
     res.json({
       success: true,
@@ -749,6 +754,9 @@ router.post(
           60 * 60 * 1000
         );
 
+        // Still schedule inactivity rollup — session ended even if too short for summary
+        scheduleInactivityRollup(userId);
+
         res.json({
           success: true,
           session: {
@@ -837,24 +845,34 @@ router.post(
             .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
-          // Trigger session ingestion (chunk + embed session data)
-          SessionIngestionService.ingestSession(id)
-            .then(async () => {
-              await db
-                .update(schema.monitoringSessions)
-                .set({ ingestionStatus: "completed" })
-                .where(eq(schema.monitoringSessions.id, id));
-            })
-            .catch(async (error) => {
-              log.error("Session ingestion failed", {
+          // Run ingestion + activity classification in parallel
+          Promise.all([
+            // Chunk + embed session data
+            SessionIngestionService.ingestSession(id)
+              .then(async () => {
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ ingestionStatus: "completed" })
+                  .where(eq(schema.monitoringSessions.id, id));
+              })
+              .catch(async (error) => {
+                log.error("Session ingestion failed", {
+                  sessionId: id,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ ingestionStatus: "failed" })
+                  .where(eq(schema.monitoringSessions.id, id));
+              }),
+            // Classify session activities via Groq → keyActivities
+            classifySession(id).catch((error) => {
+              log.error("Session classification failed", {
                 sessionId: id,
                 error: error instanceof Error ? error.message : String(error),
               });
-              await db
-                .update(schema.monitoringSessions)
-                .set({ ingestionStatus: "failed" })
-                .where(eq(schema.monitoringSessions.id, id));
-            });
+            }),
+          ]);
         })
         .catch(async (error) => {
           log.error("Session end processing failed", {
@@ -866,24 +884,32 @@ router.post(
             .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
-          // Trigger session ingestion (chunk + embed session data)
-          SessionIngestionService.ingestSession(id)
-            .then(async () => {
-              await db
-                .update(schema.monitoringSessions)
-                .set({ ingestionStatus: "completed" })
-                .where(eq(schema.monitoringSessions.id, id));
-            })
-            .catch(async (ingestError) => {
-              log.error("Session ingestion failed", {
+          // Still run ingestion + classification even if storyteller failed
+          Promise.all([
+            SessionIngestionService.ingestSession(id)
+              .then(async () => {
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ ingestionStatus: "completed" })
+                  .where(eq(schema.monitoringSessions.id, id));
+              })
+              .catch(async (ingestError) => {
+                log.error("Session ingestion failed", {
+                  sessionId: id,
+                  error: ingestError instanceof Error ? ingestError.message : String(ingestError),
+                });
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ ingestionStatus: "failed" })
+                  .where(eq(schema.monitoringSessions.id, id));
+              }),
+            classifySession(id).catch((classifyError) => {
+              log.error("Session classification failed", {
                 sessionId: id,
-                error: ingestError instanceof Error ? ingestError.message : String(ingestError),
+                error: classifyError instanceof Error ? classifyError.message : String(classifyError),
               });
-              await db
-                .update(schema.monitoringSessions)
-                .set({ ingestionStatus: "failed" })
-                .where(eq(schema.monitoringSessions.id, id));
-            });
+            }),
+          ]);
         });
 
       // Schedule cleanup of imageData after 1 hour to free up storage
@@ -904,6 +930,10 @@ router.post(
         },
         60 * 60 * 1000
       ); // 1 hour
+
+      // Schedule inactivity rollup — if no new session starts within 30 min,
+      // run the full Day Analyzer RLM for this user's day
+      scheduleInactivityRollup(userId);
 
       res.json({
         success: true,

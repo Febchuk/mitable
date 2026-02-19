@@ -115,6 +115,9 @@ export const IPC_CHANNELS = {
   NOTIFICATION_HIDE: "notification-hide", // Hide/dismiss notification
   NOTIFICATION_ACTION: "notification-action", // User clicked action button
   NOTIFICATION_DATA: "notification-data", // Send notification config to renderer
+
+  // PDF Export
+  EXPORT_PDF: "export-pdf", // Renderer → Main: generate PDF from HTML and save
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

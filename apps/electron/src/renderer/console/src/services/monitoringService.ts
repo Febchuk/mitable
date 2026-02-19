@@ -146,11 +146,25 @@ export interface SlackUser {
 // API Functions
 // ===========================
 
+export interface SessionsPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
 /**
- * Fetch all sessions for the current user
+ * Fetch paginated sessions for the current user
  */
-export async function fetchSessions(): Promise<{ sessions: SessionListItem[] }> {
-  return apiRequest<{ sessions: SessionListItem[] }>("/monitoring/sessions");
+export async function fetchSessions(
+  page = 1,
+  limit = 20
+): Promise<{ sessions: SessionListItem[]; pagination: SessionsPagination }> {
+  return apiRequest<{ sessions: SessionListItem[]; pagination: SessionsPagination }>(
+    `/monitoring/sessions?page=${page}&limit=${limit}`
+  );
 }
 
 /**

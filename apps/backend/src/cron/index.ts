@@ -5,12 +5,14 @@
  * Runs inside the backend process — shares DB, config, and services.
  *
  * Schedule:
- *   - Layer 1 (User Rollup):      Every 30 minutes — Day Analyzer RLM per user
- *   - Layer 2 (Org Rollup):        Every 30 minutes — Org-wide aggregation (after Layer 1)
+ *   - Capture Rollup:              Every 10 minutes — lightweight metrics from captures (no LLM)
+ *   - Layer 1 (User Rollup):       Every 30 minutes — Day Analyzer RLM per user (rich narrative)
+ *   - Layer 2 (Org Rollup):        After Capture Rollup & Layer 1 — Org-wide aggregation
  *   - Layer 3 (Period Snapshots):   Daily at midnight — Weekly/monthly consolidation
  */
 
 import cron from "node-cron";
+import { runCaptureRollup } from "./jobs/capture-rollup.job";
 import { runUserRollup } from "./jobs/user-rollup.job";
 import { runOrgRollup } from "./jobs/org-rollup.job";
 import { runPeriodSnapshots } from "./jobs/period-snapshot.job";
@@ -18,6 +20,7 @@ import { createLogger } from "../lib/logger";
 
 const logger = createLogger({ context: "cron-scheduler" });
 
+let isCaptureRollupRunning = false;
 let isLayer1Running = false;
 let isLayer2Running = false;
 let isLayer3Running = false;
@@ -30,8 +33,39 @@ export function initCronJobs(): void {
   logger.info("Initializing cron scheduler");
 
   // ──────────────────────────────────────────────
+  // Capture Rollup: Every 10 minutes (at :00, :10, :20, :30, :40, :50)
+  // Lightweight — reads captures, computes app/time/category metrics,
+  // writes to user_daily_activities. Dashboard reads these on-the-fly.
+  // No org rollup needed — "today" is computed live at request time.
+  // ──────────────────────────────────────────────
+  cron.schedule("*/10 * * * *", async () => {
+    if (isCaptureRollupRunning) {
+      logger.warn("Capture rollup still running — skipping");
+      return;
+    }
+
+    isCaptureRollupRunning = true;
+
+    try {
+      const result = await runCaptureRollup();
+      logger.info(
+        {
+          usersProcessed: result.usersProcessed,
+          timeMs: result.totalTimeMs,
+        },
+        "Capture rollup completed"
+      );
+    } catch (error) {
+      logger.error({ error: String(error) }, "Capture rollup failed");
+    } finally {
+      isCaptureRollupRunning = false;
+    }
+  });
+
+  // ──────────────────────────────────────────────
   // Layer 1 + 2: Every 30 minutes (at :00 and :30)
-  // Layer 1 runs first, then Layer 2 reads its output
+  // Full Day Analyzer RLM — adds narrative, blocks, accomplishments.
+  // Layer 1 runs first, then Layer 2 reads its output.
   // ──────────────────────────────────────────────
   cron.schedule("0,30 * * * *", async () => {
     if (isLayer1Running) {
@@ -110,5 +144,5 @@ export function initCronJobs(): void {
     }
   });
 
-  logger.info("Cron scheduler initialized — Layer 1+2 every 30min, Layer 3 at 00:05 daily");
+  logger.info("Cron scheduler initialized — Capture rollup every 10min, Layer 1+2 every 30min, Layer 3 at 00:05 daily");
 }

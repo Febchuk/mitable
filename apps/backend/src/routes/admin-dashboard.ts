@@ -10,7 +10,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { createLogger } from "../lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
@@ -77,8 +77,129 @@ function resolveDateRange(period: string): { startDate: string; endDate: string;
 }
 
 // ============================================================================
+// Helper: Compute org-level aggregates on-the-fly from user_daily_activities
+// Used for "today" so the dashboard is always as fresh as the last capture rollup.
+// ============================================================================
+interface LiveOrgMetrics {
+  avgWorkMinutes: number;
+  avgMeetingMinutes: number;
+  avgActiveMinutes: number;
+  avgWorkPercentage: number;
+  avgMeetingPercentage: number;
+  totalUsersTracked: number;
+  totalTeamWorkMinutes: number;
+  totalTeamMeetingMinutes: number;
+  activityDistribution: { category: string; totalMinutes: number; percentage: number }[];
+  topApps: { app: string; totalMinutes: number; userCount: number }[];
+  userSummaries: { userId: string; name: string; activeMinutes: number; workPct: number; meetingPct: number }[];
+}
+
+async function computeLiveOrgMetrics(organizationId: string, dateStr: string): Promise<LiveOrgMetrics | null> {
+  // Fetch all user daily activities for this org on this date
+  const userRows = await db
+    .select({
+      userId: schema.userDailyActivities.userId,
+      totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
+      totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
+      totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
+      workPercentage: schema.userDailyActivities.workPercentage,
+      meetingPercentage: schema.userDailyActivities.meetingPercentage,
+      appBreakdown: schema.userDailyActivities.appBreakdown,
+      categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
+    })
+    .from(schema.userDailyActivities)
+    .where(
+      and(
+        eq(schema.userDailyActivities.organizationId, organizationId),
+        eq(schema.userDailyActivities.activityDate, dateStr),
+        eq(schema.userDailyActivities.periodType, "daily")
+      )
+    );
+
+  if (userRows.length === 0) return null;
+
+  const count = userRows.length;
+
+  // Averages
+  const avgWorkMinutes = Math.round((userRows.reduce((s, r) => s + r.totalWorkMinutes, 0) / count) * 10) / 10;
+  const avgMeetingMinutes = Math.round((userRows.reduce((s, r) => s + r.totalMeetingMinutes, 0) / count) * 10) / 10;
+  const avgActiveMinutes = Math.round((userRows.reduce((s, r) => s + r.totalActiveMinutes, 0) / count) * 10) / 10;
+
+  // Totals
+  const totalTeamWorkMinutes = userRows.reduce((s, r) => s + r.totalWorkMinutes, 0);
+  const totalTeamMeetingMinutes = userRows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
+  const totalTeamActive = totalTeamWorkMinutes + totalTeamMeetingMinutes;
+
+  // Activity distribution (aggregate category breakdowns)
+  const categoryTotals = new Map<string, number>();
+  for (const row of userRows) {
+    const breakdown = (row.categoryBreakdown || []) as { category: string; minutes: number }[];
+    for (const entry of breakdown) {
+      categoryTotals.set(entry.category, (categoryTotals.get(entry.category) || 0) + entry.minutes);
+    }
+  }
+  const activityDistribution = [...categoryTotals.entries()]
+    .map(([category, totalMinutes]) => ({
+      category,
+      totalMinutes,
+      percentage: totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
+    }))
+    .sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+  // Top apps (aggregate app breakdowns)
+  const appTotals = new Map<string, { totalMinutes: number; users: Set<string> }>();
+  for (const row of userRows) {
+    const breakdown = (row.appBreakdown || []) as { app: string; minutes: number }[];
+    for (const entry of breakdown) {
+      const existing = appTotals.get(entry.app) || { totalMinutes: 0, users: new Set<string>() };
+      existing.totalMinutes += entry.minutes;
+      existing.users.add(row.userId);
+      appTotals.set(entry.app, existing);
+    }
+  }
+  const topApps = [...appTotals.entries()]
+    .map(([app, data]) => ({ app, totalMinutes: Math.round(data.totalMinutes), userCount: data.users.size }))
+    .sort((a, b) => b.totalMinutes - a.totalMinutes)
+    .slice(0, 15);
+
+  // User summaries (fetch names)
+  const userIds = userRows.map((r) => r.userId);
+  const users = await db
+    .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
+    .from(schema.users)
+    .where(
+      sql`${schema.users.id} IN (${sql.join(userIds.map((id) => sql`${id}::uuid`), sql`, `)})`
+    );
+  const nameMap = new Map(users.map((u) => [u.id, [u.firstName, u.lastName].filter(Boolean).join(" ") || "Unknown"]));
+
+  const userSummaries = userRows.map((r) => ({
+    userId: r.userId,
+    name: nameMap.get(r.userId) || "Unknown",
+    activeMinutes: r.totalActiveMinutes,
+    workPct: r.workPercentage,
+    meetingPct: r.meetingPercentage,
+  }));
+
+  return {
+    avgWorkMinutes,
+    avgMeetingMinutes,
+    avgActiveMinutes,
+    avgWorkPercentage: avgActiveMinutes > 0 ? Math.round((avgWorkMinutes / avgActiveMinutes) * 100) : 0,
+    avgMeetingPercentage: avgActiveMinutes > 0 ? Math.round((avgMeetingMinutes / avgActiveMinutes) * 100) : 0,
+    totalUsersTracked: count,
+    totalTeamWorkMinutes,
+    totalTeamMeetingMinutes,
+    activityDistribution,
+    topApps,
+    userSummaries,
+  };
+}
+
+// ============================================================================
 // GET /admin/dashboard?period=today|week|month|ytd
-// Returns org-wide metrics for the admin Dashboard view
+// Returns org-wide metrics for the admin Dashboard view.
+//   - "today": computed on-the-fly from user_daily_activities (always fresh)
+//   - "week/month/ytd": historical days from org_daily_metrics + today on-the-fly
 // ============================================================================
 router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -87,9 +208,60 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
 
     const period = (req.query.period as string) || "today";
     const { startDate, endDate } = resolveDateRange(period);
+    const todayStr = new Date().toISOString().split("T")[0]!;
 
-    // Try to get pre-computed org metrics
-    const orgMetrics = await db
+    // ── "today" — always compute live from user_daily_activities ──
+    if (period === "today") {
+      const live = await computeLiveOrgMetrics(admin.organizationId, todayStr);
+
+      if (!live) {
+        res.json({
+          period,
+          hasData: false,
+          metrics: {
+            avgWorkMinutes: 0, avgMeetingMinutes: 0, avgActiveMinutes: 0,
+            avgWorkPercentage: 0, avgMeetingPercentage: 0,
+            totalUsersTracked: 0, totalTeamWorkMinutes: 0, totalTeamMeetingMinutes: 0,
+          },
+          activityDistribution: [],
+          topApps: [],
+          userSummaries: [],
+          dailyTrend: [],
+        });
+        return;
+      }
+
+      res.json({
+        period,
+        hasData: true,
+        metrics: {
+          avgWorkMinutes: live.avgWorkMinutes,
+          avgMeetingMinutes: live.avgMeetingMinutes,
+          avgActiveMinutes: live.avgActiveMinutes,
+          avgWorkPercentage: live.avgWorkPercentage,
+          avgMeetingPercentage: live.avgMeetingPercentage,
+          totalUsersTracked: live.totalUsersTracked,
+          totalTeamWorkMinutes: live.totalTeamWorkMinutes,
+          totalTeamMeetingMinutes: live.totalTeamMeetingMinutes,
+        },
+        activityDistribution: live.activityDistribution,
+        topApps: live.topApps,
+        userSummaries: live.userSummaries,
+        dailyTrend: [{
+          date: todayStr,
+          avgActiveMinutes: live.avgActiveMinutes,
+          avgWorkMinutes: live.avgWorkMinutes,
+          avgMeetingMinutes: live.avgMeetingMinutes,
+          usersTracked: live.totalUsersTracked,
+        }],
+      });
+      return;
+    }
+
+    // ── Multi-day periods — historical from org_daily_metrics + today live ──
+
+    // Fetch historical org metrics (past days, not including today)
+    const historicalMetrics = await db
       .select()
       .from(schema.orgDailyMetrics)
       .where(
@@ -102,20 +274,75 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
       )
       .orderBy(desc(schema.orgDailyMetrics.metricsDate));
 
-    if (orgMetrics.length === 0) {
-      // No data yet — return empty structure
+    // Compute today's live data
+    const todayLive = await computeLiveOrgMetrics(admin.organizationId, todayStr);
+
+    // Build daily trend combining historical + today
+    const dailyTrend: { date: string; avgActiveMinutes: number; avgWorkMinutes: number; avgMeetingMinutes: number; usersTracked: number }[] = [];
+
+    for (const d of historicalMetrics) {
+      // Skip today from historical if it exists (we'll use live data instead)
+      if (d.metricsDate === todayStr) continue;
+      dailyTrend.push({
+        date: d.metricsDate,
+        avgActiveMinutes: d.avgActiveMinutes,
+        avgWorkMinutes: d.avgWorkMinutes,
+        avgMeetingMinutes: d.avgMeetingMinutes,
+        usersTracked: d.totalUsersTracked,
+      });
+    }
+
+    if (todayLive) {
+      dailyTrend.push({
+        date: todayStr,
+        avgActiveMinutes: todayLive.avgActiveMinutes,
+        avgWorkMinutes: todayLive.avgWorkMinutes,
+        avgMeetingMinutes: todayLive.avgMeetingMinutes,
+        usersTracked: todayLive.totalUsersTracked,
+      });
+    }
+
+    // Sort chronologically
+    dailyTrend.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Aggregate across all days for the period summary
+    const allDayMetrics = [
+      ...historicalMetrics
+        .filter((d) => d.metricsDate !== todayStr)
+        .map((d) => ({
+          avgWork: d.avgWorkMinutes,
+          avgMeeting: d.avgMeetingMinutes,
+          avgActive: d.avgActiveMinutes,
+          totalWork: d.totalTeamWorkMinutes,
+          totalMeeting: d.totalTeamMeetingMinutes,
+          users: d.totalUsersTracked,
+          activityDistribution: d.activityDistribution,
+          topApps: d.topApps,
+          userSummaries: d.userSummaries,
+        })),
+      ...(todayLive
+        ? [{
+            avgWork: todayLive.avgWorkMinutes,
+            avgMeeting: todayLive.avgMeetingMinutes,
+            avgActive: todayLive.avgActiveMinutes,
+            totalWork: todayLive.totalTeamWorkMinutes,
+            totalMeeting: todayLive.totalTeamMeetingMinutes,
+            users: todayLive.totalUsersTracked,
+            activityDistribution: todayLive.activityDistribution,
+            topApps: todayLive.topApps,
+            userSummaries: todayLive.userSummaries,
+          }]
+        : []),
+    ];
+
+    if (allDayMetrics.length === 0) {
       res.json({
         period,
         hasData: false,
         metrics: {
-          avgWorkMinutes: 0,
-          avgMeetingMinutes: 0,
-          avgActiveMinutes: 0,
-          avgWorkPercentage: 0,
-          avgMeetingPercentage: 0,
-          totalUsersTracked: 0,
-          totalTeamWorkMinutes: 0,
-          totalTeamMeetingMinutes: 0,
+          avgWorkMinutes: 0, avgMeetingMinutes: 0, avgActiveMinutes: 0,
+          avgWorkPercentage: 0, avgMeetingPercentage: 0,
+          totalUsersTracked: 0, totalTeamWorkMinutes: 0, totalTeamMeetingMinutes: 0,
         },
         activityDistribution: [],
         topApps: [],
@@ -125,74 +352,39 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
       return;
     }
 
-    // For single-day (today), return the latest row
-    // For multi-day (week/month/ytd), aggregate across days
-    if (orgMetrics.length === 1) {
-      const m = orgMetrics[0]!;
-      res.json({
-        period,
-        hasData: true,
-        metrics: {
-          avgWorkMinutes: m.avgWorkMinutes,
-          avgMeetingMinutes: m.avgMeetingMinutes,
-          avgActiveMinutes: m.avgActiveMinutes,
-          avgWorkPercentage: m.avgWorkPercentage,
-          avgMeetingPercentage: m.avgMeetingPercentage,
-          totalUsersTracked: m.totalUsersTracked,
-          totalTeamWorkMinutes: m.totalTeamWorkMinutes,
-          totalTeamMeetingMinutes: m.totalTeamMeetingMinutes,
-        },
-        activityDistribution: m.activityDistribution,
-        topApps: m.topApps,
-        userSummaries: m.userSummaries,
-        dailyTrend: orgMetrics.map((d) => ({
-          date: d.metricsDate,
-          avgActiveMinutes: d.avgActiveMinutes,
-          avgWorkMinutes: d.avgWorkMinutes,
-          avgMeetingMinutes: d.avgMeetingMinutes,
-          usersTracked: d.totalUsersTracked,
-        })),
-      });
-    } else {
-      // Multi-day: compute averages across days
-      const count = orgMetrics.length;
-      const avgWork = orgMetrics.reduce((s, m) => s + m.avgWorkMinutes, 0) / count;
-      const avgMeeting = orgMetrics.reduce((s, m) => s + m.avgMeetingMinutes, 0) / count;
-      const avgActive = orgMetrics.reduce((s, m) => s + m.avgActiveMinutes, 0) / count;
-      const totalWork = orgMetrics.reduce((s, m) => s + m.totalTeamWorkMinutes, 0);
-      const totalMeeting = orgMetrics.reduce((s, m) => s + m.totalTeamMeetingMinutes, 0);
-      const maxUsers = Math.max(...orgMetrics.map((m) => m.totalUsersTracked));
+    const dayCount = allDayMetrics.length;
+    const avgWork = allDayMetrics.reduce((s, d) => s + d.avgWork, 0) / dayCount;
+    const avgMeeting = allDayMetrics.reduce((s, d) => s + d.avgMeeting, 0) / dayCount;
+    const avgActive = allDayMetrics.reduce((s, d) => s + d.avgActive, 0) / dayCount;
+    const totalWork = allDayMetrics.reduce((s, d) => s + d.totalWork, 0);
+    const totalMeeting = allDayMetrics.reduce((s, d) => s + d.totalMeeting, 0);
+    const maxUsers = Math.max(...allDayMetrics.map((d) => d.users));
 
-      // Use latest day's distribution as representative
-      const latest = orgMetrics[0]!;
+    // Use the most recent day's distribution (today if available, else latest historical)
+    const latest = todayLive
+      ? { activityDistribution: todayLive.activityDistribution, topApps: todayLive.topApps, userSummaries: todayLive.userSummaries }
+      : historicalMetrics[0]
+        ? { activityDistribution: historicalMetrics[0].activityDistribution, topApps: historicalMetrics[0].topApps, userSummaries: historicalMetrics[0].userSummaries }
+        : { activityDistribution: [], topApps: [], userSummaries: [] };
 
-      res.json({
-        period,
-        hasData: true,
-        metrics: {
-          avgWorkMinutes: Math.round(avgWork * 10) / 10,
-          avgMeetingMinutes: Math.round(avgMeeting * 10) / 10,
-          avgActiveMinutes: Math.round(avgActive * 10) / 10,
-          avgWorkPercentage: avgActive > 0 ? Math.round((avgWork / avgActive) * 100) : 0,
-          avgMeetingPercentage: avgActive > 0 ? Math.round((avgMeeting / avgActive) * 100) : 0,
-          totalUsersTracked: maxUsers,
-          totalTeamWorkMinutes: totalWork,
-          totalTeamMeetingMinutes: totalMeeting,
-        },
-        activityDistribution: latest.activityDistribution,
-        topApps: latest.topApps,
-        userSummaries: latest.userSummaries,
-        dailyTrend: orgMetrics
-          .map((d) => ({
-            date: d.metricsDate,
-            avgActiveMinutes: d.avgActiveMinutes,
-            avgWorkMinutes: d.avgWorkMinutes,
-            avgMeetingMinutes: d.avgMeetingMinutes,
-            usersTracked: d.totalUsersTracked,
-          }))
-          .reverse(), // chronological order
-      });
-    }
+    res.json({
+      period,
+      hasData: true,
+      metrics: {
+        avgWorkMinutes: Math.round(avgWork * 10) / 10,
+        avgMeetingMinutes: Math.round(avgMeeting * 10) / 10,
+        avgActiveMinutes: Math.round(avgActive * 10) / 10,
+        avgWorkPercentage: avgActive > 0 ? Math.round((avgWork / avgActive) * 100) : 0,
+        avgMeetingPercentage: avgActive > 0 ? Math.round((avgMeeting / avgActive) * 100) : 0,
+        totalUsersTracked: maxUsers,
+        totalTeamWorkMinutes: totalWork,
+        totalTeamMeetingMinutes: totalMeeting,
+      },
+      activityDistribution: latest.activityDistribution,
+      topApps: latest.topApps,
+      userSummaries: latest.userSummaries,
+      dailyTrend,
+    });
   } catch (error) {
     logger.error({ error: String(error) }, "Error fetching dashboard metrics");
     res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch dashboard metrics" });
@@ -233,7 +425,6 @@ router.get("/dashboard/people", requireAuth, async (req: Request, res: Response)
         and(
           eq(schema.userDailyActivities.organizationId, admin.organizationId),
           eq(schema.userDailyActivities.periodType, "daily"),
-          eq(schema.userDailyActivities.status, "completed"),
           gte(schema.userDailyActivities.activityDate, startDate),
           lte(schema.userDailyActivities.activityDate, endDate)
         )
@@ -357,7 +548,6 @@ router.get(
           and(
             eq(schema.userDailyActivities.userId, targetUserId),
             eq(schema.userDailyActivities.periodType, "daily"),
-            eq(schema.userDailyActivities.status, "completed"),
             gte(schema.userDailyActivities.activityDate, startDate),
             lte(schema.userDailyActivities.activityDate, endDate)
           )
@@ -379,6 +569,30 @@ router.get(
         const idSet = new Set(dailyActivityIds);
         blocks = blocks.filter((b) => idSet.has(b.dailyActivityId));
       }
+
+      // Fetch session-level classified activities for the timeline
+      const dayStart = new Date(startDate + "T00:00:00");
+      const dayEnd = new Date(endDate + "T23:59:59.999");
+
+      const sessionActivities = await db
+        .select({
+          id: schema.monitoringSessions.id,
+          name: schema.monitoringSessions.name,
+          startedAt: schema.monitoringSessions.startedAt,
+          endedAt: schema.monitoringSessions.endedAt,
+          totalPausedMs: schema.monitoringSessions.totalPausedMs,
+          keyActivities: schema.monitoringSessions.keyActivities,
+          finalSummary: schema.monitoringSessions.finalSummary,
+        })
+        .from(schema.monitoringSessions)
+        .where(
+          and(
+            eq(schema.monitoringSessions.userId, targetUserId),
+            gte(schema.monitoringSessions.startedAt, dayStart),
+            lte(schema.monitoringSessions.startedAt, dayEnd)
+          )
+        )
+        .orderBy(desc(schema.monitoringSessions.startedAt));
 
       // Aggregate totals
       const totalWork = dailyActivities.reduce((s, d) => s + d.totalWorkMinutes, 0);
@@ -454,6 +668,21 @@ router.get(
             })),
           ])
         ),
+        // Session-level classified activities (Groq-inferred from captures)
+        sessionActivities: sessionActivities.map((s) => {
+          const startMs = new Date(s.startedAt).getTime();
+          const endMs = s.endedAt ? new Date(s.endedAt).getTime() : startMs;
+          const activeMs = Math.max(0, endMs - startMs - (s.totalPausedMs || 0));
+          return {
+            sessionId: s.id,
+            sessionName: s.name,
+            startedAt: s.startedAt,
+            endedAt: s.endedAt,
+            durationMinutes: Math.round(activeMs / 60000),
+            summary: s.finalSummary,
+            activities: (s.keyActivities as any[]) || [],
+          };
+        }),
       });
     } catch (error) {
       logger.error({ error: String(error) }, "Error fetching user activity detail");
@@ -943,6 +1172,60 @@ router.delete("/ask/threads/:id", requireAuth, async (req: Request, res: Respons
     res.json({ success: true });
   } catch (error) {
     logger.error({ error: String(error) }, "Error deleting thread");
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// ── PATCH /admin/ask/messages/:id/report — update report content (auto-save) ──
+router.patch("/ask/messages/:id/report", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const admin = await verifyAdmin(req, res);
+    if (!admin) return;
+
+    const messageId = req.params.id;
+    const { reportHtml } = req.body as { reportHtml: string };
+
+    if (!reportHtml && reportHtml !== "") {
+      res.status(400).json({ error: "reportHtml is required" });
+      return;
+    }
+
+    // Verify the message belongs to a thread owned by this user
+    const [msg] = await db
+      .select({ threadId: schema.askMessages.threadId })
+      .from(schema.askMessages)
+      .where(eq(schema.askMessages.id, messageId))
+      .limit(1);
+
+    if (!msg) {
+      res.status(404).json({ error: "Message not found" });
+      return;
+    }
+
+    const [thread] = await db
+      .select()
+      .from(schema.askThreads)
+      .where(
+        and(
+          eq(schema.askThreads.id, msg.threadId),
+          eq(schema.askThreads.userId, admin.userId)
+        )
+      )
+      .limit(1);
+
+    if (!thread) {
+      res.status(404).json({ error: "Thread not found" });
+      return;
+    }
+
+    await db
+      .update(schema.askMessages)
+      .set({ reportHtml })
+      .where(eq(schema.askMessages.id, messageId));
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error: String(error) }, "Error updating report");
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

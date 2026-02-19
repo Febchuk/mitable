@@ -83,7 +83,8 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
     useGenerateDocumentStream();
 
   // Fetch sessions for selection
-  const { data: sessions, isLoading: isLoadingSessions } = useSessions();
+  const { data: sessionsData, isLoading: isLoadingSessions } = useSessions();
+  const sessions = sessionsData?.sessions ?? [];
 
   // Fetch artifacts for selection
   const { data: artifactsData, isLoading: isLoadingArtifacts } = useArtifacts();

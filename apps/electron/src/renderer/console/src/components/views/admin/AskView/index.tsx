@@ -1,16 +1,39 @@
-import { useState, useRef, useEffect } from "react";
-import { ArrowUp, Sparkles, ChevronDown, Plus, Trash2, FileText, Download, X, Bold, Italic, Underline, List, ListOrdered, Link } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { ArrowUp, Sparkles, ChevronDown, Plus, Trash2, FileText, Download, X } from "lucide-react";
 import {
   sendAskChat,
   fetchAskThreads,
   fetchAskThreadMessages,
   deleteAskThread,
+  updateAskMessageReport,
   type AskThread,
   type AskMessageRow,
 } from "@/console/src/services/adminService";
+import {
+  MDXEditor,
+  type MDXEditorMethods,
+  headingsPlugin,
+  listsPlugin,
+  quotePlugin,
+  thematicBreakPlugin,
+  linkPlugin,
+  linkDialogPlugin,
+  tablePlugin,
+  toolbarPlugin,
+  BoldItalicUnderlineToggles,
+  ListsToggle,
+  CreateLink,
+  InsertTable,
+  Separator,
+  markdownShortcutPlugin,
+} from "@mdxeditor/editor";
+import "@mdxeditor/editor/style.css";
+import TurndownService from "turndown";
+import { gfm } from "turndown-plugin-gfm";
 
 // ── Types ─────────────────────────────────────────────────────
 interface ReportData {
+  messageId: string;
   title: string;
   subtitle: string;
   html: string;
@@ -53,79 +76,102 @@ const suggestionChips: { label: string; prompt: string }[] = [
 ];
 
 // ── PDF Export ────────────────────────────────────────────────
-function exportReportAsPdf(html: string, title: string) {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) return;
-  printWindow.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+async function exportReportAsPdf(html: string, title: string) {
+  try {
+    await window.consoleAPI.exportPdf(html, title);
+  } catch {
+    // Fallback to print dialog if IPC fails
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.6; }
-  h2 { font-size: 22px; margin-bottom: 4px; }
-  h3 { font-size: 15px; margin-top: 24px; margin-bottom: 8px; }
-  p { font-size: 13px; margin-bottom: 12px; }
-  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 12px; }
-  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e5e5e5; }
-  th { font-weight: 600; background: #f8f8f8; }
-  ul, ol { font-size: 13px; padding-left: 24px; }
-  li { margin-bottom: 6px; }
-  strong { font-weight: 600; }
-  @media print { body { margin: 20px; } }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.6; font-size: 13px; }
+  h1 { font-size: 22px; } h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+  h3 { font-size: 14px; } table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 12px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e0e0e0; }
+  th { font-weight: 600; background: #f5f5f5; } ul, ol { padding-left: 24px; } li { margin-bottom: 4px; } strong { font-weight: 600; }
 </style></head><body>${html}</body></html>`);
-  printWindow.document.close();
-  setTimeout(() => { printWindow.print(); }, 300);
+    printWindow.document.close();
+    setTimeout(() => { printWindow.print(); }, 300);
+  }
+}
+
+// ── HTML → Markdown converter ─────────────────────────────────
+function htmlToMarkdown(html: string): string {
+  const td = new TurndownService({ headingStyle: "atx", bulletListMarker: "-" });
+  td.use(gfm);
+  // Strip inline styles before converting
+  const clean = html
+    .replace(/\s*style="[^"]*"/gi, "")
+    .replace(/\s*style='[^']*'/gi, "")
+    .replace(/<\/?font[^>]*>/gi, "")
+    .replace(/\s*width="[^"]*"/gi, "")
+    .replace(/\s*bgcolor="[^"]*"/gi, "");
+  return td.turndown(clean);
 }
 
 // ── Report Editor ─────────────────────────────────────────────
-function ToolbarBtn({ icon: Icon }: { icon: typeof Bold }) {
+function ReportEditor({
+  html,
+  title,
+  messageId,
+  onClose,
+}: {
+  html: string;
+  title: string;
+  messageId: string;
+  onClose: () => void;
+}) {
+  const editorRef = useRef<MDXEditorMethods>(null);
+  const markdown = useMemo(() => htmlToMarkdown(html), [html]);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentMarkdownRef = useRef(markdown);
+
+  const handleChange = (md: string) => {
+    currentMarkdownRef.current = md;
+
+    // Debounce: wait 1.5s after last edit before saving
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setSaveStatus("idle");
+    saveTimerRef.current = setTimeout(async () => {
+      setSaveStatus("saving");
+      try {
+        await updateAskMessageReport(messageId, md);
+        setSaveStatus("saved");
+        // Reset to idle after 2s
+        setTimeout(() => setSaveStatus((s) => (s === "saved" ? "idle" : s)), 2000);
+      } catch {
+        setSaveStatus("idle");
+      }
+    }, 1500);
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
   return (
-    <button className="w-7 h-7 rounded flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-canvas-muted/50 transition-colors">
-      <Icon size={14} />
-    </button>
-  );
-}
-
-// Strip inline styles from LLM HTML so our CSS takes full control.
-// Preserves green/red color values used for metrics (positive/negative indicators).
-function sanitizeReportHtml(raw: string): string {
-  return raw
-    // Remove entire style attributes (inline styles override our CSS)
-    .replace(/\s*style="[^"]*"/gi, "")
-    .replace(/\s*style='[^']*'/gi, "")
-    // Remove font tags the LLM sometimes wraps things in
-    .replace(/<\/?font[^>]*>/gi, "")
-    // Remove explicit width/max-width on divs
-    .replace(/\s*width="[^"]*"/gi, "")
-    .replace(/\s*bgcolor="[^"]*"/gi, "");
-}
-
-function ReportEditor({ html, title, onClose }: { html: string; title: string; onClose: () => void }) {
-  const cleanHtml = sanitizeReportHtml(html);
-
-  return (
-    <div className="flex flex-col h-full bg-canvas-default">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-stroke-subtle shrink-0">
+    <div className="flex flex-col h-full bg-canvas-default report-editor-wrapper">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-stroke-subtle shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <FileText size={14} className="text-indigo-light" />
             <span className="text-xs font-medium text-text-primary">Report</span>
           </div>
-          <div className="h-4 w-px bg-stroke-subtle" />
-          <div className="flex items-center gap-0.5">
-            <ToolbarBtn icon={Bold} />
-            <ToolbarBtn icon={Italic} />
-            <ToolbarBtn icon={Underline} />
-          </div>
-          <div className="h-4 w-px bg-stroke-subtle" />
-          <div className="flex items-center gap-0.5">
-            <ToolbarBtn icon={List} />
-            <ToolbarBtn icon={ListOrdered} />
-          </div>
-          <div className="h-4 w-px bg-stroke-subtle" />
-          <ToolbarBtn icon={Link} />
+          {/* Save status indicator */}
+          <span className="text-[10px] text-text-tertiary">
+            {saveStatus === "saving" && "Saving..."}
+            {saveStatus === "saved" && "✓ Saved"}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => exportReportAsPdf(html, title)}
+            onClick={() => exportReportAsPdf(mdToHtml(currentMarkdownRef.current), title)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo text-white text-xs font-medium hover:bg-indigo/90 transition-colors"
           >
             <Download size={12} />
@@ -140,32 +186,37 @@ function ReportEditor({ html, title, onClose }: { html: string; title: string; o
         </div>
       </div>
 
-      {/* Report document */}
+      {/* MDXEditor with built-in toolbar */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[780px] mx-auto py-8 px-6">
-          <div
-            className="report-content rounded-xl border border-stroke-subtle bg-canvas-raised px-10 py-8 min-h-[600px]
-              [&_*]:text-text-primary
-              [&_h1]:text-xl [&_h1]:font-bold [&_h1]:text-white [&_h1]:mb-2 [&_h1]:pb-3 [&_h1]:border-b [&_h1]:border-indigo/30
-              [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-white [&_h2]:mb-2 [&_h2]:mt-8 [&_h2]:pb-1.5 [&_h2]:border-b [&_h2]:border-stroke-subtle
-              [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-white [&_h3]:mt-5 [&_h3]:mb-2
-              [&_p]:text-[13px] [&_p]:text-text-primary [&_p]:leading-relaxed [&_p]:mb-3
-              [&_ul]:text-[13px] [&_ul]:text-text-primary [&_ul]:space-y-1.5 [&_ul]:mb-4 [&_ul]:pl-5 [&_ul]:list-disc
-              [&_ol]:text-[13px] [&_ol]:text-text-primary [&_ol]:space-y-1.5 [&_ol]:mb-4 [&_ol]:pl-5 [&_ol]:list-decimal
-              [&_li]:leading-relaxed
-              [&_strong]:text-white [&_strong]:font-semibold
-              [&_em]:text-indigo-light
-              [&_table]:text-xs [&_table]:w-full [&_table]:mb-6 [&_table]:border-collapse [&_table]:border [&_table]:border-stroke-subtle [&_table]:rounded-lg [&_table]:overflow-hidden
-              [&_thead]:bg-canvas-muted/50
-              [&_th]:text-left [&_th]:py-2.5 [&_th]:px-3 [&_th]:text-text-secondary [&_th]:font-semibold [&_th]:text-xs [&_th]:border-b [&_th]:border-stroke-subtle
-              [&_td]:py-2.5 [&_td]:px-3 [&_td]:text-text-primary [&_td]:text-xs [&_td]:border-b [&_td]:border-stroke-subtle/50
-              [&_tr:nth-child(even)]:bg-canvas-muted/20
-              [&_div]:text-text-primary"
-            contentEditable
-            suppressContentEditableWarning
-            dangerouslySetInnerHTML={{ __html: cleanHtml }}
-          />
-        </div>
+        <MDXEditor
+          ref={editorRef}
+          markdown={markdown}
+          onChange={handleChange}
+          className="dark-theme dark-editor h-full"
+          contentEditableClassName="prose prose-invert prose-sm max-w-none px-8 py-6 min-h-full focus:outline-none"
+          plugins={[
+            headingsPlugin(),
+            listsPlugin(),
+            quotePlugin(),
+            thematicBreakPlugin(),
+            linkPlugin(),
+            linkDialogPlugin(),
+            tablePlugin(),
+            markdownShortcutPlugin(),
+            toolbarPlugin({
+              toolbarContents: () => (
+                <>
+                  <BoldItalicUnderlineToggles />
+                  <Separator />
+                  <ListsToggle />
+                  <Separator />
+                  <CreateLink />
+                  <InsertTable />
+                </>
+              ),
+            }),
+          ]}
+        />
       </div>
     </div>
   );
@@ -489,7 +540,7 @@ export default function AskView() {
         }, 50);
         return;
       }
-      setActiveReport({ title: msg.reportCard.title, subtitle: msg.reportCard.subtitle, html: msg.reportHtml });
+      setActiveReport({ messageId: msg.id, title: msg.reportCard.title, subtitle: msg.reportCard.subtitle, html: msg.reportHtml });
       setActiveReportMsgId(msg.id);
       setEditorOpen(true);
       // Scroll chat to the report message after layout updates
@@ -744,6 +795,7 @@ export default function AskView() {
           <ReportEditor
             html={activeReport.html}
             title={activeReport.title}
+            messageId={activeReport.messageId}
             onClose={closeEditor}
           />
         </div>

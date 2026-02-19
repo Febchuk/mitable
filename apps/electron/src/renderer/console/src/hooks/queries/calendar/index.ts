@@ -311,7 +311,8 @@ function groupSessionsByDay(
  */
 export function useCalendarDays() {
   const { user } = useUser();
-  const { data: sessions } = useSessions();
+  const { data: sessionsData } = useSessions();
+  const sessions = sessionsData?.sessions;
 
   return useQuery({
     queryKey: calendarKeys.days(),
@@ -320,11 +321,11 @@ export function useCalendarDays() {
 
       // For now, create blocks without captures (we'll fetch captures on demand)
       const emptyCaptures = new Map<string, SessionCapture[]>();
-      return groupSessionsByDay(sessions, emptyCaptures);
+      return groupSessionsByDay(sessions!, emptyCaptures);
     },
     enabled: !!user && !!sessions,
     // Poll for new blocks while we have any active sessions
-    refetchInterval: sessions?.some((s) => s.status === "active" || s.status === "paused")
+    refetchInterval: sessions?.some((s: monitoringService.SessionListItem) => s.status === "active" || s.status === "paused")
       ? 10000
       : false,
   });

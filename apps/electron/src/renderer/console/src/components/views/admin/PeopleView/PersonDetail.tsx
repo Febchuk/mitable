@@ -16,11 +16,20 @@ interface PersonViewModel {
   metrics: { label: string; value: string; sub: string }[];
   activities: { id: string; label: string; hours: number; color: string }[];
   weeklyTrend: { day: string; focus: number; meetings: number; other: number }[];
-  highlights: { time: string; text: string; type: "doc" | "meeting" | "support" | "code" }[];
+  highlights: { time: string; text: string; type: "doc" | "meeting" | "support" | "code"; category?: string; minutes?: number }[];
   topTopics: { label: string; count: number }[];
 }
 
 type TimeRange = "day" | "week" | "month" | "ytd";
+
+function categoryToType(category?: string): "doc" | "meeting" | "support" | "code" {
+  if (!category) return "doc";
+  const lower = category.toLowerCase();
+  if (lower === "meeting") return "meeting";
+  if (lower === "development" || lower === "design") return "code";
+  if (lower === "communication" || lower === "project management") return "support";
+  return "doc";
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   development: "#6366F1",
@@ -47,12 +56,35 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
       ? "bg-emerald/15 text-emerald"
       : "bg-indigo/15 text-indigo-light";
 
-  const activities = (api.dailyActivities[0]?.categoryBreakdown || []).map((c: any) => ({
-    id: c.category,
-    label: c.category.charAt(0).toUpperCase() + c.category.slice(1),
-    hours: Math.round((c.minutes / 60) * 10) / 10,
-    color: CATEGORY_COLORS[c.category] || CATEGORY_COLORS.other,
-  }));
+  // Aggregate activity breakdown from session-level classifications
+  const categoryMinutes = new Map<string, number>();
+  if (api.sessionActivities && api.sessionActivities.length > 0) {
+    for (const session of api.sessionActivities) {
+      for (const act of session.activities || []) {
+        const cat = act.category || "Other";
+        categoryMinutes.set(cat, (categoryMinutes.get(cat) || 0) + (act.minutes || 0));
+      }
+    }
+  }
+
+  // Fall back to dailyActivities category breakdown if no session data
+  if (categoryMinutes.size === 0) {
+    for (const day of api.dailyActivities) {
+      for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
+        categoryMinutes.set(c.category, (categoryMinutes.get(c.category) || 0) + c.minutes);
+      }
+    }
+  }
+
+  const activities = [...categoryMinutes.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, mins]) => ({
+      id: cat.toLowerCase(),
+      label: cat.charAt(0).toUpperCase() + cat.slice(1),
+      hours: Math.round((mins / 60) * 10) / 10,
+      color: CATEGORY_COLORS[cat.toLowerCase()] || CATEGORY_COLORS.other,
+    }));
+
   if (activities.length === 0) {
     activities.push(
       { id: "work", label: "Work", hours: workHours, color: "#6366F1" },
@@ -67,22 +99,75 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     other: 0,
   })).reverse();
 
-  const highlights: PersonViewModel["highlights"] = [...api.blocks]
-    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-    .slice(0, 10)
-    .map((b) => ({
-      time: new Date(b.startTime).toLocaleDateString([], { month: "short", day: "numeric" }) +
-        ", " + new Date(b.startTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
-      text: b.description || b.name,
-      type: b.type === "meeting" ? "meeting" as const : "doc" as const,
-    }));
+  // Build highlights from session-level classified activities (complete timeline)
+  const highlights: PersonViewModel["highlights"] = [];
 
-  const topTopics: PersonViewModel["topTopics"] = (api.dailyActivities[0]?.categoryBreakdown || [])
+  if (api.sessionActivities && api.sessionActivities.length > 0) {
+    for (const session of api.sessionActivities) {
+      const sessionDate = new Date(session.startedAt);
+      const timeStr =
+        sessionDate.toLocaleDateString([], { month: "short", day: "numeric" }) +
+        ", " +
+        sessionDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+      if (session.activities && session.activities.length > 0) {
+        for (const act of session.activities) {
+          highlights.push({
+            time: timeStr,
+            text: act.description || act.activity,
+            type: categoryToType(act.category),
+            category: act.category,
+            minutes: act.minutes,
+          });
+        }
+      } else {
+        // Session without classification — show session name/summary
+        highlights.push({
+          time: timeStr,
+          text: session.summary || session.sessionName || "Work session",
+          type: "doc",
+        });
+      }
+    }
+  } else {
+    // Fallback to activity_blocks for backward compat
+    for (const b of [...api.blocks].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())) {
+      highlights.push({
+        time:
+          new Date(b.startTime).toLocaleDateString([], { month: "short", day: "numeric" }) +
+          ", " +
+          new Date(b.startTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+        text: b.description || b.name,
+        type: b.type === "meeting" ? "meeting" as const : "doc" as const,
+      });
+    }
+  }
+
+  // Aggregate top topics from session activity names
+  const topicCounts = new Map<string, number>();
+  if (api.sessionActivities && api.sessionActivities.length > 0) {
+    for (const session of api.sessionActivities) {
+      for (const act of session.activities || []) {
+        const label = act.category || "Other";
+        topicCounts.set(label, (topicCounts.get(label) || 0) + 1);
+      }
+    }
+  }
+
+  // Fall back to dailyActivities
+  if (topicCounts.size === 0) {
+    for (const day of api.dailyActivities) {
+      for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
+        const label = c.category.charAt(0).toUpperCase() + c.category.slice(1);
+        topicCounts.set(label, (topicCounts.get(label) || 0) + Math.round(c.minutes / 30));
+      }
+    }
+  }
+
+  const topTopics: PersonViewModel["topTopics"] = [...topicCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
-    .map((c: any) => ({
-      label: c.category.charAt(0).toUpperCase() + c.category.slice(1),
-      count: Math.round(c.minutes / 30),
-    }));
+    .map(([label, count]) => ({ label, count }));
 
   return {
     name: u.name,
@@ -373,7 +458,7 @@ export default function PersonDetail() {
             Recent Work
             <span className="text-text-secondary font-normal ml-2">What they've been doing</span>
           </h3>
-          <div className="relative space-y-1 max-h-[280px] overflow-y-auto pr-1">
+          <div className="relative space-y-1 max-h-[440px] overflow-y-auto pr-1">
             {person.highlights.map((h, i) => {
               const Icon = highlightIcons[h.type] || Clock;
               const colorClass = highlightColors[h.type] || "text-text-secondary bg-canvas-overlay";
@@ -389,7 +474,19 @@ export default function PersonDetail() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-text-primary">{h.text}</p>
-                    <p className="text-[10px] text-text-tertiary mt-0.5">{h.time}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[10px] text-text-tertiary">{h.time}</p>
+                      {h.category && (
+                        <span className="text-[9px] font-medium text-text-tertiary bg-canvas-overlay px-1.5 py-0.5 rounded">
+                          {h.category}
+                        </span>
+                      )}
+                      {h.minutes != null && h.minutes > 0 && (
+                        <span className="text-[9px] text-text-tertiary">
+                          {h.minutes < 60 ? `${h.minutes}m` : `${Math.round(h.minutes / 6) / 10}h`}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

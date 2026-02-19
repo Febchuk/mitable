@@ -118,8 +118,10 @@ export async function runUserRollup(targetDate?: Date, options?: { skipCompleted
 
 /**
  * Process a single user's day: fetch data, run RLM, write results.
+ * Exported so the inactivity trigger can call it for a single user
+ * after their last session ends.
  */
-async function processUserDay(
+export async function processUserDay(
   userId: string,
   today: Date,
   todayStr: string

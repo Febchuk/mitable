@@ -544,6 +544,23 @@ export interface ActivityBlock {
   sequenceNumber: number;
 }
 
+export interface ClassifiedActivity {
+  activity: string;
+  category: string;
+  minutes: number;
+  description: string;
+}
+
+export interface SessionActivity {
+  sessionId: string;
+  sessionName: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  durationMinutes: number;
+  summary: string | null;
+  activities: ClassifiedActivity[];
+}
+
 export interface DashboardPersonDetail {
   period: string;
   user: {
@@ -576,6 +593,7 @@ export interface DashboardPersonDetail {
   }>;
   blocks: ActivityBlock[];
   blocksByDate: Record<string, ActivityBlock[]>;
+  sessionActivities: SessionActivity[];
 }
 
 /**
@@ -675,6 +693,18 @@ export async function deleteAskThread(threadId: string): Promise<void> {
     await apiRequest(`/admin/ask/threads/${threadId}`, { method: "DELETE" });
   } catch (error) {
     logger.error("Error deleting ask thread:", error);
+    throw error;
+  }
+}
+
+export async function updateAskMessageReport(messageId: string, reportHtml: string): Promise<void> {
+  try {
+    await apiRequest(`/admin/ask/messages/${messageId}/report`, {
+      method: "PATCH",
+      body: JSON.stringify({ reportHtml }),
+    });
+  } catch (error) {
+    logger.error("Error updating report:", error);
     throw error;
   }
 }
