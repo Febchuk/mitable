@@ -21,16 +21,15 @@ import {
   Copy,
   ExternalLink,
   Target,
-  Sparkles,
   Check,
   Loader2,
   Clock,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Plus,
   Calendar,
   Edit2,
+  X,
 } from "lucide-react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
@@ -47,6 +46,15 @@ import {
   useReviseRecap,
 } from "../../../../hooks/queries/monitoring";
 import AIEditPanel from "../../../shared/AIEditPanel";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // Types
 type RecapTone = "professional" | "casual" | "concise" | "detailed";
@@ -129,21 +137,6 @@ const destinationConfig: Record<
     bgColor: "bg-emerald/20",
   },
 };
-
-// Tone options
-const toneOptions: { value: RecapTone; label: string }[] = [
-  { value: "professional", label: "Professional" },
-  { value: "casual", label: "Casual" },
-  { value: "concise", label: "Concise" },
-  { value: "detailed", label: "Detailed" },
-];
-
-// Length options
-const lengthOptions: { value: RecapLength; label: string }[] = [
-  { value: "brief", label: "Brief" },
-  { value: "standard", label: "Standard" },
-  { value: "comprehensive", label: "Full" },
-];
 
 // Local deterministic content generation (mock data fallback)
 function generateRecapContent(
@@ -233,14 +226,13 @@ export default function RecapDetail() {
     }
     return new Set(initialBlockIds.length > 0 ? initialBlockIds : []);
   });
-  const [tone, setTone] = useState<RecapTone>("professional");
-  const [length, setLength] = useState<RecapLength>("standard");
+  const tone: RecapTone = "professional";
+  const length: RecapLength = "standard";
   const [content, setContent] = useState(existingRecap?.content ?? "");
   const [isAIEditMode, setIsAIEditMode] = useState(false);
   const [deliveries, setDeliveries] = useState<DeliveryEntry[]>([]);
   const [sendingTo, setSendingTo] = useState<RecapDestination | null>(null);
-  const [showToneMenu, setShowToneMenu] = useState(false);
-  const [showLengthMenu, setShowLengthMenu] = useState(false);
+  const [isBlockPickerOpen, setIsBlockPickerOpen] = useState(false);
 
   // Day browsing helpers
   const getDaysWithBlocks = (blocks: WorkBlock[]): Date[] => {
@@ -442,67 +434,29 @@ export default function RecapDetail() {
       {/* Main content */}
       <div className="px-8 pb-8">
         <div className="stagger-2 space-y-6">
-          {/* Browse blocks by day */}
-          <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-stroke-subtle">
-              <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-                Add Blocks from Day
-              </span>
-              {browsingDay && (
-                <button
-                  onClick={() => setBrowsingDay(null)}
-                  className="text-xs text-ink-tertiary hover:text-ink-primary transition-colors"
-                >
-                  Close
-                </button>
-              )}
-            </div>
-            <div className="p-4">
-              {!browsingDay ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {availableDays.map((day) => {
-                    const dayBlocks = getBlocksForDay(allBlocks, day);
-                    const selectedFromDay = dayBlocks.filter((b) =>
-                      selectedBlockIds.has(b.id)
-                    ).length;
-                    const isToday = isSameDay(day, new Date());
+          {/* Block Picker Dialog */}
+          <Dialog
+            open={isBlockPickerOpen}
+            onOpenChange={(open) => {
+              setIsBlockPickerOpen(open);
+              if (!open) setBrowsingDay(null);
+            }}
+          >
+            <DialogContent className="sm:max-w-[520px] bg-canvas-raised border-stroke p-0 gap-0 flex flex-col h-[520px]">
+              {/* Fixed header */}
+              <div className="px-5 pt-5 pb-3 border-b border-stroke-subtle flex-shrink-0">
+                <DialogHeader>
+                  <DialogTitle className="text-ink-primary">Add Blocks</DialogTitle>
+                  <DialogDescription className="text-ink-tertiary">
+                    {selectedBlockIds.size} block{selectedBlockIds.size !== 1 ? "s" : ""} selected
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
 
-                    return (
-                      <button
-                        key={getDateKey(day)}
-                        onClick={() => setBrowsingDay(day)}
-                        className="flex items-center gap-3 p-3 rounded-lg text-left hover:bg-canvas-muted/50 transition-colors border border-stroke-subtle"
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-canvas-muted flex items-center justify-center flex-shrink-0">
-                          <Calendar size={18} className="text-ink-tertiary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-ink-primary">
-                              {formatShortDate(day)}
-                            </span>
-                            {isToday && (
-                              <span className="px-1.5 py-0.5 rounded-full bg-emerald/20 text-emerald text-[10px] font-semibold">
-                                Today
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-ink-tertiary mt-0.5">
-                            {dayBlocks.length} block{dayBlocks.length !== 1 ? "s" : ""}
-                            {selectedFromDay > 0 && (
-                              <span className="text-indigo"> · {selectedFromDay} added</span>
-                            )}
-                          </p>
-                        </div>
-                        <ChevronRight size={16} className="text-ink-tertiary" />
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div>
-                  {/* Day navigation */}
-                  <div className="flex items-center justify-between mb-4">
+              {browsingDay && (
+                <>
+                  {/* Fixed day carousel nav */}
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-stroke-subtle flex-shrink-0">
                     <button
                       onClick={() => {
                         if (browsingDayIndex < availableDays.length - 1) {
@@ -512,14 +466,26 @@ export default function RecapDetail() {
                       disabled={browsingDayIndex >= availableDays.length - 1}
                       className="p-1.5 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      <ChevronLeft size={18} />
+                      <ChevronLeft size={16} />
                     </button>
                     <div className="text-center">
-                      <span className="text-sm font-medium text-ink-primary">
-                        {formatShortDate(browsingDay)}
-                      </span>
-                      <p className="text-xs text-ink-tertiary">
+                      <div className="flex items-center gap-2 justify-center">
+                        <Calendar size={13} className="text-ink-tertiary" />
+                        <span className="text-sm font-medium text-ink-primary">
+                          {formatShortDate(browsingDay)}
+                        </span>
+                        {isSameDay(browsingDay, new Date()) && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-emerald/20 text-emerald text-[10px] font-semibold">
+                            Today
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-ink-tertiary mt-0.5">
                         {blocksForBrowsingDay.length} block{blocksForBrowsingDay.length !== 1 ? "s" : ""}
+                        {(() => {
+                          const sel = blocksForBrowsingDay.filter((b) => selectedBlockIds.has(b.id)).length;
+                          return sel > 0 ? <span className="text-indigo"> · {sel} selected</span> : null;
+                        })()}
                       </p>
                     </div>
                     <button
@@ -531,67 +497,95 @@ export default function RecapDetail() {
                       disabled={browsingDayIndex <= 0}
                       className="p-1.5 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      <ChevronRight size={18} />
+                      <ChevronRight size={16} />
                     </button>
                   </div>
 
-                  {/* Blocks for this day */}
-                  <div className="space-y-2">
-                    {blocksForBrowsingDay.map((block) => {
-                      const isSelected = selectedBlockIds.has(block.id);
-                      return (
-                        <button
-                          key={block.id}
-                          onClick={() => toggleBlock(block.id)}
-                          className={`w-full flex items-start gap-3 p-3 rounded-lg text-left transition-all ${
-                            isSelected
-                              ? "bg-indigo/10 ring-1 ring-indigo/30"
-                              : "hover:bg-canvas-muted/50 border border-stroke-subtle"
-                          }`}
-                        >
-                          <div
-                            className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
-                              isSelected ? "bg-indigo" : "border border-stroke"
+                  {/* Scrollable block list — fills remaining space */}
+                  <div className="flex-1 min-h-0 overflow-y-auto px-5 py-3 space-y-2">
+                    {blocksForBrowsingDay.length === 0 ? (
+                      <div className="flex items-center justify-center h-full">
+                        <p className="text-sm text-ink-tertiary">No blocks on this day.</p>
+                      </div>
+                    ) : (
+                      blocksForBrowsingDay.map((block) => {
+                        const isSelected = selectedBlockIds.has(block.id);
+                        return (
+                          <button
+                            key={block.id}
+                            onClick={() => toggleBlock(block.id)}
+                            className={`w-full flex items-start gap-3 p-3 rounded-lg text-left transition-all border ${
+                              isSelected
+                                ? "bg-indigo/10 border-indigo/30"
+                                : "bg-canvas-overlay/50 border-stroke-subtle hover:border-stroke hover:bg-canvas-muted/40"
                             }`}
                           >
-                            {isSelected ? (
-                              <Check size={10} className="text-white" />
-                            ) : (
-                              <Plus size={10} className="text-ink-tertiary" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-ink-tertiary tabular-nums">
-                                {formatTime(block.startTime)} – {block.endTime ? formatTime(block.endTime) : "now"}
-                              </span>
-                              <span className="text-xs text-ink-tertiary">
-                                · {formatDuration(block.duration)}
-                              </span>
-                              {block.isFocusedSession && (
-                                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo/20 text-indigo text-[10px] font-semibold">
-                                  <Target size={8} />
-                                  Focused
-                                </span>
+                            <div
+                              className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                                isSelected ? "bg-indigo" : "border border-stroke"
+                              }`}
+                            >
+                              {isSelected ? (
+                                <Check size={10} className="text-white" />
+                              ) : (
+                                <Plus size={10} className="text-ink-tertiary" />
                               )}
                             </div>
-                            {block.goal && (
-                              <p className="text-sm font-medium text-ink-primary mt-1">
-                                {block.goal}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs text-ink-secondary tabular-nums">
+                                  {formatTime(block.startTime)} – {block.endTime ? formatTime(block.endTime) : "now"}
+                                </span>
+                                <span className="text-xs text-ink-tertiary">
+                                  · {formatDuration(block.duration)}
+                                </span>
+                                {block.isFocusedSession && (
+                                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo/15 text-indigo text-[10px] font-semibold">
+                                    <Target size={8} />
+                                    Focused
+                                  </span>
+                                )}
+                              </div>
+                              {block.goal && (
+                                <p className="text-sm font-medium text-ink-primary mt-1">
+                                  {block.goal}
+                                </p>
+                              )}
+                              <p className="text-xs text-ink-tertiary mt-1 line-clamp-2">
+                                {block.summary}
                               </p>
-                            )}
-                            <p className="text-xs text-ink-tertiary mt-1 line-clamp-2">
-                              {block.summary}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
+                </>
+              )}
+
+              {!browsingDay && availableDays.length === 0 && (
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-sm text-ink-tertiary">No days with blocks available.</p>
                 </div>
               )}
-            </div>
-          </div>
+
+              {/* Fixed footer */}
+              <div className="px-5 py-3 border-t border-stroke-subtle flex-shrink-0">
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    className="border-stroke hover:bg-canvas-muted text-ink-secondary hover:text-ink-primary"
+                    onClick={() => {
+                      setIsBlockPickerOpen(false);
+                      setBrowsingDay(null);
+                    }}
+                  >
+                    Done
+                  </Button>
+                </DialogFooter>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Selected blocks */}
           <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50">
@@ -599,28 +593,34 @@ export default function RecapDetail() {
               <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
                 Selected Blocks
               </span>
-              <span className="text-xs text-ink-tertiary tabular-nums">
-                {selectedBlocks.length} block{selectedBlocks.length !== 1 ? "s" : ""}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-ink-tertiary tabular-nums">
+                  {selectedBlocks.length} block{selectedBlocks.length !== 1 ? "s" : ""}
+                </span>
+                <button
+                  onClick={() => {
+                    if (availableDays.length > 0) setBrowsingDay(availableDays[0]);
+                    setIsBlockPickerOpen(true);
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-indigo hover:bg-indigo/10 transition-colors"
+                >
+                  <Plus size={14} />
+                  Add Blocks
+                </button>
+              </div>
             </div>
             <div className="p-4">
               {selectedBlocks.length === 0 ? (
                 <p className="text-sm text-ink-tertiary text-center py-4">
-                  No blocks selected. Browse days above to add blocks.
+                  No blocks selected. Click "Add Blocks" to get started.
                 </p>
               ) : (
                 <div className="space-y-2">
                   {selectedBlocks.map((block, idx) => (
                     <div
                       key={block.id}
-                      className="flex items-start gap-3 p-3 rounded-lg bg-indigo/10 ring-1 ring-indigo/30"
+                      className="group flex items-start gap-3 p-3 rounded-lg bg-indigo/10 ring-1 ring-indigo/30"
                     >
-                      <button
-                        onClick={() => toggleBlock(block.id)}
-                        className="mt-0.5 w-4 h-4 rounded bg-indigo flex items-center justify-center flex-shrink-0 hover:bg-indigo/80 transition-colors"
-                      >
-                        <Check size={10} className="text-white" />
-                      </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-ink-primary">
@@ -643,6 +643,13 @@ export default function RecapDetail() {
                           {block.summary}
                         </p>
                       </div>
+                      <button
+                        onClick={() => toggleBlock(block.id)}
+                        className="mt-0.5 p-1 rounded-md text-ink-tertiary opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400 transition-all flex-shrink-0"
+                        title="Remove block"
+                      >
+                        <X size={14} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -657,93 +664,18 @@ export default function RecapDetail() {
                 Recap Content
               </span>
               <div className="flex items-center gap-2">
-                {/* Tone dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setShowToneMenu(!showToneMenu);
-                      setShowLengthMenu(false);
-                    }}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-canvas-muted text-sm text-ink-secondary transition-colors"
-                  >
-                    {toneOptions.find((t) => t.value === tone)?.label}
-                    <ChevronDown size={14} className="text-ink-tertiary" />
-                  </button>
-                  {showToneMenu && (
-                    <div className="absolute right-0 top-full mt-1 w-36 rounded-lg border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-10">
-                      {toneOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            setTone(option.value);
-                            setShowToneMenu(false);
-                          }}
-                          className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-canvas-muted transition-colors ${
-                            tone === option.value ? "text-ink-primary" : "text-ink-secondary"
-                          }`}
-                        >
-                          {option.label}
-                          {tone === option.value && <Check size={14} className="text-indigo" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Length dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setShowLengthMenu(!showLengthMenu);
-                      setShowToneMenu(false);
-                    }}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-canvas-muted text-sm text-ink-secondary transition-colors"
-                  >
-                    {lengthOptions.find((l) => l.value === length)?.label}
-                    <ChevronDown size={14} className="text-ink-tertiary" />
-                  </button>
-                  {showLengthMenu && (
-                    <div className="absolute right-0 top-full mt-1 w-36 rounded-lg border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-10">
-                      {lengthOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            setLength(option.value);
-                            setShowLengthMenu(false);
-                          }}
-                          className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-canvas-muted transition-colors ${
-                            length === option.value ? "text-ink-primary" : "text-ink-secondary"
-                          }`}
-                        >
-                          {option.label}
-                          {length === option.value && <Check size={14} className="text-indigo" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="w-px h-5 bg-stroke-subtle" />
-
-                {/* Generate */}
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating || selectedBlocks.length === 0}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo/10 text-indigo text-sm font-medium hover:bg-indigo/20 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-indigo hover:bg-indigo/10 transition-colors disabled:opacity-40"
                 >
-                  {isGenerating ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Sparkles size={14} />
-                  )}
-                  {canGenerate ? "Generate" : "Rewrite"}
+                  {isGenerating && <Loader2 size={14} className="animate-spin" />}
+                  {content ? "Update" : "Generate"}
                 </button>
-
-                {/* Edit */}
                 {content && (
                   <button
                     onClick={() => setIsAIEditMode(true)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-canvas-muted text-sm text-ink-secondary font-medium transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-ink-secondary hover:bg-canvas-muted hover:text-ink-primary transition-colors"
                   >
                     <Edit2 size={14} />
                     Edit
@@ -765,7 +697,7 @@ export default function RecapDetail() {
                 <div className="w-full h-64 flex items-center justify-center rounded-lg bg-canvas-muted/30 border border-stroke-subtle">
                   <p className="text-sm text-ink-tertiary/50">
                     {selectedBlocks.length === 0
-                      ? "Select blocks above to get started..."
+                      ? "Select blocks to get started..."
                       : canGenerate
                         ? "Click Generate to create your recap with AI..."
                         : "Click Rewrite to generate recap content..."}
