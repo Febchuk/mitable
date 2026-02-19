@@ -11,7 +11,7 @@
  * - Content area: read-only rendered markdown preview
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -30,6 +30,7 @@ import {
   Calendar,
   Edit2,
   X,
+  Share2,
 } from "lucide-react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
@@ -40,6 +41,7 @@ import {
   useRecaps,
   snapshotBlock,
   type RecapDestination,
+  type RecapDelivery,
 } from "../../../../context/RecapsContext";
 import {
   useGenerateRecap,
@@ -60,11 +62,6 @@ import { Button } from "@/components/ui/button";
 type RecapTone = "professional" | "casual" | "concise" | "detailed";
 type RecapLength = "brief" | "standard" | "comprehensive";
 
-interface DeliveryEntry {
-  destination: RecapDestination;
-  sentAt: Date;
-  status: "sent" | "failed";
-}
 
 // Helper functions
 function formatTime(date: Date): string {
@@ -110,29 +107,33 @@ function isSameDay(date1: Date, date2: Date): boolean {
 // Destination config
 const destinationConfig: Record<
   RecapDestination,
-  { icon: typeof Send; label: string; color: string; bgColor: string }
+  { icon: typeof Send; label: string; subtitle: string; color: string; bgColor: string }
 > = {
   slack: {
     icon: MessageSquare,
     label: "Slack",
+    subtitle: "Post to channel",
     color: "text-purple-400",
     bgColor: "bg-purple-500/20",
   },
   gmail: {
     icon: Mail,
     label: "Gmail",
+    subtitle: "Send as email",
     color: "text-rose-400",
     bgColor: "bg-rose-500/20",
   },
   linear: {
     icon: ExternalLink,
     label: "Linear",
+    subtitle: "Create issue",
     color: "text-indigo",
     bgColor: "bg-indigo/20",
   },
   copy: {
     icon: Copy,
     label: "Copy",
+    subtitle: "Copy to clipboard",
     color: "text-emerald",
     bgColor: "bg-emerald/20",
   },
@@ -190,7 +191,7 @@ export default function RecapDetail() {
   const { recapId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { addRecap, getRecap } = useRecaps();
+  const { addRecap, addDelivery, updateRecap, getRecap } = useRecaps();
 
   const isNew = recapId === "new";
   const blockIdsParam = searchParams.get("blocks");
@@ -230,9 +231,20 @@ export default function RecapDetail() {
   const length: RecapLength = "standard";
   const [content, setContent] = useState(existingRecap?.content ?? "");
   const [isAIEditMode, setIsAIEditMode] = useState(false);
-  const [deliveries, setDeliveries] = useState<DeliveryEntry[]>([]);
+  const [savedRecapId, setSavedRecapId] = useState<string | null>(
+    existingRecap?.id ?? null
+  );
   const [sendingTo, setSendingTo] = useState<RecapDestination | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [isBlockPickerOpen, setIsBlockPickerOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [showGateTooltip, setShowGateTooltip] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const shareRef = useRef<HTMLDivElement>(null);
+
+  // Derive deliveries from the saved recap in context
+  const savedRecap = savedRecapId ? getRecap(savedRecapId) : undefined;
+  const deliveries: RecapDelivery[] = savedRecap?.deliveries ?? [];
 
   // Day browsing helpers
   const getDaysWithBlocks = (blocks: WorkBlock[]): Date[] => {
@@ -343,8 +355,34 @@ export default function RecapDetail() {
     setIsAIEditMode(false);
   };
 
-  const handleSend = async (destination: RecapDestination) => {
-    if (selectedBlocks.length === 0) return;
+  const handlePublish = async () => {
+    if (selectedBlocks.length === 0 || !content) return;
+
+    setIsPublishing(true);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    if (savedRecapId) {
+      // Editing an existing recap
+      updateRecap(savedRecapId, {
+        blocks: selectedBlocks.map(snapshotBlock),
+        totalDuration,
+        content,
+      });
+    } else {
+      // New recap
+      const recap = addRecap({
+        blocks: selectedBlocks.map(snapshotBlock),
+        totalDuration,
+        content,
+      });
+      setSavedRecapId(recap.id);
+    }
+
+    setIsPublishing(false);
+  };
+
+  const handleSendTo = async (destination: RecapDestination) => {
+    if (!savedRecapId) return;
 
     setSendingTo(destination);
     await new Promise((resolve) => setTimeout(resolve, 800));
@@ -353,24 +391,40 @@ export default function RecapDetail() {
       await navigator.clipboard.writeText(content);
     }
 
-    // Save to RecapsContext
-    addRecap({
-      sentAt: new Date(),
-      destination,
-      blocks: selectedBlocks.map(snapshotBlock),
-      totalDuration,
-      content,
-    });
-
-    setDeliveries((prev) => [
-      ...prev,
-      { destination, sentAt: new Date(), status: "sent" },
-    ]);
+    addDelivery(savedRecapId, destination);
     setSendingTo(null);
   };
 
   const isSentTo = (destination: RecapDestination) =>
-    deliveries.some((d) => d.destination === destination && d.status === "sent");
+    deliveries.some((d) => d.destination === destination);
+
+  // Close share dropdown on click outside or Escape
+  useEffect(() => {
+    if (!isShareOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (shareRef.current && !shareRef.current.contains(e.target as Node)) {
+        setIsShareOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsShareOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isShareOpen]);
+
+  const handleShareClick = useCallback(() => {
+    if (!savedRecapId) {
+      setShowGateTooltip(true);
+      setTimeout(() => setShowGateTooltip(false), 2000);
+      return;
+    }
+    setIsShareOpen((prev) => !prev);
+  }, [savedRecapId]);
 
   // AI Edit Mode - full page takeover (same pattern as SessionDetail)
   if (isAIEditMode && content) {
@@ -426,6 +480,136 @@ export default function RecapDetail() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Publish / Save button */}
+            <button
+              onClick={handlePublish}
+              disabled={isPublishing || selectedBlocks.length === 0 || !content}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-indigo text-white text-sm font-medium hover:bg-indigo/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isPublishing ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <Check size={15} />
+              )}
+              {savedRecapId ? "Save Changes" : "Publish"}
+            </button>
+
+            {/* Share dropdown button */}
+            <div className="relative" ref={shareRef}>
+              <button
+                onClick={handleShareClick}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                  savedRecapId
+                    ? "bg-canvas-overlay border border-stroke hover:border-indigo/30 text-ink-primary shadow-sm"
+                    : "bg-canvas-muted/50 text-ink-tertiary border border-stroke-subtle"
+                }`}
+              >
+                <Share2 size={15} />
+                <span>Share</span>
+                {deliveries.length > 0 && (
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo/15 text-indigo text-[10px] font-bold">
+                    {deliveries.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Gated tooltip */}
+              {showGateTooltip && !savedRecapId && (
+                <div className="absolute right-0 top-full mt-2 z-50 whitespace-nowrap bg-canvas-muted text-ink-secondary text-xs rounded-lg px-3 py-2 shadow-lg border border-stroke-subtle animate-fade-in">
+                  Publish your recap first
+                </div>
+              )}
+
+              {/* Share dropdown */}
+              {isShareOpen && savedRecapId && (
+                <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-stroke bg-canvas-overlay shadow-2xl backdrop-blur-sm z-50 overflow-hidden">
+                  <div className="bg-gradient-to-br from-white/[0.03] to-transparent">
+                    {/* Header */}
+                    <div className="px-4 py-3 border-b border-stroke-subtle">
+                      <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-tertiary">
+                        Share Recap
+                      </span>
+                    </div>
+
+                    {/* Destination rows */}
+                    <div className="py-1">
+                      {(["slack", "gmail", "linear"] as RecapDestination[]).map((dest) => {
+                        const config = destinationConfig[dest];
+                        const Icon = config.icon;
+                        const sent = isSentTo(dest);
+                        const sending = sendingTo === dest;
+                        const delivery = deliveries.find((d) => d.destination === dest);
+
+                        return (
+                          <button
+                            key={dest}
+                            onClick={() => {
+                              if (!sent && !sending) handleSendTo(dest);
+                            }}
+                            disabled={sent || sending}
+                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                              sent
+                                ? "bg-emerald/[0.04]"
+                                : "hover:bg-canvas-muted/40"
+                            } disabled:cursor-default`}
+                          >
+                            <div className={`w-8 h-8 rounded-lg ${config.bgColor} flex items-center justify-center flex-shrink-0`}>
+                              <Icon size={16} className={config.color} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className={`text-sm font-medium ${sent ? "text-ink-secondary" : "text-ink-primary"}`}>
+                                {config.label}
+                              </span>
+                              <p className="text-[11px] text-ink-tertiary">{config.subtitle}</p>
+                            </div>
+                            <div className="flex-shrink-0">
+                              {sending ? (
+                                <Loader2 size={14} className="animate-spin text-ink-tertiary" />
+                              ) : sent && delivery ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Check size={14} className="text-emerald" />
+                                  <span className="text-[11px] text-ink-tertiary tabular-nums">
+                                    {formatTime(delivery.sentAt)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-ink-tertiary group-hover:text-ink-secondary">
+                                  Share &rarr;
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Delivery history footer */}
+                    {deliveries.length > 0 && (
+                      <div className="px-4 py-2.5 border-t border-stroke-subtle">
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-tertiary">
+                          Delivered
+                        </span>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          {deliveries.map((d, idx) => {
+                            const cfg = destinationConfig[d.destination];
+                            return (
+                              <span
+                                key={idx}
+                                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${cfg.bgColor} ${cfg.color}`}
+                              >
+                                <Check size={10} />
+                                {cfg.label} · {formatTime(d.sentAt)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -687,7 +871,19 @@ export default function RecapDetail() {
             {/* Markdown preview */}
             <div className="p-4">
               {content ? (
-                <div className="w-full min-h-[16rem] max-h-[32rem] overflow-y-auto p-4 rounded-lg bg-canvas-muted/30 border border-stroke-subtle">
+                <div className="relative w-full min-h-[16rem] max-h-[32rem] overflow-y-auto p-4 rounded-lg bg-canvas-muted/30 border border-stroke-subtle">
+                  {/* Copy button */}
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(content);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1500);
+                    }}
+                    className="absolute top-2 right-2 p-1.5 rounded-md text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted transition-colors z-10"
+                    title="Copy to clipboard"
+                  >
+                    {copied ? <Check size={14} className="text-emerald" /> : <Copy size={14} />}
+                  </button>
                   <div
                     className="prose prose-sm prose-invert max-w-none text-ink-primary [&_h1]:text-ink-primary [&_h2]:text-ink-primary [&_h3]:text-ink-primary [&_strong]:text-ink-primary [&_li]:text-ink-secondary [&_p]:text-ink-secondary [&_ul]:my-2 [&_ol]:my-2"
                     dangerouslySetInnerHTML={{ __html: contentHtml }}
@@ -714,61 +910,7 @@ export default function RecapDetail() {
             </div>
           </div>
 
-          {/* Send to */}
-          <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-stroke-subtle">
-              <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-                Send To
-              </span>
-            </div>
-            <div className="p-4">
-              <div className="flex items-center gap-2">
-                {(Object.keys(destinationConfig) as RecapDestination[]).map((dest) => {
-                  const config = destinationConfig[dest];
-                  const Icon = config.icon;
-                  const sent = isSentTo(dest);
-                  const sending = sendingTo === dest;
 
-                  return (
-                    <button
-                      key={dest}
-                      onClick={() => handleSend(dest)}
-                      disabled={sending || selectedBlocks.length === 0 || sent}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 ${
-                        sent
-                          ? "bg-emerald/10 text-emerald ring-1 ring-emerald/30"
-                          : "bg-canvas-muted hover:bg-canvas-muted/80 text-ink-secondary hover:text-ink-primary"
-                      }`}
-                    >
-                      {sending ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : sent ? (
-                        <Check size={16} />
-                      ) : (
-                        <Icon size={16} />
-                      )}
-                      {sent ? "Sent" : config.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Delivery history */}
-              {deliveries.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-stroke-subtle">
-                  <div className="flex items-center gap-2 text-xs text-ink-tertiary">
-                    <span>Delivered:</span>
-                    {deliveries.map((d, idx) => (
-                      <span key={idx} className="flex items-center gap-1">
-                        {destinationConfig[d.destination].label} at {formatTime(d.sentAt)}
-                        {idx < deliveries.length - 1 && <span>·</span>}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>

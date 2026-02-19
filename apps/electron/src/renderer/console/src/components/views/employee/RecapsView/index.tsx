@@ -119,8 +119,7 @@ function RecapCard({ recap, onEdit, onDelete }: RecapCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
-  const destConfig = destinationConfig[recap.destination];
-  const DestIcon = destConfig.icon;
+  const hasDeliveries = recap.deliveries.length > 0;
 
   return (
     <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 transition-all hover:border-stroke">
@@ -134,19 +133,47 @@ function RecapCard({ recap, onEdit, onDelete }: RecapCardProps) {
           {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
         </div>
 
-        {/* Destination badge */}
-        <div className={`flex-shrink-0 p-2 rounded-lg ${destConfig.bgColor}`}>
-          <DestIcon size={16} className={destConfig.color} />
+        {/* Destination chips */}
+        <div className="flex-shrink-0">
+          {hasDeliveries ? (
+            <div className="flex items-center gap-1.5">
+              {recap.deliveries.map((d, idx) => {
+                const config = destinationConfig[d.destination];
+                const Icon = config.icon;
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg ${config.bgColor}`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${config.color.replace('text-', 'bg-')}`} />
+                    <Icon size={14} className={config.color} />
+                    <span className={`text-xs font-medium ${config.color}`}>
+                      {config.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-canvas-muted">
+              <Check size={14} className="text-ink-tertiary" />
+              <span className="text-xs font-medium text-ink-tertiary">
+                Published
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Main info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-ink-primary">
-              Sent to {destConfig.label}
+              {hasDeliveries
+                ? `Sent to ${recap.deliveries.map((d) => destinationConfig[d.destination].label).join(", ")}`
+                : "Published"}
             </span>
             <span className="text-xs text-ink-tertiary">
-              · {formatRelativeTime(recap.sentAt)}
+              · {formatRelativeTime(recap.createdAt)}
             </span>
           </div>
           <div className="flex items-center gap-3 mt-1">
@@ -267,7 +294,7 @@ function RecapCard({ recap, onEdit, onDelete }: RecapCardProps) {
           {/* Content preview */}
           <div className="px-5 py-4">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary mb-3">
-              Content sent
+              Content
             </h4>
             <div className="rounded-lg border border-stroke-subtle bg-canvas-muted/30 p-4">
               <pre className="whitespace-pre-wrap text-sm text-ink-secondary font-sans">
@@ -276,12 +303,31 @@ function RecapCard({ recap, onEdit, onDelete }: RecapCardProps) {
             </div>
             <div className="flex items-center justify-between mt-3">
               <span className="text-xs text-ink-tertiary">
-                {formatFullDate(recap.sentAt)} at {formatTime(recap.sentAt)}
+                {formatFullDate(recap.createdAt)} at {formatTime(recap.createdAt)}
               </span>
-              <div className="flex items-center gap-1 text-xs text-emerald">
-                <Check size={12} />
-                <span>Delivered</span>
-              </div>
+              {hasDeliveries ? (
+                <div className="flex items-center gap-2">
+                  {recap.deliveries.map((d, idx) => {
+                    const config = destinationConfig[d.destination];
+                    const Icon = config.icon;
+                    return (
+                      <span
+                        key={idx}
+                        className={`flex items-center gap-1 text-xs ${config.color}`}
+                        title={`Sent ${formatTime(d.sentAt)}`}
+                      >
+                        <Icon size={12} />
+                        <span>{config.label}</span>
+                        <span className="text-ink-tertiary">
+                          {formatTime(d.sentAt)}
+                        </span>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span className="text-xs text-ink-tertiary">Not sent yet</span>
+              )}
             </div>
           </div>
         </div>
@@ -297,7 +343,7 @@ export default function RecapsView() {
   // Group recaps by date
   const groupedRecaps = recaps.reduce(
     (acc, recap) => {
-      const dateKey = recap.sentAt.toDateString();
+      const dateKey = recap.createdAt.toDateString();
       if (!acc[dateKey]) {
         acc[dateKey] = [];
       }

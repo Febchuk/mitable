@@ -20,19 +20,25 @@ export interface RecapBlockSnapshot {
   isFocusedSession?: boolean;
 }
 
+export interface RecapDelivery {
+  destination: RecapDestination;
+  sentAt: Date;
+}
+
 export interface Recap {
   id: string;
   createdAt: Date;
-  sentAt: Date;
-  destination: RecapDestination;
   blocks: RecapBlockSnapshot[];
   totalDuration: number;
   content: string;
+  deliveries: RecapDelivery[];
 }
 
 interface RecapsContextValue {
   recaps: Recap[];
-  addRecap: (recap: Omit<Recap, "id" | "createdAt">) => Recap;
+  addRecap: (recap: Omit<Recap, "id" | "createdAt" | "deliveries">) => Recap;
+  addDelivery: (recapId: string, destination: RecapDestination) => void;
+  updateRecap: (recapId: string, data: Partial<Pick<Recap, "content" | "blocks" | "totalDuration">>) => void;
   deleteRecap: (id: string) => void;
   getRecap: (id: string) => Recap | undefined;
 }
@@ -55,15 +61,35 @@ export function snapshotBlock(block: WorkBlock): RecapBlockSnapshot {
 export function RecapsProvider({ children }: { children: ReactNode }) {
   const [recaps, setRecaps] = useState<Recap[]>([]);
 
-  const addRecap = useCallback((data: Omit<Recap, "id" | "createdAt">) => {
+  const addRecap = useCallback((data: Omit<Recap, "id" | "createdAt" | "deliveries">) => {
     const recap: Recap = {
       ...data,
       id: `recap-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       createdAt: new Date(),
+      deliveries: [],
     };
     setRecaps((prev) => [recap, ...prev]);
     return recap;
   }, []);
+
+  const addDelivery = useCallback((recapId: string, destination: RecapDestination) => {
+    setRecaps((prev) =>
+      prev.map((r) =>
+        r.id === recapId
+          ? { ...r, deliveries: [...r.deliveries, { destination, sentAt: new Date() }] }
+          : r
+      )
+    );
+  }, []);
+
+  const updateRecap = useCallback(
+    (recapId: string, data: Partial<Pick<Recap, "content" | "blocks" | "totalDuration">>) => {
+      setRecaps((prev) =>
+        prev.map((r) => (r.id === recapId ? { ...r, ...data } : r))
+      );
+    },
+    []
+  );
 
   const deleteRecap = useCallback((id: string) => {
     setRecaps((prev) => prev.filter((r) => r.id !== id));
@@ -75,7 +101,7 @@ export function RecapsProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <RecapsContext.Provider value={{ recaps, addRecap, deleteRecap, getRecap }}>
+    <RecapsContext.Provider value={{ recaps, addRecap, addDelivery, updateRecap, deleteRecap, getRecap }}>
       {children}
     </RecapsContext.Provider>
   );
