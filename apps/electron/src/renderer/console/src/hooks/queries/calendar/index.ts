@@ -16,10 +16,7 @@ import type {
   ActivityType,
   WorkBlockStatus,
 } from "../../../components/views/employee/CalendarView/types";
-import type {
-  SessionListItem,
-  SessionCapture,
-} from "../../../services/monitoringService";
+import type { SessionListItem, SessionCapture } from "../../../services/monitoringService";
 
 // Query Keys
 export const calendarKeys = {
@@ -261,9 +258,7 @@ function groupSessionsByDay(
 
   for (const [dateKey, daySessions] of dayMap.entries()) {
     // Sort sessions by start time
-    daySessions.sort(
-      (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
-    );
+    daySessions.sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
 
     // Transform sessions to work blocks
     const workBlocks: WorkBlock[] = [];

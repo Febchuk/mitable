@@ -43,10 +43,7 @@ import {
   type RecapDestination,
   type RecapDelivery,
 } from "../../../../context/RecapsContext";
-import {
-  useGenerateRecap,
-  useReviseRecap,
-} from "../../../../hooks/queries/monitoring";
+import { useGenerateRecap, useReviseRecap } from "../../../../hooks/queries/monitoring";
 import AIEditPanel from "../../../shared/AIEditPanel";
 import {
   Dialog,
@@ -61,7 +58,6 @@ import { Button } from "@/components/ui/button";
 // Types
 type RecapTone = "professional" | "casual" | "concise" | "detailed";
 type RecapLength = "brief" | "standard" | "comprehensive";
-
 
 // Helper functions
 function formatTime(date: Date): string {
@@ -142,7 +138,11 @@ const destinationConfig: Record<
 /** Build a short natural-language title from block goals / summaries. */
 function deriveTitle(blocks: WorkBlock[]): string {
   // Collect unique goals, falling back to first sentence of summary
-  const strip = (s: string) => s.replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1").replace(/^#+\s*/, "").trim();
+  const strip = (s: string) =>
+    s
+      .replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1")
+      .replace(/^#+\s*/, "")
+      .trim();
   const labels: string[] = [];
   for (const b of blocks) {
     const raw = strip(b.goal || b.summary.split(/[.!?\n]/)[0] || "");
@@ -249,9 +249,7 @@ export default function RecapDetail() {
   const [title, setTitle] = useState(existingRecap?.title ?? "");
   const [content, setContent] = useState(existingRecap?.content ?? "");
   const [isAIEditMode, setIsAIEditMode] = useState(false);
-  const [savedRecapId, setSavedRecapId] = useState<string | null>(
-    existingRecap?.id ?? null
-  );
+  const [savedRecapId, setSavedRecapId] = useState<string | null>(existingRecap?.id ?? null);
   const [sendingTo, setSendingTo] = useState<RecapDestination | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isBlockPickerOpen, setIsBlockPickerOpen] = useState(false);
@@ -292,9 +290,7 @@ export default function RecapDetail() {
   const browsingDayIndex = browsingDay
     ? availableDays.findIndex((d) => isSameDay(d, browsingDay))
     : -1;
-  const blocksForBrowsingDay = browsingDay
-    ? getBlocksForDay(allBlocks, browsingDay)
-    : [];
+  const blocksForBrowsingDay = browsingDay ? getBlocksForDay(allBlocks, browsingDay) : [];
 
   const selectedBlocks = allBlocks.filter((b) => selectedBlockIds.has(b.id));
   const totalDuration = selectedBlocks.reduce((acc, b) => acc + b.duration, 0);
@@ -357,10 +353,11 @@ export default function RecapDetail() {
       });
       // Extract title from first heading/line of AI response, strip markdown
       const lines = result.recap.split("\n").filter(Boolean);
-      const extractedTitle = lines[0]
-        ?.replace(/^#+\s*/, "")
-        .replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1")
-        .trim() || "Work Update";
+      const extractedTitle =
+        lines[0]
+          ?.replace(/^#+\s*/, "")
+          .replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1")
+          .trim() || "Work Update";
       setTitle(extractedTitle);
       setContent(result.recap);
     } catch {
@@ -500,7 +497,8 @@ export default function RecapDetail() {
               </h1>
               <div className="flex items-center gap-3 mt-1">
                 <span className="text-sm text-ink-tertiary">
-                  {selectedBlocks.length} block{selectedBlocks.length !== 1 ? "s" : ""} · {formatDuration(totalDuration)}
+                  {selectedBlocks.length} block{selectedBlocks.length !== 1 ? "s" : ""} ·{" "}
+                  {formatDuration(totalDuration)}
                 </span>
                 {deliveries.length > 0 && (
                   <div className="flex items-center gap-1.5">
@@ -528,11 +526,7 @@ export default function RecapDetail() {
               disabled={isPublishing || selectedBlocks.length === 0 || !content}
               className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-indigo text-white text-sm font-medium hover:bg-indigo/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {isPublishing ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <Check size={15} />
-              )}
+              {isPublishing ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
               {savedRecapId ? "Save Changes" : "Publish"}
             </button>
 
@@ -590,16 +584,18 @@ export default function RecapDetail() {
                             }}
                             disabled={sent || sending}
                             className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                              sent
-                                ? "bg-emerald/[0.04]"
-                                : "hover:bg-canvas-muted/40"
+                              sent ? "bg-emerald/[0.04]" : "hover:bg-canvas-muted/40"
                             } disabled:cursor-default`}
                           >
-                            <div className={`w-8 h-8 rounded-lg ${config.bgColor} flex items-center justify-center flex-shrink-0`}>
+                            <div
+                              className={`w-8 h-8 rounded-lg ${config.bgColor} flex items-center justify-center flex-shrink-0`}
+                            >
                               <Icon size={16} className={config.color} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className={`text-sm font-medium ${sent ? "text-ink-secondary" : "text-ink-primary"}`}>
+                              <span
+                                className={`text-sm font-medium ${sent ? "text-ink-secondary" : "text-ink-primary"}`}
+                              >
                                 {config.label}
                               </span>
                               <p className="text-[11px] text-ink-tertiary">{config.subtitle}</p>
@@ -705,10 +701,15 @@ export default function RecapDetail() {
                         )}
                       </div>
                       <p className="text-xs text-ink-tertiary mt-0.5">
-                        {blocksForBrowsingDay.length} block{blocksForBrowsingDay.length !== 1 ? "s" : ""}
+                        {blocksForBrowsingDay.length} block
+                        {blocksForBrowsingDay.length !== 1 ? "s" : ""}
                         {(() => {
-                          const sel = blocksForBrowsingDay.filter((b) => selectedBlockIds.has(b.id)).length;
-                          return sel > 0 ? <span className="text-indigo"> · {sel} selected</span> : null;
+                          const sel = blocksForBrowsingDay.filter((b) =>
+                            selectedBlockIds.has(b.id)
+                          ).length;
+                          return sel > 0 ? (
+                            <span className="text-indigo"> · {sel} selected</span>
+                          ) : null;
                         })()}
                       </p>
                     </div>
@@ -758,7 +759,8 @@ export default function RecapDetail() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs text-ink-secondary tabular-nums">
-                                  {formatTime(block.startTime)} – {block.endTime ? formatTime(block.endTime) : "now"}
+                                  {formatTime(block.startTime)} –{" "}
+                                  {block.endTime ? formatTime(block.endTime) : "now"}
                                 </span>
                                 <span className="text-xs text-ink-tertiary">
                                   · {formatDuration(block.duration)}
@@ -848,9 +850,7 @@ export default function RecapDetail() {
                             {formatDuration(block.duration)} · {formatDate(block.startTime)}
                           </span>
                         </div>
-                        {block.goal && (
-                          <p className="text-xs text-indigo mt-0.5">{block.goal}</p>
-                        )}
+                        {block.goal && <p className="text-xs text-indigo mt-0.5">{block.goal}</p>}
                         <p className="text-xs text-ink-tertiary mt-1 line-clamp-2">
                           {block.summary}
                         </p>
@@ -929,10 +929,11 @@ export default function RecapDetail() {
                 </div>
               )}
               <div className="flex items-center justify-between mt-3 text-xs text-ink-tertiary">
-                <span>{content.length} characters · {wordCount} words</span>
+                <span>
+                  {content.length} characters · {wordCount} words
+                </span>
                 <span className="flex items-center gap-1">
-                  <Clock size={12} />
-                  ~{Math.max(1, Math.ceil(wordCount / 200))} min read
+                  <Clock size={12} />~{Math.max(1, Math.ceil(wordCount / 200))} min read
                 </span>
               </div>
             </div>
@@ -953,7 +954,6 @@ export default function RecapDetail() {
               </button>
             </div>
           )}
-
         </div>
       </div>
     </div>

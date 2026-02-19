@@ -35,13 +35,7 @@ export interface Capture {
 /**
  * WorkBlock status - aligns with MonitoringSession status
  */
-export type WorkBlockStatus =
-  | "active"
-  | "paused"
-  | "ended"
-  | "summarizing"
-  | "ready"
-  | "delivered";
+export type WorkBlockStatus = "active" | "paused" | "ended" | "summarizing" | "ready" | "delivered";
 
 /**
  * Delivery channel for block summaries (via Recaps)

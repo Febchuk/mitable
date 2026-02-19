@@ -1352,7 +1352,8 @@ Example good output:
       .join("\n\n");
 
     const toneInstructions: Record<string, string> = {
-      professional: "Use a professional, polished tone suitable for a manager or stakeholder update.",
+      professional:
+        "Use a professional, polished tone suitable for a manager or stakeholder update.",
       casual: "Use a casual, conversational tone like a Slack update to teammates.",
       concise: "Be extremely concise — bullet points and short phrases only.",
       detailed: "Be thorough and detailed, covering each session's contributions.",

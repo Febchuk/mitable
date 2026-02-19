@@ -44,9 +44,7 @@ export default function DayCard({ day, isSelected, isToday, onClick }: DayCardPr
   const hasActivity = day.totalWorkTime > 0;
 
   // Check for active/paused/summarizing blocks
-  const hasActiveBlock = day.workBlocks.some(
-    (b) => b.status === "active" || b.isActive
-  );
+  const hasActiveBlock = day.workBlocks.some((b) => b.status === "active" || b.isActive);
   const hasPausedBlock = day.workBlocks.some((b) => b.status === "paused");
   const hasSummarizingBlock = day.workBlocks.some((b) => b.status === "summarizing");
 

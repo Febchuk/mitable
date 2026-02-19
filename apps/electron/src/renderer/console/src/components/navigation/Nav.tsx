@@ -1,4 +1,14 @@
-import { Layers, Users, BarChart3, Plug, FileText, Paperclip, CalendarDays, Target, History } from "lucide-react";
+import {
+  Layers,
+  Users,
+  BarChart3,
+  Plug,
+  FileText,
+  Paperclip,
+  CalendarDays,
+  Target,
+  History,
+} from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 import { useSubscription } from "../../hooks/queries/billing";

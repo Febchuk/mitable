@@ -3290,51 +3290,55 @@ router.patch("/recaps/:id", requireAuth, async (req: Request, res: Response): Pr
  * POST /api/monitoring/recaps/:id/deliveries
  * Append a delivery entry to a recap
  */
-router.post("/recaps/:id/deliveries", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const userId = req.userId!;
-  const { id } = req.params;
-  const { destination } = req.body;
+router.post(
+  "/recaps/:id/deliveries",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { destination } = req.body;
 
-  if (!destination) {
-    res.status(400).json({ error: "Bad Request", message: "destination is required" });
-    return;
-  }
-
-  try {
-    // Fetch existing recap (ownership check)
-    const [existing] = await db
-      .select()
-      .from(schema.recaps)
-      .where(and(eq(schema.recaps.id, id), eq(schema.recaps.userId, userId)))
-      .limit(1);
-
-    if (!existing) {
-      res.status(404).json({ error: "Not Found", message: "Recap not found" });
+    if (!destination) {
+      res.status(400).json({ error: "Bad Request", message: "destination is required" });
       return;
     }
 
-    const currentDeliveries = Array.isArray(existing.deliveries) ? existing.deliveries : [];
-    const newDelivery = { destination, sentAt: new Date().toISOString() };
-    const updatedDeliveries = [...currentDeliveries, newDelivery];
+    try {
+      // Fetch existing recap (ownership check)
+      const [existing] = await db
+        .select()
+        .from(schema.recaps)
+        .where(and(eq(schema.recaps.id, id), eq(schema.recaps.userId, userId)))
+        .limit(1);
 
-    const [recap] = await db
-      .update(schema.recaps)
-      .set({ deliveries: updatedDeliveries, updatedAt: new Date() })
-      .where(eq(schema.recaps.id, id))
-      .returning();
+      if (!existing) {
+        res.status(404).json({ error: "Not Found", message: "Recap not found" });
+        return;
+      }
 
-    res.json({ recap });
-  } catch (error) {
-    logger.error(
-      { error: error instanceof Error ? error.message : String(error), userId },
-      "[Monitoring] Error adding delivery to recap"
-    );
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: error instanceof Error ? error.message : "Failed to add delivery",
-    });
+      const currentDeliveries = Array.isArray(existing.deliveries) ? existing.deliveries : [];
+      const newDelivery = { destination, sentAt: new Date().toISOString() };
+      const updatedDeliveries = [...currentDeliveries, newDelivery];
+
+      const [recap] = await db
+        .update(schema.recaps)
+        .set({ deliveries: updatedDeliveries, updatedAt: new Date() })
+        .where(eq(schema.recaps.id, id))
+        .returning();
+
+      res.json({ recap });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), userId },
+        "[Monitoring] Error adding delivery to recap"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to add delivery",
+      });
+    }
   }
-});
+);
 
 /**
  * DELETE /api/monitoring/recaps/:id

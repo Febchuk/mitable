@@ -32,7 +32,10 @@ import { mockDays, getMockWeekDays } from "./mockData";
 import DayCard from "./DayCard";
 import DaySummary from "./DaySummary";
 import WorkBlockList from "./WorkBlockList";
-import { Calendar as UntitledCalendar, type CalendarEvent } from "@/components/application/calendar/calendar";
+import {
+  Calendar as UntitledCalendar,
+  type CalendarEvent,
+} from "@/components/application/calendar/calendar";
 import type { ActivityDay } from "./types";
 import { useCalendarDays } from "../../../../hooks/queries/calendar";
 
@@ -60,10 +63,7 @@ function isSameDay(date1: Date, date2: Date): boolean {
 }
 
 function isSameMonth(date1: Date, date2: Date): boolean {
-  return (
-    date1.getFullYear() === date2.getFullYear() &&
-    date1.getMonth() === date2.getMonth()
-  );
+  return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth();
 }
 
 function formatDateRange(start: Date, end: Date): string {
@@ -138,11 +138,7 @@ export default function CalendarView() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Fetch real data from backend
-  const {
-    data: realDays,
-    isLoading: isLoadingDays,
-    error: daysError,
-  } = useCalendarDays();
+  const { data: realDays, isLoading: isLoadingDays, error: daysError } = useCalendarDays();
 
   // Use real data if available, fall back to mock data for development
   const useMockData = !realDays || realDays.length === 0;
@@ -289,7 +285,9 @@ export default function CalendarView() {
   const isGridView = viewMode === "week" || viewMode === "month";
 
   return (
-    <div className={`app-no-drag ${isGridView ? "h-full flex flex-col overflow-hidden" : "h-full overflow-auto"}`}>
+    <div
+      className={`app-no-drag ${isGridView ? "h-full flex flex-col overflow-hidden" : "h-full overflow-auto"}`}
+    >
       {/* ═══════════════════════════════════════════════════════════════════
           HEADER - Navigation and View Controls
           ═══════════════════════════════════════════════════════════════════ */}
@@ -404,10 +402,9 @@ export default function CalendarView() {
             </button>
 
             <div className="flex-1 flex items-center justify-center gap-3">
-              <span className="text-sm font-medium text-ink-primary">
-                {getPeriodDisplay()}
-              </span>
-              {((viewMode !== "month" && !isCurrentWeek) || (viewMode === "month" && !isCurrentMonth)) && (
+              <span className="text-sm font-medium text-ink-primary">{getPeriodDisplay()}</span>
+              {((viewMode !== "month" && !isCurrentWeek) ||
+                (viewMode === "month" && !isCurrentMonth)) && (
                 <button
                   onClick={goToToday}
                   className="px-2 py-1 text-xs font-medium text-indigo hover:bg-indigo/10 rounded transition-colors"
@@ -551,9 +548,7 @@ export default function CalendarView() {
                   <h3 className="font-display text-lg font-semibold text-ink-primary">
                     Start New Block
                   </h3>
-                  <p className="text-xs text-ink-tertiary">
-                    Begin a new work session
-                  </p>
+                  <p className="text-xs text-ink-tertiary">Begin a new work session</p>
                 </div>
               </div>
               <button
@@ -602,7 +597,6 @@ export default function CalendarView() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

@@ -22,7 +22,11 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-export default function WorkBlockList({ blocks, totalWorkTime, onBlockDelete }: WorkBlockListProps) {
+export default function WorkBlockList({
+  blocks,
+  totalWorkTime,
+  onBlockDelete,
+}: WorkBlockListProps) {
   if (blocks.length === 0) {
     return (
       <div className="py-16 text-center">
@@ -33,8 +37,7 @@ export default function WorkBlockList({ blocks, totalWorkTime, onBlockDelete }: 
           No activity recorded
         </h3>
         <p className="text-ink-tertiary text-sm max-w-xs mx-auto">
-          Work blocks will appear here as you use your computer.
-          Activity is automatically detected.
+          Work blocks will appear here as you use your computer. Activity is automatically detected.
         </p>
       </div>
     );

@@ -109,13 +109,7 @@ function getBlockColors(block: WorkBlock): { bg: string; border: string; text: s
 }
 
 // Work block component
-function BlockItem({
-  block,
-  onClick,
-}: {
-  block: WorkBlock;
-  onClick?: () => void;
-}) {
+function BlockItem({ block, onClick }: { block: WorkBlock; onClick?: () => void }) {
   const style = getBlockStyle(block);
   if (!style) return null;
 
@@ -132,12 +126,8 @@ function BlockItem({
       <div className="p-2 h-full flex flex-col">
         {/* Time and duration */}
         <div className="flex items-center justify-between gap-1">
-          <span className={`text-[10px] font-medium ${colors.text}`}>
-            {formatTime(startTime)}
-          </span>
-          <span className="text-[10px] text-ink-tertiary">
-            {formatDuration(block.duration)}
-          </span>
+          <span className={`text-[10px] font-medium ${colors.text}`}>{formatTime(startTime)}</span>
+          <span className="text-[10px] text-ink-tertiary">{formatDuration(block.duration)}</span>
         </div>
 
         {/* Goal or top app */}
@@ -151,9 +141,7 @@ function BlockItem({
                 </span>
               </div>
             ) : topApp ? (
-              <span className="text-[11px] text-ink-secondary line-clamp-2">
-                {topApp}
-              </span>
+              <span className="text-[11px] text-ink-secondary line-clamp-2">{topApp}</span>
             ) : null}
           </div>
         )}
@@ -206,9 +194,7 @@ function DayColumn({
         </div>
         <div
           className={`mt-1 w-8 h-8 flex items-center justify-center rounded-full text-sm font-semibold ${
-            isToday
-              ? "bg-indigo text-white"
-              : "text-ink-primary"
+            isToday ? "bg-indigo text-white" : "text-ink-primary"
           }`}
         >
           {dayNum}
@@ -224,11 +210,7 @@ function DayColumn({
       <div className="relative" style={{ height: TOTAL_HOURS * HOUR_HEIGHT }}>
         {/* Work blocks */}
         {day.workBlocks.map((block) => (
-          <BlockItem
-            key={block.id}
-            block={block}
-            onClick={() => onBlockClick?.(block)}
-          />
+          <BlockItem key={block.id} block={block} onClick={() => onBlockClick?.(block)} />
         ))}
       </div>
     </div>
@@ -260,7 +242,10 @@ export default function WeekGridView({ weekDays, onBlockClick }: WeekGridViewPro
         {/* Time column */}
         <div className="w-14 shrink-0 border-r border-stroke-subtle bg-canvas-overlay/50 relative z-10">
           {/* Header spacer - matches day column header height */}
-          <div className="border-b border-stroke-subtle bg-canvas-base" style={{ height: HEADER_HEIGHT }} />
+          <div
+            className="border-b border-stroke-subtle bg-canvas-base"
+            style={{ height: HEADER_HEIGHT }}
+          />
 
           {/* Time labels */}
           <div className="relative" style={{ height: TOTAL_HOURS * HOUR_HEIGHT }}>

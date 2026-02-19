@@ -123,7 +123,8 @@ export default function WorkBlockDetail({
   const timeRange = `${formatTime(block.startTime)} - ${block.endTime ? formatTime(block.endTime) : "now"}`;
 
   // Get summary from block detail if available
-  const displaySummary = blockDetail?.finalSummary || blockDetail?.rawActivitySummary || block.summary;
+  const displaySummary =
+    blockDetail?.finalSummary || blockDetail?.rawActivitySummary || block.summary;
 
   // Handle creating a recap from this block
   const handleCreateRecap = () => {
@@ -194,9 +195,7 @@ export default function WorkBlockDetail({
                 </span>
               )}
             </div>
-            <div className="text-sm text-ink-secondary mt-0.5 tabular-nums">
-              {timeRange}
-            </div>
+            <div className="text-sm text-ink-secondary mt-0.5 tabular-nums">{timeRange}</div>
           </div>
 
           {/* Summary preview */}
@@ -207,7 +206,9 @@ export default function WorkBlockDetail({
                 <span className="text-xs font-medium text-indigo">{block.goal}</span>
               </div>
             )}
-            <p className="text-sm text-ink-primary line-clamp-2">{displaySummary || "No summary yet"}</p>
+            <p className="text-sm text-ink-primary line-clamp-2">
+              {displaySummary || "No summary yet"}
+            </p>
           </div>
 
           {/* Duration */}
@@ -349,9 +350,7 @@ export default function WorkBlockDetail({
                 {block.appBreakdown.map((app) => (
                   <div key={app.app} className="flex items-center gap-3">
                     {/* App indicator */}
-                    <div
-                      className={`w-2 h-2 rounded-full flex-shrink-0 ${getAppColor(app.app)}`}
-                    />
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getAppColor(app.app)}`} />
                     {/* App name */}
                     <span className="w-20 flex-shrink-0 text-sm text-ink-secondary truncate">
                       {app.app}

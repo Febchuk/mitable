@@ -2993,7 +2993,10 @@ export default function UserProfilePage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label htmlFor="flag-experience" className="text-sm font-medium text-text-primary">
+                      <Label
+                        htmlFor="flag-experience"
+                        className="text-sm font-medium text-text-primary"
+                      >
                         Calendar & Recaps
                       </Label>
                       <p className="text-xs text-text-tertiary mt-0.5">

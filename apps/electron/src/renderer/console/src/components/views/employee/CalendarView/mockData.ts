@@ -268,7 +268,12 @@ const todayMorningBlock: WorkBlock = {
   idleGapBefore: null,
   summary:
     "Morning focused coding session. Implemented CalendarView components and set up the routing. Reviewed PRs and responded to team feedback on Slack.",
-  captures: generateRichCaptures(daysAgo(0, 9, 15), 150, ["VS Code", "Chrome", "Terminal"], "coding"),
+  captures: generateRichCaptures(
+    daysAgo(0, 9, 15),
+    150,
+    ["VS Code", "Chrome", "Terminal"],
+    "coding"
+  ),
   appBreakdown: [
     { app: "VS Code", minutes: 95, percentage: 63 },
     { app: "Chrome", minutes: 35, percentage: 23 },
@@ -339,7 +344,12 @@ const yesterdayBlock2: WorkBlock = {
   idleGapBefore: 90,
   summary:
     "Code review and refactoring session. Reviewed 3 PRs, cleaned up monitoring service types, and updated shared package.",
-  captures: generateRichCaptures(daysAgo(1, 14, 0), 135, ["VS Code", "Chrome", "Terminal"], "review"),
+  captures: generateRichCaptures(
+    daysAgo(1, 14, 0),
+    135,
+    ["VS Code", "Chrome", "Terminal"],
+    "review"
+  ),
   appBreakdown: [
     { app: "VS Code", minutes: 80, percentage: 59 },
     { app: "Chrome", minutes: 40, percentage: 30 },
@@ -393,7 +403,12 @@ const twoDaysAgoBlock1: WorkBlock = {
   idleGapBefore: null,
   summary:
     "Backend development sprint. Implemented new API endpoints for tracking service and wrote integration tests.",
-  captures: generateRichCaptures(daysAgo(2, 10, 30), 150, ["VS Code", "Terminal", "Chrome"], "coding"),
+  captures: generateRichCaptures(
+    daysAgo(2, 10, 30),
+    150,
+    ["VS Code", "Terminal", "Chrome"],
+    "coding"
+  ),
   appBreakdown: [
     { app: "VS Code", minutes: 100, percentage: 67 },
     { app: "Terminal", minutes: 35, percentage: 23 },
@@ -451,7 +466,12 @@ const threeDaysAgo: ActivityDay = {
       idleGapBefore: null,
       summary:
         "Morning standup and feature development. Started passive monitoring implementation.",
-      captures: generateRichCaptures(daysAgo(3, 9, 0), 180, ["VS Code", "Slack", "Chrome"], "coding"),
+      captures: generateRichCaptures(
+        daysAgo(3, 9, 0),
+        180,
+        ["VS Code", "Slack", "Chrome"],
+        "coding"
+      ),
       appBreakdown: [
         { app: "VS Code", minutes: 120, percentage: 67 },
         { app: "Slack", minutes: 35, percentage: 19 },
@@ -467,7 +487,12 @@ const threeDaysAgo: ActivityDay = {
       idleGapBefore: 120,
       summary:
         "Continued implementation and documentation. Updated technical spec and created diagrams.",
-      captures: generateRichCaptures(daysAgo(3, 14, 0), 200, ["VS Code", "Notion", "Chrome"], "planning"),
+      captures: generateRichCaptures(
+        daysAgo(3, 14, 0),
+        200,
+        ["VS Code", "Notion", "Chrome"],
+        "planning"
+      ),
       appBreakdown: [
         { app: "VS Code", minutes: 110, percentage: 55 },
         { app: "Notion", minutes: 60, percentage: 30 },
@@ -500,7 +525,12 @@ const fourDaysAgo: ActivityDay = {
       duration: 180,
       idleGapBefore: null,
       summary: "Half day - meetings and planning. Team sync, 1:1s, and roadmap review.",
-      captures: generateRichCaptures(daysAgo(4, 10, 0), 180, ["Slack", "Chrome", "Notion"], "planning"),
+      captures: generateRichCaptures(
+        daysAgo(4, 10, 0),
+        180,
+        ["Slack", "Chrome", "Notion"],
+        "planning"
+      ),
       appBreakdown: [
         { app: "Slack", minutes: 80, percentage: 44 },
         { app: "Chrome", minutes: 60, percentage: 33 },
@@ -547,7 +577,12 @@ const fiveDaysAgo: ActivityDay = {
       duration: 180,
       idleGapBefore: 90,
       summary: "Afternoon testing and documentation. Wrote unit tests and updated README.",
-      captures: generateRichCaptures(daysAgo(5, 14, 0), 180, ["VS Code", "Chrome", "Terminal"], "coding"),
+      captures: generateRichCaptures(
+        daysAgo(5, 14, 0),
+        180,
+        ["VS Code", "Chrome", "Terminal"],
+        "coding"
+      ),
       appBreakdown: [
         { app: "VS Code", minutes: 120, percentage: 67 },
         { app: "Chrome", minutes: 40, percentage: 22 },
@@ -556,8 +591,7 @@ const fiveDaysAgo: ActivityDay = {
       status: "ended",
     },
   ],
-  summary:
-    "Intense development day. Major refactoring completed with comprehensive test coverage.",
+  summary: "Intense development day. Major refactoring completed with comprehensive test coverage.",
   topApps: [
     { app: "VS Code", minutes: 310 },
     { app: "Terminal", minutes: 70 },
@@ -579,7 +613,12 @@ const sixDaysAgo: ActivityDay = {
       duration: 180,
       idleGapBefore: null,
       summary: "Morning code review marathon. Reviewed and merged 5 PRs.",
-      captures: generateRichCaptures(daysAgo(6, 9, 0), 180, ["Chrome", "VS Code", "Slack"], "review"),
+      captures: generateRichCaptures(
+        daysAgo(6, 9, 0),
+        180,
+        ["Chrome", "VS Code", "Slack"],
+        "review"
+      ),
       appBreakdown: [
         { app: "Chrome", minutes: 90, percentage: 50 },
         { app: "VS Code", minutes: 60, percentage: 33 },
@@ -593,9 +632,13 @@ const sixDaysAgo: ActivityDay = {
       endTime: daysAgo(6, 17, 0),
       duration: 180,
       idleGapBefore: 120,
-      summary:
-        "Bug fixes and hotfix deployment. Fixed production issues and monitored rollout.",
-      captures: generateRichCaptures(daysAgo(6, 14, 0), 180, ["VS Code", "Terminal", "Chrome"], "coding"),
+      summary: "Bug fixes and hotfix deployment. Fixed production issues and monitored rollout.",
+      captures: generateRichCaptures(
+        daysAgo(6, 14, 0),
+        180,
+        ["VS Code", "Terminal", "Chrome"],
+        "coding"
+      ),
       appBreakdown: [
         { app: "VS Code", minutes: 100, percentage: 56 },
         { app: "Terminal", minutes: 50, percentage: 28 },

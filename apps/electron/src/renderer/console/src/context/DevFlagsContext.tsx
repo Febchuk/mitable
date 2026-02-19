@@ -41,11 +41,7 @@ export function DevFlagsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  return (
-    <DevFlagsContext.Provider value={{ flags, setFlag }}>
-      {children}
-    </DevFlagsContext.Provider>
-  );
+  return <DevFlagsContext.Provider value={{ flags, setFlag }}>{children}</DevFlagsContext.Provider>;
 }
 
 export function useDevFlags(): DevFlagsContextValue {

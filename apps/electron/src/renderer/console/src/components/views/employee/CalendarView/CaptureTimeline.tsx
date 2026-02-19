@@ -158,18 +158,14 @@ function CaptureItem({ capture, showContextSwitch, onDelete, onRestore }: Captur
         </div>
 
         {/* Activity type icon */}
-        <div
-          className={`flex-shrink-0 p-1.5 rounded-lg ${config.bgColor} ${config.color}`}
-        >
+        <div className={`flex-shrink-0 p-1.5 rounded-lg ${config.bgColor} ${config.color}`}>
           <Icon size={14} />
         </div>
 
         {/* Main content */}
         <div className="flex-1 min-w-0 space-y-1">
           {/* Activity description - primary info */}
-          <p className="text-sm text-ink-primary leading-snug">
-            {capture.activityDescription}
-          </p>
+          <p className="text-sm text-ink-primary leading-snug">{capture.activityDescription}</p>
 
           {/* Document and context - secondary info */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -199,11 +195,7 @@ function CaptureItem({ capture, showContextSwitch, onDelete, onRestore }: Captur
         {/* Thumbnail placeholder */}
         {capture.thumbnailUrl ? (
           <div className="w-20 h-12 rounded-lg bg-canvas-muted flex-shrink-0 overflow-hidden border border-stroke-subtle">
-            <img
-              src={capture.thumbnailUrl}
-              alt="Capture"
-              className="w-full h-full object-cover"
-            />
+            <img src={capture.thumbnailUrl} alt="Capture" className="w-full h-full object-cover" />
           </div>
         ) : (
           <div className="w-20 h-12 rounded-lg bg-canvas-muted/30 flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border border-stroke-subtle/50">
@@ -261,8 +253,7 @@ function groupCapturesByTime(captures: Capture[]): CaptureGroup[] {
   let groupStartTime = captures[0].timestamp;
 
   captures.forEach((capture) => {
-    const timeSinceGroupStart =
-      (capture.timestamp.getTime() - groupStartTime.getTime()) / 60000;
+    const timeSinceGroupStart = (capture.timestamp.getTime() - groupStartTime.getTime()) / 60000;
 
     // Start new group every 5 minutes or on context switch
     if (timeSinceGroupStart >= 5 || (capture.isContextSwitch && currentGroup.length > 0)) {
@@ -316,9 +307,7 @@ interface CaptureGroupCardProps {
 function CaptureGroupCard({ group, isExpanded, onToggle }: CaptureGroupCardProps) {
   const config = activityConfig[group.primaryActivity] || activityConfig.other;
   const Icon = config.icon;
-  const durationMinutes = Math.round(
-    (group.endTime.getTime() - group.startTime.getTime()) / 60000
-  );
+  const durationMinutes = Math.round((group.endTime.getTime() - group.startTime.getTime()) / 60000);
 
   return (
     <div className="border border-stroke-subtle rounded-lg overflow-hidden">
@@ -348,9 +337,7 @@ function CaptureGroupCard({ group, isExpanded, onToggle }: CaptureGroupCardProps
         </div>
 
         {/* Expand indicator */}
-        <div
-          className={`text-ink-tertiary transition-transform ${isExpanded ? "rotate-180" : ""}`}
-        >
+        <div className={`text-ink-tertiary transition-transform ${isExpanded ? "rotate-180" : ""}`}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
               d="M4 6L8 10L12 6"
@@ -381,18 +368,13 @@ function CaptureGroupCard({ group, isExpanded, onToggle }: CaptureGroupCardProps
   );
 }
 
-export default function CaptureTimeline({
-  captures,
-  maxVisible = 100,
-}: CaptureTimelineProps) {
+export default function CaptureTimeline({ captures, maxVisible = 100 }: CaptureTimelineProps) {
   const [showDeleted, setShowDeleted] = useState(false);
   const [viewMode, setViewMode] = useState<"grouped" | "detailed">("grouped");
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
 
   // Filter out deleted unless showing them
-  const visibleCaptures = showDeleted
-    ? captures
-    : captures.filter((c) => !c.isDeleted);
+  const visibleCaptures = showDeleted ? captures : captures.filter((c) => !c.isDeleted);
 
   const deletedCount = captures.filter((c) => c.isDeleted).length;
 

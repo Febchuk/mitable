@@ -49,7 +49,10 @@ interface RecapsContextValue {
   isLoading: boolean;
   addRecap: (recap: Omit<Recap, "id" | "createdAt" | "deliveries">) => Promise<Recap>;
   addDelivery: (recapId: string, destination: RecapDestination) => Promise<void>;
-  updateRecap: (recapId: string, data: Partial<Pick<Recap, "title" | "content" | "blocks" | "totalDuration">>) => Promise<void>;
+  updateRecap: (
+    recapId: string,
+    data: Partial<Pick<Recap, "title" | "content" | "blocks" | "totalDuration">>
+  ) => Promise<void>;
   deleteRecap: (id: string) => Promise<void>;
   getRecap: (id: string) => Recap | undefined;
 }
@@ -72,7 +75,9 @@ export function snapshotBlock(block: WorkBlock): RecapBlockSnapshot {
 /** Convert a backend RecapRecord (ISO strings) into a frontend Recap (Date objects) */
 function toRecap(row: RecapRecord): Recap {
   const blocks = (Array.isArray(row.blocks) ? row.blocks : []) as Array<Record<string, unknown>>;
-  const deliveries = (Array.isArray(row.deliveries) ? row.deliveries : []) as Array<Record<string, unknown>>;
+  const deliveries = (Array.isArray(row.deliveries) ? row.deliveries : []) as Array<
+    Record<string, unknown>
+  >;
 
   return {
     id: row.id,
@@ -156,10 +161,7 @@ export function RecapsProvider({ children }: { children: ReactNode }) {
     [deleteMutation]
   );
 
-  const getRecap = useCallback(
-    (id: string) => recaps.find((r) => r.id === id),
-    [recaps]
-  );
+  const getRecap = useCallback((id: string) => recaps.find((r) => r.id === id), [recaps]);
 
   return (
     <RecapsContext.Provider

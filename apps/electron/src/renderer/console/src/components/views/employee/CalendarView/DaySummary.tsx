@@ -306,14 +306,10 @@ export default function DaySummary({ day }: DaySummaryProps) {
               const Icon = item.icon;
               return (
                 <li key={idx} className="flex items-start gap-3">
-                  <div
-                    className={`flex-shrink-0 p-1 rounded ${item.bgColor} ${item.color} mt-0.5`}
-                  >
+                  <div className={`flex-shrink-0 p-1 rounded ${item.bgColor} ${item.color} mt-0.5`}>
                     <Icon size={12} />
                   </div>
-                  <span className="text-sm text-ink-secondary leading-relaxed">
-                    {item.text}
-                  </span>
+                  <span className="text-sm text-ink-secondary leading-relaxed">{item.text}</span>
                 </li>
               );
             })}

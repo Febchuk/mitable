@@ -6,14 +6,7 @@
  */
 
 import { useNavigate } from "react-router-dom";
-import {
-  History,
-  Send,
-  ChevronRight,
-  Clock,
-  Calendar,
-  Plus,
-} from "lucide-react";
+import { History, Send, ChevronRight, Clock, Calendar, Plus } from "lucide-react";
 import { useRecaps, type Recap } from "../../../../context/RecapsContext";
 
 function formatDuration(minutes: number): string {
@@ -62,9 +55,7 @@ function RecapCard({ recap, onEdit }: RecapCardProps) {
           <span className="text-sm font-medium text-ink-primary">
             {recap.title || "Work Update"}
           </span>
-          <span className="text-xs text-ink-tertiary">
-            · {formatRelativeTime(recap.createdAt)}
-          </span>
+          <span className="text-xs text-ink-tertiary">· {formatRelativeTime(recap.createdAt)}</span>
         </div>
         <div className="flex items-center gap-3 mt-1">
           <span className="inline-flex items-center gap-1 text-xs text-ink-tertiary">
@@ -119,9 +110,7 @@ export default function RecapsView() {
                 <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
                   Recaps
                 </h1>
-                <p className="text-ink-tertiary text-sm">
-                  History of shared work updates
-                </p>
+                <p className="text-ink-tertiary text-sm">History of shared work updates</p>
               </div>
             </div>
             <button
@@ -143,9 +132,7 @@ export default function RecapsView() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-canvas-muted mb-4">
                 <Send size={24} className="text-ink-tertiary" />
               </div>
-              <h3 className="text-lg font-medium text-ink-primary mb-2">
-                No recaps yet
-              </h3>
+              <h3 className="text-lg font-medium text-ink-primary mb-2">No recaps yet</h3>
               <p className="text-sm text-ink-tertiary max-w-sm mx-auto mb-6">
                 Create a recap from your work blocks to share progress with your team.
               </p>
