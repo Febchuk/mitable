@@ -143,11 +143,10 @@ function RecapCard({ recap, onEdit, onDelete }: RecapCardProps) {
                 return (
                   <div
                     key={idx}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-lg ${config.bgColor}`}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-canvas-muted"
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${config.color.replace('text-', 'bg-')}`} />
-                    <Icon size={14} className={config.color} />
-                    <span className={`text-xs font-medium ${config.color}`}>
+                    <Icon size={14} className="text-ink-tertiary" />
+                    <span className="text-xs font-medium text-ink-secondary">
                       {config.label}
                     </span>
                   </div>
@@ -313,14 +312,12 @@ function RecapCard({ recap, onEdit, onDelete }: RecapCardProps) {
                     return (
                       <span
                         key={idx}
-                        className={`flex items-center gap-1 text-xs ${config.color}`}
+                        className="flex items-center gap-1 text-xs text-ink-tertiary"
                         title={`Sent ${formatTime(d.sentAt)}`}
                       >
                         <Icon size={12} />
                         <span>{config.label}</span>
-                        <span className="text-ink-tertiary">
-                          {formatTime(d.sentAt)}
-                        </span>
+                        <span>{formatTime(d.sentAt)}</span>
                       </span>
                     );
                   })}

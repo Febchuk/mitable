@@ -470,7 +470,7 @@ export default function RecapDetail() {
                       return (
                         <span
                           key={idx}
-                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${config.bgColor} ${config.color} text-[10px] font-semibold uppercase tracking-wider`}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-canvas-muted text-ink-tertiary text-[10px] font-semibold uppercase tracking-wider"
                         >
                           <Icon size={10} />
                           <Check size={10} />
@@ -597,7 +597,7 @@ export default function RecapDetail() {
                             return (
                               <span
                                 key={idx}
-                                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${cfg.bgColor} ${cfg.color}`}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-canvas-muted text-ink-tertiary text-[10px] font-medium"
                               >
                                 <Check size={10} />
                                 {cfg.label} · {formatTime(d.sentAt)}
