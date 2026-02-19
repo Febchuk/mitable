@@ -28,6 +28,7 @@ export interface RecapDelivery {
 export interface Recap {
   id: string;
   createdAt: Date;
+  title: string;
   blocks: RecapBlockSnapshot[];
   totalDuration: number;
   content: string;
@@ -38,7 +39,7 @@ interface RecapsContextValue {
   recaps: Recap[];
   addRecap: (recap: Omit<Recap, "id" | "createdAt" | "deliveries">) => Recap;
   addDelivery: (recapId: string, destination: RecapDestination) => void;
-  updateRecap: (recapId: string, data: Partial<Pick<Recap, "content" | "blocks" | "totalDuration">>) => void;
+  updateRecap: (recapId: string, data: Partial<Pick<Recap, "title" | "content" | "blocks" | "totalDuration">>) => void;
   deleteRecap: (id: string) => void;
   getRecap: (id: string) => Recap | undefined;
 }
@@ -83,7 +84,7 @@ export function RecapsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateRecap = useCallback(
-    (recapId: string, data: Partial<Pick<Recap, "content" | "blocks" | "totalDuration">>) => {
+    (recapId: string, data: Partial<Pick<Recap, "title" | "content" | "blocks" | "totalDuration">>) => {
       setRecaps((prev) =>
         prev.map((r) => (r.id === recapId ? { ...r, ...data } : r))
       );

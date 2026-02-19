@@ -5,40 +5,17 @@
  * Reads from RecapsContext (populated when user sends from RecapDetail).
  */
 
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   History,
   Send,
-  MessageSquare,
-  Mail,
-  Copy,
-  ExternalLink,
-  ChevronDown,
   ChevronRight,
   Clock,
   Target,
   Calendar,
-  Check,
-  MoreHorizontal,
-  Trash2,
   Plus,
-  Pencil,
 } from "lucide-react";
-import {
-  useRecaps,
-  type Recap,
-  type RecapDestination,
-} from "../../../../context/RecapsContext";
-
-// Helper functions
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
+import { useRecaps, type Recap } from "../../../../context/RecapsContext";
 
 function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60);
@@ -68,274 +45,55 @@ function formatRelativeTime(date: Date): string {
   }
 }
 
-function formatFullDate(date: Date): string {
-  return date.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-// Destination config
-const destinationConfig: Record<
-  RecapDestination,
-  { icon: typeof Send; label: string; color: string; bgColor: string }
-> = {
-  slack: {
-    icon: MessageSquare,
-    label: "Slack",
-    color: "text-purple-400",
-    bgColor: "bg-purple-500/10",
-  },
-  gmail: {
-    icon: Mail,
-    label: "Gmail",
-    color: "text-red-400",
-    bgColor: "bg-red-500/10",
-  },
-  linear: {
-    icon: ExternalLink,
-    label: "Linear",
-    color: "text-indigo",
-    bgColor: "bg-indigo/10",
-  },
-  copy: {
-    icon: Copy,
-    label: "Copied",
-    color: "text-ink-tertiary",
-    bgColor: "bg-canvas-muted",
-  },
-};
-
 // Recap card component
 interface RecapCardProps {
   recap: Recap;
   onEdit: () => void;
-  onDelete: () => void;
 }
 
-function RecapCard({ recap, onEdit, onDelete }: RecapCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-
-  const hasDeliveries = recap.deliveries.length > 0;
-
+function RecapCard({ recap, onEdit }: RecapCardProps) {
   return (
-    <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 transition-all hover:border-stroke">
-      {/* Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-4 px-5 py-4 text-left"
-      >
-        {/* Expand indicator */}
-        <div className="flex-shrink-0 text-ink-tertiary">
-          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+    <button
+      onClick={onEdit}
+      className="w-full rounded-xl border border-stroke-subtle bg-canvas-overlay/50 transition-all hover:border-stroke flex items-center gap-4 px-5 py-4 text-left"
+    >
+      {/* Main info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-ink-primary">
+            {recap.title || "Work Update"}
+          </span>
+          <span className="text-xs text-ink-tertiary">
+            · {formatRelativeTime(recap.createdAt)}
+          </span>
         </div>
-
-        {/* Destination chips */}
-        <div className="flex-shrink-0">
-          {hasDeliveries ? (
-            <div className="flex items-center gap-1.5">
-              {recap.deliveries.map((d, idx) => {
-                const config = destinationConfig[d.destination];
-                const Icon = config.icon;
-                return (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-canvas-muted"
-                  >
-                    <Icon size={14} className="text-ink-tertiary" />
-                    <span className="text-xs font-medium text-ink-secondary">
-                      {config.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-canvas-muted">
-              <Check size={14} className="text-ink-tertiary" />
-              <span className="text-xs font-medium text-ink-tertiary">
-                Published
-              </span>
-            </div>
+        <div className="flex items-center gap-3 mt-1">
+          <span className="inline-flex items-center gap-1 text-xs text-ink-tertiary">
+            <Clock size={12} />
+            {formatDuration(recap.totalDuration)}
+          </span>
+          <span className="inline-flex items-center gap-1 text-xs text-ink-tertiary">
+            <Calendar size={12} />
+            {recap.blocks.length} block{recap.blocks.length !== 1 ? "s" : ""}
+          </span>
+          {recap.blocks.some((b) => b.isFocusedSession) && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo/10 text-indigo">
+              <Target size={10} />
+              Focused
+            </span>
           )}
         </div>
+      </div>
 
-        {/* Main info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-ink-primary">
-              {hasDeliveries
-                ? `Sent to ${recap.deliveries.map((d) => destinationConfig[d.destination].label).join(", ")}`
-                : "Published"}
-            </span>
-            <span className="text-xs text-ink-tertiary">
-              · {formatRelativeTime(recap.createdAt)}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 mt-1">
-            <span className="inline-flex items-center gap-1 text-xs text-ink-tertiary">
-              <Clock size={12} />
-              {formatDuration(recap.totalDuration)}
-            </span>
-            <span className="inline-flex items-center gap-1 text-xs text-ink-tertiary">
-              <Calendar size={12} />
-              {recap.blocks.length} block{recap.blocks.length !== 1 ? "s" : ""}
-            </span>
-            {recap.blocks.some((b) => b.isFocusedSession) && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo/10 text-indigo">
-                <Target size={10} />
-                Focused
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div
-          className="relative flex-shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
-          >
-            <MoreHorizontal size={16} />
-          </button>
-          {showMenu && (
-            <div className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-10">
-              <button
-                onClick={() => {
-                  onEdit();
-                  setShowMenu(false);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-canvas-muted transition-colors"
-              >
-                <Pencil size={14} className="text-ink-tertiary" />
-                <span className="text-sm text-ink-primary">Edit recap</span>
-              </button>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(recap.content);
-                  setShowMenu(false);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle"
-              >
-                <Copy size={14} className="text-ink-tertiary" />
-                <span className="text-sm text-ink-primary">Copy content</span>
-              </button>
-              <button
-                onClick={() => {
-                  onDelete();
-                  setShowMenu(false);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle"
-              >
-                <Trash2 size={14} className="text-red-400" />
-                <span className="text-sm text-red-400">Delete</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </button>
-
-      {/* Expanded content */}
-      {isExpanded && (
-        <div className="border-t border-stroke-subtle">
-          {/* Blocks included */}
-          <div className="px-5 py-4 border-b border-stroke-subtle">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary mb-3">
-              Blocks included
-            </h4>
-            <div className="space-y-2">
-              {recap.blocks.map((block, idx) => (
-                <div
-                  key={block.id}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-canvas-muted/30"
-                >
-                  <div className="flex-shrink-0 w-5 h-5 rounded bg-indigo/10 text-indigo flex items-center justify-center text-xs font-medium">
-                    {idx + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-ink-tertiary tabular-nums">
-                        {formatTime(block.startTime)} -{" "}
-                        {block.endTime ? formatTime(block.endTime) : "ongoing"}
-                      </span>
-                      <span className="text-xs text-ink-tertiary">
-                        ({formatDuration(block.duration)})
-                      </span>
-                      {block.isFocusedSession && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo/10 text-indigo">
-                          Focused
-                        </span>
-                      )}
-                    </div>
-                    {block.goal && (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <Target size={10} className="text-indigo" />
-                        <span className="text-xs font-medium text-indigo">
-                          {block.goal}
-                        </span>
-                      </div>
-                    )}
-                    <p className="text-sm text-ink-secondary mt-1 line-clamp-2">
-                      {block.summary}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Content preview */}
-          <div className="px-5 py-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary mb-3">
-              Content
-            </h4>
-            <div className="rounded-lg border border-stroke-subtle bg-canvas-muted/30 p-4">
-              <pre className="whitespace-pre-wrap text-sm text-ink-secondary font-sans">
-                {recap.content}
-              </pre>
-            </div>
-            <div className="flex items-center justify-between mt-3">
-              <span className="text-xs text-ink-tertiary">
-                {formatFullDate(recap.createdAt)} at {formatTime(recap.createdAt)}
-              </span>
-              {hasDeliveries ? (
-                <div className="flex items-center gap-2">
-                  {recap.deliveries.map((d, idx) => {
-                    const config = destinationConfig[d.destination];
-                    const Icon = config.icon;
-                    return (
-                      <span
-                        key={idx}
-                        className="flex items-center gap-1 text-xs text-ink-tertiary"
-                        title={`Sent ${formatTime(d.sentAt)}`}
-                      >
-                        <Icon size={12} />
-                        <span>{config.label}</span>
-                        <span>{formatTime(d.sentAt)}</span>
-                      </span>
-                    );
-                  })}
-                </div>
-              ) : (
-                <span className="text-xs text-ink-tertiary">Not sent yet</span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Trailing chevron */}
+      <ChevronRight size={16} className="flex-shrink-0 text-ink-tertiary" />
+    </button>
   );
 }
 
 export default function RecapsView() {
   const navigate = useNavigate();
-  const { recaps, deleteRecap } = useRecaps();
+  const { recaps } = useRecaps();
 
   // Group recaps by date
   const groupedRecaps = recaps.reduce(
@@ -434,7 +192,6 @@ export default function RecapsView() {
                         key={recap.id}
                         recap={recap}
                         onEdit={() => navigate(`/recaps/${recap.id}`)}
-                        onDelete={() => deleteRecap(recap.id)}
                       />
                     ))}
                   </div>

@@ -31,6 +31,7 @@ import {
   Edit2,
   X,
   Share2,
+  Trash2,
 } from "lucide-react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
@@ -139,13 +140,33 @@ const destinationConfig: Record<
   },
 };
 
+/** Build a short natural-language title from block goals / summaries. */
+function deriveTitle(blocks: WorkBlock[]): string {
+  // Collect unique goals, falling back to first sentence of summary
+  const strip = (s: string) => s.replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1").replace(/^#+\s*/, "").trim();
+  const labels: string[] = [];
+  for (const b of blocks) {
+    const raw = strip(b.goal || b.summary.split(/[.!?\n]/)[0] || "");
+    if (raw && !labels.includes(raw)) labels.push(raw);
+  }
+
+  if (labels.length === 0) return "Work Update";
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} & ${labels[1]}`;
+  // 3+ → first two + count
+  return `${labels[0]}, ${labels[1]} + ${labels.length - 2} more`;
+}
+
 // Local deterministic content generation (mock data fallback)
 function generateRecapContent(
   blocks: WorkBlock[],
   tone: RecapTone,
   length: RecapLength
-): string {
+): { title: string; content: string } {
   const totalMinutes = blocks.reduce((acc, b) => acc + b.duration, 0);
+
+  // Derive a natural-language title from block goals/summaries
+  const title = deriveTitle(blocks);
 
   let header = "";
   if (tone === "professional") {
@@ -184,14 +205,14 @@ function generateRecapContent(
     }
   });
 
-  return content.trim();
+  return { title, content: content.trim() };
 }
 
 export default function RecapDetail() {
   const { recapId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { addRecap, addDelivery, updateRecap, getRecap } = useRecaps();
+  const { addRecap, addDelivery, updateRecap, deleteRecap, getRecap } = useRecaps();
 
   const isNew = recapId === "new";
   const blockIdsParam = searchParams.get("blocks");
@@ -229,6 +250,7 @@ export default function RecapDetail() {
   });
   const tone: RecapTone = "professional";
   const length: RecapLength = "standard";
+  const [title, setTitle] = useState(existingRecap?.title ?? "");
   const [content, setContent] = useState(existingRecap?.content ?? "");
   const [isAIEditMode, setIsAIEditMode] = useState(false);
   const [savedRecapId, setSavedRecapId] = useState<string | null>(
@@ -300,10 +322,12 @@ export default function RecapDetail() {
     if (existingRecap && content === existingRecap.content) return;
     if (selectedBlocks.length === 0) {
       setContent("");
+      setTitle("");
       return;
     }
-    const newContent = generateRecapContent(selectedBlocks, tone, length);
-    setContent(newContent);
+    const result = generateRecapContent(selectedBlocks, tone, length);
+    setTitle(result.title);
+    setContent(result.content);
   }, [selectedBlockIds, tone, length, allBlocks, useMockData]);
 
   const toggleBlock = (blockId: string) => {
@@ -321,8 +345,9 @@ export default function RecapDetail() {
 
     // Mock data: use local generation
     if (useMockData) {
-      const newContent = generateRecapContent(selectedBlocks, tone, length);
-      setContent(newContent);
+      const result = generateRecapContent(selectedBlocks, tone, length);
+      setTitle(result.title);
+      setContent(result.content);
       return;
     }
 
@@ -334,11 +359,19 @@ export default function RecapDetail() {
         tone,
         length,
       });
+      // Extract title from first heading/line of AI response, strip markdown
+      const lines = result.recap.split("\n").filter(Boolean);
+      const extractedTitle = lines[0]
+        ?.replace(/^#+\s*/, "")
+        .replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1")
+        .trim() || "Work Update";
+      setTitle(extractedTitle);
       setContent(result.recap);
     } catch {
       // Fallback to local generation on error
-      const newContent = generateRecapContent(selectedBlocks, tone, length);
-      setContent(newContent);
+      const result = generateRecapContent(selectedBlocks, tone, length);
+      setTitle(result.title);
+      setContent(result.content);
     }
   };
 
@@ -364,6 +397,7 @@ export default function RecapDetail() {
     if (savedRecapId) {
       // Editing an existing recap
       updateRecap(savedRecapId, {
+        title: title || "Work Update",
         blocks: selectedBlocks.map(snapshotBlock),
         totalDuration,
         content,
@@ -371,6 +405,7 @@ export default function RecapDetail() {
     } else {
       // New recap
       const recap = addRecap({
+        title: title || "Work Update",
         blocks: selectedBlocks.map(snapshotBlock),
         totalDuration,
         content,
@@ -456,7 +491,7 @@ export default function RecapDetail() {
             </button>
             <div className="flex-1">
               <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
-                {isNew ? "Create Recap" : "Edit Recap"}
+                {title || (isNew ? "Create Recap" : "Edit Recap")}
               </h1>
               <div className="flex items-center gap-3 mt-1">
                 <span className="text-sm text-ink-tertiary">
@@ -910,6 +945,21 @@ export default function RecapDetail() {
             </div>
           </div>
 
+          {/* Delete — only for saved recaps */}
+          {savedRecapId && (
+            <div className="pt-4 border-t border-stroke-subtle">
+              <button
+                onClick={() => {
+                  deleteRecap(savedRecapId);
+                  navigate("/recaps");
+                }}
+                className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors"
+              >
+                <Trash2 size={14} />
+                Delete recap
+              </button>
+            </div>
+          )}
 
         </div>
       </div>
