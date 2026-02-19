@@ -3,11 +3,13 @@ import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
 import { useSubscription } from "../../hooks/queries/billing";
 import { useVariant } from "../../context/VariantContext";
+import { useDevFlags } from "../../context/DevFlagsContext";
 
 export default function Nav() {
   const { user } = useUser();
   const { data: subscriptionData } = useSubscription();
   const { labels } = useVariant();
+  const { flags } = useDevFlags();
 
   const isAdmin = user?.role === "admin";
   const tier = subscriptionData?.subscription?.tier;
@@ -20,9 +22,9 @@ export default function Nav() {
     // Personal account navigation - unified view
     return (
       <nav className="space-y-1 px-2">
-        <NavItem to="/calendar" icon={CalendarDays} label="Calendar" />
-        <NavItem to="/recaps" icon={History} label="Recaps" />
-        <NavItem to="/monitoring" icon={Target} label="Sessions" />
+        {flags.newExperience && <NavItem to="/calendar" icon={CalendarDays} label="Calendar" />}
+        {flags.newExperience && <NavItem to="/recaps" icon={History} label="Recaps" />}
+        {!flags.newExperience && <NavItem to="/monitoring" icon={Target} label="Sessions" />}
         <NavItem to="/docs" icon={FileText} label={labels.docs} />
         <NavItem to="/artefacts" icon={Paperclip} label={labels.artifacts} />
         {/* <NavItem to="/todos" icon={CheckSquare} label="Todos" /> */}
@@ -45,9 +47,9 @@ export default function Nav() {
   // Team employee navigation
   return (
     <nav className="space-y-1 px-2">
-      <NavItem to="/calendar" icon={CalendarDays} label="Calendar" />
-      <NavItem to="/recaps" icon={History} label="Recaps" />
-      <NavItem to="/monitoring" icon={Target} label="Sessions" />
+      {flags.newExperience && <NavItem to="/calendar" icon={CalendarDays} label="Calendar" />}
+      {flags.newExperience && <NavItem to="/recaps" icon={History} label="Recaps" />}
+      {!flags.newExperience && <NavItem to="/monitoring" icon={Target} label="Sessions" />}
       <NavItem to="/docs" icon={FileText} label={labels.docs} />
       <NavItem to="/artefacts" icon={Paperclip} label={labels.artifacts} />
       {/* <NavItem to="/todos" icon={CheckSquare} label="Todos" /> */}

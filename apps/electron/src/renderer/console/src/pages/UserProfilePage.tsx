@@ -20,6 +20,7 @@ import {
   FileText,
   Search,
   Globe,
+  FlaskConical,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import Button from "../components/ui/Button";
@@ -45,6 +46,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { OrgVariant } from "@mitable/shared";
+import { useDevFlags } from "../context/DevFlagsContext";
 import { createLogger } from "../../../lib/logger";
 import { API_BASE_URL } from "../lib/config";
 import MultiSelectPicker from "../components/shared/MultiSelectPicker/index";
@@ -1499,8 +1501,10 @@ export default function UserProfilePage() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState<
-    "account" | "security" | "preferences" | "integrations" | "about"
+    "account" | "security" | "preferences" | "integrations" | "about" | "dev"
   >("account");
+
+  const { flags, setFlag } = useDevFlags();
 
   const tabs = [
     { id: "account" as const, label: "Account", icon: User },
@@ -1508,6 +1512,7 @@ export default function UserProfilePage() {
     { id: "preferences" as const, label: "Preferences", icon: Settings },
     { id: "integrations" as const, label: "Integrations", icon: Link2 },
     { id: "about" as const, label: "About", icon: Info },
+    { id: "dev" as const, label: "Dev", icon: FlaskConical },
   ];
 
   return (
@@ -2974,6 +2979,33 @@ export default function UserProfilePage() {
                     View release notes
                     <ExternalLink className="w-3 h-3" />
                   </a>
+                </div>
+              </Card>
+            )}
+
+            {activeTab === "dev" && (
+              <Card className="p-6 bg-background-elevated border-border-subtle">
+                <h3 className="text-lg font-semibold text-white mb-1">Beta Features</h3>
+                <p className="text-sm text-text-tertiary mb-6">
+                  Toggle work-in-progress features. These may be incomplete or unstable.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="flag-experience" className="text-sm font-medium text-text-primary">
+                        Calendar & Recaps
+                      </Label>
+                      <p className="text-xs text-text-tertiary mt-0.5">
+                        Switch between the new Calendar + Recaps experience and classic Sessions
+                      </p>
+                    </div>
+                    <Switch
+                      id="flag-experience"
+                      checked={flags.newExperience}
+                      onCheckedChange={(v) => setFlag("newExperience", v)}
+                    />
+                  </div>
                 </div>
               </Card>
             )}

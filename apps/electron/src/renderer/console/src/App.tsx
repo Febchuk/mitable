@@ -8,6 +8,7 @@ const logger = createLogger("ConsoleApp");
 import { UserProvider, useUser } from "./context/UserContext";
 import { VariantProvider } from "./context/VariantContext";
 import { RecapsProvider } from "./context/RecapsContext";
+import { DevFlagsProvider, useDevFlags } from "./context/DevFlagsContext";
 import type { OrgVariant } from "@mitable/shared";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -143,9 +144,18 @@ function MonitoringSessionHandler() {
   return null;
 }
 
-// Default route - all users start at Calendar (/calendar)
+// Default route - start at monitoring (calendar may be gated)
 function DefaultRoute() {
-  return <Navigate to="/calendar" replace />;
+  return <Navigate to="/monitoring" replace />;
+}
+
+// Feature gate - renders children only if the dev flag is enabled, otherwise redirects
+function FeatureGate({ flag, children }: { flag: keyof import("./context/DevFlagsContext").DevFlags; children: React.ReactNode }) {
+  const { flags } = useDevFlags();
+  if (!flags[flag]) {
+    return <Navigate to="/monitoring" replace />;
+  }
+  return <>{children}</>;
 }
 
 // Protected route wrapper - redirects to login if not authenticated
@@ -198,6 +208,7 @@ function App() {
           <MonitoringSessionHandler />
           <UserProvider>
             <VariantWrapper>
+              <DevFlagsProvider>
               <RecapsProvider>
               <Routes>
                 {/* Public routes */}
@@ -231,10 +242,10 @@ function App() {
                   <Route path="docs/:docId" element={<DocDetail />} />
                   <Route path="artefacts" element={<ArtifactsView />} />
                   <Route path="todos" element={<TodosView />} />
-                  {/* Calendar/Journal Routes (Passive Tracking) */}
-                  <Route path="calendar" element={<CalendarView />} />
-                  <Route path="recaps" element={<RecapsView />} />
-                  <Route path="recaps/:recapId" element={<RecapDetail />} />
+                  {/* Calendar/Journal Routes (Passive Tracking) — gated behind dev flags */}
+                  <Route path="calendar" element={<FeatureGate flag="newExperience"><CalendarView /></FeatureGate>} />
+                  <Route path="recaps" element={<FeatureGate flag="newExperience"><RecapsView /></FeatureGate>} />
+                  <Route path="recaps/:recapId" element={<FeatureGate flag="newExperience"><RecapDetail /></FeatureGate>} />
                   {/* Focused Sessions Routes */}
                   <Route path="monitoring" element={<MonitoringView />} />
                   <Route path="monitoring/:sessionId" element={<SessionDetail />} />
@@ -248,6 +259,7 @@ function App() {
                 </Route>
               </Routes>
               </RecapsProvider>
+              </DevFlagsProvider>
               <Toaster />
             </VariantWrapper>
           </UserProvider>
