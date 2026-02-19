@@ -112,7 +112,7 @@ function workBlocksToCalendarEvents(days: ActivityDay[]): CalendarEvent[] {
         title: block.goal || block.appBreakdown[0]?.app || "Work Block",
         start: new Date(block.startTime),
         end: new Date(endTime),
-        color: block.isActive ? "green" : block.isFocusedSession ? "brand" : "gray",
+        color: block.isActive ? "green" : "gray",
         dot: block.isActive,
       });
     });
@@ -552,7 +552,7 @@ export default function CalendarView() {
                     Start New Block
                   </h3>
                   <p className="text-xs text-ink-tertiary">
-                    Begin a focused work session
+                    Begin a new work session
                   </p>
                 </div>
               </div>

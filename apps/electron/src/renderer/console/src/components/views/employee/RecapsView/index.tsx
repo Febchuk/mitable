@@ -11,7 +11,6 @@ import {
   Send,
   ChevronRight,
   Clock,
-  Target,
   Calendar,
   Plus,
 } from "lucide-react";
@@ -76,12 +75,6 @@ function RecapCard({ recap, onEdit }: RecapCardProps) {
             <Calendar size={12} />
             {recap.blocks.length} block{recap.blocks.length !== 1 ? "s" : ""}
           </span>
-          {recap.blocks.some((b) => b.isFocusedSession) && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo/10 text-indigo">
-              <Target size={10} />
-              Focused
-            </span>
-          )}
         </div>
       </div>
 

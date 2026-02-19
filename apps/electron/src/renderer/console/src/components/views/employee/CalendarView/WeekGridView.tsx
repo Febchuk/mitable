@@ -100,14 +100,7 @@ function getBlockColors(block: WorkBlock): { bg: string; border: string; text: s
       text: "text-cyan",
     };
   }
-  // Type-based colors (for ended blocks)
-  if (block.isFocusedSession) {
-    return {
-      bg: "bg-indigo/20",
-      border: "border-indigo/40",
-      text: "text-indigo",
-    };
-  }
+  // Default colors for ended blocks
   return {
     bg: "bg-canvas-muted",
     border: "border-stroke-subtle",

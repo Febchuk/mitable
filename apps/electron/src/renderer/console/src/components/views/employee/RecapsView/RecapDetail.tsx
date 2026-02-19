@@ -20,7 +20,6 @@ import {
   Mail,
   Copy,
   ExternalLink,
-  Target,
   Check,
   Loader2,
   Clock,
@@ -198,9 +197,6 @@ function generateRecapContent(
       content += `${block.goal || `Work Block ${idx + 1}`}\n`;
       content += `${timeRange} · ${formatDuration(block.duration)}\n\n`;
       content += `${block.summary}\n`;
-      if (block.isFocusedSession) {
-        content += `\n✓ Focused session\n`;
-      }
       content += "\n";
     }
   });
@@ -767,12 +763,6 @@ export default function RecapDetail() {
                                 <span className="text-xs text-ink-tertiary">
                                   · {formatDuration(block.duration)}
                                 </span>
-                                {block.isFocusedSession && (
-                                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo/15 text-indigo text-[10px] font-semibold">
-                                    <Target size={8} />
-                                    Focused
-                                  </span>
-                                )}
                               </div>
                               {block.goal && (
                                 <p className="text-sm font-medium text-ink-primary mt-1">
@@ -857,12 +847,6 @@ export default function RecapDetail() {
                           <span className="text-xs text-ink-tertiary tabular-nums">
                             {formatDuration(block.duration)} · {formatDate(block.startTime)}
                           </span>
-                          {block.isFocusedSession && (
-                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo/20 text-indigo text-[10px] font-semibold">
-                              <Target size={8} />
-                              Focused
-                            </span>
-                          )}
                         </div>
                         {block.goal && (
                           <p className="text-xs text-indigo mt-0.5">{block.goal}</p>

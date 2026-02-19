@@ -167,13 +167,12 @@ function generateListItems(day: ActivityDay, analysis: ReturnType<typeof analyze
   const items: { icon: typeof Code; color: string; bgColor: string; text: string }[] = [];
 
   // Work blocks summary
-  const focusedBlocks = day.workBlocks.filter((b) => b.isFocusedSession);
   if (day.workBlocks.length > 0) {
     items.push({
       icon: Code,
       color: "text-indigo",
       bgColor: "bg-indigo/10",
-      text: `${day.workBlocks.length} work block${day.workBlocks.length !== 1 ? "s" : ""} totaling ${formatDuration(day.totalWorkTime)}${focusedBlocks.length > 0 ? ` (${focusedBlocks.length} focused)` : ""}`,
+      text: `${day.workBlocks.length} work block${day.workBlocks.length !== 1 ? "s" : ""} totaling ${formatDuration(day.totalWorkTime)}`,
     });
   }
 
