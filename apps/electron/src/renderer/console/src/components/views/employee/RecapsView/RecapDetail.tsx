@@ -392,42 +392,51 @@ export default function RecapDetail() {
     if (selectedBlocks.length === 0 || !content) return;
 
     setIsPublishing(true);
-    await new Promise((resolve) => setTimeout(resolve, 400));
 
-    if (savedRecapId) {
-      // Editing an existing recap
-      updateRecap(savedRecapId, {
-        title: title || "Work Update",
-        blocks: selectedBlocks.map(snapshotBlock),
-        totalDuration,
-        content,
-      });
-    } else {
-      // New recap
-      const recap = addRecap({
-        title: title || "Work Update",
-        blocks: selectedBlocks.map(snapshotBlock),
-        totalDuration,
-        content,
-      });
-      setSavedRecapId(recap.id);
+    try {
+      if (savedRecapId) {
+        // Editing an existing recap
+        await updateRecap(savedRecapId, {
+          title: title || "Work Update",
+          blocks: selectedBlocks.map(snapshotBlock),
+          totalDuration,
+          content,
+        });
+      } else {
+        // New recap — server returns the real UUID
+        const recap = await addRecap({
+          title: title || "Work Update",
+          blocks: selectedBlocks.map(snapshotBlock),
+          totalDuration,
+          content,
+        });
+        setSavedRecapId(recap.id);
+        // Navigate to the server-generated ID so refresh works
+        navigate(`/recaps/${recap.id}`, { replace: true });
+      }
+    } catch {
+      // Silently fail — React Query will handle error state
+    } finally {
+      setIsPublishing(false);
     }
-
-    setIsPublishing(false);
   };
 
   const handleSendTo = async (destination: RecapDestination) => {
     if (!savedRecapId) return;
 
     setSendingTo(destination);
-    await new Promise((resolve) => setTimeout(resolve, 800));
 
     if (destination === "copy") {
       await navigator.clipboard.writeText(content);
     }
 
-    addDelivery(savedRecapId, destination);
-    setSendingTo(null);
+    try {
+      await addDelivery(savedRecapId, destination);
+    } catch {
+      // Silently fail
+    } finally {
+      setSendingTo(null);
+    }
   };
 
   const isSentTo = (destination: RecapDestination) =>
@@ -949,8 +958,8 @@ export default function RecapDetail() {
           {savedRecapId && (
             <div className="pt-4 border-t border-stroke-subtle">
               <button
-                onClick={() => {
-                  deleteRecap(savedRecapId);
+                onClick={async () => {
+                  await deleteRecap(savedRecapId);
                   navigate("/recaps");
                 }}
                 className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors"
