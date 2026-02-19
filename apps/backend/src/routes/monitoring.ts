@@ -3013,4 +3013,114 @@ router.patch(
   }
 );
 
+/**
+ * POST /api/monitoring/recaps/generate
+ * Generate a recap from multiple session summaries using AI
+ */
+router.post("/recaps/generate", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const {
+    sessionIds,
+    tone = "professional",
+    length = "standard",
+  }: { sessionIds: string[]; tone?: string; length?: string } = req.body;
+
+  if (!sessionIds || !Array.isArray(sessionIds) || sessionIds.length === 0) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "sessionIds array is required and must not be empty",
+    });
+    return;
+  }
+
+  try {
+    // Fetch sessions that belong to this user
+    const sessions = await db
+      .select({
+        id: schema.monitoringSessions.id,
+        rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+        finalSummary: schema.monitoringSessions.finalSummary,
+        sessionGoal: schema.monitoringSessions.sessionGoal,
+        startedAt: schema.monitoringSessions.startedAt,
+        endedAt: schema.monitoringSessions.endedAt,
+        totalPausedMs: schema.monitoringSessions.totalPausedMs,
+      })
+      .from(schema.monitoringSessions)
+      .where(
+        and(
+          inArray(schema.monitoringSessions.id, sessionIds),
+          eq(schema.monitoringSessions.userId, userId)
+        )
+      );
+
+    if (sessions.length === 0) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "No sessions found for the provided IDs",
+      });
+      return;
+    }
+
+    // Build session data for the recap generator
+    const sessionData = sessions.map((s) => {
+      const startTime = new Date(s.startedAt).getTime();
+      const endTime = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
+      const totalMs = endTime - startTime;
+      const pausedMs = s.totalPausedMs || 0;
+      const activeMinutes = Math.round(Math.max(0, totalMs - pausedMs) / 60000);
+
+      return {
+        sessionId: s.id,
+        summary: s.finalSummary || s.rawActivitySummary || "No summary available",
+        goal: s.sessionGoal,
+        durationMinutes: activeMinutes,
+        startTime: new Date(s.startedAt).toLocaleString(),
+      };
+    });
+
+    const recap = await sessionSummarizationService.generateRecap(sessionData, tone, length);
+
+    res.json({ recap });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error generating recap"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to generate recap",
+    });
+  }
+});
+
+/**
+ * POST /api/monitoring/recaps/revise
+ * Revise recap content using AI (no session ownership needed)
+ */
+router.post("/recaps/revise", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { instruction, currentContent }: { instruction: string; currentContent: string } = req.body;
+
+  if (!instruction || !currentContent) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "instruction and currentContent are required",
+    });
+    return;
+  }
+
+  try {
+    const suggestion = await sessionSummarizationService.reviseSummary(currentContent, instruction);
+    res.json({ suggestion });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error) },
+      "[Monitoring] Error revising recap"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to revise recap",
+    });
+  }
+});
+
 export default router;

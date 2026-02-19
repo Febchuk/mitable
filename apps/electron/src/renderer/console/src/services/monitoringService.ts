@@ -574,6 +574,37 @@ export async function regenerateSummary(
 }
 
 // ===========================
+// Recap API
+// ===========================
+
+/**
+ * Generate a recap from multiple session summaries using AI
+ */
+export async function generateRecap(
+  sessionIds: string[],
+  tone: string = "professional",
+  length: string = "standard"
+): Promise<{ recap: string }> {
+  return apiRequest<{ recap: string }>("/monitoring/recaps/generate", {
+    method: "POST",
+    body: JSON.stringify({ sessionIds, tone, length }),
+  });
+}
+
+/**
+ * Revise recap content using AI
+ */
+export async function reviseRecap(
+  instruction: string,
+  currentContent: string
+): Promise<{ suggestion: string }> {
+  return apiRequest<{ suggestion: string }>("/monitoring/recaps/revise", {
+    method: "POST",
+    body: JSON.stringify({ instruction, currentContent }),
+  });
+}
+
+// ===========================
 // Workstream Types & API
 // ===========================
 

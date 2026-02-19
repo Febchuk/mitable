@@ -289,3 +289,35 @@ export function useUpdateSessionSettings() {
     },
   });
 }
+
+/**
+ * Generate a recap from multiple sessions
+ */
+export function useGenerateRecap() {
+  return useMutation({
+    mutationFn: ({
+      sessionIds,
+      tone,
+      length,
+    }: {
+      sessionIds: string[];
+      tone?: string;
+      length?: string;
+    }) => monitoringService.generateRecap(sessionIds, tone, length),
+  });
+}
+
+/**
+ * Revise recap content with AI
+ */
+export function useReviseRecap() {
+  return useMutation({
+    mutationFn: ({
+      instruction,
+      currentContent,
+    }: {
+      instruction: string;
+      currentContent: string;
+    }) => monitoringService.reviseRecap(instruction, currentContent),
+  });
+}

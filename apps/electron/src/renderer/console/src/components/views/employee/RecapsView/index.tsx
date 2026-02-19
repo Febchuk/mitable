@@ -2,7 +2,7 @@
  * RecapsView
  *
  * Shows history of sent work updates/recaps.
- * Each recap shows the blocks included and where it was sent.
+ * Reads from RecapsContext (populated when user sends from RecapDetail).
  */
 
 import { useState } from "react";
@@ -25,108 +25,11 @@ import {
   Plus,
   Pencil,
 } from "lucide-react";
-
-// Recap destination types
-type RecapDestination = "slack" | "gmail" | "linear" | "copy";
-
-// Recap data structure
-interface RecapBlock {
-  id: string;
-  startTime: Date;
-  endTime: Date | null;
-  duration: number;
-  summary: string;
-  goal?: string;
-  isFocusedSession?: boolean;
-}
-
-interface Recap {
-  id: string;
-  sentAt: Date;
-  destination: RecapDestination;
-  blocks: RecapBlock[];
-  totalDuration: number;
-  content: string;
-}
-
-// Mock recaps data
-const mockRecaps: Recap[] = [
-  {
-    id: "recap-1",
-    sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    destination: "slack",
-    totalDuration: 180,
-    content:
-      "**Work Update** (3h total)\n\n**Block 1** (9:00 AM - 11:30 AM, 2h 30m)\nGoal: Complete Calendar UI prototype\nBuilt the main CalendarView component with week navigation and day selection. Implemented work block cards with expandable details and capture timeline.\n\n**Block 2** (12:00 PM - 12:30 PM, 30m)\nReviewed PR feedback and addressed comments on the DaySummary component.",
-    blocks: [
-      {
-        id: "b1",
-        startTime: new Date(Date.now() - 5 * 60 * 60 * 1000),
-        endTime: new Date(Date.now() - 2.5 * 60 * 60 * 1000),
-        duration: 150,
-        summary:
-          "Built the main CalendarView component with week navigation and day selection. Implemented work block cards with expandable details and capture timeline.",
-        goal: "Complete Calendar UI prototype",
-        isFocusedSession: true,
-      },
-      {
-        id: "b2",
-        startTime: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        endTime: new Date(Date.now() - 1.5 * 60 * 60 * 1000),
-        duration: 30,
-        summary: "Reviewed PR feedback and addressed comments on the DaySummary component.",
-      },
-    ],
-  },
-  {
-    id: "recap-2",
-    sentAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-    destination: "linear",
-    totalDuration: 240,
-    content:
-      "**Work Update** (4h total)\n\n**Block 1** (10:00 AM - 12:00 PM, 2h)\nGoal: Fix authentication flow\nInvestigated and fixed the OAuth token refresh bug. Updated error handling in the auth service.\n\n**Block 2** (2:00 PM - 4:00 PM, 2h)\nGoal: Write tests\nAdded unit tests for the authentication service and integration tests for the login flow.",
-    blocks: [
-      {
-        id: "b3",
-        startTime: new Date(Date.now() - 26 * 60 * 60 * 1000),
-        endTime: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        duration: 120,
-        summary:
-          "Investigated and fixed the OAuth token refresh bug. Updated error handling in the auth service.",
-        goal: "Fix authentication flow",
-        isFocusedSession: true,
-      },
-      {
-        id: "b4",
-        startTime: new Date(Date.now() - 22 * 60 * 60 * 1000),
-        endTime: new Date(Date.now() - 20 * 60 * 60 * 1000),
-        duration: 120,
-        summary:
-          "Added unit tests for the authentication service and integration tests for the login flow.",
-        goal: "Write tests",
-        isFocusedSession: true,
-      },
-    ],
-  },
-  {
-    id: "recap-3",
-    sentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-    destination: "gmail",
-    totalDuration: 90,
-    content:
-      "**Work Update** (1h 30m total)\n\n**Block 1** (3:00 PM - 4:30 PM, 1h 30m)\nResearched competitor products and documented findings in Notion. Created comparison matrix for feature prioritization.",
-    blocks: [
-      {
-        id: "b5",
-        startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 - 1.5 * 60 * 60 * 1000),
-        endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        duration: 90,
-        summary:
-          "Researched competitor products and documented findings in Notion. Created comparison matrix for feature prioritization.",
-      },
-    ],
-  },
-];
+import {
+  useRecaps,
+  type Recap,
+  type RecapDestination,
+} from "../../../../context/RecapsContext";
 
 // Helper functions
 function formatTime(date: Date): string {
@@ -209,9 +112,10 @@ const destinationConfig: Record<
 interface RecapCardProps {
   recap: Recap;
   onEdit: () => void;
+  onDelete: () => void;
 }
 
-function RecapCard({ recap, onEdit }: RecapCardProps) {
+function RecapCard({ recap, onEdit, onDelete }: RecapCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
@@ -298,7 +202,7 @@ function RecapCard({ recap, onEdit }: RecapCardProps) {
               </button>
               <button
                 onClick={() => {
-                  console.log("Delete recap:", recap.id);
+                  onDelete();
                   setShowMenu(false);
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle"
@@ -388,7 +292,7 @@ function RecapCard({ recap, onEdit }: RecapCardProps) {
 
 export default function RecapsView() {
   const navigate = useNavigate();
-  const [recaps] = useState<Recap[]>(mockRecaps);
+  const { recaps, deleteRecap } = useRecaps();
 
   // Group recaps by date
   const groupedRecaps = recaps.reduce(
@@ -448,10 +352,16 @@ export default function RecapsView() {
               <h3 className="text-lg font-medium text-ink-primary mb-2">
                 No recaps yet
               </h3>
-              <p className="text-sm text-ink-tertiary max-w-sm mx-auto">
-                When you send work updates from the Calendar view, they'll appear
-                here for easy reference.
+              <p className="text-sm text-ink-tertiary max-w-sm mx-auto mb-6">
+                Create a recap from your work blocks to share progress with your team.
               </p>
+              <button
+                onClick={() => navigate("/recaps/new")}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo text-white font-medium text-sm hover:bg-indigo/90 transition-colors"
+              >
+                <Plus size={16} />
+                <span>Create your first recap</span>
+              </button>
             </div>
           ) : (
             <div className="space-y-8">
@@ -481,6 +391,7 @@ export default function RecapsView() {
                         key={recap.id}
                         recap={recap}
                         onEdit={() => navigate(`/recaps/${recap.id}`)}
+                        onDelete={() => deleteRecap(recap.id)}
                       />
                     ))}
                   </div>

@@ -1,10 +1,17 @@
 /**
  * RecapDetail
  *
- * Recap editing and sending view - consistent with app design language.
+ * Recap editing and sending view.
+ * Pulls work blocks from the same data source as CalendarView
+ * (real sessions via useCalendarDays, mock fallback).
+ * Saves created recaps to RecapsContext.
+ *
+ * - Generate: calls AI backend to compose recap from selected sessions
+ * - Edit: opens AIEditPanel (split-pane editor + AI chat)
+ * - Content area: read-only rendered markdown preview
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -23,24 +30,29 @@ import {
   ChevronRight,
   Plus,
   Calendar,
+  Edit2,
 } from "lucide-react";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+import { useCalendarDays } from "../../../../hooks/queries/calendar";
+import { mockDays } from "../CalendarView/mockData";
+import type { WorkBlock, ActivityDay } from "../CalendarView/types";
+import {
+  useRecaps,
+  snapshotBlock,
+  type RecapDestination,
+} from "../../../../context/RecapsContext";
+import {
+  useGenerateRecap,
+  useReviseRecap,
+} from "../../../../hooks/queries/monitoring";
+import AIEditPanel from "../../../shared/AIEditPanel";
 
 // Types
-type RecapDestination = "slack" | "gmail" | "linear" | "copy";
 type RecapTone = "professional" | "casual" | "concise" | "detailed";
 type RecapLength = "brief" | "standard" | "comprehensive";
 
-interface RecapBlock {
-  id: string;
-  startTime: Date;
-  endTime: Date | null;
-  duration: number;
-  summary: string;
-  goal?: string;
-  isFocusedSession?: boolean;
-}
-
-interface DeliveryStatus {
+interface DeliveryEntry {
   destination: RecapDestination;
   sentAt: Date;
   status: "sent" | "failed";
@@ -85,21 +97,6 @@ function getDateKey(date: Date): string {
 
 function isSameDay(date1: Date, date2: Date): boolean {
   return getDateKey(date1) === getDateKey(date2);
-}
-
-function getDaysWithBlocks(blocks: RecapBlock[]): Date[] {
-  const dayMap = new Map<string, Date>();
-  blocks.forEach((block) => {
-    const key = getDateKey(block.startTime);
-    if (!dayMap.has(key)) {
-      dayMap.set(key, new Date(block.startTime));
-    }
-  });
-  return Array.from(dayMap.values()).sort((a, b) => b.getTime() - a.getTime());
-}
-
-function getBlocksForDay(blocks: RecapBlock[], day: Date): RecapBlock[] {
-  return blocks.filter((block) => isSameDay(block.startTime, day));
 }
 
 // Destination config
@@ -148,85 +145,9 @@ const lengthOptions: { value: RecapLength; label: string }[] = [
   { value: "comprehensive", label: "Full" },
 ];
 
-// Mock blocks data - organized by day for realistic browsing
-const mockAllBlocks: RecapBlock[] = [
-  // Today
-  {
-    id: "b1",
-    startTime: new Date(Date.now() - 3 * 60 * 60 * 1000),
-    endTime: new Date(Date.now() - 1 * 60 * 60 * 1000),
-    duration: 120,
-    summary:
-      "Built the main CalendarView component with week navigation and day selection. Implemented work block cards with expandable details and capture timeline.",
-    goal: "Complete Calendar UI prototype",
-    isFocusedSession: true,
-  },
-  {
-    id: "b2",
-    startTime: new Date(Date.now() - 45 * 60 * 1000),
-    endTime: null,
-    duration: 45,
-    summary:
-      "Reviewed PR feedback and addressed comments. Updated component styling for better consistency with design system.",
-    isFocusedSession: false,
-  },
-  // Yesterday
-  {
-    id: "b3",
-    startTime: new Date(Date.now() - 24 * 60 * 60 * 1000 - 5 * 60 * 60 * 1000),
-    endTime: new Date(Date.now() - 24 * 60 * 60 * 1000 - 3 * 60 * 60 * 1000),
-    duration: 120,
-    summary:
-      "Set up the RecapsView routing and created the initial component structure. Integrated with the navigation system.",
-    goal: "Scaffold Recaps feature",
-    isFocusedSession: true,
-  },
-  {
-    id: "b4",
-    startTime: new Date(Date.now() - 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000),
-    endTime: new Date(Date.now() - 24 * 60 * 60 * 1000),
-    duration: 90,
-    summary:
-      "Added placeholder content and mock data for development. Connected to the sidebar navigation.",
-    goal: "Recaps navigation setup",
-    isFocusedSession: false,
-  },
-  // 2 days ago
-  {
-    id: "b5",
-    startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 6 * 60 * 60 * 1000),
-    endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 3 * 60 * 60 * 1000),
-    duration: 180,
-    summary:
-      "Implemented the core monitoring service with screen capture integration. Added event listeners for application focus changes.",
-    goal: "Build monitoring backend",
-    isFocusedSession: true,
-  },
-  {
-    id: "b6",
-    startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000),
-    endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 1 * 60 * 60 * 1000),
-    duration: 60,
-    summary:
-      "Fixed idle detection bugs and improved event handling. Tested cross-platform behavior.",
-    isFocusedSession: false,
-  },
-  // 3 days ago
-  {
-    id: "b7",
-    startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 - 4 * 60 * 60 * 1000),
-    endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000),
-    duration: 120,
-    summary:
-      "Designed the database schema for work sessions and recaps. Created migration files and seed data.",
-    goal: "Database design",
-    isFocusedSession: true,
-  },
-];
-
-// Generate recap content
+// Local deterministic content generation (mock data fallback)
 function generateRecapContent(
-  blocks: RecapBlock[],
+  blocks: WorkBlock[],
   tone: RecapTone,
   length: RecapLength
 ): string {
@@ -276,6 +197,7 @@ export default function RecapDetail() {
   const { recapId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { addRecap, getRecap } = useRecaps();
 
   const isNew = recapId === "new";
   const blockIdsParam = searchParams.get("blocks");
@@ -283,29 +205,68 @@ export default function RecapDetail() {
   const initialBlockIds = blockIdsParam ? blockIdsParam.split(",") : [];
   const initialDate = dateParam ? new Date(dateParam + "T12:00:00") : null;
 
+  // Pull blocks from the same source as CalendarView
+  const { data: realDays } = useCalendarDays();
+  const useMockData = !realDays || realDays.length === 0;
+  const allDays: ActivityDay[] = useMockData ? mockDays : realDays;
+
+  // Flatten all blocks from all days
+  const allBlocks = useMemo(() => {
+    const blocks: WorkBlock[] = [];
+    for (const day of allDays) {
+      blocks.push(...day.workBlocks);
+    }
+    return blocks;
+  }, [allDays]);
+
+  // If editing an existing recap, load its data
+  const existingRecap = !isNew && recapId ? getRecap(recapId) : undefined;
+
+  // Mutations
+  const generateRecapMutation = useGenerateRecap();
+  const reviseRecapMutation = useReviseRecap();
+
   // State
-  const [allBlocks] = useState<RecapBlock[]>(mockAllBlocks);
-  const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(
-    new Set(initialBlockIds.length > 0 ? initialBlockIds : [])
-  );
+  const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(() => {
+    if (existingRecap) {
+      return new Set(existingRecap.blocks.map((b) => b.id));
+    }
+    return new Set(initialBlockIds.length > 0 ? initialBlockIds : []);
+  });
   const [tone, setTone] = useState<RecapTone>("professional");
   const [length, setLength] = useState<RecapLength>("standard");
-  const [content, setContent] = useState("");
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [deliveries, setDeliveries] = useState<DeliveryStatus[]>([]);
+  const [content, setContent] = useState(existingRecap?.content ?? "");
+  const [isAIEditMode, setIsAIEditMode] = useState(false);
+  const [deliveries, setDeliveries] = useState<DeliveryEntry[]>([]);
   const [sendingTo, setSendingTo] = useState<RecapDestination | null>(null);
   const [showToneMenu, setShowToneMenu] = useState(false);
   const [showLengthMenu, setShowLengthMenu] = useState(false);
 
-  // Day browsing state - auto-open to the date passed from calendar
-  const availableDays = getDaysWithBlocks(allBlocks);
+  // Day browsing helpers
+  const getDaysWithBlocks = (blocks: WorkBlock[]): Date[] => {
+    const dayMap = new Map<string, Date>();
+    blocks.forEach((block) => {
+      const key = getDateKey(block.startTime);
+      if (!dayMap.has(key)) {
+        dayMap.set(key, new Date(block.startTime));
+      }
+    });
+    return Array.from(dayMap.values()).sort((a, b) => b.getTime() - a.getTime());
+  };
+
+  const getBlocksForDay = (blocks: WorkBlock[], day: Date): WorkBlock[] => {
+    return blocks.filter((block) => isSameDay(block.startTime, day));
+  };
+
+  const availableDays = useMemo(() => getDaysWithBlocks(allBlocks), [allBlocks]);
+
   const [browsingDay, setBrowsingDay] = useState<Date | null>(() => {
-    // If coming from calendar with a date, auto-open that day
     if (initialDate && initialBlockIds.length > 0) {
       return initialDate;
     }
     return null;
   });
+
   const browsingDayIndex = browsingDay
     ? availableDays.findIndex((d) => isSameDay(d, browsingDay))
     : -1;
@@ -316,11 +277,30 @@ export default function RecapDetail() {
   const selectedBlocks = allBlocks.filter((b) => selectedBlockIds.has(b.id));
   const totalDuration = selectedBlocks.reduce((acc, b) => acc + b.duration, 0);
 
-  // Generate content when settings change
+  // Can we use AI generation? Only with real data and blocks selected
+  const canGenerate = !useMockData && selectedBlocks.length > 0;
+  const isGenerating = generateRecapMutation.isPending;
+
+  // Convert content to sanitized HTML for markdown preview
+  const contentHtml = useMemo(() => {
+    if (!content) return "";
+    const result = marked.parse(content);
+    return typeof result === "string" ? DOMPurify.sanitize(result) : "";
+  }, [content]);
+
+  const wordCount = content.split(/\s+/).filter(Boolean).length;
+
+  // Auto-generate content for mock data when selection/settings change
   useEffect(() => {
+    if (!useMockData) return; // Real data: user clicks Generate explicitly
+    if (existingRecap && content === existingRecap.content) return;
+    if (selectedBlocks.length === 0) {
+      setContent("");
+      return;
+    }
     const newContent = generateRecapContent(selectedBlocks, tone, length);
     setContent(newContent);
-  }, [selectedBlocks, tone, length]);
+  }, [selectedBlockIds, tone, length, allBlocks, useMockData]);
 
   const toggleBlock = (blockId: string) => {
     const next = new Set(selectedBlockIds);
@@ -332,21 +312,63 @@ export default function RecapDetail() {
     setSelectedBlockIds(next);
   };
 
-  const handleRegenerate = async () => {
-    setIsRegenerating(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    const newContent = generateRecapContent(selectedBlocks, tone, length);
-    setContent(newContent);
-    setIsRegenerating(false);
+  const handleGenerate = async () => {
+    if (selectedBlocks.length === 0) return;
+
+    // Mock data: use local generation
+    if (useMockData) {
+      const newContent = generateRecapContent(selectedBlocks, tone, length);
+      setContent(newContent);
+      return;
+    }
+
+    // Real data: call AI backend
+    try {
+      const sessionIds = selectedBlocks.map((b) => b.id);
+      const result = await generateRecapMutation.mutateAsync({
+        sessionIds,
+        tone,
+        length,
+      });
+      setContent(result.recap);
+    } catch {
+      // Fallback to local generation on error
+      const newContent = generateRecapContent(selectedBlocks, tone, length);
+      setContent(newContent);
+    }
+  };
+
+  const handleRevise = async (instruction: string, currentContent: string) => {
+    const result = await reviseRecapMutation.mutateAsync({
+      instruction,
+      currentContent,
+    });
+    return result;
+  };
+
+  const handleSaveFromEditor = async (editedContent: string) => {
+    setContent(editedContent);
+    setIsAIEditMode(false);
   };
 
   const handleSend = async (destination: RecapDestination) => {
+    if (selectedBlocks.length === 0) return;
+
     setSendingTo(destination);
     await new Promise((resolve) => setTimeout(resolve, 800));
 
     if (destination === "copy") {
       await navigator.clipboard.writeText(content);
     }
+
+    // Save to RecapsContext
+    addRecap({
+      sentAt: new Date(),
+      destination,
+      blocks: selectedBlocks.map(snapshotBlock),
+      totalDuration,
+      content,
+    });
 
     setDeliveries((prev) => [
       ...prev,
@@ -357,6 +379,22 @@ export default function RecapDetail() {
 
   const isSentTo = (destination: RecapDestination) =>
     deliveries.some((d) => d.destination === destination && d.status === "sent");
+
+  // AI Edit Mode - full page takeover (same pattern as SessionDetail)
+  if (isAIEditMode && content) {
+    return (
+      <AIEditPanel
+        title="Edit Recap"
+        subtitle={`${selectedBlocks.length} block${selectedBlocks.length !== 1 ? "s" : ""} · ${formatDuration(totalDuration)}`}
+        initialContent={content}
+        onSave={handleSaveFromEditor}
+        onCancel={() => setIsAIEditMode(false)}
+        onRevise={handleRevise}
+        placeholder="Edit your recap content..."
+        contextLabel="recap"
+      />
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto app-no-drag">
@@ -378,7 +416,6 @@ export default function RecapDetail() {
                 <span className="text-sm text-ink-tertiary">
                   {selectedBlocks.length} block{selectedBlocks.length !== 1 ? "s" : ""} · {formatDuration(totalDuration)}
                 </span>
-                {/* Delivery chips */}
                 {deliveries.length > 0 && (
                   <div className="flex items-center gap-1.5">
                     {deliveries.map((d, idx) => {
@@ -421,7 +458,6 @@ export default function RecapDetail() {
               )}
             </div>
             <div className="p-4">
-              {/* Day selector */}
               {!browsingDay ? (
                 <div className="grid grid-cols-2 gap-2">
                   {availableDays.map((day) => {
@@ -464,7 +500,6 @@ export default function RecapDetail() {
                   })}
                 </div>
               ) : (
-                /* Day detail view */
                 <div>
                   {/* Day navigation */}
                   <div className="flex items-center justify-between mb-4">
@@ -617,7 +652,6 @@ export default function RecapDetail() {
 
           {/* Recap content */}
           <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50">
-            {/* Controls */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-stroke-subtle">
               <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
                 Recap Content
@@ -691,36 +725,58 @@ export default function RecapDetail() {
 
                 <div className="w-px h-5 bg-stroke-subtle" />
 
-                {/* Regenerate */}
+                {/* Generate */}
                 <button
-                  onClick={handleRegenerate}
-                  disabled={isRegenerating || selectedBlocks.length === 0}
+                  onClick={handleGenerate}
+                  disabled={isGenerating || selectedBlocks.length === 0}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo/10 text-indigo text-sm font-medium hover:bg-indigo/20 transition-colors disabled:opacity-50"
                 >
-                  {isRegenerating ? (
+                  {isGenerating ? (
                     <Loader2 size={14} className="animate-spin" />
                   ) : (
                     <Sparkles size={14} />
                   )}
-                  Rewrite
+                  {canGenerate ? "Generate" : "Rewrite"}
                 </button>
+
+                {/* Edit */}
+                {content && (
+                  <button
+                    onClick={() => setIsAIEditMode(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-canvas-muted text-sm text-ink-secondary font-medium transition-colors"
+                  >
+                    <Edit2 size={14} />
+                    Edit
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Textarea */}
+            {/* Markdown preview */}
             <div className="p-4">
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Your recap content will appear here..."
-                disabled={selectedBlocks.length === 0}
-                className="w-full h-64 p-4 rounded-lg bg-canvas-muted/30 border border-stroke-subtle text-sm text-ink-primary leading-relaxed resize-none focus:outline-none focus:border-indigo/50 placeholder:text-ink-tertiary/50 disabled:opacity-50"
-              />
+              {content ? (
+                <div className="w-full min-h-[16rem] max-h-[32rem] overflow-y-auto p-4 rounded-lg bg-canvas-muted/30 border border-stroke-subtle">
+                  <div
+                    className="prose prose-sm prose-invert max-w-none text-ink-primary [&_h1]:text-ink-primary [&_h2]:text-ink-primary [&_h3]:text-ink-primary [&_strong]:text-ink-primary [&_li]:text-ink-secondary [&_p]:text-ink-secondary [&_ul]:my-2 [&_ol]:my-2"
+                    dangerouslySetInnerHTML={{ __html: contentHtml }}
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-64 flex items-center justify-center rounded-lg bg-canvas-muted/30 border border-stroke-subtle">
+                  <p className="text-sm text-ink-tertiary/50">
+                    {selectedBlocks.length === 0
+                      ? "Select blocks above to get started..."
+                      : canGenerate
+                        ? "Click Generate to create your recap with AI..."
+                        : "Click Rewrite to generate recap content..."}
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between mt-3 text-xs text-ink-tertiary">
-                <span>{content.length} characters · {content.split(/\s+/).filter(Boolean).length} words</span>
+                <span>{content.length} characters · {wordCount} words</span>
                 <span className="flex items-center gap-1">
                   <Clock size={12} />
-                  ~{Math.max(1, Math.ceil(content.split(/\s+/).length / 200))} min read
+                  ~{Math.max(1, Math.ceil(wordCount / 200))} min read
                 </span>
               </div>
             </div>

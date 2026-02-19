@@ -1329,6 +1329,73 @@ Example good output:
   }
 
   /**
+   * Generate a recap from multiple session summaries
+   */
+  async generateRecap(
+    sessions: Array<{
+      sessionId: string;
+      summary: string;
+      goal?: string | null;
+      durationMinutes: number;
+      startTime: string;
+    }>,
+    tone: string = "professional",
+    length: string = "standard"
+  ): Promise<string> {
+    const sessionList = sessions
+      .map((s, i) => {
+        const parts = [`${i + 1}. ${s.summary}`];
+        if (s.goal) parts.push(`   Goal: ${s.goal}`);
+        parts.push(`   Duration: ${s.durationMinutes}m | Started: ${s.startTime}`);
+        return parts.join("\n");
+      })
+      .join("\n\n");
+
+    const toneInstructions: Record<string, string> = {
+      professional: "Use a professional, polished tone suitable for a manager or stakeholder update.",
+      casual: "Use a casual, conversational tone like a Slack update to teammates.",
+      concise: "Be extremely concise — bullet points and short phrases only.",
+      detailed: "Be thorough and detailed, covering each session's contributions.",
+    };
+
+    const lengthInstructions: Record<string, string> = {
+      brief: "Keep the recap under 100 words.",
+      standard: "Keep the recap between 100-250 words.",
+      comprehensive: "Write a comprehensive recap of 250-500 words covering all details.",
+    };
+
+    const prompt = `You are writing a work recap that combines multiple work sessions into a single update.
+
+<sessions>
+${sessionList}
+</sessions>
+
+<tone>${toneInstructions[tone] || toneInstructions.professional}</tone>
+<length>${lengthInstructions[length] || lengthInstructions.standard}</length>
+
+<instructions>
+- Write in first person ("I worked on...", "I completed...")
+- Combine related activities across sessions into coherent themes
+- Use markdown formatting (headers, bullets, bold) for readability
+- Include a brief opening line summarizing the overall period
+- Group by theme/project rather than by individual session
+- Only mention facts present in the session summaries above
+</instructions>
+
+Write the recap now (markdown only, no JSON wrapping):`;
+
+    const completion = await this.groq.chat.completions.create({
+      model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.4,
+      max_tokens: 1000,
+    });
+
+    const response = completion.choices[0]?.message?.content || "";
+    return response.trim();
+  }
+
+  /**
    * Revise a summary based on user instructions
    */
   async reviseSummary(currentSummary: string, instruction: string): Promise<string> {

@@ -7,6 +7,7 @@ import { createLogger } from "../../lib/logger";
 const logger = createLogger("ConsoleApp");
 import { UserProvider, useUser } from "./context/UserContext";
 import { VariantProvider } from "./context/VariantContext";
+import { RecapsProvider } from "./context/RecapsContext";
 import type { OrgVariant } from "@mitable/shared";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -197,6 +198,7 @@ function App() {
           <MonitoringSessionHandler />
           <UserProvider>
             <VariantWrapper>
+              <RecapsProvider>
               <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<LoginPage />} />
@@ -245,6 +247,7 @@ function App() {
                   <Route path="chats/:chatId" element={<ChatDetail />} />
                 </Route>
               </Routes>
+              </RecapsProvider>
               <Toaster />
             </VariantWrapper>
           </UserProvider>
