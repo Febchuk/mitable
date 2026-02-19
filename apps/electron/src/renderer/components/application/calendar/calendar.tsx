@@ -332,7 +332,7 @@ const MonthView = ({
         const findAvailableRow = (startDayIndex: number, span: number): number => {
             let row = 0;
 
-            while (true) {
+            for (;;) {
                 let isAvailable = true;
 
                 // Check if this row is free for all days in the span
@@ -1143,10 +1143,11 @@ export const Calendar = ({ events, view: defaultView = "month", className, hideH
                 case "month":
                     newDate = currentMonthDate.add({ months: P });
                     break;
-                case "week":
+                case "week": {
                     const currentWeekStart = startOfWeek(anchorDate, locale);
                     newDate = currentWeekStart.add({ weeks: P });
                     break;
+                }
                 case "day":
                     newDate = anchorDate.add({ days: P });
                     break;
