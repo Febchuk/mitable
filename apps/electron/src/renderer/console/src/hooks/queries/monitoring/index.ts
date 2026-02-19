@@ -18,6 +18,8 @@ export const monitoringKeys = {
   story: (sessionId: string) => [...monitoringKeys.session(sessionId), "story"] as const,
   slackChannels: () => [...monitoringKeys.all, "slackChannels"] as const,
   slackUsers: () => [...monitoringKeys.all, "slackUsers"] as const,
+  recaps: () => [...monitoringKeys.all, "recaps"] as const,
+  recap: (id: string) => [...monitoringKeys.recaps(), id] as const,
 };
 
 /**
@@ -287,5 +289,143 @@ export function useUpdateSessionSettings() {
     onSuccess: (_, { sessionId }) => {
       queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
     },
+  });
+}
+
+// ===========================
+// Recap CRUD Hooks
+// ===========================
+
+/**
+ * Fetch all recaps for the current user
+ */
+export function useRecapsList() {
+  const { user } = useUser();
+
+  return useQuery({
+    queryKey: monitoringKeys.recaps(),
+    queryFn: async () => {
+      const response = await monitoringService.fetchRecaps();
+      return response.recaps;
+    },
+    enabled: !!user,
+  });
+}
+
+/**
+ * Fetch a single recap by ID
+ */
+export function useRecapQuery(id: string | undefined) {
+  const { user } = useUser();
+
+  return useQuery({
+    queryKey: monitoringKeys.recap(id ?? ""),
+    queryFn: async () => {
+      const response = await monitoringService.fetchRecap(id!);
+      return response.recap;
+    },
+    enabled: !!user && !!id,
+  });
+}
+
+/**
+ * Create a new recap
+ */
+export function useCreateRecap() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      title: string;
+      content: string;
+      blocks: unknown[];
+      totalDuration: number;
+    }) => monitoringService.createRecap(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.recaps() });
+    },
+  });
+}
+
+/**
+ * Update an existing recap
+ */
+export function useUpdateRecap() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: { title?: string; content?: string; blocks?: unknown[]; totalDuration?: number };
+    }) => monitoringService.updateRecapApi(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.recap(id) });
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.recaps() });
+    },
+  });
+}
+
+/**
+ * Add a delivery to a recap
+ */
+export function useAddRecapDelivery() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, destination }: { id: string; destination: string }) =>
+      monitoringService.addRecapDelivery(id, destination),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.recap(id) });
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.recaps() });
+    },
+  });
+}
+
+/**
+ * Delete a recap
+ */
+export function useDeleteRecap() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => monitoringService.deleteRecapApi(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.recaps() });
+    },
+  });
+}
+
+/**
+ * Generate a recap from multiple sessions
+ */
+export function useGenerateRecap() {
+  return useMutation({
+    mutationFn: ({
+      sessionIds,
+      tone,
+      length,
+    }: {
+      sessionIds: string[];
+      tone?: string;
+      length?: string;
+    }) => monitoringService.generateRecap(sessionIds, tone, length),
+  });
+}
+
+/**
+ * Revise recap content with AI
+ */
+export function useReviseRecap() {
+  return useMutation({
+    mutationFn: ({
+      instruction,
+      currentContent,
+    }: {
+      instruction: string;
+      currentContent: string;
+    }) => monitoringService.reviseRecap(instruction, currentContent),
   });
 }

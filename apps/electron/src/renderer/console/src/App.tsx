@@ -7,6 +7,8 @@ import { createLogger } from "../../lib/logger";
 const logger = createLogger("ConsoleApp");
 import { UserProvider, useUser } from "./context/UserContext";
 import { VariantProvider } from "./context/VariantContext";
+import { RecapsProvider } from "./context/RecapsContext";
+import { DevFlagsProvider, useDevFlags } from "./context/DevFlagsContext";
 import type { OrgVariant } from "@mitable/shared";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +24,9 @@ import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
+import CalendarView from "./components/views/employee/CalendarView";
+import RecapsView from "./components/views/employee/RecapsView";
+import RecapDetail from "./components/views/employee/RecapsView/RecapDetail";
 import { monitoringKeys } from "./hooks/queries/monitoring";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
@@ -139,9 +144,24 @@ function MonitoringSessionHandler() {
   return null;
 }
 
-// Default route - all users start at Sessions (/monitoring)
+// Default route - start at monitoring (calendar may be gated)
 function DefaultRoute() {
   return <Navigate to="/monitoring" replace />;
+}
+
+// Feature gate - renders children only if the dev flag is enabled, otherwise redirects
+function FeatureGate({
+  flag,
+  children,
+}: {
+  flag: keyof import("./context/DevFlagsContext").DevFlags;
+  children: React.ReactNode;
+}) {
+  const { flags } = useDevFlags();
+  if (!flags[flag]) {
+    return <Navigate to="/monitoring" replace />;
+  }
+  return <>{children}</>;
 }
 
 // Protected route wrapper - redirects to login if not authenticated
@@ -194,50 +214,79 @@ function App() {
           <MonitoringSessionHandler />
           <UserProvider>
             <VariantWrapper>
-              <Routes>
-                {/* Public routes */}
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/signup-organization" element={<SignupOrganizationPage />} />
-                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <DevFlagsProvider>
+                <RecapsProvider>
+                  <Routes>
+                    {/* Public routes */}
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/signup-organization" element={<SignupOrganizationPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-                {/* Protected routes */}
-                <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <ConsoleLayout />
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route index element={<DefaultRoute />} />
-                  {/* Admin Routes */}
-                  <Route path="dashboard" element={<DashboardView />} />
-                  <Route path="people" element={<PeopleView />} />
-                  <Route path="people/new" element={<AddNewUser />} />
-                  <Route path="people/:id" element={<PersonDetail />} />
-                  <Route path="templates" element={<TemplatesView />} />
-                  <Route path="templates/:id" element={<TemplateDetail />} />
-                  <Route path="templates/new" element={<CreateTemplate />} />
-                  <Route path="integrations" element={<IntegrationsView />} />
-                  <Route path="setup" element={<SetupView />} />
-                  {/* Employee Routes */}
-                  <Route path="docs" element={<DocsView />} />
-                  <Route path="docs/:docId" element={<DocDetail />} />
-                  <Route path="artefacts" element={<ArtifactsView />} />
-                  <Route path="todos" element={<TodosView />} />
-                  {/* Monitoring Routes */}
-                  <Route path="monitoring" element={<MonitoringView />} />
-                  <Route path="monitoring/:sessionId" element={<SessionDetail />} />
-                  <Route path="profile" element={<UserProfilePage />} />
-                  {/* Legacy routes (hidden from nav but accessible via URL) */}
-                  <Route path="roadmap" element={<RoadmapView />} />
-                  <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
-                  <Route path="chats" element={<ChatsView />} />
-                  <Route path="chats/new" element={<NewChat />} />
-                  <Route path="chats/:chatId" element={<ChatDetail />} />
-                </Route>
-              </Routes>
+                    {/* Protected routes */}
+                    <Route
+                      path="/"
+                      element={
+                        <ProtectedRoute>
+                          <ConsoleLayout />
+                        </ProtectedRoute>
+                      }
+                    >
+                      <Route index element={<DefaultRoute />} />
+                      {/* Admin Routes */}
+                      <Route path="dashboard" element={<DashboardView />} />
+                      <Route path="people" element={<PeopleView />} />
+                      <Route path="people/new" element={<AddNewUser />} />
+                      <Route path="people/:id" element={<PersonDetail />} />
+                      <Route path="templates" element={<TemplatesView />} />
+                      <Route path="templates/:id" element={<TemplateDetail />} />
+                      <Route path="templates/new" element={<CreateTemplate />} />
+                      <Route path="integrations" element={<IntegrationsView />} />
+                      <Route path="setup" element={<SetupView />} />
+                      {/* Employee Routes */}
+                      <Route path="docs" element={<DocsView />} />
+                      <Route path="docs/:docId" element={<DocDetail />} />
+                      <Route path="artefacts" element={<ArtifactsView />} />
+                      <Route path="todos" element={<TodosView />} />
+                      {/* Calendar/Journal Routes (Passive Tracking) — gated behind dev flags */}
+                      <Route
+                        path="calendar"
+                        element={
+                          <FeatureGate flag="newExperience">
+                            <CalendarView />
+                          </FeatureGate>
+                        }
+                      />
+                      <Route
+                        path="recaps"
+                        element={
+                          <FeatureGate flag="newExperience">
+                            <RecapsView />
+                          </FeatureGate>
+                        }
+                      />
+                      <Route
+                        path="recaps/:recapId"
+                        element={
+                          <FeatureGate flag="newExperience">
+                            <RecapDetail />
+                          </FeatureGate>
+                        }
+                      />
+                      {/* Focused Sessions Routes */}
+                      <Route path="monitoring" element={<MonitoringView />} />
+                      <Route path="monitoring/:sessionId" element={<SessionDetail />} />
+                      <Route path="profile" element={<UserProfilePage />} />
+                      {/* Legacy routes (hidden from nav but accessible via URL) */}
+                      <Route path="roadmap" element={<RoadmapView />} />
+                      <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
+                      <Route path="chats" element={<ChatsView />} />
+                      <Route path="chats/new" element={<NewChat />} />
+                      <Route path="chats/:chatId" element={<ChatDetail />} />
+                    </Route>
+                  </Routes>
+                </RecapsProvider>
+              </DevFlagsProvider>
               <Toaster />
             </VariantWrapper>
           </UserProvider>

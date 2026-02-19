@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { SidebarProvider } from "../../context/SidebarContext";
-import { ScrollArea } from "../ui/scroll-area";
 import Sidebar from "./Sidebar";
 import TitleBar from "./TitleBar";
 import { createLogger } from "../../../../lib/logger";
@@ -46,11 +45,10 @@ export default function ConsoleLayout() {
               {/* Ambient glow effect */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-gradient-to-b from-indigo/5 to-transparent pointer-events-none rounded-t-2xl" />
 
-              <ScrollArea className="h-full w-full relative">
-                <div className="max-w-full overflow-x-hidden">
-                  <Outlet />
-                </div>
-              </ScrollArea>
+              {/* Content area - uses flex to allow views to control their own height/scrolling */}
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+                <Outlet />
+              </div>
             </div>
           </div>
         </div>

@@ -574,6 +574,100 @@ export async function regenerateSummary(
 }
 
 // ===========================
+// Recap API
+// ===========================
+
+/**
+ * Generate a recap from multiple session summaries using AI
+ */
+export async function generateRecap(
+  sessionIds: string[],
+  tone: string = "professional",
+  length: string = "standard"
+): Promise<{ recap: string }> {
+  return apiRequest<{ recap: string }>("/monitoring/recaps/generate", {
+    method: "POST",
+    body: JSON.stringify({ sessionIds, tone, length }),
+  });
+}
+
+/**
+ * Revise recap content using AI
+ */
+export async function reviseRecap(
+  instruction: string,
+  currentContent: string
+): Promise<{ suggestion: string }> {
+  return apiRequest<{ suggestion: string }>("/monitoring/recaps/revise", {
+    method: "POST",
+    body: JSON.stringify({ instruction, currentContent }),
+  });
+}
+
+// ===========================
+// Recap CRUD API
+// ===========================
+
+export interface RecapRecord {
+  id: string;
+  userId: string;
+  organizationId: string;
+  title: string;
+  content: string;
+  blocks: unknown[];
+  totalDuration: number;
+  deliveries: unknown[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchRecaps(): Promise<{ recaps: RecapRecord[] }> {
+  return apiRequest<{ recaps: RecapRecord[] }>("/monitoring/recaps");
+}
+
+export async function fetchRecap(id: string): Promise<{ recap: RecapRecord }> {
+  return apiRequest<{ recap: RecapRecord }>(`/monitoring/recaps/${id}`);
+}
+
+export async function createRecap(data: {
+  title: string;
+  content: string;
+  blocks: unknown[];
+  totalDuration: number;
+}): Promise<{ recap: RecapRecord }> {
+  return apiRequest<{ recap: RecapRecord }>("/monitoring/recaps", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateRecapApi(
+  id: string,
+  data: { title?: string; content?: string; blocks?: unknown[]; totalDuration?: number }
+): Promise<{ recap: RecapRecord }> {
+  return apiRequest<{ recap: RecapRecord }>(`/monitoring/recaps/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function addRecapDelivery(
+  id: string,
+  destination: string
+): Promise<{ recap: RecapRecord }> {
+  return apiRequest<{ recap: RecapRecord }>(`/monitoring/recaps/${id}/deliveries`, {
+    method: "POST",
+    body: JSON.stringify({ destination }),
+  });
+}
+
+export async function deleteRecapApi(id: string): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`/monitoring/recaps/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// ===========================
 // Workstream Types & API
 // ===========================
 

@@ -4,6 +4,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Calendar theme override - scoped to .mitable-calendar */
+@import "./styles/calendar-theme.css";
+
 @layer base {
   :root {
     /* Background layers - warm neutrals */

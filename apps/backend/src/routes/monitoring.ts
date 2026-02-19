@@ -3013,4 +3013,363 @@ router.patch(
   }
 );
 
+/**
+ * POST /api/monitoring/recaps/generate
+ * Generate a recap from multiple session summaries using AI
+ */
+router.post("/recaps/generate", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const {
+    sessionIds,
+    tone = "professional",
+    length = "standard",
+  }: { sessionIds: string[]; tone?: string; length?: string } = req.body;
+
+  if (!sessionIds || !Array.isArray(sessionIds) || sessionIds.length === 0) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "sessionIds array is required and must not be empty",
+    });
+    return;
+  }
+
+  try {
+    // Fetch sessions that belong to this user
+    const sessions = await db
+      .select({
+        id: schema.monitoringSessions.id,
+        rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+        finalSummary: schema.monitoringSessions.finalSummary,
+        sessionGoal: schema.monitoringSessions.sessionGoal,
+        startedAt: schema.monitoringSessions.startedAt,
+        endedAt: schema.monitoringSessions.endedAt,
+        totalPausedMs: schema.monitoringSessions.totalPausedMs,
+      })
+      .from(schema.monitoringSessions)
+      .where(
+        and(
+          inArray(schema.monitoringSessions.id, sessionIds),
+          eq(schema.monitoringSessions.userId, userId)
+        )
+      );
+
+    if (sessions.length === 0) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "No sessions found for the provided IDs",
+      });
+      return;
+    }
+
+    // Build session data for the recap generator
+    const sessionData = sessions.map((s) => {
+      const startTime = new Date(s.startedAt).getTime();
+      const endTime = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
+      const totalMs = endTime - startTime;
+      const pausedMs = s.totalPausedMs || 0;
+      const activeMinutes = Math.round(Math.max(0, totalMs - pausedMs) / 60000);
+
+      return {
+        sessionId: s.id,
+        summary: s.finalSummary || s.rawActivitySummary || "No summary available",
+        goal: s.sessionGoal,
+        durationMinutes: activeMinutes,
+        startTime: new Date(s.startedAt).toLocaleString(),
+      };
+    });
+
+    const recap = await sessionSummarizationService.generateRecap(sessionData, tone, length);
+
+    res.json({ recap });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error generating recap"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to generate recap",
+    });
+  }
+});
+
+/**
+ * POST /api/monitoring/recaps/revise
+ * Revise recap content using AI (no session ownership needed)
+ */
+router.post("/recaps/revise", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { instruction, currentContent }: { instruction: string; currentContent: string } = req.body;
+
+  if (!instruction || !currentContent) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "instruction and currentContent are required",
+    });
+    return;
+  }
+
+  try {
+    const suggestion = await sessionSummarizationService.reviseSummary(currentContent, instruction);
+    res.json({ suggestion });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error) },
+      "[Monitoring] Error revising recap"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to revise recap",
+    });
+  }
+});
+
+// ===========================
+// Recap CRUD Routes
+// ===========================
+
+/**
+ * GET /api/monitoring/recaps
+ * List all recaps for the authenticated user (newest first)
+ */
+router.get("/recaps", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+
+  try {
+    const rows = await db
+      .select()
+      .from(schema.recaps)
+      .where(eq(schema.recaps.userId, userId))
+      .orderBy(desc(schema.recaps.createdAt));
+
+    res.json({ recaps: rows });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error listing recaps"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to list recaps",
+    });
+  }
+});
+
+/**
+ * GET /api/monitoring/recaps/:id
+ * Get a single recap by ID (ownership enforced)
+ */
+router.get("/recaps/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { id } = req.params;
+
+  try {
+    const [recap] = await db
+      .select()
+      .from(schema.recaps)
+      .where(and(eq(schema.recaps.id, id), eq(schema.recaps.userId, userId)))
+      .limit(1);
+
+    if (!recap) {
+      res.status(404).json({ error: "Not Found", message: "Recap not found" });
+      return;
+    }
+
+    res.json({ recap });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error fetching recap"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to fetch recap",
+    });
+  }
+});
+
+/**
+ * POST /api/monitoring/recaps
+ * Create a new recap
+ */
+router.post("/recaps", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { title, content, blocks, totalDuration, deliveries } = req.body;
+
+  if (!title) {
+    res.status(400).json({ error: "Bad Request", message: "title is required" });
+    return;
+  }
+
+  // Get user's organizationId
+  const [user] = await db
+    .select({ organizationId: schema.users.organizationId })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+
+  if (!user?.organizationId) {
+    res.status(400).json({ error: "Bad Request", message: "User organization not found" });
+    return;
+  }
+
+  try {
+    const [recap] = await db
+      .insert(schema.recaps)
+      .values({
+        userId,
+        organizationId: user.organizationId,
+        title,
+        content: content ?? "",
+        blocks: blocks ?? [],
+        totalDuration: totalDuration ?? 0,
+        deliveries: deliveries ?? [],
+      })
+      .returning();
+
+    res.status(201).json({ recap });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error creating recap"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to create recap",
+    });
+  }
+});
+
+/**
+ * PATCH /api/monitoring/recaps/:id
+ * Update a recap (title, content, blocks, totalDuration)
+ */
+router.patch("/recaps/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { id } = req.params;
+  const { title, content, blocks, totalDuration } = req.body;
+
+  try {
+    // Ownership check
+    const [existing] = await db
+      .select({ id: schema.recaps.id })
+      .from(schema.recaps)
+      .where(and(eq(schema.recaps.id, id), eq(schema.recaps.userId, userId)))
+      .limit(1);
+
+    if (!existing) {
+      res.status(404).json({ error: "Not Found", message: "Recap not found" });
+      return;
+    }
+
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (title !== undefined) updateData.title = title;
+    if (content !== undefined) updateData.content = content;
+    if (blocks !== undefined) updateData.blocks = blocks;
+    if (totalDuration !== undefined) updateData.totalDuration = totalDuration;
+
+    const [recap] = await db
+      .update(schema.recaps)
+      .set(updateData)
+      .where(eq(schema.recaps.id, id))
+      .returning();
+
+    res.json({ recap });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error updating recap"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to update recap",
+    });
+  }
+});
+
+/**
+ * POST /api/monitoring/recaps/:id/deliveries
+ * Append a delivery entry to a recap
+ */
+router.post(
+  "/recaps/:id/deliveries",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { destination } = req.body;
+
+    if (!destination) {
+      res.status(400).json({ error: "Bad Request", message: "destination is required" });
+      return;
+    }
+
+    try {
+      // Fetch existing recap (ownership check)
+      const [existing] = await db
+        .select()
+        .from(schema.recaps)
+        .where(and(eq(schema.recaps.id, id), eq(schema.recaps.userId, userId)))
+        .limit(1);
+
+      if (!existing) {
+        res.status(404).json({ error: "Not Found", message: "Recap not found" });
+        return;
+      }
+
+      const currentDeliveries = Array.isArray(existing.deliveries) ? existing.deliveries : [];
+      const newDelivery = { destination, sentAt: new Date().toISOString() };
+      const updatedDeliveries = [...currentDeliveries, newDelivery];
+
+      const [recap] = await db
+        .update(schema.recaps)
+        .set({ deliveries: updatedDeliveries, updatedAt: new Date() })
+        .where(eq(schema.recaps.id, id))
+        .returning();
+
+      res.json({ recap });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), userId },
+        "[Monitoring] Error adding delivery to recap"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Failed to add delivery",
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/monitoring/recaps/:id
+ * Delete a recap (ownership enforced)
+ */
+router.delete("/recaps/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { id } = req.params;
+
+  try {
+    const result = await db
+      .delete(schema.recaps)
+      .where(and(eq(schema.recaps.id, id), eq(schema.recaps.userId, userId)))
+      .returning({ id: schema.recaps.id });
+
+    if (result.length === 0) {
+      res.status(404).json({ error: "Not Found", message: "Recap not found" });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error deleting recap"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to delete recap",
+    });
+  }
+});
+
 export default router;
