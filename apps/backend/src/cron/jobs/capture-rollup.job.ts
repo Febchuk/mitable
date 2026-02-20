@@ -17,10 +17,7 @@ import Groq from "groq-sdk";
 import { db } from "../../db/client";
 import * as schema from "../../db/schema/index";
 import { eq, and, gte, lte, asc, sql } from "drizzle-orm";
-import {
-  AppBreakdownEntry,
-  CategoryBreakdownEntry,
-} from "../../db/schema/daily-activities.schema";
+import { AppBreakdownEntry, CategoryBreakdownEntry } from "../../db/schema/daily-activities.schema";
 import { config } from "../../config";
 import { createLogger } from "../../lib/logger";
 
@@ -96,7 +93,9 @@ ${uniqueLines.map((l) => `• ${l}`).join("\n")}`;
 /**
  * Fetch master story summaries for sessions.
  */
-async function fetchSessionSummaries(sessionIds: string[]): Promise<{ sessionId: string; narrative: string }[]> {
+async function fetchSessionSummaries(
+  sessionIds: string[]
+): Promise<{ sessionId: string; narrative: string }[]> {
   if (sessionIds.length === 0) return [];
   return db
     .select({
@@ -115,7 +114,9 @@ async function fetchSessionSummaries(sessionIds: string[]): Promise<{ sessionId:
 /**
  * Fetch transcript text for sessions.
  */
-async function fetchSessionTranscripts(sessionIds: string[]): Promise<{ sessionId: string; transcript: string }[]> {
+async function fetchSessionTranscripts(
+  sessionIds: string[]
+): Promise<{ sessionId: string; transcript: string }[]> {
   if (sessionIds.length === 0) return [];
   return db
     .select({
@@ -167,10 +168,7 @@ export async function runCaptureRollup(targetDate?: Date): Promise<{
       await processUserCaptures(userId, day, tomorrow, todayStr);
       usersProcessed++;
     } catch (error) {
-      logger.error(
-        { userId, error: String(error) },
-        "Failed to process user captures"
-      );
+      logger.error({ userId, error: String(error) }, "Failed to process user captures");
     }
   }
 
@@ -346,9 +344,7 @@ async function processUserCaptures(
 
   // Build key accomplishments from the activity list
   const keyAccomplishments = activities.map((a) => `${a.activity} (${a.minutes}min)`);
-  const daySummary = activities.length > 0
-    ? activities.map((a) => a.activity).join("; ")
-    : null;
+  const daySummary = activities.length > 0 ? activities.map((a) => a.activity).join("; ") : null;
 
   // ── Upsert user_daily_activities ────────────────────────────
   // Reuses existingRow from the capture-count guard above.

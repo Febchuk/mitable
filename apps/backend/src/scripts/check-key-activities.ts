@@ -5,9 +5,7 @@ import { sql, desc, isNotNull, eq, count } from "drizzle-orm";
 
 async function main() {
   // Check total capture count
-  const [total] = await db
-    .select({ cnt: count() })
-    .from(schema.sessionCaptures);
+  const [total] = await db.select({ cnt: count() }).from(schema.sessionCaptures);
   console.log(`Total captures in DB: ${total?.cnt ?? 0}`);
 
   // Check a few sessions with their capture counts (using join)
@@ -55,4 +53,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

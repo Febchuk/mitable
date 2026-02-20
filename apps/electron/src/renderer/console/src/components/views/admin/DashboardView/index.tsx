@@ -5,24 +5,32 @@ import ActivityBreakdown from "./ActivityBreakdown";
 import OrgInsights from "./OrgInsights";
 import ChatPanel from "./ChatPanel";
 import DrillDownPanel from "./DrillDownPanel";
-import { getDrillDown } from "./drillDownData";
-import type { DrillDownItem } from "./drillDownData";
 import type { TimeRange, MetricData, ActivityEntry, WorkBlock, WeeklyTrendPoint } from "./mockData";
-import { useDashboardMetrics } from "@/console/src/hooks/queries/admin";
+import { useDashboardMetrics, useDrillDown } from "@/console/src/hooks/queries/admin";
 import type { DashboardPeriod, DashboardMetrics } from "@/console/src/services/adminService";
 
+// Map UI labels → API metric keys for drill-down
+const LABEL_TO_METRIC: Record<string, string> = {
+  "Avg Focus Time": "focus_time",
+  "Avg Active Time": "active_time",
+  "Avg Meeting Load": "meeting_load",
+  "People Tracked": "people_tracked",
+};
+
 const timeRangeLabels: Record<TimeRange, string> = {
-  day: "Today",
+  yesterday: "Yesterday",
   week: "This Week",
   month: "This Month",
   ytd: "Year to Date",
+  all: "All Time",
 };
 
 const timeRangeToPeriod: Record<TimeRange, DashboardPeriod> = {
-  day: "today",
+  yesterday: "yesterday",
   week: "week",
   month: "month",
   ytd: "ytd",
+  all: "all",
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -82,14 +90,12 @@ function transformApiData(api: DashboardMetrics): {
     },
   ];
 
-  const activityBreakdown: ActivityEntry[] = (api.activityDistribution || []).map(
-    (d) => ({
-      id: d.category,
-      label: d.category.charAt(0).toUpperCase() + d.category.slice(1),
-      hours: Math.round((d.totalMinutes / 60) * 10) / 10,
-      color: CATEGORY_COLORS[d.category] || CATEGORY_COLORS.other,
-    })
-  );
+  const activityBreakdown: ActivityEntry[] = (api.activityDistribution || []).map((d) => ({
+    id: d.category,
+    label: d.category.charAt(0).toUpperCase() + d.category.slice(1),
+    hours: Math.round((d.totalMinutes / 60) * 10) / 10,
+    color: CATEGORY_COLORS[d.category] || CATEGORY_COLORS.other,
+  }));
 
   const workBlocks: WorkBlock[] = [
     { label: "Work", value: m.avgWorkPercentage, color: "#6366F1" },
@@ -108,10 +114,11 @@ function transformApiData(api: DashboardMetrics): {
 
 export default function DashboardView() {
   const [chatOpen, setChatOpen] = useState(false);
-  const [drillDown, setDrillDown] = useState<DrillDownItem | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>("month");
+  const [drillDownMetric, setDrillDownMetric] = useState<string | null>(null);
+  const [timeRange, setTimeRange] = useState<TimeRange>("yesterday");
 
   const { data: apiData } = useDashboardMetrics(timeRangeToPeriod[timeRange]);
+  const { data: drillDownData } = useDrillDown(drillDownMetric, timeRangeToPeriod[timeRange]);
 
   const data = useMemo(() => {
     if (apiData?.hasData) {
@@ -120,10 +127,34 @@ export default function DashboardView() {
     // No data — return empty structure instead of mock data
     return {
       metrics: [
-        { label: "Avg Focus Time", value: "0h", change: "No data yet", changeType: "neutral" as const, description: "Average deep work per person" },
-        { label: "Avg Active Time", value: "0h", change: "No data yet", changeType: "neutral" as const, description: "Average total tracked time per person" },
-        { label: "Avg Meeting Load", value: "0h", change: "No data yet", changeType: "neutral" as const, description: "Average meeting time per person" },
-        { label: "People Tracked", value: "0", change: "No data yet", changeType: "neutral" as const, description: "Users with activity data" },
+        {
+          label: "Avg Focus Time",
+          value: "0h",
+          change: "No data yet",
+          changeType: "neutral" as const,
+          description: "Average deep work per person",
+        },
+        {
+          label: "Avg Active Time",
+          value: "0h",
+          change: "No data yet",
+          changeType: "neutral" as const,
+          description: "Average total tracked time per person",
+        },
+        {
+          label: "Avg Meeting Load",
+          value: "0h",
+          change: "No data yet",
+          changeType: "neutral" as const,
+          description: "Average meeting time per person",
+        },
+        {
+          label: "People Tracked",
+          value: "0",
+          change: "No data yet",
+          changeType: "neutral" as const,
+          description: "Users with activity data",
+        },
       ],
       activityBreakdown: [],
       workBlocks: [],
@@ -132,14 +163,13 @@ export default function DashboardView() {
   }, [apiData, timeRange]);
 
   const handleDrillDown = (label: string) => {
-    const detail = getDrillDown(label);
-    if (detail) {
-      setChatOpen(false);
-      setDrillDown(detail);
-    }
+    // Map label to API key: check metric cards first, then treat as category
+    const metricKey = LABEL_TO_METRIC[label] || label.toLowerCase();
+    setChatOpen(false);
+    setDrillDownMetric(metricKey);
   };
 
-  const closeDrillDown = () => setDrillDown(null);
+  const closeDrillDown = () => setDrillDownMetric(null);
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -164,7 +194,11 @@ export default function DashboardView() {
                     : "text-text-secondary hover:text-text-primary"
                 }`}
               >
-                {key === "ytd" ? "YTD" : timeRangeLabels[key].replace("This ", "")}
+                {key === "ytd"
+                  ? "YTD"
+                  : key === "all"
+                    ? "All"
+                    : timeRangeLabels[key].replace("This ", "")}
               </button>
             ))}
           </div>
@@ -177,20 +211,28 @@ export default function DashboardView() {
 
         {/* Charts row: Activity breakdown + Work block distribution */}
         <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
-          <ActivityBreakdown activities={data.activityBreakdown} onDrillDown={handleDrillDown} />
-          <OrgInsights workBlocks={data.workBlocks} weeklyTrend={data.trend} />
+          <ActivityBreakdown
+            activities={data.activityBreakdown}
+            periodLabel={timeRangeLabels[timeRange]}
+            onDrillDown={handleDrillDown}
+          />
+          <OrgInsights
+            workBlocks={data.workBlocks}
+            weeklyTrend={data.trend}
+            periodLabel={timeRangeLabels[timeRange]}
+          />
         </div>
       </div>
 
       {/* Drill-down overlay panel */}
-      {drillDown && (
+      {drillDownMetric && drillDownData && (
         <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
-          <DrillDownPanel data={drillDown} onClose={closeDrillDown} />
+          <DrillDownPanel data={drillDownData} onClose={closeDrillDown} />
         </div>
       )}
 
       {/* Chat overlay panel — slides in from the right */}
-      {chatOpen && !drillDown && (
+      {chatOpen && !drillDownMetric && (
         <>
           <div className="absolute inset-0 z-10" onClick={() => setChatOpen(false)} />
           <div className="absolute top-4 right-4 bottom-16 w-[380px] z-20">
@@ -200,7 +242,7 @@ export default function DashboardView() {
       )}
 
       {/* Minimized chat button — fixed to viewport bottom-right */}
-      {!chatOpen && !drillDown && (
+      {!chatOpen && !drillDownMetric && (
         <button
           onClick={() => setChatOpen(true)}
           className="fixed bottom-8 right-8 z-30 flex items-center gap-2 px-4 py-2.5 rounded-full bg-indigo text-white text-sm font-medium shadow-lg hover:bg-indigo/90 transition-colors"

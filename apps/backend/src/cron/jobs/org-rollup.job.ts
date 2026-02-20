@@ -58,10 +58,7 @@ export async function runOrgRollup(targetDate?: Date): Promise<{
       await processOrgDay(organizationId, todayStr);
       orgsProcessed++;
     } catch (error) {
-      logger.error(
-        { organizationId, error: String(error) },
-        "Failed to process org rollup"
-      );
+      logger.error({ organizationId, error: String(error) }, "Failed to process org rollup");
     }
   }
 
@@ -113,16 +110,11 @@ async function processOrgDay(organizationId: string, todayStr: string): Promise<
   const count = userRollups.length;
 
   // Averages
-  const avgWorkMinutes =
-    userRollups.reduce((sum, r) => sum + r.totalWorkMinutes, 0) / count;
-  const avgMeetingMinutes =
-    userRollups.reduce((sum, r) => sum + r.totalMeetingMinutes, 0) / count;
-  const avgActiveMinutes =
-    userRollups.reduce((sum, r) => sum + r.totalActiveMinutes, 0) / count;
-  const avgWorkPercentage =
-    userRollups.reduce((sum, r) => sum + r.workPercentage, 0) / count;
-  const avgMeetingPercentage =
-    userRollups.reduce((sum, r) => sum + r.meetingPercentage, 0) / count;
+  const avgWorkMinutes = userRollups.reduce((sum, r) => sum + r.totalWorkMinutes, 0) / count;
+  const avgMeetingMinutes = userRollups.reduce((sum, r) => sum + r.totalMeetingMinutes, 0) / count;
+  const avgActiveMinutes = userRollups.reduce((sum, r) => sum + r.totalActiveMinutes, 0) / count;
+  const avgWorkPercentage = userRollups.reduce((sum, r) => sum + r.workPercentage, 0) / count;
+  const avgMeetingPercentage = userRollups.reduce((sum, r) => sum + r.meetingPercentage, 0) / count;
 
   // Totals
   const totalTeamWorkMinutes = userRollups.reduce((sum, r) => sum + r.totalWorkMinutes, 0);
@@ -134,10 +126,7 @@ async function processOrgDay(organizationId: string, todayStr: string): Promise<
   for (const rollup of userRollups) {
     const breakdown = (rollup.categoryBreakdown || []) as CategoryBreakdownEntry[];
     for (const entry of breakdown) {
-      categoryTotals.set(
-        entry.category,
-        (categoryTotals.get(entry.category) || 0) + entry.minutes
-      );
+      categoryTotals.set(entry.category, (categoryTotals.get(entry.category) || 0) + entry.minutes);
     }
   }
   const activityDistribution: OrgActivityDistributionEntry[] = [...categoryTotals.entries()]
@@ -145,9 +134,7 @@ async function processOrgDay(organizationId: string, todayStr: string): Promise<
       category,
       totalMinutes,
       percentage:
-        totalTeamActiveMinutes > 0
-          ? Math.round((totalMinutes / totalTeamActiveMinutes) * 100)
-          : 0,
+        totalTeamActiveMinutes > 0 ? Math.round((totalMinutes / totalTeamActiveMinutes) * 100) : 0,
     }))
     .sort((a, b) => b.totalMinutes - a.totalMinutes);
 

@@ -45,7 +45,9 @@ const CATEGORY_COLORS: Record<string, string> = {
 function deriveMood(person: DashboardPerson): UserActivityMeta["mood"] {
   if (person.meetingPercentage > 50) return "meeting-heavy";
   if (person.workPercentage > 70) return "focused";
-  if (person.totalActiveMinutes < 60) return "ramping-up";
+  // Use per-day average if available, otherwise fall back to total
+  const avgPerDay = person.avgActiveMinutesPerDay ?? person.totalActiveMinutes;
+  if (avgPerDay < 60) return "ramping-up";
   return "collaborative";
 }
 
@@ -109,7 +111,15 @@ function MiniActivityBar({ breakdown }: { breakdown: UserActivityMeta["dayBreakd
   );
 }
 
-function PersonRow({ user, onClick, dashboardPerson }: { user: User; onClick: () => void; dashboardPerson?: DashboardPerson }) {
+function PersonRow({
+  user,
+  onClick,
+  dashboardPerson,
+}: {
+  user: User;
+  onClick: () => void;
+  dashboardPerson?: DashboardPerson;
+}) {
   const activity = dashboardPerson ? deriveActivityFromDashboard(dashboardPerson) : emptyActivity;
   const moodStyle = moodConfig[activity.mood];
 
@@ -169,7 +179,7 @@ function PersonRow({ user, onClick, dashboardPerson }: { user: User; onClick: ()
 export default function PeopleView() {
   const navigate = useNavigate();
   const { data: users = [], isLoading: loading, error } = useUsers();
-  const { data: dashboardPeople = [] } = useDashboardPeople("month");
+  const { data: dashboardPeople = [] } = useDashboardPeople("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<ActiveFilters>(() => {
     try {
@@ -182,18 +192,23 @@ export default function PeopleView() {
           activityStatus: parsed.activityStatus || "all",
         };
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return { roles: new Set(), moods: new Set(), activityStatus: "all" };
   });
   const [filterOpen, setFilterOpen] = useState(false);
 
   // Persist filters to localStorage on change
   useEffect(() => {
-    localStorage.setItem("mitable:peopleFilters", JSON.stringify({
-      roles: [...filters.roles],
-      moods: [...filters.moods],
-      activityStatus: filters.activityStatus,
-    }));
+    localStorage.setItem(
+      "mitable:peopleFilters",
+      JSON.stringify({
+        roles: [...filters.roles],
+        moods: [...filters.moods],
+        activityStatus: filters.activityStatus,
+      })
+    );
   }, [filters]);
 
   // Build lookup map: userId → DashboardPerson
@@ -213,7 +228,8 @@ export default function PeopleView() {
   }, [users]);
 
   // Count active filters
-  const activeFilterCount = filters.roles.size + filters.moods.size + (filters.activityStatus !== "all" ? 1 : 0);
+  const activeFilterCount =
+    filters.roles.size + filters.moods.size + (filters.activityStatus !== "all" ? 1 : 0);
 
   const toggleRole = useCallback((role: string) => {
     setFilters((prev) => {
@@ -239,11 +255,15 @@ export default function PeopleView() {
     const query = searchQuery.toLowerCase();
     return users.filter((user) => {
       // Text search
-      if (query && !(
-        user.name.toLowerCase().includes(query) ||
-        user.email.toLowerCase().includes(query) ||
-        user.role.toLowerCase().includes(query)
-      )) return false;
+      if (
+        query &&
+        !(
+          user.name.toLowerCase().includes(query) ||
+          user.email.toLowerCase().includes(query) ||
+          user.role.toLowerCase().includes(query)
+        )
+      )
+        return false;
 
       // Role filter
       if (filters.roles.size > 0 && !filters.roles.has(user.role)) return false;
@@ -296,11 +316,19 @@ export default function PeopleView() {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-72 bg-[#1A1A1A] border-white/10 text-white p-0">
+            <PopoverContent
+              align="end"
+              className="w-72 bg-[#1A1A1A] border-white/10 text-white p-0"
+            >
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                <span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Filters</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+                  Filters
+                </span>
                 {activeFilterCount > 0 && (
-                  <button onClick={clearFilters} className="text-[10px] text-indigo-light hover:underline">
+                  <button
+                    onClick={clearFilters}
+                    className="text-[10px] text-indigo-light hover:underline"
+                  >
                     Clear all
                   </button>
                 )}
@@ -308,17 +336,23 @@ export default function PeopleView() {
 
               {/* Activity Status */}
               <div className="px-4 py-3 border-b border-white/10">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-2">Activity</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-2">
+                  Activity
+                </p>
                 <div className="flex gap-1">
                   {(["all", "has-data", "no-data"] as const).map((status) => {
-                    const label = { all: "All", "has-data": "Has data", "no-data": "No data" }[status];
+                    const label = { all: "All", "has-data": "Has data", "no-data": "No data" }[
+                      status
+                    ];
                     const active = filters.activityStatus === status;
                     return (
                       <button
                         key={status}
                         onClick={() => setFilters((p) => ({ ...p, activityStatus: status }))}
                         className={`text-[11px] px-2.5 py-1 rounded-md transition-colors ${
-                          active ? "bg-indigo text-white" : "bg-white/5 text-text-secondary hover:bg-white/10"
+                          active
+                            ? "bg-indigo text-white"
+                            : "bg-white/5 text-text-secondary hover:bg-white/10"
                         }`}
                       >
                         {label}
@@ -330,7 +364,9 @@ export default function PeopleView() {
 
               {/* Mood */}
               <div className="px-4 py-3 border-b border-white/10">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-2">Mood</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-2">
+                  Mood
+                </p>
                 <div className="space-y-1">
                   {filterOptions.moods.map((mood) => {
                     const active = filters.moods.has(mood);
@@ -341,12 +377,16 @@ export default function PeopleView() {
                         onClick={() => toggleMood(mood)}
                         className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-left hover:bg-white/5 transition-colors"
                       >
-                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
-                          active ? "bg-indigo border-indigo" : "border-white/20"
-                        }`}>
+                        <div
+                          className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
+                            active ? "bg-indigo border-indigo" : "border-white/20"
+                          }`}
+                        >
                           {active && <Check size={10} className="text-white" />}
                         </div>
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cfg.color}`}>
+                        <span
+                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cfg.color}`}
+                        >
                           {cfg.label}
                         </span>
                       </button>
@@ -357,7 +397,9 @@ export default function PeopleView() {
 
               {/* Role */}
               <div className="px-4 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-2">Role</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary mb-2">
+                  Role
+                </p>
                 <div className="space-y-1 max-h-[140px] overflow-y-auto">
                   {filterOptions.roles.map((role) => {
                     const active = filters.roles.has(role);
@@ -367,9 +409,11 @@ export default function PeopleView() {
                         onClick={() => toggleRole(role)}
                         className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-left hover:bg-white/5 transition-colors"
                       >
-                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
-                          active ? "bg-indigo border-indigo" : "border-white/20"
-                        }`}>
+                        <div
+                          className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
+                            active ? "bg-indigo border-indigo" : "border-white/20"
+                          }`}
+                        >
                           {active && <Check size={10} className="text-white" />}
                         </div>
                         <span className="text-xs text-text-primary capitalize">{role}</span>

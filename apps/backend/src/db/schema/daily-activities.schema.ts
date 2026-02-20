@@ -14,6 +14,7 @@ import {
 import { relations } from "drizzle-orm";
 import { users } from "./users.schema";
 import { organizations } from "./organizations.schema";
+import { monitoringSessions } from "./monitoring.schema";
 
 /**
  * User Daily Activities
@@ -59,6 +60,9 @@ export const userDailyActivities = pgTable(
     // AI-generated content (from Day Analyzer RLM)
     daySummary: text("day_summary"),
     keyAccomplishments: jsonb("key_accomplishments").notNull().default("[]"),
+
+    // Tracking which sessions have been materialized into this day (idempotency)
+    processedSessionIds: jsonb("processed_session_ids").notNull().default("[]"),
 
     // Processing metadata
     status: varchar("status", { length: 20 }).notNull().default("pending"),
@@ -114,6 +118,7 @@ export const activityBlocks = pgTable(
     participants: jsonb("participants").default("[]"),
 
     // Source tracking
+    sessionId: uuid("session_id").references(() => monitoringSessions.id, { onDelete: "set null" }),
     sourceSessionIds: jsonb("source_session_ids").notNull().default("[]"),
 
     // Ordering within the day

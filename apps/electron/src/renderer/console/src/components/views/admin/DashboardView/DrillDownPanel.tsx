@@ -1,8 +1,8 @@
 import { X, ArrowLeft } from "lucide-react";
-import type { DrillDownItem } from "./drillDownData";
+import type { DrillDownData } from "@/console/src/services/adminService";
 
 interface DrillDownPanelProps {
-  data: DrillDownItem;
+  data: DrillDownData;
   onClose: () => void;
 }
 

@@ -164,7 +164,10 @@ export class DayAnalyzerEnvironment {
     return this.masterStories.find((s) => s.sessionId === sessionId) || null;
   }
 
-  getSessionCaptures(sessionId: string, page: number): {
+  getSessionCaptures(
+    sessionId: string,
+    page: number
+  ): {
     captures: DayCapture[];
     page: number;
     totalPages: number;
@@ -194,7 +197,10 @@ export class DayAnalyzerEnvironment {
     };
   }
 
-  getSessionTranscripts(sessionId: string, page: number): {
+  getSessionTranscripts(
+    sessionId: string,
+    page: number
+  ): {
     transcripts: DayTranscript[];
     page: number;
     totalPages: number;
@@ -218,9 +224,7 @@ export class DayAnalyzerEnvironment {
   // ──────────────────────────────────────────────
 
   getCapturesByTimeRange(startTime: Date, endTime: Date): DayCapture[] {
-    return this.captures.filter(
-      (c) => c.capturedAt >= startTime && c.capturedAt <= endTime
-    );
+    return this.captures.filter((c) => c.capturedAt >= startTime && c.capturedAt <= endTime);
   }
 
   // ──────────────────────────────────────────────
@@ -236,9 +240,7 @@ export class DayAnalyzerEnvironment {
   }
 
   getEmittedBlocks(): EmittedBlock[] {
-    return [...this.emittedBlocks].sort(
-      (a, b) => a.startTime.getTime() - b.startTime.getTime()
-    );
+    return [...this.emittedBlocks].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
   }
 
   // ──────────────────────────────────────────────

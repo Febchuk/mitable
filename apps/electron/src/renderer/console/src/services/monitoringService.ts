@@ -57,6 +57,9 @@ export interface SessionListItem {
     formatted: string;
   };
   deliveryStatus: string | null;
+  finalSummary: string | null;
+  rawActivitySummary: string | null;
+  timeBreakdown: Record<string, number> | null;
 }
 
 export interface CreateSessionRequest {
@@ -165,6 +168,23 @@ export async function fetchSessions(
   return apiRequest<{ sessions: SessionListItem[]; pagination: SessionsPagination }>(
     `/monitoring/sessions?page=${page}&limit=${limit}`
   );
+}
+
+/**
+ * Fetch ALL sessions for the current user (auto-paginates)
+ */
+export async function fetchAllSessions(): Promise<SessionListItem[]> {
+  const all: SessionListItem[] = [];
+  let page = 1;
+  let hasMore = true;
+  const limit = 50; // Max per page
+  while (hasMore) {
+    const { sessions, pagination } = await fetchSessions(page, limit);
+    all.push(...sessions);
+    hasMore = pagination.hasNext;
+    page++;
+  }
+  return all;
 }
 
 /**

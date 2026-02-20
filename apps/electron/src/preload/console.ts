@@ -90,7 +90,10 @@ const IPC_CHANNELS = {
 
 contextBridge.exposeInMainWorld("consoleAPI", {
   // PDF Export
-  exportPdf: async (html: string, title: string): Promise<{ success: boolean; filePath?: string; error?: string }> => {
+  exportPdf: async (
+    html: string,
+    title: string
+  ): Promise<{ success: boolean; filePath?: string; error?: string }> => {
     return ipcRenderer.invoke(IPC_CHANNELS.EXPORT_PDF, { html, title });
   },
 
@@ -131,18 +134,20 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   minimizeWindow: () => ipcRenderer.send(IPC_CHANNELS.CONSOLE_MINIMIZE),
 
   // Navigation - Listen for navigation requests from main process
-  onNavigateToChat: (callback: (conversationId: string) => void) => {
-    ipcRenderer.on("navigate-to-chat", (_event: IpcRendererEvent, conversationId: string) =>
-      callback(conversationId)
-    );
+  onNavigateToChat: (callback: (conversationId: string) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, conversationId: string) => callback(conversationId);
+    ipcRenderer.on("navigate-to-chat", handler);
+    return () => ipcRenderer.removeListener("navigate-to-chat", handler);
   },
 
   // Drafts navigation (Update Buddy)
-  onDraftsNavigate: (callback: (draftId: string) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.DRAFTS_NAVIGATE, (_event: IpcRendererEvent, draftId: string) => {
+  onDraftsNavigate: (callback: (draftId: string) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, draftId: string) => {
       logger.info(" Drafts navigate received:", draftId);
       callback(draftId);
-    });
+    };
+    ipcRenderer.on(IPC_CHANNELS.DRAFTS_NAVIGATE, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.DRAFTS_NAVIGATE, handler);
   },
 
   // Auth management - Console sends tokens to main process after login
@@ -286,11 +291,13 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   },
 
   // Navigation - Navigate to active monitoring session
-  onNavigateToActiveSession: (callback: () => void) => {
-    ipcRenderer.on(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION, () => {
+  onNavigateToActiveSession: (callback: () => void): (() => void) => {
+    const handler = () => {
       logger.info(" Navigate to active session received");
       callback();
-    });
+    };
+    ipcRenderer.on(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION, handler);
   },
 
   // Navigation - Navigate to a specific session detail with optional flags

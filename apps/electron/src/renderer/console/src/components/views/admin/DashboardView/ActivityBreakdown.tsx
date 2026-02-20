@@ -2,10 +2,15 @@ import type { ActivityEntry } from "./mockData";
 
 interface ActivityBreakdownProps {
   activities: ActivityEntry[];
+  periodLabel: string;
   onDrillDown: (label: string) => void;
 }
 
-export default function ActivityBreakdown({ activities, onDrillDown }: ActivityBreakdownProps) {
+export default function ActivityBreakdown({
+  activities,
+  periodLabel,
+  onDrillDown,
+}: ActivityBreakdownProps) {
   const totalHours = activities.reduce((sum, a) => sum + a.hours, 0);
 
   return (
@@ -13,7 +18,7 @@ export default function ActivityBreakdown({ activities, onDrillDown }: ActivityB
       <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
       <h3 className="relative text-sm font-semibold text-text-primary mb-4">
         Activity Breakdown
-        <span className="text-text-secondary font-normal ml-2">Today</span>
+        <span className="text-text-secondary font-normal ml-2">{periodLabel}</span>
       </h3>
 
       {/* Stacked bar */}

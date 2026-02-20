@@ -54,7 +54,9 @@ function dbToMessage(row: AskMessageRow): Message {
     role: row.role,
     content: row.content,
     timestamp: new Date(row.createdAt),
-    reportCard: row.reportTitle ? { title: row.reportTitle, subtitle: row.reportSubtitle || "" } : undefined,
+    reportCard: row.reportTitle
+      ? { title: row.reportTitle, subtitle: row.reportSubtitle || "" }
+      : undefined,
     reportHtml: row.reportHtml || undefined,
   };
 }
@@ -92,7 +94,9 @@ async function exportReportAsPdf(html: string, title: string) {
   th { font-weight: 600; background: #f5f5f5; } ul, ol { padding-left: 24px; } li { margin-bottom: 4px; } strong { font-weight: 600; }
 </style></head><body>${html}</body></html>`);
     printWindow.document.close();
-    setTimeout(() => { printWindow.print(); }, 300);
+    setTimeout(() => {
+      printWindow.print();
+    }, 300);
   }
 }
 
@@ -123,7 +127,11 @@ function ReportEditor({
   onClose: () => void;
 }) {
   const editorRef = useRef<MDXEditorMethods>(null);
-  const markdown = useMemo(() => htmlToMarkdown(html), [html]);
+  const markdown = useMemo(() => {
+    // If content was previously saved as markdown (no HTML tags), use directly
+    const isHtml = /<[a-z][\s\S]*>/i.test(html);
+    return isHtml ? htmlToMarkdown(html) : html;
+  }, [html]);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentMarkdownRef = useRef(markdown);
@@ -231,23 +239,34 @@ function mdToHtml(md: string): string {
   let inTable = false;
 
   const closeLists = () => {
-    if (inUl) { out.push("</ul>"); inUl = false; }
-    if (inOl) { out.push("</ol>"); inOl = false; }
+    if (inUl) {
+      out.push("</ul>");
+      inUl = false;
+    }
+    if (inOl) {
+      out.push("</ol>");
+      inOl = false;
+    }
   };
   const closeTable = () => {
-    if (inTable) { out.push("</tbody></table>"); inTable = false; }
+    if (inTable) {
+      out.push("</tbody></table>");
+      inTable = false;
+    }
   };
 
   // Escape HTML entities so raw HTML from LLM doesn't render
-  const esc = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   // Inline formatting: bold, italic, code (applied AFTER escaping)
   const inlineFmt = (s: string) =>
     esc(s)
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(/`(.+?)`/g, '<code style="background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px;font-size:0.85em">$1</code>');
+      .replace(
+        /`(.+?)`/g,
+        '<code style="background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px;font-size:0.85em">$1</code>'
+      );
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -256,15 +275,18 @@ function mdToHtml(md: string): string {
     // Table rows
     if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
       closeLists();
-      const cells = trimmed.split("|").filter(Boolean).map((c) => c.trim());
+      const cells = trimmed
+        .split("|")
+        .filter(Boolean)
+        .map((c) => c.trim());
       // Skip separator rows (|---|---|)
       if (cells.every((c) => /^[-:]+$/.test(c))) {
         continue;
       }
       if (!inTable) {
-        out.push('<table><thead><tr>');
+        out.push("<table><thead><tr>");
         cells.forEach((c) => out.push(`<th>${inlineFmt(c)}</th>`));
-        out.push('</tr></thead><tbody>');
+        out.push("</tr></thead><tbody>");
         inTable = true;
         continue;
       }
@@ -276,15 +298,33 @@ function mdToHtml(md: string): string {
     closeTable();
 
     // Headings
-    if (trimmed.startsWith("### ")) { closeLists(); out.push(`<h3>${inlineFmt(trimmed.slice(4))}</h3>`); continue; }
-    if (trimmed.startsWith("## ")) { closeLists(); out.push(`<h2>${inlineFmt(trimmed.slice(3))}</h2>`); continue; }
-    if (trimmed.startsWith("# ")) { closeLists(); out.push(`<h1>${inlineFmt(trimmed.slice(2))}</h1>`); continue; }
+    if (trimmed.startsWith("### ")) {
+      closeLists();
+      out.push(`<h3>${inlineFmt(trimmed.slice(4))}</h3>`);
+      continue;
+    }
+    if (trimmed.startsWith("## ")) {
+      closeLists();
+      out.push(`<h2>${inlineFmt(trimmed.slice(3))}</h2>`);
+      continue;
+    }
+    if (trimmed.startsWith("# ")) {
+      closeLists();
+      out.push(`<h1>${inlineFmt(trimmed.slice(2))}</h1>`);
+      continue;
+    }
 
     // Unordered list
     if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
       closeTable();
-      if (inOl) { out.push("</ol>"); inOl = false; }
-      if (!inUl) { out.push("<ul>"); inUl = true; }
+      if (inOl) {
+        out.push("</ol>");
+        inOl = false;
+      }
+      if (!inUl) {
+        out.push("<ul>");
+        inUl = true;
+      }
       out.push(`<li>${inlineFmt(trimmed.slice(2))}</li>`);
       continue;
     }
@@ -293,8 +333,14 @@ function mdToHtml(md: string): string {
     const olMatch = trimmed.match(/^(\d+)\.\s(.+)/);
     if (olMatch) {
       closeTable();
-      if (inUl) { out.push("</ul>"); inUl = false; }
-      if (!inOl) { out.push("<ol>"); inOl = true; }
+      if (inUl) {
+        out.push("</ul>");
+        inUl = false;
+      }
+      if (!inOl) {
+        out.push("<ol>");
+        inOl = true;
+      }
       out.push(`<li>${inlineFmt(olMatch[2])}</li>`);
       continue;
     }
@@ -302,7 +348,9 @@ function mdToHtml(md: string): string {
     closeLists();
 
     // Empty line
-    if (trimmed === "") { continue; }
+    if (trimmed === "") {
+      continue;
+    }
 
     // Regular paragraph
     out.push(`<p>${inlineFmt(trimmed)}</p>`);
@@ -540,7 +588,12 @@ export default function AskView() {
         }, 50);
         return;
       }
-      setActiveReport({ messageId: msg.id, title: msg.reportCard.title, subtitle: msg.reportCard.subtitle, html: msg.reportHtml });
+      setActiveReport({
+        messageId: msg.id,
+        title: msg.reportCard.title,
+        subtitle: msg.reportCard.subtitle,
+        html: msg.reportHtml,
+      });
       setActiveReportMsgId(msg.id);
       setEditorOpen(true);
       // Scroll chat to the report message after layout updates
@@ -566,7 +619,9 @@ export default function AskView() {
     try {
       const updated = await fetchAskThreads();
       setThreads(updated);
-    } catch {}
+    } catch {
+      // silently ignore refresh failures
+    }
   };
 
   const handleSend = async (text?: string) => {
@@ -647,7 +702,9 @@ export default function AskView() {
         setMessages([]);
         setInput("");
       }
-    } catch {}
+    } catch {
+      // silently ignore delete failures
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -749,7 +806,12 @@ export default function AskView() {
       <div className="flex-1 overflow-y-auto px-6 pt-14">
         <div className={`${editorOpen ? "max-w-none" : "max-w-3xl"} mx-auto py-4`}>
           {messages.map((msg) => (
-            <div key={msg.id} ref={(el) => { msgRefs.current[msg.id] = el; }}>
+            <div
+              key={msg.id}
+              ref={(el) => {
+                msgRefs.current[msg.id] = el;
+              }}
+            >
               <MessageBubble
                 message={msg}
                 onOpenReport={msg.reportCard ? () => openReport(msg) : undefined}
@@ -805,9 +867,7 @@ export default function AskView() {
             <p className="text-xs font-medium text-text-secondary">AI Assistant</p>
             <p className="text-[10px] text-text-tertiary">Ask me to refine the report</p>
           </div>
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {chatPanel}
-          </div>
+          <div className="flex-1 flex flex-col overflow-hidden">{chatPanel}</div>
         </div>
       </div>
     );

@@ -52,10 +52,7 @@ export async function runPeriodSnapshots(): Promise<{
       const monthly = await createMonthlySnapshot(organizationId, today);
       if (monthly) monthlySnapshots++;
     } catch (error) {
-      logger.error(
-        { organizationId, error: String(error) },
-        "Failed to create period snapshots"
-      );
+      logger.error({ organizationId, error: String(error) }, "Failed to create period snapshots");
     }
   }
 
@@ -68,10 +65,7 @@ export async function runPeriodSnapshots(): Promise<{
 /**
  * Create a weekly snapshot for the current week (Monday-Sunday).
  */
-async function createWeeklySnapshot(
-  organizationId: string,
-  today: Date
-): Promise<boolean> {
+async function createWeeklySnapshot(organizationId: string, today: Date): Promise<boolean> {
   // Get Monday of this week
   const monday = new Date(today);
   const dayOfWeek = monday.getDay();
@@ -118,10 +112,7 @@ async function createWeeklySnapshot(
 /**
  * Create a monthly snapshot for the current month.
  */
-async function createMonthlySnapshot(
-  organizationId: string,
-  today: Date
-): Promise<boolean> {
+async function createMonthlySnapshot(organizationId: string, today: Date): Promise<boolean> {
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
@@ -218,8 +209,7 @@ function aggregateUserPeriod(
       .map(([category, minutes]) => ({
         category,
         minutes,
-        percentage:
-          totalActiveMinutes > 0 ? Math.round((minutes / totalActiveMinutes) * 100) : 0,
+        percentage: totalActiveMinutes > 0 ? Math.round((minutes / totalActiveMinutes) * 100) : 0,
       }))
       .sort((a, b) => b.minutes - a.minutes);
 
@@ -239,9 +229,7 @@ function aggregateUserPeriod(
       workPercentage:
         totalActiveMinutes > 0 ? Math.round((totalWorkMinutes / totalActiveMinutes) * 100) : 0,
       meetingPercentage:
-        totalActiveMinutes > 0
-          ? Math.round((totalMeetingMinutes / totalActiveMinutes) * 100)
-          : 0,
+        totalActiveMinutes > 0 ? Math.round((totalMeetingMinutes / totalActiveMinutes) * 100) : 0,
       appBreakdown,
       categoryBreakdown,
       daySummary,
@@ -317,12 +305,9 @@ async function upsertOrgPeriodMetrics(
   const count = userAggregates.length;
   if (count === 0) return;
 
-  const avgWorkMinutes =
-    userAggregates.reduce((s, u) => s + u.totalWorkMinutes, 0) / count;
-  const avgMeetingMinutes =
-    userAggregates.reduce((s, u) => s + u.totalMeetingMinutes, 0) / count;
-  const avgActiveMinutes =
-    userAggregates.reduce((s, u) => s + u.totalActiveMinutes, 0) / count;
+  const avgWorkMinutes = userAggregates.reduce((s, u) => s + u.totalWorkMinutes, 0) / count;
+  const avgMeetingMinutes = userAggregates.reduce((s, u) => s + u.totalMeetingMinutes, 0) / count;
+  const avgActiveMinutes = userAggregates.reduce((s, u) => s + u.totalActiveMinutes, 0) / count;
   const totalTeamWork = userAggregates.reduce((s, u) => s + u.totalWorkMinutes, 0);
   const totalTeamMeeting = userAggregates.reduce((s, u) => s + u.totalMeetingMinutes, 0);
   const totalTeamActive = totalTeamWork + totalTeamMeeting;
@@ -338,8 +323,7 @@ async function upsertOrgPeriodMetrics(
     .map(([category, totalMinutes]) => ({
       category,
       totalMinutes,
-      percentage:
-        totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
+      percentage: totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
     }))
     .sort((a, b) => b.totalMinutes - a.totalMinutes);
 
@@ -365,9 +349,7 @@ async function upsertOrgPeriodMetrics(
     avgWorkPercentage:
       avgActiveMinutes > 0 ? Math.round((avgWorkMinutes / avgActiveMinutes) * 100 * 10) / 10 : 0,
     avgMeetingPercentage:
-      avgActiveMinutes > 0
-        ? Math.round((avgMeetingMinutes / avgActiveMinutes) * 100 * 10) / 10
-        : 0,
+      avgActiveMinutes > 0 ? Math.round((avgMeetingMinutes / avgActiveMinutes) * 100 * 10) / 10 : 0,
     totalUsersTracked: count,
     totalTeamWorkMinutes: totalTeamWork,
     totalTeamMeetingMinutes: totalTeamMeeting,

@@ -59,20 +59,28 @@ function formatIdleGap(minutes: number | null): string | null {
   return `${hours}hr ${mins}min break`;
 }
 
-// App icon colors
-const appColors: Record<string, string> = {
-  "VS Code": "bg-blue-500",
-  Chrome: "bg-amber-500",
-  Slack: "bg-purple-500",
-  Figma: "bg-pink-500",
-  Terminal: "bg-gray-600",
-  Notion: "bg-gray-800",
-  Safari: "bg-blue-400",
-  Discord: "bg-indigo-500",
-};
+// Dynamic app color palette — assigns a consistent color per app name
+const APP_COLOR_PALETTE = [
+  "bg-blue-500",
+  "bg-amber-500",
+  "bg-purple-500",
+  "bg-pink-500",
+  "bg-emerald-500",
+  "bg-indigo-500",
+  "bg-cyan-500",
+  "bg-rose-500",
+  "bg-teal-500",
+  "bg-orange-500",
+  "bg-violet-500",
+  "bg-lime-500",
+];
 
 function getAppColor(appName: string): string {
-  return appColors[appName] || "bg-gray-500";
+  let hash = 0;
+  for (let i = 0; i < appName.length; i++) {
+    hash = appName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return APP_COLOR_PALETTE[Math.abs(hash) % APP_COLOR_PALETTE.length];
 }
 
 // Status badge colors
@@ -169,9 +177,17 @@ export default function WorkBlockDetail({
         `}
       >
         {/* Header - always visible */}
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center gap-4 p-4 text-left"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setIsExpanded(!isExpanded);
+            }
+          }}
+          className="w-full flex items-center gap-4 p-4 text-left cursor-pointer"
         >
           {/* Expand indicator */}
           <div className="flex-shrink-0 text-ink-tertiary">
@@ -303,7 +319,7 @@ export default function WorkBlockDetail({
               </div>
             )}
           </div>
-        </button>
+        </div>
 
         {/* Expanded content */}
         {isExpanded && (

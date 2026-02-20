@@ -102,9 +102,7 @@ export async function classifySession(sessionId: string): Promise<ClassifiedActi
 
   const uniqueLines = [...new Set(captureLines)].slice(0, 60);
 
-  const transcriptContext = transcriptSnippet
-    ? `\nTranscript excerpt:\n${transcriptSnippet}`
-    : "";
+  const transcriptContext = transcriptSnippet ? `\nTranscript excerpt:\n${transcriptSnippet}` : "";
 
   const prompt = `You are a work activity classifier. Given screen capture observations from a single work session (${totalMinutes} minutes), classify them into distinct activities.
 
@@ -160,16 +158,21 @@ ${uniqueLines.map((l) => `• ${l}`).join("\n")}${transcriptContext}`;
 
     return activities;
   } catch (error) {
-    logger.warn({ sessionId, error: String(error) }, "Session classification failed — using fallback");
+    logger.warn(
+      { sessionId, error: String(error) },
+      "Session classification failed — using fallback"
+    );
 
     // Fallback: single generic activity from captures
     const topApp = captures[0]?.appName || "Unknown";
-    const fallback: ClassifiedActivity[] = [{
-      activity: `Work session in ${topApp}`,
-      category: "Other",
-      minutes: totalMinutes,
-      description: `${totalMinutes} minute session with ${captures.length} captures.`,
-    }];
+    const fallback: ClassifiedActivity[] = [
+      {
+        activity: `Work session in ${topApp}`,
+        category: "Other",
+        minutes: totalMinutes,
+        description: `${totalMinutes} minute session with ${captures.length} captures.`,
+      },
+    ];
 
     await db
       .update(schema.monitoringSessions)

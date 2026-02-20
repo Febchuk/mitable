@@ -48,6 +48,9 @@ CREATE TABLE user_daily_activities (
   key_accomplishments JSONB NOT NULL DEFAULT '[]',
   -- Format: ["Merged auth refactor PR", "Completed payment flow UI"]
 
+  -- Tracking which sessions have been materialized into this day (idempotency)
+  processed_session_ids JSONB NOT NULL DEFAULT '[]',
+
   -- Processing metadata
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   -- Values: 'pending', 'processing', 'completed', 'failed'
@@ -103,7 +106,8 @@ CREATE TABLE activity_blocks (
   participants JSONB DEFAULT '[]',
   -- Format: ["Speaker 0", "Speaker 1"] or named if identifiable
 
-  -- Source tracking (which sessions contributed to this block)
+  -- Source tracking
+  session_id UUID REFERENCES monitoring_sessions(id) ON DELETE SET NULL,
   source_session_ids JSONB NOT NULL DEFAULT '[]',
   -- Format: ["uuid1", "uuid2"]
 

@@ -10,7 +10,16 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSessions } from "@/console/src/hooks/queries/monitoring";
 import { useStartSession } from "@/console/src/hooks/useStartSession";
-import { Search, Play, Loader2, Zap, Clock, ChevronLeft, ChevronRight, Activity } from "lucide-react";
+import {
+  Search,
+  Play,
+  Loader2,
+  Zap,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  Activity,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import SessionRow from "./SessionRow";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
@@ -299,7 +308,9 @@ export default function MonitoringView() {
                   }, [])
                   .map((item, idx) =>
                     item === "ellipsis" ? (
-                      <span key={`e-${idx}`} className="w-8 text-center text-ink-tertiary text-sm">…</span>
+                      <span key={`e-${idx}`} className="w-8 text-center text-ink-tertiary text-sm">
+                        …
+                      </span>
                     ) : (
                       <button
                         key={item}

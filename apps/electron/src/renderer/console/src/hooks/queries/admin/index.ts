@@ -12,3 +12,5 @@ export { useOrganizationSettings, useUpdateOrganizationSettings } from "./useOrg
 export { useDashboardMetrics } from "./useDashboardMetrics";
 export { useDashboardPeople } from "./useDashboardPeople";
 export { useDashboardPersonDetail } from "./useDashboardPersonDetail";
+export { useDrillDown } from "./useDrillDown";
+export { useUserDrillDown } from "./useUserDrillDown";

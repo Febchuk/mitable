@@ -68,7 +68,8 @@ function TypingIndicator() {
 const WELCOME_MESSAGE: ChatMessage = {
   id: "welcome",
   role: "assistant",
-  content: "Welcome to your dashboard. I can help you understand trends, drill into any metric, or compare time periods. Ask me anything about your team's activity data.",
+  content:
+    "Welcome to your dashboard. I can help you understand trends, drill into any metric, or compare time periods. Ask me anything about your team's activity data.",
   timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
 };
 

@@ -112,7 +112,9 @@ function printDiscovery(dates: DateDiscovery[], skipCompleted: boolean) {
   console.log(`  Users:    ${totalUsers} (across all dates)`);
   console.log(`  Sessions: ${totalSessions} total`);
   if (totalAlready > 0) {
-    console.log(`  Already:  ${totalAlready} user-days already processed${skipCompleted ? " (will skip)" : " (will reprocess)"}`);
+    console.log(
+      `  Already:  ${totalAlready} user-days already processed${skipCompleted ? " (will skip)" : " (will reprocess)"}`
+    );
   }
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
@@ -131,7 +133,9 @@ function printDiscovery(dates: DateDiscovery[], skipCompleted: boolean) {
     for (const [orgName, orgUsers] of orgGroups) {
       console.log(`   🏢 ${orgName}`);
       for (const u of orgUsers) {
-        console.log(`      👤 ${u.userName} — ${u.sessionCount} session${u.sessionCount !== 1 ? "s" : ""}`);
+        console.log(
+          `      👤 ${u.userName} — ${u.sessionCount} session${u.sessionCount !== 1 ? "s" : ""}`
+        );
       }
     }
   }
@@ -145,7 +149,9 @@ async function runForDate(date: Date, dateStr: string, skipCompleted: boolean) {
 
   const t0 = Date.now();
   const r1 = await runUserRollup(date, { skipCompleted });
-  console.log(`   L1 User Rollup: ${r1.usersProcessed} processed, ${r1.usersSkipped} skipped, ${r1.usersFailed} failed (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+  console.log(
+    `   L1 User Rollup: ${r1.usersProcessed} processed, ${r1.usersSkipped} skipped, ${r1.usersFailed} failed (${((Date.now() - t0) / 1000).toFixed(1)}s)`
+  );
 
   const t1 = Date.now();
   const r2 = await runOrgRollup(date);
@@ -207,7 +213,9 @@ async function main() {
     console.log("\n━━━ Layer 3: Period Snapshots ━━━");
     const t0 = Date.now();
     const r3 = await runPeriodSnapshots();
-    console.log(`   L3: ${r3.weeklySnapshots} weekly, ${r3.monthlySnapshots} monthly (${Date.now() - t0}ms)`);
+    console.log(
+      `   L3: ${r3.weeklySnapshots} weekly, ${r3.monthlySnapshots} monthly (${Date.now() - t0}ms)`
+    );
 
     console.log("\n🎉 All done!");
   } catch (error) {

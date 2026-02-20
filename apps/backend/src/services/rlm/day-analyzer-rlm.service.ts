@@ -243,10 +243,7 @@ class DayAnalyzerRLMService {
       try {
         return await this.getLLMDecisionClaude(systemPrompt, messages);
       } catch (error) {
-        logger.warn(
-          { error: String(error) },
-          "Claude call failed — falling back to DeepSeek R1"
-        );
+        logger.warn({ error: String(error) }, "Claude call failed — falling back to DeepSeek R1");
         this.anthropic = null;
         return this.getLLMDecisionDeepSeek(systemPrompt, messages);
       }
@@ -301,9 +298,7 @@ class DayAnalyzerRLMService {
     messages: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<LLMResponse> {
     if (!this.deepseek) {
-      throw new Error(
-        "No LLM available — both ANTHROPIC_API_KEY and DEEPSEEK_API_KEY are missing"
-      );
+      throw new Error("No LLM available — both ANTHROPIC_API_KEY and DEEPSEEK_API_KEY are missing");
     }
 
     const deepseekMessages = [
@@ -429,9 +424,7 @@ class DayAnalyzerRLMService {
     const parts: string[] = [];
 
     if (stats.totalActiveMinutes > 0) {
-      parts.push(
-        `${Math.round(stats.totalActiveMinutes / 60 * 10) / 10}h tracked`
-      );
+      parts.push(`${Math.round((stats.totalActiveMinutes / 60) * 10) / 10}h tracked`);
     }
     if (workBlocks.length > 0) {
       parts.push(`${workBlocks.length} work block${workBlocks.length > 1 ? "s" : ""}`);

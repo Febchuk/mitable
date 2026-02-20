@@ -14,7 +14,7 @@ import "dotenv/config";
 import minimist from "minimist";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { sql, desc, isNotNull, eq, count } from "drizzle-orm";
+import { desc, isNotNull, eq, count } from "drizzle-orm";
 import { classifySession, isSessionClassified } from "../services/session-classification.service";
 
 const argv = minimist(process.argv.slice(2));
@@ -40,7 +40,7 @@ async function main() {
   console.log(`Found ${allSessions.length} ended sessions total`);
 
   // Get capture counts per session (separate query — subqueries don't work in Drizzle)
-  const sessions: (typeof allSessions[number] & { captureCount: number })[] = [];
+  const sessions: ((typeof allSessions)[number] & { captureCount: number })[] = [];
   for (const s of allSessions) {
     const [capCount] = await db
       .select({ cnt: count() })
@@ -64,7 +64,9 @@ async function main() {
       const classified = await isSessionClassified(s.id);
       if (!classified) toProcess.push(s);
     }
-    console.log(`${toProcess.length} sessions need classification (${withCaptures.length - toProcess.length} already done)\n`);
+    console.log(
+      `${toProcess.length} sessions need classification (${withCaptures.length - toProcess.length} already done)\n`
+    );
   }
 
   if (toProcess.length === 0) {
@@ -98,10 +100,14 @@ async function main() {
     try {
       const activities = await classifySession(s.id);
       const categories = activities.map((a) => a.category).join(", ");
-      console.log(`  ✅ ${progress} ${date} "${name}" → ${activities.length} activities (${categories})`);
+      console.log(
+        `  ✅ ${progress} ${date} "${name}" → ${activities.length} activities (${categories})`
+      );
       success++;
     } catch (error) {
-      console.log(`  ❌ ${progress} ${date} "${name}" — ${error instanceof Error ? error.message : String(error)}`);
+      console.log(
+        `  ❌ ${progress} ${date} "${name}" — ${error instanceof Error ? error.message : String(error)}`
+      );
       failed++;
     }
 

@@ -166,17 +166,43 @@ class StorytellerRLMService {
     messages: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<LLMResponse> {
     if (this.anthropic) {
-      try {
-        const result = await this.getLLMDecisionClaude(systemPrompt, messages);
-        logger.info("✅ Storyteller decision via Claude Sonnet 4.5");
-        return result;
-      } catch (error) {
-        logger.warn(
-          { error: String(error) },
-          "Claude call failed at runtime — falling back to DeepSeek R1"
-        );
-        // Disable Anthropic for the rest of this process lifetime to avoid repeated failures
-        this.anthropic = null;
+      // Retry transient errors (429 rate limit, 529 overloaded) up to 2 times
+      const MAX_RETRIES = 2;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const result = await this.getLLMDecisionClaude(systemPrompt, messages);
+          logger.info("✅ Storyteller decision via Claude Sonnet 4.5");
+          return result;
+        } catch (error) {
+          const errStr = String(error);
+          const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+          if (isFatal) {
+            logger.error(
+              { error: errStr },
+              "Claude auth/billing error — permanently disabling for this process"
+            );
+            this.anthropic = null;
+            break;
+          }
+          const isRetryable = /429|rate.?limit|529|overloaded/i.test(errStr);
+          if (isRetryable && attempt < MAX_RETRIES) {
+            const delayMs = (attempt + 1) * 5000; // 5s, 10s
+            logger.warn(
+              { error: errStr, attempt: attempt + 1, delayMs },
+              `Claude rate-limited/overloaded — retrying in ${delayMs / 1000}s`
+            );
+            await new Promise((r) => setTimeout(r, delayMs));
+            continue;
+          }
+          logger.warn(
+            { error: errStr, attempt: attempt + 1 },
+            "Claude call failed — falling back to DeepSeek R1 for this call only"
+          );
+          break;
+        }
+      }
+      // All retries exhausted or non-retryable transient error — fall back
+      if (this.deepseek) {
         const result = await this.getLLMDecisionDeepSeek(systemPrompt, messages);
         logger.info("⚠️ Storyteller decision via DeepSeek R1 (fallback)");
         return result;

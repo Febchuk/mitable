@@ -46,7 +46,7 @@ export interface UserActivity {
 }
 
 // ── Dashboard data by time range ──────────────────────────────
-export type TimeRange = "day" | "week" | "month" | "ytd";
+export type TimeRange = "yesterday" | "week" | "month" | "ytd" | "all";
 
 export interface DashboardData {
   metrics: MetricData[];
@@ -56,7 +56,7 @@ export interface DashboardData {
 }
 
 const dataByRange: Record<TimeRange, DashboardData> = {
-  day: {
+  yesterday: {
     metrics: [
       {
         label: "Avg Focus Time",
@@ -273,6 +273,12 @@ const dataByRange: Record<TimeRange, DashboardData> = {
       { day: "May", activities: 3500, meetings: 590, docs: 142 },
       { day: "Jun", activities: 3350, meetings: 570, docs: 130 },
     ],
+  },
+  all: {
+    metrics: [],
+    activityBreakdown: [],
+    workBlocks: [],
+    trend: [],
   },
 };
 

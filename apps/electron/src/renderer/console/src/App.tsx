@@ -8,7 +8,7 @@ const logger = createLogger("ConsoleApp");
 import { UserProvider, useUser } from "./context/UserContext";
 import { VariantProvider } from "./context/VariantContext";
 import { RecapsProvider } from "./context/RecapsContext";
-import { DevFlagsProvider, useDevFlags } from "./context/DevFlagsContext";
+import { DevFlagsProvider } from "./context/DevFlagsContext";
 import type { OrgVariant } from "@mitable/shared";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,8 +17,6 @@ import LoginPage from "./pages/LoginPage";
 import SignupOrganizationPage from "./pages/SignupOrganizationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
-import RoadmapView from "./components/views/employee/RoadmapView";
-import RoadmapTaskDetail from "./components/views/employee/RoadmapView/RoadmapTaskDetail";
 import ChatsView from "./components/views/employee/ChatsView";
 import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
 import NewChat from "./components/views/employee/ChatsView/NewChat";
@@ -37,11 +35,7 @@ import DashboardView from "./components/views/admin/DashboardView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
 import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
-import TemplatesView from "./components/views/admin/TemplatesView";
-import CreateTemplate from "./components/views/admin/TemplatesView/CreateTemplate";
-import TemplateDetail from "./components/views/admin/TemplatesView/TemplateDetail";
 import AskView from "./components/views/admin/AskView";
-import AskDemoView from "./components/views/admin/AskDemoView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
 import { useEffect } from "react";
@@ -58,13 +52,13 @@ function NavigationHandler() {
     }
 
     // Listen for navigation requests from main process (e.g., from Agent window)
-    window.consoleAPI.onNavigateToChat?.((conversationId: string) => {
+    const unsubscribeChat = window.consoleAPI.onNavigateToChat?.((conversationId: string) => {
       logger.info(" Navigating to chat:", conversationId);
       navigate(`/chats/${conversationId}`);
     });
 
     // Listen for active session navigation (from native notification click)
-    window.consoleAPI.onNavigateToActiveSession?.(async () => {
+    const unsubscribeActiveSession = window.consoleAPI.onNavigateToActiveSession?.(async () => {
       logger.info(" Navigate to active session requested");
       try {
         const sessionState = await window.consoleAPI?.getMonitoringSessionState();
@@ -112,6 +106,8 @@ function NavigationHandler() {
     });
 
     return () => {
+      unsubscribeChat?.();
+      unsubscribeActiveSession?.();
       unsubscribeEndDialog?.();
       unsubscribeSessionDetail?.();
     };
@@ -149,28 +145,12 @@ function MonitoringSessionHandler() {
 // Default route
 function DefaultRoute() {
   const { user } = useUser();
-  const { flags } = useDevFlags();
 
   if (user?.role === "admin") {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <Navigate to={flags.newExperience ? "/calendar" : "/monitoring"} replace />;
-}
-
-// Feature gate - renders children only if the dev flag is enabled, otherwise redirects
-function FeatureGate({
-  flag,
-  children,
-}: {
-  flag: keyof import("./context/DevFlagsContext").DevFlags;
-  children: React.ReactNode;
-}) {
-  const { flags } = useDevFlags();
-  if (!flags[flag]) {
-    return <Navigate to="/monitoring" replace />;
-  }
-  return <>{children}</>;
+  return <Navigate to="/calendar" replace />;
 }
 
 // Protected route wrapper - redirects to login if not authenticated
@@ -247,10 +227,6 @@ function App() {
                       <Route path="people/new" element={<AddNewUser />} />
                       <Route path="people/:id" element={<PersonDetail />} />
                       <Route path="ask" element={<AskView />} />
-                      <Route path="ask-demo" element={<AskDemoView />} />
-                      <Route path="templates" element={<TemplatesView />} />
-                      <Route path="templates/:id" element={<TemplateDetail />} />
-                      <Route path="templates/new" element={<CreateTemplate />} />
                       <Route path="integrations" element={<IntegrationsView />} />
                       <Route path="setup" element={<SetupView />} />
                       {/* Employee Routes */}
@@ -258,38 +234,15 @@ function App() {
                       <Route path="docs/:docId" element={<DocDetail />} />
                       <Route path="artefacts" element={<ArtifactsView />} />
                       <Route path="todos" element={<TodosView />} />
-                      {/* Calendar/Journal Routes (Passive Tracking) — gated behind dev flags */}
-                      <Route
-                        path="calendar"
-                        element={
-                          <FeatureGate flag="newExperience">
-                            <CalendarView />
-                          </FeatureGate>
-                        }
-                      />
-                      <Route
-                        path="recaps"
-                        element={
-                          <FeatureGate flag="newExperience">
-                            <RecapsView />
-                          </FeatureGate>
-                        }
-                      />
-                      <Route
-                        path="recaps/:recapId"
-                        element={
-                          <FeatureGate flag="newExperience">
-                            <RecapDetail />
-                          </FeatureGate>
-                        }
-                      />
+                      {/* Calendar/Journal Routes */}
+                      <Route path="calendar" element={<CalendarView />} />
+                      <Route path="recaps" element={<RecapsView />} />
+                      <Route path="recaps/:recapId" element={<RecapDetail />} />
                       {/* Focused Sessions Routes */}
                       <Route path="monitoring" element={<MonitoringView />} />
                       <Route path="monitoring/:sessionId" element={<SessionDetail />} />
                       <Route path="profile" element={<UserProfilePage />} />
                       {/* Legacy routes (hidden from nav but accessible via URL) */}
-                      <Route path="roadmap" element={<RoadmapView />} />
-                      <Route path="roadmap/task/:taskId" element={<RoadmapTaskDetail />} />
                       <Route path="chats" element={<ChatsView />} />
                       <Route path="chats/new" element={<NewChat />} />
                       <Route path="chats/:chatId" element={<ChatDetail />} />

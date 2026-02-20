@@ -243,8 +243,6 @@ export interface CreateUserPayload {
   lastName: string;
   email: string;
   role: string; // Job title (e.g., "Software Engineer", "Product Designer")
-  startDate: string;
-  templateIds: string[];
   sendWelcomeEmail: boolean;
   makeAdmin?: boolean;
 }
@@ -258,8 +256,6 @@ export interface CreateUserResponse {
     lastName: string;
     role: string;
   };
-  templatesAssigned: number;
-  tasksCreated: number;
   initialPassword: string;
 }
 
@@ -478,7 +474,7 @@ export async function updateOrganizationSettings(
 // Dashboard Analytics (from cron pipeline)
 // ============================================
 
-export type DashboardPeriod = "today" | "week" | "month" | "ytd";
+export type DashboardPeriod = "yesterday" | "today" | "week" | "month" | "ytd" | "all";
 
 export interface DashboardMetrics {
   period: string;
@@ -521,6 +517,7 @@ export interface DashboardPerson {
   totalWorkMinutes: number;
   totalMeetingMinutes: number;
   totalActiveMinutes: number;
+  avgActiveMinutesPerDay: number;
   workPercentage: number;
   meetingPercentage: number;
   daySummary: string | null;
@@ -594,18 +591,26 @@ export interface DashboardPersonDetail {
   blocks: ActivityBlock[];
   blocksByDate: Record<string, ActivityBlock[]>;
   sessionActivities: SessionActivity[];
+  documents: Array<{
+    id: string;
+    title: string;
+    docType: string;
+    status: string;
+    content: string;
+    description: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 }
 
 /**
  * Fetch org-wide dashboard metrics (admin only)
  */
 export async function fetchDashboardMetrics(
-  period: DashboardPeriod = "today"
+  period: DashboardPeriod = "yesterday"
 ): Promise<DashboardMetrics> {
   try {
-    const response = await apiRequest<DashboardMetrics>(
-      `/admin/dashboard?period=${period}`
-    );
+    const response = await apiRequest<DashboardMetrics>(`/admin/dashboard?period=${period}`);
     return response;
   } catch (error) {
     logger.error("Error fetching dashboard metrics:", error);
@@ -617,7 +622,7 @@ export async function fetchDashboardMetrics(
  * Fetch per-user activity list for People tab (admin only)
  */
 export async function fetchDashboardPeople(
-  period: DashboardPeriod = "today"
+  period: DashboardPeriod = "yesterday"
 ): Promise<DashboardPerson[]> {
   try {
     const response = await apiRequest<{ period: string; people: DashboardPerson[] }>(
@@ -635,7 +640,7 @@ export async function fetchDashboardPeople(
  */
 export async function fetchDashboardPersonDetail(
   userId: string,
-  period: DashboardPeriod = "today"
+  period: DashboardPeriod = "yesterday"
 ): Promise<DashboardPersonDetail> {
   try {
     const response = await apiRequest<DashboardPersonDetail>(
@@ -644,6 +649,53 @@ export async function fetchDashboardPersonDetail(
     return response;
   } catch (error) {
     logger.error("Error fetching person activity detail:", error);
+    throw error;
+  }
+}
+
+// ── Drill-Down Data ──────────────────────────────────────────
+
+export interface DrillDownData {
+  title: string;
+  subtitle: string;
+  stats: { label: string; value: string }[];
+  breakdown: { label: string; value: string; bar?: number }[];
+  trend: { label: string; value: number }[];
+}
+
+/**
+ * Fetch drill-down breakdown for a specific metric or category (admin only)
+ * Metrics: focus_time, active_time, meeting_load, people_tracked
+ * Categories: development, communication, meeting, browsing, etc.
+ */
+export async function fetchDrillDown(
+  metric: string,
+  period: DashboardPeriod = "yesterday"
+): Promise<DrillDownData> {
+  try {
+    return await apiRequest<DrillDownData>(
+      `/admin/dashboard/drill-down/${encodeURIComponent(metric)}?period=${period}`
+    );
+  } catch (error) {
+    logger.error("Error fetching drill-down data:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch per-user drill-down breakdown for a specific metric or category (admin only)
+ */
+export async function fetchUserDrillDown(
+  userId: string,
+  metric: string,
+  period: DashboardPeriod = "yesterday"
+): Promise<DrillDownData> {
+  try {
+    return await apiRequest<DrillDownData>(
+      `/admin/dashboard/people/${userId}/drill-down/${encodeURIComponent(metric)}?period=${period}`
+    );
+  } catch (error) {
+    logger.error("Error fetching user drill-down data:", error);
     throw error;
   }
 }
@@ -712,15 +764,20 @@ export async function updateAskMessageReport(messageId: string, reportHtml: stri
 export async function sendAskChat(
   message: string,
   threadId?: string
-): Promise<{ message: string; threadId: string; report?: { title: string; subtitle: string; html: string } }> {
+): Promise<{
+  message: string;
+  threadId: string;
+  report?: { title: string; subtitle: string; html: string };
+}> {
   try {
-    const response = await apiRequest<{ message: string; threadId: string; report?: { title: string; subtitle: string; html: string } }>(
-      "/admin/ask/chat",
-      {
-        method: "POST",
-        body: JSON.stringify({ message, threadId }),
-      }
-    );
+    const response = await apiRequest<{
+      message: string;
+      threadId: string;
+      report?: { title: string; subtitle: string; html: string };
+    }>("/admin/ask/chat", {
+      method: "POST",
+      body: JSON.stringify({ message, threadId }),
+    });
     return response;
   } catch (error) {
     logger.error("Error in ask chat:", error);
@@ -736,13 +793,10 @@ export async function sendDashboardChat(
   period: DashboardPeriod = "month"
 ): Promise<{ message: string }> {
   try {
-    const response = await apiRequest<{ message: string }>(
-      "/admin/dashboard/chat",
-      {
-        method: "POST",
-        body: JSON.stringify({ messages, period }),
-      }
-    );
+    const response = await apiRequest<{ message: string }>("/admin/dashboard/chat", {
+      method: "POST",
+      body: JSON.stringify({ messages, period }),
+    });
     return response;
   } catch (error) {
     logger.error("Error in dashboard chat:", error);

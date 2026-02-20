@@ -2652,6 +2652,29 @@ app.whenReady().then(async () => {
   // Start periodic notification timer (prompts user to turn on monitoring)
   startNotificationTimer();
 
+  // Clean up stale sessions on startup (laptop closed, crash, etc.)
+  // Runs server-side for this user — auto-ends sessions with no recent captures
+  try {
+    if (authManager.getAccessToken()) {
+      const cleanupRes = await authManager.authenticatedFetch(
+        "/api/monitoring/sessions/cleanup-stale",
+        {
+          method: "POST",
+        }
+      );
+      if (cleanupRes.ok) {
+        const cleanupData = await cleanupRes.json();
+        if (cleanupData.sessionsEnded > 0) {
+          recoveryLogger.info(
+            `Auto-ended ${cleanupData.sessionsEnded} stale session(s) on startup`
+          );
+        }
+      }
+    }
+  } catch (error) {
+    recoveryLogger.warn("Stale session cleanup failed on startup (non-fatal):", error);
+  }
+
   // Check for recoverable sessions on startup (crash recovery)
   try {
     const recoverableSessions = await monitoringSessionService.getRecoverableSessions();
@@ -2732,7 +2755,9 @@ app.on("before-quit", async (event) => {
 
 // PDF Export — generate PDF from HTML via hidden BrowserWindow
 function setupPdfExportHandler() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { dialog } = require("electron") as typeof import("electron");
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { writeFile } = require("fs/promises") as typeof import("fs/promises");
 
   ipcMain.handle(

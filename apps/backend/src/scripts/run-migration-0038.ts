@@ -24,7 +24,10 @@ async function runMigration() {
   });
 
   try {
-    const dailyActivityPath = join(__dirname, "../db/migrations/0038_create_daily_activity_tables.sql");
+    const dailyActivityPath = join(
+      __dirname,
+      "../db/migrations/0038_create_daily_activity_tables.sql"
+    );
     const recapsPath = join(__dirname, "../db/migrations/0038_create_recaps.sql");
 
     let migrationPath: string | null = null;

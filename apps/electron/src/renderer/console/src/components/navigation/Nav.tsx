@@ -1,5 +1,4 @@
 import {
-  Layers,
   Users,
   BarChart3,
   Plug,
@@ -9,7 +8,6 @@ import {
   Target,
   History,
   Sparkles,
-  FlaskConical,
 } from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
@@ -51,8 +49,6 @@ export default function Nav() {
         <NavItem to="/dashboard" icon={BarChart3} label="Dashboard" />
         <NavItem to="/people" icon={Users} label="People" />
         <NavItem to="/ask" icon={Sparkles} label="Ask" />
-        <NavItem to="/ask-demo" icon={FlaskConical} label="Ask 2" />
-        <NavItem to="/templates" icon={Layers} label="Templates" />
         <NavItem to="/integrations" icon={Plug} label="Integrations" />
       </nav>
     );

@@ -11,7 +11,8 @@ import * as monitoringService from "../../../services/monitoringService";
 // Query Keys
 export const monitoringKeys = {
   all: ["monitoring"] as const,
-  sessions: (page?: number) => [...monitoringKeys.all, "sessions", ...(page != null ? [page] : [])] as const,
+  sessions: (page?: number) =>
+    [...monitoringKeys.all, "sessions", ...(page != null ? [page] : [])] as const,
   session: (id: string) => [...monitoringKeys.all, "sessions", id] as const,
   captures: (sessionId: string) => [...monitoringKeys.session(sessionId), "captures"] as const,
   summary: (sessionId: string) => [...monitoringKeys.session(sessionId), "summary"] as const,

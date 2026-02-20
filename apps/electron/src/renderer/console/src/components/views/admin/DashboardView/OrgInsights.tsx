@@ -15,6 +15,7 @@ import type { WorkBlock, WeeklyTrendPoint } from "./mockData";
 interface OrgInsightsProps {
   workBlocks: WorkBlock[];
   weeklyTrend: WeeklyTrendPoint[];
+  periodLabel: string;
 }
 
 function PieChartTooltip({ active, payload }: any) {
@@ -45,7 +46,7 @@ function BarChartTooltip({ active, payload, label }: any) {
   );
 }
 
-export default function OrgInsights({ workBlocks, weeklyTrend }: OrgInsightsProps) {
+export default function OrgInsights({ workBlocks, weeklyTrend, periodLabel }: OrgInsightsProps) {
   return (
     <div className="space-y-4">
       {/* Pie chart: Work block distribution */}
@@ -53,7 +54,7 @@ export default function OrgInsights({ workBlocks, weeklyTrend }: OrgInsightsProp
         <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
         <h3 className="relative text-sm font-semibold text-text-primary mb-4">
           Work Block Distribution
-          <span className="text-text-secondary font-normal ml-2">This Week</span>
+          <span className="text-text-secondary font-normal ml-2">{periodLabel}</span>
         </h3>
         <div className="relative flex items-center gap-6">
           <div className="w-[180px] h-[180px] shrink-0">
@@ -97,8 +98,8 @@ export default function OrgInsights({ workBlocks, weeklyTrend }: OrgInsightsProp
       <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
         <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
         <h3 className="relative text-sm font-semibold text-text-primary mb-4">
-          Weekly Trend
-          <span className="text-text-secondary font-normal ml-2">Activities per day</span>
+          Activity Trend
+          <span className="text-text-secondary font-normal ml-2">{periodLabel}</span>
         </h3>
         <div className="relative h-[180px]">
           <ResponsiveContainer width="100%" height="100%">

@@ -32,7 +32,10 @@ const logger = createLogger({ context: "user-rollup-job" });
  * Called by the cron scheduler every 30 minutes (defaults to today).
  * Pass a targetDate to backfill historical days.
  */
-export async function runUserRollup(targetDate?: Date, options?: { skipCompleted?: boolean }): Promise<{
+export async function runUserRollup(
+  targetDate?: Date,
+  options?: { skipCompleted?: boolean }
+): Promise<{
   usersProcessed: number;
   usersSkipped: number;
   usersFailed: number;
@@ -59,10 +62,7 @@ export async function runUserRollup(targetDate?: Date, options?: { skipCompleted
       )
     );
 
-  logger.info(
-    { userCount: usersWithSessions.length },
-    "Found users with sessions on this date"
-  );
+  logger.info({ userCount: usersWithSessions.length }, "Found users with sessions on this date");
 
   let usersProcessed = 0;
   let usersSkipped = 0;
@@ -99,10 +99,7 @@ export async function runUserRollup(targetDate?: Date, options?: { skipCompleted
       }
     } catch (error) {
       usersFailed++;
-      logger.error(
-        { userId, error: String(error) },
-        "Failed to process user day"
-      );
+      logger.error({ userId, error: String(error) }, "Failed to process user day");
     }
   }
 
@@ -152,11 +149,7 @@ export async function processUserDay(
   }
 
   // Fetch user profile
-  const [user] = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
 
   if (!user) {
     logger.warn({ userId }, "User not found — skipping");
@@ -284,7 +277,15 @@ export async function processUserDay(
   const result = await dayAnalyzerRLMService.analyzeDay(input);
 
   // Write results to database
-  await writeResults(userId, user.organizationId, todayStr, dailyActivityId, result, sessions.length, captures.length);
+  await writeResults(
+    userId,
+    user.organizationId,
+    todayStr,
+    dailyActivityId,
+    result,
+    sessions.length,
+    captures.length
+  );
 
   return "processed";
 }
