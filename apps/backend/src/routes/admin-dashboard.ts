@@ -10,7 +10,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { createLogger } from "../lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
@@ -210,19 +210,17 @@ async function computeLiveOrgMetrics(
 
   // User summaries (fetch names)
   const userIds = userRows.map((r) => r.userId);
-  const users = await db
-    .select({
-      id: schema.users.id,
-      firstName: schema.users.firstName,
-      lastName: schema.users.lastName,
-    })
-    .from(schema.users)
-    .where(
-      sql`${schema.users.id} IN (${sql.join(
-        userIds.map((id) => sql`${id}::uuid`),
-        sql`, `
-      )})`
-    );
+  const users =
+    userIds.length > 0
+      ? await db
+          .select({
+            id: schema.users.id,
+            firstName: schema.users.firstName,
+            lastName: schema.users.lastName,
+          })
+          .from(schema.users)
+          .where(inArray(schema.users.id, userIds))
+      : [];
   const nameMap = new Map(
     users.map((u) => [u.id, [u.firstName, u.lastName].filter(Boolean).join(" ") || "Unknown"])
   );
@@ -326,6 +324,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
     // ── Multi-day periods — compute everything from user_daily_activities ──
 
     // Single query: fetch all user daily rows in the date range
+    const MAX_DASHBOARD_ROWS = 10000; // Safety limit for large orgs on wide date ranges
     const allUserRows = await db
       .select({
         userId: schema.userDailyActivities.userId,
@@ -346,7 +345,8 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
           gte(schema.userDailyActivities.activityDate, startDate),
           lte(schema.userDailyActivities.activityDate, endDate)
         )
-      );
+      )
+      .limit(MAX_DASHBOARD_ROWS);
 
     if (allUserRows.length === 0) {
       res.json({
@@ -481,12 +481,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
               lastName: schema.users.lastName,
             })
             .from(schema.users)
-            .where(
-              sql`${schema.users.id} IN (${sql.join(
-                userIds.map((id) => sql`${id}::uuid`),
-                sql`, `
-              )})`
-            )
+            .where(inArray(schema.users.id, userIds))
         : [];
     const nameMap = new Map(
       userProfiles.map((u) => [

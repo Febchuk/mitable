@@ -2770,7 +2770,12 @@ function setupPdfExportHandler() {
           width: 800,
           height: 1100,
           show: false,
-          webPreferences: { offscreen: true },
+          webPreferences: {
+            offscreen: true,
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+          },
         });
 
         const styledHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>

@@ -171,18 +171,22 @@ export async function fetchSessions(
 }
 
 /**
- * Fetch ALL sessions for the current user (auto-paginates)
+ * Fetch ALL sessions for the current user (auto-paginates with circuit breaker)
  */
 export async function fetchAllSessions(): Promise<SessionListItem[]> {
   const all: SessionListItem[] = [];
   let page = 1;
   let hasMore = true;
   const limit = 50; // Max per page
-  while (hasMore) {
+  const MAX_PAGES = 100; // Circuit breaker: 100 pages × 50 = 5000 sessions max
+  while (hasMore && page <= MAX_PAGES) {
     const { sessions, pagination } = await fetchSessions(page, limit);
     all.push(...sessions);
     hasMore = pagination.hasNext;
     page++;
+  }
+  if (page > MAX_PAGES) {
+    logger.warn(`Session fetch capped at ${MAX_PAGES} pages (${all.length} sessions)`);
   }
   return all;
 }

@@ -188,60 +188,65 @@ export async function materializeSession(sessionId: string): Promise<void> {
       });
     }
 
-    // 5. Upsert daily activity row
+    // 5-8. Upsert daily activity, insert blocks, recalculate — all in one transaction
     const dailyActivityId = existingDay?.id || crypto.randomUUID();
 
-    if (!existingDay) {
-      await db.insert(schema.userDailyActivities).values({
-        id: dailyActivityId,
-        userId: session.userId,
-        organizationId: session.organizationId,
-        activityDate,
-        periodType: "daily",
-        processedSessionIds: [sessionId],
-        status: "completed",
-        lastProcessedAt: new Date(),
-      });
-    } else {
-      await db
-        .update(schema.userDailyActivities)
-        .set({
-          processedSessionIds: [...processedIds, sessionId],
+    await db.transaction(async (tx) => {
+      // 5. Upsert daily activity row
+      if (!existingDay) {
+        await tx.insert(schema.userDailyActivities).values({
+          id: dailyActivityId,
+          userId: session.userId,
+          organizationId: session.organizationId,
+          activityDate,
+          periodType: "daily",
+          processedSessionIds: [sessionId],
+          status: "completed",
           lastProcessedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.userDailyActivities.id, dailyActivityId));
-    }
+        });
+      } else {
+        await tx
+          .update(schema.userDailyActivities)
+          .set({
+            processedSessionIds: [...processedIds, sessionId],
+            lastProcessedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.userDailyActivities.id, dailyActivityId));
+      }
 
-    // 6. Get current max sequence number for this day
-    const [{ maxSeq }] = await db
-      .select({ maxSeq: sql<number>`coalesce(max(${schema.activityBlocks.sequenceNumber}), -1)` })
-      .from(schema.activityBlocks)
-      .where(eq(schema.activityBlocks.dailyActivityId, dailyActivityId));
+      // 6. Get current max sequence number for this day
+      const [{ maxSeq }] = await tx
+        .select({ maxSeq: sql<number>`coalesce(max(${schema.activityBlocks.sequenceNumber}), -1)` })
+        .from(schema.activityBlocks)
+        .where(eq(schema.activityBlocks.dailyActivityId, dailyActivityId));
 
-    let nextSeq = (maxSeq ?? -1) + 1;
+      const nextSeq = (maxSeq ?? -1) + 1;
 
-    // 7. Insert activity blocks for this session
-    for (const block of blocks) {
-      await db.insert(schema.activityBlocks).values({
-        dailyActivityId,
-        userId: session.userId,
-        blockType: block.blockType,
-        name: block.name,
-        startTime: block.startTime,
-        endTime: block.endTime,
-        durationMinutes: block.durationMinutes,
-        description: block.description,
-        apps: block.apps,
-        category: block.category,
-        sessionId,
-        sourceSessionIds: [sessionId],
-        sequenceNumber: nextSeq++,
-      });
-    }
+      // 7. Batch insert activity blocks for this session
+      if (blocks.length > 0) {
+        await tx.insert(schema.activityBlocks).values(
+          blocks.map((block, i) => ({
+            dailyActivityId,
+            userId: session.userId,
+            blockType: block.blockType,
+            name: block.name,
+            startTime: block.startTime,
+            endTime: block.endTime,
+            durationMinutes: block.durationMinutes,
+            description: block.description,
+            apps: block.apps,
+            category: block.category,
+            sessionId,
+            sourceSessionIds: [sessionId],
+            sequenceNumber: nextSeq + i,
+          }))
+        );
+      }
 
-    // 8. Recalculate daily aggregate stats from ALL blocks for this day
-    await recalculateDailyStats(dailyActivityId);
+      // 8. Recalculate daily aggregate stats from ALL blocks for this day
+      await recalculateDailyStats(dailyActivityId, tx);
+    });
 
     const elapsed = Date.now() - startMs;
     logger.info(
@@ -347,9 +352,9 @@ function finalizeBlock(captures: CaptureForBlock[], sessionName: string | null):
  * Recalculate aggregate stats for a user_daily_activities row
  * from all its activity_blocks.
  */
-async function recalculateDailyStats(dailyActivityId: string): Promise<void> {
+async function recalculateDailyStats(dailyActivityId: string, txOrDb: typeof db = db): Promise<void> {
   // Fetch all blocks for this day
-  const blocks = await db
+  const blocks = await txOrDb
     .select({
       blockType: schema.activityBlocks.blockType,
       durationMinutes: schema.activityBlocks.durationMinutes,
@@ -405,7 +410,7 @@ async function recalculateDailyStats(dailyActivityId: string): Promise<void> {
     }))
     .sort((a, b) => b.minutes - a.minutes);
 
-  await db
+  await txOrDb
     .update(schema.userDailyActivities)
     .set({
       totalWorkMinutes: Math.round(totalWorkMinutes),

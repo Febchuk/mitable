@@ -1,4 +1,5 @@
 import { pgTable, uuid, varchar, text, timestamp } from "drizzle-orm/pg-core";
+// Note: organizationId uses uuid (not varchar) to match all other schemas
 import { relations } from "drizzle-orm";
 import { users } from "./users.schema";
 
@@ -8,7 +9,7 @@ export const askThreads = pgTable("ask_threads", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  organizationId: varchar("organization_id", { length: 255 }).notNull(),
+  organizationId: uuid("organization_id").notNull(),
   title: varchar("title", { length: 255 }).default("New conversation"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

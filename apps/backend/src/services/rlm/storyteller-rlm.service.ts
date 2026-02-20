@@ -207,8 +207,10 @@ class StorytellerRLMService {
         logger.info("⚠️ Storyteller decision via DeepSeek R1 (fallback)");
         return result;
       }
+      throw new Error(
+        "No LLM available — Claude exhausted retries and DeepSeek not configured"
+      );
     }
-    logger.info("⚠️ Storyteller decision via DeepSeek R1 (no Anthropic key)");
     return this.getLLMDecisionDeepSeek(systemPrompt, messages);
   }
 

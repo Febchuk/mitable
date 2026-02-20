@@ -338,7 +338,8 @@ export function useCalendarDays() {
       return groupSessionsByDay(sessions, emptyCaptures);
     },
     enabled: !!user,
-    refetchInterval: 15000, // Poll periodically for new/active blocks
+    staleTime: 30000,
+    refetchInterval: 60000, // Poll every 60s (was 15s — too aggressive for full pagination)
   });
 }
 
