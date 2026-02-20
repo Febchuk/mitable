@@ -207,9 +207,7 @@ class StorytellerRLMService {
         logger.info("⚠️ Storyteller decision via DeepSeek R1 (fallback)");
         return result;
       }
-      throw new Error(
-        "No LLM available — Claude exhausted retries and DeepSeek not configured"
-      );
+      throw new Error("No LLM available — Claude exhausted retries and DeepSeek not configured");
     }
     return this.getLLMDecisionDeepSeek(systemPrompt, messages);
   }

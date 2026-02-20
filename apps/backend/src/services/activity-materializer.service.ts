@@ -352,7 +352,8 @@ function finalizeBlock(captures: CaptureForBlock[], sessionName: string | null):
  * Recalculate aggregate stats for a user_daily_activities row
  * from all its activity_blocks.
  */
-async function recalculateDailyStats(dailyActivityId: string, txOrDb: typeof db = db): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db): Promise<void> {
   // Fetch all blocks for this day
   const blocks = await txOrDb
     .select({

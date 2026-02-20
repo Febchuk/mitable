@@ -10,7 +10,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, and, desc, asc, gte, lte, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { createLogger } from "../lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
