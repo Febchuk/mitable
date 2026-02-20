@@ -1,6 +1,17 @@
 import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, Zap, Calendar, X, Clock, Briefcase } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  Zap,
+  Calendar,
+  X,
+  Clock,
+  Briefcase,
+  Edit,
+  Check,
+  Clipboard,
+} from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import {
   useDashboardPersonDetail,
@@ -12,10 +23,10 @@ import type {
   DashboardPersonDetail as PersonDetailData,
 } from "@/console/src/services/adminService";
 import DrillDownPanel from "../DashboardView/DrillDownPanel";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
 import { DocEditor } from "@/console/src/components/editor";
 import { useDocument } from "@/console/src/hooks/queries/documents";
+import { updateSessionSummary, reviseSummary } from "@/console/src/services/monitoringService";
+import AIEditPanel from "@/console/src/components/shared/AIEditPanel";
 import { Badge } from "@/components/ui/badge";
 import { getLocale } from "@/console/src/lib/date";
 
@@ -79,9 +90,24 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
 
   // For multi-day periods, show per-day averages; for single-day, show totals
   const divisor = isSingleDay ? 1 : days;
-  const workHours = Math.round((s.totalWorkMinutes / 60 / divisor) * 10) / 10;
-  const meetingHours = Math.round((s.totalMeetingMinutes / 60 / divisor) * 10) / 10;
-  const activeHours = Math.round((s.totalActiveMinutes / 60 / divisor) * 10) / 10;
+
+  // If dailyActivities time totals are all 0 but sessions exist, compute from session durations
+  let effectiveWorkMin = s.totalWorkMinutes;
+  let effectiveActiveMin = s.totalActiveMinutes;
+  const effectiveMeetingMin = s.totalMeetingMinutes;
+
+  if (effectiveWorkMin === 0 && effectiveActiveMin === 0 && api.sessionActivities?.length > 0) {
+    const totalSessionMin = api.sessionActivities.reduce(
+      (sum, sess) => sum + (sess.durationMinutes || 0),
+      0
+    );
+    effectiveWorkMin = totalSessionMin;
+    effectiveActiveMin = totalSessionMin;
+  }
+
+  const workHours = Math.round((effectiveWorkMin / 60 / divisor) * 10) / 10;
+  const meetingHours = Math.round((effectiveMeetingMin / 60 / divisor) * 10) / 10;
+  const activeHours = Math.round((effectiveActiveMin / 60 / divisor) * 10) / 10;
 
   const periodLabel = {
     yesterday: "yesterday",
@@ -90,16 +116,21 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     ytd: "year to date",
     all: "all time",
   }[range];
+  const effectiveWorkPct =
+    effectiveActiveMin > 0 ? Math.round((effectiveWorkMin / effectiveActiveMin) * 100) : 0;
+  const effectiveMeetingPct =
+    effectiveActiveMin > 0 ? Math.round((effectiveMeetingMin / effectiveActiveMin) * 100) : 0;
+
   const moodLabel =
-    s.meetingPercentage > 50
+    effectiveMeetingPct > 50
       ? "Meeting-heavy"
-      : s.workPercentage > 70
+      : effectiveWorkPct > 70
         ? "Focused"
         : "Collaborative";
   const moodColor =
-    s.meetingPercentage > 50
+    effectiveMeetingPct > 50
       ? "bg-yellow-500/15 text-yellow-400"
-      : s.workPercentage > 70
+      : effectiveWorkPct > 70
         ? "bg-emerald/15 text-emerald"
         : "bg-indigo/15 text-indigo-light";
 
@@ -111,8 +142,10 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     }
   }
 
-  // Fall back to session-level classifications only when dailyActivities has no category data
-  if (categoryMinutes.size === 0 && api.sessionActivities && api.sessionActivities.length > 0) {
+  // Fall back to session-level classifications when dailyActivities have no meaningful category data
+  const totalCategoryMinutes = [...categoryMinutes.values()].reduce((s, v) => s + v, 0);
+  if (totalCategoryMinutes === 0 && api.sessionActivities && api.sessionActivities.length > 0) {
+    categoryMinutes.clear();
     for (const session of api.sessionActivities) {
       for (const act of session.activities || []) {
         const cat = act.category || "Other";
@@ -137,14 +170,43 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     );
   }
 
-  const trend: PersonViewModel["weeklyTrend"] = api.dailyActivities
-    .map((d) => ({
-      day: d.date,
-      focus: Math.round((d.totalWorkMinutes / 60) * 10) / 10,
-      meetings: Math.round((d.totalMeetingMinutes / 60) * 10) / 10,
+  // Build trend — fall back to session durations when dailyActivities time fields are 0
+  const dailyTotalsAreZero = api.dailyActivities.every(
+    (d) => d.totalWorkMinutes === 0 && d.totalMeetingMinutes === 0
+  );
+  let trend: PersonViewModel["weeklyTrend"];
+
+  if (dailyTotalsAreZero && api.sessionActivities?.length > 0) {
+    // Group session minutes by date
+    const sessionMinByDate = new Map<string, number>();
+    for (const sess of api.sessionActivities) {
+      const dateKey = new Date(sess.startedAt).toISOString().split("T")[0]!;
+      sessionMinByDate.set(
+        dateKey,
+        (sessionMinByDate.get(dateKey) || 0) + (sess.durationMinutes || 0)
+      );
+    }
+    // Merge with dailyActivities dates (to keep the date range correct)
+    const allDates = new Set([
+      ...api.dailyActivities.map((d) => d.date),
+      ...sessionMinByDate.keys(),
+    ]);
+    trend = [...allDates].sort().map((date) => ({
+      day: date,
+      focus: Math.round(((sessionMinByDate.get(date) || 0) / 60) * 10) / 10,
+      meetings: 0,
       other: 0,
-    }))
-    .reverse();
+    }));
+  } else {
+    trend = api.dailyActivities
+      .map((d) => ({
+        day: d.date,
+        focus: Math.round((d.totalWorkMinutes / 60) * 10) / 10,
+        meetings: Math.round((d.totalMeetingMinutes / 60) * 10) / 10,
+        other: 0,
+      }))
+      .reverse();
+  }
 
   // Build recent work items from session summaries + user docs
   const recentWork: RecentWorkItem[] = [];
@@ -231,8 +293,10 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     }
   }
 
-  // Fall back to session-level classifications only when dailyActivities has no data
-  if (topicCounts.size === 0 && api.sessionActivities && api.sessionActivities.length > 0) {
+  // Fall back to session-level classifications when dailyActivities have no meaningful topic data
+  const totalTopicCounts = [...topicCounts.values()].reduce((s, v) => s + v, 0);
+  if (totalTopicCounts === 0 && api.sessionActivities && api.sessionActivities.length > 0) {
+    topicCounts.clear();
     for (const session of api.sessionActivities) {
       for (const act of session.activities || []) {
         const label = act.category || "Other";
@@ -312,11 +376,6 @@ const timeRangeLabels: Record<TimeRange, string> = {
   all: "All Time",
 };
 
-function renderMarkdownContent(content: string): string {
-  const raw = marked.parse(content);
-  return DOMPurify.sanitize(typeof raw === "string" ? raw : "");
-}
-
 export default function PersonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -326,6 +385,8 @@ export default function PersonDetail() {
   const [selectedWork, setSelectedWork] = useState<RecentWorkItem | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [workFilter, setWorkFilter] = useState<"all" | "session" | "doc">("all");
+  const [isEditingSummary, setIsEditingSummary] = useState(false);
+  const [copiedSummary, setCopiedSummary] = useState(false);
 
   const { data: apiDetail } = useDashboardPersonDetail(id || "", timeRangeToPeriod[timeRange]);
   const { data: drillDownData } = useUserDrillDown(
@@ -487,6 +548,130 @@ export default function PersonDetail() {
               />
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Full-page session summary view — AI Edit mode (reuses AIEditPanel)
+  if (selectedWork && selectedWork.type === "session" && isEditingSummary) {
+    return (
+      <AIEditPanel
+        title="Edit Summary"
+        subtitle={selectedWork.title}
+        initialContent={selectedWork.fullContent}
+        onSave={async (content: string) => {
+          await updateSessionSummary(selectedWork.id, content);
+          setSelectedWork({ ...selectedWork, fullContent: content });
+          setIsEditingSummary(false);
+        }}
+        onAutoSave={async (content: string) => {
+          await updateSessionSummary(selectedWork.id, content);
+        }}
+        onCancel={() => setIsEditingSummary(false)}
+        onRevise={async (instruction: string, currentContent: string) => {
+          return reviseSummary(selectedWork.id, instruction, currentContent);
+        }}
+        placeholder="Edit the session summary..."
+        contextLabel="session summary"
+        sessionId={selectedWork.id}
+      />
+    );
+  }
+
+  // Full-page session summary view — read mode (like doc viewer)
+  if (selectedWork && selectedWork.type === "session") {
+    const handleCopySummary = async () => {
+      await navigator.clipboard.writeText(selectedWork.fullContent);
+      setCopiedSummary(true);
+      setTimeout(() => setCopiedSummary(false), 2000);
+    };
+
+    return (
+      <div className="h-screen flex flex-col">
+        {/* Session header */}
+        <div className="flex items-start justify-between p-6 border-b border-border-subtle">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                setSelectedWork(null);
+                setIsEditingSummary(false);
+              }}
+              className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald/10 flex items-center justify-center">
+                <Zap size={20} className="text-emerald" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-text-primary">{selectedWork.title}</h2>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="text-text-secondary text-sm">
+                    {selectedWork.date}, {selectedWork.time}
+                  </span>
+                  {selectedWork.durationMinutes != null && selectedWork.durationMinutes > 0 && (
+                    <span className="text-text-secondary text-sm">
+                      · {truncateDuration(selectedWork.durationMinutes)}
+                    </span>
+                  )}
+                  {selectedWork.category && (
+                    <Badge className="bg-canvas-overlay text-text-secondary text-[10px]">
+                      {selectedWork.category}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary content */}
+        <div className="flex-1 overflow-auto bg-background-primary">
+          <div className="max-w-3xl mx-auto px-8 py-6">
+            {/* Summary heading + actions */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-text-primary">Summary</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopySummary}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-canvas-overlay border border-stroke-subtle transition-colors"
+                >
+                  {copiedSummary ? (
+                    <>
+                      <Check size={14} className="text-emerald" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Clipboard size={14} />
+                      Copy
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setIsEditingSummary(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-canvas-overlay border border-stroke-subtle transition-colors"
+                >
+                  <Edit size={14} />
+                  Edit
+                </button>
+              </div>
+            </div>
+
+            {/* Summary body — rich text rendering */}
+            <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-5">
+              <DocEditor
+                key={selectedWork.id}
+                initialContent={selectedWork.fullContent}
+                readOnly
+                showToolbar={false}
+                placeholder=""
+                className="h-full"
+              />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -928,72 +1113,6 @@ export default function PersonDetail() {
                   );
                 })
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Summary detail modal */}
-      {selectedWork && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setSelectedWork(null)}
-          />
-          <div className="relative w-full max-w-2xl max-h-[80vh] bg-canvas-raised border border-stroke-subtle rounded-2xl shadow-2xl flex flex-col">
-            {/* Modal header */}
-            <div className="flex items-start justify-between p-5 border-b border-stroke-subtle">
-              <div className="flex items-start gap-3 min-w-0">
-                <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                    selectedWork.type === "doc"
-                      ? "text-indigo-light bg-indigo/15"
-                      : "text-emerald bg-emerald/15"
-                  }`}
-                >
-                  {selectedWork.type === "doc" ? <FileText size={16} /> : <Zap size={16} />}
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-base font-semibold text-text-primary truncate">
-                    {selectedWork.title}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-text-tertiary">
-                      {selectedWork.date}, {selectedWork.time}
-                    </span>
-                    {selectedWork.category && (
-                      <span className="text-[10px] font-medium text-text-tertiary bg-canvas-overlay px-1.5 py-0.5 rounded">
-                        {selectedWork.category}
-                      </span>
-                    )}
-                    {selectedWork.docType && (
-                      <span className="text-[10px] font-medium text-indigo-light bg-indigo/10 px-1.5 py-0.5 rounded">
-                        {selectedWork.docType}
-                      </span>
-                    )}
-                    {selectedWork.durationMinutes != null && selectedWork.durationMinutes > 0 && (
-                      <span className="text-[10px] text-text-tertiary">
-                        {truncateDuration(selectedWork.durationMinutes)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedWork(null)}
-                className="p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            {/* Modal content — rendered markdown */}
-            <div className="flex-1 overflow-y-auto p-5">
-              <div
-                className="prose prose-invert prose-sm max-w-none text-text-primary prose-headings:text-text-primary prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-primary prose-a:text-indigo-light"
-                dangerouslySetInnerHTML={{
-                  __html: renderMarkdownContent(selectedWork.fullContent),
-                }}
-              />
             </div>
           </div>
         </div>

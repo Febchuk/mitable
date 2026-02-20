@@ -771,7 +771,9 @@ router.get(
 
       // Fetch recent sessions + docs independent of the period filter
       // (admins should always see latest work without needing to switch to "all time")
-      const sessionActivities = await db
+      // Fetch recent sessions, excluding noise/short sessions (same gate as summarization:
+      // sessions must be >= 3 min active duration OR have a real summary, not "Short session")
+      const allSessionActivities = await db
         .select({
           id: schema.monitoringSessions.id,
           name: schema.monitoringSessions.name,
@@ -784,7 +786,20 @@ router.get(
         .from(schema.monitoringSessions)
         .where(eq(schema.monitoringSessions.userId, targetUserId))
         .orderBy(desc(schema.monitoringSessions.startedAt))
-        .limit(20);
+        .limit(50);
+
+      const MIN_SESSION_DURATION_MS = 3 * 60 * 1000; // 3 minutes
+      const sessionActivities = allSessionActivities
+        .filter((s) => {
+          if (s.name === "Short session") return false;
+          if (!s.endedAt) return true; // still active
+          const activeMs = Math.max(
+            0,
+            new Date(s.endedAt).getTime() - new Date(s.startedAt).getTime() - (s.totalPausedMs || 0)
+          );
+          return activeMs >= MIN_SESSION_DURATION_MS;
+        })
+        .slice(0, 20);
 
       const userDocs = await db
         .select({

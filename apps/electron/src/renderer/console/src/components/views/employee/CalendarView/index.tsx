@@ -10,19 +10,16 @@
  * - Sessions are transformed into WorkBlocks with status tracking
  */
 
-import { useState, useMemo, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
   ChevronRight,
   Calendar,
   CalendarDays,
   Sparkles,
-  MoreVertical,
-  Plus,
-  FileText,
-  X,
-  Target,
+  Circle,
+  Square,
   LayoutGrid,
   List,
   Loader2,
@@ -36,7 +33,10 @@ import {
   type CalendarEvent,
 } from "@/components/application/calendar/calendar";
 import type { ActivityDay } from "./types";
-import { useCalendarDays } from "../../../../hooks/queries/calendar";
+import { useCalendarDays, calendarKeys } from "../../../../hooks/queries/calendar";
+import { useStartSession } from "../../../../hooks/useStartSession";
+import { useSessions, monitoringKeys } from "../../../../hooks/queries/monitoring";
+import { endSession, uploadCaptures } from "../../../../services/monitoringService";
 
 // Helper functions
 function getStartOfWeek(date: Date): Date {
@@ -123,35 +123,57 @@ function workBlocksToCalendarEvents(days: ActivityDay[]): CalendarEvent[] {
 type ViewMode = "detail" | "week" | "month";
 
 export default function CalendarView() {
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
   const [viewMode, setViewMode] = useState<ViewMode>("detail");
 
-  // Menu and dialog states
-  const [showMenu, setShowMenu] = useState(false);
-  const [showNewBlockDialog, setShowNewBlockDialog] = useState(false);
-  const [newBlockGoal, setNewBlockGoal] = useState("");
+  // Session start/stop — use Electron-local state for immediate UI updates
+  const { startSession, isStarting } = useStartSession({ navigateOnSuccess: false });
+  const { data: monitoringData } = useSessions();
+  const backendActiveSession = monitoringData?.sessions?.find(
+    (s: any) => s.status === "active" || s.status === "paused"
+  );
+  const [isStopping, setIsStopping] = useState(false);
+  const [electronSessionActive, setElectronSessionActive] = useState<boolean | null>(null);
+  const [electronSessionId, setElectronSessionId] = useState<string | null>(null);
 
-  const menuRef = useRef<HTMLDivElement>(null);
+  // Listen to Electron-local session state for immediate button response
+  useEffect(() => {
+    // Check initial state
+    window.consoleAPI?.getMonitoringSessionState?.().then((state) => {
+      setElectronSessionActive(state?.status === "active" || state?.status === "paused");
+      setElectronSessionId(state?.id || null);
+    });
+    // Listen for updates
+    const unsub = window.consoleAPI?.onMonitoringSessionUpdate?.((state) => {
+      const isActive = state?.status === "active" || state?.status === "paused";
+      setElectronSessionActive(isActive);
+      setElectronSessionId(state?.id || null);
+    });
+    return () => unsub?.();
+  }, []);
+
+  // Use Electron state for button, fall back to backend query
+  const activeSession =
+    electronSessionActive !== null
+      ? electronSessionActive
+        ? backendActiveSession || { id: electronSessionId }
+        : undefined
+      : backendActiveSession;
+
+  // Invalidate both calendar and sessions caches so UI updates immediately
+  const refreshData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
+    queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+  }, [queryClient]);
 
   // Fetch real data from backend
   const { data: realDays, isLoading: isLoadingDays, error: daysError } = useCalendarDays();
 
   // Use real data only — no mock fallback (mock IDs cause backend 500 errors)
   const allDays = realDays || [];
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   // Get week days with activity data
   const weekDays = useMemo(() => {
@@ -205,15 +227,7 @@ export default function CalendarView() {
   const canNavigateNext = viewMode === "month" ? !isCurrentMonth : !isCurrentWeek;
 
   // Check if there's an active work block
-  const hasActiveBlock = selectedDay.workBlocks.some((b) => b.isActive);
-
-  // Navigate to create recap with all blocks pre-selected
-  const handleCreateRecap = () => {
-    const blockIds = selectedDay.workBlocks.map((b) => b.id).join(",");
-    const dateStr = selectedDay.date.toISOString().split("T")[0];
-    navigate(`/recaps/new?blocks=${blockIds}&date=${dateStr}`);
-    setShowMenu(false);
-  };
+  const hasActiveBlock = !!activeSession;
 
   // Navigate based on view mode
   const goToPrevious = () => {
@@ -267,11 +281,32 @@ export default function CalendarView() {
     return formatDateRange(weekStart, getEndOfWeek(weekStart));
   };
 
-  // Handle actions
-  const handleStartNewBlock = () => {
-    console.log("Starting new block with goal:", newBlockGoal || "(no goal)");
-    setShowNewBlockDialog(false);
-    setNewBlockGoal("");
+  // Handle record toggle
+  const handleRecord = async () => {
+    if (activeSession && activeSession.id) {
+      const sessionId = activeSession.id;
+      setIsStopping(true);
+      try {
+        // 1. Stop Electron capture loop and get remaining captures
+        const electronResult = await window.consoleAPI.endMonitoringSession();
+
+        // 2. Upload any remaining captures
+        if (electronResult.captures && electronResult.captures.length > 0) {
+          await uploadCaptures(sessionId, electronResult.captures);
+        }
+
+        // 3. End session on backend (triggers storyteller + classification)
+        await endSession(sessionId);
+        refreshData();
+      } catch (error) {
+        console.error("Failed to end session:", error);
+      } finally {
+        setIsStopping(false);
+      }
+    } else {
+      await startSession();
+      refreshData();
+    }
   };
 
   // Is this a calendar grid view (week or month)?
@@ -350,38 +385,33 @@ export default function CalendarView() {
                 </button>
               </div>
 
-              {/* Three-dot menu */}
-              <div className="relative" ref={menuRef}>
-                <button
-                  onClick={() => setShowMenu(!showMenu)}
-                  className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
-                >
-                  <MoreVertical size={20} />
-                </button>
-
-                {showMenu && (
-                  <div className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-50">
-                    <button
-                      onClick={handleCreateRecap}
-                      disabled={selectedDay.workBlocks.length === 0}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <FileText size={16} className="text-indigo" />
-                      <span className="text-sm text-ink-primary">Create Recap</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowNewBlockDialog(true);
-                        setShowMenu(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle"
-                    >
-                      <Plus size={16} className="text-ink-tertiary" />
-                      <span className="text-sm text-ink-primary">Start New Block</span>
-                    </button>
-                  </div>
+              {/* Record / Stop button */}
+              <button
+                onClick={handleRecord}
+                disabled={isStarting || isStopping}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  activeSession
+                    ? "bg-rose/10 text-rose border border-rose/20 hover:bg-rose/20"
+                    : "bg-indigo text-white hover:bg-indigo/90 shadow-sm hover:shadow-md"
+                } disabled:opacity-60 disabled:cursor-not-allowed`}
+              >
+                {isStarting ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : isStopping ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : activeSession ? (
+                  <Square size={14} className="fill-current" />
+                ) : (
+                  <Circle size={14} className="fill-current" />
                 )}
-              </div>
+                {isStarting
+                  ? "Starting..."
+                  : isStopping
+                    ? "Stopping..."
+                    : activeSession
+                      ? "Stop"
+                      : "Record"}
+              </button>
             </div>
           </div>
 
@@ -513,75 +543,6 @@ export default function CalendarView() {
           </>
         )}
       </div>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-          NEW BLOCK DIALOG
-          ═══════════════════════════════════════════════════════════════════ */}
-      {showNewBlockDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowNewBlockDialog(false)}
-          />
-          <div className="relative bg-canvas-overlay rounded-2xl border border-stroke-subtle shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-stroke-subtle">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-indigo/10">
-                  <Target size={18} className="text-indigo" />
-                </div>
-                <div>
-                  <h3 className="font-display text-lg font-semibold text-ink-primary">
-                    Start New Block
-                  </h3>
-                  <p className="text-xs text-ink-tertiary">Begin a new work session</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowNewBlockDialog(false)}
-                className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label
-                  htmlFor="goal-input"
-                  className="block text-sm font-medium text-ink-secondary mb-2"
-                >
-                  What are you working on? (optional)
-                </label>
-                <input
-                  id="goal-input"
-                  type="text"
-                  value={newBlockGoal}
-                  onChange={(e) => setNewBlockGoal(e.target.value)}
-                  placeholder="e.g., Complete Calendar UI prototype"
-                  className="w-full px-4 py-3 rounded-lg bg-canvas-muted border border-stroke-subtle text-ink-primary placeholder:text-ink-tertiary focus:outline-none focus:border-indigo focus:ring-1 focus:ring-indigo/20 transition-all"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-stroke-subtle bg-canvas-muted/30">
-              <button
-                onClick={() => setShowNewBlockDialog(false)}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-ink-secondary hover:bg-canvas-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleStartNewBlock}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo text-white font-medium text-sm hover:bg-indigo/90 transition-colors"
-              >
-                <Plus size={16} />
-                Start Block
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

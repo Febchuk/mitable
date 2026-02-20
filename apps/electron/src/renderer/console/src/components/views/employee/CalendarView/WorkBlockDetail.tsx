@@ -7,6 +7,21 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
+/** Strip markdown formatting for clean plain-text display */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/#{1,6}\s*/g, "") // headings
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // bold
+    .replace(/\*([^*]+)\*/g, "$1") // italic
+    .replace(/__([^_]+)__/g, "$1") // bold alt
+    .replace(/_([^_]+)_/g, "$1") // italic alt
+    .replace(/^[-*+]\s+/gm, "• ") // list bullets
+    .replace(/\n{2,}/g, " — ") // paragraph breaks → dash separator
+    .replace(/\n/g, " ") // remaining newlines → space
+    .replace(/\s{2,}/g, " ") // collapse whitespace
+    .trim();
+}
 import {
   ChevronDown,
   ChevronRight,
@@ -223,7 +238,7 @@ export default function WorkBlockDetail({
               </div>
             )}
             <p className="text-sm text-ink-primary line-clamp-2">
-              {displaySummary || "No summary yet"}
+              {displaySummary ? stripMarkdown(displaySummary) : "No summary yet"}
             </p>
           </div>
 
@@ -336,8 +351,8 @@ export default function WorkBlockDetail({
                     <Loader2 size={12} className="text-ink-tertiary animate-spin" />
                   )}
                 </div>
-                <p className="text-sm text-ink-secondary leading-relaxed">
-                  {displaySummary || "Loading..."}
+                <p className="text-sm text-ink-secondary leading-relaxed whitespace-pre-line">
+                  {displaySummary ? stripMarkdown(displaySummary) : "Loading..."}
                 </p>
                 {/* Create Recap action */}
                 {block.status !== "active" && block.status !== "paused" && (

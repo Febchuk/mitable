@@ -73,3 +73,20 @@ export const DocEditorKit = [
   ...FixedToolbarKit,
   ...FloatingToolbarKit,
 ];
+
+/** Same as DocEditorKit but without toolbar plugins — for clean read-only rendering */
+export const DocEditorKitNoToolbar = [
+  ...AIKit,
+  ...BasicBlocksKit,
+  ...CodeBlockKit,
+  ...TableKit,
+  ...LinkKit,
+  ...BasicMarksKit,
+  ...ListKit,
+  ...AutoformatKit,
+  ...CursorOverlayKit,
+  ...BlockMenuKit,
+  ...ExitBreakKit,
+  TrailingBlockPlugin,
+  ...MarkdownKit,
+];

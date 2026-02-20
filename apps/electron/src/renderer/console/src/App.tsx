@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
@@ -38,11 +38,15 @@ import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
 import AskView from "./components/views/admin/AskView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 // Navigation handler - listens for IPC navigation events from main process
 function NavigationHandler() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const pathnameRef = useRef(location.pathname);
+  pathnameRef.current = location.pathname;
 
   useEffect(() => {
     // Skip if not running in Electron or preload script not ready
@@ -93,6 +97,13 @@ function NavigationHandler() {
     });
 
     const unsubscribeSessionDetail = window.consoleAPI.onNavigateToSessionDetail?.((payload) => {
+      // If user is on Calendar view, don't navigate away — just refresh data
+      if (pathnameRef.current === "/calendar") {
+        logger.info(" Session detail event on Calendar — refreshing data instead of navigating");
+        queryClient.invalidateQueries({ queryKey: ["calendar"] });
+        queryClient.invalidateQueries({ queryKey: ["monitoring"] });
+        return;
+      }
       logger.info(" Navigating to session detail:", payload);
       const params = new URLSearchParams();
       if (payload.openEndDialog) {
@@ -111,7 +122,7 @@ function NavigationHandler() {
       unsubscribeEndDialog?.();
       unsubscribeSessionDetail?.();
     };
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   return null;
 }
@@ -129,11 +140,13 @@ function MonitoringSessionHandler() {
     const unsubscribe = window.consoleAPI.onMonitoringSessionUpdate?.((state) => {
       logger.info(" Monitoring session update:", state?.status, state?.id);
 
-      // Invalidate session queries on any status change (paused, active, ended)
+      // Invalidate session + calendar queries on any status change (paused, active, ended, cleared)
       if (state?.id) {
         queryClient.invalidateQueries({ queryKey: monitoringKeys.session(state.id) });
-        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
       }
+      // Always invalidate sessions list + calendar — including when state is null (session cleared)
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+      queryClient.invalidateQueries({ queryKey: ["calendar"] });
     });
 
     return () => unsubscribe?.();

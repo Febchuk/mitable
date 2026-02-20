@@ -259,10 +259,19 @@ function groupSessionsByDay(
   sessions: SessionListItem[],
   sessionsWithCaptures: Map<string, SessionCapture[]>
 ): ActivityDay[] {
+  const MIN_SESSION_DURATION_MS = 3 * 60 * 1000; // 3 minutes — same gate as summarization pipeline
+
+  // Filter out noise/short sessions (same gate as backend summarization)
+  const meaningful = sessions.filter((s) => {
+    if (s.name === "Short session") return false;
+    if (s.status === "active" || s.status === "paused") return true; // keep active sessions
+    return s.duration.activeMs >= MIN_SESSION_DURATION_MS;
+  });
+
   const dayMap = new Map<string, SessionListItem[]>();
 
   // Group sessions by day
-  for (const session of sessions) {
+  for (const session of meaningful) {
     const dateKey = new Date(session.startedAt).toISOString().split("T")[0];
     const daySessions = dayMap.get(dateKey) || [];
     daySessions.push(session);
@@ -338,8 +347,16 @@ export function useCalendarDays() {
       return groupSessionsByDay(sessions, emptyCaptures);
     },
     enabled: !!user,
-    staleTime: 30000,
-    refetchInterval: 60000, // Poll every 60s (was 15s — too aggressive for full pagination)
+    staleTime: 5000,
+    // Poll every 5s when there's an active/paused session, 60s otherwise
+    refetchInterval: (query) => {
+      const days = query.state.data;
+      if (!days) return 60000;
+      const hasActive = days.some((d) =>
+        d.workBlocks.some((b) => b.status === "active" || b.status === "paused")
+      );
+      return hasActive ? 5000 : 60000;
+    },
   });
 }
 
