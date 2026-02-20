@@ -1,8 +1,12 @@
 import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, Zap, Calendar, X } from "lucide-react";
+import { ArrowLeft, FileText, Zap, Calendar, X, Clock, Briefcase } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useDashboardPersonDetail, useUserDrillDown } from "@/console/src/hooks/queries/admin";
+import {
+  useDashboardPersonDetail,
+  useUserDrillDown,
+  useCategoryActivities,
+} from "@/console/src/hooks/queries/admin";
 import type {
   DashboardPeriod,
   DashboardPersonDetail as PersonDetailData,
@@ -99,22 +103,20 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
         ? "bg-emerald/15 text-emerald"
         : "bg-indigo/15 text-indigo-light";
 
-  // Aggregate activity breakdown from session-level classifications
+  // Aggregate activity breakdown from period-filtered dailyActivities (respects time filter)
   const categoryMinutes = new Map<string, number>();
-  if (api.sessionActivities && api.sessionActivities.length > 0) {
+  for (const day of api.dailyActivities) {
+    for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
+      categoryMinutes.set(c.category, (categoryMinutes.get(c.category) || 0) + c.minutes);
+    }
+  }
+
+  // Fall back to session-level classifications only when dailyActivities has no category data
+  if (categoryMinutes.size === 0 && api.sessionActivities && api.sessionActivities.length > 0) {
     for (const session of api.sessionActivities) {
       for (const act of session.activities || []) {
         const cat = act.category || "Other";
         categoryMinutes.set(cat, (categoryMinutes.get(cat) || 0) + (act.minutes || 0));
-      }
-    }
-  }
-
-  // Fall back to dailyActivities category breakdown if no session data
-  if (categoryMinutes.size === 0) {
-    for (const day of api.dailyActivities) {
-      for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
-        categoryMinutes.set(c.category, (categoryMinutes.get(c.category) || 0) + c.minutes);
       }
     }
   }
@@ -220,23 +222,21 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     return db - da;
   });
 
-  // Aggregate top topics from session activity names
+  // Aggregate top topics from period-filtered dailyActivities (respects time filter)
   const topicCounts = new Map<string, number>();
-  if (api.sessionActivities && api.sessionActivities.length > 0) {
+  for (const day of api.dailyActivities) {
+    for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
+      const label = c.category.charAt(0).toUpperCase() + c.category.slice(1);
+      topicCounts.set(label, (topicCounts.get(label) || 0) + Math.round(c.minutes / 30));
+    }
+  }
+
+  // Fall back to session-level classifications only when dailyActivities has no data
+  if (topicCounts.size === 0 && api.sessionActivities && api.sessionActivities.length > 0) {
     for (const session of api.sessionActivities) {
       for (const act of session.activities || []) {
         const label = act.category || "Other";
         topicCounts.set(label, (topicCounts.get(label) || 0) + 1);
-      }
-    }
-  }
-
-  // Fall back to dailyActivities
-  if (topicCounts.size === 0) {
-    for (const day of api.dailyActivities) {
-      for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
-        const label = c.category.charAt(0).toUpperCase() + c.category.slice(1);
-        topicCounts.set(label, (topicCounts.get(label) || 0) + Math.round(c.minutes / 30));
       }
     }
   }
@@ -320,8 +320,9 @@ function renderMarkdownContent(content: string): string {
 export default function PersonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [timeRange, setTimeRange] = useState<TimeRange>("yesterday");
+  const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [drillDownMetric, setDrillDownMetric] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedWork, setSelectedWork] = useState<RecentWorkItem | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [workFilter, setWorkFilter] = useState<"all" | "session" | "doc">("all");
@@ -332,14 +333,29 @@ export default function PersonDetail() {
     drillDownMetric,
     timeRangeToPeriod[timeRange]
   );
+  const { data: categoryData } = useCategoryActivities(
+    id || "",
+    selectedCategory,
+    timeRangeToPeriod[timeRange]
+  );
   const { data: docData, isLoading: docLoading } = useDocument(selectedDocId || "");
 
   const handleDrillDown = (label: string) => {
     const metricKey = LABEL_TO_METRIC[label] || label.toLowerCase();
-    setDrillDownMetric(metricKey);
+    // If it's a known metric card, use org-style drill-down; otherwise it's a category
+    if (LABEL_TO_METRIC[label]) {
+      setSelectedCategory(null);
+      setDrillDownMetric(metricKey);
+    } else {
+      setDrillDownMetric(null);
+      setSelectedCategory(metricKey);
+    }
   };
 
-  const closeDrillDown = () => setDrillDownMetric(null);
+  const closeDrillDown = () => {
+    setDrillDownMetric(null);
+    setSelectedCategory(null);
+  };
 
   const person = useMemo(() => {
     if (apiDetail) {
@@ -802,10 +818,118 @@ export default function PersonDetail() {
         </div>
       </div>
 
-      {/* Drill-down overlay panel */}
+      {/* Metric drill-down overlay (org-style — for metric cards) */}
       {drillDownMetric && drillDownData && (
         <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
           <DrillDownPanel data={drillDownData} onClose={closeDrillDown} />
+        </div>
+      )}
+
+      {/* Category activity list panel (per-user — for activity breakdown) */}
+      {selectedCategory && (
+        <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
+          <div className="flex flex-col h-full rounded-xl border border-stroke-subtle bg-canvas-raised overflow-hidden">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-stroke-subtle shrink-0">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={closeDrillDown}
+                  className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  <ArrowLeft size={14} />
+                  Back
+                </button>
+                <button
+                  onClick={closeDrillDown}
+                  className="p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <h2 className="text-lg font-semibold text-text-primary mt-2 capitalize">
+                {selectedCategory}
+              </h2>
+              <p className="text-xs text-text-secondary mt-0.5">
+                {categoryData
+                  ? `${categoryData.totalHours}h across ${categoryData.activityCount} activities · ${timeRangeLabels[timeRange]}`
+                  : "Loading..."}
+              </p>
+            </div>
+
+            {/* Activity list */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {!categoryData ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : categoryData.activities.length === 0 ? (
+                <p className="text-sm text-text-tertiary text-center py-12">
+                  No activities in this category for the selected period.
+                </p>
+              ) : (
+                categoryData.activities.map((act) => {
+                  const date = new Date(act.startTime);
+                  const dateStr = date.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  });
+                  const timeStr = date.toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                  });
+                  const hours = Math.floor(act.durationMinutes / 60);
+                  const mins = act.durationMinutes % 60;
+                  const duration =
+                    hours > 0 ? `${hours}h ${mins > 0 ? `${mins}m` : ""}` : `${mins}m`;
+
+                  return (
+                    <div
+                      key={act.id}
+                      className="rounded-lg border border-stroke-subtle bg-canvas-overlay/50 p-3 hover:border-indigo/30 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                              act.blockType === "meeting"
+                                ? "text-yellow-400 bg-yellow-500/15"
+                                : "text-indigo-light bg-indigo/15"
+                            }`}
+                          >
+                            {act.blockType === "meeting" ? (
+                              <Calendar size={14} />
+                            ) : (
+                              <Briefcase size={14} />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-medium text-text-primary leading-snug">
+                              {act.name}
+                            </p>
+                            {act.description && act.description !== act.name && (
+                              <p className="text-xs text-text-secondary mt-0.5 line-clamp-2 leading-relaxed">
+                                {act.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-xs font-medium text-text-secondary whitespace-nowrap shrink-0">
+                          {duration}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2 ml-[38px]">
+                        <span className="text-[10px] text-text-tertiary flex items-center gap-1">
+                          <Clock size={10} />
+                          {dateStr}, {timeStr}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
       )}
 

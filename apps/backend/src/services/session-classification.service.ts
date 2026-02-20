@@ -1,17 +1,19 @@
 /**
  * Session Classification Service
  *
- * Classifies a session's captures into high-level activities using Groq.
+ * Classifies a session's captures into high-level activities using Claude.
  * Writes the result to monitoring_sessions.keyActivities as a JSONB array.
  *
  * Each activity: { activity, category, minutes, description }
  *
- * This is the per-session equivalent of the capture rollup's day-level
- * classification. The base unit is the activity (not the session), which
- * aligns with the upcoming calendar/journal feature where blocks = activities.
+ * Claude builds a narrative timeline from raw captures — grouping related
+ * window switches into coherent activities (e.g., all Teams windows during
+ * a call → one "Meeting" activity, filling out a timesheet mid-meeting →
+ * a separate "Project Management" activity).
  */
 
-import Groq from "groq-sdk";
+import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, asc } from "drizzle-orm";
@@ -20,7 +22,8 @@ import { createLogger } from "../lib/logger";
 
 const logger = createLogger({ context: "session-classification" });
 
-const groq = new Groq({ apiKey: config.groq.apiKey });
+const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
+const openai = new OpenAI({ apiKey: config.openai.apiKey });
 
 export interface ClassifiedActivity {
   activity: string;
@@ -30,7 +33,7 @@ export interface ClassifiedActivity {
 }
 
 /**
- * Classify a single session's captures into activities via Groq.
+ * Classify a single session's captures into activities via Claude.
  * Reads captures + optional transcript, writes keyActivities on the session.
  * Returns the classified activities (or empty array on failure).
  */
@@ -59,6 +62,8 @@ export async function classifySession(sessionId: string): Promise<ClassifiedActi
       endedAt: schema.monitoringSessions.endedAt,
       totalPausedMs: schema.monitoringSessions.totalPausedMs,
       name: schema.monitoringSessions.name,
+      finalSummary: schema.monitoringSessions.finalSummary,
+      rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
     })
     .from(schema.monitoringSessions)
     .where(eq(schema.monitoringSessions.id, sessionId))
@@ -84,68 +89,78 @@ export async function classifySession(sessionId: string): Promise<ClassifiedActi
         .map((t) => t.transcript)
         .filter(Boolean)
         .join(" ")
-        .slice(0, 400);
+        .slice(0, 600);
     }
   } catch {
     // sessionTranscripts may not exist for older sessions
   }
 
-  // Build capture lines for Groq
+  // Build timestamped capture lines for Claude
   const captureLines: string[] = [];
   for (const c of captures) {
-    const parts: string[] = [];
+    const time = new Date(c.capturedAt).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const parts: string[] = [time];
     if (c.appName) parts.push(c.appName);
     if (c.windowTitle) parts.push(`"${c.windowTitle}"`);
     if (c.activityDescription) parts.push(`— ${c.activityDescription}`);
-    if (parts.length > 0) captureLines.push(parts.join(" "));
+    captureLines.push(parts.join(" | "));
   }
 
-  const uniqueLines = [...new Set(captureLines)].slice(0, 60);
+  // Include timestamps but deduplicate consecutive identical entries
+  const deduped: string[] = [];
+  let prev = "";
+  for (const line of captureLines) {
+    const withoutTime = line.substring(6); // strip HH:MM prefix
+    if (withoutTime !== prev) {
+      deduped.push(line);
+      prev = withoutTime;
+    }
+  }
+  const lines = deduped.slice(0, 80);
 
-  const transcriptContext = transcriptSnippet ? `\nTranscript excerpt:\n${transcriptSnippet}` : "";
+  const summaryContext = session.finalSummary || session.rawActivitySummary || "";
+  const transcriptContext = transcriptSnippet
+    ? `\n\nAudio transcript excerpt:\n${transcriptSnippet}`
+    : "";
 
-  const prompt = `You are a work activity classifier. Given screen capture observations from a single work session (${totalMinutes} minutes), classify them into distinct activities.
+  const prompt = `You are a work-activity analyst. Given timestamped screen capture observations from a ${totalMinutes}-minute work session, build a **narrative timeline** of what the person actually did and classify it into distinct activities.
 
-For each activity, provide:
-- "activity": Short name (e.g., "Code review in VS Code", "Team standup on Zoom")
-- "category": Type — one of: "Meeting", "Development", "Communication", "Documentation", "Design", "Research", "Project Management", "Browsing", "Other"
-- "minutes": Duration in minutes
-- "description": 1-2 sentence description of what was being done
+**Your job is to think like a human looking at this data:**
+- Multiple window titles from "Microsoft Teams" (meeting views, chat, sharing, control bar, compact view) during the same time period = ONE meeting activity
+- Briefly switching to a timesheet app (e.g., Costpoint, Harvest) while in a meeting = a SEPARATE "Project Management" activity
+- Several Chrome tabs about the same topic = ONE research/browsing activity
+- Consecutive VS Code captures = ONE development activity
+- Don't create an activity for every window switch — group by WHAT the person was doing, not which window was in focus
 
-Rules:
-- Merge similar/consecutive captures into single activities
-- Total minutes across all activities should roughly equal ${totalMinutes}
-- If it looks like a video call / conference / huddle, category MUST be "Meeting"
-- Be specific about what was done, not just app names
-- If there's transcript data, use it to enrich the description (participants, topics discussed)
+**Categories** (pick exactly one per activity):
+Meeting, Development, Communication, Documentation, Design, Research, Project Management, Browsing, Other
 
-Respond in JSON:
-{ "activities": [ { "activity": "...", "category": "...", "minutes": N, "description": "..." }, ... ] }
+**Output format — strict JSON, no markdown:**
+{"activities":[{"activity":"Short descriptive name","category":"Category","minutes":N,"description":"1-2 sentence description"}]}
+
+**Rules:**
+1. Total minutes across all activities MUST equal ${totalMinutes}
+2. Each activity should be at least 1 minute
+3. Prefer fewer, larger activities (3-6 is typical) over many tiny ones
+4. If multiple apps are used for the same goal, that's ONE activity
+5. Meeting-related windows (Teams meeting, Zoom call, Google Meet, etc.) = "Meeting"
+6. Be specific in names: "Sprint planning with team" not "Meeting in Teams"
+7. If a session summary exists below, use it to inform your classification
 
 ${session.name ? `Session name: "${session.name}"` : ""}
-Capture observations (chronological):
-${uniqueLines.map((l) => `• ${l}`).join("\n")}${transcriptContext}`;
+${summaryContext ? `Session summary: ${summaryContext.slice(0, 500)}` : ""}
 
-  try {
-    const response = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
-      max_tokens: 800,
-      response_format: { type: "json_object" },
-    });
+Timestamped captures (chronological):
+${lines.join("\n")}${transcriptContext}`;
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) throw new Error("Empty Groq response");
+  // Try Claude first, then OpenAI fallback, then dumb fallback
+  const activities = (await tryClassifyClaude(prompt)) ?? (await tryClassifyOpenAI(prompt));
 
-    const parsed = JSON.parse(content) as { activities?: ClassifiedActivity[] };
-    if (!Array.isArray(parsed.activities) || parsed.activities.length === 0) {
-      throw new Error("No activities in Groq response");
-    }
-
-    const activities = parsed.activities;
-
-    // Write to monitoring_sessions.keyActivities
+  if (activities) {
     await db
       .update(schema.monitoringSessions)
       .set({ keyActivities: activities })
@@ -155,31 +170,67 @@ ${uniqueLines.map((l) => `• ${l}`).join("\n")}${transcriptContext}`;
       { sessionId, activityCount: activities.length, totalMinutes },
       "Session classified"
     );
-
     return activities;
+  }
+
+  // Dumb fallback — both LLMs failed
+  logger.warn({ sessionId }, "Both Claude and OpenAI failed — using dumb fallback");
+  const topApp = captures[0]?.appName || "Unknown";
+  const fallback: ClassifiedActivity[] = [
+    {
+      activity: `Work session in ${topApp}`,
+      category: "Other",
+      minutes: totalMinutes,
+      description: `${totalMinutes} minute session with ${captures.length} captures.`,
+    },
+  ];
+
+  await db
+    .update(schema.monitoringSessions)
+    .set({ keyActivities: fallback })
+    .where(eq(schema.monitoringSessions.id, sessionId));
+
+  return fallback;
+}
+
+/** Parse LLM response text into activities array, or null */
+function parseActivitiesJson(text: string): ClassifiedActivity[] | null {
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+  const parsed = JSON.parse(jsonMatch[0]) as { activities?: ClassifiedActivity[] };
+  if (!Array.isArray(parsed.activities) || parsed.activities.length === 0) return null;
+  return parsed.activities;
+}
+
+async function tryClassifyClaude(prompt: string): Promise<ClassifiedActivity[] | null> {
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const content = response.content[0]?.type === "text" ? response.content[0].text : "";
+    if (!content) throw new Error("Empty Claude response");
+    return parseActivitiesJson(content);
   } catch (error) {
-    logger.warn(
-      { sessionId, error: String(error) },
-      "Session classification failed — using fallback"
-    );
+    logger.warn({ error: String(error) }, "Claude classification failed — trying OpenAI");
+    return null;
+  }
+}
 
-    // Fallback: single generic activity from captures
-    const topApp = captures[0]?.appName || "Unknown";
-    const fallback: ClassifiedActivity[] = [
-      {
-        activity: `Work session in ${topApp}`,
-        category: "Other",
-        minutes: totalMinutes,
-        description: `${totalMinutes} minute session with ${captures.length} captures.`,
-      },
-    ];
-
-    await db
-      .update(schema.monitoringSessions)
-      .set({ keyActivities: fallback })
-      .where(eq(schema.monitoringSessions.id, sessionId));
-
-    return fallback;
+async function tryClassifyOpenAI(prompt: string): Promise<ClassifiedActivity[] | null> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4.1",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const content = response.choices[0]?.message?.content || "";
+    if (!content) throw new Error("Empty OpenAI response");
+    return parseActivitiesJson(content);
+  } catch (error) {
+    logger.warn({ error: String(error) }, "OpenAI classification also failed");
+    return null;
   }
 }
 
@@ -197,10 +248,23 @@ export async function isSessionClassified(sessionId: string): Promise<boolean> {
 
   if (!row) return false;
   const activities = row.keyActivities as any[];
-  return (
-    Array.isArray(activities) &&
-    activities.length > 0 &&
-    typeof activities[0]?.category === "string" &&
-    typeof activities[0]?.minutes === "number"
-  );
+  if (
+    !Array.isArray(activities) ||
+    activities.length === 0 ||
+    typeof activities[0]?.category !== "string" ||
+    typeof activities[0]?.minutes !== "number"
+  ) {
+    return false;
+  }
+
+  // Detect dumb fallback: single "Other" activity starting with "Work session in"
+  if (
+    activities.length === 1 &&
+    activities[0].category === "Other" &&
+    activities[0].activity?.startsWith("Work session in")
+  ) {
+    return false;
+  }
+
+  return true;
 }

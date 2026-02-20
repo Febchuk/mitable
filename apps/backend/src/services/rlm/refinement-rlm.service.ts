@@ -3,7 +3,7 @@
  *
  * Conversational summary refinement agent with tool-calling capabilities.
  * Primary: Anthropic native tool_use (Claude Sonnet 4.5 with extended thinking)
- * Fallback: DeepSeek R1 single-shot (all context pre-loaded, no tool loop)
+ * Fallback: OpenAI GPT-5 single-shot (all context pre-loaded, no tool loop)
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -135,7 +135,7 @@ function parseResponse(raw: string): { message: string; suggestedEdit: string | 
 
 class RefinementRLMService {
   private anthropic: Anthropic | null = null;
-  private deepseek: OpenAI | null = null;
+  private openai: OpenAI | null = null;
   private maxToolRounds = 6; // Safety limit for tool-calling rounds
 
   constructor() {
@@ -143,12 +143,9 @@ class RefinementRLMService {
       this.anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
       logger.info("Refinement RLM using Claude Sonnet 4.5 with native tool_use");
     }
-    if (config.deepseek.apiKey) {
-      this.deepseek = new OpenAI({
-        apiKey: config.deepseek.apiKey,
-        baseURL: "https://api.deepseek.com",
-      });
-      logger.info("DeepSeek R1 fallback configured for Refinement RLM");
+    if (config.openai.apiKey) {
+      this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+      logger.info("GPT-5 fallback configured for Refinement RLM");
     }
   }
 
@@ -163,14 +160,11 @@ class RefinementRLMService {
       try {
         return await this.refineWithClaude(input, ctx);
       } catch (error) {
-        logger.warn(
-          { error: String(error) },
-          "Claude refinement failed — falling back to DeepSeek"
-        );
+        logger.warn({ error: String(error) }, "Claude refinement failed — falling back to GPT-5");
       }
     }
 
-    return await this.refineWithDeepSeek(input, ctx);
+    return await this.refineWithOpenAI(input, ctx);
   }
 
   // --------------------------------------------------------------------------
@@ -273,18 +267,18 @@ class RefinementRLMService {
   }
 
   // --------------------------------------------------------------------------
-  // Fallback: DeepSeek R1 single-shot (no tool loop)
+  // Fallback: OpenAI GPT-5 single-shot (no tool loop)
   // --------------------------------------------------------------------------
 
-  private async refineWithDeepSeek(
+  private async refineWithOpenAI(
     input: RefinementRLMInput,
     ctx: RefinementContext
   ): Promise<RefinementRLMResult> {
-    if (!this.deepseek) {
-      throw new Error("No LLM available — both ANTHROPIC_API_KEY and DEEPSEEK_API_KEY are missing");
+    if (!this.openai) {
+      throw new Error("No LLM available — both ANTHROPIC_API_KEY and OPENAI_API_KEY are missing");
     }
 
-    // Pre-load all context since DeepSeek can't call tools
+    // Pre-load all context since GPT-5 fallback uses single-shot (no tool loop)
     const [statsResult, activitiesResult, transcriptsResult, prefsResult] = await Promise.all([
       executeRefinementTool("get_timeline_stats", {}, ctx),
       executeRefinementTool("get_activities", { start: 0, end: 50 }, ctx),
@@ -307,7 +301,7 @@ ${prefsResult}`;
 
     const systemPrompt = `${buildSystemPrompt(input.currentSummary)}\n\n${contextBlock}`;
 
-    const deepseekMessages = [
+    const openaiMessages = [
       { role: "system" as const, content: systemPrompt },
       ...input.messages.map((m) => ({
         role: m.role as "user" | "assistant",
@@ -315,19 +309,16 @@ ${prefsResult}`;
       })),
     ];
 
-    const completion = await this.deepseek.chat.completions.create({
-      messages: deepseekMessages,
-      model: "deepseek-reasoner",
+    const completion = await this.openai.chat.completions.create({
+      messages: openaiMessages,
+      model: "gpt-5",
       max_tokens: 4000,
     });
 
     const rawText = completion.choices[0]?.message?.content || "";
     const { message, suggestedEdit } = parseResponse(rawText);
 
-    logger.info(
-      { hasSuggestedEdit: !!suggestedEdit },
-      "Refinement RLM completed (DeepSeek fallback)"
-    );
+    logger.info({ hasSuggestedEdit: !!suggestedEdit }, "Refinement RLM completed (GPT-5 fallback)");
 
     return { message, suggestedEdit, toolCallCount: 0 };
   }

@@ -10,7 +10,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, and, desc, asc, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, inArray, isNotNull } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { createLogger } from "../lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
@@ -525,77 +525,102 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
 });
 
 // ============================================================================
-// GET /admin/dashboard/people?period=today|week|month|ytd
-// Returns per-user activity summaries for the People tab
+// GET /admin/dashboard/people
+// Returns ALL org users with lifetime activity summaries for the People tab.
+// Date filtering is NOT applied here — it belongs in the per-user drill-down.
 // ============================================================================
 router.get("/dashboard/people", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const admin = await verifyAdmin(req, res);
     if (!admin) return;
 
-    const period = (req.query.period as string) || "yesterday";
-    const { startDate, endDate } = resolveDateRange(period);
+    // Step 1: Fetch ALL users in the org (regardless of activity)
+    const orgUsers = await db
+      .select({
+        id: schema.users.id,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        email: schema.users.email,
+        role: schema.users.role,
+        jobTitle: schema.users.jobTitle,
+        avatarUrl: schema.users.avatarUrl,
+        status: schema.users.status,
+        createdAt: schema.users.createdAt,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.organizationId, admin.organizationId))
+      .orderBy(asc(schema.users.firstName));
 
-    // Fetch all user daily activities for this org in the date range
+    // Step 2a: Fetch ALL daily activities for this org (no date filter)
     const activities = await db
       .select({
-        id: schema.userDailyActivities.id,
         userId: schema.userDailyActivities.userId,
         activityDate: schema.userDailyActivities.activityDate,
         totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
         totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
         totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
-        workPercentage: schema.userDailyActivities.workPercentage,
-        meetingPercentage: schema.userDailyActivities.meetingPercentage,
         appBreakdown: schema.userDailyActivities.appBreakdown,
         categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
-        daySummary: schema.userDailyActivities.daySummary,
-        keyAccomplishments: schema.userDailyActivities.keyAccomplishments,
-        status: schema.userDailyActivities.status,
       })
       .from(schema.userDailyActivities)
       .where(
         and(
           eq(schema.userDailyActivities.organizationId, admin.organizationId),
-          eq(schema.userDailyActivities.periodType, "daily"),
-          gte(schema.userDailyActivities.activityDate, startDate),
-          lte(schema.userDailyActivities.activityDate, endDate)
+          eq(schema.userDailyActivities.periodType, "daily")
         )
       )
       .orderBy(desc(schema.userDailyActivities.activityDate));
 
-    // Group by user and aggregate
-    const userMap = new Map<string, typeof activities>();
-    for (const act of activities) {
-      const existing = userMap.get(act.userId) || [];
-      existing.push(act);
-      userMap.set(act.userId, existing);
-    }
-
-    // Fetch user profiles
-    const userIds = [...userMap.keys()];
-    const users =
+    // Step 2b: Fetch latest session per user for "Recent Highlight"
+    // (daySummary/keyAccomplishments are never populated by materializer)
+    const userIds = orgUsers.map((u) => u.id);
+    const latestSessions =
       userIds.length > 0
         ? await db
             .select({
-              id: schema.users.id,
-              firstName: schema.users.firstName,
-              lastName: schema.users.lastName,
-              email: schema.users.email,
-              role: schema.users.role,
-              jobTitle: schema.users.jobTitle,
-              avatarUrl: schema.users.avatarUrl,
+              userId: schema.monitoringSessions.userId,
+              name: schema.monitoringSessions.name,
+              finalSummary: schema.monitoringSessions.finalSummary,
+              rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+              endedAt: schema.monitoringSessions.endedAt,
             })
-            .from(schema.users)
-            .where(eq(schema.users.organizationId, admin.organizationId))
+            .from(schema.monitoringSessions)
+            .where(
+              and(
+                eq(schema.monitoringSessions.organizationId, admin.organizationId),
+                isNotNull(schema.monitoringSessions.endedAt)
+              )
+            )
+            .orderBy(desc(schema.monitoringSessions.endedAt))
         : [];
 
-    const userProfileMap = new Map(users.map((u) => [u.id, u]));
+    // Build map: userId → most recent session
+    const latestSessionMap = new Map<
+      string,
+      { name: string | null; summary: string | null; endedAt: Date | null }
+    >();
+    for (const s of latestSessions) {
+      if (!latestSessionMap.has(s.userId)) {
+        latestSessionMap.set(s.userId, {
+          name: s.name,
+          summary: s.finalSummary || s.rawActivitySummary || null,
+          endedAt: s.endedAt,
+        });
+      }
+    }
 
-    // Build per-user response
-    const people = userIds.map((userId) => {
-      const rows = userMap.get(userId)!;
-      const profile = userProfileMap.get(userId);
+    // Step 3: Group activities by user
+    const activityMap = new Map<string, typeof activities>();
+    for (const act of activities) {
+      const existing = activityMap.get(act.userId) || [];
+      existing.push(act);
+      activityMap.set(act.userId, existing);
+    }
+
+    // Step 4: Build response — every user appears, activity data is optional
+    const people = orgUsers.map((user) => {
+      const rows = activityMap.get(user.id) || [];
+      const hasActivity = rows.length > 0;
 
       const totalWork = rows.reduce((s, r) => s + r.totalWorkMinutes, 0);
       const totalMeeting = rows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
@@ -633,34 +658,42 @@ router.get("/dashboard/people", requireAuth, async (req: Request, res: Response)
         .map(([app, minutes]) => ({ app, minutes }))
         .sort((a, b) => b.minutes - a.minutes);
 
-      // Use most recent day's summary
-      const latestDay = rows[0]!;
+      // Use latest session summary for "Recent Highlight"
+      const latestSession = latestSessionMap.get(user.id);
 
       return {
-        userId,
-        name: profile ? [profile.firstName, profile.lastName].filter(Boolean).join(" ") : "Unknown",
-        email: profile?.email,
-        role: profile?.role,
-        jobTitle: profile?.jobTitle,
-        avatarUrl: profile?.avatarUrl,
+        userId: user.id,
+        name: [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unknown",
+        email: user.email,
+        role: user.role,
+        jobTitle: user.jobTitle,
+        avatarUrl: user.avatarUrl,
+        userStatus: user.status,
+        createdAt: user.createdAt,
         totalWorkMinutes: totalWork,
         totalMeetingMinutes: totalMeeting,
         totalActiveMinutes: totalActive,
-        avgActiveMinutesPerDay: Math.round(totalActive / daysTracked),
+        avgActiveMinutesPerDay: daysTracked > 0 ? Math.round(totalActive / daysTracked) : 0,
         workPercentage: totalActive > 0 ? Math.round((totalWork / totalActive) * 100) : 0,
         meetingPercentage: totalActive > 0 ? Math.round((totalMeeting / totalActive) * 100) : 0,
-        daySummary: latestDay.daySummary,
-        keyAccomplishments: latestDay.keyAccomplishments,
+        recentHighlight: latestSession?.summary || latestSession?.name || null,
+        lastActiveAt: latestSession?.endedAt?.toISOString() ?? null,
         categoryBreakdown: aggregatedCategories,
         appBreakdown: aggregatedApps,
         daysTracked,
+        hasActivity,
       };
     });
 
-    // Sort by active minutes descending
-    people.sort((a, b) => b.totalActiveMinutes - a.totalActiveMinutes);
+    // Sort: users with activity first (by active minutes desc), then inactive users alphabetically
+    people.sort((a, b) => {
+      if (a.hasActivity && !b.hasActivity) return -1;
+      if (!a.hasActivity && b.hasActivity) return 1;
+      if (a.hasActivity && b.hasActivity) return b.totalActiveMinutes - a.totalActiveMinutes;
+      return a.name.localeCompare(b.name);
+    });
 
-    res.json({ period, people });
+    res.json({ people });
   } catch (error) {
     logger.error({ error: String(error) }, "Error fetching people data");
     res
@@ -1390,6 +1423,96 @@ router.get(
       res
         .status(500)
         .json({ error: "Internal Server Error", message: "Failed to fetch user drill-down data" });
+    }
+  }
+);
+
+// ============================================================================
+// GET /admin/dashboard/people/:id/category-activities/:category?period=...
+// Returns individual activity blocks for a user filtered by category + period.
+// Used by the per-user Activity Breakdown drill-down panel.
+// ============================================================================
+router.get(
+  "/dashboard/people/:id/category-activities/:category",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
+
+      const targetUserId = req.params.id;
+      const category = req.params.category.toLowerCase();
+      const period = (req.query.period as string) || "all";
+
+      // Verify user belongs to same org
+      const [targetUser] = await db
+        .select({ id: schema.users.id, organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, targetUserId))
+        .limit(1);
+
+      if (!targetUser || targetUser.organizationId !== admin.organizationId) {
+        res.status(404).json({ error: "Not Found" });
+        return;
+      }
+
+      // Build date conditions
+      const conditions = [eq(schema.activityBlocks.userId, targetUserId)];
+
+      // Filter by category (case-insensitive match)
+      // activity_blocks.category is stored lowercase from the materializer
+
+      if (period !== "all") {
+        const { startDate, endDate } = resolveDateRange(period);
+        conditions.push(gte(schema.activityBlocks.startTime, new Date(startDate)));
+        conditions.push(lte(schema.activityBlocks.startTime, new Date(endDate + "T23:59:59.999Z")));
+      }
+
+      const blocks = await db
+        .select({
+          id: schema.activityBlocks.id,
+          name: schema.activityBlocks.name,
+          description: schema.activityBlocks.description,
+          category: schema.activityBlocks.category,
+          blockType: schema.activityBlocks.blockType,
+          startTime: schema.activityBlocks.startTime,
+          endTime: schema.activityBlocks.endTime,
+          durationMinutes: schema.activityBlocks.durationMinutes,
+          apps: schema.activityBlocks.apps,
+          sessionId: schema.activityBlocks.sessionId,
+        })
+        .from(schema.activityBlocks)
+        .where(and(...conditions))
+        .orderBy(desc(schema.activityBlocks.startTime));
+
+      // Filter by category in JS (more flexible than SQL for case matching)
+      const filtered = blocks.filter((b) => (b.category || "other").toLowerCase() === category);
+
+      const totalMinutes = filtered.reduce((s, b) => s + b.durationMinutes, 0);
+
+      res.json({
+        category,
+        period,
+        totalMinutes,
+        totalHours: Math.round((totalMinutes / 60) * 10) / 10,
+        activityCount: filtered.length,
+        activities: filtered.map((b) => ({
+          id: b.id,
+          name: b.name,
+          description: b.description,
+          blockType: b.blockType,
+          startTime: b.startTime.toISOString(),
+          endTime: b.endTime.toISOString(),
+          durationMinutes: b.durationMinutes,
+          apps: b.apps,
+          sessionId: b.sessionId,
+        })),
+      });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error fetching category activities");
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: "Failed to fetch category activities" });
     }
   }
 );

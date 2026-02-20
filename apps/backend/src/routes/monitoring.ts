@@ -939,7 +939,7 @@ router.post(
             .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
-          // Run ingestion + classification + activity materialization in parallel
+          // Run ingestion in parallel with classify → materialize chain
           Promise.all([
             // Chunk + embed session data
             SessionIngestionService.ingestSession(id)
@@ -959,20 +959,21 @@ router.post(
                   .set({ ingestionStatus: "failed" })
                   .where(eq(schema.monitoringSessions.id, id));
               }),
-            // Classify session activities via Groq → keyActivities
-            classifySession(id).catch((error) => {
-              log.error("Session classification failed", {
-                sessionId: id,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            }),
-            // Materialize activity blocks for admin dashboard
-            materializeSession(id).catch((error) => {
-              log.error("Activity materialization failed", {
-                sessionId: id,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            }),
+            // Classify (Claude → OpenAI fallback) then materialize activity blocks
+            classifySession(id)
+              .catch((error) => {
+                log.error("Session classification failed", {
+                  sessionId: id,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              })
+              .then(() => materializeSession(id))
+              .catch((error) => {
+                log.error("Activity materialization failed", {
+                  sessionId: id,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }),
           ]);
         })
         .catch(async (error) => {
@@ -985,7 +986,7 @@ router.post(
             .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
-          // Still run ingestion + classification + materialization even if storyteller failed
+          // Still run ingestion + classify → materialize even if storyteller failed
           Promise.all([
             SessionIngestionService.ingestSession(id)
               .then(async () => {
@@ -1004,19 +1005,21 @@ router.post(
                   .set({ ingestionStatus: "failed" })
                   .where(eq(schema.monitoringSessions.id, id));
               }),
-            classifySession(id).catch((classifyError) => {
-              log.error("Session classification failed", {
-                sessionId: id,
-                error:
-                  classifyError instanceof Error ? classifyError.message : String(classifyError),
-              });
-            }),
-            materializeSession(id).catch((matError) => {
-              log.error("Activity materialization failed", {
-                sessionId: id,
-                error: matError instanceof Error ? matError.message : String(matError),
-              });
-            }),
+            classifySession(id)
+              .catch((classifyError) => {
+                log.error("Session classification failed", {
+                  sessionId: id,
+                  error:
+                    classifyError instanceof Error ? classifyError.message : String(classifyError),
+                });
+              })
+              .then(() => materializeSession(id))
+              .catch((matError) => {
+                log.error("Activity materialization failed", {
+                  sessionId: id,
+                  error: matError instanceof Error ? matError.message : String(matError),
+                });
+              }),
           ]);
         });
 

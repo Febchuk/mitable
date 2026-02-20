@@ -6,7 +6,7 @@
  * and explicitly save user preferences via the save_user_preference tool.
  *
  * Primary: Anthropic native tool_use (Claude Sonnet 4.5 with extended thinking)
- * Fallback: DeepSeek R1 single-shot with pre-loaded context
+ * Fallback: OpenAI GPT-5 single-shot with pre-loaded context
  */
 
 import { refinementRLMService } from "./rlm/refinement-rlm.service";

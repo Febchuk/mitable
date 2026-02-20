@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, sql, count, desc, and, ne, asc } from "drizzle-orm";
+import { eq, sql, count, desc, and, asc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { supabaseAdmin } from "../lib/supabase";
 import { extractNotionPageId } from "../utils/notion-url-parser.js";
@@ -397,62 +397,35 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
       return;
     }
 
-    // Fetch all users with their task completion stats (exclude admins, filter by organization)
-    const users = await db
+    // Fetch ALL users in the org (including admins — they can have sessions too)
+    const orgUsers = await db
       .select({
         id: schema.users.id,
         firstName: schema.users.firstName,
         lastName: schema.users.lastName,
         email: schema.users.email,
         role: schema.users.role,
-        startDate: schema.users.startDate,
-        currentWeek: schema.users.currentWeek,
+        jobTitle: schema.users.jobTitle,
         status: schema.users.status,
         avatarUrl: schema.users.avatarUrl,
+        createdAt: schema.users.createdAt,
       })
       .from(schema.users)
-      .where(
-        and(
-          ne(schema.users.role, "admin"),
-          eq(schema.users.organizationId, currentUser.organizationId)
-        )
-      )
-      .orderBy(schema.users.lastName, schema.users.firstName);
+      .where(eq(schema.users.organizationId, currentUser.organizationId))
+      .orderBy(schema.users.firstName, schema.users.lastName);
 
-    // Calculate progress for each user
-    const usersWithProgress = await Promise.all(
-      users.map(async (user) => {
-        // Get total tasks and completed tasks
-        const [taskStats] = await db
-          .select({
-            total: count(),
-            completed: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
-          })
-          .from(schema.userRoadmapTasks)
-          .where(eq(schema.userRoadmapTasks.userId, user.id));
+    const usersFormatted = orgUsers.map((user) => ({
+      id: user.id,
+      name: [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unknown",
+      email: user.email,
+      role: user.role,
+      jobTitle: user.jobTitle,
+      status: user.status || "active",
+      avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt,
+    }));
 
-        const progress =
-          taskStats && taskStats.total > 0
-            ? Math.round((Number(taskStats.completed) / Number(taskStats.total)) * 100)
-            : 0;
-
-        // Determine status based on completion
-        const status = progress === 100 ? "Active" : "Onboarding";
-
-        return {
-          id: user.id,
-          name: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          role: user.role,
-          startDate: user.startDate || "N/A",
-          status,
-          progress,
-          avatarUrl: user.avatarUrl,
-        };
-      })
-    );
-
-    res.json({ users: usersWithProgress });
+    res.json({ users: usersFormatted });
   } catch (error) {
     console.error("Error fetching admin users:", error);
     res.status(500).json({
