@@ -57,6 +57,9 @@ export interface SessionListItem {
     formatted: string;
   };
   deliveryStatus: string | null;
+  finalSummary: string | null;
+  rawActivitySummary: string | null;
+  timeBreakdown: Record<string, number> | null;
 }
 
 export interface CreateSessionRequest {
@@ -146,11 +149,46 @@ export interface SlackUser {
 // API Functions
 // ===========================
 
+export interface SessionsPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
 /**
- * Fetch all sessions for the current user
+ * Fetch paginated sessions for the current user
  */
-export async function fetchSessions(): Promise<{ sessions: SessionListItem[] }> {
-  return apiRequest<{ sessions: SessionListItem[] }>("/monitoring/sessions");
+export async function fetchSessions(
+  page = 1,
+  limit = 20
+): Promise<{ sessions: SessionListItem[]; pagination: SessionsPagination }> {
+  return apiRequest<{ sessions: SessionListItem[]; pagination: SessionsPagination }>(
+    `/monitoring/sessions?page=${page}&limit=${limit}`
+  );
+}
+
+/**
+ * Fetch ALL sessions for the current user (auto-paginates with circuit breaker)
+ */
+export async function fetchAllSessions(): Promise<SessionListItem[]> {
+  const all: SessionListItem[] = [];
+  let page = 1;
+  let hasMore = true;
+  const limit = 50; // Max per page
+  const MAX_PAGES = 100; // Circuit breaker: 100 pages × 50 = 5000 sessions max
+  while (hasMore && page <= MAX_PAGES) {
+    const { sessions, pagination } = await fetchSessions(page, limit);
+    all.push(...sessions);
+    hasMore = pagination.hasNext;
+    page++;
+  }
+  if (page > MAX_PAGES) {
+    logger.warn(`Session fetch capped at ${MAX_PAGES} pages (${all.length} sessions)`);
+  }
+  return all;
 }
 
 /**

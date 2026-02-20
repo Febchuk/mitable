@@ -4,6 +4,7 @@ import { requireAuth, optionalAuth } from "./middleware/auth.js";
 import roadmapsRouter from "./routes/roadmaps.js";
 import conversationsRouter from "./routes/conversations.js";
 import adminRouter from "./routes/admin.js";
+import adminDashboardRouter from "./routes/admin-dashboard.js";
 import integrationsRouter from "./routes/integrations.js";
 import piiRouter from "./routes/pii.js";
 import monitoringRouter from "./routes/monitoring.js";
@@ -23,6 +24,7 @@ router.use("/auth", authLimiter, authRouter);
 router.use("/roadmaps", roadmapsRouter);
 router.use("/conversations", conversationsRouter); // Screenshot limiter applied within conversations.ts
 router.use("/admin", adminRouter);
+router.use("/admin", adminDashboardRouter);
 router.use("/integrations", integrationsRouter);
 router.use("/pii", piiRouter);
 router.use("/monitoring", monitoringRouter);

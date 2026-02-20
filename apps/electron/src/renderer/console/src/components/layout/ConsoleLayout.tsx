@@ -21,9 +21,11 @@ export default function ConsoleLayout() {
     };
 
     // Register IPC listener
-    if (window.consoleAPI?.onDraftsNavigate) {
-      window.consoleAPI.onDraftsNavigate(handleDraftsNavigate);
-    }
+    const unsubscribe = window.consoleAPI?.onDraftsNavigate?.(handleDraftsNavigate);
+
+    return () => {
+      unsubscribe?.();
+    };
   }, [navigate]);
 
   // macOS: transparent to show vibrancy, Windows: solid background (Mica handles the effect)

@@ -41,7 +41,7 @@ export default function LoginPage() {
       if (response.profile.role === "admin") {
         navigate("/dashboard");
       } else {
-        navigate("/docs");
+        navigate("/calendar");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -66,9 +66,7 @@ export default function LoginPage() {
         <div className="space-y-6">
           <div className="space-y-2 text-center">
             <h1 className="text-heading-3 text-white">Welcome</h1>
-            <p className="text-body-sm text-text-secondary">
-              Sign in to continue your onboarding journey
-            </p>
+            <p className="text-body-sm text-text-secondary">Sign in to your workspace</p>
           </div>
 
           {error && (

@@ -7,7 +7,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "../../../context/UserContext";
-import { monitoringKeys, useSessions } from "../monitoring";
+import { monitoringKeys } from "../monitoring";
 import * as monitoringService from "../../../services/monitoringService";
 import type {
   WorkBlock,
@@ -211,7 +211,23 @@ function sessionToWorkBlock(
   }
 
   const transformedCaptures = transformCaptures(captures);
-  const appBreakdown = calculateAppBreakdown(transformedCaptures, durationMinutes);
+
+  // Prefer timeBreakdown from backend (stored on session) over capture-based calculation
+  let appBreakdown: { app: string; minutes: number; percentage: number }[] = [];
+  const tb = session.timeBreakdown as Record<string, number> | null;
+  if (tb && Object.keys(tb).length > 0) {
+    const totalMs = Object.values(tb).reduce((a, b) => a + b, 0);
+    appBreakdown = Object.entries(tb)
+      .map(([app, ms]) => ({
+        app,
+        minutes: Math.round(ms / 60000),
+        percentage: totalMs > 0 ? Math.round((ms / totalMs) * 100) : 0,
+      }))
+      .sort((a, b) => b.minutes - a.minutes)
+      .slice(0, 5);
+  } else if (transformedCaptures.length > 0) {
+    appBreakdown = calculateAppBreakdown(transformedCaptures, durationMinutes);
+  }
 
   return {
     id: session.id,
@@ -219,7 +235,7 @@ function sessionToWorkBlock(
     endTime,
     duration: Math.round(durationMinutes),
     idleGapBefore,
-    summary: "", // Will be populated from session detail if needed
+    summary: session.finalSummary || session.rawActivitySummary || "",
     captures: transformedCaptures,
     appBreakdown,
     isActive: session.status === "active",
@@ -311,22 +327,19 @@ function groupSessionsByDay(
  */
 export function useCalendarDays() {
   const { user } = useUser();
-  const { data: sessions } = useSessions();
 
   return useQuery({
     queryKey: calendarKeys.days(),
     queryFn: async () => {
-      if (!sessions) return [];
+      const sessions = await monitoringService.fetchAllSessions();
+      if (!sessions.length) return [];
 
-      // For now, create blocks without captures (we'll fetch captures on demand)
       const emptyCaptures = new Map<string, SessionCapture[]>();
       return groupSessionsByDay(sessions, emptyCaptures);
     },
-    enabled: !!user && !!sessions,
-    // Poll for new blocks while we have any active sessions
-    refetchInterval: sessions?.some((s) => s.status === "active" || s.status === "paused")
-      ? 10000
-      : false,
+    enabled: !!user,
+    staleTime: 30000,
+    refetchInterval: 60000, // Poll every 60s (was 15s — too aggressive for full pagination)
   });
 }
 

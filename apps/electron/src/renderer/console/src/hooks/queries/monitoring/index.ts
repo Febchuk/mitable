@@ -11,8 +11,9 @@ import * as monitoringService from "../../../services/monitoringService";
 // Query Keys
 export const monitoringKeys = {
   all: ["monitoring"] as const,
-  sessions: () => [...monitoringKeys.all, "sessions"] as const,
-  session: (id: string) => [...monitoringKeys.sessions(), id] as const,
+  sessions: (page?: number) =>
+    [...monitoringKeys.all, "sessions", ...(page != null ? [page] : [])] as const,
+  session: (id: string) => [...monitoringKeys.all, "sessions", id] as const,
   captures: (sessionId: string) => [...monitoringKeys.session(sessionId), "captures"] as const,
   summary: (sessionId: string) => [...monitoringKeys.session(sessionId), "summary"] as const,
   story: (sessionId: string) => [...monitoringKeys.session(sessionId), "story"] as const,
@@ -23,18 +24,22 @@ export const monitoringKeys = {
 };
 
 /**
- * Fetch all sessions for the current user
+ * Fetch a single page of sessions for the current user.
  */
-export function useSessions() {
+export function useSessions(page = 1) {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: monitoringKeys.sessions(),
+    queryKey: monitoringKeys.sessions(page),
     queryFn: async () => {
-      const response = await monitoringService.fetchSessions();
-      return response.sessions;
+      const response = await monitoringService.fetchSessions(page, 20);
+      return {
+        sessions: response.sessions,
+        pagination: response.pagination,
+      };
     },
     enabled: !!user,
+    placeholderData: (prev) => prev,
   });
 }
 

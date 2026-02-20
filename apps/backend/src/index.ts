@@ -19,6 +19,7 @@ import * as schema from "./db/schema/index.js";
 import { isNotNull, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { initializeAudioWebSocket } from "./routes/audio.js";
+import { initCronJobs } from "./cron/index.js";
 
 async function startServer() {
   // Validate environment variables
@@ -77,6 +78,9 @@ async function startServer() {
 
   // Set up workstream event emitter to broadcast via WebSocket
   setupWorkstreamSocketEmitter();
+
+  // Initialize cron jobs for admin dashboard data pipeline
+  initCronJobs();
 
   // Startup cleanup: clear stale imageData from sessions that ended >1 hour ago
   // This catches any images missed due to server restarts (replaces fragile setTimeout)

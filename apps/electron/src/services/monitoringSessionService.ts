@@ -58,7 +58,13 @@ interface ActiveSession {
   totalPausedMs: number;
   captureCount: number; // Track count from manifest
   lastCaptureHashByWindow: Map<string, string>; // Per-window deduplication
+  consecutiveEmptyCaptures: number; // Track consecutive capture cycles with 0 captures
+  lastSuccessfulCaptureAt: number; // Timestamp of last successful capture
 }
+
+// If N consecutive capture cycles produce 0 captures, auto-pause the session.
+// With a 30s interval, 20 failures = ~10 minutes of no captures.
+const MAX_CONSECUTIVE_EMPTY_CAPTURES = 20;
 
 // ===========================
 // MonitoringSessionService Class
@@ -175,6 +181,8 @@ class MonitoringSessionService {
         totalPausedMs: 0,
         captureCount: 0,
         lastCaptureHashByWindow: new Map(),
+        consecutiveEmptyCaptures: 0,
+        lastSuccessfulCaptureAt: startedAt,
       };
 
       // Start checkpoint tracking for crash recovery
@@ -517,6 +525,8 @@ class MonitoringSessionService {
         totalPausedMs: checkpoint.totalPausedMs,
         captureCount: checkpoint.frameCount,
         lastCaptureHashByWindow: new Map(),
+        consecutiveEmptyCaptures: 0,
+        lastSuccessfulCaptureAt: Date.now(),
       };
 
       // Resume capture loop if session was active
@@ -659,9 +669,11 @@ class MonitoringSessionService {
     // Get windows from focus tracker (dynamic list based on user focus)
     const trackedWindowIds = focusWindowTracker.getTrackedWindowIds();
 
-    // If no windows are being tracked yet, skip this capture cycle
+    // If no windows are being tracked yet, count as empty capture cycle
     if (trackedWindowIds.length === 0) {
       logger.info(" No windows tracked yet, skipping capture");
+      this.activeSession.consecutiveEmptyCaptures++;
+      this.checkCaptureHealth();
       return;
     }
 
@@ -675,8 +687,20 @@ class MonitoringSessionService {
 
       if (!result.success) {
         logger.warn(" Capture failed:", result.error);
+        this.activeSession.consecutiveEmptyCaptures++;
+        this.checkCaptureHealth();
         return;
       }
+
+      if (!result.screenshots || result.screenshots.length === 0) {
+        this.activeSession.consecutiveEmptyCaptures++;
+        this.checkCaptureHealth();
+        return;
+      }
+
+      // Reset empty counter on successful capture
+      this.activeSession.consecutiveEmptyCaptures = 0;
+      this.activeSession.lastSuccessfulCaptureAt = Date.now();
 
       // Process each screenshot
       for (const screenshot of result.screenshots) {
@@ -687,6 +711,41 @@ class MonitoringSessionService {
       this.broadcastCaptureProgress();
     } catch (error) {
       logger.error(" Error capturing windows:", error);
+    }
+  }
+
+  /**
+   * Check capture health — auto-pause if too many consecutive empty cycles.
+   * Prevents sessions from running for hours with no actual data.
+   */
+  private checkCaptureHealth(): void {
+    if (!this.activeSession || this.activeSession.status !== "active") return;
+
+    const emptyCount = this.activeSession.consecutiveEmptyCaptures;
+    const lastCapture = this.activeSession.lastSuccessfulCaptureAt;
+    const gapMinutes = Math.round((Date.now() - lastCapture) / 60000);
+
+    if (emptyCount >= MAX_CONSECUTIVE_EMPTY_CAPTURES) {
+      logger.warn(
+        `[CaptureHealth] ${emptyCount} consecutive empty capture cycles (~${gapMinutes}min without data). Auto-pausing session.`
+      );
+
+      // Auto-pause the session
+      this.stopCaptureLoop();
+      this.activeSession.status = "paused";
+      this.activeSession.pausedAt = Date.now();
+
+      // Update local storage status
+      localFrameStorage.updateSessionStatus(this.activeSession.id, "paused").catch(() => {});
+      checkpointService.onSessionPaused().catch(() => {});
+
+      // Broadcast so UI shows "Paused — no screen activity detected"
+      this.broadcastSessionUpdate();
+    } else if (emptyCount > 0 && emptyCount % 5 === 0) {
+      // Log a warning every 5 empty cycles for debugging
+      logger.warn(
+        `[CaptureHealth] ${emptyCount} consecutive empty captures (~${gapMinutes}min without data)`
+      );
     }
   }
 

@@ -28,7 +28,6 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { mockDays, getMockWeekDays } from "./mockData";
 import DayCard from "./DayCard";
 import DaySummary from "./DaySummary";
 import WorkBlockList from "./WorkBlockList";
@@ -140,9 +139,8 @@ export default function CalendarView() {
   // Fetch real data from backend
   const { data: realDays, isLoading: isLoadingDays, error: daysError } = useCalendarDays();
 
-  // Use real data if available, fall back to mock data for development
-  const useMockData = !realDays || realDays.length === 0;
-  const allDays = useMockData ? mockDays : realDays;
+  // Use real data only — no mock fallback (mock IDs cause backend 500 errors)
+  const allDays = realDays || [];
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -157,11 +155,6 @@ export default function CalendarView() {
 
   // Get week days with activity data
   const weekDays = useMemo(() => {
-    if (useMockData) {
-      return getMockWeekDays(weekStart);
-    }
-
-    // Build week days from real data
     const days: ActivityDay[] = [];
     const current = new Date(weekStart);
 
@@ -186,7 +179,7 @@ export default function CalendarView() {
     }
 
     return days;
-  }, [weekStart, useMockData, allDays]);
+  }, [weekStart, allDays]);
 
   // Convert all days to calendar events for the Calendar component
   const calendarEvents = useMemo(() => workBlocksToCalendarEvents(allDays), [allDays]);
@@ -449,7 +442,7 @@ export default function CalendarView() {
           ═══════════════════════════════════════════════════════════════════ */}
       <div className={`px-8 ${isGridView ? "flex-1 flex flex-col min-h-0 pb-4" : "pb-8"}`}>
         {/* Loading State */}
-        {isLoadingDays && !useMockData && (
+        {isLoadingDays && (
           <div className="flex flex-col items-center justify-center py-16">
             <Loader2 size={32} className="text-indigo animate-spin mb-4" />
             <p className="text-ink-tertiary text-sm">Loading activity data...</p>
@@ -457,7 +450,7 @@ export default function CalendarView() {
         )}
 
         {/* Error State */}
-        {daysError && !useMockData && (
+        {daysError && (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="p-3 rounded-full bg-rose/10 mb-4">
               <AlertCircle size={24} className="text-rose" />
@@ -469,16 +462,8 @@ export default function CalendarView() {
           </div>
         )}
 
-        {/* Data Source Indicator (dev only) */}
-        {useMockData && !isLoadingDays && (
-          <div className="mb-4 px-3 py-2 rounded-lg bg-amber/10 border border-amber/20 text-amber text-xs flex items-center gap-2">
-            <AlertCircle size={14} />
-            <span>Showing mock data - no sessions found</span>
-          </div>
-        )}
-
         {/* Main Content */}
-        {(!isLoadingDays || useMockData) && !daysError && (
+        {!isLoadingDays && !daysError && (
           <>
             {isGridView ? (
               /* Calendar Grid View - Using untitledui Calendar */

@@ -243,8 +243,6 @@ export interface CreateUserPayload {
   lastName: string;
   email: string;
   role: string; // Job title (e.g., "Software Engineer", "Product Designer")
-  startDate: string;
-  templateIds: string[];
   sendWelcomeEmail: boolean;
   makeAdmin?: boolean;
 }
@@ -258,8 +256,6 @@ export interface CreateUserResponse {
     lastName: string;
     role: string;
   };
-  templatesAssigned: number;
-  tasksCreated: number;
   initialPassword: string;
 }
 
@@ -470,6 +466,340 @@ export async function updateOrganizationSettings(
     return response.organization;
   } catch (error) {
     logger.error("Error updating organization settings:", error);
+    throw error;
+  }
+}
+
+// ============================================
+// Dashboard Analytics (from cron pipeline)
+// ============================================
+
+export type DashboardPeriod = "yesterday" | "today" | "week" | "month" | "ytd" | "all";
+
+export interface DashboardMetrics {
+  period: string;
+  hasData: boolean;
+  metrics: {
+    avgWorkMinutes: number;
+    avgMeetingMinutes: number;
+    avgActiveMinutes: number;
+    avgWorkPercentage: number;
+    avgMeetingPercentage: number;
+    totalUsersTracked: number;
+    totalTeamWorkMinutes: number;
+    totalTeamMeetingMinutes: number;
+  };
+  activityDistribution: Array<{ category: string; percentage: number; totalMinutes: number }>;
+  topApps: Array<{ app: string; totalMinutes: number; userCount: number }>;
+  userSummaries: Array<{
+    userId: string;
+    name: string;
+    activeMinutes: number;
+    workPct: number;
+    meetingPct: number;
+  }>;
+  dailyTrend: Array<{
+    date: string;
+    avgActiveMinutes: number;
+    avgWorkMinutes: number;
+    avgMeetingMinutes: number;
+    usersTracked: number;
+  }>;
+}
+
+export interface DashboardPerson {
+  userId: string;
+  name: string;
+  email?: string;
+  role?: string;
+  jobTitle?: string;
+  avatarUrl?: string | null;
+  totalWorkMinutes: number;
+  totalMeetingMinutes: number;
+  totalActiveMinutes: number;
+  avgActiveMinutesPerDay: number;
+  workPercentage: number;
+  meetingPercentage: number;
+  daySummary: string | null;
+  keyAccomplishments: string[];
+  categoryBreakdown: Array<{ category: string; percentage: number; minutes: number }>;
+  appBreakdown: Array<{ app: string; minutes: number }>;
+  daysTracked: number;
+}
+
+export interface ActivityBlock {
+  id: string;
+  type: "work" | "meeting";
+  name: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  description: string | null;
+  apps: string[];
+  category: string | null;
+  participants?: string[];
+  sequenceNumber: number;
+}
+
+export interface ClassifiedActivity {
+  activity: string;
+  category: string;
+  minutes: number;
+  description: string;
+}
+
+export interface SessionActivity {
+  sessionId: string;
+  sessionName: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  durationMinutes: number;
+  summary: string | null;
+  activities: ClassifiedActivity[];
+}
+
+export interface DashboardPersonDetail {
+  period: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    jobTitle: string | null;
+    avatarUrl: string | null;
+  };
+  summary: {
+    totalWorkMinutes: number;
+    totalMeetingMinutes: number;
+    totalActiveMinutes: number;
+    workPercentage: number;
+    meetingPercentage: number;
+    daysTracked: number;
+  };
+  dailyActivities: Array<{
+    date: string;
+    totalWorkMinutes: number;
+    totalMeetingMinutes: number;
+    totalActiveMinutes: number;
+    workPercentage: number;
+    meetingPercentage: number;
+    daySummary: string | null;
+    keyAccomplishments: string[];
+    categoryBreakdown: any;
+    appBreakdown: any;
+  }>;
+  blocks: ActivityBlock[];
+  blocksByDate: Record<string, ActivityBlock[]>;
+  sessionActivities: SessionActivity[];
+  documents: Array<{
+    id: string;
+    title: string;
+    docType: string;
+    status: string;
+    content: string;
+    description: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}
+
+/**
+ * Fetch org-wide dashboard metrics (admin only)
+ */
+export async function fetchDashboardMetrics(
+  period: DashboardPeriod = "yesterday"
+): Promise<DashboardMetrics> {
+  try {
+    const response = await apiRequest<DashboardMetrics>(`/admin/dashboard?period=${period}`);
+    return response;
+  } catch (error) {
+    logger.error("Error fetching dashboard metrics:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch per-user activity list for People tab (admin only)
+ */
+export async function fetchDashboardPeople(
+  period: DashboardPeriod = "yesterday"
+): Promise<DashboardPerson[]> {
+  try {
+    const response = await apiRequest<{ period: string; people: DashboardPerson[] }>(
+      `/admin/dashboard/people?period=${period}`
+    );
+    return response.people;
+  } catch (error) {
+    logger.error("Error fetching dashboard people:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch detailed activity for a specific user (admin only)
+ */
+export async function fetchDashboardPersonDetail(
+  userId: string,
+  period: DashboardPeriod = "yesterday"
+): Promise<DashboardPersonDetail> {
+  try {
+    const response = await apiRequest<DashboardPersonDetail>(
+      `/admin/dashboard/people/${userId}?period=${period}`
+    );
+    return response;
+  } catch (error) {
+    logger.error("Error fetching person activity detail:", error);
+    throw error;
+  }
+}
+
+// ── Drill-Down Data ──────────────────────────────────────────
+
+export interface DrillDownData {
+  title: string;
+  subtitle: string;
+  stats: { label: string; value: string }[];
+  breakdown: { label: string; value: string; bar?: number }[];
+  trend: { label: string; value: number }[];
+}
+
+/**
+ * Fetch drill-down breakdown for a specific metric or category (admin only)
+ * Metrics: focus_time, active_time, meeting_load, people_tracked
+ * Categories: development, communication, meeting, browsing, etc.
+ */
+export async function fetchDrillDown(
+  metric: string,
+  period: DashboardPeriod = "yesterday"
+): Promise<DrillDownData> {
+  try {
+    return await apiRequest<DrillDownData>(
+      `/admin/dashboard/drill-down/${encodeURIComponent(metric)}?period=${period}`
+    );
+  } catch (error) {
+    logger.error("Error fetching drill-down data:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch per-user drill-down breakdown for a specific metric or category (admin only)
+ */
+export async function fetchUserDrillDown(
+  userId: string,
+  metric: string,
+  period: DashboardPeriod = "yesterday"
+): Promise<DrillDownData> {
+  try {
+    return await apiRequest<DrillDownData>(
+      `/admin/dashboard/people/${userId}/drill-down/${encodeURIComponent(metric)}?period=${period}`
+    );
+  } catch (error) {
+    logger.error("Error fetching user drill-down data:", error);
+    throw error;
+  }
+}
+
+// ── Ask Threads CRUD ──────────────────────────────────────────
+
+export interface AskThread {
+  id: string;
+  userId: string;
+  organizationId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AskMessageRow {
+  id: string;
+  threadId: string;
+  role: "user" | "assistant";
+  content: string;
+  reportTitle: string | null;
+  reportSubtitle: string | null;
+  reportHtml: string | null;
+  createdAt: string;
+}
+
+export async function fetchAskThreads(): Promise<AskThread[]> {
+  try {
+    return await apiRequest<AskThread[]>("/admin/ask/threads");
+  } catch (error) {
+    logger.error("Error fetching ask threads:", error);
+    throw error;
+  }
+}
+
+export async function fetchAskThreadMessages(threadId: string): Promise<AskMessageRow[]> {
+  try {
+    return await apiRequest<AskMessageRow[]>(`/admin/ask/threads/${threadId}/messages`);
+  } catch (error) {
+    logger.error("Error fetching thread messages:", error);
+    throw error;
+  }
+}
+
+export async function deleteAskThread(threadId: string): Promise<void> {
+  try {
+    await apiRequest(`/admin/ask/threads/${threadId}`, { method: "DELETE" });
+  } catch (error) {
+    logger.error("Error deleting ask thread:", error);
+    throw error;
+  }
+}
+
+export async function updateAskMessageReport(messageId: string, reportHtml: string): Promise<void> {
+  try {
+    await apiRequest(`/admin/ask/messages/${messageId}/report`, {
+      method: "PATCH",
+      body: JSON.stringify({ reportHtml }),
+    });
+  } catch (error) {
+    logger.error("Error updating report:", error);
+    throw error;
+  }
+}
+
+export async function sendAskChat(
+  message: string,
+  threadId?: string
+): Promise<{
+  message: string;
+  threadId: string;
+  report?: { title: string; subtitle: string; html: string };
+}> {
+  try {
+    const response = await apiRequest<{
+      message: string;
+      threadId: string;
+      report?: { title: string; subtitle: string; html: string };
+    }>("/admin/ask/chat", {
+      method: "POST",
+      body: JSON.stringify({ message, threadId }),
+    });
+    return response;
+  } catch (error) {
+    logger.error("Error in ask chat:", error);
+    throw error;
+  }
+}
+
+/**
+ * Send a chat message to the dashboard AI assistant (admin only)
+ */
+export async function sendDashboardChat(
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  period: DashboardPeriod = "month"
+): Promise<{ message: string }> {
+  try {
+    const response = await apiRequest<{ message: string }>("/admin/dashboard/chat", {
+      method: "POST",
+      body: JSON.stringify({ messages, period }),
+    });
+    return response;
+  } catch (error) {
+    logger.error("Error in dashboard chat:", error);
     throw error;
   }
 }

@@ -1,86 +1,485 @@
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { useEffect, useState } from "react";
-import { createLogger } from "../../../../../../lib/logger";
-
-const logger = createLogger("PersonDetail");
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, FileText, Zap, Calendar, X } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useDashboardPersonDetail, useUserDrillDown } from "@/console/src/hooks/queries/admin";
+import type {
+  DashboardPeriod,
+  DashboardPersonDetail as PersonDetailData,
+} from "@/console/src/services/adminService";
+import DrillDownPanel from "../DashboardView/DrillDownPanel";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+import { DocEditor } from "@/console/src/components/editor";
+import { useDocument } from "@/console/src/hooks/queries/documents";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
-import { fetchUserDetail, type UserDetail } from "@/console/src/services/adminService";
+import { getLocale } from "@/console/src/lib/date";
 
-const chartConfig = {
-  hours: {
-    label: "Hours",
-    color: "#6366F1",
-  },
+const LABEL_TO_METRIC: Record<string, string> = {
+  "Avg Focus Time": "focus_time",
+  "Active Time": "active_time",
+  "Meeting Time": "meeting_load",
+  "Days Tracked": "days_tracked",
 };
+
+interface RecentWorkItem {
+  id: string;
+  type: "session" | "doc";
+  title: string;
+  preview: string;
+  fullContent: string;
+  date: string;
+  time: string;
+  durationMinutes?: number;
+  category?: string;
+  docType?: string;
+}
+
+interface PersonViewModel {
+  name: string;
+  role: string;
+  email: string;
+  startDate: string;
+  lastActive: string;
+  mood: string;
+  moodColor: string;
+  metrics: { label: string; value: string; sub: string }[];
+  activities: { id: string; label: string; hours: number; color: string }[];
+  weeklyTrend: { day: string; focus: number; meetings: number; other: number }[];
+  recentWork: RecentWorkItem[];
+  topTopics: { label: string; count: number }[];
+}
+
+type TimeRange = "yesterday" | "week" | "month" | "ytd" | "all";
+
+function truncateDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  return `${Math.round(minutes / 6) / 10}h`;
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  development: "#6366F1",
+  communication: "#F472B6",
+  research: "#F59E0B",
+  design: "#818CF8",
+  review: "#34D399",
+  documentation: "#60A5FA",
+  other: "#A1A1A1",
+};
+
+function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange): PersonViewModel {
+  const u = api.user;
+  const s = api.summary;
+  const days = s.daysTracked || 1;
+  const isSingleDay = range === "yesterday";
+
+  // For multi-day periods, show per-day averages; for single-day, show totals
+  const divisor = isSingleDay ? 1 : days;
+  const workHours = Math.round((s.totalWorkMinutes / 60 / divisor) * 10) / 10;
+  const meetingHours = Math.round((s.totalMeetingMinutes / 60 / divisor) * 10) / 10;
+  const activeHours = Math.round((s.totalActiveMinutes / 60 / divisor) * 10) / 10;
+
+  const periodLabel = {
+    yesterday: "yesterday",
+    week: "this week",
+    month: "this month",
+    ytd: "year to date",
+    all: "all time",
+  }[range];
+  const moodLabel =
+    s.meetingPercentage > 50
+      ? "Meeting-heavy"
+      : s.workPercentage > 70
+        ? "Focused"
+        : "Collaborative";
+  const moodColor =
+    s.meetingPercentage > 50
+      ? "bg-yellow-500/15 text-yellow-400"
+      : s.workPercentage > 70
+        ? "bg-emerald/15 text-emerald"
+        : "bg-indigo/15 text-indigo-light";
+
+  // Aggregate activity breakdown from session-level classifications
+  const categoryMinutes = new Map<string, number>();
+  if (api.sessionActivities && api.sessionActivities.length > 0) {
+    for (const session of api.sessionActivities) {
+      for (const act of session.activities || []) {
+        const cat = act.category || "Other";
+        categoryMinutes.set(cat, (categoryMinutes.get(cat) || 0) + (act.minutes || 0));
+      }
+    }
+  }
+
+  // Fall back to dailyActivities category breakdown if no session data
+  if (categoryMinutes.size === 0) {
+    for (const day of api.dailyActivities) {
+      for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
+        categoryMinutes.set(c.category, (categoryMinutes.get(c.category) || 0) + c.minutes);
+      }
+    }
+  }
+
+  const activities = [...categoryMinutes.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, mins]) => ({
+      id: cat.toLowerCase(),
+      label: cat.charAt(0).toUpperCase() + cat.slice(1),
+      hours: Math.round((mins / 60) * 10) / 10,
+      color: CATEGORY_COLORS[cat.toLowerCase()] || CATEGORY_COLORS.other,
+    }));
+
+  if (activities.length === 0) {
+    activities.push(
+      { id: "work", label: "Work", hours: workHours, color: "#6366F1" },
+      { id: "meetings", label: "Meetings", hours: meetingHours, color: "#F59E0B" }
+    );
+  }
+
+  const trend: PersonViewModel["weeklyTrend"] = api.dailyActivities
+    .map((d) => ({
+      day: d.date,
+      focus: Math.round((d.totalWorkMinutes / 60) * 10) / 10,
+      meetings: Math.round((d.totalMeetingMinutes / 60) * 10) / 10,
+      other: 0,
+    }))
+    .reverse();
+
+  // Build recent work items from session summaries + user docs
+  const recentWork: RecentWorkItem[] = [];
+
+  // Add session summaries
+  if (api.sessionActivities && api.sessionActivities.length > 0) {
+    for (const session of api.sessionActivities) {
+      const sessionDate = new Date(session.startedAt);
+      const dateStr = sessionDate.toLocaleDateString([], { month: "short", day: "numeric" });
+      const timeStr = sessionDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      const fullContent = session.summary || session.sessionName || "Work session";
+      // Strip markdown for the plain-text preview (first ~150 chars)
+      const plainText = fullContent
+        .replace(/^#{1,6}\s+/gm, "")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/[*_~`]/g, "")
+        .replace(/^[-•]\s+/gm, "")
+        .replace(/\n+/g, " ")
+        .trim();
+      const preview = plainText.length > 150 ? plainText.slice(0, 150) + "…" : plainText;
+
+      // Determine primary category from classified activities
+      const catCounts = new Map<string, number>();
+      for (const act of session.activities || []) {
+        if (act.category) catCounts.set(act.category, (catCounts.get(act.category) || 0) + 1);
+      }
+      const topCat = [...catCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+
+      recentWork.push({
+        id: session.sessionId,
+        type: "session",
+        title: session.sessionName || "Work Session",
+        preview,
+        fullContent,
+        date: dateStr,
+        time: timeStr,
+        durationMinutes: session.durationMinutes,
+        category: topCat,
+      });
+    }
+  }
+
+  // Add user-created documents
+  if (api.documents && api.documents.length > 0) {
+    for (const doc of api.documents) {
+      const docDate = new Date(doc.createdAt);
+      const dateStr = docDate.toLocaleDateString([], { month: "short", day: "numeric" });
+      const timeStr = docDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      const plainText = (doc.content || "")
+        .replace(/^#{1,6}\s+/gm, "")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/[*_~`]/g, "")
+        .replace(/^[-•]\s+/gm, "")
+        .replace(/\n+/g, " ")
+        .trim();
+      const preview = plainText.length > 150 ? plainText.slice(0, 150) + "…" : plainText;
+
+      recentWork.push({
+        id: doc.id,
+        type: "doc",
+        title: doc.title,
+        preview,
+        fullContent: doc.content,
+        date: dateStr,
+        time: timeStr,
+        docType: doc.docType,
+      });
+    }
+  }
+
+  // Sort all by date descending (most recent first)
+  recentWork.sort((a, b) => {
+    const da = new Date(`${a.date} ${a.time}`).getTime();
+    const db = new Date(`${b.date} ${b.time}`).getTime();
+    return db - da;
+  });
+
+  // Aggregate top topics from session activity names
+  const topicCounts = new Map<string, number>();
+  if (api.sessionActivities && api.sessionActivities.length > 0) {
+    for (const session of api.sessionActivities) {
+      for (const act of session.activities || []) {
+        const label = act.category || "Other";
+        topicCounts.set(label, (topicCounts.get(label) || 0) + 1);
+      }
+    }
+  }
+
+  // Fall back to dailyActivities
+  if (topicCounts.size === 0) {
+    for (const day of api.dailyActivities) {
+      for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
+        const label = c.category.charAt(0).toUpperCase() + c.category.slice(1);
+        topicCounts.set(label, (topicCounts.get(label) || 0) + Math.round(c.minutes / 30));
+      }
+    }
+  }
+
+  const topTopics: PersonViewModel["topTopics"] = [...topicCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([label, count]) => ({ label, count }));
+
+  return {
+    name: u.name,
+    role: u.role || "Employee",
+    email: u.email,
+    startDate: "—",
+    lastActive: s.daysTracked > 0 ? "Today" : "—",
+    mood: moodLabel,
+    moodColor,
+    metrics: [
+      {
+        label: "Avg Focus Time",
+        value: `${workHours}h`,
+        sub: isSingleDay ? periodLabel : `per day ${periodLabel}`,
+      },
+      {
+        label: "Active Time",
+        value: `${activeHours}h`,
+        sub: isSingleDay ? periodLabel : `avg/day ${periodLabel}`,
+      },
+      {
+        label: "Meeting Time",
+        value: `${meetingHours}h`,
+        sub: isSingleDay ? periodLabel : `avg/day ${periodLabel}`,
+      },
+      { label: "Days Tracked", value: `${s.daysTracked}`, sub: periodLabel },
+    ],
+    activities,
+    weeklyTrend: trend.length > 0 ? trend : [{ day: "—", focus: 0, meetings: 0, other: 0 }],
+    recentWork,
+    topTopics: topTopics.length > 0 ? topTopics : [{ label: "No data", count: 0 }],
+  };
+}
+
+const timeRangeToPeriod: Record<TimeRange, DashboardPeriod> = {
+  yesterday: "yesterday",
+  week: "week",
+  month: "month",
+  ytd: "ytd",
+  all: "all",
+};
+
+function ChartTooltipCustom({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-canvas-overlay border border-stroke-subtle rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
+      <p className="text-text-primary font-medium">{label}</p>
+      {payload.map((entry: any) => (
+        <div key={entry.name} className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+          <span className="text-text-secondary">
+            {entry.name}: {entry.value}h
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const timeRangeLabels: Record<TimeRange, string> = {
+  yesterday: "Yesterday",
+  week: "This Week",
+  month: "This Month",
+  ytd: "Year to Date",
+  all: "All Time",
+};
+
+function renderMarkdownContent(content: string): string {
+  const raw = marked.parse(content);
+  return DOMPurify.sanitize(typeof raw === "string" ? raw : "");
+}
 
 export default function PersonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [person, setPerson] = useState<UserDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [timeRange, setTimeRange] = useState<TimeRange>("yesterday");
+  const [drillDownMetric, setDrillDownMetric] = useState<string | null>(null);
+  const [selectedWork, setSelectedWork] = useState<RecentWorkItem | null>(null);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [workFilter, setWorkFilter] = useState<"all" | "session" | "doc">("all");
 
-  useEffect(() => {
-    if (!id) {
-      setError("No user ID provided");
-      setLoading(false);
-      return;
+  const { data: apiDetail } = useDashboardPersonDetail(id || "", timeRangeToPeriod[timeRange]);
+  const { data: drillDownData } = useUserDrillDown(
+    id || "",
+    drillDownMetric,
+    timeRangeToPeriod[timeRange]
+  );
+  const { data: docData, isLoading: docLoading } = useDocument(selectedDocId || "");
+
+  const handleDrillDown = (label: string) => {
+    const metricKey = LABEL_TO_METRIC[label] || label.toLowerCase();
+    setDrillDownMetric(metricKey);
+  };
+
+  const closeDrillDown = () => setDrillDownMetric(null);
+
+  const person = useMemo(() => {
+    if (apiDetail) {
+      return transformApiToPersonViewModel(apiDetail, timeRange);
     }
+    return null;
+  }, [apiDetail, timeRange]);
 
-    const loadUserDetail = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const userData = await fetchUserDetail(id);
-        setPerson(userData);
-      } catch (err) {
-        logger.error("Failed to load user detail:", err);
-        setError(err instanceof Error ? err.message : "Failed to load user details");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadUserDetail();
-  }, [id]);
-
-  if (loading) {
+  if (!person) {
     return (
-      <div className="p-8">
-        <div className="flex items-center justify-center py-12">
+      <div className="h-screen overflow-y-auto p-8 pb-16 space-y-6">
+        <button
+          onClick={() => navigate("/people")}
+          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
+        >
+          <ArrowLeft size={16} />
+          <span className="text-sm">Back to People</span>
+        </button>
+        <div className="flex items-center justify-center py-24">
           <div className="text-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-            <p className="text-sm text-text-secondary">Loading user details...</p>
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto mb-3" />
+            <p className="text-sm text-text-secondary">Loading activity data...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (error || !person) {
+  const totalActivityHours = person.activities.reduce((s, a) => s + a.hours, 0);
+
+  // Inline read-only doc viewer
+  if (selectedDocId) {
+    const DOC_TYPE_LABELS: Record<string, string> = {
+      "how-to": "How-To Guide",
+      "knowledge-article": "Knowledge Article",
+      troubleshooting: "Troubleshooting Guide",
+    };
+    const DOC_STATUS_COLORS: Record<string, string> = {
+      draft: "bg-yellow-500/20 text-yellow-400",
+      published: "bg-green-500/20 text-green-400",
+      archived: "bg-gray-500/20 text-gray-400",
+    };
+
     return (
-      <div className="p-8">
-        <button
-          onClick={() => navigate("/people")}
-          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-4"
-        >
-          <ArrowLeft size={16} />
-          <span className="text-sm">Back to People</span>
-        </button>
-        <p className="text-status-error">{error || "Person not found"}</p>
+      <div className="h-screen flex flex-col">
+        {/* Doc header */}
+        <div className="flex items-start justify-between p-6 border-b border-border-subtle">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSelectedDocId(null)}
+              className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FileText size={20} className="text-primary" />
+              </div>
+              <div>
+                {docLoading ? (
+                  <div className="h-5 w-48 bg-canvas-overlay rounded animate-pulse" />
+                ) : (
+                  <>
+                    <h2 className="text-xl font-bold text-text-primary">
+                      {docData?.title || "Document"}
+                    </h2>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <span className="text-text-secondary text-sm">
+                        {DOC_TYPE_LABELS[docData?.docType || ""] || docData?.docType}
+                      </span>
+                      {docData?.status && (
+                        <Badge className={DOC_STATUS_COLORS[docData.status] || ""}>
+                          {docData.status}
+                        </Badge>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          <span className="text-xs text-text-tertiary px-3 py-1 rounded-full bg-canvas-overlay">
+            View only
+          </span>
+        </div>
+
+        {/* Metadata bar */}
+        {docData && (
+          <div className="flex items-center gap-6 text-sm px-6 py-3 border-b border-border-subtle bg-background-secondary/30">
+            <div className="flex items-center gap-2 text-text-secondary">
+              <Calendar size={14} />
+              <span>
+                Updated:{" "}
+                <span className="text-text-primary">
+                  {new Date(docData.updatedAt).toLocaleDateString(getLocale(), {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </span>
+            </div>
+            {docData.creator && (
+              <div className="text-text-secondary">
+                By:{" "}
+                <span className="text-text-primary">
+                  {docData.creator.firstName} {docData.creator.lastName}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Read-only editor */}
+        <div className="flex-1 overflow-auto bg-background-primary">
+          {docLoading ? (
+            <div className="flex items-center justify-center py-24">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : (
+            <div className="max-w-4xl mx-auto px-8 py-6">
+              <DocEditor
+                key={selectedDocId}
+                initialContent={docData?.content || ""}
+                readOnly
+                placeholder=""
+                className="h-full"
+              />
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-6">
-      {/* Header */}
-      <div className="space-y-4">
+    <div className="relative h-screen overflow-hidden">
+      <div className="h-full overflow-y-auto p-8 pb-16 space-y-6">
+        {/* Back button */}
         <button
           onClick={() => navigate("/people")}
           className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
@@ -89,213 +488,392 @@ export default function PersonDetail() {
           <span className="text-sm">Back to People</span>
         </button>
 
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold text-text-primary">{person.name}</h1>
-            <div className="flex items-center gap-3">
-              <Badge className="bg-background-elevated text-text-secondary border-transparent hover:bg-background-elevated">
-                {person.role}
-              </Badge>
-              {person.manager && (
-                <span className="text-text-secondary">Manager: {person.manager.name}</span>
-              )}
+        {/* User header + time filter */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-indigo/20 flex items-center justify-center text-lg font-semibold text-indigo-light">
+              {person.name
+                .split(" ")
+                .map((n) => n[0])
+                .join("")}
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-text-primary">{person.name}</h1>
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-sm text-text-secondary">{person.role}</span>
+                <span className="text-text-tertiary">·</span>
+                <span
+                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${person.moodColor}`}
+                >
+                  {person.mood}
+                </span>
+                <span className="text-text-tertiary">·</span>
+                <span className="flex items-center gap-1 text-xs text-text-secondary">
+                  <Zap size={10} className="text-emerald" />
+                  {person.lastActive}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 mt-1 text-xs text-text-tertiary">
+                <span className="flex items-center gap-1">
+                  <Calendar size={10} />
+                  Started {person.startDate}
+                </span>
+                <span>{person.email}</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              className="bg-background-elevated border-transparent text-text-primary hover:bg-background-elevated/80"
+          {/* Time filter */}
+          <div className="flex items-center rounded-lg bg-canvas-overlay border border-stroke-subtle p-0.5 self-center">
+            {(Object.keys(timeRangeLabels) as TimeRange[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => setTimeRange(key)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-normal ${
+                  timeRange === key
+                    ? "bg-indigo text-white shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {key === "ytd"
+                  ? "YTD"
+                  : key === "all"
+                    ? "All"
+                    : timeRangeLabels[key].replace("This ", "")}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Metric cards */}
+        <div className="grid grid-cols-4 gap-4">
+          {person.metrics.map((m) => (
+            <div
+              key={m.label}
+              onClick={() => handleDrillDown(m.label)}
+              className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-4 cursor-pointer hover:border-indigo/40 transition-colors"
             >
-              Send Slack Reminder
-            </Button>
-            <Button className="bg-primary text-white hover:bg-primary/90">Edit</Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Onboarding Progress */}
-        <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-text-primary">Onboarding Progress</h2>
-            <button className="text-sm text-primary hover:underline">View Details</button>
-          </div>
-          <div className="space-y-2">
-            <p className="text-5xl font-bold text-text-primary">{person.progress}%</p>
-            <p className="text-sm text-text-secondary">
-              {person.metrics.completedTasks} of {person.metrics.totalTasks} tasks completed
-            </p>
-          </div>
-        </div>
-
-        {/* Overdue Tasks */}
-        <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-text-primary">Overdue Tasks</h2>
-            <button className="text-sm text-primary hover:underline">View Details</button>
-          </div>
-          <div className="space-y-2">
-            <p className="text-5xl font-bold text-status-warning">{person.metrics.overdueTasks}</p>
-            <p className="text-sm text-text-secondary">
-              {person.metrics.overdueTasks} tasks overdue
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Assigned Roadmaps */}
-      <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-        <div>
-          <h2 className="text-xl font-semibold text-text-primary mb-1">Assigned Roadmaps</h2>
-          <p className="text-sm text-text-secondary">
-            {person.name.split(" ")[0]}'s active onboarding paths
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          {person.assignedRoadmaps.length === 0 ? (
-            <p className="text-center text-text-secondary py-4">No roadmaps assigned yet</p>
-          ) : (
-            person.assignedRoadmaps.map((roadmap) => (
-              <div
-                key={roadmap.id}
-                className="bg-background-secondary rounded-lg border border-border-subtle p-4 space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-text-primary font-semibold">{roadmap.title}</h3>
-                  <span
-                    className={`text-sm font-semibold ${
-                      roadmap.completion === 100 ? "text-status-success" : "text-primary"
-                    }`}
-                  >
-                    {roadmap.completion}% complete
-                  </span>
-                </div>
-                <p className="text-sm text-text-secondary">
-                  {roadmap.tasks} tasks • {roadmap.description}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
+              <div className="relative">
+                <p className="text-[10px] font-medium text-text-tertiary uppercase tracking-wider">
+                  {m.label}
                 </p>
-                <Progress value={roadmap.completion} className="h-2 bg-border-subtle" />
+                <p className="text-2xl font-bold text-text-primary mt-1">{m.value}</p>
+                <p className="text-xs text-text-secondary mt-0.5">{m.sub}</p>
               </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* AI Assistant Activity */}
-      <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-        <div>
-          <h2 className="text-xl font-semibold text-text-primary mb-1">AI Assistant Activity</h2>
-          <p className="text-sm text-text-secondary">Recent interactions with the Mitable Agent</p>
-        </div>
-
-        <div className="space-y-3">
-          {person.conversations.length === 0 ? (
-            <p className="text-center text-text-secondary py-4">No conversations yet</p>
-          ) : (
-            person.conversations.map((conversation) => (
-              <div
-                key={conversation.id}
-                className="flex items-start justify-between p-3 bg-background-secondary rounded-lg border border-border-subtle"
-              >
-                <div className="flex-1">
-                  <p className="text-xs text-text-secondary mb-1">{conversation.timestamp}</p>
-                  <p className="text-text-primary">{conversation.question}</p>
-                </div>
-                <Badge
-                  className={
-                    conversation.status === "resolved"
-                      ? "bg-status-success/20 text-status-success border-transparent"
-                      : "bg-status-warning/20 text-status-warning border-transparent"
-                  }
-                >
-                  {conversation.status === "resolved" ? "Resolved by Mitable" : "Required a nudge"}
-                </Badge>
-              </div>
-            ))
-          )}
-        </div>
-
-        {person.conversations.length > 0 && (
-          <button className="text-sm text-primary hover:underline">View All Conversations</button>
-        )}
-      </div>
-
-      {/* Common Nudge Themes and Platform Activity */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Common Nudge Themes */}
-        <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold text-text-primary mb-1">Common Nudge Themes</h2>
-            <p className="text-sm text-text-secondary">
-              Topics where {person.name.split(" ")[0]} needed human help
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {person.nudgeThemes.length === 0 ? (
-              <p className="text-center text-text-secondary py-4">No nudges yet</p>
-            ) : (
-              person.nudgeThemes.map((theme, index) => (
-                <div
-                  key={index}
-                  className="bg-background-secondary rounded-lg border border-border-subtle p-4 space-y-2"
-                >
-                  <h3 className="text-text-primary font-semibold">{theme.theme}</h3>
-                  <p className="text-sm text-text-secondary">{theme.count} times</p>
-                  <p className="text-xs text-text-secondary">
-                    Nudged:{" "}
-                    {theme.nudges.map((nudgedPerson, i) => (
-                      <span key={i}>
-                        {nudgedPerson.name} ({nudgedPerson.count}x)
-                        {i < theme.nudges.length - 1 ? ", " : ""}
-                      </span>
-                    ))}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-
-          {person.nudgeThemes.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-text-secondary italic">Auto generated by AI</p>
-              <button className="text-sm text-primary hover:underline">View All Nudges</button>
             </div>
-          )}
+          ))}
         </div>
 
-        {/* Platform Activity */}
-        <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold text-text-primary mb-1">Platform Activity</h2>
-            <p className="text-sm text-text-secondary">Daily activity hours recorded</p>
+        {/* Activity breakdown + Weekly trend */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Activity breakdown */}
+          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
+            <h3 className="relative text-sm font-semibold text-text-primary mb-4">
+              Activity Breakdown
+              <span className="text-text-secondary font-normal ml-2">
+                {timeRangeLabels[timeRange]}
+              </span>
+            </h3>
+            <div className="relative flex h-3 rounded-full overflow-hidden mb-4">
+              {person.activities.map((a) => (
+                <div
+                  key={a.id}
+                  style={{
+                    width: `${totalActivityHours > 0 ? (a.hours / totalActivityHours) * 100 : 0}%`,
+                    backgroundColor: a.color,
+                  }}
+                />
+              ))}
+            </div>
+            <div className="relative space-y-2">
+              {person.activities.map((a) => (
+                <div
+                  key={a.id}
+                  onClick={() => handleDrillDown(a.label)}
+                  className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: a.color }}
+                    />
+                    <span className="text-xs text-text-primary">{a.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-text-secondary">{a.hours}h</span>
+                    <span className="text-[10px] text-text-tertiary w-7 text-right">
+                      {totalActivityHours > 0
+                        ? Math.round((a.hours / totalActivityHours) * 100)
+                        : 0}
+                      %
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <ChartContainer config={chartConfig} className="h-[300px] w-full">
-            <BarChart data={person.activityData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#4A4A4A" vertical={false} />
-              <XAxis
-                dataKey="date"
-                stroke="#A1A1A1"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="#A1A1A1"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${value}h`}
-              />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="hours" fill="#6366F1" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ChartContainer>
+          {/* Weekly trend */}
+          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
+            <h3 className="relative text-sm font-semibold text-text-primary mb-4">
+              Weekly Trend
+              <span className="text-text-secondary font-normal ml-2">Hours per day</span>
+            </h3>
+            <div className="relative h-[180px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={person.weeklyTrend} barGap={2}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fill: "#A1A1A1", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "#A1A1A1", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={30}
+                  />
+                  <Tooltip
+                    content={<ChartTooltipCustom />}
+                    cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                  />
+                  <Bar
+                    dataKey="focus"
+                    name="Focus"
+                    fill="#6366F1"
+                    radius={[3, 3, 0, 0]}
+                    stackId="a"
+                  />
+                  <Bar
+                    dataKey="meetings"
+                    name="Meetings"
+                    fill="#F59E0B"
+                    radius={[0, 0, 0, 0]}
+                    stackId="a"
+                  />
+                  <Bar
+                    dataKey="other"
+                    name="Other"
+                    fill="#818CF8"
+                    radius={[3, 3, 0, 0]}
+                    stackId="a"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent work + Top topics */}
+        <div className="grid grid-cols-3 gap-4">
+          {/* Recent work — session summaries + docs */}
+          <div className="col-span-2 relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
+            <div className="relative flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-text-primary">
+                Recent Work
+                <span className="text-text-secondary font-normal ml-2">
+                  What they've been doing
+                </span>
+              </h3>
+              <div className="flex items-center gap-1 bg-canvas-overlay rounded-lg p-0.5">
+                {(["all", "session", "doc"] as const).map((f) => {
+                  const label = f === "all" ? "All" : f === "session" ? "Blocks" : "Docs";
+                  const count =
+                    f === "all"
+                      ? person.recentWork.length
+                      : person.recentWork.filter((w) => w.type === f).length;
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => setWorkFilter(f)}
+                      className={`text-[11px] px-2.5 py-1 rounded-md transition-colors ${
+                        workFilter === f
+                          ? "bg-canvas-raised text-text-primary font-medium shadow-sm"
+                          : "text-text-tertiary hover:text-text-secondary"
+                      }`}
+                    >
+                      {label}
+                      {count > 0 ? ` (${count})` : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {(() => {
+              const filtered =
+                workFilter === "all"
+                  ? person.recentWork
+                  : person.recentWork.filter((w) => w.type === workFilter);
+              return (
+                <div className="relative space-y-1 max-h-[440px] overflow-y-auto pr-1">
+                  {filtered.length === 0 ? (
+                    <p className="text-sm text-text-tertiary py-4 text-center">
+                      {workFilter === "all"
+                        ? "No activity yet"
+                        : `No ${workFilter === "doc" ? "documents" : "blocks"} yet`}
+                    </p>
+                  ) : (
+                    filtered.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() =>
+                          item.type === "doc" ? setSelectedDocId(item.id) : setSelectedWork(item)
+                        }
+                        className="w-full text-left flex items-start gap-3 py-3 px-2 -mx-2 rounded-lg border border-transparent hover:border-stroke-subtle hover:bg-canvas-overlay/50 transition-colors cursor-pointer"
+                      >
+                        <div
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                            item.type === "doc"
+                              ? "text-indigo-light bg-indigo/15"
+                              : "text-emerald bg-emerald/15"
+                          }`}
+                        >
+                          {item.type === "doc" ? <FileText size={14} /> : <Zap size={14} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-text-primary truncate">
+                            {item.title}
+                          </p>
+                          <p className="text-xs text-text-secondary mt-0.5 line-clamp-2 leading-relaxed">
+                            {item.preview}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-text-tertiary">
+                              {item.date}, {item.time}
+                            </span>
+                            {item.category && (
+                              <span className="text-[9px] font-medium text-text-tertiary bg-canvas-overlay px-1.5 py-0.5 rounded">
+                                {item.category}
+                              </span>
+                            )}
+                            {item.docType && (
+                              <span className="text-[9px] font-medium text-indigo-light bg-indigo/10 px-1.5 py-0.5 rounded">
+                                {item.docType}
+                              </span>
+                            )}
+                            {item.durationMinutes != null && item.durationMinutes > 0 && (
+                              <span className="text-[9px] text-text-tertiary">
+                                {truncateDuration(item.durationMinutes)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Top topics */}
+          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
+            <h3 className="relative text-sm font-semibold text-text-primary mb-4">
+              Top Topics
+              <span className="text-text-secondary font-normal ml-2">Most worked on</span>
+            </h3>
+            <div className="relative space-y-3">
+              {person.topTopics.map((topic) => {
+                const maxCount = person.topTopics[0].count;
+                return (
+                  <div key={topic.label}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-text-primary">{topic.label}</span>
+                      <span className="text-[10px] text-text-tertiary">{topic.count} blocks</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-canvas-overlay overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-indigo transition-all duration-normal"
+                        style={{ width: `${maxCount > 0 ? (topic.count / maxCount) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Drill-down overlay panel */}
+      {drillDownMetric && drillDownData && (
+        <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
+          <DrillDownPanel data={drillDownData} onClose={closeDrillDown} />
+        </div>
+      )}
+
+      {/* Summary detail modal */}
+      {selectedWork && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setSelectedWork(null)}
+          />
+          <div className="relative w-full max-w-2xl max-h-[80vh] bg-canvas-raised border border-stroke-subtle rounded-2xl shadow-2xl flex flex-col">
+            {/* Modal header */}
+            <div className="flex items-start justify-between p-5 border-b border-stroke-subtle">
+              <div className="flex items-start gap-3 min-w-0">
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    selectedWork.type === "doc"
+                      ? "text-indigo-light bg-indigo/15"
+                      : "text-emerald bg-emerald/15"
+                  }`}
+                >
+                  {selectedWork.type === "doc" ? <FileText size={16} /> : <Zap size={16} />}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-semibold text-text-primary truncate">
+                    {selectedWork.title}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-text-tertiary">
+                      {selectedWork.date}, {selectedWork.time}
+                    </span>
+                    {selectedWork.category && (
+                      <span className="text-[10px] font-medium text-text-tertiary bg-canvas-overlay px-1.5 py-0.5 rounded">
+                        {selectedWork.category}
+                      </span>
+                    )}
+                    {selectedWork.docType && (
+                      <span className="text-[10px] font-medium text-indigo-light bg-indigo/10 px-1.5 py-0.5 rounded">
+                        {selectedWork.docType}
+                      </span>
+                    )}
+                    {selectedWork.durationMinutes != null && selectedWork.durationMinutes > 0 && (
+                      <span className="text-[10px] text-text-tertiary">
+                        {truncateDuration(selectedWork.durationMinutes)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedWork(null)}
+                className="p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            {/* Modal content — rendered markdown */}
+            <div className="flex-1 overflow-y-auto p-5">
+              <div
+                className="prose prose-invert prose-sm max-w-none text-text-primary prose-headings:text-text-primary prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-primary prose-a:text-indigo-light"
+                dangerouslySetInnerHTML={{
+                  __html: renderMarkdownContent(selectedWork.fullContent),
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

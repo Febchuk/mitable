@@ -1,16 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
 import { createLogger } from "../../../../../../lib/logger";
 
 const logger = createLogger("AddNewUser");
-import { ArrowLeft, CalendarIcon, Check, ChevronsUpDown, Clipboard, X } from "lucide-react";
+import { ArrowLeft, Clipboard, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -18,34 +15,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { cn } from "@/lib/utils";
-import { useTemplates, useCreateUser } from "@/console/src/hooks/queries/admin";
+import { useCreateUser } from "@/console/src/hooks/queries/admin";
 import { useToast } from "@/hooks/use-toast";
-
-const roles = [
-  { value: "engineer", label: "Software Engineer" },
-  { value: "fde", label: "Forward Deployed Engineer" },
-  { value: "designer", label: "Product Designer" },
-  { value: "manager", label: "Marketing Manager" },
-  { value: "pm", label: "Product Manager" },
-];
-
-const managers = [
-  { value: "1", label: "Marcus Johnson" },
-  { value: "2", label: "David Kim" },
-];
 
 export default function AddNewUser() {
   const navigate = useNavigate();
-  const { data: templates = [], isLoading: templatesLoading } = useTemplates();
   const createUserMutation = useCreateUser();
   const { toast } = useToast();
 
@@ -53,35 +27,14 @@ export default function AddNewUser() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [jobTitle, setJobTitle] = useState("");
   const [welcomeEmail, setWelcomeEmail] = useState(true);
-  const [notifyManager, setNotifyManager] = useState(false);
   const [makeAdmin, setMakeAdmin] = useState(false);
-  const [date, setDate] = useState<Date>();
-  const [roleOpen, setRoleOpen] = useState(false);
-  const [role, setRole] = useState("");
-  const [managerOpen, setManagerOpen] = useState(false);
-  const [manager, setManager] = useState("");
 
   // Password modal state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState("");
   const [passwordCopied, setPasswordCopied] = useState(false);
-
-  const handleTemplateToggle = (templateId: string) => {
-    setSelectedTemplates((prev) =>
-      prev.includes(templateId) ? prev.filter((id) => id !== templateId) : [...prev, templateId]
-    );
-  };
-
-  const calculateTotals = () => {
-    const selected = templates.filter((t) => selectedTemplates.includes(t.id));
-    const totalTasks = selected.reduce((sum, t) => sum + (t.tasks || 0), 0);
-    const totalWeeks = selected.reduce((sum, t) => sum + t.totalWeeks, 0);
-    return { totalTasks, totalWeeks };
-  };
-
-  const { totalTasks, totalWeeks } = calculateTotals();
 
   const handleCopyPassword = async () => {
     try {
@@ -124,35 +77,21 @@ export default function AddNewUser() {
       return;
     }
 
-    if (!role) {
+    if (!jobTitle.trim()) {
       toast({
         title: "Error",
-        description: "Please select a role",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!date) {
-      toast({
-        title: "Error",
-        description: "Please select a start date",
+        description: "Please enter a job title",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      // Get the full role label (e.g., "Software Engineer") from the selected role value
-      const selectedRole = roles.find((r) => r.value === role);
-
       const response = await createUserMutation.mutateAsync({
         firstName,
         lastName,
         email,
-        role: selectedRole?.label || "",
-        startDate: format(date, "yyyy-MM-dd"),
-        templateIds: selectedTemplates,
+        role: jobTitle.trim(),
         sendWelcomeEmail: welcomeEmail,
         makeAdmin,
       });
@@ -301,183 +240,24 @@ export default function AddNewUser() {
               </p>
             </div>
 
-            {/* Role Combobox */}
-            <div className="space-y-2">
-              <Label htmlFor="role" className="text-text-primary">
-                Role <span className="text-red-500">*</span>
+            {/* Job Title */}
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="jobTitle" className="text-text-primary">
+                Job Title <span className="text-red-500">*</span>
               </Label>
-              <Popover open={roleOpen} onOpenChange={setRoleOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={roleOpen}
-                    className="w-full justify-between bg-background-secondary border-transparent text-text-primary hover:bg-background-secondary hover:text-text-primary"
-                  >
-                    {role ? roles.find((r) => r.value === role)?.label : "Select role"}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search role..." className="h-9" />
-                    <CommandList>
-                      <CommandEmpty>No role found.</CommandEmpty>
-                      <CommandGroup>
-                        {roles.map((r) => (
-                          <CommandItem
-                            key={r.value}
-                            value={r.value}
-                            onSelect={(currentValue) => {
-                              setRole(currentValue === role ? "" : currentValue);
-                              setRoleOpen(false);
-                            }}
-                          >
-                            {r.label}
-                            <Check
-                              className={cn(
-                                "ml-auto h-4 w-4",
-                                role === r.value ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Input
+                id="jobTitle"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="e.g. Software Engineer, Product Designer, Marketing Manager"
+                className="bg-background-secondary border-transparent text-text-primary placeholder:text-text-secondary"
+              />
             </div>
-
-            {/* Start Date Picker */}
-            <div className="space-y-2">
-              <Label htmlFor="startDate" className="text-text-primary">
-                Start Date <span className="text-red-500">*</span>
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal bg-background-secondary border-transparent hover:bg-background-secondary hover:text-text-primary",
-                      !date && "text-text-secondary"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={date} onSelect={setDate} />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          {/* Manager Combobox */}
-          <div className="space-y-2">
-            <Label htmlFor="manager" className="text-text-primary">
-              Manager
-            </Label>
-            <Popover open={managerOpen} onOpenChange={setManagerOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={managerOpen}
-                  className="w-full justify-between bg-background-secondary border-transparent text-text-primary hover:bg-background-secondary hover:text-text-primary"
-                >
-                  {manager
-                    ? managers.find((m) => m.value === manager)?.label
-                    : "Select manager (optional)"}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                <Command>
-                  <CommandInput placeholder="Search manager..." className="h-9" />
-                  <CommandList>
-                    <CommandEmpty>No manager found.</CommandEmpty>
-                    <CommandGroup>
-                      {managers.map((m) => (
-                        <CommandItem
-                          key={m.value}
-                          value={m.value}
-                          onSelect={(currentValue) => {
-                            setManager(currentValue === manager ? "" : currentValue);
-                            setManagerOpen(false);
-                          }}
-                        >
-                          {m.label}
-                          <Check
-                            className={cn(
-                              "ml-auto h-4 w-4",
-                              manager === m.value ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            <p className="text-xs text-text-secondary">
-              Manager will be notified and can track progress
-            </p>
           </div>
         </div>
 
-        {/* Onboarding Roadmap Section */}
+        {/* Settings Section */}
         <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold text-text-primary mb-1">Onboarding Roadmap</h2>
-            <p className="text-sm text-text-secondary">
-              Optionally select one or more templates. They'll be combined into this person's
-              complete onboarding plan.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {templates.map((template) => (
-              <Label
-                key={template.id}
-                htmlFor={template.id}
-                className="flex items-start gap-3 p-4 bg-background-secondary rounded-lg border border-border-subtle hover:bg-background-secondary/80 transition-colors cursor-pointer has-[[aria-checked=true]]:border-primary has-[[aria-checked=true]]:bg-primary/5"
-              >
-                <Checkbox
-                  id={template.id}
-                  checked={selectedTemplates.includes(template.id)}
-                  onCheckedChange={() => handleTemplateToggle(template.id)}
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <p className="text-text-primary font-semibold">{template.title}</p>
-                  <p className="text-sm text-primary mt-1">
-                    {template.tasks} tasks • {template.totalWeeks}{" "}
-                    {template.totalWeeks === 1 ? "week" : "weeks"}
-                  </p>
-                  <p className="text-sm text-text-secondary mt-1">{template.description}</p>
-                </div>
-              </Label>
-            ))}
-          </div>
-
-          {/* Summary */}
-          {selectedTemplates.length > 0 && (
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-              <p className="text-sm text-primary">
-                📋 {selectedTemplates.length} templates selected • {totalTasks} total tasks • ~
-                {totalWeeks} weeks duration
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Additional Settings Section */}
-        <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-          <h2 className="text-xl font-semibold text-text-primary">Additional Settings</h2>
-
           <div className="space-y-4">
             {/* Welcome Email */}
             <div className="flex items-start gap-3">
@@ -491,31 +271,9 @@ export default function AddNewUser() {
                   htmlFor="welcomeEmail"
                   className="text-text-primary font-medium cursor-pointer"
                 >
-                  Send welcome email on start date
+                  Send welcome email
                 </Label>
-                <p className="text-sm text-text-secondary mt-1">
-                  Email includes login credentials and first day instructions
-                </p>
-              </div>
-            </div>
-
-            {/* Notify Manager */}
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="notifyManager"
-                checked={notifyManager}
-                onCheckedChange={(checked) => setNotifyManager(checked as boolean)}
-              />
-              <div className="flex-1">
-                <Label
-                  htmlFor="notifyManager"
-                  className="text-text-primary font-medium cursor-pointer"
-                >
-                  Notify manager
-                </Label>
-                <p className="text-sm text-text-secondary mt-1">
-                  Manager receives progress updates and milestone notifications
-                </p>
+                <p className="text-sm text-text-secondary mt-1">Email includes login credentials</p>
               </div>
             </div>
 
@@ -531,7 +289,7 @@ export default function AddNewUser() {
                   Make user an admin
                 </Label>
                 <p className="text-sm text-text-secondary mt-1">
-                  Admins can manage onboarding, integrations, and other employees.
+                  Admins can manage integrations and view team analytics.
                 </p>
               </div>
             </div>
@@ -550,10 +308,10 @@ export default function AddNewUser() {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={createUserMutation.isPending || templatesLoading}
+            disabled={createUserMutation.isPending}
             className="bg-primary text-white hover:bg-primary/90"
           >
-            {createUserMutation.isPending ? "Creating..." : "+ Add New Hire"}
+            {createUserMutation.isPending ? "Creating..." : "+ Add User"}
           </Button>
         </div>
       </div>

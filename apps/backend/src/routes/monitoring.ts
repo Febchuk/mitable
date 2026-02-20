@@ -21,6 +21,10 @@ import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { closeAudioConnection } from "./audio.js";
 import { logger } from "../lib/logger";
+import { scheduleInactivityRollup, cancelInactivityRollup } from "../cron/jobs/inactivity-trigger";
+import { classifySession } from "../services/session-classification.service";
+import { materializeSession } from "../services/activity-materializer.service";
+import { cleanupStaleSessions } from "../services/stale-session-cleanup.service";
 
 const router = Router();
 
@@ -218,6 +222,9 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       hasRelatedDocs: !!relatedDocsContext,
     });
 
+    // Cancel any pending inactivity rollup — user is starting a new session
+    cancelInactivityRollup(userId);
+
     res.json({
       success: true,
       session: {
@@ -276,6 +283,8 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
         endedAt: schema.monitoringSessions.endedAt,
         totalPausedMs: schema.monitoringSessions.totalPausedMs,
         finalSummary: schema.monitoringSessions.finalSummary,
+        rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+        timeBreakdown: schema.monitoringSessions.timeBreakdown,
         deliveryStatus: schema.monitoringSessions.deliveryStatus,
         deliveryChannel: schema.monitoringSessions.deliveryChannel,
         createdAt: schema.monitoringSessions.createdAt,
@@ -286,21 +295,47 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
       .limit(limit)
       .offset(offset);
 
-    // Get capture counts for all sessions in a single query
+    // Get capture counts and per-app breakdown for all sessions in parallel
     const sessionIds = sessions.map((s) => s.id);
-    const captureCounts =
+    const [captureCounts, appBreakdowns] =
       sessionIds.length > 0
-        ? await db
-            .select({
-              sessionId: schema.sessionCaptures.sessionId,
-              count: sql<number>`count(*)::int`,
-            })
-            .from(schema.sessionCaptures)
-            .where(inArray(schema.sessionCaptures.sessionId, sessionIds))
-            .groupBy(schema.sessionCaptures.sessionId)
-        : [];
+        ? await Promise.all([
+            db
+              .select({
+                sessionId: schema.sessionCaptures.sessionId,
+                count: sql<number>`count(*)::int`,
+              })
+              .from(schema.sessionCaptures)
+              .where(inArray(schema.sessionCaptures.sessionId, sessionIds))
+              .groupBy(schema.sessionCaptures.sessionId),
+            // Per-session app time: count captures per app, each ~30s of activity
+            db
+              .select({
+                sessionId: schema.sessionCaptures.sessionId,
+                appName: schema.sessionCaptures.appName,
+                captureCount: sql<number>`count(*)::int`,
+              })
+              .from(schema.sessionCaptures)
+              .where(
+                and(
+                  inArray(schema.sessionCaptures.sessionId, sessionIds),
+                  isNotNull(schema.sessionCaptures.appName)
+                )
+              )
+              .groupBy(schema.sessionCaptures.sessionId, schema.sessionCaptures.appName),
+          ])
+        : [[], []];
 
-    // Build response with duration and captureCount
+    // Group app capture counts by session (raw counts, not time yet)
+    const appCaptureMap = new Map<string, Record<string, number>>();
+    for (const row of appBreakdowns) {
+      if (!row.appName) continue;
+      const existing = appCaptureMap.get(row.sessionId) || {};
+      existing[row.appName] = (existing[row.appName] || 0) + row.captureCount;
+      appCaptureMap.set(row.sessionId, existing);
+    }
+
+    // Build response with duration, captureCount, and timeBreakdown
     const sessionsWithDuration = sessions.map((session) => {
       const now = Date.now();
       const startTime = new Date(session.startedAt).getTime();
@@ -311,9 +346,30 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
 
       const captureCount = captureCounts.find((c) => c.sessionId === session.id)?.count || 0;
 
+      // Use stored timeBreakdown if populated, otherwise derive from capture proportions
+      const storedTb = session.timeBreakdown as Record<string, number> | null;
+      const hasStoredTb = storedTb && Object.keys(storedTb).length > 0;
+      let timeBreakdown: Record<string, number> | null = null;
+      if (hasStoredTb) {
+        timeBreakdown = storedTb;
+      } else {
+        const captureCounts = appCaptureMap.get(session.id);
+        if (captureCounts) {
+          const totalCaptures = Object.values(captureCounts).reduce((a, b) => a + b, 0);
+          if (totalCaptures > 0) {
+            timeBreakdown = {};
+            for (const [app, count] of Object.entries(captureCounts)) {
+              // Distribute activeMs proportionally by capture count
+              timeBreakdown[app] = Math.round((count / totalCaptures) * activeMs);
+            }
+          }
+        }
+      }
+
       return {
         ...session,
         captureCount,
+        timeBreakdown,
         duration: {
           totalMs,
           activeMs,
@@ -634,13 +690,56 @@ router.post(
       });
 
       // Calculate final duration
-      const endTime = new Date();
+      let endTime = new Date();
       const startTime = new Date(session.startedAt).getTime();
       let totalPausedMs = session.totalPausedMs || 0;
 
       // If currently paused, add remaining pause time
       if (session.status === "paused" && session.pausedAt) {
         totalPausedMs += Date.now() - new Date(session.pausedAt).getTime();
+      }
+
+      // Duration correction: if the gap between last real activity and now is
+      // large (>5 min), trim endedAt to the last capture/transcript timestamp.
+      // Prevents "walked away for 2 hours then hit end" from inflating duration.
+      const DURATION_CORRECTION_GAP_MS = 5 * 60 * 1000; // 5 minutes
+      try {
+        const [lastCapture] = await db
+          .select({ capturedAt: schema.sessionCaptures.capturedAt })
+          .from(schema.sessionCaptures)
+          .where(eq(schema.sessionCaptures.sessionId, id))
+          .orderBy(sql`${schema.sessionCaptures.capturedAt} DESC`)
+          .limit(1);
+
+        let lastTranscriptMs = 0;
+        try {
+          const [lastTranscript] = await db
+            .select({ endTime: schema.sessionTranscripts.endTime })
+            .from(schema.sessionTranscripts)
+            .where(eq(schema.sessionTranscripts.sessionId, id))
+            .orderBy(sql`${schema.sessionTranscripts.endTime} DESC`)
+            .limit(1);
+          if (lastTranscript) lastTranscriptMs = new Date(lastTranscript.endTime).getTime();
+        } catch {
+          /* table may not exist */
+        }
+
+        const lastCaptureMs = lastCapture ? new Date(lastCapture.capturedAt).getTime() : 0;
+        const lastActivityMs = Math.max(lastCaptureMs, lastTranscriptMs);
+
+        if (lastActivityMs > 0 && endTime.getTime() - lastActivityMs > DURATION_CORRECTION_GAP_MS) {
+          log.info("Duration correction: trimming endedAt to last activity", {
+            originalEnd: endTime.toISOString(),
+            correctedEnd: new Date(lastActivityMs).toISOString(),
+            gapMinutes: Math.round((endTime.getTime() - lastActivityMs) / 60000),
+          });
+          endTime = new Date(lastActivityMs);
+        }
+      } catch (correctionError) {
+        log.warn("Duration correction check failed (non-fatal)", {
+          error:
+            correctionError instanceof Error ? correctionError.message : String(correctionError),
+        });
       }
 
       const activeDurationMs = endTime.getTime() - startTime - totalPausedMs;
@@ -749,6 +848,9 @@ router.post(
           60 * 60 * 1000
         );
 
+        // Still schedule inactivity rollup — session ended even if too short for summary
+        scheduleInactivityRollup(userId);
+
         res.json({
           success: true,
           session: {
@@ -837,24 +939,41 @@ router.post(
             .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
-          // Trigger session ingestion (chunk + embed session data)
-          SessionIngestionService.ingestSession(id)
-            .then(async () => {
-              await db
-                .update(schema.monitoringSessions)
-                .set({ ingestionStatus: "completed" })
-                .where(eq(schema.monitoringSessions.id, id));
-            })
-            .catch(async (error) => {
-              log.error("Session ingestion failed", {
+          // Run ingestion + classification + activity materialization in parallel
+          Promise.all([
+            // Chunk + embed session data
+            SessionIngestionService.ingestSession(id)
+              .then(async () => {
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ ingestionStatus: "completed" })
+                  .where(eq(schema.monitoringSessions.id, id));
+              })
+              .catch(async (error) => {
+                log.error("Session ingestion failed", {
+                  sessionId: id,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ ingestionStatus: "failed" })
+                  .where(eq(schema.monitoringSessions.id, id));
+              }),
+            // Classify session activities via Groq → keyActivities
+            classifySession(id).catch((error) => {
+              log.error("Session classification failed", {
                 sessionId: id,
                 error: error instanceof Error ? error.message : String(error),
               });
-              await db
-                .update(schema.monitoringSessions)
-                .set({ ingestionStatus: "failed" })
-                .where(eq(schema.monitoringSessions.id, id));
-            });
+            }),
+            // Materialize activity blocks for admin dashboard
+            materializeSession(id).catch((error) => {
+              log.error("Activity materialization failed", {
+                sessionId: id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }),
+          ]);
         })
         .catch(async (error) => {
           log.error("Session end processing failed", {
@@ -866,24 +985,39 @@ router.post(
             .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
-          // Trigger session ingestion (chunk + embed session data)
-          SessionIngestionService.ingestSession(id)
-            .then(async () => {
-              await db
-                .update(schema.monitoringSessions)
-                .set({ ingestionStatus: "completed" })
-                .where(eq(schema.monitoringSessions.id, id));
-            })
-            .catch(async (ingestError) => {
-              log.error("Session ingestion failed", {
+          // Still run ingestion + classification + materialization even if storyteller failed
+          Promise.all([
+            SessionIngestionService.ingestSession(id)
+              .then(async () => {
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ ingestionStatus: "completed" })
+                  .where(eq(schema.monitoringSessions.id, id));
+              })
+              .catch(async (ingestError) => {
+                log.error("Session ingestion failed", {
+                  sessionId: id,
+                  error: ingestError instanceof Error ? ingestError.message : String(ingestError),
+                });
+                await db
+                  .update(schema.monitoringSessions)
+                  .set({ ingestionStatus: "failed" })
+                  .where(eq(schema.monitoringSessions.id, id));
+              }),
+            classifySession(id).catch((classifyError) => {
+              log.error("Session classification failed", {
                 sessionId: id,
-                error: ingestError instanceof Error ? ingestError.message : String(ingestError),
+                error:
+                  classifyError instanceof Error ? classifyError.message : String(classifyError),
               });
-              await db
-                .update(schema.monitoringSessions)
-                .set({ ingestionStatus: "failed" })
-                .where(eq(schema.monitoringSessions.id, id));
-            });
+            }),
+            materializeSession(id).catch((matError) => {
+              log.error("Activity materialization failed", {
+                sessionId: id,
+                error: matError instanceof Error ? matError.message : String(matError),
+              });
+            }),
+          ]);
         });
 
       // Schedule cleanup of imageData after 1 hour to free up storage
@@ -904,6 +1038,10 @@ router.post(
         },
         60 * 60 * 1000
       ); // 1 hour
+
+      // Schedule inactivity rollup — if no new session starts within 30 min,
+      // run the full Day Analyzer RLM for this user's day
+      scheduleInactivityRollup(userId);
 
       res.json({
         success: true,
@@ -3371,5 +3509,46 @@ router.delete("/recaps/:id", requireAuth, async (req: Request, res: Response): P
     });
   }
 });
+
+/**
+ * POST /api/monitoring/sessions/cleanup-stale
+ * Client-triggered stale session cleanup.
+ * Called on Electron app startup to catch sessions that weren't properly ended
+ * (e.g., laptop closed, crash, network loss).
+ * Only cleans up sessions for the requesting user.
+ */
+router.post(
+  "/sessions/cleanup-stale",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+
+    try {
+      const result = await cleanupStaleSessions(userId);
+
+      if (result.sessionsEnded > 0) {
+        logger.info(
+          { userId, ended: result.sessionsEnded },
+          "Client-triggered stale session cleanup"
+        );
+      }
+
+      res.json({
+        success: true,
+        sessionsEnded: result.sessionsEnded,
+        details: result.details,
+      });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), userId },
+        "[Monitoring] Error in stale session cleanup"
+      );
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to clean up stale sessions",
+      });
+    }
+  }
+);
 
 export default router;

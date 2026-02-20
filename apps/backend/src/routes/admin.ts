@@ -417,7 +417,7 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
           eq(schema.users.organizationId, currentUser.organizationId)
         )
       )
-      .orderBy(desc(schema.users.createdAt));
+      .orderBy(schema.users.lastName, schema.users.firstName);
 
     // Calculate progress for each user
     const usersWithProgress = await Promise.all(
@@ -1277,7 +1277,7 @@ router.post(
  *     tags:
  *       - Admin - People Management
  *     summary: Create a new employee account
- *     description: Create a new employee with Supabase Auth account, database profile, and assigned roadmap templates. Generates temporary password and optionally sends welcome email with credentials. Admin access required.
+ *     description: Create a new user with Supabase Auth account and database profile. Generates temporary password and optionally sends welcome email with credentials. Admin access required.
  *     requestBody:
  *       required: true
  *       content:
@@ -1289,8 +1289,6 @@ router.post(
  *               - lastName
  *               - email
  *               - role
- *               - startDate
- *               - templateIds
  *             properties:
  *               firstName:
  *                 type: string
@@ -1304,20 +1302,8 @@ router.post(
  *                 example: jane.smith@company.com
  *               role:
  *                 type: string
- *                 description: Employee role/title
+ *                 description: Job title
  *                 example: Software Engineer
- *               startDate:
- *                 type: string
- *                 format: date
- *                 description: Employee start date
- *                 example: 2025-01-15
- *               templateIds:
- *                 type: array
- *                 description: Optional array of roadmap template IDs to assign
- *                 items:
- *                   type: string
- *                   format: uuid
- *                 example: ["123e4567-e89b-12d3-a456-426614174000"]
  *               sendWelcomeEmail:
  *                 type: boolean
  *                 description: Whether to send welcome email with credentials
@@ -1327,7 +1313,7 @@ router.post(
  *                 description: If true, create this user as an org admin
  *     responses:
  *       201:
- *         description: Employee created successfully
+ *         description: User created successfully
  *         content:
  *           application/json:
  *             schema:
@@ -1351,14 +1337,9 @@ router.post(
  *                       type: string
  *                     role:
  *                       type: string
- *                 templatesAssigned:
- *                   type: integer
- *                   description: Number of templates assigned
- *                   example: 2
- *                 tasksCreated:
- *                   type: integer
- *                   description: Total tasks created from templates
- *                   example: 45
+ *                 initialPassword:
+ *                   type: string
+ *                   description: Generated temporary password
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -1373,16 +1354,7 @@ router.post(
 router.post("/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    const {
-      firstName,
-      lastName,
-      email,
-      role,
-      startDate,
-      templateIds,
-      sendWelcomeEmail,
-      makeAdmin,
-    } = req.body;
+    const { firstName, lastName, email, role, sendWelcomeEmail, makeAdmin } = req.body;
 
     // Verify requester is admin
     const [currentUser] = await db
@@ -1431,17 +1403,6 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
         error: {
           code: "VALIDATION_ERROR",
           message: "Role is required",
-        },
-      });
-      return;
-    }
-
-    if (!startDate) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Start date is required",
         },
       });
       return;
@@ -1499,8 +1460,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
         .update(schema.users)
         .set({
           role: makeAdmin ? "admin" : role,
-          startDate: startDate,
-          currentWeek: 1,
+          jobTitle: role,
         })
         .where(eq(schema.users.id, authData.user.id));
     } catch (dbError) {
@@ -1516,44 +1476,6 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
         },
       });
       return;
-    }
-
-    // Assign templates and copy tasks (optional)
-    let totalTasksCreated = 0;
-
-    if (Array.isArray(templateIds) && templateIds.length > 0) {
-      for (const templateId of templateIds) {
-        // Create template assignment
-        await db.insert(schema.userTemplateAssignments).values({
-          userId: authData.user.id,
-          templateId,
-          status: "active",
-          assignedAt: new Date(),
-        });
-
-        // Get all tasks from this template
-        const templateTasks = await db
-          .select()
-          .from(schema.roadmapTemplateTasks)
-          .where(eq(schema.roadmapTemplateTasks.templateId, templateId))
-          .orderBy(schema.roadmapTemplateTasks.weekNumber, schema.roadmapTemplateTasks.orderIndex);
-
-        // Copy tasks to user's roadmap
-        for (const task of templateTasks) {
-          await db.insert(schema.userRoadmapTasks).values({
-            userId: authData.user.id,
-            templateId: templateId,
-            templateTaskId: task.id,
-            weekNumber: task.weekNumber,
-            title: task.title,
-            description: task.description,
-            timeEstimate: task.timeEstimate,
-            orderIndex: task.orderIndex,
-            completed: false,
-          });
-          totalTasksCreated++;
-        }
-      }
     }
 
     // Send welcome email with password reset link if requested
@@ -1583,8 +1505,6 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
         lastName,
         role,
       },
-      templatesAssigned: Array.isArray(templateIds) ? templateIds.length : 0,
-      tasksCreated: totalTasksCreated,
       initialPassword: tempPassword,
     });
   } catch (error) {

@@ -61,7 +61,8 @@ export default function GenerateDocDialog({ open, onOpenChange }: GenerateDocDia
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const { data: sessions = [] } = useSessions();
+  const { data: sessionsData } = useSessions();
+  const sessions = sessionsData?.sessions ?? [];
   const generateMutation = useGenerateDocument();
 
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");

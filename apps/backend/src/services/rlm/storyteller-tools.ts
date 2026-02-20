@@ -35,31 +35,53 @@ async function callSummarizationLLM(
   maxOutputTokens: number
 ): Promise<string> {
   if (anthropicClient) {
-    try {
-      const response = await anthropicClient.messages.create({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: maxOutputTokens + 5000, // Extra headroom for thinking tokens
-        thinking: {
-          type: "enabled",
-          budget_tokens: 3000, // Let Claude reason before summarizing
-        },
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      });
+    const MAX_RETRIES = 2;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await anthropicClient.messages.create({
+          model: "claude-sonnet-4-5-20250929",
+          max_tokens: maxOutputTokens + 5000, // Extra headroom for thinking tokens
+          thinking: {
+            type: "enabled",
+            budget_tokens: 3000, // Let Claude reason before summarizing
+          },
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+        });
 
-      for (const block of response.content) {
-        if (block.type === "text") {
-          return block.text;
+        for (const block of response.content) {
+          if (block.type === "text") {
+            return block.text;
+          }
         }
+        throw new Error("No text block in Claude response");
+      } catch (error) {
+        const errStr = String(error);
+        const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+        if (isFatal) {
+          console.error(
+            "[storyteller-tools] Claude auth/billing error — permanently disabling:",
+            errStr
+          );
+          anthropicClient = null;
+          break;
+        }
+        const isRetryable = /429|rate.?limit|529|overloaded/i.test(errStr);
+        if (isRetryable && attempt < MAX_RETRIES) {
+          const delayMs = (attempt + 1) * 5000;
+          console.warn(
+            `[storyteller-tools] Claude rate-limited/overloaded — retrying in ${delayMs / 1000}s (attempt ${attempt + 1})`,
+            errStr
+          );
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+        console.warn(
+          "[storyteller-tools] Claude sub-call failed — falling back to DeepSeek R1 for this call:",
+          errStr
+        );
+        break;
       }
-      throw new Error("No text block in Claude response");
-    } catch (error) {
-      console.warn(
-        "[storyteller-tools] Claude sub-call failed at runtime — falling back to DeepSeek R1:",
-        String(error)
-      );
-      // Disable Anthropic for the rest of this process to avoid repeated failures
-      anthropicClient = null;
     }
   }
 

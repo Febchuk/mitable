@@ -10,7 +10,16 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSessions } from "@/console/src/hooks/queries/monitoring";
 import { useStartSession } from "@/console/src/hooks/useStartSession";
-import { Search, Play, Loader2, Zap, Clock, ChevronRight, Activity } from "lucide-react";
+import {
+  Search,
+  Play,
+  Loader2,
+  Zap,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  Activity,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import SessionRow from "./SessionRow";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
@@ -74,7 +83,12 @@ function groupSessionsByDate(sessions: SessionListItem[]) {
 }
 
 export default function MonitoringView() {
-  const { data: sessions = [], isLoading, error } = useSessions();
+  const [page, setPage] = useState(1);
+  const { data: sessionsData, isLoading, error, isPlaceholderData } = useSessions(page);
+  const sessions = sessionsData?.sessions ?? [];
+  const pagination = sessionsData?.pagination;
+  const totalSessions = pagination?.total ?? 0;
+  const totalPages = pagination?.totalPages ?? 1;
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -133,7 +147,7 @@ export default function MonitoringView() {
                 Sessions
               </h1>
               <p className="text-ink-tertiary mt-1 text-sm">
-                {sessions.length} total · {activeSession ? "1 active" : "None active"}
+                {totalSessions} total · {activeSession ? "1 active" : "None active"}
               </p>
             </div>
 
@@ -268,6 +282,60 @@ export default function MonitoringView() {
                 </div>
               </div>
             ))}
+
+            {/* Page Navigation */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-1.5 pt-4 pb-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1 || isPlaceholderData}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg text-ink-tertiary hover:text-ink-primary hover:bg-canvas-overlay border border-transparent hover:border-stroke-subtle transition-all disabled:opacity-30 disabled:pointer-events-none"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => {
+                    // Show: first, last, current ±2
+                    if (p === 1 || p === totalPages) return true;
+                    if (Math.abs(p - page) <= 2) return true;
+                    return false;
+                  })
+                  .reduce<(number | "ellipsis")[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("ellipsis");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === "ellipsis" ? (
+                      <span key={`e-${idx}`} className="w-8 text-center text-ink-tertiary text-sm">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => setPage(item)}
+                        disabled={isPlaceholderData}
+                        className={`flex items-center justify-center w-8 h-8 rounded-lg text-sm font-medium transition-all ${
+                          item === page
+                            ? "bg-indigo text-white shadow-sm"
+                            : "text-ink-secondary hover:text-ink-primary hover:bg-canvas-overlay border border-transparent hover:border-stroke-subtle"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages || isPlaceholderData}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg text-ink-tertiary hover:text-ink-primary hover:bg-canvas-overlay border border-transparent hover:border-stroke-subtle transition-all disabled:opacity-30 disabled:pointer-events-none"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           /* Empty State - Minimal, elegant */

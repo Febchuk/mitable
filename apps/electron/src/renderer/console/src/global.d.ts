@@ -8,6 +8,12 @@ import type {
 } from "@mitable/shared";
 
 interface ConsoleAPI {
+  // PDF Export
+  exportPdf: (
+    html: string,
+    title: string
+  ) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+
   // Screenshot capture - multi-window capture with policy filtering
   captureScreenshot: () => Promise<MultiWindowCaptureResult>;
 
@@ -22,13 +28,13 @@ interface ConsoleAPI {
   minimizeWindow: () => void;
 
   // Navigation
-  onNavigateToChat: (callback: (conversationId: string) => void) => void;
+  onNavigateToChat: (callback: (conversationId: string) => void) => () => void;
 
   // Drafts navigation (Update Buddy)
-  onDraftsNavigate: (callback: (draftId: string) => void) => void;
+  onDraftsNavigate: (callback: (draftId: string) => void) => () => void;
 
   // Active session navigation (from native notification click)
-  onNavigateToActiveSession: (callback: () => void) => void;
+  onNavigateToActiveSession: (callback: () => void) => () => void;
 
   // Navigate to a specific session detail with optional flags
   onNavigateToSessionDetail: (
