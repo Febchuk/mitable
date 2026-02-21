@@ -120,6 +120,38 @@ export async function reviseDocument(
 }
 
 // ===========================
+// AI Conversational Chat
+// ===========================
+
+export async function chatRefineDocument(
+  documentId: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+  currentContent: string
+): Promise<{ message: string; suggestedEdit: string | null; toolCallCount: number }> {
+  return apiRequest(`/documents/${documentId}/chat`, {
+    method: "POST",
+    body: JSON.stringify({ messages, currentContent }),
+  });
+}
+
+export async function loadDocChat(documentId: string): Promise<{
+  messages: { role: "user" | "assistant"; content: string; timestamp: string }[];
+  updatedAt: string | null;
+}> {
+  return apiRequest(`/documents/${documentId}/chat`, { method: "GET" });
+}
+
+export async function saveDocChat(
+  documentId: string,
+  messages: { role: "user" | "assistant"; content: string; timestamp?: string }[]
+): Promise<void> {
+  return apiRequest(`/documents/${documentId}/chat/save`, {
+    method: "PUT",
+    body: JSON.stringify({ messages }),
+  });
+}
+
+// ===========================
 // Generate Document from Session
 // ===========================
 

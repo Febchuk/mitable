@@ -725,6 +725,170 @@ router.post("/:id/revise", requireAuth, async (req: Request, res: Response): Pro
 });
 
 /**
+ * POST /api/documents/:id/chat
+ * Conversational document refinement with AI (same agent as doc generation)
+ */
+router.post("/:id/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const organizationId = req.organizationId!;
+  const documentId = req.params.id;
+  const { messages, currentContent } = req.body;
+
+  if (!messages || !Array.isArray(messages) || !currentContent) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "messages (array) and currentContent are required",
+    });
+    return;
+  }
+
+  try {
+    // Verify document belongs to user's org
+    const [document] = await db
+      .select({ id: schema.documents.id })
+      .from(schema.documents)
+      .where(
+        and(
+          eq(schema.documents.id, documentId),
+          eq(schema.documents.organizationId, organizationId)
+        )
+      )
+      .limit(1);
+
+    if (!document) {
+      res.status(404).json({ error: "Not Found", message: "Document not found" });
+      return;
+    }
+
+    const { docRefinementService } = await import("../services/doc-refinement.service.js");
+
+    const result = await docRefinementService.refine({
+      documentId,
+      userId,
+      organizationId,
+      messages,
+      currentContent,
+    });
+
+    // Build full conversation with timestamps for persistence
+    const updatedMessages = [
+      ...messages.map((m: any) => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp || new Date().toISOString(),
+      })),
+      {
+        role: "assistant",
+        content: result.suggestedEdit
+          ? `${result.message}\n\n<document>${result.suggestedEdit}</document>`
+          : result.message,
+        timestamp: new Date().toISOString(),
+      },
+    ];
+
+    // Upsert chat history (one chat per document per user)
+    await db
+      .insert(schema.documentRefinementChats)
+      .values({
+        documentId,
+        userId,
+        messages: updatedMessages,
+      })
+      .onConflictDoUpdate({
+        target: [schema.documentRefinementChats.documentId, schema.documentRefinementChats.userId],
+        set: {
+          messages: updatedMessages,
+          updatedAt: new Date(),
+        },
+      });
+
+    console.log("[Documents] Doc chat refinement", {
+      documentId,
+      messageCount: messages.length,
+      hasSuggestedEdit: !!result.suggestedEdit,
+      toolCallCount: result.toolCallCount,
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("[Documents] Error in doc chat:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to refine document",
+    });
+  }
+});
+
+/**
+ * GET /api/documents/:id/chat
+ * Load persisted refinement chat history for a document
+ */
+router.get("/:id/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const documentId = req.params.id;
+
+  try {
+    const [chat] = await db
+      .select({
+        messages: schema.documentRefinementChats.messages,
+        updatedAt: schema.documentRefinementChats.updatedAt,
+      })
+      .from(schema.documentRefinementChats)
+      .where(
+        and(
+          eq(schema.documentRefinementChats.documentId, documentId),
+          eq(schema.documentRefinementChats.userId, userId)
+        )
+      )
+      .limit(1);
+
+    res.json({
+      messages: (chat?.messages as any[]) || [],
+      updatedAt: chat?.updatedAt?.toISOString() || null,
+    });
+  } catch (error) {
+    console.error("[Documents] Error loading doc chat:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to load chat",
+    });
+  }
+});
+
+/**
+ * PUT /api/documents/:id/chat/save
+ * Save chat messages without calling AI
+ */
+router.put("/:id/chat/save", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const documentId = req.params.id;
+  const { messages } = req.body;
+
+  if (!messages || !Array.isArray(messages)) {
+    res.status(400).json({ error: "Bad Request", message: "messages array required" });
+    return;
+  }
+
+  try {
+    await db
+      .insert(schema.documentRefinementChats)
+      .values({ documentId, userId, messages })
+      .onConflictDoUpdate({
+        target: [schema.documentRefinementChats.documentId, schema.documentRefinementChats.userId],
+        set: { messages, updatedAt: new Date() },
+      });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("[Documents] Error saving doc chat:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to save chat",
+    });
+  }
+});
+
+/**
  * POST /api/documents/generate/stream
  * Generate a new document from user prompt with streaming progress (SSE)
  */

@@ -2,11 +2,12 @@
  * Document Generation Agent
  *
  * RLM-based document generation using tool-calling loop.
- * The agent examines session data programmatically via tools,
- * then recursively builds the document section by section.
+ * Uses Claude Sonnet 4.5 (primary) with OpenAI GPT-5 fallback.
+ * Native tool-calling for both providers with per-call fallback.
  */
 
-import Groq from "groq-sdk";
+import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { config } from "../../config.js";
 import type { DocType } from "@mitable/shared";
 import type { DocumentGenerationEnvironment } from "./environment.js";
@@ -18,7 +19,9 @@ import {
 } from "./tools.js";
 
 const MAX_TOOL_ITERATIONS = 30;
-const MODEL = "openai/gpt-oss-120b"; // Groq GPT-OSS 120B
+const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+const OPENAI_MODEL = "gpt-5";
+const MAX_RETRIES = 2;
 
 interface GenerationStep {
   type: "tool_call" | "content" | "complete";
@@ -27,16 +30,114 @@ interface GenerationStep {
   content?: string;
 }
 
+/** Parse result from either provider — normalized to OpenAI-like shape */
+interface LLMCallResult {
+  toolCalls: ToolCall[];
+  content: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Format converters
+// ---------------------------------------------------------------------------
+
+/** Convert OpenAI-format tool defs to Claude tool defs */
+function toClaudeTools(tools: typeof DOCUMENT_GENERATION_TOOLS): Anthropic.Tool[] {
+  return tools.map((t) => ({
+    name: t.function.name,
+    description: t.function.description,
+    input_schema: t.function.parameters as Anthropic.Tool.InputSchema,
+  }));
+}
+
+/**
+ * Convert accumulated OpenAI-format messages to Claude messages.
+ * Claude requires: system separate, tool_result grouped into user messages,
+ * and content blocks instead of top-level content strings for tool_use.
+ */
+function toClaudeMessages(openaiMessages: any[]): {
+  system: string;
+  messages: Anthropic.MessageParam[];
+} {
+  let system = "";
+  const messages: Anthropic.MessageParam[] = [];
+
+  for (let i = 0; i < openaiMessages.length; i++) {
+    const msg = openaiMessages[i];
+
+    if (msg.role === "system") {
+      system = msg.content;
+      continue;
+    }
+
+    if (msg.role === "assistant") {
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        messages.push({
+          role: "assistant",
+          content: msg.tool_calls.map((tc: any) => ({
+            type: "tool_use" as const,
+            id: tc.id,
+            name: tc.function.name,
+            input: JSON.parse(tc.function.arguments),
+          })),
+        });
+      } else if (msg.content) {
+        messages.push({ role: "assistant", content: msg.content });
+      }
+      continue;
+    }
+
+    if (msg.role === "tool") {
+      // Group consecutive tool messages into a single user message
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      let j = i;
+      while (j < openaiMessages.length && openaiMessages[j].role === "tool") {
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: openaiMessages[j].tool_call_id,
+          content: openaiMessages[j].content,
+        });
+        j++;
+      }
+      messages.push({ role: "user", content: toolResults });
+      i = j - 1; // skip processed messages (loop will increment)
+      continue;
+    }
+
+    if (msg.role === "user") {
+      messages.push({ role: "user", content: msg.content });
+    }
+  }
+
+  return { system, messages };
+}
+
+// ---------------------------------------------------------------------------
+// Agent
+// ---------------------------------------------------------------------------
+
 export class DocumentGenerationAgent {
-  private groq: Groq;
+  private anthropic: Anthropic | null = null;
+  private openai: OpenAI | null = null;
 
   constructor() {
-    this.groq = new Groq({ apiKey: config.groq.apiKey });
+    if (config.anthropic.apiKey) {
+      this.anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
+      console.log("[DocGenAgent] Claude Sonnet 4.5 configured (primary)");
+    } else {
+      console.warn("[DocGenAgent] ANTHROPIC_API_KEY not set — will use OpenAI fallback");
+    }
+
+    if (config.openai.apiKey) {
+      this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+      console.log("[DocGenAgent] OpenAI GPT-5 configured (fallback)");
+    } else {
+      console.warn("[DocGenAgent] OPENAI_API_KEY not set — no fallback available");
+    }
   }
 
   /**
-   * Generate document using RLM pattern
-   * Yields progress steps for streaming
+   * Generate document using RLM pattern.
+   * Yields progress steps for streaming.
    */
   async *generateDocument(
     docType: DocType,
@@ -46,6 +147,7 @@ export class DocumentGenerationAgent {
     console.log(`[DocGenAgent] Starting RLM generation for ${docType}`);
     console.log(`[DocGenAgent] Environment: ${environment.sessionIds.length} sessions`);
 
+    // Messages stored in OpenAI format — converted to Claude format at call time
     const messages: any[] = [
       {
         role: "system",
@@ -60,60 +162,47 @@ export class DocumentGenerationAgent {
       iterations++;
       console.log(`[DocGenAgent] Iteration ${iterations}/${MAX_TOOL_ITERATIONS}`);
 
-      // Call LLM with tools
-      const completion = await this.groq.chat.completions.create({
-        model: MODEL,
-        messages,
-        tools: DOCUMENT_GENERATION_TOOLS as any,
-        tool_choice: iterations === 1 ? "auto" : "auto", // Let model decide when to stop
-        temperature: 0.4,
-        max_tokens: 4000,
-      });
+      const result = await this.callWithTools(messages);
 
-      const message = completion.choices[0].message;
+      if (result.toolCalls.length > 0) {
+        console.log(`[DocGenAgent] LLM called ${result.toolCalls.length} tools`);
 
-      // Check if LLM wants to call tools
-      if (message.tool_calls && message.tool_calls.length > 0) {
-        console.log(`[DocGenAgent] LLM called ${message.tool_calls.length} tools`);
-
-        // Add assistant message with tool calls
-        messages.push(message);
+        // Add assistant message with tool calls (OpenAI format)
+        messages.push({
+          role: "assistant",
+          content: null,
+          tool_calls: result.toolCalls,
+        });
 
         // Execute all tool calls
         const toolResults: ToolResult[] = [];
-        for (const toolCall of message.tool_calls) {
+        for (const toolCall of result.toolCalls) {
           console.log(`[DocGenAgent] Executing: ${toolCall.function.name}`);
-          const result = await executeToolCall(toolCall as ToolCall, environment);
-          toolResults.push(result);
+          const tr = await executeToolCall(toolCall, environment);
+          toolResults.push(tr);
         }
 
         // Add tool results to messages
         messages.push(...toolResults);
 
-        // Yield progress
         yield {
           type: "tool_call",
-          toolCalls: message.tool_calls as ToolCall[],
+          toolCalls: result.toolCalls,
           toolResults,
         };
 
-        continue; // Next iteration
+        continue;
       }
 
       // LLM returned content (no more tool calls)
-      if (message.content) {
-        console.log(`[DocGenAgent] LLM returned content (${message.content.length} chars)`);
-        finalDocument = message.content;
+      if (result.content) {
+        console.log(`[DocGenAgent] LLM returned content (${result.content.length} chars)`);
+        finalDocument = result.content;
 
-        yield {
-          type: "content",
-          content: message.content,
-        };
-
-        break; // Done
+        yield { type: "content", content: result.content };
+        break;
       }
 
-      // Safety: if no tool calls and no content, something went wrong
       console.log(`[DocGenAgent] Warning: No tool calls or content in iteration ${iterations}`);
       break;
     }
@@ -122,22 +211,130 @@ export class DocumentGenerationAgent {
       console.log(`[DocGenAgent] Reached max iterations (${MAX_TOOL_ITERATIONS})`);
     }
 
-    yield {
-      type: "complete",
-    };
-
+    yield { type: "complete" };
     return finalDocument;
   }
 
+  // -------------------------------------------------------------------------
+  // LLM call with per-call fallback
+  // -------------------------------------------------------------------------
+
   /**
-   * Build system prompt that instructs the LLM on how to use tools
+   * Call LLM with native tool-calling.
+   * Tries Claude Sonnet 4.5 first, falls back to OpenAI GPT-5.
    */
+  private async callWithTools(openaiMessages: any[]): Promise<LLMCallResult> {
+    if (this.anthropic) {
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          return await this.callClaude(openaiMessages);
+        } catch (error) {
+          const errStr = String(error);
+          const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+          if (isFatal) {
+            console.error("[DocGenAgent] Claude auth/billing error — disabling:", errStr);
+            this.anthropic = null;
+            break;
+          }
+          const isRetryable = /429|rate.?limit|529|overloaded/i.test(errStr);
+          if (isRetryable && attempt < MAX_RETRIES) {
+            const delayMs = (attempt + 1) * 5000;
+            console.warn(`[DocGenAgent] Claude rate-limited — retrying in ${delayMs / 1000}s`);
+            await new Promise((r) => setTimeout(r, delayMs));
+            continue;
+          }
+          console.warn("[DocGenAgent] Claude failed — falling back to OpenAI:", errStr);
+          break;
+        }
+      }
+    }
+
+    if (this.openai) {
+      console.log("[DocGenAgent] ⚠️ Using OpenAI GPT-5 (fallback)");
+      return this.callOpenAI(openaiMessages);
+    }
+
+    throw new Error("No LLM available — both Anthropic and OpenAI are unconfigured or failed");
+  }
+
+  /** Call Claude Sonnet 4.5 with native tool-calling */
+  private async callClaude(openaiMessages: any[]): Promise<LLMCallResult> {
+    const { system, messages } = toClaudeMessages(openaiMessages);
+
+    const response = await this.anthropic!.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 8000,
+      temperature: 0.4,
+      system,
+      messages,
+      tools: toClaudeTools(DOCUMENT_GENERATION_TOOLS),
+    });
+
+    // Parse response → normalized shape
+    const toolCalls: ToolCall[] = [];
+    let textContent = "";
+
+    for (const block of response.content) {
+      if (block.type === "tool_use") {
+        toolCalls.push({
+          id: block.id,
+          type: "function",
+          function: {
+            name: block.name,
+            arguments: JSON.stringify(block.input),
+          },
+        });
+      } else if (block.type === "text") {
+        textContent += block.text;
+      }
+    }
+
+    // If Claude returned both text and tool_use, prioritize tool_use
+    if (toolCalls.length > 0) {
+      return { toolCalls, content: null };
+    }
+    return { toolCalls: [], content: textContent || null };
+  }
+
+  /** Call OpenAI GPT-5 with native tool-calling (fallback) */
+  private async callOpenAI(openaiMessages: any[]): Promise<LLMCallResult> {
+    if (!this.openai) {
+      throw new Error("OpenAI client not configured");
+    }
+
+    const completion = await this.openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: openaiMessages,
+      tools: DOCUMENT_GENERATION_TOOLS as any,
+      tool_choice: "auto",
+      temperature: 0.4,
+      max_tokens: 8000,
+    });
+
+    const message = completion.choices[0].message;
+    const toolCalls: ToolCall[] = (message.tool_calls || []).map((tc: any) => ({
+      id: tc.id,
+      type: "function" as const,
+      function: { name: tc.function.name, arguments: tc.function.arguments },
+    }));
+
+    if (toolCalls.length > 0) {
+      return { toolCalls, content: null };
+    }
+    return { toolCalls: [], content: message.content || null };
+  }
+
+  // -------------------------------------------------------------------------
+  // Prompt building
+  // -------------------------------------------------------------------------
+
   private buildSystemPrompt(
     docType: DocType,
     userPrompt: string,
     environment: DocumentGenerationEnvironment
   ): string {
     const docTypeInstructions = this.getDocTypeInstructions(docType);
+    const hasArtifacts = environment.artifactIds && environment.artifactIds.length > 0;
 
     return `You are an expert document generation agent. Your task is to create a ${docType} document based on the user's work sessions.
 
@@ -147,24 +344,14 @@ export class DocumentGenerationAgent {
 **Available Session Data:**
 - ${environment.sessionIds.length} sessions in scope
 ${environment.dateRange ? `- Date range: ${environment.dateRange.start.toLocaleDateString()} to ${environment.dateRange.end.toLocaleDateString()}` : ""}
+${hasArtifacts ? `- ${environment.artifactIds!.length} uploaded document(s) available as reference material` : ""}
 
 **Your Process:**
-1. **Examine the data** - Use tools to explore sessions, timelines, summaries, and time breakdowns
-2. **Identify key information** - Find accomplishments, activities, blockers, time spent on different tasks
-3. **Structure the document** - Organize findings according to the ${docType} format
-4. **Generate content** - Create the complete document in Markdown format
-
-**Available Tools:**
-- get_sessions_overview: Get high-level overview of all sessions
-- get_session_timeline: Get detailed timeline for a specific session
-- get_session_summary: Get narrative summary for a session
-- get_all_summaries: Get summaries for all sessions at once
-- get_time_breakdown: Get application usage breakdown
-- get_top_applications: Get top apps by time spent
-- filter_sessions_by_priority: Filter sessions by priority (high/medium/low)
-- get_artifact_content: Get full text of uploaded reference documents (PDFs, DOCX, etc.)
-- search_artifacts: Search uploaded documents by semantic similarity to find relevant passages
-${environment.artifactIds && environment.artifactIds.length > 0 ? `\n**Attached Artifacts:** ${environment.artifactIds.length} document(s) were attached as reference material. Use get_artifact_content to read them.` : ""}
+1. **Examine the data** — Use tools to explore sessions, timelines, summaries, and time breakdowns
+2. **Check for reference material** — If the user mentions a template, report format, or uploaded document, use get_artifact_content or search_artifacts to find it, then use parse_template_structure to extract its layout so you can replicate it
+3. **Identify key information** — Find accomplishments, activities, blockers, time spent on different tasks
+4. **Structure the document** — Organize findings according to the ${docType} format (or follow an uploaded template if one was found)
+5. **Generate content** — Create the complete document in Markdown format
 
 **Document Type Guidance:**
 ${docTypeInstructions}
@@ -172,22 +359,18 @@ ${docTypeInstructions}
 **Output Format:**
 - Use Markdown formatting (headings, lists, tables, code blocks)
 - Include specific details from the session data
-- Use proper structure for ${docType} documents
 - Be concise but comprehensive
+- If a template was found via parse_template_structure, replicate its section headings, ordering, and formatting style
 
 **Important:**
 - Call tools to gather data BEFORE generating content
 - Use multiple tool calls to get a complete picture
 - Base your document ONLY on actual session data and artifact content (no hallucination)
-- If the user's request could benefit from uploaded documents, use search_artifacts to find relevant content
 - When you have enough information, generate the complete document
 
 Begin by examining the session data using the available tools.`;
   }
 
-  /**
-   * Get specific instructions for each document type
-   */
   private getDocTypeInstructions(docType: DocType): string {
     switch (docType) {
       case "how-to":

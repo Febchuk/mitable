@@ -14,6 +14,11 @@ import {
   loadRefinementChat,
   saveRefinementChat,
 } from "@/console/src/services/monitoringService";
+import {
+  chatRefineDocument,
+  loadDocChat,
+  saveDocChat,
+} from "@/console/src/services/documentsService";
 
 interface Message {
   id: string;
@@ -30,10 +35,14 @@ interface AIChatPanelProps {
   onRevise: (instruction: string, currentContent: string) => Promise<{ suggestion: string }>;
   contextLabel?: string; // e.g., "session summary"
   sessionId?: string; // When provided, uses conversational /summary/chat endpoint
+  documentId?: string; // When provided, uses conversational /documents/:id/chat endpoint
 }
 
-const WELCOME_MESSAGE =
+const SUMMARY_WELCOME =
   "I can help you refine your summary. Try asking me to:\n\n• Make it more concise\n• Add more detail\n• Make it more professional\n• Focus on accomplishments";
+
+const DOC_WELCOME =
+  "I can help you edit this document. I have access to your session data and uploaded artifacts. Try asking me to:\n\n• Restructure the document\n• Add more detail from your sessions\n• Follow an uploaded template\n• Change the tone or format";
 
 export default function AIChatPanel({
   currentContent,
@@ -41,7 +50,11 @@ export default function AIChatPanel({
   onRevise,
   contextLabel = "content",
   sessionId,
+  documentId,
 }: AIChatPanelProps) {
+  const WELCOME_MESSAGE = documentId ? DOC_WELCOME : SUMMARY_WELCOME;
+  // Determine which conversational mode to use
+  const conversationalId = sessionId || documentId;
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -58,8 +71,11 @@ export default function AIChatPanel({
 
   // Load persisted chat history on mount
   useEffect(() => {
-    if (!sessionId) return;
-    loadRefinementChat(sessionId)
+    if (!conversationalId) return;
+    const loadChat = documentId
+      ? () => loadDocChat(documentId)
+      : () => loadRefinementChat(sessionId!);
+    loadChat()
       .then(({ messages: saved }) => {
         if (!saved || saved.length === 0) return;
 
@@ -87,13 +103,16 @@ export default function AIChatPanel({
           content:
             m.role === "user"
               ? m.content
-              : m.content.replace(/<summary>[\s\S]*?<\/summary>/, "").trim(),
+              : m.content
+                  .replace(/<summary>[\s\S]*?<\/summary>/, "")
+                  .replace(/<document>[\s\S]*?<\/document>/, "")
+                  .trim(),
         }));
 
         setMessages([{ id: "welcome", role: "assistant", content: WELCOME_MESSAGE }, ...restored]);
       })
       .catch(() => {}); // Silently fail — fresh chat is fine
-  }, [sessionId]);
+  }, [conversationalId]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -135,11 +154,13 @@ export default function AIChatPanel({
     try {
       let assistantMessage: Message;
 
-      if (sessionId) {
+      if (conversationalId) {
         // Conversational endpoint — send full chat history
         chatHistoryRef.current.push({ role: "user", content: userQuery });
 
-        const result = await chatRefineSummary(sessionId, chatHistoryRef.current, currentContent);
+        const result = documentId
+          ? await chatRefineDocument(documentId, chatHistoryRef.current, currentContent)
+          : await chatRefineSummary(sessionId!, chatHistoryRef.current, currentContent);
 
         chatHistoryRef.current.push({ role: "assistant", content: result.message });
 
@@ -174,20 +195,25 @@ export default function AIChatPanel({
           )
         );
         // Persist: strip <summary> so it doesn't reappear on reload
-        if (sessionId) {
+        if (conversationalId) {
           chatHistoryRef.current = chatHistoryRef.current.map((m) => {
-            if (
-              m.role === "assistant" &&
-              m.content.includes(`<summary>${assistantMessage.suggestedEdit}</summary>`)
-            ) {
-              return {
-                ...m,
-                content: m.content.replace(/<summary>[\s\S]*?<\/summary>/, "").trim(),
-              };
+            if (m.role === "assistant") {
+              let cleaned = m.content;
+              if (cleaned.includes(`<summary>${assistantMessage.suggestedEdit}</summary>`)) {
+                cleaned = cleaned.replace(/<summary>[\s\S]*?<\/summary>/, "").trim();
+              }
+              if (cleaned.includes(`<document>${assistantMessage.suggestedEdit}</document>`)) {
+                cleaned = cleaned.replace(/<document>[\s\S]*?<\/document>/, "").trim();
+              }
+              return { ...m, content: cleaned };
             }
             return m;
           });
-          saveRefinementChat(sessionId, chatHistoryRef.current).catch(() => {});
+          if (documentId) {
+            saveDocChat(documentId, chatHistoryRef.current).catch(() => {});
+          } else if (sessionId) {
+            saveRefinementChat(sessionId, chatHistoryRef.current).catch(() => {});
+          }
         }
       }
     } catch (error) {

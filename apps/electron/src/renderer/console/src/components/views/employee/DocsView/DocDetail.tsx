@@ -35,6 +35,7 @@ import {
   CheckCircle,
   Clock,
   ExternalLink,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { DocEditor } from "@/console/src/components/editor";
+import AIEditPanel from "@/console/src/components/shared/AIEditPanel";
+import { reviseDocument } from "@/console/src/services/documentsService";
 import ExportNotionDialog from "./dialogs/ExportNotionDialog";
 import ExportGoogleDocsDialog from "./dialogs/ExportGoogleDocsDialog";
 import ExportPopover, { type ExportDestination } from "./components/ExportPopover";
@@ -124,6 +127,8 @@ export default function DocDetail() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [title, setTitle] = useState(isNewDocument ? "Untitled Document" : "");
   const [createdDocId, setCreatedDocId] = useState<string | null>(null); // Track if we've created the doc
+  const [isAIEditMode, setIsAIEditMode] = useState(false);
+  const latestContentRef = useRef<string>(""); // Track latest editor content for AI edit mode
 
   // Debounce timers
   const titleSaveTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -204,6 +209,8 @@ export default function DocDetail() {
   // Handle content change with debounced autosave
   const handleContentChange = useCallback(
     (newContent: string) => {
+      latestContentRef.current = newContent;
+
       // Clear existing timeout
       if (contentSaveTimeout.current) {
         clearTimeout(contentSaveTimeout.current);
@@ -216,6 +223,24 @@ export default function DocDetail() {
     },
     [debouncedSave]
   );
+
+  // AI Edit Mode handlers
+  const handleRevise = async (instruction: string, currentContent: string) => {
+    const targetId = createdDocId || docId;
+    if (!targetId || targetId === "new") throw new Error("Document not saved yet");
+    const result = await reviseDocument(targetId, instruction, currentContent);
+    return result;
+  };
+
+  const handleSaveFromAIEditor = async (editedContent: string) => {
+    const targetId = createdDocId || docId;
+    if (!targetId || targetId === "new") return;
+    await updateMutation.mutateAsync({ id: targetId, data: { content: editedContent } });
+    setLastSaved(new Date());
+    setIsAIEditMode(false);
+    // Refetch so the Plate editor picks up the updated content
+    refetchDocument();
+  };
 
   // Handle explicit save from editor (⌘+S)
   const handleSave = useCallback(
@@ -407,6 +432,35 @@ export default function DocDetail() {
   const hasExportIntegrations = exportDestinations.length > 0;
   const isIntegrationStatusLoading = isNotionStatusLoading || isGmailStatusLoading;
 
+  // Initialize latestContentRef from document
+  useEffect(() => {
+    if (document?.content) {
+      latestContentRef.current = document.content;
+    }
+  }, [document?.content]);
+
+  // AI Edit Mode - full page takeover (same pattern as RecapDetail / SessionDetail)
+  if (isAIEditMode && (document?.content || latestContentRef.current)) {
+    const targetId = createdDocId || docId;
+    return (
+      <AIEditPanel
+        title="Edit Document"
+        subtitle={title || document?.title || "Document"}
+        initialContent={latestContentRef.current || document?.content || ""}
+        onSave={handleSaveFromAIEditor}
+        onAutoSave={async (content: string) => {
+          if (!targetId || targetId === "new") return;
+          await updateMutation.mutateAsync({ id: targetId, data: { content } });
+        }}
+        onCancel={() => setIsAIEditMode(false)}
+        onRevise={handleRevise}
+        placeholder="Edit your document content..."
+        contextLabel="document"
+        documentId={targetId !== "new" ? targetId : undefined}
+      />
+    );
+  }
+
   if (isLoading && !isNewDocument) {
     return (
       <div className="p-8 flex items-center justify-center">
@@ -483,6 +537,16 @@ export default function DocDetail() {
             ) : null}
           </span>
 
+          {!isNewDocument && (
+            <Button
+              variant="outline"
+              className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 gap-2"
+              onClick={() => setIsAIEditMode(true)}
+            >
+              <Sparkles size={16} />
+              Edit with AI
+            </Button>
+          )}
           {hasExportIntegrations && !isNewDocument ? (
             <ExportPopover
               destinations={exportDestinations}

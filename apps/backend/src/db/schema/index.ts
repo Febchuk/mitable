@@ -17,6 +17,7 @@ export * from "./billing.schema";
 export * from "./artifacts.schema";
 export * from "./user-memories.schema";
 export * from "./session-refinement-chats.schema";
+export * from "./document-refinement-chats.schema";
 export * from "./recaps.schema";
 export * from "./daily-activities.schema";
 export * from "./ask-threads.schema";
