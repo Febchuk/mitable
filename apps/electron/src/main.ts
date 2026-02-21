@@ -675,6 +675,14 @@ function handleNotificationAction(actionId: string) {
         consoleWindow.focus();
       }
       break;
+    case "view-recap":
+      // Show console and navigate to recaps page
+      if (consoleWindow && !consoleWindow.isDestroyed()) {
+        consoleWindow.show();
+        consoleWindow.focus();
+        consoleWindow.webContents.send("navigate-to-recaps");
+      }
+      break;
     case "dismiss":
       // No-op — notification already dismissed
       break;
@@ -1185,6 +1193,9 @@ function setupIPC() {
 
               // End backend session with stored preferences
               monitoringLogger.info(` Triggering backend summarization with defaults`);
+              const autoRecapEnabled = currentUserContext?.userId
+                ? preferencesService.getUserAutoRecap(currentUserContext.userId)
+                : true;
               await authManager.authenticatedFetch(
                 `/api/monitoring/sessions/${result.sessionId}/end`,
                 {
@@ -1195,6 +1206,7 @@ function setupIPC() {
                       format: summaryDefaults.format,
                       includeScreenshots: summaryDefaults.includeScreenshots,
                     },
+                    autoRecap: autoRecapEnabled,
                   }),
                 }
               );
@@ -1380,6 +1392,28 @@ function setupNotificationHandlers() {
     hideNotification();
     handleNotificationAction(actionId);
   });
+
+  // Recap-ready notification — uses simple Electron Notification (no protocol URLs)
+  ipcMain.handle(
+    "show-recap-notification",
+    async (_, config: { title: string; message: string }) => {
+      const notification = new Notification({
+        title: config.title,
+        body: config.message,
+        silent: false,
+      });
+      notification.on("click", () => {
+        if (consoleWindow && !consoleWindow.isDestroyed()) {
+          consoleWindow.show();
+          consoleWindow.focus();
+          consoleWindow.webContents.send("navigate-to-recaps");
+        }
+      });
+      notification.show();
+      notificationLogger.info("Recap notification shown:", config.title);
+      return { success: true };
+    }
+  );
 
   ipcLogger.info(" Notification handlers registered successfully");
 }
@@ -1763,6 +1797,9 @@ function setupMonitoringSessionHandlers() {
 
         // Step 2: Call /end endpoint to trigger summarization
         monitoringLogger.info(" Triggering summarization");
+        const autoRecapForFinalize = currentUserContext?.userId
+          ? preferencesService.getUserAutoRecap(currentUserContext.userId)
+          : true;
         const endResponse = await fetch(
           `${API_BASE_URL}/api/monitoring/sessions/${sessionId}/end`,
           {
@@ -1771,6 +1808,7 @@ function setupMonitoringSessionHandlers() {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
+            body: JSON.stringify({ autoRecap: autoRecapForFinalize }),
           }
         );
 
@@ -2035,6 +2073,16 @@ function setupMonitoringSessionHandlers() {
     return { success: true };
   });
 
+  // Auto recap IPC handlers (user-scoped)
+  ipcMain.handle(IPC_CHANNELS.AUTO_RECAP_GET, (_, userId: string) => {
+    return preferencesService.getUserAutoRecap(userId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AUTO_RECAP_SET, (_, userId: string, enabled: boolean) => {
+    preferencesService.setUserAutoRecap(userId, enabled);
+    return { success: true };
+  });
+
   // Summary preferences IPC handlers
   ipcMain.handle(IPC_CHANNELS.SUMMARY_PREFERENCES_GET, () => {
     return preferencesService.getSummaryPreferences();
@@ -2195,6 +2243,9 @@ function setupMonitoringSessionHandlers() {
 
         // End backend session with preferences
         monitoringLogger.info(` Triggering backend summarization with preferences`);
+        const autoRecapWithPrefs = currentUserContext?.userId
+          ? preferencesService.getUserAutoRecap(currentUserContext.userId)
+          : true;
         await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
           method: "POST",
           body: JSON.stringify({
@@ -2203,6 +2254,7 @@ function setupMonitoringSessionHandlers() {
               format: preferences.format,
               includeScreenshots: preferences.includeScreenshots,
             },
+            autoRecap: autoRecapWithPrefs,
           }),
         });
       } catch (error) {
@@ -2739,8 +2791,12 @@ app.on("before-quit", async (event) => {
 
       if (result.success && result.sessionId) {
         // End on backend (triggers summarization)
+        const autoRecapShutdown = currentUserContext?.userId
+          ? preferencesService.getUserAutoRecap(currentUserContext.userId)
+          : true;
         await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
           method: "POST",
+          body: JSON.stringify({ autoRecap: autoRecapShutdown }),
         });
         shutdownLogger.info(" Session ended successfully on backend");
       }

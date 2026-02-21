@@ -85,6 +85,8 @@ export const IPC_CHANNELS = {
   NOTIFICATION_FREQUENCY_SET: "notification-frequency-set",
   AUTO_SESSION_START_GET: "auto-session-start-get",
   AUTO_SESSION_START_SET: "auto-session-start-set",
+  AUTO_RECAP_GET: "auto-recap-get",
+  AUTO_RECAP_SET: "auto-recap-set",
 
   // Summary preferences
   SUMMARY_PREFERENCES_GET: "summary-preferences-get",

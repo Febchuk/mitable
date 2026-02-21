@@ -36,6 +36,9 @@ interface ConsoleAPI {
   // Active session navigation (from native notification click)
   onNavigateToActiveSession: (callback: () => void) => () => void;
 
+  // Recaps navigation (from recap-ready notification click)
+  onNavigateToRecaps: (callback: () => void) => () => void;
+
   // Navigate to a specific session detail with optional flags
   onNavigateToSessionDetail: (
     callback: (payload: {
@@ -179,6 +182,10 @@ interface ConsoleAPI {
   getAutoSessionStart: (userId: string) => Promise<boolean>;
   setAutoSessionStart: (userId: string, enabled: boolean) => Promise<{ success: boolean }>;
 
+  // Auto recap API (user-scoped)
+  getAutoRecap: (userId: string) => Promise<boolean>;
+  setAutoRecap: (userId: string, enabled: boolean) => Promise<{ success: boolean }>;
+
   // Pill display mode API (user-scoped)
   getPillDisplayMode: (userId: string) => Promise<"compact" | "expanded">;
   setPillDisplayMode: (
@@ -253,6 +260,12 @@ interface ConsoleAPI {
     message: string;
     actions: Array<{ id: string; label: string; primary?: boolean }>;
     timeout?: number;
+  }) => Promise<{ success: boolean }>;
+
+  // Show recap-ready notification (simple click-to-navigate, no protocol URLs)
+  showRecapNotification: (config: {
+    title: string;
+    message: string;
   }) => Promise<{ success: boolean }>;
 }
 

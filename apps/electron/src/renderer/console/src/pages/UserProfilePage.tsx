@@ -162,6 +162,10 @@ export default function UserProfilePage() {
   const [autoSessionStart, setAutoSessionStart] = useState<boolean>(false);
   const [isAutoSessionStartLoading, setIsAutoSessionStartLoading] = useState(true);
 
+  // Auto recap state
+  const [autoRecap, setAutoRecap] = useState<boolean>(true);
+  const [isAutoRecapLoading, setIsAutoRecapLoading] = useState(true);
+
   // Pill display mode state
   const [pillDisplayMode, setPillDisplayMode] = useState<"compact" | "expanded">("compact");
   const [isPillDisplayModeLoading, setIsPillDisplayModeLoading] = useState(true);
@@ -425,6 +429,49 @@ export default function UserProfilePage() {
       toast({
         title: "Error",
         description: "Failed to save auto session start preference.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Auto recap functions
+  const loadAutoRecap = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setIsAutoRecapLoading(true);
+      const enabled = await window.consoleAPI.getAutoRecap(user.id);
+      setAutoRecap(enabled);
+    } catch (error) {
+      logger.error("Error loading auto recap:", error);
+    } finally {
+      setIsAutoRecapLoading(false);
+    }
+  }, [user?.id]);
+
+  const handleAutoRecapChange = async (enabled: boolean) => {
+    if (!user?.id) return;
+    try {
+      const result = await window.consoleAPI.setAutoRecap(user.id, enabled);
+      if (result.success) {
+        setAutoRecap(enabled);
+        toast({
+          title: "Preference saved",
+          description: enabled
+            ? "Recaps will be automatically generated when sessions end."
+            : "Auto recap disabled. You can still create recaps manually.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save auto recap preference.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      logger.error("Error setting auto recap:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save auto recap preference.",
         variant: "destructive",
       });
     }
@@ -851,6 +898,7 @@ export default function UserProfilePage() {
       loadAllBlockableApps();
       loadNotificationFrequency();
       loadAutoSessionStart();
+      loadAutoRecap();
       loadPillDisplayMode();
       loadSummaryPreferences();
     }
@@ -860,6 +908,7 @@ export default function UserProfilePage() {
     loadAllBlockableApps,
     loadNotificationFrequency,
     loadAutoSessionStart,
+    loadAutoRecap,
     loadPillDisplayMode,
     loadSummaryPreferences,
     loadAudioPreferences,
@@ -2077,6 +2126,32 @@ export default function UserProfilePage() {
                         id="auto-session-start-toggle-profile"
                         checked={autoSessionStart}
                         onCheckedChange={handleAutoSessionStartChange}
+                        className="flex-shrink-0"
+                      />
+                    )}
+                  </div>
+
+                  {/* Auto Recap Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label
+                        htmlFor="auto-recap-toggle-profile"
+                        className="text-sm font-medium text-text-primary cursor-pointer"
+                      >
+                        Auto Recap
+                      </Label>
+                      <p className="text-xs text-text-tertiary">
+                        Automatically generate a daily recap when sessions end. When disabled, you
+                        can still create recaps manually from the Recaps page.
+                      </p>
+                    </div>
+                    {isAutoRecapLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                    ) : (
+                      <Switch
+                        id="auto-recap-toggle-profile"
+                        checked={autoRecap}
+                        onCheckedChange={handleAutoRecapChange}
                         className="flex-shrink-0"
                       />
                     )}

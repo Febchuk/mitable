@@ -272,7 +272,8 @@ function groupSessionsByDay(
 
   // Group sessions by day
   for (const session of meaningful) {
-    const dateKey = new Date(session.startedAt).toISOString().split("T")[0];
+    const d = new Date(session.startedAt);
+    const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const daySessions = dayMap.get(dateKey) || [];
     daySessions.push(session);
     dayMap.set(dateKey, daySessions);

@@ -641,12 +641,13 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.userId!;
     const { id } = req.params;
-    const { preferences } = req.body as {
+    const { preferences, autoRecap } = req.body as {
       preferences?: {
         detailLevel: "concise" | "verbose";
         format: "bullets" | "paragraphs";
         includeScreenshots: boolean;
       };
+      autoRecap?: boolean;
     };
 
     try {
@@ -931,13 +932,203 @@ router.post(
             })(),
           ])
         )
-        .then(async () => {
+        .then(async ([_, storyResult]) => {
           log.info("Session end processing completed", { sessionId: id });
-          // Update status to ready after successful story generation
+          // Update status to ready and persist the story summary on the session record
           await db
             .update(schema.monitoringSessions)
-            .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
+            .set({
+              status: "ready",
+              summarizationProgress: null,
+              ingestionStatus: "ingesting",
+              ...(storyResult ? { finalSummary: storyResult } : {}),
+            })
             .where(eq(schema.monitoringSessions.id, id));
+
+          // Rolling daily recap: append to today's recap or create a new one
+          // Skip if client explicitly disabled auto-recap (default: enabled)
+          if (autoRecap === false) {
+            log.info("Auto-recap disabled by user preference, skipping", { sessionId: id });
+          } else
+            try {
+              const [completedSession] = await db
+                .select({
+                  name: schema.monitoringSessions.name,
+                  finalSummary: schema.monitoringSessions.finalSummary,
+                  rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+                  sessionGoal: schema.monitoringSessions.sessionGoal,
+                  startedAt: schema.monitoringSessions.startedAt,
+                  endedAt: schema.monitoringSessions.endedAt,
+                  totalPausedMs: schema.monitoringSessions.totalPausedMs,
+                })
+                .from(schema.monitoringSessions)
+                .where(eq(schema.monitoringSessions.id, id))
+                .limit(1);
+
+              // Summary lives in session_summaries table (Storyteller output), not monitoringSessions
+              const storyRow = await db.query.sessionSummaries.findFirst({
+                where: and(
+                  eq(schema.sessionSummaries.sessionId, id),
+                  eq(schema.sessionSummaries.summaryType, "master_story")
+                ),
+                orderBy: [desc(schema.sessionSummaries.createdAt)],
+                columns: { narrativeSummary: true },
+              });
+
+              const summary =
+                storyRow?.narrativeSummary ||
+                completedSession?.finalSummary ||
+                completedSession?.rawActivitySummary;
+
+              if (!completedSession) {
+                log.warn("Recap skipped — session not found after story generation", {
+                  sessionId: id,
+                });
+              } else if (!summary) {
+                log.warn("Recap skipped — no summary available", { sessionId: id });
+              }
+
+              if (completedSession && summary) {
+                const sessionStart = new Date(completedSession.startedAt);
+                const endMs = completedSession.endedAt
+                  ? new Date(completedSession.endedAt).getTime()
+                  : Date.now();
+                const activeMinutes = Math.round(
+                  Math.max(
+                    0,
+                    endMs - sessionStart.getTime() - (completedSession.totalPausedMs || 0)
+                  ) / 60000
+                );
+
+                // Shape must match frontend RecapBlockSnapshot: {id, startTime, endTime, duration, summary, goal}
+                const sessionEnd = completedSession.endedAt
+                  ? new Date(completedSession.endedAt)
+                  : new Date();
+                const newBlock = {
+                  id,
+                  startTime: sessionStart.toISOString(),
+                  endTime: sessionEnd.toISOString(),
+                  duration: activeMinutes,
+                  summary,
+                  goal: completedSession.sessionGoal || undefined,
+                  sessionId: id,
+                  title: completedSession.name || "Work session",
+                  durationMinutes: activeMinutes,
+                };
+
+                // Check for an existing recap created today (local calendar day)
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+                const todayEnd = new Date();
+                todayEnd.setHours(23, 59, 59, 999);
+
+                const [existingRecap] = await db
+                  .select()
+                  .from(schema.recaps)
+                  .where(
+                    and(
+                      eq(schema.recaps.userId, userId),
+                      sql`${schema.recaps.createdAt} >= ${todayStart.toISOString()}`,
+                      sql`${schema.recaps.createdAt} <= ${todayEnd.toISOString()}`
+                    )
+                  )
+                  .orderBy(desc(schema.recaps.createdAt))
+                  .limit(1);
+
+                if (existingRecap) {
+                  // Append new block to existing daily recap
+                  const existingBlocks = (
+                    Array.isArray(existingRecap.blocks) ? existingRecap.blocks : []
+                  ) as Array<Record<string, unknown>>;
+
+                  // Skip if this session was already added (idempotency guard)
+                  const alreadyAdded = existingBlocks.some((b) => (b.id || b.sessionId) === id);
+                  if (!alreadyAdded) {
+                    const allBlocks = [...existingBlocks, newBlock];
+                    const totalDuration = allBlocks.reduce(
+                      (sum, b) => sum + (Number(b.duration) || Number(b.durationMinutes) || 0),
+                      0
+                    );
+
+                    // Build session data for recap regeneration from ALL blocks
+                    const sessionDataForRecap = allBlocks.map((b, i) => ({
+                      sessionId: String(b.id || b.sessionId),
+                      summary: String(b.summary || b.title || ""),
+                      goal: b.goal ? String(b.goal) : null,
+                      durationMinutes: Number(b.duration) || Number(b.durationMinutes) || 0,
+                      startTime: b.startTime
+                        ? new Date(String(b.startTime)).toLocaleString()
+                        : `Block ${i + 1}`,
+                    }));
+
+                    const recapContent = await sessionSummarizationService.generateRecap(
+                      sessionDataForRecap,
+                      "professional",
+                      "standard",
+                      userId
+                    );
+
+                    // Multi-block title: "Daily Recap — Mon DD"
+                    const dateLabel = new Date().toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    });
+                    const recapTitle = `Daily Recap — ${dateLabel}`;
+
+                    await db
+                      .update(schema.recaps)
+                      .set({
+                        title: recapTitle,
+                        content: recapContent,
+                        blocks: allBlocks,
+                        totalDuration,
+                        sessionId: id,
+                        updatedAt: new Date(),
+                      })
+                      .where(eq(schema.recaps.id, existingRecap.id));
+
+                    log.info("Updated daily recap with new block", {
+                      recapId: existingRecap.id,
+                      sessionId: id,
+                      blockCount: allBlocks.length,
+                    });
+                  }
+                } else {
+                  // First session of the day — create new recap
+                  const recapContent = await sessionSummarizationService.generateRecap(
+                    [
+                      {
+                        sessionId: id,
+                        summary,
+                        goal: completedSession.sessionGoal,
+                        durationMinutes: activeMinutes,
+                        startTime: sessionStart.toLocaleString(),
+                      },
+                    ],
+                    "professional",
+                    "standard",
+                    userId
+                  );
+
+                  const recapTitle = completedSession.name || "Work session recap";
+                  await db.insert(schema.recaps).values({
+                    userId,
+                    organizationId: session.organizationId,
+                    title: recapTitle,
+                    content: recapContent,
+                    blocks: [newBlock],
+                    totalDuration: activeMinutes,
+                    sessionId: id,
+                  });
+                  log.info("Auto-created daily recap for session", { sessionId: id });
+                }
+              }
+            } catch (recapError) {
+              log.error("Auto-recap creation failed (non-blocking)", {
+                sessionId: id,
+                error: recapError instanceof Error ? recapError.message : String(recapError),
+              });
+            }
 
           // Run ingestion in parallel with classify → materialize chain
           Promise.all([
@@ -3219,7 +3410,12 @@ router.post("/recaps/generate", requireAuth, async (req: Request, res: Response)
       };
     });
 
-    const recap = await sessionSummarizationService.generateRecap(sessionData, tone, length);
+    const recap = await sessionSummarizationService.generateRecap(
+      sessionData,
+      tone,
+      length,
+      userId
+    );
 
     res.json({ recap });
   } catch (error) {
@@ -3239,6 +3435,7 @@ router.post("/recaps/generate", requireAuth, async (req: Request, res: Response)
  * Revise recap content using AI (no session ownership needed)
  */
 router.post("/recaps/revise", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
   const { instruction, currentContent }: { instruction: string; currentContent: string } = req.body;
 
   if (!instruction || !currentContent) {
@@ -3251,6 +3448,22 @@ router.post("/recaps/revise", requireAuth, async (req: Request, res: Response): 
 
   try {
     const suggestion = await sessionSummarizationService.reviseSummary(currentContent, instruction);
+
+    // Save the user's revision instruction as a recap style memory
+    // so future auto-generated recaps match their preferred format
+    const [user] = await db
+      .select({ organizationId: schema.users.organizationId })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (user?.organizationId) {
+      // Fire and forget — don't block the response
+      sessionSummarizationService
+        .saveRecapStyleMemory(userId, user.organizationId, instruction)
+        .catch(() => {});
+    }
+
     res.json({ suggestion });
   } catch (error) {
     logger.error(
