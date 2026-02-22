@@ -118,6 +118,11 @@ export const IPC_CHANNELS = {
   NOTIFICATION_ACTION: "notification-action", // User clicked action button
   NOTIFICATION_DATA: "notification-data", // Send notification config to renderer
 
+  // Passive Monitoring (auto-detect activity for session start/end)
+  PASSIVE_MONITORING_SET_ENABLED: "passive-monitoring-set-enabled",
+  PASSIVE_MONITORING_GET_STATE: "passive-monitoring-get-state",
+  PASSIVE_MONITORING_STATE_UPDATE: "passive-monitoring-state-update",
+
   // PDF Export
   EXPORT_PDF: "export-pdf", // Renderer → Main: generate PDF from HTML and save
 

@@ -44,6 +44,9 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
   additionalContext: text("additional_context"), // User's free-text context about what they're working on
   relatedDocsContext: text("related_docs_context"), // RAG-retrieved docs at session start
 
+  // Session type: 'focused' (manual) or 'passive' (auto-detected)
+  sessionType: varchar("session_type", { length: 20 }).notNull().default("focused"),
+
   // Session state
   status: varchar("status", { length: 50 }).notNull().default("active"),
   // States:

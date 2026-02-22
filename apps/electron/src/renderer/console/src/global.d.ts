@@ -262,11 +262,37 @@ interface ConsoleAPI {
     timeout?: number;
   }) => Promise<{ success: boolean }>;
 
+  // Passive monitoring
+  setPassiveMonitoringEnabled: (enabled: boolean) => Promise<{ success: boolean }>;
+  getPassiveMonitoringState: () => Promise<{
+    state: "disabled" | "detecting" | "deferred";
+    sessionId: string | null;
+  }>;
+  onPassiveMonitoringStateUpdate: (
+    callback: (state: {
+      state: "disabled" | "detecting" | "deferred";
+      sessionId: string | null;
+    }) => void
+  ) => () => void;
+
   // Show recap-ready notification (simple click-to-navigate, no protocol URLs)
   showRecapNotification: (config: {
     title: string;
     message: string;
   }) => Promise<{ success: boolean }>;
+
+  // Passive monitoring
+  setPassiveMonitoringEnabled: (enabled: boolean) => Promise<{ success: boolean }>;
+  getPassiveMonitoringState: () => Promise<{
+    state: "disabled" | "detecting" | "deferred";
+    sessionId: string | null;
+  }>;
+  onPassiveMonitoringStateUpdate: (
+    callback: (state: {
+      state: "disabled" | "detecting" | "deferred";
+      sessionId: string | null;
+    }) => void
+  ) => () => void;
 }
 
 declare global {

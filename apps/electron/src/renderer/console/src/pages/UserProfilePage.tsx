@@ -3084,6 +3084,26 @@ export default function UserProfilePage() {
                       onCheckedChange={(v) => setFlag("newExperience", v)}
                     />
                   </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label
+                        htmlFor="flag-passive-monitoring"
+                        className="text-sm font-medium text-text-primary"
+                      >
+                        Passive Monitoring
+                      </Label>
+                      <p className="text-xs text-text-tertiary mt-0.5">
+                        Automatically start sessions when activity is detected and end after
+                        inactivity
+                      </p>
+                    </div>
+                    <Switch
+                      id="flag-passive-monitoring"
+                      checked={flags.passiveMonitoring}
+                      onCheckedChange={(v) => setFlag("passiveMonitoring", v)}
+                    />
+                  </div>
                 </div>
               </Card>
             )}

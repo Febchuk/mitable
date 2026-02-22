@@ -28,6 +28,7 @@ import { preferencesService } from "./services/preferencesService";
 import { updateService } from "./services/updateService";
 import { captureService } from "./services/captureService";
 import { isBlockedByPolicy } from "./services/capturePolicy";
+import { passiveMonitorService } from "./services/passiveMonitorService";
 
 // Force dark theme for consistent vibrancy effect regardless of system settings
 nativeTheme.themeSource = "dark";
@@ -1684,6 +1685,9 @@ function setupMonitoringSessionHandlers() {
         }
       }
 
+      // Notify passive monitor that a manual session is starting
+      await passiveMonitorService.onManualSessionStart();
+
       const result = await monitoringSessionService.startSession({
         sessionId: config.sessionId,
         selectedWindows: config.selectedWindows,
@@ -1737,6 +1741,9 @@ function setupMonitoringSessionHandlers() {
     if (shouldHide && result.success && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
       watchingPillWindow.hide();
     }
+
+    // Resume passive monitoring detection after manual session ends
+    passiveMonitorService.onManualSessionEnd();
 
     return result;
   });
@@ -1831,7 +1838,31 @@ function setupMonitoringSessionHandlers() {
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESET, async () => {
     monitoringLogger.info(" Resetting session state");
     monitoringSessionService.resetSession();
+    passiveMonitorService.onManualSessionEnd();
     return { success: true };
+  });
+
+  // Passive monitoring IPC handlers
+  ipcMain.handle(IPC_CHANNELS.PASSIVE_MONITORING_SET_ENABLED, async (_, enabled: boolean) => {
+    monitoringLogger.info(` Passive monitoring set enabled: ${enabled}`);
+    if (enabled) {
+      if (currentUserContext) {
+        passiveMonitorService.enable({
+          startSession: () => startSessionFromMain("passive"),
+          endSession: (sessionId) => endPassiveSessionFromMain(sessionId),
+        });
+      } else {
+        monitoringLogger.warn(" Cannot enable passive monitoring: no user context");
+        return { success: false };
+      }
+    } else {
+      await passiveMonitorService.disable();
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PASSIVE_MONITORING_GET_STATE, async () => {
+    return passiveMonitorService.getState();
   });
 
   // Get current session status
@@ -2375,8 +2406,8 @@ function createWatchButtonWindow(window: any, watchButtonWindows: Map<string, Br
   );
 }
 
-// Helper function to start a session from main process (used by shortcuts and pill)
-async function startSessionFromMain(): Promise<{
+// Helper function to start a session from main process (used by shortcuts, pill, and passive monitoring)
+async function startSessionFromMain(sessionType: "focused" | "passive" = "focused"): Promise<{
   success: boolean;
   error?: string;
   sessionId?: string;
@@ -2402,16 +2433,22 @@ async function startSessionFromMain(): Promise<{
   }
 
   try {
+    // Notify passive monitor that a manual session is starting (only for focused sessions)
+    if (sessionType === "focused") {
+      await passiveMonitorService.onManualSessionStart();
+    }
+
     const sessionName = SESSION_DEFAULTS.DEFAULT_NAME;
     const captureIntervalMs = SESSION_DEFAULTS.CAPTURE_INTERVAL_MS;
 
-    shortcutLogger.info(` Creating backend session: ${sessionName}`);
+    shortcutLogger.info(` Creating backend session: ${sessionName} (type: ${sessionType})`);
     const response = await authManager.authenticatedFetch("/api/monitoring/sessions", {
       method: "POST",
       body: JSON.stringify({
         name: sessionName,
         selectedWindows: [], // Empty - focus tracker adds windows dynamically
         captureIntervalMs,
+        sessionType,
       }),
     });
 
@@ -2458,6 +2495,51 @@ async function startSessionFromMain(): Promise<{
   } catch (error) {
     shortcutLogger.error(" Start session error:", error);
     return { success: false, error: "Failed to start session" };
+  }
+}
+
+// Helper function to end a passive session from main process
+async function endPassiveSessionFromMain(sessionId: string): Promise<void> {
+  const passiveLogger = createLogger("PassiveSession");
+  passiveLogger.info(`Ending passive session: ${sessionId}`);
+
+  try {
+    // End via monitoringSessionService (handles captures/cleanup)
+    const endResult = await monitoringSessionService.endSession();
+
+    if (endResult.success) {
+      passiveLogger.info(`Passive session ended, ${endResult.captureCount} captures`);
+
+      // Upload captures to backend
+      if (endResult.captures && endResult.captures.length > 0) {
+        try {
+          await authManager.authenticatedFetch(`/api/monitoring/sessions/${sessionId}/finalize`, {
+            method: "POST",
+            body: JSON.stringify({ captures: endResult.captures }),
+          });
+          passiveLogger.info("Passive session captures uploaded to backend");
+        } catch (uploadError) {
+          passiveLogger.error("Failed to upload passive session captures:", uploadError);
+        }
+      }
+
+      // End the session on backend
+      try {
+        await authManager.authenticatedFetch(`/api/monitoring/sessions/${sessionId}/end`, {
+          method: "POST",
+        });
+      } catch (endError) {
+        passiveLogger.error("Failed to end session on backend:", endError);
+      }
+    }
+
+    // Hide watching pill
+    const shouldHide = preferencesService.getHidePillOnSessionEnd();
+    if (shouldHide && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.hide();
+    }
+  } catch (error) {
+    passiveLogger.error("Error ending passive session:", error);
   }
 }
 

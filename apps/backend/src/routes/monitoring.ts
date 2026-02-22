@@ -66,6 +66,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
     selectedWindows,
     captureIntervalMs = 30000,
     name,
+    sessionType = "focused",
     // Goal context fields
     sessionGoal,
     linearIssueId,
@@ -76,6 +77,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
     selectedWindows: SelectedWindowInfo[];
     captureIntervalMs?: number;
     name?: string;
+    sessionType?: "focused" | "passive";
     sessionGoal?: string;
     linearIssueId?: string;
     linearIssueTitle?: string;
@@ -182,6 +184,7 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
         organizationId,
         userId,
         name: name || null,
+        sessionType,
         status: "active",
         captureIntervalMs,
         selectedWindows: initialWindows as any,
@@ -240,13 +243,20 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       },
     });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorCause =
+      error instanceof Error && error.cause
+        ? error.cause instanceof Error
+          ? error.cause.message
+          : String(error.cause)
+        : undefined;
     logger.error(
-      { error: error instanceof Error ? error.message : String(error), userId },
+      { error: errorMessage, cause: errorCause, userId },
       "[Monitoring] Error starting session"
     );
     res.status(500).json({
       error: "Internal Server Error",
-      message: error instanceof Error ? error.message : "Failed to start session",
+      message: errorCause || errorMessage,
     });
   }
 });
