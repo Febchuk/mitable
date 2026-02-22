@@ -568,7 +568,8 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   showRecapNotification: (config: {
     title: string;
     message: string;
-  }): Promise<{ success: boolean }> => ipcRenderer.invoke(IPC_CHANNELS.SHOW_RECAP_NOTIFICATION, config),
+  }): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SHOW_RECAP_NOTIFICATION, config),
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

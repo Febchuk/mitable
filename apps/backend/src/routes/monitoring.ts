@@ -1202,8 +1202,10 @@ router.post(
                   ? new Date(fallbackSession.endedAt).getTime()
                   : Date.now();
                 const activeMinutes = Math.round(
-                  Math.max(0, endMs - sessionStart.getTime() - (fallbackSession.totalPausedMs || 0)) /
-                    60000
+                  Math.max(
+                    0,
+                    endMs - sessionStart.getTime() - (fallbackSession.totalPausedMs || 0)
+                  ) / 60000
                 );
 
                 const recapContent = await sessionSummarizationService.generateRecap(
@@ -1231,7 +1233,10 @@ router.post(
                     {
                       id,
                       startTime: sessionStart.toISOString(),
-                      endTime: (fallbackSession.endedAt ? new Date(fallbackSession.endedAt) : new Date()).toISOString(),
+                      endTime: (fallbackSession.endedAt
+                        ? new Date(fallbackSession.endedAt)
+                        : new Date()
+                      ).toISOString(),
                       duration: activeMinutes,
                       summary: fallbackSession.rawActivitySummary,
                       goal: fallbackSession.sessionGoal || undefined,

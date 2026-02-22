@@ -1480,7 +1480,9 @@ router.get(
       const conditions = [eq(schema.activityBlocks.userId, targetUserId)];
 
       // Filter by category in SQL (case-insensitive)
-      conditions.push(sql`LOWER(COALESCE(${schema.activityBlocks.category}, 'other')) = ${category}`);
+      conditions.push(
+        sql`LOWER(COALESCE(${schema.activityBlocks.category}, 'other')) = ${category}`
+      );
 
       if (period !== "all") {
         const { startDate, endDate } = resolveDateRange(period);
