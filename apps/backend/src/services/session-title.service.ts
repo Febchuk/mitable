@@ -52,21 +52,18 @@ Return ONLY the title text, nothing else. No quotes, no punctuation at the end.
 
 class SessionTitleService {
   private anthropic: Anthropic | null = null;
-  private deepseek: OpenAI | null = null;
+  private openai: OpenAI | null = null;
 
   constructor() {
     if (config.anthropic.apiKey) {
       this.anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
     }
-    if (config.deepseek.apiKey) {
-      this.deepseek = new OpenAI({
-        apiKey: config.deepseek.apiKey,
-        baseURL: "https://api.deepseek.com",
-      });
+    if (config.openai.apiKey) {
+      this.openai = new OpenAI({ apiKey: config.openai.apiKey });
     }
-    if (!this.anthropic && !this.deepseek) {
+    if (!this.anthropic && !this.openai) {
       logger.warn(
-        "No LLM configured for title generation (need ANTHROPIC_API_KEY or DEEPSEEK_API_KEY)"
+        "No LLM configured for title generation (need ANTHROPIC_API_KEY or OPENAI_API_KEY)"
       );
     }
   }
@@ -114,7 +111,7 @@ class SessionTitleService {
 
       const activitySummary = this.buildActivitySummary(cappedActivities);
 
-      // 3. Generate title using AI (Claude primary, DeepSeek fallback)
+      // 3. Generate title using AI (Claude primary, GPT-5 fallback)
       const title = await this.callLLM(activitySummary);
 
       if (!title || title.length === 0) {
@@ -146,7 +143,7 @@ class SessionTitleService {
   /**
    * Call LLM for title generation.
    * Claude Sonnet 4.5 (primary, no extended thinking needed for titles).
-   * DeepSeek chat (fallback).
+   * OpenAI GPT-5 (fallback).
    */
   private async callLLM(activitySummary: string): Promise<string> {
     // Try Claude first
@@ -167,14 +164,14 @@ class SessionTitleService {
         }
         throw new Error("No text block in Claude response");
       } catch (error) {
-        logger.warn(`Claude title generation failed, falling back to DeepSeek: ${String(error)}`);
+        logger.warn(`Claude title generation failed, falling back to GPT-5: ${String(error)}`);
       }
     }
 
-    // DeepSeek fallback
-    if (this.deepseek) {
-      const completion = await this.deepseek.chat.completions.create({
-        model: "deepseek-chat",
+    // OpenAI GPT-5 fallback
+    if (this.openai) {
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-5",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: activitySummary },
@@ -185,7 +182,7 @@ class SessionTitleService {
 
       const title = completion.choices[0]?.message?.content?.trim();
       if (title) {
-        logger.info("⚠️ Title generated via DeepSeek (fallback)");
+        logger.info("⚠️ Title generated via GPT-5 (fallback)");
         return title;
       }
     }

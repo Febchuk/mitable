@@ -1,7 +1,7 @@
 /**
  * Document Generation RLM Tools
  *
- * Tool definitions for Groq function calling.
+ * Tool definitions for Claude / OpenAI native function calling.
  * Each tool queries the DB environment in bounded slices.
  */
 
@@ -172,6 +172,25 @@ export const DOCUMENT_GENERATION_TOOLS = [
           },
         },
         required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "parse_template_structure",
+      description:
+        "Parse an uploaded artifact to extract its document structure: section headings, ordering, nesting, and formatting patterns. Use this when the user wants to follow a template or report format from an uploaded document. Returns the skeleton layout without the original content, so you can fill it with session data.",
+      parameters: {
+        type: "object",
+        properties: {
+          artifactId: {
+            type: "string",
+            description:
+              "The artifact ID to parse. Get IDs from get_artifact_content first. If omitted, parses all available artifacts and picks the most template-like one.",
+          },
+        },
+        required: [],
       },
     },
   },
@@ -368,6 +387,97 @@ export async function executeToolCall(
             })),
           };
         }
+        break;
+      }
+
+      case "parse_template_structure": {
+        const { artifactId: targetId } = args;
+        const artifacts = await env.getArtifactReferences(environment);
+
+        if (artifacts.length === 0) {
+          result = {
+            message: "No artifacts available to parse for template structure.",
+            structure: null,
+          };
+          break;
+        }
+
+        // If a specific ID was given, use it; otherwise pick the best candidate
+        const target = targetId
+          ? artifacts.find((a) => a.id === targetId) || artifacts[0]
+          : artifacts[0];
+
+        if (!target.extractedText) {
+          result = {
+            message: `Artifact "${target.filename}" has no extracted text (may be an image).`,
+            structure: null,
+          };
+          break;
+        }
+
+        const text = target.extractedText;
+
+        // Extract structural elements from the document text
+        const lines = text.split("\n");
+        const sections: Array<{ level: number; heading: string; lineIndex: number }> = [];
+        const tableDetected = text.includes("|") && text.includes("---");
+        let hasNumberedSteps = false;
+        let hasBulletLists = false;
+        let hasPlaceholders = false;
+
+        for (let li = 0; li < lines.length; li++) {
+          const line = lines[li].trim();
+
+          // Markdown headings
+          const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+          if (headingMatch) {
+            sections.push({
+              level: headingMatch[1].length,
+              heading: headingMatch[2].trim(),
+              lineIndex: li,
+            });
+            continue;
+          }
+
+          // ALL-CAPS or Title Case lines that look like section headers
+          if (
+            line.length > 3 &&
+            line.length < 80 &&
+            !line.startsWith("-") &&
+            !line.startsWith("*") &&
+            (line === line.toUpperCase() || /^[A-Z][a-z]+(\s+[A-Z][a-z]+){1,}$/.test(line))
+          ) {
+            sections.push({ level: 2, heading: line, lineIndex: li });
+          }
+
+          // Detect patterns
+          if (/^\d+[.)\s]/.test(line)) hasNumberedSteps = true;
+          if (/^[-*]\s/.test(line)) hasBulletLists = true;
+          if (/\[.*\]|<.*>|\{\{.*\}\}|___/.test(line)) hasPlaceholders = true;
+        }
+
+        // Deduplicate sequential headings at the same level
+        const uniqueSections = sections.filter(
+          (s, i) => i === 0 || s.heading !== sections[i - 1].heading
+        );
+
+        result = {
+          filename: target.filename,
+          artifactId: target.id,
+          sectionCount: uniqueSections.length,
+          sections: uniqueSections.map((s) => ({
+            level: s.level,
+            heading: s.heading,
+          })),
+          formatting: {
+            hasNumberedSteps,
+            hasBulletLists,
+            hasPlaceholders,
+            hasTable: tableDetected,
+          },
+          instruction:
+            "Replicate this section structure when generating your document. Use the same heading names and ordering. Fill each section with data from the user's sessions.",
+        };
         break;
       }
 

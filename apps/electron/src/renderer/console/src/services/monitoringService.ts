@@ -655,6 +655,7 @@ export interface RecapRecord {
   blocks: unknown[];
   totalDuration: number;
   deliveries: unknown[];
+  sessionId: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -42,6 +42,7 @@ interface PreferencesSchema {
       blockedApps: string[]; // Array of normalized app names (lowercase)
       notificationFrequencyMinutes: number; // Frequency in minutes for reminder notifications
       autoSessionStart: boolean; // Auto-start session on powerMonitor resume
+      autoRecap: boolean; // Auto-create recap after session ends
     };
   };
 }
@@ -233,6 +234,22 @@ class PreferencesService {
       autoSessionStart: enabled,
     });
     logger.info(` Auto session start for user ${userId} set to: ${enabled}`);
+  }
+
+  // Auto recap preference (user-scoped)
+  getUserAutoRecap(userId: string): boolean {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    // Default to true — auto-recap is on unless explicitly disabled
+    return userPrefs.autoRecap ?? true;
+  }
+
+  setUserAutoRecap(userId: string, enabled: boolean): void {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    this.store.set(`users.${userId}`, {
+      ...userPrefs,
+      autoRecap: enabled,
+    });
+    logger.info(` Auto recap for user ${userId} set to: ${enabled}`);
   }
 
   // Summary preferences

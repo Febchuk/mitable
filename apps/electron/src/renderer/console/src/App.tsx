@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
@@ -38,11 +38,17 @@ import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
 import AskView from "./components/views/admin/AskView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import * as monitoringService from "./services/monitoringService";
 
 // Navigation handler - listens for IPC navigation events from main process
 function NavigationHandler() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const pathnameRef = useRef(location.pathname);
+  pathnameRef.current = location.pathname;
 
   useEffect(() => {
     // Skip if not running in Electron or preload script not ready
@@ -93,6 +99,13 @@ function NavigationHandler() {
     });
 
     const unsubscribeSessionDetail = window.consoleAPI.onNavigateToSessionDetail?.((payload) => {
+      // If user is on Calendar view, don't navigate away — just refresh data
+      if (pathnameRef.current === "/calendar") {
+        logger.info(" Session detail event on Calendar — refreshing data instead of navigating");
+        queryClient.invalidateQueries({ queryKey: ["calendar"] });
+        queryClient.invalidateQueries({ queryKey: ["monitoring"] });
+        return;
+      }
       logger.info(" Navigating to session detail:", payload);
       const params = new URLSearchParams();
       if (payload.openEndDialog) {
@@ -111,7 +124,7 @@ function NavigationHandler() {
       unsubscribeEndDialog?.();
       unsubscribeSessionDetail?.();
     };
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   return null;
 }
@@ -129,15 +142,120 @@ function MonitoringSessionHandler() {
     const unsubscribe = window.consoleAPI.onMonitoringSessionUpdate?.((state) => {
       logger.info(" Monitoring session update:", state?.status, state?.id);
 
-      // Invalidate session queries on any status change (paused, active, ended)
+      // Invalidate session + calendar queries on any status change (paused, active, ended, cleared)
       if (state?.id) {
         queryClient.invalidateQueries({ queryKey: monitoringKeys.session(state.id) });
-        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
       }
+      // Always invalidate sessions list + calendar — including when state is null (session cleared)
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+      queryClient.invalidateQueries({ queryKey: ["calendar"] });
     });
 
     return () => unsubscribe?.();
   }, [queryClient]);
+
+  return null;
+}
+
+// Recap notification handler — polls recaps to detect NEW ones and fires OS notification.
+// Does NOT rely on session status (which fires for short sessions with no recap).
+function RecapNotificationHandler() {
+  const { user } = useUser();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  // Track "id:updatedAt" so we detect both NEW recaps and UPDATED ones (rolling daily recap)
+  const knownRecapKeysRef = useRef<Set<string> | null>(null); // null = not yet initialized
+  const latestRecapIdRef = useRef<string | null>(null);
+
+  // Poll recaps directly — fires notification only when a new or updated recap appears
+  const { data: recaps } = useQuery({
+    queryKey: ["recap-notification-poll"],
+    queryFn: async () => {
+      const res = await monitoringService.fetchRecaps();
+      return res.recaps;
+    },
+    enabled: !!user,
+    refetchInterval: 10000, // check every 10s
+    refetchIntervalInBackground: true,
+  });
+
+  useEffect(() => {
+    if (!recaps) return;
+
+    const recapKey = (r: { id: string; updatedAt: string }) => `${r.id}:${r.updatedAt}`;
+    const known = knownRecapKeysRef.current;
+
+    // First load — seed known keys, don't fire notifications
+    if (known === null) {
+      knownRecapKeysRef.current = new Set(recaps.map(recapKey));
+      return;
+    }
+
+    // Check for new OR updated recaps
+    for (const recap of recaps) {
+      const key = recapKey(recap);
+      if (!known.has(key)) {
+        logger.info("New/updated recap detected, firing notification", {
+          recapId: recap.id,
+          title: recap.title,
+        });
+
+        latestRecapIdRef.current = recap.id;
+        // Auto-expire after 60s so stale IDs don't trigger random navigation
+        setTimeout(() => {
+          if (latestRecapIdRef.current === recap.id) latestRecapIdRef.current = null;
+        }, 60000);
+
+        // Invalidate recaps cache so the UI updates immediately
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.recaps() });
+
+        // Fire notification
+        const notifMsg = `Your recap "${recap.title || "Work session"}" is ready to review.`;
+        if (window.consoleAPI?.showRecapNotification) {
+          window.consoleAPI.showRecapNotification({ title: "Recap Ready", message: notifMsg });
+        } else {
+          try {
+            new Notification("Recap Ready", { body: notifMsg });
+          } catch {
+            /* ignore */
+          }
+        }
+
+        // Only notify once per poll cycle (avoid double-notif if multiple recaps changed)
+        break;
+      }
+    }
+
+    // Update known set
+    knownRecapKeysRef.current = new Set(recaps.map(recapKey));
+  }, [recaps, queryClient]);
+
+  // Navigate to recap when notification is clicked (window regains focus)
+  // or via IPC from the main process showRecapNotification click handler
+  useEffect(() => {
+    const handleFocus = () => {
+      const recapId = latestRecapIdRef.current;
+      if (recapId) {
+        latestRecapIdRef.current = null;
+        navigate(`/recaps/${recapId}`);
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+
+    let unsubscribe: (() => void) | undefined;
+    if (window.consoleAPI?.onNavigateToRecaps) {
+      unsubscribe = window.consoleAPI.onNavigateToRecaps(() => {
+        const recapId = latestRecapIdRef.current;
+        latestRecapIdRef.current = null;
+        navigate(recapId ? `/recaps/${recapId}` : "/recaps");
+      });
+    }
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      unsubscribe?.();
+    };
+  }, [navigate]);
 
   return null;
 }
@@ -202,6 +320,7 @@ function App() {
           <NavigationHandler />
           <MonitoringSessionHandler />
           <UserProvider>
+            <RecapNotificationHandler />
             <VariantWrapper>
               <DevFlagsProvider>
                 <RecapsProvider>

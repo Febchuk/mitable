@@ -8,10 +8,10 @@ export interface User {
   name: string;
   email: string;
   role: string;
-  startDate: string;
-  status: "Onboarding" | "Active";
-  progress: number;
+  jobTitle?: string | null;
+  status: string;
   avatarUrl?: string | null;
+  createdAt?: string;
 }
 
 export interface Template {
@@ -514,17 +514,20 @@ export interface DashboardPerson {
   role?: string;
   jobTitle?: string;
   avatarUrl?: string | null;
+  userStatus?: string;
+  createdAt?: string;
   totalWorkMinutes: number;
   totalMeetingMinutes: number;
   totalActiveMinutes: number;
   avgActiveMinutesPerDay: number;
   workPercentage: number;
   meetingPercentage: number;
-  daySummary: string | null;
-  keyAccomplishments: string[];
+  recentHighlight: string | null;
+  lastActiveAt: string | null;
   categoryBreakdown: Array<{ category: string; percentage: number; minutes: number }>;
   appBreakdown: Array<{ app: string; minutes: number }>;
   daysTracked: number;
+  hasActivity: boolean;
 }
 
 export interface ActivityBlock {
@@ -619,15 +622,12 @@ export async function fetchDashboardMetrics(
 }
 
 /**
- * Fetch per-user activity list for People tab (admin only)
+ * Fetch all org users with lifetime activity summaries for People tab (admin only).
+ * No date filtering — the backend returns ALL users with aggregated lifetime stats.
  */
-export async function fetchDashboardPeople(
-  period: DashboardPeriod = "yesterday"
-): Promise<DashboardPerson[]> {
+export async function fetchDashboardPeople(): Promise<DashboardPerson[]> {
   try {
-    const response = await apiRequest<{ period: string; people: DashboardPerson[] }>(
-      `/admin/dashboard/people?period=${period}`
-    );
+    const response = await apiRequest<{ people: DashboardPerson[] }>(`/admin/dashboard/people`);
     return response.people;
   } catch (error) {
     logger.error("Error fetching dashboard people:", error);
@@ -696,6 +696,45 @@ export async function fetchUserDrillDown(
     );
   } catch (error) {
     logger.error("Error fetching user drill-down data:", error);
+    throw error;
+  }
+}
+
+/**
+ * Per-user category activity blocks (for Activity Breakdown drill-down)
+ */
+export interface CategoryActivity {
+  id: string;
+  name: string;
+  description: string | null;
+  blockType: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  apps: string[];
+  sessionId: string | null;
+}
+
+export interface CategoryActivitiesResponse {
+  category: string;
+  period: string;
+  totalMinutes: number;
+  totalHours: number;
+  activityCount: number;
+  activities: CategoryActivity[];
+}
+
+export async function fetchCategoryActivities(
+  userId: string,
+  category: string,
+  period: DashboardPeriod = "all"
+): Promise<CategoryActivitiesResponse> {
+  try {
+    return await apiRequest<CategoryActivitiesResponse>(
+      `/admin/dashboard/people/${userId}/category-activities/${encodeURIComponent(category)}?period=${period}`
+    );
+  } catch (error) {
+    logger.error("Error fetching category activities:", error);
     throw error;
   }
 }

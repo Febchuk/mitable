@@ -7,7 +7,7 @@
  * Input: All of a user's sessions for a day (classifier data, master stories, transcripts)
  * Output: Structured timeline of named work and meeting blocks
  *
- * Uses Claude Sonnet 4.5 with extended thinking (primary) or DeepSeek R1 (fallback).
+ * Uses Claude Sonnet 4.5 with extended thinking (primary) or GPT-5 (fallback).
  * Follows the same RLM pattern as the Storyteller and Workstream engines.
  */
 
@@ -70,7 +70,7 @@ interface LLMResponse {
 
 class DayAnalyzerRLMService {
   private anthropic: Anthropic | null = null;
-  private deepseek: OpenAI | null = null;
+  private openai: OpenAI | null = null;
   private maxIterations = 30; // Higher limit than storyteller — full day analysis needs more steps
 
   constructor() {
@@ -78,17 +78,14 @@ class DayAnalyzerRLMService {
       this.anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
       logger.info("Day Analyzer RLM using Claude Sonnet 4.5 with extended thinking");
     } else {
-      logger.warn("ANTHROPIC_API_KEY not set — will use DeepSeek R1 fallback");
+      logger.warn("ANTHROPIC_API_KEY not set — will use GPT-5 fallback");
     }
 
-    if (config.deepseek.apiKey) {
-      this.deepseek = new OpenAI({
-        apiKey: config.deepseek.apiKey,
-        baseURL: "https://api.deepseek.com",
-      });
-      logger.info("DeepSeek R1 fallback configured for Day Analyzer");
+    if (config.openai.apiKey) {
+      this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+      logger.info("GPT-5 fallback configured for Day Analyzer");
     } else {
-      logger.warn("DEEPSEEK_API_KEY not set — no fallback available for Day Analyzer");
+      logger.warn("OPENAI_API_KEY not set — no fallback available for Day Analyzer");
     }
   }
 
@@ -97,7 +94,7 @@ class DayAnalyzerRLMService {
    */
   async analyzeDay(input: DayAnalyzerInput): Promise<DayAnalyzerResult> {
     const startTime = Date.now();
-    const modelUsed = this.anthropic ? "claude-sonnet-4-5-20250929" : "deepseek-reasoner";
+    const modelUsed = this.anthropic ? "claude-sonnet-4-5-20250929" : "gpt-5";
 
     logger.info(
       {
@@ -233,7 +230,7 @@ class DayAnalyzerRLMService {
   }
 
   /**
-   * Get LLM decision — Claude primary, DeepSeek fallback
+   * Get LLM decision — Claude primary, GPT-5 fallback
    */
   private async getLLMDecision(
     systemPrompt: string,
@@ -243,12 +240,12 @@ class DayAnalyzerRLMService {
       try {
         return await this.getLLMDecisionClaude(systemPrompt, messages);
       } catch (error) {
-        logger.warn({ error: String(error) }, "Claude call failed — falling back to DeepSeek R1");
+        logger.warn({ error: String(error) }, "Claude call failed — falling back to GPT-5");
         this.anthropic = null;
-        return this.getLLMDecisionDeepSeek(systemPrompt, messages);
+        return this.getLLMDecisionOpenAI(systemPrompt, messages);
       }
     }
-    return this.getLLMDecisionDeepSeek(systemPrompt, messages);
+    return this.getLLMDecisionOpenAI(systemPrompt, messages);
   }
 
   /**
@@ -291,17 +288,17 @@ class DayAnalyzerRLMService {
   }
 
   /**
-   * DeepSeek R1 fallback
+   * OpenAI GPT-5 fallback
    */
-  private async getLLMDecisionDeepSeek(
+  private async getLLMDecisionOpenAI(
     systemPrompt: string,
     messages: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<LLMResponse> {
-    if (!this.deepseek) {
-      throw new Error("No LLM available — both ANTHROPIC_API_KEY and DEEPSEEK_API_KEY are missing");
+    if (!this.openai) {
+      throw new Error("No LLM available — both ANTHROPIC_API_KEY and OPENAI_API_KEY are missing");
     }
 
-    const deepseekMessages = [
+    const openaiMessages = [
       {
         role: "system" as const,
         content:
@@ -311,15 +308,15 @@ class DayAnalyzerRLMService {
       ...messages,
     ];
 
-    const completion = await this.deepseek.chat.completions.create({
-      messages: deepseekMessages as any,
-      model: "deepseek-reasoner",
+    const completion = await this.openai.chat.completions.create({
+      messages: openaiMessages as any,
+      model: "gpt-5",
       max_tokens: 8000,
     });
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {
-      throw new Error("Empty response from DeepSeek R1");
+      throw new Error("Empty response from GPT-5");
     }
 
     return this.parseToolCallResponse(content);
@@ -445,7 +442,7 @@ class DayAnalyzerRLMService {
    * Check if RLM is available
    */
   isAvailable(): boolean {
-    return !!this.anthropic || !!this.deepseek;
+    return !!this.anthropic || !!this.openai;
   }
 }
 

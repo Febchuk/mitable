@@ -11,6 +11,7 @@ import {
 import { relations } from "drizzle-orm";
 import { users } from "./users.schema";
 import { organizations } from "./organizations.schema";
+import { monitoringSessions } from "./monitoring.schema";
 
 /**
  * Recaps
@@ -35,6 +36,9 @@ export const recaps = pgTable(
     blocks: jsonb("blocks").notNull().default("[]"), // RecapBlockSnapshot[]
     totalDuration: integer("total_duration").notNull().default(0), // minutes
     deliveries: jsonb("deliveries").notNull().default("[]"), // RecapDelivery[]
+
+    // Nullable — set when auto-created from a single session end
+    sessionId: uuid("session_id").references(() => monitoringSessions.id, { onDelete: "set null" }),
 
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

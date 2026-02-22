@@ -5,7 +5,7 @@
  * Orchestrates tool execution based on LLM decisions.
  *
  * Uses Claude Sonnet 4.5 with extended thinking for high-quality,
- * deliberate summarization. Falls back to DeepSeek R1 (reasoning model) if Anthropic fails.
+ * deliberate summarization. Falls back to OpenAI GPT-5 if Anthropic fails.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -54,7 +54,7 @@ interface LLMResponse {
 
 class StorytellerRLMService {
   private anthropic: Anthropic | null = null;
-  private deepseek: OpenAI | null = null; // DeepSeek R1 fallback (OpenAI-compatible)
+  private openai: OpenAI | null = null; // GPT-5 fallback
   private maxIterations = 10; // Safety limit to prevent runaway tool calls
 
   constructor() {
@@ -62,17 +62,14 @@ class StorytellerRLMService {
       this.anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
       logger.info("Storyteller RLM using Claude Sonnet 4.5 with extended thinking");
     } else {
-      logger.warn("ANTHROPIC_API_KEY not set — will use DeepSeek R1 fallback");
+      logger.warn("ANTHROPIC_API_KEY not set — will use GPT-5 fallback");
     }
 
-    if (config.deepseek.apiKey) {
-      this.deepseek = new OpenAI({
-        apiKey: config.deepseek.apiKey,
-        baseURL: "https://api.deepseek.com",
-      });
-      logger.info("DeepSeek R1 fallback configured for Storyteller");
+    if (config.openai.apiKey) {
+      this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+      logger.info("GPT-5 fallback configured for Storyteller");
     } else {
-      logger.warn("DEEPSEEK_API_KEY not set — no fallback available for Storyteller");
+      logger.warn("OPENAI_API_KEY not set — no fallback available for Storyteller");
     }
   }
 
@@ -159,7 +156,7 @@ class StorytellerRLMService {
 
   /**
    * Get LLM decision on which tool to call next.
-   * Uses Claude Sonnet 4.5 with extended thinking (primary) or DeepSeek R1 (fallback).
+   * Uses Claude Sonnet 4.5 with extended thinking (primary) or GPT-5 (fallback).
    */
   private async getLLMDecision(
     systemPrompt: string,
@@ -196,20 +193,20 @@ class StorytellerRLMService {
           }
           logger.warn(
             { error: errStr, attempt: attempt + 1 },
-            "Claude call failed — falling back to DeepSeek R1 for this call only"
+            "Claude call failed — falling back to GPT-5 for this call only"
           );
           break;
         }
       }
       // All retries exhausted or non-retryable transient error — fall back
-      if (this.deepseek) {
-        const result = await this.getLLMDecisionDeepSeek(systemPrompt, messages);
-        logger.info("⚠️ Storyteller decision via DeepSeek R1 (fallback)");
+      if (this.openai) {
+        const result = await this.getLLMDecisionOpenAI(systemPrompt, messages);
+        logger.info("⚠️ Storyteller decision via GPT-5 (fallback)");
         return result;
       }
-      throw new Error("No LLM available — Claude exhausted retries and DeepSeek not configured");
+      throw new Error("No LLM available — Claude exhausted retries and OpenAI not configured");
     }
-    return this.getLLMDecisionDeepSeek(systemPrompt, messages);
+    return this.getLLMDecisionOpenAI(systemPrompt, messages);
   }
 
   /**
@@ -254,19 +251,19 @@ class StorytellerRLMService {
   }
 
   /**
-   * DeepSeek R1 fallback — reasoning model with built-in chain-of-thought
+   * OpenAI GPT-5 fallback
    */
-  private async getLLMDecisionDeepSeek(
+  private async getLLMDecisionOpenAI(
     systemPrompt: string,
     messages: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<LLMResponse> {
-    if (!this.deepseek) {
+    if (!this.openai) {
       throw new Error(
-        "No fallback LLM available — both ANTHROPIC_API_KEY and DEEPSEEK_API_KEY are missing"
+        "No fallback LLM available — both ANTHROPIC_API_KEY and OPENAI_API_KEY are missing"
       );
     }
 
-    const deepseekMessages = [
+    const openaiMessages = [
       {
         role: "system" as const,
         content:
@@ -276,15 +273,15 @@ class StorytellerRLMService {
       ...messages,
     ];
 
-    const completion = await this.deepseek.chat.completions.create({
-      messages: deepseekMessages as any,
-      model: "deepseek-reasoner",
+    const completion = await this.openai.chat.completions.create({
+      messages: openaiMessages as any,
+      model: "gpt-5",
       max_tokens: 8000,
     });
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {
-      throw new Error("Empty response from DeepSeek R1");
+      throw new Error("Empty response from GPT-5");
     }
 
     return this.parseToolCallResponse(content);
@@ -420,7 +417,7 @@ class StorytellerRLMService {
    * Check if RLM is available
    */
   isAvailable(): boolean {
-    return !!this.anthropic || !!this.deepseek;
+    return !!this.anthropic || !!this.openai;
   }
 }
 

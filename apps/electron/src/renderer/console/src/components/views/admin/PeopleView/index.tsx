@@ -68,11 +68,23 @@ function deriveActivityFromDashboard(person: DashboardPerson): UserActivityMeta 
     );
   }
 
-  const accomplishments = (person.keyAccomplishments || []) as string[];
-  const highlight = accomplishments[0] || person.daySummary || "No recent activity";
+  const highlight = person.recentHighlight || "No recent activity";
+
+  // Format lastActive as relative time
+  let lastActive = "—";
+  if (person.lastActiveAt) {
+    const diff = Date.now() - new Date(person.lastActiveAt).getTime();
+    const hours = Math.floor(diff / 3600000);
+    if (hours < 1) lastActive = "Just now";
+    else if (hours < 24) lastActive = `${hours}h ago`;
+    else {
+      const days = Math.floor(hours / 24);
+      lastActive = days === 1 ? "Yesterday" : `${days}d ago`;
+    }
+  }
 
   return {
-    lastActive: person.daysTracked > 0 ? "Today" : "—",
+    lastActive,
     topTopic,
     recentHighlight: highlight.length > 60 ? highlight.slice(0, 57) + "..." : highlight,
     dayBreakdown: breakdown,
@@ -136,7 +148,7 @@ function PersonRow({
       {/* Name + role + email */}
       <div className="w-[200px] shrink-0">
         <p className="text-sm font-semibold text-text-primary">{user.name}</p>
-        <p className="text-xs text-text-secondary truncate">{user.role}</p>
+        <p className="text-xs text-text-secondary truncate">{user.jobTitle || user.role}</p>
       </div>
 
       {/* Recent highlight */}
@@ -179,7 +191,7 @@ function PersonRow({
 export default function PeopleView() {
   const navigate = useNavigate();
   const { data: users = [], isLoading: loading, error } = useUsers();
-  const { data: dashboardPeople = [] } = useDashboardPeople("all");
+  const { data: dashboardPeople = [] } = useDashboardPeople();
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<ActiveFilters>(() => {
     try {
@@ -271,7 +283,7 @@ export default function PeopleView() {
       // Mood & activity status filters (need dashboard data)
       const dp = dashboardMap.get(user.id);
       const mood: MoodKey = dp ? deriveMood(dp) : "ramping-up";
-      const hasData = !!dp;
+      const hasData = dp?.hasActivity ?? false;
 
       if (filters.moods.size > 0 && !filters.moods.has(mood)) return false;
       if (filters.activityStatus === "has-data" && !hasData) return false;

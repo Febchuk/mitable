@@ -17,6 +17,8 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
+import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { promises as fs } from "fs";
 import { config } from "../config";
 import { db } from "../db/client";
@@ -108,6 +110,8 @@ class SessionSummarizationService {
   private genAI: GoogleGenerativeAI;
   private visionModel: any;
   private groq: Groq;
+  private anthropic: Anthropic | null = null;
+  private openai: OpenAI | null = null;
 
   constructor() {
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
@@ -115,6 +119,13 @@ class SessionSummarizationService {
       model: SUMMARIZATION_CONFIG.VISION_MODEL,
     });
     this.groq = new Groq({ apiKey: config.groq.apiKey });
+
+    if (config.anthropic.apiKey) {
+      this.anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
+    }
+    if (config.openai.apiKey) {
+      this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+    }
   }
 
   /**
@@ -1329,7 +1340,86 @@ Example good output:
   }
 
   /**
-   * Generate a recap from multiple session summaries
+   * Call LLM with Claude → OpenAI → Groq fallback chain
+   */
+  private async callLLM(prompt: string, maxTokens: number = 1000): Promise<string> {
+    // Primary: Claude
+    if (this.anthropic) {
+      try {
+        const response = await this.anthropic.messages.create({
+          model: "claude-sonnet-4-5-20250929",
+          max_tokens: maxTokens,
+          messages: [{ role: "user", content: prompt }],
+        });
+        const text = response.content.find((b) => b.type === "text");
+        if (text && text.type === "text" && text.text.trim()) {
+          logger.info("Recap/revise via Claude Sonnet 4.5");
+          return text.text.trim();
+        }
+      } catch (error) {
+        logger.warn(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Claude failed for recap — falling back to OpenAI"
+        );
+      }
+    }
+
+    // Fallback: OpenAI
+    if (this.openai) {
+      try {
+        const completion = await this.openai.chat.completions.create({
+          model: "gpt-5",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.4,
+          max_tokens: maxTokens,
+        });
+        const content = completion.choices[0]?.message?.content?.trim();
+        if (content) {
+          logger.info("Recap/revise via OpenAI GPT-5 (fallback)");
+          return content;
+        }
+      } catch (error) {
+        logger.warn(
+          { error: error instanceof Error ? error.message : String(error) },
+          "OpenAI failed for recap — falling back to Groq"
+        );
+      }
+    }
+
+    // Last resort: Groq
+    const completion = await this.groq.chat.completions.create({
+      model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.4,
+      max_tokens: maxTokens,
+    });
+    return (completion.choices[0]?.message?.content || "").trim();
+  }
+
+  /**
+   * Fetch user recap style memories from the user_memories table
+   */
+  private async fetchRecapMemories(userId: string): Promise<string[]> {
+    try {
+      const memories = await db
+        .select({ content: schema.userMemories.content })
+        .from(schema.userMemories)
+        .where(
+          and(
+            eq(schema.userMemories.userId, userId),
+            eq(schema.userMemories.category, "recap_style")
+          )
+        );
+      return memories.map((m) => m.content);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Generate a recap from multiple session summaries.
+   * Uses Claude → OpenAI fallback chain.
+   * Injects user style preferences from memories if userId is provided.
    */
   async generateRecap(
     sessions: Array<{
@@ -1340,7 +1430,8 @@ Example good output:
       startTime: string;
     }>,
     tone: string = "professional",
-    length: string = "standard"
+    length: string = "standard",
+    userId?: string
   ): Promise<string> {
     const sessionList = sessions
       .map((s, i) => {
@@ -1365,6 +1456,15 @@ Example good output:
       comprehensive: "Write a comprehensive recap of 250-500 words covering all details.",
     };
 
+    // Fetch user style preferences from memories
+    let styleSection = "";
+    if (userId) {
+      const memories = await this.fetchRecapMemories(userId);
+      if (memories.length > 0) {
+        styleSection = `\n<user_style_preferences>\nThe user has previously specified these preferences for their recaps. Follow them closely:\n${memories.map((m, i) => `${i + 1}. ${m}`).join("\n")}\n</user_style_preferences>\n`;
+      }
+    }
+
     const prompt = `You are writing a work recap that combines multiple work sessions into a single update.
 
 <sessions>
@@ -1373,7 +1473,7 @@ ${sessionList}
 
 <tone>${toneInstructions[tone] || toneInstructions.professional}</tone>
 <length>${lengthInstructions[length] || lengthInstructions.standard}</length>
-
+${styleSection}
 <instructions>
 - Write in first person ("I worked on...", "I completed...")
 - Combine related activities across sessions into coherent themes
@@ -1385,24 +1485,17 @@ ${sessionList}
 
 Write the recap now (markdown only, no JSON wrapping):`;
 
-    const completion = await this.groq.chat.completions.create({
-      model: SUMMARIZATION_CONFIG.TEXT_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.4,
-      max_tokens: 1000,
-    });
-
-    const response = completion.choices[0]?.message?.content || "";
-    return response.trim();
+    return this.callLLM(prompt, 1000);
   }
 
   /**
-   * Revise a summary based on user instructions
+   * Revise a recap/summary based on user instructions.
+   * Uses Claude → OpenAI fallback chain.
    */
   async reviseSummary(currentSummary: string, instruction: string): Promise<string> {
-    const prompt = `You are an AI assistant helping to revise a work session summary.
+    const prompt = `You are an AI assistant helping to revise a work recap.
 
-Current summary:
+Current recap:
 """
 ${currentSummary}
 """
@@ -1410,25 +1503,60 @@ ${currentSummary}
 User's revision request:
 "${instruction}"
 
-Please revise the summary according to the user's request. Keep the same general structure unless the user asks for a different format.
+Please revise the recap according to the user's request. Keep the same general structure unless the user asks for a different format.
 
 Important:
 - Maintain a professional tone
 - Keep it concise unless asked to expand
 - Preserve key facts and accomplishments
-- Only output the revised summary text, no explanations
+- Only output the revised recap text, no explanations
 
-Revised summary:`;
+Revised recap:`;
 
-    const completion = await this.groq.chat.completions.create({
-      model: SUMMARIZATION_CONFIG.TEXT_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.4,
-      max_tokens: 800,
-    });
+    return this.callLLM(prompt, 800);
+  }
 
-    const response = completion.choices[0]?.message?.content || "";
-    return response.trim();
+  /**
+   * Save a user's recap style preference as a memory.
+   * Called after a user revises their recap — their instruction becomes a style memory
+   * so future auto-generated recaps match their preferred format.
+   */
+  async saveRecapStyleMemory(userId: string, orgId: string, instruction: string): Promise<void> {
+    try {
+      // Check if there's already a recap_style memory for this user
+      const [existing] = await db
+        .select()
+        .from(schema.userMemories)
+        .where(
+          and(
+            eq(schema.userMemories.userId, userId),
+            eq(schema.userMemories.category, "recap_style")
+          )
+        )
+        .limit(1);
+
+      if (existing) {
+        // Append to existing memory content (keep history of preferences)
+        const updatedContent = `${existing.content}\n${instruction}`;
+        await db
+          .update(schema.userMemories)
+          .set({ content: updatedContent, updatedAt: new Date() })
+          .where(eq(schema.userMemories.id, existing.id));
+      } else {
+        await db.insert(schema.userMemories).values({
+          userId,
+          orgId,
+          category: "recap_style",
+          content: instruction,
+        });
+      }
+      logger.info({ userId }, "Saved recap style memory");
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error), userId },
+        "Failed to save recap style memory"
+      );
+    }
   }
 }
 

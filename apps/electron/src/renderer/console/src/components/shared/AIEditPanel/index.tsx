@@ -23,6 +23,7 @@ interface AIEditPanelProps {
   placeholder?: string;
   contextLabel?: string; // e.g., "session summary"
   sessionId?: string; // When provided, enables conversational refinement
+  documentId?: string; // When provided, enables conversational doc refinement
 }
 
 export default function AIEditPanel({
@@ -36,6 +37,7 @@ export default function AIEditPanel({
   placeholder = "Write your content here...",
   contextLabel = "content",
   sessionId,
+  documentId,
 }: AIEditPanelProps) {
   const [content, setContent] = useState(initialContent);
   const [isSaving, setIsSaving] = useState(false);
@@ -125,6 +127,7 @@ export default function AIEditPanel({
             onRevise={onRevise}
             contextLabel={contextLabel}
             sessionId={sessionId}
+            documentId={documentId}
           />
         </div>
       </div>

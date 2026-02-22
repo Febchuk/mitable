@@ -2,16 +2,16 @@
  * Activity Materializer Service
  *
  * Runs on session end (alongside storyteller/ingestion).
- * Reads a session's captures, groups them into activity blocks,
- * and writes pre-computed data to the daily_activities tables
- * so the admin dashboard can do pure reads.
+ * Reads a session's keyActivities (from Claude classification) and converts
+ * them into activity blocks + daily aggregate stats for the admin dashboard.
  *
  * Flow:
- *   1. Fetch all analyzed captures for the session
- *   2. Group consecutive captures into activity blocks (by app + time proximity)
+ *   1. Fetch session metadata + keyActivities (from classifySession)
+ *   2. Convert keyActivities into activity_blocks rows
  *   3. Upsert user_daily_activities row for that user+date
- *   4. Insert activity_blocks rows
- *   5. Recalculate daily aggregate stats from ALL blocks for that day
+ *   4. Recalculate daily aggregate stats (categoryBreakdown, appBreakdown, etc.)
+ *
+ * If keyActivities is empty, falls back to capture-based grouping.
  *
  * Idempotency: Checks processedSessionIds to skip already-materialized sessions.
  *
@@ -26,56 +26,8 @@ import { createLogger } from "../lib/logger";
 const logger = createLogger({ context: "activity-materializer" });
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-// If gap between captures exceeds this, start a new block
-const BLOCK_GAP_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-
-// App name → category mapping (lowercase keys)
-const APP_CATEGORY_MAP: Record<string, string> = {
-  "vs code": "development",
-  "visual studio code": "development",
-  windsurf: "development",
-  cursor: "development",
-  terminal: "development",
-  iterm: "development",
-  iterm2: "development",
-  warp: "development",
-  github: "development",
-  gitlab: "development",
-  postman: "development",
-  chrome: "browsing",
-  safari: "browsing",
-  firefox: "browsing",
-  arc: "browsing",
-  "microsoft edge": "browsing",
-  "brave browser": "browsing",
-  slack: "communication",
-  discord: "communication",
-  "microsoft teams": "communication",
-  zoom: "meeting",
-  "google meet": "meeting",
-  figma: "design",
-  sketch: "design",
-  notion: "documentation",
-  obsidian: "documentation",
-  "microsoft word": "documentation",
-  "google docs": "documentation",
-  finder: "other",
-  explorer: "other",
-};
-
-// ============================================================================
 // Types
 // ============================================================================
-
-interface CaptureForBlock {
-  appName: string | null;
-  windowTitle: string | null;
-  capturedAt: Date;
-  activityDescription: string | null;
-}
 
 interface MaterializedBlock {
   name: string;
@@ -93,14 +45,14 @@ interface MaterializedBlock {
 // ============================================================================
 
 /**
- * Materialize a single session's captures into activity blocks and daily stats.
- * Called after storyteller completes on session end.
+ * Materialize a single session into activity blocks and daily stats.
+ * Prefers keyActivities (from Claude classification) over raw captures.
  */
 export async function materializeSession(sessionId: string): Promise<void> {
   const startMs = Date.now();
 
   try {
-    // 1. Fetch session metadata
+    // 1. Fetch session metadata + keyActivities
     const [session] = await db
       .select({
         id: schema.monitoringSessions.id,
@@ -109,6 +61,7 @@ export async function materializeSession(sessionId: string): Promise<void> {
         startedAt: schema.monitoringSessions.startedAt,
         endedAt: schema.monitoringSessions.endedAt,
         name: schema.monitoringSessions.name,
+        keyActivities: schema.monitoringSessions.keyActivities,
       })
       .from(schema.monitoringSessions)
       .where(eq(schema.monitoringSessions.id, sessionId))
@@ -143,49 +96,75 @@ export async function materializeSession(sessionId: string): Promise<void> {
       return;
     }
 
-    // 3. Fetch all analyzed captures for this session
-    const captures = await db
-      .select({
-        appName: schema.sessionCaptures.appName,
-        windowTitle: schema.sessionCaptures.windowTitle,
-        capturedAt: schema.sessionCaptures.capturedAt,
-        activityDescription: schema.sessionCaptures.activityDescription,
-      })
-      .from(schema.sessionCaptures)
-      .where(eq(schema.sessionCaptures.sessionId, sessionId))
-      .orderBy(schema.sessionCaptures.capturedAt);
+    // 3. Build blocks from keyActivities (Claude classification)
+    const sessionStart = new Date(session.startedAt);
+    const sessionEnd = session.endedAt ? new Date(session.endedAt) : new Date();
+    const keyActivities = (session.keyActivities as any[]) || [];
 
-    // Guard: skip sessions with too few captures (meaningless data)
-    const MIN_CAPTURES_FOR_MATERIALIZATION = 3;
-    if (captures.length < MIN_CAPTURES_FOR_MATERIALIZATION) {
-      logger.info(
-        { sessionId, captureCount: captures.length },
-        "Too few captures for meaningful materialization, skipping"
+    const blocks: MaterializedBlock[] = [];
+
+    if (keyActivities.length > 0 && typeof keyActivities[0]?.category === "string") {
+      // Use classified activities — distribute time proportionally across the session
+      let offsetMs = 0;
+      const totalClassifiedMinutes = keyActivities.reduce(
+        (s: number, a: any) => s + (a.minutes || 0),
+        0
       );
-      return;
-    }
+      const sessionDurationMs = sessionEnd.getTime() - sessionStart.getTime();
 
-    // 4. Group captures into activity blocks
-    const blocks = groupCapturesIntoBlocks(captures, session.name);
+      for (const act of keyActivities) {
+        const minutes = Math.max(1, act.minutes || 1);
+        const fractionMs =
+          totalClassifiedMinutes > 0
+            ? (minutes / totalClassifiedMinutes) * sessionDurationMs
+            : sessionDurationMs / keyActivities.length;
 
-    if (blocks.length === 0) {
-      // No meaningful blocks — still record the session as processed
-      // so we don't re-attempt it, but create a single "untracked" block
-      // from the session's start/end times
-      const sessionStart = new Date(session.startedAt);
-      const sessionEnd = session.endedAt ? new Date(session.endedAt) : new Date();
-      const durationMin = Math.round((sessionEnd.getTime() - sessionStart.getTime()) / 60000);
+        const blockStart = new Date(sessionStart.getTime() + offsetMs);
+        const blockEnd = new Date(sessionStart.getTime() + offsetMs + fractionMs);
+        const category = (act.category || "Other").toLowerCase();
 
+        blocks.push({
+          name: act.activity || "Activity",
+          blockType: category === "meeting" ? "meeting" : "work",
+          startTime: blockStart,
+          endTime: blockEnd,
+          durationMinutes: minutes,
+          description: act.description || act.activity || "",
+          apps: [],
+          category,
+        });
+
+        offsetMs += fractionMs;
+      }
+    } else {
+      // Fallback: no classification — create one generic block
+      const durationMin = Math.max(
+        1,
+        Math.round((sessionEnd.getTime() - sessionStart.getTime()) / 60000)
+      );
       blocks.push({
         name: session.name || "Work session",
         blockType: "work",
         startTime: sessionStart,
         endTime: sessionEnd,
         durationMinutes: durationMin,
-        description: "Session with no captured screen activity.",
+        description: "Unclassified session.",
         apps: [],
         category: "other",
       });
+    }
+
+    // 4. Enrich blocks with app names from captures (for appBreakdown)
+    const captures = await db
+      .select({ appName: schema.sessionCaptures.appName })
+      .from(schema.sessionCaptures)
+      .where(eq(schema.sessionCaptures.sessionId, sessionId));
+
+    const uniqueApps = [...new Set(captures.map((c) => c.appName).filter(Boolean))] as string[];
+    if (uniqueApps.length > 0) {
+      for (const block of blocks) {
+        block.apps = uniqueApps;
+      }
     }
 
     // 5-8. Upsert daily activity, insert blocks, recalculate — all in one transaction
@@ -266,89 +245,6 @@ export async function materializeSession(sessionId: string): Promise<void> {
 // ============================================================================
 
 /**
- * Group captures into logical activity blocks based on app changes and time gaps.
- */
-function groupCapturesIntoBlocks(
-  captures: CaptureForBlock[],
-  sessionName: string | null
-): MaterializedBlock[] {
-  if (captures.length === 0) return [];
-
-  const blocks: MaterializedBlock[] = [];
-  let currentGroup: CaptureForBlock[] = [captures[0]!];
-
-  for (let i = 1; i < captures.length; i++) {
-    const prev = captures[i - 1]!;
-    const curr = captures[i]!;
-    const gapMs = curr.capturedAt.getTime() - prev.capturedAt.getTime();
-    const appChanged = normalizeApp(curr.appName) !== normalizeApp(prev.appName);
-
-    // Start new block on app change or large time gap
-    if (appChanged || gapMs > BLOCK_GAP_THRESHOLD_MS) {
-      blocks.push(finalizeBlock(currentGroup, sessionName));
-      currentGroup = [curr];
-    } else {
-      currentGroup.push(curr);
-    }
-  }
-
-  // Finalize last group
-  if (currentGroup.length > 0) {
-    blocks.push(finalizeBlock(currentGroup, sessionName));
-  }
-
-  return blocks;
-}
-
-/**
- * Convert a group of captures into a single MaterializedBlock.
- */
-function finalizeBlock(captures: CaptureForBlock[], sessionName: string | null): MaterializedBlock {
-  const first = captures[0]!;
-  const last = captures[captures.length - 1]!;
-
-  // Collect unique apps
-  const appSet = new Set<string>();
-  for (const c of captures) {
-    if (c.appName) appSet.add(c.appName);
-  }
-  const apps = Array.from(appSet);
-  const primaryApp = apps[0] || "Unknown";
-
-  // Determine category from primary app
-  const category = categorizeApp(primaryApp);
-
-  // Determine block type
-  const blockType = category === "meeting" ? "meeting" : "work";
-
-  // Build name from activity descriptions or fall back to app name
-  const descriptions = captures
-    .map((c) => c.activityDescription)
-    .filter((d): d is string => !!d && d.trim().length > 0);
-
-  const name = descriptions.length > 0 ? descriptions[0]! : sessionName || `${primaryApp} activity`;
-
-  // Build a brief description from unique activity descriptions
-  const uniqueDescriptions = [...new Set(descriptions)];
-  const description = uniqueDescriptions.slice(0, 5).join(". ") || name;
-
-  // Duration: from first capture to last capture, minimum 1 minute
-  const durationMs = Math.max(last.capturedAt.getTime() - first.capturedAt.getTime(), 60000);
-  const durationMinutes = Math.round(durationMs / 60000);
-
-  return {
-    name: name.substring(0, 500),
-    blockType,
-    startTime: first.capturedAt,
-    endTime: last.capturedAt,
-    durationMinutes,
-    description: description.substring(0, 2000),
-    apps,
-    category,
-  };
-}
-
-/**
  * Recalculate aggregate stats for a user_daily_activities row
  * from all its activity_blocks.
  */
@@ -388,7 +284,7 @@ async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db):
       appMinutes[app] = (appMinutes[app] || 0) + perAppMinutes;
     }
 
-    // Category breakdown
+    // Category breakdown — use the classified category from the block
     const cat = (block.category as string) || "other";
     categoryMinutes[cat] = (categoryMinutes[cat] || 0) + block.durationMinutes;
   }
@@ -418,7 +314,7 @@ async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db):
       totalMeetingMinutes: Math.round(totalMeetingMinutes),
       totalActiveMinutes: Math.round(totalActiveMinutes),
       totalSessions: sessionIds.size,
-      totalCaptures: blocks.length, // one block per capture group
+      totalCaptures: blocks.length,
       workPercentage: Math.round(workPercentage * 10) / 10,
       meetingPercentage: Math.round(meetingPercentage * 10) / 10,
       appBreakdown,
@@ -427,24 +323,4 @@ async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db):
       updatedAt: new Date(),
     })
     .where(eq(schema.userDailyActivities.id, dailyActivityId));
-}
-
-/**
- * Normalize app name for comparison.
- */
-function normalizeApp(appName: string | null): string {
-  if (!appName) return "";
-  return appName
-    .toLowerCase()
-    .replace(/\.exe$/i, "")
-    .replace(/\.app$/i, "")
-    .trim();
-}
-
-/**
- * Map an app name to a category.
- */
-function categorizeApp(appName: string): string {
-  const normalized = normalizeApp(appName);
-  return APP_CATEGORY_MAP[normalized] || "other";
 }

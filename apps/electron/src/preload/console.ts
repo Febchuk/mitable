@@ -60,6 +60,8 @@ const IPC_CHANNELS = {
   NOTIFICATION_FREQUENCY_SET: "notification-frequency-set",
   AUTO_SESSION_START_GET: "auto-session-start-get",
   AUTO_SESSION_START_SET: "auto-session-start-set",
+  AUTO_RECAP_GET: "auto-recap-get",
+  AUTO_RECAP_SET: "auto-recap-set",
   PILL_DISPLAY_MODE_GET: "pill-display-mode-get",
   PILL_DISPLAY_MODE_SET: "pill-display-mode-set",
   // Summary preferences
@@ -86,6 +88,8 @@ const IPC_CHANNELS = {
   NOTIFICATION_SHOW: "notification-show",
   // PDF Export
   EXPORT_PDF: "export-pdf",
+  // Recap Notifications
+  SHOW_RECAP_NOTIFICATION: "show-recap-notification",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -300,6 +304,16 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION, handler);
   },
 
+  // Navigation - Navigate to recaps page (from recap-ready notification)
+  onNavigateToRecaps: (callback: () => void): (() => void) => {
+    const handler = () => {
+      logger.info(" Navigate to recaps received");
+      callback();
+    };
+    ipcRenderer.on("navigate-to-recaps", handler);
+    return () => ipcRenderer.removeListener("navigate-to-recaps", handler);
+  },
+
   // Navigation - Navigate to a specific session detail with optional flags
   onNavigateToSessionDetail: (
     callback: (payload: {
@@ -445,6 +459,13 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   setAutoSessionStart: (userId: string, enabled: boolean): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.AUTO_SESSION_START_SET, userId, enabled),
 
+  // Auto recap API (user-scoped)
+  getAutoRecap: (userId: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AUTO_RECAP_GET, userId),
+
+  setAutoRecap: (userId: string, enabled: boolean): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AUTO_RECAP_SET, userId, enabled),
+
   // Pill display mode API (user-scoped)
   getPillDisplayMode: (userId: string): Promise<"compact" | "expanded"> =>
     ipcRenderer.invoke(IPC_CHANNELS.PILL_DISPLAY_MODE_GET, userId),
@@ -542,6 +563,13 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     actions: Array<{ id: string; label: string; primary?: boolean }>;
     timeout?: number;
   }): Promise<{ success: boolean }> => ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_SHOW, config),
+
+  // Show recap-ready notification (simple click-to-navigate, no protocol URLs)
+  showRecapNotification: (config: {
+    title: string;
+    message: string;
+  }): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SHOW_RECAP_NOTIFICATION, config),
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

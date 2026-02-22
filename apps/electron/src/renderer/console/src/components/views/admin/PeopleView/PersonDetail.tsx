@@ -1,17 +1,32 @@
 import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, Zap, Calendar, X } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  Zap,
+  Calendar,
+  X,
+  Clock,
+  Briefcase,
+  Edit,
+  Check,
+  Clipboard,
+} from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useDashboardPersonDetail, useUserDrillDown } from "@/console/src/hooks/queries/admin";
+import {
+  useDashboardPersonDetail,
+  useUserDrillDown,
+  useCategoryActivities,
+} from "@/console/src/hooks/queries/admin";
 import type {
   DashboardPeriod,
   DashboardPersonDetail as PersonDetailData,
 } from "@/console/src/services/adminService";
 import DrillDownPanel from "../DashboardView/DrillDownPanel";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
 import { DocEditor } from "@/console/src/components/editor";
 import { useDocument } from "@/console/src/hooks/queries/documents";
+import { updateSessionSummary, reviseSummary } from "@/console/src/services/monitoringService";
+import AIEditPanel from "@/console/src/components/shared/AIEditPanel";
 import { Badge } from "@/components/ui/badge";
 import { getLocale } from "@/console/src/lib/date";
 
@@ -75,9 +90,24 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
 
   // For multi-day periods, show per-day averages; for single-day, show totals
   const divisor = isSingleDay ? 1 : days;
-  const workHours = Math.round((s.totalWorkMinutes / 60 / divisor) * 10) / 10;
-  const meetingHours = Math.round((s.totalMeetingMinutes / 60 / divisor) * 10) / 10;
-  const activeHours = Math.round((s.totalActiveMinutes / 60 / divisor) * 10) / 10;
+
+  // If dailyActivities time totals are all 0 but sessions exist, compute from session durations
+  let effectiveWorkMin = s.totalWorkMinutes;
+  let effectiveActiveMin = s.totalActiveMinutes;
+  const effectiveMeetingMin = s.totalMeetingMinutes;
+
+  if (effectiveWorkMin === 0 && effectiveActiveMin === 0 && api.sessionActivities?.length > 0) {
+    const totalSessionMin = api.sessionActivities.reduce(
+      (sum, sess) => sum + (sess.durationMinutes || 0),
+      0
+    );
+    effectiveWorkMin = totalSessionMin;
+    effectiveActiveMin = totalSessionMin;
+  }
+
+  const workHours = Math.round((effectiveWorkMin / 60 / divisor) * 10) / 10;
+  const meetingHours = Math.round((effectiveMeetingMin / 60 / divisor) * 10) / 10;
+  const activeHours = Math.round((effectiveActiveMin / 60 / divisor) * 10) / 10;
 
   const periodLabel = {
     yesterday: "yesterday",
@@ -86,35 +116,40 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     ytd: "year to date",
     all: "all time",
   }[range];
+  const effectiveWorkPct =
+    effectiveActiveMin > 0 ? Math.round((effectiveWorkMin / effectiveActiveMin) * 100) : 0;
+  const effectiveMeetingPct =
+    effectiveActiveMin > 0 ? Math.round((effectiveMeetingMin / effectiveActiveMin) * 100) : 0;
+
   const moodLabel =
-    s.meetingPercentage > 50
+    effectiveMeetingPct > 50
       ? "Meeting-heavy"
-      : s.workPercentage > 70
+      : effectiveWorkPct > 70
         ? "Focused"
         : "Collaborative";
   const moodColor =
-    s.meetingPercentage > 50
+    effectiveMeetingPct > 50
       ? "bg-yellow-500/15 text-yellow-400"
-      : s.workPercentage > 70
+      : effectiveWorkPct > 70
         ? "bg-emerald/15 text-emerald"
         : "bg-indigo/15 text-indigo-light";
 
-  // Aggregate activity breakdown from session-level classifications
+  // Aggregate activity breakdown from period-filtered dailyActivities (respects time filter)
   const categoryMinutes = new Map<string, number>();
-  if (api.sessionActivities && api.sessionActivities.length > 0) {
+  for (const day of api.dailyActivities) {
+    for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
+      categoryMinutes.set(c.category, (categoryMinutes.get(c.category) || 0) + c.minutes);
+    }
+  }
+
+  // Fall back to session-level classifications when dailyActivities have no meaningful category data
+  const totalCategoryMinutes = [...categoryMinutes.values()].reduce((s, v) => s + v, 0);
+  if (totalCategoryMinutes === 0 && api.sessionActivities && api.sessionActivities.length > 0) {
+    categoryMinutes.clear();
     for (const session of api.sessionActivities) {
       for (const act of session.activities || []) {
         const cat = act.category || "Other";
         categoryMinutes.set(cat, (categoryMinutes.get(cat) || 0) + (act.minutes || 0));
-      }
-    }
-  }
-
-  // Fall back to dailyActivities category breakdown if no session data
-  if (categoryMinutes.size === 0) {
-    for (const day of api.dailyActivities) {
-      for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
-        categoryMinutes.set(c.category, (categoryMinutes.get(c.category) || 0) + c.minutes);
       }
     }
   }
@@ -135,14 +170,43 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     );
   }
 
-  const trend: PersonViewModel["weeklyTrend"] = api.dailyActivities
-    .map((d) => ({
-      day: d.date,
-      focus: Math.round((d.totalWorkMinutes / 60) * 10) / 10,
-      meetings: Math.round((d.totalMeetingMinutes / 60) * 10) / 10,
+  // Build trend — fall back to session durations when dailyActivities time fields are 0
+  const dailyTotalsAreZero = api.dailyActivities.every(
+    (d) => d.totalWorkMinutes === 0 && d.totalMeetingMinutes === 0
+  );
+  let trend: PersonViewModel["weeklyTrend"];
+
+  if (dailyTotalsAreZero && api.sessionActivities?.length > 0) {
+    // Group session minutes by date
+    const sessionMinByDate = new Map<string, number>();
+    for (const sess of api.sessionActivities) {
+      const dateKey = new Date(sess.startedAt).toISOString().split("T")[0]!;
+      sessionMinByDate.set(
+        dateKey,
+        (sessionMinByDate.get(dateKey) || 0) + (sess.durationMinutes || 0)
+      );
+    }
+    // Merge with dailyActivities dates (to keep the date range correct)
+    const allDates = new Set([
+      ...api.dailyActivities.map((d) => d.date),
+      ...sessionMinByDate.keys(),
+    ]);
+    trend = [...allDates].sort().map((date) => ({
+      day: date,
+      focus: Math.round(((sessionMinByDate.get(date) || 0) / 60) * 10) / 10,
+      meetings: 0,
       other: 0,
-    }))
-    .reverse();
+    }));
+  } else {
+    trend = api.dailyActivities
+      .map((d) => ({
+        day: d.date,
+        focus: Math.round((d.totalWorkMinutes / 60) * 10) / 10,
+        meetings: Math.round((d.totalMeetingMinutes / 60) * 10) / 10,
+        other: 0,
+      }))
+      .reverse();
+  }
 
   // Build recent work items from session summaries + user docs
   const recentWork: RecentWorkItem[] = [];
@@ -220,23 +284,23 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     return db - da;
   });
 
-  // Aggregate top topics from session activity names
+  // Aggregate top topics from period-filtered dailyActivities (respects time filter)
   const topicCounts = new Map<string, number>();
-  if (api.sessionActivities && api.sessionActivities.length > 0) {
+  for (const day of api.dailyActivities) {
+    for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
+      const label = c.category.charAt(0).toUpperCase() + c.category.slice(1);
+      topicCounts.set(label, (topicCounts.get(label) || 0) + Math.round(c.minutes / 30));
+    }
+  }
+
+  // Fall back to session-level classifications when dailyActivities have no meaningful topic data
+  const totalTopicCounts = [...topicCounts.values()].reduce((s, v) => s + v, 0);
+  if (totalTopicCounts === 0 && api.sessionActivities && api.sessionActivities.length > 0) {
+    topicCounts.clear();
     for (const session of api.sessionActivities) {
       for (const act of session.activities || []) {
         const label = act.category || "Other";
         topicCounts.set(label, (topicCounts.get(label) || 0) + 1);
-      }
-    }
-  }
-
-  // Fall back to dailyActivities
-  if (topicCounts.size === 0) {
-    for (const day of api.dailyActivities) {
-      for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
-        const label = c.category.charAt(0).toUpperCase() + c.category.slice(1);
-        topicCounts.set(label, (topicCounts.get(label) || 0) + Math.round(c.minutes / 30));
       }
     }
   }
@@ -312,19 +376,17 @@ const timeRangeLabels: Record<TimeRange, string> = {
   all: "All Time",
 };
 
-function renderMarkdownContent(content: string): string {
-  const raw = marked.parse(content);
-  return DOMPurify.sanitize(typeof raw === "string" ? raw : "");
-}
-
 export default function PersonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [timeRange, setTimeRange] = useState<TimeRange>("yesterday");
+  const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [drillDownMetric, setDrillDownMetric] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedWork, setSelectedWork] = useState<RecentWorkItem | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [workFilter, setWorkFilter] = useState<"all" | "session" | "doc">("all");
+  const [isEditingSummary, setIsEditingSummary] = useState(false);
+  const [copiedSummary, setCopiedSummary] = useState(false);
 
   const { data: apiDetail } = useDashboardPersonDetail(id || "", timeRangeToPeriod[timeRange]);
   const { data: drillDownData } = useUserDrillDown(
@@ -332,14 +394,29 @@ export default function PersonDetail() {
     drillDownMetric,
     timeRangeToPeriod[timeRange]
   );
+  const { data: categoryData } = useCategoryActivities(
+    id || "",
+    selectedCategory,
+    timeRangeToPeriod[timeRange]
+  );
   const { data: docData, isLoading: docLoading } = useDocument(selectedDocId || "");
 
   const handleDrillDown = (label: string) => {
     const metricKey = LABEL_TO_METRIC[label] || label.toLowerCase();
-    setDrillDownMetric(metricKey);
+    // If it's a known metric card, use org-style drill-down; otherwise it's a category
+    if (LABEL_TO_METRIC[label]) {
+      setSelectedCategory(null);
+      setDrillDownMetric(metricKey);
+    } else {
+      setDrillDownMetric(null);
+      setSelectedCategory(metricKey);
+    }
   };
 
-  const closeDrillDown = () => setDrillDownMetric(null);
+  const closeDrillDown = () => {
+    setDrillDownMetric(null);
+    setSelectedCategory(null);
+  };
 
   const person = useMemo(() => {
     if (apiDetail) {
@@ -471,6 +548,130 @@ export default function PersonDetail() {
               />
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Full-page session summary view — AI Edit mode (reuses AIEditPanel)
+  if (selectedWork && selectedWork.type === "session" && isEditingSummary) {
+    return (
+      <AIEditPanel
+        title="Edit Summary"
+        subtitle={selectedWork.title}
+        initialContent={selectedWork.fullContent}
+        onSave={async (content: string) => {
+          await updateSessionSummary(selectedWork.id, content);
+          setSelectedWork({ ...selectedWork, fullContent: content });
+          setIsEditingSummary(false);
+        }}
+        onAutoSave={async (content: string) => {
+          await updateSessionSummary(selectedWork.id, content);
+        }}
+        onCancel={() => setIsEditingSummary(false)}
+        onRevise={async (instruction: string, currentContent: string) => {
+          return reviseSummary(selectedWork.id, instruction, currentContent);
+        }}
+        placeholder="Edit the session summary..."
+        contextLabel="session summary"
+        sessionId={selectedWork.id}
+      />
+    );
+  }
+
+  // Full-page session summary view — read mode (like doc viewer)
+  if (selectedWork && selectedWork.type === "session") {
+    const handleCopySummary = async () => {
+      await navigator.clipboard.writeText(selectedWork.fullContent);
+      setCopiedSummary(true);
+      setTimeout(() => setCopiedSummary(false), 2000);
+    };
+
+    return (
+      <div className="h-screen flex flex-col">
+        {/* Session header */}
+        <div className="flex items-start justify-between p-6 border-b border-border-subtle">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                setSelectedWork(null);
+                setIsEditingSummary(false);
+              }}
+              className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald/10 flex items-center justify-center">
+                <Zap size={20} className="text-emerald" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-text-primary">{selectedWork.title}</h2>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="text-text-secondary text-sm">
+                    {selectedWork.date}, {selectedWork.time}
+                  </span>
+                  {selectedWork.durationMinutes != null && selectedWork.durationMinutes > 0 && (
+                    <span className="text-text-secondary text-sm">
+                      · {truncateDuration(selectedWork.durationMinutes)}
+                    </span>
+                  )}
+                  {selectedWork.category && (
+                    <Badge className="bg-canvas-overlay text-text-secondary text-[10px]">
+                      {selectedWork.category}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary content */}
+        <div className="flex-1 overflow-auto bg-background-primary">
+          <div className="max-w-3xl mx-auto px-8 py-6">
+            {/* Summary heading + actions */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-text-primary">Summary</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopySummary}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-canvas-overlay border border-stroke-subtle transition-colors"
+                >
+                  {copiedSummary ? (
+                    <>
+                      <Check size={14} className="text-emerald" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Clipboard size={14} />
+                      Copy
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setIsEditingSummary(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-canvas-overlay border border-stroke-subtle transition-colors"
+                >
+                  <Edit size={14} />
+                  Edit
+                </button>
+              </div>
+            </div>
+
+            {/* Summary body — rich text rendering */}
+            <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-5">
+              <DocEditor
+                key={selectedWork.id}
+                initialContent={selectedWork.fullContent}
+                readOnly
+                showToolbar={false}
+                placeholder=""
+                className="h-full"
+              />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -802,74 +1003,116 @@ export default function PersonDetail() {
         </div>
       </div>
 
-      {/* Drill-down overlay panel */}
+      {/* Metric drill-down overlay (org-style — for metric cards) */}
       {drillDownMetric && drillDownData && (
         <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
           <DrillDownPanel data={drillDownData} onClose={closeDrillDown} />
         </div>
       )}
 
-      {/* Summary detail modal */}
-      {selectedWork && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setSelectedWork(null)}
-          />
-          <div className="relative w-full max-w-2xl max-h-[80vh] bg-canvas-raised border border-stroke-subtle rounded-2xl shadow-2xl flex flex-col">
-            {/* Modal header */}
-            <div className="flex items-start justify-between p-5 border-b border-stroke-subtle">
-              <div className="flex items-start gap-3 min-w-0">
-                <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                    selectedWork.type === "doc"
-                      ? "text-indigo-light bg-indigo/15"
-                      : "text-emerald bg-emerald/15"
-                  }`}
+      {/* Category activity list panel (per-user — for activity breakdown) */}
+      {selectedCategory && (
+        <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
+          <div className="flex flex-col h-full rounded-xl border border-stroke-subtle bg-canvas-raised overflow-hidden">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-stroke-subtle shrink-0">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={closeDrillDown}
+                  className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
                 >
-                  {selectedWork.type === "doc" ? <FileText size={16} /> : <Zap size={16} />}
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-base font-semibold text-text-primary truncate">
-                    {selectedWork.title}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-text-tertiary">
-                      {selectedWork.date}, {selectedWork.time}
-                    </span>
-                    {selectedWork.category && (
-                      <span className="text-[10px] font-medium text-text-tertiary bg-canvas-overlay px-1.5 py-0.5 rounded">
-                        {selectedWork.category}
-                      </span>
-                    )}
-                    {selectedWork.docType && (
-                      <span className="text-[10px] font-medium text-indigo-light bg-indigo/10 px-1.5 py-0.5 rounded">
-                        {selectedWork.docType}
-                      </span>
-                    )}
-                    {selectedWork.durationMinutes != null && selectedWork.durationMinutes > 0 && (
-                      <span className="text-[10px] text-text-tertiary">
-                        {truncateDuration(selectedWork.durationMinutes)}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                  <ArrowLeft size={14} />
+                  Back
+                </button>
+                <button
+                  onClick={closeDrillDown}
+                  className="p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <button
-                onClick={() => setSelectedWork(null)}
-                className="p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
-              >
-                <X size={18} />
-              </button>
+              <h2 className="text-lg font-semibold text-text-primary mt-2 capitalize">
+                {selectedCategory}
+              </h2>
+              <p className="text-xs text-text-secondary mt-0.5">
+                {categoryData
+                  ? `${categoryData.totalHours}h across ${categoryData.activityCount} activities · ${timeRangeLabels[timeRange]}`
+                  : "Loading..."}
+              </p>
             </div>
-            {/* Modal content — rendered markdown */}
-            <div className="flex-1 overflow-y-auto p-5">
-              <div
-                className="prose prose-invert prose-sm max-w-none text-text-primary prose-headings:text-text-primary prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-primary prose-a:text-indigo-light"
-                dangerouslySetInnerHTML={{
-                  __html: renderMarkdownContent(selectedWork.fullContent),
-                }}
-              />
+
+            {/* Activity list */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {!categoryData ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : categoryData.activities.length === 0 ? (
+                <p className="text-sm text-text-tertiary text-center py-12">
+                  No activities in this category for the selected period.
+                </p>
+              ) : (
+                categoryData.activities.map((act) => {
+                  const date = new Date(act.startTime);
+                  const dateStr = date.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  });
+                  const timeStr = date.toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                  });
+                  const hours = Math.floor(act.durationMinutes / 60);
+                  const mins = act.durationMinutes % 60;
+                  const duration =
+                    hours > 0 ? `${hours}h ${mins > 0 ? `${mins}m` : ""}` : `${mins}m`;
+
+                  return (
+                    <div
+                      key={act.id}
+                      className="rounded-lg border border-stroke-subtle bg-canvas-overlay/50 p-3 hover:border-indigo/30 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                              act.blockType === "meeting"
+                                ? "text-yellow-400 bg-yellow-500/15"
+                                : "text-indigo-light bg-indigo/15"
+                            }`}
+                          >
+                            {act.blockType === "meeting" ? (
+                              <Calendar size={14} />
+                            ) : (
+                              <Briefcase size={14} />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-medium text-text-primary leading-snug">
+                              {act.name}
+                            </p>
+                            {act.description && act.description !== act.name && (
+                              <p className="text-xs text-text-secondary mt-0.5 line-clamp-2 leading-relaxed">
+                                {act.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-xs font-medium text-text-secondary whitespace-nowrap shrink-0">
+                          {duration}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2 ml-[38px]">
+                        <span className="text-[10px] text-text-tertiary flex items-center gap-1">
+                          <Clock size={10} />
+                          {dateStr}, {timeStr}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

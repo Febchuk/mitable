@@ -24,7 +24,7 @@ import { Plate, usePlateEditor } from "platejs/react";
 
 import { Editor, EditorContainer } from "@/components/ui/editor";
 
-import { DocEditorKit } from "./doc-editor-kit";
+import { DocEditorKit, DocEditorKitNoToolbar } from "./doc-editor-kit";
 import { createEmptyDocument, markdownToPlate, plateToMarkdown } from "./markdown-utils";
 
 // Error boundary component
@@ -90,6 +90,8 @@ export interface DocEditorProps {
   variant?: "default" | "demo" | "fullWidth";
   /** Custom class name */
   className?: string;
+  /** Show toolbar (default: true). Set false for clean read-only rendering. */
+  showToolbar?: boolean;
 }
 
 export function DocEditor({
@@ -102,6 +104,7 @@ export function DocEditor({
   autosaveDelay = 2000,
   variant = "default",
   className,
+  showToolbar = true,
 }: DocEditorProps) {
   const autosaveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedContentRef = React.useRef<string>(initialContent);
@@ -113,7 +116,7 @@ export function DocEditor({
   }, []);
 
   const editor = usePlateEditor({
-    plugins: DocEditorKit,
+    plugins: showToolbar ? DocEditorKit : DocEditorKitNoToolbar,
     value: initialValue,
   });
 

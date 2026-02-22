@@ -16,18 +16,15 @@ if (config.anthropic.apiKey) {
   anthropicClient = new Anthropic({ apiKey: config.anthropic.apiKey });
 }
 
-// DeepSeek R1 fallback client (OpenAI-compatible)
-let deepseekClient: OpenAI | null = null;
-if (config.deepseek.apiKey) {
-  deepseekClient = new OpenAI({
-    apiKey: config.deepseek.apiKey,
-    baseURL: "https://api.deepseek.com",
-  });
+// OpenAI GPT-5 fallback client
+let openaiClient: OpenAI | null = null;
+if (config.openai.apiKey) {
+  openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
 }
 
 /**
  * Call Claude Sonnet 4.5 with extended thinking for high-quality summarization.
- * Falls back to DeepSeek R1 (reasoning model) if Anthropic fails.
+ * Falls back to OpenAI GPT-5 if Anthropic fails.
  */
 async function callSummarizationLLM(
   systemPrompt: string,
@@ -77,7 +74,7 @@ async function callSummarizationLLM(
           continue;
         }
         console.warn(
-          "[storyteller-tools] Claude sub-call failed — falling back to DeepSeek R1 for this call:",
+          "[storyteller-tools] Claude sub-call failed — falling back to GPT-5 for this call:",
           errStr
         );
         break;
@@ -85,19 +82,19 @@ async function callSummarizationLLM(
     }
   }
 
-  // DeepSeek R1 fallback (reasoning model with built-in chain-of-thought)
-  if (!deepseekClient) {
+  // OpenAI GPT-5 fallback
+  if (!openaiClient) {
     throw new Error(
-      "No LLM available for summarization — both ANTHROPIC_API_KEY and DEEPSEEK_API_KEY are missing"
+      "No LLM available for summarization — both ANTHROPIC_API_KEY and OPENAI_API_KEY are missing"
     );
   }
 
-  const completion = await deepseekClient.chat.completions.create({
+  const completion = await openaiClient.chat.completions.create({
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    model: "deepseek-reasoner",
+    model: "gpt-5",
     max_tokens: maxOutputTokens,
   });
   return completion.choices[0]?.message?.content || "Failed to generate summary";
