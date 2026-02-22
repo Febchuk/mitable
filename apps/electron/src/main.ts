@@ -1395,7 +1395,7 @@ function setupNotificationHandlers() {
 
   // Recap-ready notification — uses simple Electron Notification (no protocol URLs)
   ipcMain.handle(
-    "show-recap-notification",
+    IPC_CHANNELS.SHOW_RECAP_NOTIFICATION,
     async (_, config: { title: string; message: string }) => {
       const notification = new Notification({
         title: config.title,

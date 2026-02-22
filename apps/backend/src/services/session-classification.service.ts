@@ -22,8 +22,10 @@ import { createLogger } from "../lib/logger";
 
 const logger = createLogger({ context: "session-classification" });
 
-const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
-const openai = new OpenAI({ apiKey: config.openai.apiKey });
+const anthropic = config.anthropic.apiKey
+  ? new Anthropic({ apiKey: config.anthropic.apiKey })
+  : null;
+const openai = config.openai.apiKey ? new OpenAI({ apiKey: config.openai.apiKey }) : null;
 
 export interface ClassifiedActivity {
   activity: string;
@@ -197,12 +199,17 @@ ${lines.join("\n")}${transcriptContext}`;
 function parseActivitiesJson(text: string): ClassifiedActivity[] | null {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
-  const parsed = JSON.parse(jsonMatch[0]) as { activities?: ClassifiedActivity[] };
-  if (!Array.isArray(parsed.activities) || parsed.activities.length === 0) return null;
-  return parsed.activities;
+  try {
+    const parsed = JSON.parse(jsonMatch[0]) as { activities?: ClassifiedActivity[] };
+    if (!Array.isArray(parsed.activities) || parsed.activities.length === 0) return null;
+    return parsed.activities;
+  } catch {
+    return null;
+  }
 }
 
 async function tryClassifyClaude(prompt: string): Promise<ClassifiedActivity[] | null> {
+  if (!anthropic) return null;
   try {
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -219,6 +226,7 @@ async function tryClassifyClaude(prompt: string): Promise<ClassifiedActivity[] |
 }
 
 async function tryClassifyOpenAI(prompt: string): Promise<ClassifiedActivity[] | null> {
+  if (!openai) return null;
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4.1",

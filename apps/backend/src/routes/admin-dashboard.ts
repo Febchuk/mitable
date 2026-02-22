@@ -10,7 +10,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, and, desc, asc, gte, lte, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, inArray, isNotNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { createLogger } from "../lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
@@ -551,7 +551,11 @@ router.get("/dashboard/people", requireAuth, async (req: Request, res: Response)
       .where(eq(schema.users.organizationId, admin.organizationId))
       .orderBy(asc(schema.users.firstName));
 
-    // Step 2a: Fetch ALL daily activities for this org (no date filter)
+    // Step 2a: Fetch daily activities for this org (last 90 days)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const activitiesCutoff = ninetyDaysAgo.toISOString().slice(0, 10);
+
     const activities = await db
       .select({
         userId: schema.userDailyActivities.userId,
@@ -566,7 +570,8 @@ router.get("/dashboard/people", requireAuth, async (req: Request, res: Response)
       .where(
         and(
           eq(schema.userDailyActivities.organizationId, admin.organizationId),
-          eq(schema.userDailyActivities.periodType, "daily")
+          eq(schema.userDailyActivities.periodType, "daily"),
+          gte(schema.userDailyActivities.activityDate, activitiesCutoff)
         )
       )
       .orderBy(desc(schema.userDailyActivities.activityDate));
@@ -1474,8 +1479,8 @@ router.get(
       // Build date conditions
       const conditions = [eq(schema.activityBlocks.userId, targetUserId)];
 
-      // Filter by category (case-insensitive match)
-      // activity_blocks.category is stored lowercase from the materializer
+      // Filter by category in SQL (case-insensitive)
+      conditions.push(sql`LOWER(COALESCE(${schema.activityBlocks.category}, 'other')) = ${category}`);
 
       if (period !== "all") {
         const { startDate, endDate } = resolveDateRange(period);
@@ -1500,18 +1505,15 @@ router.get(
         .where(and(...conditions))
         .orderBy(desc(schema.activityBlocks.startTime));
 
-      // Filter by category in JS (more flexible than SQL for case matching)
-      const filtered = blocks.filter((b) => (b.category || "other").toLowerCase() === category);
-
-      const totalMinutes = filtered.reduce((s, b) => s + b.durationMinutes, 0);
+      const totalMinutes = blocks.reduce((s, b) => s + b.durationMinutes, 0);
 
       res.json({
         category,
         period,
         totalMinutes,
         totalHours: Math.round((totalMinutes / 60) * 10) / 10,
-        activityCount: filtered.length,
-        activities: filtered.map((b) => ({
+        activityCount: blocks.length,
+        activities: blocks.map((b) => ({
           id: b.id,
           name: b.name,
           description: b.description,

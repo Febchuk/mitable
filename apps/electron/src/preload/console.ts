@@ -88,6 +88,8 @@ const IPC_CHANNELS = {
   NOTIFICATION_SHOW: "notification-show",
   // PDF Export
   EXPORT_PDF: "export-pdf",
+  // Recap Notifications
+  SHOW_RECAP_NOTIFICATION: "show-recap-notification",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -566,7 +568,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   showRecapNotification: (config: {
     title: string;
     message: string;
-  }): Promise<{ success: boolean }> => ipcRenderer.invoke("show-recap-notification", config),
+  }): Promise<{ success: boolean }> => ipcRenderer.invoke(IPC_CHANNELS.SHOW_RECAP_NOTIFICATION, config),
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

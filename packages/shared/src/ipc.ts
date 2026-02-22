@@ -120,6 +120,9 @@ export const IPC_CHANNELS = {
 
   // PDF Export
   EXPORT_PDF: "export-pdf", // Renderer → Main: generate PDF from HTML and save
+
+  // Recap Notifications
+  SHOW_RECAP_NOTIFICATION: "show-recap-notification", // Renderer → Main: trigger recap notification
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

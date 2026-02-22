@@ -949,7 +949,7 @@ router.post(
           // Skip if client explicitly disabled auto-recap (default: enabled)
           if (autoRecap === false) {
             log.info("Auto-recap disabled by user preference, skipping", { sessionId: id });
-          } else
+          } else {
             try {
               const [completedSession] = await db
                 .select({
@@ -1016,10 +1016,12 @@ router.post(
                   durationMinutes: activeMinutes,
                 };
 
-                // Check for an existing recap created today (local calendar day)
-                const todayStart = new Date();
+                // Check for an existing recap on the session's calendar day
+                // Use session start date (not server time) to group by the user's actual work day
+                const sessionDay = new Date(completedSession.startedAt);
+                const todayStart = new Date(sessionDay);
                 todayStart.setHours(0, 0, 0, 0);
-                const todayEnd = new Date();
+                const todayEnd = new Date(sessionDay);
                 todayEnd.setHours(23, 59, 59, 999);
 
                 const [existingRecap] = await db
@@ -1069,7 +1071,7 @@ router.post(
                     );
 
                     // Multi-block title: "Daily Recap — Mon DD"
-                    const dateLabel = new Date().toLocaleDateString("en-US", {
+                    const dateLabel = sessionDay.toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                     });
@@ -1129,6 +1131,7 @@ router.post(
                 error: recapError instanceof Error ? recapError.message : String(recapError),
               });
             }
+          }
 
           // Run ingestion in parallel with classify → materialize chain
           Promise.all([
@@ -1176,6 +1179,79 @@ router.post(
             .update(schema.monitoringSessions)
             .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
+
+          // Still attempt recap using rawActivitySummary when story generation failed
+          if (autoRecap !== false) {
+            try {
+              const [fallbackSession] = await db
+                .select({
+                  name: schema.monitoringSessions.name,
+                  rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+                  sessionGoal: schema.monitoringSessions.sessionGoal,
+                  startedAt: schema.monitoringSessions.startedAt,
+                  endedAt: schema.monitoringSessions.endedAt,
+                  totalPausedMs: schema.monitoringSessions.totalPausedMs,
+                })
+                .from(schema.monitoringSessions)
+                .where(eq(schema.monitoringSessions.id, id))
+                .limit(1);
+
+              if (fallbackSession?.rawActivitySummary) {
+                const sessionStart = new Date(fallbackSession.startedAt);
+                const endMs = fallbackSession.endedAt
+                  ? new Date(fallbackSession.endedAt).getTime()
+                  : Date.now();
+                const activeMinutes = Math.round(
+                  Math.max(0, endMs - sessionStart.getTime() - (fallbackSession.totalPausedMs || 0)) /
+                    60000
+                );
+
+                const recapContent = await sessionSummarizationService.generateRecap(
+                  [
+                    {
+                      sessionId: id,
+                      summary: fallbackSession.rawActivitySummary,
+                      goal: fallbackSession.sessionGoal,
+                      durationMinutes: activeMinutes,
+                      startTime: sessionStart.toLocaleString(),
+                    },
+                  ],
+                  "professional",
+                  "standard",
+                  userId
+                );
+
+                const recapTitle = fallbackSession.name || "Work session recap";
+                await db.insert(schema.recaps).values({
+                  userId,
+                  organizationId: session.organizationId,
+                  title: recapTitle,
+                  content: recapContent,
+                  blocks: [
+                    {
+                      id,
+                      startTime: sessionStart.toISOString(),
+                      endTime: (fallbackSession.endedAt ? new Date(fallbackSession.endedAt) : new Date()).toISOString(),
+                      duration: activeMinutes,
+                      summary: fallbackSession.rawActivitySummary,
+                      goal: fallbackSession.sessionGoal || undefined,
+                      sessionId: id,
+                      title: fallbackSession.name || "Work session",
+                      durationMinutes: activeMinutes,
+                    },
+                  ],
+                  totalDuration: activeMinutes,
+                  sessionId: id,
+                });
+                log.info("Auto-created fallback recap (story failed)", { sessionId: id });
+              }
+            } catch (recapError) {
+              log.error("Fallback recap creation failed (non-blocking)", {
+                sessionId: id,
+                error: recapError instanceof Error ? recapError.message : String(recapError),
+              });
+            }
+          }
 
           // Still run ingestion + classify → materialize even if storyteller failed
           Promise.all([
