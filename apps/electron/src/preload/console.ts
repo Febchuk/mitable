@@ -86,6 +86,10 @@ const IPC_CHANNELS = {
   AUTH_SESSION_RESTORED: "auth-session-restored",
   // Native notifications
   NOTIFICATION_SHOW: "notification-show",
+  // Passive monitoring
+  PASSIVE_MONITORING_SET_ENABLED: "passive-monitoring-set-enabled",
+  PASSIVE_MONITORING_GET_STATE: "passive-monitoring-get-state",
+  PASSIVE_MONITORING_STATE_UPDATE: "passive-monitoring-state-update",
   // PDF Export
   EXPORT_PDF: "export-pdf",
   // Recap Notifications
@@ -563,6 +567,34 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     actions: Array<{ id: string; label: string; primary?: boolean }>;
     timeout?: number;
   }): Promise<{ success: boolean }> => ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_SHOW, config),
+
+  // Passive monitoring
+  setPassiveMonitoringEnabled: (enabled: boolean): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PASSIVE_MONITORING_SET_ENABLED, enabled),
+
+  getPassiveMonitoringState: (): Promise<{
+    state: "disabled" | "detecting" | "deferred";
+    sessionId: string | null;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.PASSIVE_MONITORING_GET_STATE),
+
+  onPassiveMonitoringStateUpdate: (
+    callback: (state: {
+      state: "disabled" | "detecting" | "deferred";
+      sessionId: string | null;
+    }) => void
+  ): (() => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      state: {
+        state: "disabled" | "detecting" | "deferred";
+        sessionId: string | null;
+      }
+    ) => callback(state);
+    ipcRenderer.on(IPC_CHANNELS.PASSIVE_MONITORING_STATE_UPDATE, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.PASSIVE_MONITORING_STATE_UPDATE, handler);
+    };
+  },
 
   // Show recap-ready notification (simple click-to-navigate, no protocol URLs)
   showRecapNotification: (config: {

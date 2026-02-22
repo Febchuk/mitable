@@ -9,9 +9,9 @@ import {
   unique,
   vector,
 } from "drizzle-orm/pg-core";
-import { monitoringSessions } from "./monitoring.schema.js";
-import { organizations } from "./organizations.schema.js";
-import { users } from "./users.schema.js";
+import { monitoringSessions } from "./monitoring.schema";
+import { organizations } from "./organizations.schema";
+import { users } from "./users.schema";
 
 export const sessionChunks = pgTable(
   "session_chunks",
