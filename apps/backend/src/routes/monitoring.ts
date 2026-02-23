@@ -3,6 +3,7 @@ import { eq, sql, desc, and, inArray, isNull, isNotNull } from "drizzle-orm";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { requireAuth } from "../middleware/auth.js";
+import { config } from "../config.js";
 import {
   sessionDeliveryService,
   type MultiDeliveryTarget,
@@ -3368,6 +3369,180 @@ router.patch(
     }
   }
 );
+
+/**
+ * POST /api/monitoring/day-summary
+ * Generate a day summary from block summaries using Groq.
+ * Skips blocks that have no summary. Returns a cohesive narrative for the day.
+ */
+router.post("/day-summary", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { date, sessionIds }: { date?: string; sessionIds?: string[] } = req.body;
+
+  if (!date && (!sessionIds || sessionIds.length === 0)) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "Either date (YYYY-MM-DD) or sessionIds array is required",
+    });
+    return;
+  }
+
+  try {
+    // Fetch sessions for the given day or session IDs
+    let sessions;
+    if (sessionIds && sessionIds.length > 0) {
+      sessions = await db
+        .select({
+          id: schema.monitoringSessions.id,
+          name: schema.monitoringSessions.name,
+          finalSummary: schema.monitoringSessions.finalSummary,
+          rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+          sessionGoal: schema.monitoringSessions.sessionGoal,
+          startedAt: schema.monitoringSessions.startedAt,
+          endedAt: schema.monitoringSessions.endedAt,
+          totalPausedMs: schema.monitoringSessions.totalPausedMs,
+        })
+        .from(schema.monitoringSessions)
+        .where(
+          and(
+            inArray(schema.monitoringSessions.id, sessionIds),
+            eq(schema.monitoringSessions.userId, userId)
+          )
+        );
+    } else {
+      // Fetch by date range
+      const dayStart = new Date(date + "T00:00:00.000Z");
+      const dayEnd = new Date(date + "T23:59:59.999Z");
+      sessions = await db
+        .select({
+          id: schema.monitoringSessions.id,
+          name: schema.monitoringSessions.name,
+          finalSummary: schema.monitoringSessions.finalSummary,
+          rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+          sessionGoal: schema.monitoringSessions.sessionGoal,
+          startedAt: schema.monitoringSessions.startedAt,
+          endedAt: schema.monitoringSessions.endedAt,
+          totalPausedMs: schema.monitoringSessions.totalPausedMs,
+        })
+        .from(schema.monitoringSessions)
+        .where(
+          and(
+            eq(schema.monitoringSessions.userId, userId),
+            sql`${schema.monitoringSessions.startedAt} >= ${dayStart.toISOString()}`,
+            sql`${schema.monitoringSessions.startedAt} <= ${dayEnd.toISOString()}`
+          )
+        );
+    }
+
+    if (sessions.length === 0) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "No sessions found for the given date or IDs",
+      });
+      return;
+    }
+
+    // Build block summaries — skip blocks without a summary
+    const blockSummaries = sessions
+      .map((s) => {
+        const summary = s.finalSummary || s.rawActivitySummary;
+        if (!summary) return null;
+
+        const startTime = new Date(s.startedAt).getTime();
+        const endTime = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
+        const pausedMs = s.totalPausedMs || 0;
+        const activeMinutes = Math.round(Math.max(0, endTime - startTime - pausedMs) / 60000);
+
+        return {
+          name: s.name || "Work session",
+          goal: s.sessionGoal,
+          summary,
+          durationMinutes: activeMinutes,
+          startTime: new Date(s.startedAt).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }),
+        };
+      })
+      .filter(Boolean) as Array<{
+      name: string;
+      goal: string | null;
+      summary: string;
+      durationMinutes: number;
+      startTime: string;
+    }>;
+
+    if (blockSummaries.length === 0) {
+      res.json({
+        summary: null,
+        message: "No blocks have summaries yet",
+        skippedCount: sessions.length,
+      });
+      return;
+    }
+
+    // Build prompt
+    const blockList = blockSummaries
+      .map((b, i) => {
+        const parts = [`${i + 1}. ${b.name} (${b.durationMinutes}m, started ${b.startTime})`];
+        if (b.goal) parts.push(`   Goal: ${b.goal}`);
+        parts.push(`   Summary: ${b.summary}`);
+        return parts.join("\n");
+      })
+      .join("\n\n");
+
+    const totalMinutes = blockSummaries.reduce((sum, b) => sum + b.durationMinutes, 0);
+    const prompt = `Summarize the following work blocks into a single cohesive day summary.
+
+<blocks>
+${blockList}
+</blocks>
+
+<context>
+Total blocks: ${blockSummaries.length} (${sessions.length - blockSummaries.length} skipped — no summary)
+Total active time: ${totalMinutes} minutes
+</context>
+
+<instructions>
+- Write 2-4 sentences max
+- Write in third person ("The user worked on..." or use passive voice)
+- Focus on what was accomplished, not individual sessions
+- Combine related activities into themes
+- Do not use markdown formatting — plain text only
+- Be concise and factual
+</instructions>
+
+Write the day summary now:`;
+
+    // Groq-only call
+    const Groq = (await import("groq-sdk")).default;
+    const groq = new Groq({ apiKey: config.groq.apiKey });
+    const completion = await groq.chat.completions.create({
+      model: config.groq.chatModel || "openai/gpt-oss-120b",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 300,
+    });
+
+    const daySummary = completion.choices[0]?.message?.content?.trim() || null;
+
+    res.json({
+      summary: daySummary,
+      blockCount: blockSummaries.length,
+      skippedCount: sessions.length - blockSummaries.length,
+    });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error generating day summary"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to generate day summary",
+    });
+  }
+});
 
 /**
  * POST /api/monitoring/recaps/generate
