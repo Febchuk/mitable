@@ -35,7 +35,7 @@ export default function Sidebar() {
       className={`
         flex flex-col h-[calc(100%-16px)] my-2 ml-2 text-white
         transition-all duration-300 ease-in-out relative z-10
-        rounded-2xl glass border border-stroke-subtle
+        rounded-2xl glass border border-stroke-subtle overflow-visible
         ${open ? "w-64" : "w-16"}
       `}
     >
@@ -44,26 +44,29 @@ export default function Sidebar() {
         <Logo />
       </div>
 
-      {/* Main Navigation with stagger animation */}
-      <div className="overflow-y-auto py-4 px-2 flex-1">
+      {/* Main Navigation */}
+      <div className={`overflow-y-auto flex-1 ${open ? "py-4 px-2" : "py-6 px-1"}`}>
         <Nav />
       </div>
 
       {/* Profile Avatar with Dropdown */}
-      <div className="flex-shrink-0 px-2 pb-4 relative" ref={dropdownRef}>
+      <div className={`flex-shrink-0 pb-4 relative ${open ? "px-2" : "px-1"}`} ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="group flex items-center justify-start p-2 w-full rounded-xl hover:bg-canvas-muted/50 transition-all duration-normal"
+          className={`group flex items-center w-full rounded-xl hover:bg-canvas-muted/50 transition-all duration-normal ${
+            open ? "justify-start p-2" : "justify-center p-1.5"
+          }`}
           title="Profile"
         >
           {/* Circular Avatar with gradient ring on hover */}
           <div className="relative">
             <div
               className={`
-                w-10 h-10 rounded-full bg-indigo flex items-center justify-center
+                rounded-full bg-indigo flex items-center justify-center
                 text-white font-display font-semibold text-sm
                 transition-all duration-normal
                 group-hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]
+                ${open ? "w-10 h-10" : "w-9 h-9"}
               `}
             >
               {(() => {
@@ -90,7 +93,11 @@ export default function Sidebar() {
 
         {/* Dropdown Menu with glass effect */}
         {dropdownOpen && (
-          <div className="absolute bottom-full left-2 right-2 mb-2 glass border border-stroke rounded-xl shadow-2xl overflow-hidden animate-reveal-up">
+          <div
+            className={`absolute w-48 glass border border-stroke rounded-xl shadow-2xl overflow-hidden animate-reveal-up ${
+              open ? "bottom-full left-2 mb-2" : "bottom-0 left-full ml-2"
+            }`}
+          >
             <button
               onClick={() => {
                 navigate("/profile");

@@ -11,6 +11,29 @@ interface NavItemProps {
 export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
   const { open } = useSidebar();
 
+  if (!open) {
+    return (
+      <NavLink
+        to={to}
+        className={({ isActive }) =>
+          `group relative flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${
+            isActive ? "text-indigo" : "text-white/40 hover:text-white/80"
+          }`
+        }
+        title={label}
+      >
+        {({ isActive }) => (
+          <>
+            <Icon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+            {isActive && (
+              <span className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-indigo shadow-[0_0_6px_rgba(99,102,241,0.8)]" />
+            )}
+          </>
+        )}
+      </NavLink>
+    );
+  }
+
   return (
     <NavLink
       to={to}
@@ -25,12 +48,9 @@ export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
     >
       {({ isActive }) => (
         <>
-          {/* Glow indicator for active state */}
           {isActive && (
             <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-indigo rounded-r shadow-[0_0_12px_rgba(99,102,241,0.6)]" />
           )}
-
-          {/* Icon with tilt effect on hover */}
           <span
             className={`flex items-center justify-center w-8 h-8 rounded-md transition-all duration-fast ${
               isActive
@@ -40,19 +60,15 @@ export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
           >
             <Icon className="w-[18px] h-[18px]" />
           </span>
-
-          {/* Label with letter-spacing animation */}
-          {open && (
-            <span
-              className={`text-sm font-medium tracking-tight transition-all duration-normal ${
-                isActive
-                  ? "text-ink-primary"
-                  : "text-ink-secondary group-hover:text-ink-primary group-hover:tracking-normal"
-              }`}
-            >
-              {label}
-            </span>
-          )}
+          <span
+            className={`text-sm font-medium tracking-tight transition-all duration-normal ${
+              isActive
+                ? "text-ink-primary"
+                : "text-ink-secondary group-hover:text-ink-primary group-hover:tracking-normal"
+            }`}
+          >
+            {label}
+          </span>
         </>
       )}
     </NavLink>
