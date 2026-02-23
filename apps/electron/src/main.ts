@@ -11,7 +11,6 @@ import {
   ipcMain,
   nativeTheme,
   Notification,
-  powerMonitor,
   screen,
   shell,
 } from "electron";
@@ -765,60 +764,10 @@ function stopNotificationTimer() {
   }
 }
 
-// Setup powerMonitor listeners for auto session start
-function setupPowerMonitor() {
-  const powerLogger = createLogger("PowerMonitor");
-
-  // Listen for system resume (wake from sleep or unlock)
-  powerMonitor.on("resume", async () => {
-    powerLogger.info(" System resumed (wake from sleep/unlock)");
-
-    // Check if auto session start is enabled for current user
-    if (!currentUserContext?.userId) {
-      powerLogger.info(" No user context, skipping auto session start");
-      return;
-    }
-
-    const autoSessionStartEnabled = preferencesService.getUserAutoSessionStart(
-      currentUserContext.userId
-    );
-    if (!autoSessionStartEnabled) {
-      powerLogger.info(" Auto session start disabled, skipping");
-      return;
-    }
-
-    // Check if there's already an active session
-    const sessionState = monitoringSessionService.getSessionState();
-    const isSessionActive = sessionState?.status === "active" || sessionState?.status === "paused";
-
-    if (isSessionActive) {
-      powerLogger.info(" Session already active, continuing existing session");
-      // If session was paused, resume it
-      if (sessionState?.status === "paused") {
-        await monitoringSessionService.resumeSession();
-      }
-      return;
-    }
-
-    // No active session - start a new one
-    powerLogger.info(" No active session, starting new session via auto-start");
-    try {
-      const result = await startSessionFromMain();
-      if (result.success) {
-        powerLogger.info(" Auto session started successfully:", result.sessionId);
-      } else {
-        powerLogger.warn(" Auto session start failed:", result.error);
-      }
-    } catch (error) {
-      powerLogger.error(" Error starting auto session:", error);
-    }
-  });
-
-  powerLogger.info(" PowerMonitor listeners registered");
-}
+// (Auto session start removed — passive monitoring handles session lifecycle)
 
 /**
- * Auto-enable passive monitoring if the user's preference allows it (default: true).
+ * Auto-enable passive monitoring if the user's preference allows it (default: false, opt-in).
  * Called after user context is established (login or session restore).
  */
 function autoEnablePassiveMonitoring(userId: string) {
@@ -1797,8 +1746,17 @@ function setupMonitoringSessionHandlers() {
       watchingPillWindow.hide();
     }
 
-    // Resume passive monitoring detection after manual session ends
-    passiveMonitorService.onManualSessionEnd();
+    // Only resume passive monitoring if user has it enabled
+    if (currentUserContext?.userId) {
+      const passiveEnabled = preferencesService.getUserPassiveMonitoringEnabled(
+        currentUserContext.userId
+      );
+      if (passiveEnabled) {
+        passiveMonitorService.onManualSessionEnd();
+      } else {
+        monitoringLogger.info(" Passive monitoring disabled, not resuming after manual end");
+      }
+    }
 
     return result;
   });
@@ -1893,7 +1851,17 @@ function setupMonitoringSessionHandlers() {
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESET, async () => {
     monitoringLogger.info(" Resetting session state");
     monitoringSessionService.resetSession();
-    passiveMonitorService.onManualSessionEnd();
+
+    // Only resume passive monitoring if user has it enabled
+    if (currentUserContext?.userId) {
+      const passiveEnabled = preferencesService.getUserPassiveMonitoringEnabled(
+        currentUserContext.userId
+      );
+      if (passiveEnabled) {
+        passiveMonitorService.onManualSessionEnd();
+      }
+    }
+
     return { success: true };
   });
 
@@ -2151,16 +2119,6 @@ function setupMonitoringSessionHandlers() {
       }
     }
 
-    return { success: true };
-  });
-
-  // Auto session start IPC handlers (user-scoped)
-  ipcMain.handle(IPC_CHANNELS.AUTO_SESSION_START_GET, (_, userId: string) => {
-    return preferencesService.getUserAutoSessionStart(userId);
-  });
-
-  ipcMain.handle(IPC_CHANNELS.AUTO_SESSION_START_SET, (_, userId: string, enabled: boolean) => {
-    preferencesService.setUserAutoSessionStart(userId, enabled);
     return { success: true };
   });
 
@@ -2806,9 +2764,6 @@ app.whenReady().then(async () => {
   } catch (error) {
     authLogger.error("Session restore failed on startup:", error);
   }
-
-  // Setup powerMonitor listeners for auto session start
-  setupPowerMonitor();
 
   // Start automatic update checks (every 4 hours)
   updateService.startPeriodicChecks(240);

@@ -157,9 +157,9 @@ export default function UserProfilePage() {
   const [notificationFrequency, setNotificationFrequency] = useState<number>(30);
   const [isNotificationFrequencyLoading, setIsNotificationFrequencyLoading] = useState(true);
 
-  // Auto session start state
-  const [autoSessionStart, setAutoSessionStart] = useState<boolean>(false);
-  const [isAutoSessionStartLoading, setIsAutoSessionStartLoading] = useState(true);
+  // Passive monitoring state
+  const [passiveMonitoring, setPassiveMonitoring] = useState<boolean>(false);
+  const [isPassiveMonitoringLoading, setIsPassiveMonitoringLoading] = useState(true);
 
   // Auto recap state
   const [autoRecap, setAutoRecap] = useState<boolean>(true);
@@ -385,49 +385,42 @@ export default function UserProfilePage() {
     }
   };
 
-  // Auto session start functions
-  const loadAutoSessionStart = useCallback(async () => {
-    if (!user?.id) return;
+  // Passive monitoring functions
+  const loadPassiveMonitoring = useCallback(async () => {
     try {
-      setIsAutoSessionStartLoading(true);
-      const enabled = await window.consoleAPI.getAutoSessionStart(user.id);
-      setAutoSessionStart(enabled);
+      setIsPassiveMonitoringLoading(true);
+      const state = await window.consoleAPI?.getPassiveMonitoringState?.();
+      setPassiveMonitoring(state?.state !== "disabled");
     } catch (error) {
-      logger.error("Error loading auto session start:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load auto session start preference.",
-        variant: "destructive",
-      });
+      logger.error("Error loading passive monitoring state:", error);
     } finally {
-      setIsAutoSessionStartLoading(false);
+      setIsPassiveMonitoringLoading(false);
     }
-  }, [user?.id, toast]);
+  }, []);
 
-  const handleAutoSessionStartChange = async (enabled: boolean) => {
-    if (!user?.id) return;
+  const handlePassiveMonitoringChange = async (enabled: boolean) => {
     try {
-      const result = await window.consoleAPI.setAutoSessionStart(user.id, enabled);
-      if (result.success) {
-        setAutoSessionStart(enabled);
+      const result = await window.consoleAPI?.setPassiveMonitoringEnabled?.(enabled);
+      if (result?.success) {
+        setPassiveMonitoring(enabled);
         toast({
           title: "Preference saved",
           description: enabled
-            ? "Sessions will automatically start when your computer wakes from sleep."
-            : "Auto session start disabled.",
+            ? "Sessions will automatically start when activity is detected."
+            : "Passive monitoring disabled.",
         });
       } else {
         toast({
           title: "Error",
-          description: "Failed to save auto session start preference.",
+          description: "Failed to save passive monitoring preference.",
           variant: "destructive",
         });
       }
     } catch (error) {
-      logger.error("Error setting auto session start:", error);
+      logger.error("Error setting passive monitoring:", error);
       toast({
         title: "Error",
-        description: "Failed to save auto session start preference.",
+        description: "Failed to save passive monitoring preference.",
         variant: "destructive",
       });
     }
@@ -853,7 +846,7 @@ export default function UserProfilePage() {
       loadBlockList();
       loadAllBlockableApps();
       loadNotificationFrequency();
-      loadAutoSessionStart();
+      loadPassiveMonitoring();
       loadAutoRecap();
       loadPillDisplayMode();
       loadSummaryPreferences();
@@ -863,7 +856,7 @@ export default function UserProfilePage() {
     loadBlockList,
     loadAllBlockableApps,
     loadNotificationFrequency,
-    loadAutoSessionStart,
+    loadPassiveMonitoring,
     loadAutoRecap,
     loadPillDisplayMode,
     loadSummaryPreferences,
@@ -1871,27 +1864,27 @@ export default function UserProfilePage() {
                     )}
                   </div>
 
-                  {/* Auto Session Start Toggle */}
+                  {/* Passive Monitoring Toggle */}
                   <div className="flex items-center justify-between pt-4 border-t border-border-subtle">
                     <div className="space-y-0.5 flex-1 pr-4">
                       <Label
-                        htmlFor="auto-session-start-toggle-profile"
+                        htmlFor="passive-monitoring-toggle"
                         className="text-sm font-medium text-text-primary cursor-pointer"
                       >
-                        Auto Session Start
+                        Passive Monitoring
                       </Label>
                       <p className="text-xs text-text-tertiary">
-                        Automatically start a new session when your computer wakes from sleep or
-                        unlocks. If a session was already running, it will continue instead.
+                        Automatically start sessions when sustained activity is detected and end
+                        them after inactivity. No need to manually start or stop blocks.
                       </p>
                     </div>
-                    {isAutoSessionStartLoading ? (
+                    {isPassiveMonitoringLoading ? (
                       <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
                     ) : (
                       <Switch
-                        id="auto-session-start-toggle-profile"
-                        checked={autoSessionStart}
-                        onCheckedChange={handleAutoSessionStartChange}
+                        id="passive-monitoring-toggle"
+                        checked={passiveMonitoring}
+                        onCheckedChange={handlePassiveMonitoringChange}
                         className="flex-shrink-0"
                       />
                     )}
@@ -2848,26 +2841,6 @@ export default function UserProfilePage() {
                       id="flag-experience"
                       checked={flags.newExperience}
                       onCheckedChange={(v) => setFlag("newExperience", v)}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label
-                        htmlFor="flag-passive-monitoring"
-                        className="text-sm font-medium text-text-primary"
-                      >
-                        Passive Monitoring
-                      </Label>
-                      <p className="text-xs text-text-tertiary mt-0.5">
-                        Automatically start sessions when activity is detected and end after
-                        inactivity
-                      </p>
-                    </div>
-                    <Switch
-                      id="flag-passive-monitoring"
-                      checked={flags.passiveMonitoring}
-                      onCheckedChange={(v) => setFlag("passiveMonitoring", v)}
                     />
                   </div>
                 </div>

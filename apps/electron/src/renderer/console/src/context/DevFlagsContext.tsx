@@ -9,7 +9,7 @@ const STORAGE_KEY = "mitable-dev-flags";
 
 const DEFAULT_FLAGS: DevFlags = {
   newExperience: true,
-  passiveMonitoring: true,
+  passiveMonitoring: false,
 };
 
 function loadFlags(): DevFlags {
