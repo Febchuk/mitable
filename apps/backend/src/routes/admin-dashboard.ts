@@ -818,7 +818,12 @@ router.get(
           updatedAt: schema.documents.updatedAt,
         })
         .from(schema.documents)
-        .where(eq(schema.documents.createdBy, targetUserId))
+        .where(
+          and(
+            eq(schema.documents.createdBy, targetUserId),
+            sql`${schema.documents.title} NOT LIKE 'Generating:%'`
+          )
+        )
         .orderBy(desc(schema.documents.createdAt))
         .limit(10);
 

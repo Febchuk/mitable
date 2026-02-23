@@ -77,6 +77,8 @@ class DocGenerationStreamService {
       artifactIds,
     } = params;
 
+    let documentId: string | null = null;
+
     try {
       // Phase 1: Create document record immediately (status='generating')
       yield {
@@ -99,7 +101,7 @@ class DocGenerationStreamService {
         })
         .returning();
 
-      const documentId = document.id;
+      documentId = document.id;
 
       // Phase 2: Search sessions using RAG
       yield {
@@ -491,6 +493,17 @@ class DocGenerationStreamService {
       } as any;
     } catch (error) {
       console.error("[DocGenerationStream] Error:", error);
+
+      // Clean up orphan document record if it was created but generation failed
+      if (documentId) {
+        try {
+          await db.delete(schema.documents).where(eq(schema.documents.id, documentId));
+          console.log(`[DocGenerationStream] Cleaned up orphan document ${documentId}`);
+        } catch (cleanupError) {
+          console.error("[DocGenerationStream] Failed to clean up orphan document:", cleanupError);
+        }
+      }
+
       yield {
         type: "error",
         error: error instanceof Error ? error.message : "Document generation failed",
