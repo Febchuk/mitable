@@ -2272,14 +2272,17 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
     const parsed = parseAskResponse(rawResponse);
 
     // Save assistant message (with report data if present)
-    await db.insert(schema.askMessages).values({
-      threadId: activeThreadId,
-      role: "assistant",
-      content: parsed.message,
-      reportTitle: parsed.report?.title || null,
-      reportSubtitle: parsed.report?.subtitle || null,
-      reportHtml: parsed.report?.html || null,
-    });
+    const [savedMsg] = await db
+      .insert(schema.askMessages)
+      .values({
+        threadId: activeThreadId,
+        role: "assistant",
+        content: parsed.message,
+        reportTitle: parsed.report?.title || null,
+        reportSubtitle: parsed.report?.subtitle || null,
+        reportHtml: parsed.report?.html || null,
+      })
+      .returning({ id: schema.askMessages.id });
 
     // Update thread timestamp
     await db
@@ -2287,7 +2290,7 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
       .set({ updatedAt: new Date() })
       .where(eq(schema.askThreads.id, activeThreadId));
 
-    res.json({ ...parsed, threadId: activeThreadId });
+    res.json({ ...parsed, threadId: activeThreadId, messageId: savedMsg.id });
   } catch (error) {
     logger.error({ error: String(error) }, "Error in ask chat");
     res.status(500).json({ error: "Internal Server Error", message: "Failed to process request" });
