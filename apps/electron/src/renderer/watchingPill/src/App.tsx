@@ -231,13 +231,14 @@ export default function App() {
         {/* Top: Mitable Logo with status indicator — always visible */}
         <button
           onClick={handleLogoClick}
-          className="relative w-6 h-6 flex items-center justify-center app-no-drag cursor-pointer"
+          className="relative w-6 h-6 flex items-center justify-center app-no-drag cursor-pointer group"
           aria-label="Open Mitable console"
+          title="Open Console"
         >
           <img
             src={LogoIcon}
             alt="Mitable"
-            className={`h-5 w-auto transition-opacity ${isPaused ? "opacity-40" : "opacity-100"}`}
+            className={`h-5 w-auto transition-all duration-150 group-hover:scale-110 group-hover:brightness-125 ${isPaused ? "opacity-40" : "opacity-100"}`}
           />
 
           {/* Recording indicator - red dot */}

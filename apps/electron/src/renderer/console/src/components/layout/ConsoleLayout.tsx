@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { SidebarProvider } from "../../context/SidebarContext";
 import Sidebar from "./Sidebar";
 import TitleBar from "./TitleBar";
+import UpdateBanner from "./UpdateBanner";
 import { createLogger } from "../../../../lib/logger";
 
 const logger = createLogger("ConsoleLayout");
@@ -37,6 +38,9 @@ export default function ConsoleLayout() {
       <div className={`flex flex-col h-screen overflow-hidden ${rootBackground} noise-overlay`}>
         {/* Custom Title Bar - Spans full width */}
         <TitleBar />
+
+        {/* In-app update banner */}
+        <UpdateBanner />
 
         <div className="flex-1 flex min-h-0 overflow-hidden relative">
           <Sidebar />

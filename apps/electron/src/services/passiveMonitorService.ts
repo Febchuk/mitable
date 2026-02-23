@@ -32,6 +32,7 @@ const STOP_IDLE_THRESHOLD_S = 300; // 5 minutes idle → end session
 interface PassiveMonitorCallbacks {
   startSession: () => Promise<{ success: boolean; sessionId?: string }>;
   endSession: (sessionId: string) => Promise<void>;
+  isAudioActive: () => boolean;
 }
 
 class PassiveMonitorService {
@@ -153,10 +154,15 @@ class PassiveMonitorService {
     // Check if an active passive session should end due to inactivity
     if (this.activePassiveSessionId) {
       if (idleTime >= STOP_IDLE_THRESHOLD_S) {
-        logger.info(
-          `Inactivity detected: idle ${idleTime}s >= ${STOP_IDLE_THRESHOLD_S}s threshold, ending passive session`
-        );
-        await this.endPassiveSession();
+        // Don't end session if mic is active (user may be in a meeting)
+        if (this.callbacks?.isAudioActive()) {
+          logger.info(`Idle ${idleTime}s but mic is active — keeping session alive`);
+        } else {
+          logger.info(
+            `Inactivity detected: idle ${idleTime}s >= ${STOP_IDLE_THRESHOLD_S}s threshold, ending passive session`
+          );
+          await this.endPassiveSession();
+        }
       }
     }
   }

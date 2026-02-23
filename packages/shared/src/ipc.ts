@@ -128,6 +128,9 @@ export const IPC_CHANNELS = {
 
   // Recap Notifications
   SHOW_RECAP_NOTIFICATION: "show-recap-notification", // Renderer → Main: trigger recap notification
+
+  // Update Navigation
+  NAVIGATE_TO_UPDATE: "navigate-to-update", // Main → Console: navigate to profile/update section
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
