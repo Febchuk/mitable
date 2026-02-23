@@ -35,7 +35,11 @@ import {
 import type { ActivityDay } from "./types";
 import { useCalendarDays, calendarKeys } from "../../../../hooks/queries/calendar";
 import { useStartSession } from "../../../../hooks/useStartSession";
-import { useSessions, monitoringKeys, useGenerateDaySummary } from "../../../../hooks/queries/monitoring";
+import {
+  useSessions,
+  monitoringKeys,
+  useGenerateDaySummary,
+} from "../../../../hooks/queries/monitoring";
 import { endSession, uploadCaptures } from "../../../../services/monitoringService";
 
 // Helper functions
@@ -532,7 +536,10 @@ export default function CalendarView() {
                         const dateKey = selectedDate.toISOString().split("T")[0];
                         const sessionIds = selectedDay.workBlocks.map((b) => b.id);
                         try {
-                          const result = await daySummaryMutation.mutateAsync({ date: dateKey, sessionIds });
+                          const result = await daySummaryMutation.mutateAsync({
+                            date: dateKey,
+                            sessionIds,
+                          });
                           if (result.summary) {
                             setDaySummaries((prev) => ({ ...prev, [dateKey]: result.summary! }));
                           }
@@ -543,9 +550,14 @@ export default function CalendarView() {
                       disabled={daySummaryMutation.isPending}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:border-indigo/30 hover:bg-indigo/5 text-ink-secondary hover:text-indigo transition-all disabled:opacity-40"
                     >
-                      {daySummaryMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                      {daySummaryMutation.isPending ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={16} />
+                      )}
                       <span className="text-sm font-medium">
-                        {(daySummaries[selectedDate.toISOString().split("T")[0]] || selectedDay.summary)
+                        {daySummaries[selectedDate.toISOString().split("T")[0]] ||
+                        selectedDay.summary
                           ? "Regenerate Summary"
                           : "Generate Summary"}
                       </span>
@@ -557,7 +569,8 @@ export default function CalendarView() {
                 <DaySummary
                   day={{
                     ...selectedDay,
-                    summary: daySummaries[selectedDate.toISOString().split("T")[0]] || selectedDay.summary,
+                    summary:
+                      daySummaries[selectedDate.toISOString().split("T")[0]] || selectedDay.summary,
                   }}
                 />
 

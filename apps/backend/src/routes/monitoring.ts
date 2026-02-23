@@ -1019,7 +1019,9 @@ router.post(
                 const activeMinutes = Math.round(
                   Math.max(
                     0,
-                    sessionEnd.getTime() - sessionStart.getTime() - (completedSession.totalPausedMs || 0)
+                    sessionEnd.getTime() -
+                      sessionStart.getTime() -
+                      (completedSession.totalPausedMs || 0)
                   ) / 60000
                 );
 
@@ -1072,10 +1074,7 @@ router.post(
 
                     // Generate recap from raw classifications for ALL blocks in this recap
                     const allSessionIds = allBlocks.map((b) => String(b.id || b.sessionId));
-                    const recapContent = await recapRLMService.generateRecap(
-                      allSessionIds,
-                      userId
-                    );
+                    const recapContent = await recapRLMService.generateRecap(allSessionIds, userId);
 
                     // Multi-block title: "Daily Recap — Mon DD"
                     const dateLabel = sessionDay.toLocaleDateString("en-US", {
@@ -1197,7 +1196,9 @@ router.post(
                 const activeMinutes = Math.round(
                   Math.max(
                     0,
-                    sessionEnd.getTime() - sessionStart.getTime() - (fallbackSession.totalPausedMs || 0)
+                    sessionEnd.getTime() -
+                      sessionStart.getTime() -
+                      (fallbackSession.totalPausedMs || 0)
                   ) / 60000
                 );
 
@@ -1224,7 +1225,9 @@ router.post(
                   totalDuration: activeMinutes,
                   sessionId: id,
                 });
-                log.info("Auto-created recap from raw classifications (story failed)", { sessionId: id });
+                log.info("Auto-created recap from raw classifications (story failed)", {
+                  sessionId: id,
+                });
               }
             } catch (recapError) {
               log.error("Fallback recap creation failed (non-blocking)", {

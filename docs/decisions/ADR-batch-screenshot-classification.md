@@ -2,7 +2,7 @@
 
 **Status:** Proposed  
 **Date:** 2026-02-23  
-**Author:** Aurel  
+**Author:** Aurel
 
 ## Context
 
@@ -50,22 +50,22 @@ Within a batch of frames A, B, C, D, E, F:
 
 ## Edge Cases
 
-| Scenario | Handling |
-|----------|----------|
-| **Manual session end mid-batch** | `stopSession()` calls `buffer.flush()` before proceeding to storyteller |
-| **Pause mid-batch** | Same — flush on pause |
-| **App crash / force quit** | Frames already saved locally. On next launch, upload un-synced frames from checkpoint |
-| **Storyteller at session end** | No change needed — it reads from `sessionCaptures` in DB. Flush completes before story generation starts |
-| **Very short session (< batch interval)** | Flush triggers on end, so even a 15s session gets analyzed |
-| **Network blip during batch upload** | Retry with exponential backoff. Frames stay in local storage until confirmed synced |
+| Scenario                                  | Handling                                                                                                 |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Manual session end mid-batch**          | `stopSession()` calls `buffer.flush()` before proceeding to storyteller                                  |
+| **Pause mid-batch**                       | Same — flush on pause                                                                                    |
+| **App crash / force quit**                | Frames already saved locally. On next launch, upload un-synced frames from checkpoint                    |
+| **Storyteller at session end**            | No change needed — it reads from `sessionCaptures` in DB. Flush completes before story generation starts |
+| **Very short session (< batch interval)** | Flush triggers on end, so even a 15s session gets analyzed                                               |
+| **Network blip during batch upload**      | Retry with exponential backoff. Frames stay in local storage until confirmed synced                      |
 
 ## Cost Impact Estimate
 
-| Scenario | Gemini Calls/Min | Relative Cost |
-|----------|-----------------|---------------|
-| Current (10s, every frame) | ~6/min | 100% |
-| + Pixel-diff filter | ~3-4/min | ~60% |
-| + Batch (60s) + smart sampling | ~1-2/min | ~25% |
+| Scenario                       | Gemini Calls/Min | Relative Cost |
+| ------------------------------ | ---------------- | ------------- |
+| Current (10s, every frame)     | ~6/min           | 100%          |
+| + Pixel-diff filter            | ~3-4/min         | ~60%          |
+| + Batch (60s) + smart sampling | ~1-2/min         | ~25%          |
 
 ## Architecture Sketch
 
@@ -89,13 +89,13 @@ FrameBatchBuffer
 
 ## Key Files (Current Pipeline)
 
-| File | Role |
-|------|------|
-| `packages/shared/src/session.ts` | `SESSION_DEFAULTS.CAPTURE_INTERVAL_MS: 10000` |
-| `apps/electron/src/services/monitoringSessionService.ts` | Capture loop, `processCapture()`, `analyzeFrameAsync()` |
-| `apps/backend/src/services/frame-analysis.service.ts` | Sensor step — calls Gemini Vision to compare frames |
-| `apps/backend/src/services/gemini-vision-frame.service.ts` | Gemini Vision API wrapper (frame comparison) |
-| `apps/backend/src/services/classifier.service.ts` | Classifier step — classifies delta into activity |
+| File                                                       | Role                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------- |
+| `packages/shared/src/session.ts`                           | `SESSION_DEFAULTS.CAPTURE_INTERVAL_MS: 10000`           |
+| `apps/electron/src/services/monitoringSessionService.ts`   | Capture loop, `processCapture()`, `analyzeFrameAsync()` |
+| `apps/backend/src/services/frame-analysis.service.ts`      | Sensor step — calls Gemini Vision to compare frames     |
+| `apps/backend/src/services/gemini-vision-frame.service.ts` | Gemini Vision API wrapper (frame comparison)            |
+| `apps/backend/src/services/classifier.service.ts`          | Classifier step — classifies delta into activity        |
 
 ## Open Questions
 

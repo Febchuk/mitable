@@ -116,8 +116,7 @@ class RecapRLMService {
       const startedAt = new Date(session.startedAt);
       const endedAt = session.endedAt ? new Date(session.endedAt) : new Date();
       const activeMinutes = Math.round(
-        Math.max(0, endedAt.getTime() - startedAt.getTime() - (session.totalPausedMs || 0)) /
-          60000
+        Math.max(0, endedAt.getTime() - startedAt.getTime() - (session.totalPausedMs || 0)) / 60000
       );
 
       blocks.push({
@@ -176,8 +175,7 @@ class RecapRLMService {
 
     for (const cap of captures) {
       const app = cap.appName || "Unknown";
-      const activity =
-        cap.activityDescription || cap.deltaChangeDescription || "Working";
+      const activity = cap.activityDescription || cap.deltaChangeDescription || "Working";
       const conf = parseFloat(cap.confidence || "0.5");
 
       // Start new cluster if app changed or activity is substantially different
@@ -220,13 +218,32 @@ class RecapRLMService {
    */
   private isSimilarActivity(a: string, b: string): boolean {
     const stopWords = new Set([
-      "the", "a", "an", "in", "on", "at", "to", "for", "of", "with", "and", "or", "is", "was",
+      "the",
+      "a",
+      "an",
+      "in",
+      "on",
+      "at",
+      "to",
+      "for",
+      "of",
+      "with",
+      "and",
+      "or",
+      "is",
+      "was",
     ]);
     const wordsA = new Set(
-      a.toLowerCase().split(/\s+/).filter((w) => w.length > 2 && !stopWords.has(w))
+      a
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !stopWords.has(w))
     );
     const wordsB = new Set(
-      b.toLowerCase().split(/\s+/).filter((w) => w.length > 2 && !stopWords.has(w))
+      b
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !stopWords.has(w))
     );
 
     if (wordsA.size === 0 || wordsB.size === 0) return false;
@@ -271,11 +288,7 @@ class RecapRLMService {
   /**
    * Build the LLM prompt from clustered activity data.
    */
-  private buildPrompt(
-    blocks: SessionBlock[],
-    tone: string,
-    length: string
-  ): string {
+  private buildPrompt(blocks: SessionBlock[], tone: string, length: string): string {
     const toneInstructions: Record<string, string> = {
       professional:
         "Use a professional, polished tone suitable for a manager or stakeholder update.",

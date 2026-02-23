@@ -619,16 +619,24 @@ export async function regenerateSummary(
  * Generate a day summary from block summaries using Groq.
  * Skips blocks without summaries.
  */
-export async function generateDaySummary(
-  params: { date?: string; sessionIds?: string[] }
-): Promise<{ summary: string | null; blockCount: number; skippedCount: number; message?: string }> {
-  return apiRequest<{ summary: string | null; blockCount: number; skippedCount: number; message?: string }>(
-    "/monitoring/day-summary",
-    {
-      method: "POST",
-      body: JSON.stringify(params),
-    }
-  );
+export async function generateDaySummary(params: {
+  date?: string;
+  sessionIds?: string[];
+}): Promise<{
+  summary: string | null;
+  blockCount: number;
+  skippedCount: number;
+  message?: string;
+}> {
+  return apiRequest<{
+    summary: string | null;
+    blockCount: number;
+    skippedCount: number;
+    message?: string;
+  }>("/monitoring/day-summary", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
 }
 
 /**

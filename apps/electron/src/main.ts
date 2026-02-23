@@ -306,8 +306,8 @@ function createWatchingPillWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
 
-  const windowWidth = 50; // Just the pill width
-  const windowHeight = 180; // Pill height with mic button (increased from 130 to accommodate 4 buttons + rounded caps)
+  const windowWidth = 64; // Pill (~50px) + outer padding (12px) + 2px safety
+  const windowHeight = 200; // Pill expanded height + top padding
   const rightMargin = 5;
 
   watchingPillWindow = new BrowserWindow({

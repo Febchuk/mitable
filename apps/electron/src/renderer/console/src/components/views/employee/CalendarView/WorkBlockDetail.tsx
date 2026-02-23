@@ -396,7 +396,6 @@ export default function WorkBlockDetail({
                 ))}
               </div>
             </div>
-
           </div>
         )}
       </div>

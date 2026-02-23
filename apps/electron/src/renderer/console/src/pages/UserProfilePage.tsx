@@ -824,7 +824,6 @@ export default function UserProfilePage() {
     }
   };
 
-
   // Force scroll to top before any render
   useLayoutEffect(() => {
     const scrollableElement = document.querySelector(".overflow-y-auto");
