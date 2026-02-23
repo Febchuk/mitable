@@ -15,11 +15,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import Groq from "groq-sdk";
-import { db } from "../db/client";
-import * as schema from "../db/schema/index";
+import { db } from "../db/client.js";
+import * as schema from "../db/schema/index.js";
 import { eq, and, inArray, asc } from "drizzle-orm";
-import { config } from "../config";
-import { createLogger } from "../lib/logger";
+import { config } from "../config.js";
+import { createLogger } from "../lib/logger.js";
 
 const logger = createLogger({ context: "recap-rlm" });
 
@@ -75,7 +75,12 @@ class RecapRLMService {
         totalPausedMs: schema.monitoringSessions.totalPausedMs,
       })
       .from(schema.monitoringSessions)
-      .where(inArray(schema.monitoringSessions.id, sessionIds));
+      .where(
+        and(
+          inArray(schema.monitoringSessions.id, sessionIds),
+          eq(schema.monitoringSessions.userId, userId)
+        )
+      );
 
     if (sessions.length === 0) {
       logger.warn({ sessionIds }, "No sessions found for recap");
