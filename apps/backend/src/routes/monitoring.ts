@@ -347,6 +347,30 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
       appCaptureMap.set(row.sessionId, existing);
     }
 
+    // Fallback: for sessions missing finalSummary, check session_summaries table
+    const missingSummaryIds = sessions
+      .filter((s) => !s.finalSummary && !s.rawActivitySummary)
+      .map((s) => s.id);
+
+    const storyFallbacks = new Map<string, string>();
+    if (missingSummaryIds.length > 0) {
+      const stories = await db
+        .select({
+          sessionId: schema.sessionSummaries.sessionId,
+          narrativeSummary: schema.sessionSummaries.narrativeSummary,
+        })
+        .from(schema.sessionSummaries)
+        .where(
+          and(
+            inArray(schema.sessionSummaries.sessionId, missingSummaryIds),
+            eq(schema.sessionSummaries.summaryType, "master_story")
+          )
+        );
+      for (const story of stories) {
+        storyFallbacks.set(story.sessionId, story.narrativeSummary);
+      }
+    }
+
     // Build response with duration, captureCount, and timeBreakdown
     const sessionsWithDuration = sessions.map((session) => {
       const now = Date.now();
@@ -378,8 +402,16 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
         }
       }
 
+      // Use story from session_summaries as fallback when finalSummary is missing
+      const finalSummary =
+        session.finalSummary ||
+        session.rawActivitySummary ||
+        storyFallbacks.get(session.id) ||
+        null;
+
       return {
         ...session,
+        finalSummary,
         captureCount,
         timeBreakdown,
         duration: {
