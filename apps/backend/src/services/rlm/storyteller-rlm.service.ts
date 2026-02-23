@@ -5,11 +5,12 @@
  * Orchestrates tool execution based on LLM decisions.
  *
  * Uses Claude Sonnet 4.5 with extended thinking for high-quality,
- * deliberate summarization. Falls back to OpenAI GPT-5 if Anthropic fails.
+ * deliberate summarization. Falls back to OpenAI GPT-5, then Groq GPT-OSS-120B.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { config } from "../../config";
 import {
   StorytellerEnvironment,
@@ -54,7 +55,8 @@ interface LLMResponse {
 
 class StorytellerRLMService {
   private anthropic: Anthropic | null = null;
-  private openai: OpenAI | null = null; // GPT-5 fallback
+  private openai: OpenAI | null = null;
+  private groq: Groq | null = null;
   private maxIterations = 10; // Safety limit to prevent runaway tool calls
 
   constructor() {
@@ -69,7 +71,12 @@ class StorytellerRLMService {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
       logger.info("GPT-5 fallback configured for Storyteller");
     } else {
-      logger.warn("OPENAI_API_KEY not set — no fallback available for Storyteller");
+      logger.warn("OPENAI_API_KEY not set");
+    }
+
+    if (config.groq.apiKey) {
+      this.groq = new Groq({ apiKey: config.groq.apiKey });
+      logger.info("Groq GPT-OSS-120B configured for Storyteller (last resort)");
     }
   }
 
@@ -200,13 +207,33 @@ class StorytellerRLMService {
       }
       // All retries exhausted or non-retryable transient error — fall back
       if (this.openai) {
-        const result = await this.getLLMDecisionOpenAI(systemPrompt, messages);
-        logger.info("⚠️ Storyteller decision via GPT-5 (fallback)");
+        try {
+          const result = await this.getLLMDecisionOpenAI(systemPrompt, messages);
+          logger.info("⚠️ Storyteller decision via GPT-5 (fallback)");
+          return result;
+        } catch (error) {
+          logger.warn({ error: String(error) }, "OpenAI also failed — trying Groq");
+        }
+      }
+      if (this.groq) {
+        const result = await this.getLLMDecisionGroq(systemPrompt, messages);
+        logger.info("⚠️⚠️ Storyteller decision via Groq (last resort)");
         return result;
       }
-      throw new Error("No LLM available — Claude exhausted retries and OpenAI not configured");
+      throw new Error("No LLM available — all providers exhausted");
     }
-    return this.getLLMDecisionOpenAI(systemPrompt, messages);
+    // No Anthropic configured — try OpenAI then Groq
+    if (this.openai) {
+      try {
+        return await this.getLLMDecisionOpenAI(systemPrompt, messages);
+      } catch (error) {
+        logger.warn({ error: String(error) }, "OpenAI failed — trying Groq");
+      }
+    }
+    if (this.groq) {
+      return this.getLLMDecisionGroq(systemPrompt, messages);
+    }
+    throw new Error("No LLM available — all providers unconfigured");
   }
 
   /**
@@ -276,12 +303,47 @@ class StorytellerRLMService {
     const completion = await this.openai.chat.completions.create({
       messages: openaiMessages as any,
       model: "gpt-5",
-      max_tokens: 8000,
+      max_completion_tokens: 8000,
     });
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {
       throw new Error("Empty response from GPT-5");
+    }
+
+    return this.parseToolCallResponse(content);
+  }
+
+  /**
+   * Groq GPT-OSS-120B last resort
+   */
+  private async getLLMDecisionGroq(
+    systemPrompt: string,
+    messages: Array<{ role: "user" | "assistant"; content: string }>
+  ): Promise<LLMResponse> {
+    if (!this.groq) {
+      throw new Error("Groq client not configured");
+    }
+
+    const groqMessages = [
+      {
+        role: "system" as const,
+        content:
+          systemPrompt +
+          "\n\nIMPORTANT: Always respond with a valid JSON object. No markdown, no code fences, just raw JSON.",
+      },
+      ...messages,
+    ];
+
+    const completion = await this.groq.chat.completions.create({
+      messages: groqMessages as any,
+      model: config.groq.chatModel || "openai/gpt-oss-120b",
+      max_tokens: 8000,
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("Empty response from Groq");
     }
 
     return this.parseToolCallResponse(content);

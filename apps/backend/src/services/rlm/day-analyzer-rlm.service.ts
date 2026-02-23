@@ -13,6 +13,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { config } from "../../config";
 import {
   DayAnalyzerEnvironment,
@@ -71,6 +72,7 @@ interface LLMResponse {
 class DayAnalyzerRLMService {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
+  private groq: Groq | null = null;
   private maxIterations = 30; // Higher limit than storyteller — full day analysis needs more steps
 
   constructor() {
@@ -85,7 +87,12 @@ class DayAnalyzerRLMService {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
       logger.info("GPT-5 fallback configured for Day Analyzer");
     } else {
-      logger.warn("OPENAI_API_KEY not set — no fallback available for Day Analyzer");
+      logger.warn("OPENAI_API_KEY not set");
+    }
+
+    if (config.groq.apiKey) {
+      this.groq = new Groq({ apiKey: config.groq.apiKey });
+      logger.info("Groq GPT-OSS-120B configured for Day Analyzer (last resort)");
     }
   }
 
@@ -242,10 +249,19 @@ class DayAnalyzerRLMService {
       } catch (error) {
         logger.warn({ error: String(error) }, "Claude call failed — falling back to GPT-5");
         this.anthropic = null;
-        return this.getLLMDecisionOpenAI(systemPrompt, messages);
       }
     }
-    return this.getLLMDecisionOpenAI(systemPrompt, messages);
+    if (this.openai) {
+      try {
+        return await this.getLLMDecisionOpenAI(systemPrompt, messages);
+      } catch (error) {
+        logger.warn({ error: String(error) }, "OpenAI also failed — trying Groq");
+      }
+    }
+    if (this.groq) {
+      return this.getLLMDecisionGroq(systemPrompt, messages);
+    }
+    throw new Error("No LLM available — all providers exhausted");
   }
 
   /**
@@ -311,12 +327,47 @@ class DayAnalyzerRLMService {
     const completion = await this.openai.chat.completions.create({
       messages: openaiMessages as any,
       model: "gpt-5",
-      max_tokens: 8000,
+      max_completion_tokens: 8000,
     });
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {
       throw new Error("Empty response from GPT-5");
+    }
+
+    return this.parseToolCallResponse(content);
+  }
+
+  /**
+   * Groq GPT-OSS-120B last resort
+   */
+  private async getLLMDecisionGroq(
+    systemPrompt: string,
+    messages: Array<{ role: "user" | "assistant"; content: string }>
+  ): Promise<LLMResponse> {
+    if (!this.groq) {
+      throw new Error("Groq client not configured");
+    }
+
+    const groqMessages = [
+      {
+        role: "system" as const,
+        content:
+          systemPrompt +
+          "\n\nIMPORTANT: Always respond with a valid JSON object. No markdown, no code fences, just raw JSON.",
+      },
+      ...messages,
+    ];
+
+    const completion = await this.groq.chat.completions.create({
+      messages: groqMessages as any,
+      model: config.groq.chatModel || "openai/gpt-oss-120b",
+      max_tokens: 8000,
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("Empty response from Groq");
     }
 
     return this.parseToolCallResponse(content);

@@ -7,6 +7,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { config } from "../../config";
 import { StorytellerEnvironment } from "./storyteller-environment";
 import { createSessionLogger } from "../../lib/sessionLogger";
@@ -20,6 +21,12 @@ if (config.anthropic.apiKey) {
 let openaiClient: OpenAI | null = null;
 if (config.openai.apiKey) {
   openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
+}
+
+// Groq GPT-OSS-120B last resort client
+let groqClient: Groq | null = null;
+if (config.groq.apiKey) {
+  groqClient = new Groq({ apiKey: config.groq.apiKey });
 }
 
 /**
@@ -83,21 +90,38 @@ async function callSummarizationLLM(
   }
 
   // OpenAI GPT-5 fallback
-  if (!openaiClient) {
-    throw new Error(
-      "No LLM available for summarization — both ANTHROPIC_API_KEY and OPENAI_API_KEY are missing"
-    );
+  if (openaiClient) {
+    try {
+      const completion = await openaiClient.chat.completions.create({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        model: "gpt-5",
+        max_completion_tokens: maxOutputTokens,
+      });
+      return completion.choices[0]?.message?.content || "Failed to generate summary";
+    } catch (error) {
+      console.warn("[storyteller-tools] OpenAI also failed — trying Groq:", String(error));
+    }
   }
 
-  const completion = await openaiClient.chat.completions.create({
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    model: "gpt-5",
-    max_tokens: maxOutputTokens,
-  });
-  return completion.choices[0]?.message?.content || "Failed to generate summary";
+  // Groq GPT-OSS-120B last resort
+  if (groqClient) {
+    const completion = await groqClient.chat.completions.create({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      model: config.groq.chatModel || "openai/gpt-oss-120b",
+      max_tokens: maxOutputTokens,
+    });
+    return completion.choices[0]?.message?.content || "Failed to generate summary";
+  }
+
+  throw new Error(
+    "No LLM available for summarization — all providers (Anthropic, OpenAI, Groq) are missing"
+  );
 }
 
 export interface RLMToolParameter {

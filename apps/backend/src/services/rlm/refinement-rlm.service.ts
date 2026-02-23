@@ -8,6 +8,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { config } from "../../config";
 import {
   REFINEMENT_TOOL_DEFINITIONS,
@@ -136,6 +137,7 @@ function parseResponse(raw: string): { message: string; suggestedEdit: string | 
 class RefinementRLMService {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
+  private groq: Groq | null = null;
   private maxToolRounds = 6; // Safety limit for tool-calling rounds
 
   constructor() {
@@ -146,6 +148,10 @@ class RefinementRLMService {
     if (config.openai.apiKey) {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
       logger.info("GPT-5 fallback configured for Refinement RLM");
+    }
+    if (config.groq.apiKey) {
+      this.groq = new Groq({ apiKey: config.groq.apiKey });
+      logger.info("Groq GPT-OSS-120B configured for Refinement RLM (last resort)");
     }
   }
 
@@ -164,7 +170,15 @@ class RefinementRLMService {
       }
     }
 
-    return await this.refineWithOpenAI(input, ctx);
+    if (this.openai) {
+      try {
+        return await this.refineWithOpenAI(input, ctx);
+      } catch (error) {
+        logger.warn({ error: String(error) }, "OpenAI refinement also failed — trying Groq");
+      }
+    }
+
+    return this.refineWithGroq(input);
   }
 
   // --------------------------------------------------------------------------
@@ -312,13 +326,50 @@ ${prefsResult}`;
     const completion = await this.openai.chat.completions.create({
       messages: openaiMessages,
       model: "gpt-5",
-      max_tokens: 4000,
+      max_completion_tokens: 4000,
     });
 
     const rawText = completion.choices[0]?.message?.content || "";
     const { message, suggestedEdit } = parseResponse(rawText);
 
     logger.info({ hasSuggestedEdit: !!suggestedEdit }, "Refinement RLM completed (GPT-5 fallback)");
+
+    return { message, suggestedEdit, toolCallCount: 0 };
+  }
+
+  // --------------------------------------------------------------------------
+  // Last resort: Groq GPT-OSS-120B single-shot
+  // --------------------------------------------------------------------------
+
+  private async refineWithGroq(input: RefinementRLMInput): Promise<RefinementRLMResult> {
+    if (!this.groq) {
+      throw new Error(
+        "No LLM available — all providers (Anthropic, OpenAI, Groq) failed or unconfigured"
+      );
+    }
+
+    logger.info("⚠️⚠️ Refinement via Groq GPT-OSS-120B (last resort)");
+
+    const systemPrompt = buildSystemPrompt(input.currentSummary);
+    const groqMessages = [
+      {
+        role: "system" as const,
+        content: systemPrompt + "\n\nIMPORTANT: Do NOT call any tools. Respond directly.",
+      },
+      ...input.messages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+    ];
+
+    const completion = await this.groq.chat.completions.create({
+      messages: groqMessages,
+      model: config.groq.chatModel || "openai/gpt-oss-120b",
+      max_tokens: 4000,
+    });
+
+    const rawText = completion.choices[0]?.message?.content || "";
+    const { message, suggestedEdit } = parseResponse(rawText);
 
     return { message, suggestedEdit, toolCallCount: 0 };
   }

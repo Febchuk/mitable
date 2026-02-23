@@ -6,6 +6,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { config } from "../config";
 import { db } from "../db/client";
 import { sessionCaptures } from "../db/schema/index";
@@ -53,6 +54,7 @@ Return ONLY the title text, nothing else. No quotes, no punctuation at the end.
 class SessionTitleService {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
+  private groq: Groq | null = null;
 
   constructor() {
     if (config.anthropic.apiKey) {
@@ -61,9 +63,12 @@ class SessionTitleService {
     if (config.openai.apiKey) {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
     }
-    if (!this.anthropic && !this.openai) {
+    if (config.groq.apiKey) {
+      this.groq = new Groq({ apiKey: config.groq.apiKey });
+    }
+    if (!this.anthropic && !this.openai && !this.groq) {
       logger.warn(
-        "No LLM configured for title generation (need ANTHROPIC_API_KEY or OPENAI_API_KEY)"
+        "No LLM configured for title generation (need ANTHROPIC_API_KEY, OPENAI_API_KEY, or GROQ_API_KEY)"
       );
     }
   }
@@ -170,8 +175,31 @@ class SessionTitleService {
 
     // OpenAI GPT-5 fallback
     if (this.openai) {
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-5",
+      try {
+        const completion = await this.openai.chat.completions.create({
+          model: "gpt-5",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: activitySummary },
+          ],
+          temperature: 0.7,
+          max_completion_tokens: 50,
+        });
+
+        const title = completion.choices[0]?.message?.content?.trim();
+        if (title) {
+          logger.info("⚠️ Title generated via GPT-5 (fallback)");
+          return title;
+        }
+      } catch (error) {
+        logger.warn(`GPT-5 title generation failed, trying Groq: ${String(error)}`);
+      }
+    }
+
+    // Groq GPT-OSS-120B last resort
+    if (this.groq) {
+      const completion = await this.groq.chat.completions.create({
+        model: config.groq.chatModel || "openai/gpt-oss-120b",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: activitySummary },
@@ -182,12 +210,12 @@ class SessionTitleService {
 
       const title = completion.choices[0]?.message?.content?.trim();
       if (title) {
-        logger.info("⚠️ Title generated via GPT-5 (fallback)");
+        logger.info("⚠️⚠️ Title generated via Groq (last resort)");
         return title;
       }
     }
 
-    throw new Error("No LLM available for title generation");
+    throw new Error("No LLM available for title generation — all providers failed");
   }
 
   /**

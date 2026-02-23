@@ -2,12 +2,13 @@
  * Document Generation Agent
  *
  * RLM-based document generation using tool-calling loop.
- * Uses Claude Sonnet 4.5 (primary) with OpenAI GPT-5 fallback.
- * Native tool-calling for both providers with per-call fallback.
+ * Uses Claude Sonnet 4.5 (primary), OpenAI GPT-5 (fallback), Groq GPT-OSS-120B (last resort).
+ * Native tool-calling for Claude/OpenAI with per-call fallback chain.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { config } from "../../config.js";
 import type { DocType } from "@mitable/shared";
 import type { DocumentGenerationEnvironment } from "./environment.js";
@@ -21,6 +22,7 @@ import {
 const MAX_TOOL_ITERATIONS = 30;
 const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
 const OPENAI_MODEL = "gpt-5";
+const GROQ_MODEL = config.groq?.chatModel || "openai/gpt-oss-120b";
 const MAX_RETRIES = 2;
 
 interface GenerationStep {
@@ -118,6 +120,7 @@ function toClaudeMessages(openaiMessages: any[]): {
 export class DocumentGenerationAgent {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
+  private groq: Groq | null = null;
 
   constructor() {
     if (config.anthropic.apiKey) {
@@ -131,7 +134,14 @@ export class DocumentGenerationAgent {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
       console.log("[DocGenAgent] OpenAI GPT-5 configured (fallback)");
     } else {
-      console.warn("[DocGenAgent] OPENAI_API_KEY not set — no fallback available");
+      console.warn("[DocGenAgent] OPENAI_API_KEY not set");
+    }
+
+    if (config.groq.apiKey) {
+      this.groq = new Groq({ apiKey: config.groq.apiKey });
+      console.log(`[DocGenAgent] Groq ${GROQ_MODEL} configured (last resort)`);
+    } else {
+      console.warn("[DocGenAgent] GROQ_API_KEY not set — no last-resort fallback");
     }
   }
 
@@ -152,6 +162,10 @@ export class DocumentGenerationAgent {
       {
         role: "system",
         content: this.buildSystemPrompt(docType, userPrompt, environment),
+      },
+      {
+        role: "user",
+        content: `Generate a ${docType} document for: "${userPrompt}". Start by examining the available session data using tools.`,
       },
     ];
 
@@ -250,11 +264,22 @@ export class DocumentGenerationAgent {
     }
 
     if (this.openai) {
-      console.log("[DocGenAgent] ⚠️ Using OpenAI GPT-5 (fallback)");
-      return this.callOpenAI(openaiMessages);
+      try {
+        console.log("[DocGenAgent] ⚠️ Using OpenAI GPT-5 (fallback)");
+        return await this.callOpenAI(openaiMessages);
+      } catch (error) {
+        console.warn("[DocGenAgent] OpenAI also failed — trying Groq:", String(error));
+      }
     }
 
-    throw new Error("No LLM available — both Anthropic and OpenAI are unconfigured or failed");
+    if (this.groq) {
+      console.log(`[DocGenAgent] ⚠️⚠️ Using Groq ${GROQ_MODEL} (last resort)`);
+      return this.callGroq(openaiMessages);
+    }
+
+    throw new Error(
+      "No LLM available — all providers (Anthropic, OpenAI, Groq) failed or unconfigured"
+    );
   }
 
   /** Call Claude Sonnet 4.5 with native tool-calling */
@@ -263,7 +288,7 @@ export class DocumentGenerationAgent {
 
     const response = await this.anthropic!.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 8000,
+      max_tokens: 16384,
       temperature: 0.4,
       system,
       messages,
@@ -308,7 +333,7 @@ export class DocumentGenerationAgent {
       tools: DOCUMENT_GENERATION_TOOLS as any,
       tool_choice: "auto",
       temperature: 0.4,
-      max_tokens: 8000,
+      max_completion_tokens: 16384,
     });
 
     const message = completion.choices[0].message;
@@ -322,6 +347,45 @@ export class DocumentGenerationAgent {
       return { toolCalls, content: null };
     }
     return { toolCalls: [], content: message.content || null };
+  }
+
+  /** Call Groq GPT-OSS-120B (last resort — single-shot, no tool-calling) */
+  private async callGroq(openaiMessages: any[]): Promise<LLMCallResult> {
+    if (!this.groq) {
+      throw new Error("Groq client not configured");
+    }
+
+    // Groq doesn't support tool_choice/tools — collapse to single-shot prompt
+    const systemMsg = openaiMessages.find((m: any) => m.role === "system");
+    const nonSystemMsgs = openaiMessages.filter(
+      (m: any) => m.role !== "system" && m.role !== "tool"
+    );
+    const groqMessages = [
+      ...(systemMsg
+        ? [
+            {
+              role: "system" as const,
+              content:
+                systemMsg.content +
+                "\n\nIMPORTANT: Do NOT call any tools. Generate the complete document directly based on whatever context you have.",
+            },
+          ]
+        : []),
+      ...nonSystemMsgs.map((m: any) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content || "",
+      })),
+    ];
+
+    const completion = await this.groq.chat.completions.create({
+      model: GROQ_MODEL,
+      messages: groqMessages,
+      max_tokens: 8000,
+      temperature: 0.4,
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    return { toolCalls: [], content: content || null };
   }
 
   // -------------------------------------------------------------------------

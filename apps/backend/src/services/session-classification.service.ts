@@ -14,6 +14,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, asc } from "drizzle-orm";
@@ -26,6 +27,7 @@ const anthropic = config.anthropic.apiKey
   ? new Anthropic({ apiKey: config.anthropic.apiKey })
   : null;
 const openai = config.openai.apiKey ? new OpenAI({ apiKey: config.openai.apiKey }) : null;
+const groq = config.groq.apiKey ? new Groq({ apiKey: config.groq.apiKey }) : null;
 
 export interface ClassifiedActivity {
   activity: string;
@@ -159,8 +161,11 @@ ${summaryContext ? `Session summary: ${summaryContext.slice(0, 500)}` : ""}
 Timestamped captures (chronological):
 ${lines.join("\n")}${transcriptContext}`;
 
-  // Try Claude first, then OpenAI fallback, then dumb fallback
-  const activities = (await tryClassifyClaude(prompt)) ?? (await tryClassifyOpenAI(prompt));
+  // Try Claude first, then OpenAI fallback, then Groq, then dumb fallback
+  const activities =
+    (await tryClassifyClaude(prompt)) ??
+    (await tryClassifyOpenAI(prompt)) ??
+    (await tryClassifyGroq(prompt));
 
   if (activities) {
     await db
@@ -175,8 +180,8 @@ ${lines.join("\n")}${transcriptContext}`;
     return activities;
   }
 
-  // Dumb fallback — both LLMs failed
-  logger.warn({ sessionId }, "Both Claude and OpenAI failed — using dumb fallback");
+  // Dumb fallback — all LLMs failed
+  logger.warn({ sessionId }, "All LLMs (Claude, OpenAI, Groq) failed — using dumb fallback");
   const topApp = captures[0]?.appName || "Unknown";
   const fallback: ClassifiedActivity[] = [
     {
@@ -230,14 +235,31 @@ async function tryClassifyOpenAI(prompt: string): Promise<ClassifiedActivity[] |
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4.1",
-      max_tokens: 1024,
+      max_completion_tokens: 1024,
       messages: [{ role: "user", content: prompt }],
     });
     const content = response.choices[0]?.message?.content || "";
     if (!content) throw new Error("Empty OpenAI response");
     return parseActivitiesJson(content);
   } catch (error) {
-    logger.warn({ error: String(error) }, "OpenAI classification also failed");
+    logger.warn({ error: String(error) }, "OpenAI classification also failed — trying Groq");
+    return null;
+  }
+}
+
+async function tryClassifyGroq(prompt: string): Promise<ClassifiedActivity[] | null> {
+  if (!groq) return null;
+  try {
+    const response = await groq.chat.completions.create({
+      model: config.groq.chatModel || "openai/gpt-oss-120b",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const content = response.choices[0]?.message?.content || "";
+    if (!content) throw new Error("Empty Groq response");
+    return parseActivitiesJson(content);
+  } catch (error) {
+    logger.warn({ error: String(error) }, "Groq classification also failed");
     return null;
   }
 }
