@@ -2010,7 +2010,19 @@ function setupMonitoringSessionHandlers() {
       };
     }
 
-    // Connect WebSocket to backend for audio streaming
+    // Proactively refresh the access token before connecting the audio WebSocket.
+    // Supabase JWTs expire after ~1 hour. If the user clicks mic after a long
+    // idle period, the main-process token may be stale.
+    const userCtx = currentUserContext
+      ? { orgId: currentUserContext.organizationId, userId: currentUserContext.userId }
+      : undefined;
+    const freshToken = await authManager.refreshAccessToken(userCtx);
+    if (freshToken) {
+      authTokens.accessToken = freshToken;
+      authTokens.refreshToken = authManager.getRefreshToken();
+      monitoringLogger.info("🔑 Access token refreshed before audio WebSocket connect");
+    }
+
     const token = authTokens.accessToken;
     if (!token) {
       return {

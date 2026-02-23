@@ -204,6 +204,55 @@ class AuthManager {
   }
 
   /**
+   * Proactively refresh the access token using the stored refresh token.
+   * Returns the fresh access token, or null if refresh failed.
+   * Updates both in-memory tokens and persists the rotated refresh token.
+   */
+  async refreshAccessToken(userContext?: {
+    orgId: string;
+    userId: string;
+  }): Promise<string | null> {
+    if (!this._refreshToken) {
+      logger.warn("Cannot refresh — no refresh token available");
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: this._refreshToken }),
+      });
+
+      if (!response.ok) {
+        logger.warn(`Token refresh failed with HTTP ${response.status}`);
+        return null;
+      }
+
+      const data = await response.json();
+      const newAccessToken: string = data.session.access_token;
+      const newRefreshToken: string = data.session.refresh_token;
+
+      this.accessToken = newAccessToken;
+      this._refreshToken = newRefreshToken;
+
+      if (userContext) {
+        await keychainService.saveRefreshToken(
+          userContext.orgId,
+          userContext.userId,
+          newRefreshToken
+        );
+      }
+
+      logger.info("Access token refreshed proactively");
+      return newAccessToken;
+    } catch (error) {
+      logger.error("Token refresh request failed:", error);
+      return null;
+    }
+  }
+
+  /**
    * Make an authenticated fetch request
    */
   async authenticatedFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
