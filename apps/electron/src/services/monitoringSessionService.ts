@@ -708,8 +708,13 @@ class MonitoringSessionService {
 
       // Process each screenshot
       for (const screenshot of result.screenshots) {
+        // Normalize desktopCapturer ID ("window:12345:0" → "12345") to match
+        // OS-level IDs from active-win used by focusWindowTracker
+        const normalizedId = screenshot.windowId.startsWith("window:")
+          ? screenshot.windowId.split(":")[1]
+          : screenshot.windowId;
         const trackedMatch = trackedWindows.find(
-          (w) => w.windowId === screenshot.windowId || w.windowTitle === screenshot.windowTitle
+          (w) => w.windowId === normalizedId
         );
         if (trackedMatch?.appName) {
           screenshot.appName = trackedMatch.appName;
