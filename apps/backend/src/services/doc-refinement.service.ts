@@ -8,10 +8,12 @@
  *
  * Primary: Anthropic Claude Sonnet 4.5 with native tool_use
  * Fallback: OpenAI GPT-5 single-shot (no tool loop)
+ * Last resort: Groq GPT-OSS-120B single-shot
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { config } from "../config.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
@@ -128,6 +130,7 @@ function parseResponse(raw: string): { message: string; suggestedEdit: string | 
 class DocRefinementService {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
+  private groq: Groq | null = null;
   private maxToolRounds = 8;
 
   constructor() {
@@ -138,6 +141,10 @@ class DocRefinementService {
     if (config.openai.apiKey) {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
       console.log("[DocRefinement] OpenAI GPT-5 configured (fallback)");
+    }
+    if (config.groq.apiKey) {
+      this.groq = new Groq({ apiKey: config.groq.apiKey });
+      console.log("[DocRefinement] Groq GPT-OSS-120B configured (last resort)");
     }
   }
 
@@ -179,7 +186,15 @@ class DocRefinementService {
       }
     }
 
-    return this.refineWithOpenAI(request, docType);
+    if (this.openai) {
+      try {
+        return await this.refineWithOpenAI(request, docType);
+      } catch (error) {
+        console.warn("[DocRefinement] OpenAI also failed — trying Groq:", String(error));
+      }
+    }
+
+    return this.refineWithGroq(request, docType);
   }
 
   // --------------------------------------------------------------------------
@@ -278,7 +293,7 @@ class DocRefinementService {
     docType: string
   ): Promise<DocRefinementResponse> {
     if (!this.openai) {
-      throw new Error("No LLM available — both Anthropic and OpenAI are unconfigured");
+      throw new Error("OpenAI client not configured");
     }
 
     const systemPrompt = buildSystemPrompt(input.currentContent, docType);
@@ -297,6 +312,51 @@ class DocRefinementService {
     const completion = await this.openai.chat.completions.create({
       model: "gpt-5",
       messages: openaiMessages,
+      max_completion_tokens: 16384,
+      temperature: 0.4,
+    });
+
+    const content = completion.choices[0]?.message?.content || "Failed to generate response.";
+    const parsed = parseResponse(content);
+    return { ...parsed, toolCallCount: 0 };
+  }
+
+  // --------------------------------------------------------------------------
+  // Last resort: Groq GPT-OSS-120B single-shot
+  // --------------------------------------------------------------------------
+
+  private async refineWithGroq(
+    input: DocRefinementRequest,
+    docType: string
+  ): Promise<DocRefinementResponse> {
+    if (!this.groq) {
+      throw new Error(
+        "No LLM available — all providers (Anthropic, OpenAI, Groq) failed or unconfigured"
+      );
+    }
+
+    console.log("[DocRefinement] ⚠️⚠️ Using Groq GPT-OSS-120B (last resort)");
+    const systemPrompt = buildSystemPrompt(input.currentContent, docType);
+
+    const groqMessages = [
+      {
+        role: "system" as const,
+        content:
+          systemPrompt +
+          "\n\nIMPORTANT: Do NOT call any tools. Respond directly based on the document content provided above.",
+      },
+      ...input.messages.map((m, i) => ({
+        role: m.role as "user" | "assistant",
+        content:
+          i === 0 && m.role === "user"
+            ? `[User's request about the document above:]\n${m.content}`
+            : m.content,
+      })),
+    ];
+
+    const completion = await this.groq.chat.completions.create({
+      model: config.groq.chatModel || "openai/gpt-oss-120b",
+      messages: groqMessages,
       max_tokens: 8000,
       temperature: 0.4,
     });

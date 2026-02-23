@@ -1371,7 +1371,7 @@ Example good output:
           model: "gpt-5",
           messages: [{ role: "user", content: prompt }],
           temperature: 0.4,
-          max_tokens: maxTokens,
+          max_completion_tokens: maxTokens,
         });
         const content = completion.choices[0]?.message?.content?.trim();
         if (content) {
