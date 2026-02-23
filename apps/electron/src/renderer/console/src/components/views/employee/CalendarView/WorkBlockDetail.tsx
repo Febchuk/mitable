@@ -27,7 +27,6 @@ import {
   ChevronRight,
   Clock,
   Coffee,
-  Activity,
   BarChart3,
   Target,
   MoreVertical,
@@ -248,12 +247,6 @@ export default function WorkBlockDetail({
             <span className="text-sm font-medium tabular-nums">
               {formatDuration(block.duration)}
             </span>
-          </div>
-
-          {/* Capture count */}
-          <div className="flex-shrink-0 flex items-center gap-1.5 text-ink-tertiary">
-            <Activity size={14} />
-            <span className="text-sm tabular-nums">{block.captures.length}</span>
           </div>
 
           {/* Status badge */}
