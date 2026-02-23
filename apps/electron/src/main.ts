@@ -1227,9 +1227,18 @@ function setupIPC() {
           return { success: true, background: true };
         }
         case "show-console": {
+          if (!consoleWindow || consoleWindow.isDestroyed()) {
+            createConsoleWindow();
+          }
           if (consoleWindow && !consoleWindow.isDestroyed()) {
+            if (consoleWindow.isMinimized()) {
+              consoleWindow.restore();
+            }
             consoleWindow.show();
             consoleWindow.focus();
+            if (process.platform === "darwin") {
+              app.focus({ steal: true });
+            }
           }
           return { success: true };
         }
@@ -1248,9 +1257,20 @@ function setupIPC() {
   // Show console window
   ipcMain.on(IPC_CHANNELS.SHOW_CONSOLE, () => {
     consoleLogger.info(" Show requested");
+    if (!consoleWindow || consoleWindow.isDestroyed()) {
+      createConsoleWindow();
+    }
     if (consoleWindow && !consoleWindow.isDestroyed()) {
+      if (consoleWindow.isMinimized()) {
+        consoleWindow.restore();
+      }
       consoleWindow.show();
       consoleWindow.focus();
+      // macOS: app.focus() brings the app to the foreground
+      // which helps when focus is on an always-on-top pill window
+      if (process.platform === "darwin") {
+        app.focus({ steal: true });
+      }
     }
   });
 
@@ -1736,9 +1756,8 @@ function setupMonitoringSessionHandlers() {
 
     const result = await monitoringSessionService.endSession();
 
-    // Only hide watching pill if preference is enabled
-    const shouldHide = preferencesService.getHidePillOnSessionEnd();
-    if (shouldHide && result.success && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+    // Always hide watching pill when session ends
+    if (result.success && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
       watchingPillWindow.hide();
     }
 
@@ -2533,9 +2552,8 @@ async function endPassiveSessionFromMain(sessionId: string): Promise<void> {
       }
     }
 
-    // Hide watching pill
-    const shouldHide = preferencesService.getHidePillOnSessionEnd();
-    if (shouldHide && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+    // Always hide watching pill when session ends
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
       watchingPillWindow.hide();
     }
   } catch (error) {
