@@ -344,10 +344,7 @@ class PreferencesService {
     };
   }
 
-  setUserNotificationPreferences(
-    userId: string,
-    prefs: Partial<NotificationPreferences>
-  ): void {
+  setUserNotificationPreferences(userId: string, prefs: Partial<NotificationPreferences>): void {
     const userPrefs = this.store.get(`users.${userId}`, {});
     this.store.set(`users.${userId}`, {
       ...userPrefs,

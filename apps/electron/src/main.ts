@@ -2728,8 +2728,12 @@ app.whenReady().then(async () => {
   notificationService.setUserIdProvider(() => currentUserContext?.userId ?? null);
 
   // Wire update service → notification service (OS notifications on update events)
-  updateService.setOnUpdateAvailable((version) => notificationService.notifyUpdateAvailable(version));
-  updateService.setOnUpdateDownloaded((version) => notificationService.notifyUpdateDownloaded(version));
+  updateService.setOnUpdateAvailable((version) =>
+    notificationService.notifyUpdateAvailable(version)
+  );
+  updateService.setOnUpdateDownloaded((version) =>
+    notificationService.notifyUpdateDownloaded(version)
+  );
 
   // In dev mode, wait for the backend to be reachable before making any network calls.
   // Both processes start together via `npm run dev`, so the backend may still be initializing.
