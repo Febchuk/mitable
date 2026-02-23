@@ -29,6 +29,7 @@ import { updateService } from "./services/updateService";
 import { captureService } from "./services/captureService";
 import { isBlockedByPolicy } from "./services/capturePolicy";
 import { passiveMonitorService } from "./services/passiveMonitorService";
+import { notificationService } from "./services/notificationService";
 
 // Force dark theme for consistent vibrancy effect regardless of system settings
 nativeTheme.themeSource = "dark";
@@ -682,6 +683,26 @@ function handleNotificationAction(actionId: string) {
         consoleWindow.show();
         consoleWindow.focus();
         consoleWindow.webContents.send("navigate-to-recaps");
+      }
+      break;
+    case "view-update":
+      // Show console and navigate to profile/update section
+      if (consoleWindow && !consoleWindow.isDestroyed()) {
+        consoleWindow.show();
+        consoleWindow.focus();
+        consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_UPDATE);
+      }
+      break;
+    case "install-update":
+      // Quit and install the downloaded update
+      updateService.quitAndInstall();
+      break;
+    case "view-active-session":
+      // Show console and navigate to active session
+      if (consoleWindow && !consoleWindow.isDestroyed()) {
+        consoleWindow.show();
+        consoleWindow.focus();
+        consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
       }
       break;
     case "dismiss":
@@ -1414,24 +1435,11 @@ function setupNotificationHandlers() {
     handleNotificationAction(actionId);
   });
 
-  // Recap-ready notification — uses simple Electron Notification (no protocol URLs)
+  // Recap-ready notification — delegates to centralized NotificationService
   ipcMain.handle(
     IPC_CHANNELS.SHOW_RECAP_NOTIFICATION,
     async (_, config: { title: string; message: string }) => {
-      const notification = new Notification({
-        title: config.title,
-        body: config.message,
-        silent: false,
-      });
-      notification.on("click", () => {
-        if (consoleWindow && !consoleWindow.isDestroyed()) {
-          consoleWindow.show();
-          consoleWindow.focus();
-          consoleWindow.webContents.send("navigate-to-recaps");
-        }
-      });
-      notification.show();
-      notificationLogger.info("Recap notification shown:", config.title);
+      notificationService.notifyRecapReady(config.title);
       return { success: true };
     }
   );
@@ -1869,6 +1877,7 @@ function setupMonitoringSessionHandlers() {
         passiveMonitorService.enable({
           startSession: () => startSessionFromMain("passive"),
           endSession: (sessionId) => endPassiveSessionFromMain(sessionId),
+          isAudioActive: () => audioWebSocketService.isConnected(),
         });
       } else {
         monitoringLogger.warn(" Cannot enable passive monitoring: no user context");
@@ -2593,38 +2602,13 @@ function registerGlobalShortcuts() {
         const result = await startSessionFromMain();
 
         if (result.success) {
-          // Show success notification
-          const notification = new Notification({
-            title: "Session Started",
-            body: "Your work session is now being tracked",
-            silent: false,
-          });
-
-          notification.on("click", () => {
-            if (consoleWindow && !consoleWindow.isDestroyed()) {
-              consoleWindow.show();
-              consoleWindow.focus();
-              consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
-            }
-          });
-
-          notification.show();
+          notificationService.notifySessionStarted("focused");
         } else {
-          // Show error notification
-          const notification = new Notification({
+          notificationService.show({
             title: "Could not start session",
             body: result.error || "Please try again",
-            silent: false,
+            clickAction: "focus",
           });
-
-          notification.on("click", () => {
-            if (consoleWindow && !consoleWindow.isDestroyed()) {
-              consoleWindow.show();
-              consoleWindow.focus();
-            }
-          });
-
-          notification.show();
         }
       } catch (error) {
         shortcutLogger.error(" Error starting session via shortcut:", error);
@@ -2637,30 +2621,11 @@ function registerGlobalShortcuts() {
 
   // Update Prompt Trigger (Cmd+Shift+U) - Shows notification to send update
   globalShortcut.register("CommandOrControl+Shift+U", () => {
-    try {
-      const notification = new Notification({
-        title: "Time to Send an Update",
-        body: "Click to open your session and share your progress",
-        silent: false,
-      });
-
-      notification.on("click", () => {
-        if (consoleWindow && !consoleWindow.isDestroyed()) {
-          consoleWindow.show();
-          consoleWindow.focus();
-          consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
-        }
-      });
-
-      notification.show();
-    } catch {
-      // Fallback: just open console if notification fails
-      if (consoleWindow && !consoleWindow.isDestroyed()) {
-        consoleWindow.show();
-        consoleWindow.focus();
-        consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
-      }
-    }
+    notificationService.show({
+      title: "Time to Send an Update",
+      body: "Click to open your session and share your progress",
+      clickAction: "view-active-session",
+    });
   });
 
   // Watching Pill Toggle (Cmd+Shift+W)
@@ -2725,6 +2690,14 @@ app.whenReady().then(async () => {
 
   setupIPC();
   registerGlobalShortcuts();
+
+  // Wire centralized notification service
+  notificationService.setClickHandler(handleNotificationAction);
+  notificationService.setUserIdProvider(() => currentUserContext?.userId ?? null);
+
+  // Wire update service → notification service (OS notifications on update events)
+  updateService.setOnUpdateAvailable((version) => notificationService.notifyUpdateAvailable(version));
+  updateService.setOnUpdateDownloaded((version) => notificationService.notifyUpdateDownloaded(version));
 
   // In dev mode, wait for the backend to be reachable before making any network calls.
   // Both processes start together via `npm run dev`, so the backend may still be initializing.

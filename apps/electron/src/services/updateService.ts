@@ -8,6 +8,8 @@ class UpdateService {
   private maxRetries = 3;
   private currentRetry = 0;
   private usingGitHubFallback = false;
+  private onUpdateAvailableCb: ((version: string) => void) | null = null;
+  private onUpdateDownloadedCb: ((version: string) => void) | null = null;
 
   constructor() {
     // Configure logger
@@ -45,6 +47,7 @@ class UpdateService {
         releaseNotes: info.releaseNotes,
         releaseDate: info.releaseDate,
       });
+      this.onUpdateAvailableCb?.(info.version);
     });
 
     autoUpdater.on("update-not-available", (info) => {
@@ -96,6 +99,7 @@ class UpdateService {
       this.notifyRenderers("update-downloaded", {
         version: info.version,
       });
+      this.onUpdateDownloadedCb?.(info.version);
     });
   }
 
@@ -235,6 +239,20 @@ class UpdateService {
         throw error;
       }
     }
+  }
+
+  /**
+   * Register a callback fired when an update is available.
+   */
+  setOnUpdateAvailable(cb: (version: string) => void): void {
+    this.onUpdateAvailableCb = cb;
+  }
+
+  /**
+   * Register a callback fired when an update has been downloaded.
+   */
+  setOnUpdateDownloaded(cb: (version: string) => void): void {
+    this.onUpdateDownloadedCb = cb;
   }
 
   /**

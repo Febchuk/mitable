@@ -281,18 +281,8 @@ interface ConsoleAPI {
     message: string;
   }) => Promise<{ success: boolean }>;
 
-  // Passive monitoring
-  setPassiveMonitoringEnabled: (enabled: boolean) => Promise<{ success: boolean }>;
-  getPassiveMonitoringState: () => Promise<{
-    state: "disabled" | "detecting" | "deferred";
-    sessionId: string | null;
-  }>;
-  onPassiveMonitoringStateUpdate: (
-    callback: (state: {
-      state: "disabled" | "detecting" | "deferred";
-      sessionId: string | null;
-    }) => void
-  ) => () => void;
+  // Navigation - Navigate to update/profile page (from update notification click)
+  onNavigateToUpdate: (callback: () => void) => () => void;
 }
 
 declare global {

@@ -702,8 +702,18 @@ class MonitoringSessionService {
       this.activeSession.consecutiveEmptyCaptures = 0;
       this.activeSession.lastSuccessfulCaptureAt = Date.now();
 
+      // Resolve accurate appName from focusWindowTracker (active-win)
+      // windowTitle is preserved separately — this only fixes the appName field
+      const trackedWindows = focusWindowTracker.getTrackedWindows();
+
       // Process each screenshot
       for (const screenshot of result.screenshots) {
+        const trackedMatch = trackedWindows.find(
+          (w) => w.windowId === screenshot.windowId || w.windowTitle === screenshot.windowTitle
+        );
+        if (trackedMatch?.appName) {
+          screenshot.appName = trackedMatch.appName;
+        }
         await this.processCapture(screenshot, trigger);
       }
 

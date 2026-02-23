@@ -6,6 +6,7 @@ import { createLogger } from "../../lib/logger";
 
 const logger = createLogger("ConsoleApp");
 import { UserProvider, useUser } from "./context/UserContext";
+import { UpdateProvider } from "./context/UpdateContext";
 import { VariantProvider } from "./context/VariantContext";
 import { RecapsProvider } from "./context/RecapsContext";
 import { DevFlagsProvider } from "./context/DevFlagsContext";
@@ -98,6 +99,12 @@ function NavigationHandler() {
       }
     });
 
+    // Listen for navigate-to-update (from update notification click)
+    const unsubscribeUpdate = window.consoleAPI.onNavigateToUpdate?.(() => {
+      logger.info(" Navigate to update/profile requested");
+      navigate("/profile");
+    });
+
     const unsubscribeSessionDetail = window.consoleAPI.onNavigateToSessionDetail?.((payload) => {
       // If user is on Calendar view, don't navigate away — just refresh data
       if (pathnameRef.current === "/calendar") {
@@ -122,6 +129,7 @@ function NavigationHandler() {
       unsubscribeChat?.();
       unsubscribeActiveSession?.();
       unsubscribeEndDialog?.();
+      unsubscribeUpdate?.();
       unsubscribeSessionDetail?.();
     };
   }, [navigate, queryClient]);
@@ -319,59 +327,61 @@ function App() {
         <TooltipProvider>
           <NavigationHandler />
           <MonitoringSessionHandler />
-          <UserProvider>
-            <RecapNotificationHandler />
-            <VariantWrapper>
-              <DevFlagsProvider>
-                <RecapsProvider>
-                  <Routes>
-                    {/* Public routes */}
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route path="/signup-organization" element={<SignupOrganizationPage />} />
-                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                    <Route path="/reset-password" element={<ResetPasswordPage />} />
-                    {/* Protected routes */}
-                    <Route
-                      path="/"
-                      element={
-                        <ProtectedRoute>
-                          <ConsoleLayout />
-                        </ProtectedRoute>
-                      }
-                    >
-                      <Route index element={<DefaultRoute />} />
-                      {/* Admin Routes */}
-                      <Route path="dashboard" element={<DashboardView />} />
-                      <Route path="people" element={<PeopleView />} />
-                      <Route path="people/new" element={<AddNewUser />} />
-                      <Route path="people/:id" element={<PersonDetail />} />
-                      <Route path="ask" element={<AskView />} />
-                      <Route path="integrations" element={<IntegrationsView />} />
-                      <Route path="setup" element={<SetupView />} />
-                      {/* Employee Routes */}
-                      <Route path="docs" element={<DocsView />} />
-                      <Route path="docs/:docId" element={<DocDetail />} />
-                      <Route path="artefacts" element={<ArtifactsView />} />
-                      <Route path="todos" element={<TodosView />} />
-                      {/* Calendar/Journal Routes */}
-                      <Route path="calendar" element={<CalendarView />} />
-                      <Route path="recaps" element={<RecapsView />} />
-                      <Route path="recaps/:recapId" element={<RecapDetail />} />
-                      {/* Focused Sessions Routes */}
-                      <Route path="monitoring" element={<MonitoringView />} />
-                      <Route path="monitoring/:sessionId" element={<SessionDetail />} />
-                      <Route path="profile" element={<UserProfilePage />} />
-                      {/* Legacy routes (hidden from nav but accessible via URL) */}
-                      <Route path="chats" element={<ChatsView />} />
-                      <Route path="chats/new" element={<NewChat />} />
-                      <Route path="chats/:chatId" element={<ChatDetail />} />
-                    </Route>
-                  </Routes>
-                </RecapsProvider>
-              </DevFlagsProvider>
-              <Toaster />
-            </VariantWrapper>
-          </UserProvider>
+          <UpdateProvider>
+            <UserProvider>
+              <RecapNotificationHandler />
+              <VariantWrapper>
+                <DevFlagsProvider>
+                  <RecapsProvider>
+                    <Routes>
+                      {/* Public routes */}
+                      <Route path="/login" element={<LoginPage />} />
+                      <Route path="/signup-organization" element={<SignupOrganizationPage />} />
+                      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                      <Route path="/reset-password" element={<ResetPasswordPage />} />
+                      {/* Protected routes */}
+                      <Route
+                        path="/"
+                        element={
+                          <ProtectedRoute>
+                            <ConsoleLayout />
+                          </ProtectedRoute>
+                        }
+                      >
+                        <Route index element={<DefaultRoute />} />
+                        {/* Admin Routes */}
+                        <Route path="dashboard" element={<DashboardView />} />
+                        <Route path="people" element={<PeopleView />} />
+                        <Route path="people/new" element={<AddNewUser />} />
+                        <Route path="people/:id" element={<PersonDetail />} />
+                        <Route path="ask" element={<AskView />} />
+                        <Route path="integrations" element={<IntegrationsView />} />
+                        <Route path="setup" element={<SetupView />} />
+                        {/* Employee Routes */}
+                        <Route path="docs" element={<DocsView />} />
+                        <Route path="docs/:docId" element={<DocDetail />} />
+                        <Route path="artefacts" element={<ArtifactsView />} />
+                        <Route path="todos" element={<TodosView />} />
+                        {/* Calendar/Journal Routes */}
+                        <Route path="calendar" element={<CalendarView />} />
+                        <Route path="recaps" element={<RecapsView />} />
+                        <Route path="recaps/:recapId" element={<RecapDetail />} />
+                        {/* Focused Sessions Routes */}
+                        <Route path="monitoring" element={<MonitoringView />} />
+                        <Route path="monitoring/:sessionId" element={<SessionDetail />} />
+                        <Route path="profile" element={<UserProfilePage />} />
+                        {/* Legacy routes (hidden from nav but accessible via URL) */}
+                        <Route path="chats" element={<ChatsView />} />
+                        <Route path="chats/new" element={<NewChat />} />
+                        <Route path="chats/:chatId" element={<ChatDetail />} />
+                      </Route>
+                    </Routes>
+                  </RecapsProvider>
+                </DevFlagsProvider>
+                <Toaster />
+              </VariantWrapper>
+            </UserProvider>
+          </UpdateProvider>
         </TooltipProvider>
       </HashRouter>
       <ReactQueryDevtools initialIsOpen={false} />

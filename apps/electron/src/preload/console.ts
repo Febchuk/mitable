@@ -94,6 +94,8 @@ const IPC_CHANNELS = {
   EXPORT_PDF: "export-pdf",
   // Recap Notifications
   SHOW_RECAP_NOTIFICATION: "show-recap-notification",
+  // Update Navigation
+  NAVIGATE_TO_UPDATE: "navigate-to-update",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -602,6 +604,16 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     message: string;
   }): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.SHOW_RECAP_NOTIFICATION, config),
+
+  // Navigation - Navigate to update/profile page (from update notification click)
+  onNavigateToUpdate: (callback: () => void): (() => void) => {
+    const handler = () => {
+      logger.info(" Navigate to update received");
+      callback();
+    };
+    ipcRenderer.on(IPC_CHANNELS.NAVIGATE_TO_UPDATE, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.NAVIGATE_TO_UPDATE, handler);
+  },
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

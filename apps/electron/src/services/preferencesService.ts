@@ -27,6 +27,12 @@ interface AudioPreferences {
   systemAudioOutputId: string | null; // null = default output device
 }
 
+interface NotificationPreferences {
+  updateNotifications: boolean;
+  sessionNotifications: boolean;
+  nudgeNotifications: boolean;
+}
+
 // Preferences schema
 interface PreferencesSchema {
   session: {
@@ -311,6 +317,28 @@ class PreferencesService {
     logger.info(` Pill display mode for user ${userId} set to: ${mode}`);
   }
 
+  // Notification preferences (user-scoped)
+  getUserNotificationPreferences(userId: string): NotificationPreferences {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    return {
+      updateNotifications: userPrefs.updateNotifications ?? true,
+      sessionNotifications: userPrefs.sessionNotifications ?? true,
+      nudgeNotifications: userPrefs.nudgeNotifications ?? true,
+    };
+  }
+
+  setUserNotificationPreferences(
+    userId: string,
+    prefs: Partial<NotificationPreferences>
+  ): void {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    this.store.set(`users.${userId}`, {
+      ...userPrefs,
+      ...prefs,
+    });
+    logger.info(` Notification preferences for user ${userId} updated:`, prefs);
+  }
+
   // Audio preferences
   getAudioPreferences(): AudioPreferences {
     return (
@@ -337,4 +365,5 @@ export type {
   SummaryDetailLevel,
   SummaryFormat,
   AudioPreferences,
+  NotificationPreferences,
 };
