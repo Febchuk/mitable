@@ -49,6 +49,7 @@ interface PreferencesSchema {
       notificationFrequencyMinutes: number; // Frequency in minutes for reminder notifications
       autoSessionStart: boolean; // Auto-start session on powerMonitor resume
       autoRecap: boolean; // Auto-create recap after session ends
+      passiveMonitoringEnabled: boolean; // Auto-detect activity and start/stop sessions
     };
   };
 }
@@ -258,6 +259,22 @@ class PreferencesService {
     logger.info(` Auto recap for user ${userId} set to: ${enabled}`);
   }
 
+  // Passive monitoring preference (user-scoped)
+  getUserPassiveMonitoringEnabled(userId: string): boolean {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    // Default to true — passive monitoring is on unless explicitly disabled
+    return userPrefs.passiveMonitoringEnabled ?? true;
+  }
+
+  setUserPassiveMonitoringEnabled(userId: string, enabled: boolean): void {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    this.store.set(`users.${userId}`, {
+      ...userPrefs,
+      passiveMonitoringEnabled: enabled,
+    });
+    logger.info(` Passive monitoring for user ${userId} set to: ${enabled}`);
+  }
+
   // Summary preferences
   getSummaryPreferences(): SummaryPreferences {
     return (
@@ -327,10 +344,7 @@ class PreferencesService {
     };
   }
 
-  setUserNotificationPreferences(
-    userId: string,
-    prefs: Partial<NotificationPreferences>
-  ): void {
+  setUserNotificationPreferences(userId: string, prefs: Partial<NotificationPreferences>): void {
     const userPrefs = this.store.get(`users.${userId}`, {});
     this.store.set(`users.${userId}`, {
       ...userPrefs,

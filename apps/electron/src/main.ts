@@ -817,6 +817,31 @@ function setupPowerMonitor() {
   powerLogger.info(" PowerMonitor listeners registered");
 }
 
+/**
+ * Auto-enable passive monitoring if the user's preference allows it (default: true).
+ * Called after user context is established (login or session restore).
+ */
+function autoEnablePassiveMonitoring(userId: string) {
+  const enabled = preferencesService.getUserPassiveMonitoringEnabled(userId);
+  if (!enabled) {
+    monitoringLogger.info("Passive monitoring preference is off, skipping auto-enable");
+    return;
+  }
+
+  const { state } = passiveMonitorService.getState();
+  if (state !== "disabled") {
+    monitoringLogger.info(`Passive monitoring already ${state}, skipping auto-enable`);
+    return;
+  }
+
+  monitoringLogger.info("Auto-enabling passive monitoring on startup");
+  passiveMonitorService.enable({
+    startSession: () => startSessionFromMain("passive"),
+    endSession: (sessionId) => endPassiveSessionFromMain(sessionId),
+    isAudioActive: () => audioWebSocketService.isConnected(),
+  });
+}
+
 // IPC Handlers
 function setupIPC() {
   ipcLogger.info(" Setting up IPC handlers...");
@@ -1317,6 +1342,9 @@ function setupIPC() {
             authLogger.info("Refresh token persisted to keychain after user context set");
           });
       }
+
+      // Auto-enable passive monitoring if preference is on (default: true)
+      autoEnablePassiveMonitoring(user.userId);
     }
   );
 
@@ -1879,12 +1907,16 @@ function setupMonitoringSessionHandlers() {
           endSession: (sessionId) => endPassiveSessionFromMain(sessionId),
           isAudioActive: () => audioWebSocketService.isConnected(),
         });
+        preferencesService.setUserPassiveMonitoringEnabled(currentUserContext.userId, true);
       } else {
         monitoringLogger.warn(" Cannot enable passive monitoring: no user context");
         return { success: false };
       }
     } else {
       await passiveMonitorService.disable();
+      if (currentUserContext) {
+        preferencesService.setUserPassiveMonitoringEnabled(currentUserContext.userId, false);
+      }
     }
     return { success: true };
   });
@@ -2696,8 +2728,12 @@ app.whenReady().then(async () => {
   notificationService.setUserIdProvider(() => currentUserContext?.userId ?? null);
 
   // Wire update service → notification service (OS notifications on update events)
-  updateService.setOnUpdateAvailable((version) => notificationService.notifyUpdateAvailable(version));
-  updateService.setOnUpdateDownloaded((version) => notificationService.notifyUpdateDownloaded(version));
+  updateService.setOnUpdateAvailable((version) =>
+    notificationService.notifyUpdateAvailable(version)
+  );
+  updateService.setOnUpdateDownloaded((version) =>
+    notificationService.notifyUpdateDownloaded(version)
+  );
 
   // In dev mode, wait for the backend to be reachable before making any network calls.
   // Both processes start together via `npm run dev`, so the backend may still be initializing.
@@ -2740,6 +2776,9 @@ app.whenReady().then(async () => {
         userId: restored.userId,
         organizationId: restored.organizationId,
       };
+
+      // Auto-enable passive monitoring if preference is on (default: true)
+      autoEnablePassiveMonitoring(restored.userId);
 
       // Push restored tokens to the console renderer once it's ready
       const pushTokensToConsole = () => {

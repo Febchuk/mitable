@@ -713,9 +713,7 @@ class MonitoringSessionService {
         const normalizedId = screenshot.windowId.startsWith("window:")
           ? screenshot.windowId.split(":")[1]
           : screenshot.windowId;
-        const trackedMatch = trackedWindows.find(
-          (w) => w.windowId === normalizedId
-        );
+        const trackedMatch = trackedWindows.find((w) => w.windowId === normalizedId);
         if (trackedMatch?.appName) {
           screenshot.appName = trackedMatch.appName;
         }

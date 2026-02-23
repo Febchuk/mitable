@@ -65,7 +65,10 @@ class NotificationService {
 
     // Preference check
     if (options.category && !this.isCategoryEnabled(options.category)) {
-      logger.info(`Notification suppressed (category "${options.category}" disabled):`, options.title);
+      logger.info(
+        `Notification suppressed (category "${options.category}" disabled):`,
+        options.title
+      );
       return;
     }
 

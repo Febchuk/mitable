@@ -56,7 +56,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
     });
 
     const unsubDownloaded = window.consoleAPI.onUpdateDownloaded?.((info) => {
-      setUpdateInfo((prev) => prev ? { ...prev, ...info } : { version: info.version });
+      setUpdateInfo((prev) => (prev ? { ...prev, ...info } : { version: info.version }));
       setUpdateState("downloaded");
       setDownloadProgress(null);
       // Re-show banner when download completes (even if previously dismissed)
