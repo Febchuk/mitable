@@ -5,8 +5,10 @@
  * Supports block status display and recap actions.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 /** Strip markdown formatting for clean plain-text display */
 function stripMarkdown(text: string): string {
@@ -145,6 +147,13 @@ export default function WorkBlockDetail({
   // Get summary from block detail if available
   const displaySummary =
     blockDetail?.finalSummary || blockDetail?.rawActivitySummary || block.summary;
+
+  // Render markdown summary to sanitized HTML
+  const renderedSummaryHtml = useMemo(() => {
+    if (!displaySummary) return "";
+    const result = marked.parse(displaySummary);
+    return typeof result === "string" ? DOMPurify.sanitize(result) : "";
+  }, [displaySummary]);
 
   // Handle creating a recap from this block
   const handleCreateRecap = () => {
@@ -342,9 +351,12 @@ export default function WorkBlockDetail({
                     <Loader2 size={12} className="text-ink-tertiary animate-spin" />
                   )}
                 </div>
-                <p className="text-sm text-ink-secondary leading-relaxed whitespace-pre-line">
-                  {displaySummary ? stripMarkdown(displaySummary) : "Loading..."}
-                </p>
+                <div
+                  className="text-sm text-ink-secondary leading-relaxed prose prose-sm prose-invert max-w-none max-h-[200px] overflow-y-auto pr-2 scrollbar-thin"
+                  dangerouslySetInnerHTML={{
+                    __html: displaySummary ? renderedSummaryHtml : "<p>Loading...</p>",
+                  }}
+                />
                 {/* Create Recap action */}
                 {block.status !== "active" && block.status !== "paused" && (
                   <button

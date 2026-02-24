@@ -939,9 +939,13 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
   }
 
   try {
-    // Get user's organization
+    // Get user's organization and name (for document authorship)
     const [user] = await db
-      .select({ organizationId: schema.users.organizationId })
+      .select({
+        organizationId: schema.users.organizationId,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+      })
       .from(schema.users)
       .where(eq(schema.users.id, userId))
       .limit(1);
@@ -953,6 +957,8 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
       });
       return;
     }
+
+    const authorName = [user.firstName, user.lastName].filter(Boolean).join(" ") || undefined;
 
     // Set up Server-Sent Events
     res.setHeader("Content-Type", "text/event-stream");
@@ -978,6 +984,7 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
         userId,
         sessionIds, // Optional session IDs as hints
         artifactIds, // Optional artifact IDs to include
+        authorName, // User's real name for document content
       });
 
       for await (const chunk of stream) {

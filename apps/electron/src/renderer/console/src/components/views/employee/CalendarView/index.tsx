@@ -24,6 +24,8 @@ import {
   List,
   Loader2,
   AlertCircle,
+  Pause,
+  Play,
 } from "lucide-react";
 import DayCard from "./DayCard";
 import DaySummary from "./DaySummary";
@@ -33,14 +35,21 @@ import {
   type CalendarEvent,
 } from "@/components/application/calendar/calendar";
 import type { ActivityDay } from "./types";
+import { useToast } from "@/hooks/use-toast";
 import { useCalendarDays, calendarKeys } from "../../../../hooks/queries/calendar";
 import { useStartSession } from "../../../../hooks/useStartSession";
 import {
   useSessions,
   monitoringKeys,
   useGenerateDaySummary,
+  useUpdateSession,
 } from "../../../../hooks/queries/monitoring";
-import { endSession, uploadCaptures } from "../../../../services/monitoringService";
+import {
+  endSession,
+  uploadCaptures,
+  pauseMonitoringSession,
+  resumeMonitoringSession,
+} from "../../../../services/monitoringService";
 
 // Helper functions
 function getStartOfWeek(date: Date): Date {
@@ -128,6 +137,7 @@ type ViewMode = "detail" | "week" | "month";
 
 export default function CalendarView() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
@@ -140,8 +150,11 @@ export default function CalendarView() {
     (s: any) => s.status === "active" || s.status === "paused"
   );
   const [isStopping, setIsStopping] = useState(false);
+  const [isPauseLoading, setIsPauseLoading] = useState(false);
   const [electronSessionActive, setElectronSessionActive] = useState<boolean | null>(null);
   const [electronSessionId, setElectronSessionId] = useState<string | null>(null);
+  const [electronSessionStatus, setElectronSessionStatus] = useState<string | null>(null);
+  const updateSessionMutation = useUpdateSession();
 
   // Day summary state
   const [daySummaries, setDaySummaries] = useState<Record<string, string>>({});
@@ -153,12 +166,14 @@ export default function CalendarView() {
     window.consoleAPI?.getMonitoringSessionState?.().then((state) => {
       setElectronSessionActive(state?.status === "active" || state?.status === "paused");
       setElectronSessionId(state?.id || null);
+      setElectronSessionStatus(state?.status || null);
     });
     // Listen for updates
     const unsub = window.consoleAPI?.onMonitoringSessionUpdate?.((state) => {
       const isActive = state?.status === "active" || state?.status === "paused";
       setElectronSessionActive(isActive);
       setElectronSessionId(state?.id || null);
+      setElectronSessionStatus(state?.status || null);
     });
     return () => unsub?.();
   }, []);
@@ -289,6 +304,42 @@ export default function CalendarView() {
     return formatDateRange(weekStart, getEndOfWeek(weekStart));
   };
 
+  // Derive whether the session is paused
+  const isSessionPaused =
+    electronSessionStatus === "paused" ||
+    (backendActiveSession && (backendActiveSession as any).status === "paused");
+
+  // Handle pause/resume
+  const handlePauseSession = async () => {
+    const sessionId = activeSession?.id;
+    if (!sessionId) return;
+    setIsPauseLoading(true);
+    try {
+      await pauseMonitoringSession();
+      await updateSessionMutation.mutateAsync({ sessionId, action: "pause" });
+      refreshData();
+    } catch (error) {
+      console.error("Failed to pause session:", error);
+    } finally {
+      setIsPauseLoading(false);
+    }
+  };
+
+  const handleResumeSession = async () => {
+    const sessionId = activeSession?.id;
+    if (!sessionId) return;
+    setIsPauseLoading(true);
+    try {
+      await resumeMonitoringSession();
+      await updateSessionMutation.mutateAsync({ sessionId, action: "resume" });
+      refreshData();
+    } catch (error) {
+      console.error("Failed to resume session:", error);
+    } finally {
+      setIsPauseLoading(false);
+    }
+  };
+
   // Handle record toggle
   const handleRecord = async () => {
     if (activeSession && activeSession.id) {
@@ -341,10 +392,16 @@ export default function CalendarView() {
                 </h1>
                 <p className="text-ink-tertiary text-sm">
                   Passive tracking{" "}
-                  {hasActiveBlock && (
+                  {hasActiveBlock && !isSessionPaused && (
                     <span className="text-emerald">
                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald mr-1 animate-pulse" />
                       recording
+                    </span>
+                  )}
+                  {hasActiveBlock && isSessionPaused && (
+                    <span className="text-amber">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber mr-1" />
+                      paused
                     </span>
                   )}
                 </p>
@@ -393,33 +450,66 @@ export default function CalendarView() {
                 </button>
               </div>
 
-              {/* Record / Stop button */}
-              <button
-                onClick={handleRecord}
-                disabled={isStarting || isStopping}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                  activeSession
-                    ? "bg-rose/10 text-rose border border-rose/20 hover:bg-rose/20"
-                    : "bg-indigo text-white hover:bg-indigo/90 shadow-sm hover:shadow-md"
-                } disabled:opacity-60 disabled:cursor-not-allowed`}
-              >
-                {isStarting ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : isStopping ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : activeSession ? (
-                  <Square size={14} className="fill-current" />
-                ) : (
-                  <Circle size={14} className="fill-current" />
-                )}
-                {isStarting
-                  ? "Starting..."
-                  : isStopping
-                    ? "Stopping..."
-                    : activeSession
-                      ? "Stop"
-                      : "Record"}
-              </button>
+              {/* Session controls */}
+              {activeSession ? (
+                <div className="flex items-center gap-2">
+                  {/* Pause / Resume button */}
+                  {isSessionPaused ? (
+                    <button
+                      onClick={handleResumeSession}
+                      disabled={isPauseLoading}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-emerald/10 text-emerald border border-emerald/20 hover:bg-emerald/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isPauseLoading ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        <Play size={14} className="fill-current" />
+                      )}
+                      Resume
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handlePauseSession}
+                      disabled={isPauseLoading}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-amber/10 text-amber border border-amber/20 hover:bg-amber/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isPauseLoading ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        <Pause size={14} className="fill-current" />
+                      )}
+                      Pause
+                    </button>
+                  )}
+
+                  {/* Stop button */}
+                  <button
+                    onClick={handleRecord}
+                    disabled={isStopping}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-rose/10 text-rose border border-rose/20 hover:bg-rose/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isStopping ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <Square size={14} className="fill-current" />
+                    )}
+                    {isStopping ? "Stopping..." : "Stop"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleRecord}
+                  disabled={isStarting}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-indigo text-white hover:bg-indigo/90 shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isStarting ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Circle size={14} className="fill-current" />
+                  )}
+                  {isStarting ? "Starting..." : "Record"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -542,9 +632,28 @@ export default function CalendarView() {
                           });
                           if (result.summary) {
                             setDaySummaries((prev) => ({ ...prev, [dateKey]: result.summary! }));
+                            toast({
+                              title: "Summary generated",
+                              description: `Summarized ${result.blockCount} block${result.blockCount !== 1 ? "s" : ""}`,
+                            });
+                          } else {
+                            toast({
+                              title: "No summary available",
+                              description:
+                                result.message ||
+                                "Blocks don't have summaries yet. Try again later.",
+                              variant: "destructive",
+                            });
                           }
-                        } catch {
-                          // silently fail
+                        } catch (error) {
+                          toast({
+                            title: "Summary generation failed",
+                            description:
+                              error instanceof Error
+                                ? error.message
+                                : "Something went wrong. Please try again.",
+                            variant: "destructive",
+                          });
                         }
                       }}
                       disabled={daySummaryMutation.isPending}
