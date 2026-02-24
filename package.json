@@ -12,6 +12,7 @@
     "dev": "turbo run dev",
     "dev:debug-screenshots": "cross-env DEBUG_SAVE_SCREENSHOTS=true turbo run dev",
     "dev:backend": "npm run dev --workspace=apps/backend",
+    "dev:website": "npm run dev --workspace=apps/website",
     "dev:admin": "concurrently \"npm run dev --workspace=apps/backend\" \"npm run dev:admin --workspace=apps/electron\"",
     "dev:employee": "concurrently \"npm run dev --workspace=apps/backend\" \"npm run dev:employee --workspace=apps/electron\"",
     "dev:admin:windows": "concurrently \"npm run dev --workspace=apps/backend\" \"npm run dev:admin:windows --workspace=apps/electron\"",
@@ -58,6 +59,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "electron": "^39.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7"
   }

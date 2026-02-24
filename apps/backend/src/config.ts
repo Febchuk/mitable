@@ -149,6 +149,14 @@ export const config = {
     keyPath: (process.env.GOOGLE_CLOUD_KEY_PATH || "").trim(),
   },
 
+  // Stripe Configuration
+  stripe: {
+    secretKey: (process.env.STRIPE_SECRET_KEY || "").trim(),
+    webhookSecret: (process.env.STRIPE_WEBHOOK_SECRET || "").trim(),
+    proPriceId: (process.env.STRIPE_PRO_PRICE_ID || "").trim(),
+    teamPriceId: (process.env.STRIPE_TEAM_PRICE_ID || "").trim(),
+  },
+
   // Billing Configuration
   billing: {
     // Internal domains that bypass quota limits (test accounts)
