@@ -27,7 +27,6 @@ import {
   ChevronRight,
   Clock,
   Coffee,
-  Activity,
   BarChart3,
   Target,
   MoreVertical,
@@ -38,7 +37,6 @@ import {
   Pause,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
-import CaptureTimeline from "./CaptureTimeline";
 import { useBlockDetail } from "../../../../hooks/queries/calendar";
 import { useDeleteSession } from "../../../../hooks/queries/monitoring";
 
@@ -119,7 +117,6 @@ export default function WorkBlockDetail({
 }: WorkBlockDetailProps) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  const [showCaptures, setShowCaptures] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -248,12 +245,6 @@ export default function WorkBlockDetail({
             <span className="text-sm font-medium tabular-nums">
               {formatDuration(block.duration)}
             </span>
-          </div>
-
-          {/* Capture count */}
-          <div className="flex-shrink-0 flex items-center gap-1.5 text-ink-tertiary">
-            <Activity size={14} />
-            <span className="text-sm tabular-nums">{block.captures.length}</span>
           </div>
 
           {/* Status badge */}
@@ -404,31 +395,6 @@ export default function WorkBlockDetail({
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* Captures toggle */}
-            <div className="border-t border-stroke-subtle">
-              <button
-                onClick={() => setShowCaptures(!showCaptures)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-canvas-muted/30 transition-colors"
-              >
-                <span className="text-sm text-ink-secondary">
-                  {showCaptures ? "Hide" : "View"} capture timeline
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`text-ink-tertiary transition-transform ${
-                    showCaptures ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {/* Capture timeline */}
-              {showCaptures && (
-                <div className="border-t border-stroke-subtle max-h-80 overflow-y-auto">
-                  <CaptureTimeline captures={block.captures} maxVisible={30} />
-                </div>
-              )}
             </div>
           </div>
         )}

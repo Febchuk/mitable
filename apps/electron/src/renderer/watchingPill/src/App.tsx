@@ -222,16 +222,16 @@ export default function App() {
 
   return (
     <div
-      className="h-full w-full flex items-start justify-center app-drag"
+      className="h-full w-full flex items-start justify-center px-1.5 pt-1 app-drag"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       {/* Vertical Pill Container */}
-      <div className="flex flex-col items-center bg-[#1A1A1A]/95 backdrop-blur-lg rounded-full shadow-2xl border border-white/10 p-2.5 gap-1.5 transition-all duration-300 ease-in-out">
+      <div className="flex flex-col items-center bg-[#1A1A1A]/95 backdrop-blur-lg rounded-full shadow-2xl border border-white/10 p-2.5 gap-2 transition-all duration-300 ease-in-out">
         {/* Top: Mitable Logo with status indicator — always visible */}
         <button
           onClick={handleLogoClick}
-          className="relative w-6 h-6 flex items-center justify-center app-no-drag cursor-pointer group"
+          className="relative w-7 h-7 flex items-center justify-center app-no-drag cursor-pointer group"
           aria-label="Open Mitable console"
           title="Open Console"
         >
@@ -243,18 +243,18 @@ export default function App() {
 
           {/* Recording indicator - red dot */}
           {isActive && (
-            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
           )}
 
           {/* Paused indicator - amber dot */}
           {isPaused && (
-            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+            <div className="absolute top-0 right-0 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
           )}
         </button>
 
         {/* Expandable section — visible on hover */}
         <div
-          className={`flex flex-col items-center gap-1.5 overflow-hidden transition-all duration-300 ease-in-out ${
+          className={`flex flex-col items-center gap-2 overflow-hidden transition-all duration-300 ease-in-out ${
             isExpanded ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
           }`}
         >
@@ -264,7 +264,7 @@ export default function App() {
           {/* Eye Button - opens window selector dropdown */}
           <button
             onClick={handleEyeClick}
-            className={`relative w-6 h-6 flex items-center justify-center rounded-full transition-all app-no-drag ${
+            className={`relative w-7 h-7 flex items-center justify-center rounded-full transition-all app-no-drag ${
               eyeDropdownOpen
                 ? "bg-primary/30 text-white"
                 : selectedWindows.length > 0
@@ -275,34 +275,31 @@ export default function App() {
           >
             {selectedWindows.length > 0 ? (
               <>
-                <Eye size={12} />
-                <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-primary rounded-full text-[8px] text-white flex items-center justify-center font-medium px-0.5">
+                <Eye size={13} />
+                <span className="absolute -top-0.5 right-0 min-w-[12px] h-[12px] bg-primary rounded-full text-[7px] text-white flex items-center justify-center font-medium leading-none">
                   {selectedWindows.length}
                 </span>
               </>
             ) : (
-              <EyeOff size={12} />
+              <EyeOff size={13} />
             )}
           </button>
-
-          {/* Divider */}
-          <div className="w-5 h-px bg-white/10" />
 
           {/* Microphone Button - Audio Recording Toggle */}
           <button
             onClick={handleMicClick}
-            className={`relative w-6 h-6 flex items-center justify-center rounded-full transition-all app-no-drag ${
+            className={`relative w-7 h-7 flex items-center justify-center rounded-full transition-all app-no-drag ${
               audioRecordingEnabled
                 ? "bg-red-500/30 text-white hover:bg-red-500/40 active:bg-red-500/50 active:scale-95"
                 : "hover:bg-white/10 active:bg-white/20 active:scale-95 text-white/70"
             }`}
             aria-label={audioRecordingEnabled ? "Stop audio recording" : "Start audio recording"}
           >
-            {audioRecordingEnabled ? <Mic size={12} /> : <MicOff size={12} />}
+            {audioRecordingEnabled ? <Mic size={13} /> : <MicOff size={13} />}
 
             {/* Recording indicator - pulsing red dot */}
             {audioRecordingActive && (
-              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
             )}
           </button>
 
@@ -312,12 +309,12 @@ export default function App() {
           {/* Menu Button */}
           <button
             onClick={handleMenuClick}
-            className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors app-no-drag ${
+            className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors app-no-drag ${
               menuDropdownOpen ? "bg-white/10" : "hover:bg-white/10"
             }`}
             aria-label="Open menu"
           >
-            <MoreVertical size={12} className="text-white/70" />
+            <MoreVertical size={13} className="text-white/70" />
           </button>
         </div>
       </div>

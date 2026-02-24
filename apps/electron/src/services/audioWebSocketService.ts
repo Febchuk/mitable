@@ -32,7 +32,8 @@ interface AudioConnectionState {
 class AudioWebSocketService {
   private connection: AudioConnectionState | null = null;
   private readonly MAX_RECONNECT_ATTEMPTS = 3;
-  private readonly RECONNECT_DELAY_MS = 2000;
+  private readonly BASE_RECONNECT_DELAY_MS = 2000;
+  private reconnectCount = 0;
 
   /**
    * Connect to backend WebSocket for audio streaming
@@ -66,7 +67,7 @@ class AudioWebSocketService {
         token,
         ws,
         isConnected: false,
-        reconnectAttempts: 0,
+        reconnectAttempts: this.reconnectCount,
       };
 
       // Handle connection opened
@@ -75,6 +76,7 @@ class AudioWebSocketService {
         if (this.connection) {
           this.connection.isConnected = true;
           this.connection.reconnectAttempts = 0;
+          this.reconnectCount = 0;
         }
       });
 
@@ -95,14 +97,29 @@ class AudioWebSocketService {
 
       // Handle connection closed
       ws.on("close", (code, reason) => {
-        logger.info(`🔌 WebSocket closed. Code: ${code}, Reason: ${reason.toString()}`);
+        const reasonStr = reason.toString();
+        logger.info(`🔌 WebSocket closed. Code: ${code}, Reason: ${reasonStr}`);
 
         if (this.connection) {
           this.connection.isConnected = false;
 
-          // Attempt reconnection if not intentionally closed
-          if (code !== 1000 && this.connection.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
+          // Don't reconnect on intentional close or auth failures
+          const isAuthFailure =
+            code === 1006 || reasonStr.includes("401") || reasonStr.includes("Invalid");
+          if (code === 1000 || isAuthFailure) {
+            if (isAuthFailure) {
+              logger.warn("🚫 Auth failure — not retrying with stale token");
+            }
+            return;
+          }
+
+          // Attempt reconnection for transient failures only
+          if (this.reconnectCount < this.MAX_RECONNECT_ATTEMPTS) {
             this.attemptReconnect();
+          } else {
+            logger.warn(
+              `🚫 Max reconnect attempts (${this.MAX_RECONNECT_ATTEMPTS}) reached — giving up`
+            );
           }
         }
       });
@@ -155,6 +172,7 @@ class AudioWebSocketService {
       logger.error("❌ Error disconnecting WebSocket:", error);
     } finally {
       this.connection = null;
+      this.reconnectCount = 0;
     }
   }
 
@@ -164,17 +182,19 @@ class AudioWebSocketService {
   private async attemptReconnect(): Promise<void> {
     if (!this.connection) return;
 
-    this.connection.reconnectAttempts++;
+    this.reconnectCount++;
+    this.connection.reconnectAttempts = this.reconnectCount;
 
+    const delay = this.BASE_RECONNECT_DELAY_MS * Math.pow(2, this.reconnectCount - 1);
     logger.info(
-      `🔄 Attempting reconnection ${this.connection.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS}...`
+      `🔄 Attempting reconnection ${this.reconnectCount}/${this.MAX_RECONNECT_ATTEMPTS} in ${delay}ms...`
     );
 
     setTimeout(() => {
       if (this.connection) {
         this.connect(this.connection.sessionId, this.connection.backendUrl, this.connection.token);
       }
-    }, this.RECONNECT_DELAY_MS);
+    }, delay);
   }
 
   /**

@@ -35,7 +35,11 @@ import {
 import type { ActivityDay } from "./types";
 import { useCalendarDays, calendarKeys } from "../../../../hooks/queries/calendar";
 import { useStartSession } from "../../../../hooks/useStartSession";
-import { useSessions, monitoringKeys } from "../../../../hooks/queries/monitoring";
+import {
+  useSessions,
+  monitoringKeys,
+  useGenerateDaySummary,
+} from "../../../../hooks/queries/monitoring";
 import { endSession, uploadCaptures } from "../../../../services/monitoringService";
 
 // Helper functions
@@ -138,6 +142,10 @@ export default function CalendarView() {
   const [isStopping, setIsStopping] = useState(false);
   const [electronSessionActive, setElectronSessionActive] = useState<boolean | null>(null);
   const [electronSessionId, setElectronSessionId] = useState<string | null>(null);
+
+  // Day summary state
+  const [daySummaries, setDaySummaries] = useState<Record<string, string>>({});
+  const daySummaryMutation = useGenerateDaySummary();
 
   // Listen to Electron-local session state for immediate button response
   useEffect(() => {
@@ -523,15 +531,48 @@ export default function CalendarView() {
 
                   {/* AI Summary button */}
                   {selectedDay.workBlocks.length > 0 && (
-                    <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:border-indigo/30 hover:bg-indigo/5 text-ink-secondary hover:text-indigo transition-all">
-                      <Sparkles size={16} />
-                      <span className="text-sm font-medium">Regenerate Summary</span>
+                    <button
+                      onClick={async () => {
+                        const dateKey = selectedDate.toISOString().split("T")[0];
+                        const sessionIds = selectedDay.workBlocks.map((b) => b.id);
+                        try {
+                          const result = await daySummaryMutation.mutateAsync({
+                            date: dateKey,
+                            sessionIds,
+                          });
+                          if (result.summary) {
+                            setDaySummaries((prev) => ({ ...prev, [dateKey]: result.summary! }));
+                          }
+                        } catch {
+                          // silently fail
+                        }
+                      }}
+                      disabled={daySummaryMutation.isPending}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:border-indigo/30 hover:bg-indigo/5 text-ink-secondary hover:text-indigo transition-all disabled:opacity-40"
+                    >
+                      {daySummaryMutation.isPending ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={16} />
+                      )}
+                      <span className="text-sm font-medium">
+                        {daySummaries[selectedDate.toISOString().split("T")[0]] ||
+                        selectedDay.summary
+                          ? "Regenerate Summary"
+                          : "Generate Summary"}
+                      </span>
                     </button>
                   )}
                 </div>
 
                 {/* Day Summary with toggle */}
-                <DaySummary day={selectedDay} />
+                <DaySummary
+                  day={{
+                    ...selectedDay,
+                    summary:
+                      daySummaries[selectedDate.toISOString().split("T")[0]] || selectedDay.summary,
+                  }}
+                />
 
                 {/* Work blocks */}
                 <WorkBlockList

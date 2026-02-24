@@ -649,7 +649,7 @@ export default function AskView() {
       }
 
       const aiMsg: Message = {
-        id: `ai-${Date.now()}`,
+        id: response.messageId || `ai-${Date.now()}`,
         role: "assistant",
         content: response.message,
         timestamp: new Date(),
