@@ -9,6 +9,7 @@ import { notionService } from "../services/notion.service.js";
 import { llmService } from "../services/llm.service.js";
 import { encryptionService } from "../services/encryption.service.js";
 import { config } from "../config.js";
+import { sendWelcomeEmployeeEmail } from "../services/email/email.service.js";
 
 const router = Router();
 
@@ -1451,21 +1452,25 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Send welcome email with password reset link if requested
+    // Send branded welcome email with credentials via Resend
     if (sendWelcomeEmail !== false) {
       try {
-        // Use Supabase's password reset flow to send a secure password setup email
-        const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-          redirectTo: `${config.backendUrl}/api/auth/reset-password`,
-        });
+        const [org] = await db
+          .select({ name: schema.organizations.name })
+          .from(schema.organizations)
+          .where(eq(schema.organizations.id, currentUser.organizationId))
+          .limit(1);
 
-        if (resetError) {
-          console.error("Failed to send welcome email:", resetError);
-          // Don't fail the entire request if email fails - user is already created
-        }
+        await sendWelcomeEmployeeEmail({
+          to: email,
+          firstName,
+          organizationName: org?.name || "your organization",
+          temporaryPassword: tempPassword,
+          loginUrl: `${config.backendUrl}/api/auth/login`,
+        });
       } catch (emailError) {
         console.error("Error sending welcome email:", emailError);
-        // Don't fail the entire request if email fails
+        // Don't fail the entire request if email fails - user is already created
       }
     }
 

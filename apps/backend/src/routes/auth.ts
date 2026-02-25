@@ -7,6 +7,11 @@ import { eq } from "drizzle-orm";
 import { subscriptionService } from "../services/subscription.service.js";
 import { usageService } from "../services/usage.service.js";
 import { config } from "../config.js";
+import {
+  sendWelcomeAdminEmail,
+  sendPasswordResetEmail,
+  sendPasswordChangedEmail,
+} from "../services/email/email.service.js";
 
 export const authRouter = Router();
 
@@ -369,6 +374,13 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
       .from(schema.users)
       .where(eq(schema.users.id, data.user!.id))
       .limit(1);
+
+    // Send branded welcome email (non-blocking)
+    sendWelcomeAdminEmail({
+      to: email,
+      firstName,
+      organizationName: organization.name,
+    }).catch((err) => console.error("Welcome email failed:", err));
 
     res.status(201).json({
       success: true,
@@ -1235,8 +1247,17 @@ authRouter.post("/change-password", requireAuth, async (req: Request, res: Respo
       return;
     }
 
-    // TODO: Send confirmation email (optional - can be added later)
-    // await sendPasswordChangeConfirmationEmail(userProfile.email);
+    // Send confirmation email (non-blocking)
+    const [fullProfile] = await db
+      .select({ firstName: schema.users.firstName })
+      .from(schema.users)
+      .where(eq(schema.users.id, req.userId!))
+      .limit(1);
+
+    sendPasswordChangedEmail({
+      to: userProfile.email,
+      firstName: fullProfile?.firstName || "there",
+    }).catch((err) => console.error("Password changed email failed:", err));
 
     res.json({
       success: true,
@@ -1454,14 +1475,39 @@ authRouter.post("/forgot-password", async (req: Request, res: Response) => {
       return;
     }
 
-    // Send password reset email
-    // Supabase handles the case where email doesn't exist securely
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${config.backendUrl}/api/auth/reset-password`,
-    });
+    // Generate reset link via Supabase admin (doesn't send email),
+    // then send our own branded email via Resend.
+    // Falls back to Supabase's default email if generateLink fails.
+    const redirectTo = `${config.backendUrl}/api/auth/reset-password`;
 
-    if (error) {
-      console.error("Password reset email error:", error);
+    try {
+      const { data: linkData, error: linkError } =
+        await supabaseAdmin.auth.admin.generateLink({
+          type: "recovery",
+          email,
+          options: { redirectTo },
+        });
+
+      if (linkError || !linkData?.properties?.action_link) {
+        // Fallback: use Supabase's built-in email
+        console.error("generateLink failed, falling back to Supabase email:", linkError);
+        await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      } else {
+        // Look up user's first name for personalization
+        const [user] = await db
+          .select({ firstName: schema.users.firstName })
+          .from(schema.users)
+          .where(eq(schema.users.email, email))
+          .limit(1);
+
+        await sendPasswordResetEmail({
+          to: email,
+          firstName: user?.firstName || "there",
+          resetUrl: linkData.properties.action_link,
+        });
+      }
+    } catch (emailErr) {
+      console.error("Password reset email error:", emailErr);
       // Still return success to avoid email enumeration
     }
 
