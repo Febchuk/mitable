@@ -84,6 +84,29 @@ class PassiveMonitorService {
   }
 
   /**
+   * Reset internal state without calling the endSession callback.
+   * Used during graceful shutdown when the session has already been ended
+   * by the central endAllActiveSessions() handler.
+   */
+  forceReset(): void {
+    logger.info("Force-resetting passive monitor state");
+    this.stopPolling();
+    this.activePassiveSessionId = null;
+    this.consecutiveActivePolls = 0;
+    this.state = "disabled";
+    this.callbacks = null;
+  }
+
+  /**
+   * Returns true if passive monitoring was in an enabled state
+   * (detecting or had an active session). Used by the resume handler
+   * to know whether to restart after suspend.
+   */
+  wasEnabled(): boolean {
+    return this.state === "detecting" || this.activePassiveSessionId !== null;
+  }
+
+  /**
    * Called when a manual (focused) session starts.
    * If we're detecting or have an active passive session, defer.
    */

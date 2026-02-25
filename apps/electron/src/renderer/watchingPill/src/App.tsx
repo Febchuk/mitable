@@ -227,7 +227,7 @@ export default function App() {
       onMouseLeave={handleMouseLeave}
     >
       {/* Vertical Pill Container */}
-      <div className="flex flex-col items-center bg-[#1A1A1A]/95 backdrop-blur-lg rounded-full shadow-2xl border border-white/10 p-2.5 gap-2 transition-all duration-300 ease-in-out">
+      <div className="flex flex-col items-center bg-[#1A1A1A]/95 backdrop-blur-lg rounded-full p-2 transition-all duration-300 ease-in-out">
         {/* Top: Mitable Logo with status indicator — always visible */}
         <button
           onClick={handleLogoClick}
@@ -254,9 +254,10 @@ export default function App() {
 
         {/* Expandable section — visible on hover */}
         <div
-          className={`flex flex-col items-center gap-2 overflow-hidden transition-all duration-300 ease-in-out ${
+          className={`flex flex-col items-center gap-1.5 transition-all duration-300 ease-in-out ${
             isExpanded ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
           }`}
+          style={{ clipPath: isExpanded ? "inset(0 -10px 0 -10px)" : "inset(0 -10px 100% -10px)" }}
         >
           {/* Divider */}
           <div className="w-5 h-px bg-white/10" />
