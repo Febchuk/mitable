@@ -49,6 +49,8 @@ interface GenerateStreamParams {
   sessionIds?: string[];
   /** Optional artifact IDs to include as reference material */
   artifactIds?: string[];
+  /** User's real name for document content (replaces generic placeholders) */
+  authorName?: string;
 }
 
 interface ProgressEvent {
@@ -75,6 +77,7 @@ class DocGenerationStreamService {
       userId,
       sessionIds: hintSessionIds,
       artifactIds,
+      authorName,
     } = params;
 
     let documentId: string | null = null;
@@ -406,7 +409,8 @@ class DocGenerationStreamService {
       for await (const step of documentGenerationAgent.generateDocument(
         docType,
         prompt,
-        environment
+        environment,
+        authorName
       )) {
         if (step.type === "tool_call") {
           toolCallCount += step.toolCalls?.length || 0;
