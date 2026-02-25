@@ -121,8 +121,7 @@ const TableRoot = ({ className, size = "md", ...props }: TableRootProps) => {
 TableRoot.displayName = "Table";
 
 interface TableHeaderProps<T extends object>
-    extends AriaTableHeaderProps<T>,
-        Omit<ComponentPropsWithRef<"thead">, "children" | "className" | "slot" | "style"> {
+    extends AriaTableHeaderProps<T>, Omit<ComponentPropsWithRef<"thead">, "children" | "className" | "slot" | "style"> {
     bordered?: boolean;
 }
 
@@ -211,8 +210,7 @@ const TableHead = ({ className, tooltip, label, children, ...props }: TableHeadP
 TableHead.displayName = "TableHead";
 
 interface TableRowProps<T extends object>
-    extends AriaRowProps<T>,
-        Omit<ComponentPropsWithRef<"tr">, "children" | "className" | "onClick" | "slot" | "style" | "id"> {
+    extends AriaRowProps<T>, Omit<ComponentPropsWithRef<"tr">, "children" | "className" | "onClick" | "slot" | "style" | "id"> {
     highlightSelectedRow?: boolean;
 }
 

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { PRICING_TIERS, type QuotaStatus, type SubscriptionResponse } from "@mitable/shared";
 import { motion } from "motion/react";
-import { PRICING_TIERS, type SubscriptionResponse, type QuotaStatus } from "@mitable/shared";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
 import { Button } from "@/components/base/buttons/button";
-import { cx } from "@/utils/cx";
+import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
 import { supabase } from "@/lib/supabase";
+import { cx } from "@/utils/cx";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -47,7 +47,9 @@ export default function BillingPage() {
     }, []);
 
     async function getAccessToken(): Promise<string | null> {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+            data: { session },
+        } = await supabase.auth.getSession();
         if (!session) {
             window.location.href = "/login?redirect=/billing";
             return null;
@@ -120,21 +122,17 @@ export default function BillingPage() {
             <main className="flex-1 pt-18 md:pt-20">
                 <section className="relative overflow-hidden">
                     <div
-                        className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2"
+                        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2"
                         style={{
                             width: "800px",
                             height: "600px",
-                            background:
-                                "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
+                            background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
                         }}
                     />
 
                     <div className="relative mx-auto max-w-3xl px-4 py-20 md:px-8 md:py-28">
                         {/* Back link */}
-                        <a
-                            href="/"
-                            className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white"
-                        >
+                        <a href="/" className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white">
                             <svg
                                 className="size-4"
                                 viewBox="0 0 24 24"
@@ -151,7 +149,7 @@ export default function BillingPage() {
                         </a>
 
                         <motion.h1
-                            className="mb-2 font-display text-3xl font-extrabold uppercase tracking-tight text-white md:text-4xl"
+                            className="mb-2 font-display text-3xl font-extrabold tracking-tight text-white uppercase md:text-4xl"
                             initial={{ opacity: 0, y: 16 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5 }}
@@ -182,16 +180,12 @@ export default function BillingPage() {
                                 >
                                     <div className="mb-6 flex items-start justify-between">
                                         <div>
-                                            <p className="mb-1 font-mono text-xs uppercase tracking-widest text-gray-500">
-                                                Current Plan
-                                            </p>
-                                            <h2 className="font-display text-2xl font-bold text-white">
-                                                {tierConfig?.name || "Free"}
-                                            </h2>
+                                            <p className="mb-1 font-mono text-xs tracking-widest text-gray-500 uppercase">Current Plan</p>
+                                            <h2 className="font-display text-2xl font-bold text-white">{tierConfig?.name || "Free"}</h2>
                                         </div>
                                         <span
                                             className={cx(
-                                                "rounded-full px-3 py-1 font-mono text-xs uppercase tracking-wider",
+                                                "rounded-full px-3 py-1 font-mono text-xs tracking-wider uppercase",
                                                 status === "active"
                                                     ? "bg-green-900/40 text-green-400"
                                                     : status === "trialing"
@@ -207,14 +201,12 @@ export default function BillingPage() {
 
                                     {data.subscription?.subscription?.currentPeriodEnd && (
                                         <p className="mb-6 text-sm text-gray-500">
-                                            {data.subscription.subscription.cancelAtPeriodEnd
-                                                ? "Cancels"
-                                                : "Renews"}{" "}
-                                            on{" "}
-                                            {new Date(data.subscription.subscription.currentPeriodEnd).toLocaleDateString(
-                                                "en-US",
-                                                { month: "long", day: "numeric", year: "numeric" },
-                                            )}
+                                            {data.subscription.subscription.cancelAtPeriodEnd ? "Cancels" : "Renews"} on{" "}
+                                            {new Date(data.subscription.subscription.currentPeriodEnd).toLocaleDateString("en-US", {
+                                                month: "long",
+                                                day: "numeric",
+                                                year: "numeric",
+                                            })}
                                         </p>
                                     )}
 
@@ -224,13 +216,7 @@ export default function BillingPage() {
                                                 Upgrade
                                             </Button>
                                         ) : (
-                                            <Button
-                                                color="secondary"
-                                                size="md"
-                                                className="btn-pill"
-                                                onClick={handleManageBilling}
-                                                isDisabled={portalLoading}
-                                            >
+                                            <Button color="secondary" size="md" className="btn-pill" onClick={handleManageBilling} isDisabled={portalLoading}>
                                                 {portalLoading ? "Loading..." : "Manage Billing"}
                                             </Button>
                                         )}
@@ -245,9 +231,7 @@ export default function BillingPage() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.5, delay: 0.25 }}
                                     >
-                                        <h2 className="mb-6 font-display text-lg font-bold text-white">
-                                            Usage This Period
-                                        </h2>
+                                        <h2 className="mb-6 font-display text-lg font-bold text-white">Usage This Period</h2>
 
                                         <div className="space-y-5">
                                             <UsageBar
@@ -265,11 +249,7 @@ export default function BillingPage() {
                                             <UsageBar
                                                 label="Storage"
                                                 used={Math.round((data.quota.storage.usedBytes || 0) / 1024 / 1024)}
-                                                limit={
-                                                    data.quota.storage.limitBytes
-                                                        ? Math.round(data.quota.storage.limitBytes / 1024 / 1024)
-                                                        : null
-                                                }
+                                                limit={data.quota.storage.limitBytes ? Math.round(data.quota.storage.limitBytes / 1024 / 1024) : null}
                                                 percent={data.quota.storage.percentUsed}
                                             />
                                         </div>

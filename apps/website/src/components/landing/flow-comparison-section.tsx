@@ -1,8 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 interface FlowComparisonSectionProps {
     className?: string;
@@ -22,7 +22,7 @@ export const FlowComparisonSection = ({ className }: FlowComparisonSectionProps)
                 {/* Section header */}
                 <div className="mb-14 text-center md:mb-20">
                     <motion.p
-                        className="mb-4 font-mono text-xs uppercase tracking-widest text-brand-400"
+                        className="mb-4 font-mono text-xs tracking-widest text-brand-400 uppercase"
                         initial={{ opacity: 0, y: 12 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -31,7 +31,7 @@ export const FlowComparisonSection = ({ className }: FlowComparisonSectionProps)
                         The Problem
                     </motion.p>
                     <motion.h2
-                        className="mb-5 font-display text-3xl font-extrabold uppercase tracking-tight text-white md:text-4xl lg:text-5xl"
+                        className="mb-5 font-display text-3xl font-extrabold tracking-tight text-white uppercase md:text-4xl lg:text-5xl"
                         initial={{ opacity: 0, y: 16 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -70,9 +70,7 @@ export const FlowComparisonSection = ({ className }: FlowComparisonSectionProps)
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </div>
-                                <h3 className="font-mono text-xs font-semibold uppercase tracking-widest text-gray-500">
-                                    {flowComparison.without.title}
-                                </h3>
+                                <h3 className="font-mono text-xs font-semibold tracking-widest text-gray-500 uppercase">{flowComparison.without.title}</h3>
                             </div>
 
                             <ol className="space-y-3">
@@ -90,9 +88,7 @@ export const FlowComparisonSection = ({ className }: FlowComparisonSectionProps)
                                             <span
                                                 className={cx(
                                                     "flex size-7 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold",
-                                                    isStop
-                                                        ? "bg-red-950/40 text-red-500/60"
-                                                        : "bg-gray-800 text-white"
+                                                    isStop ? "bg-red-950/40 text-red-500/60" : "bg-gray-800 text-white",
                                                 )}
                                             >
                                                 {index + 1}
@@ -100,17 +96,13 @@ export const FlowComparisonSection = ({ className }: FlowComparisonSectionProps)
                                             <span
                                                 className={cx(
                                                     "text-sm",
-                                                    isStop
-                                                        ? "text-red-400/50 line-through decoration-red-500/30"
-                                                        : "font-medium text-white"
+                                                    isStop ? "text-red-400/50 line-through decoration-red-500/30" : "font-medium text-white",
                                                 )}
                                             >
                                                 {step.text}
                                             </span>
                                             {isStop && (
-                                                <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-red-500/40">
-                                                    CONTEXT SWITCH
-                                                </span>
+                                                <span className="ml-auto font-mono text-[10px] tracking-wider text-red-500/40 uppercase">CONTEXT SWITCH</span>
                                             )}
                                         </motion.li>
                                     );
@@ -119,7 +111,7 @@ export const FlowComparisonSection = ({ className }: FlowComparisonSectionProps)
 
                             {/* Time wasted indicator */}
                             <div className="mt-8 flex items-center justify-between border-t border-red-900/20 pt-5">
-                                <span className="font-mono text-[11px] uppercase tracking-wider text-gray-600">Time lost</span>
+                                <span className="font-mono text-[11px] tracking-wider text-gray-600 uppercase">Time lost</span>
                                 <span className="font-mono text-sm text-red-400/60">~45 min</span>
                             </div>
                         </div>
@@ -143,9 +135,7 @@ export const FlowComparisonSection = ({ className }: FlowComparisonSectionProps)
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                     </svg>
                                 </div>
-                                <h3 className="font-mono text-xs font-semibold uppercase tracking-widest text-brand-400">
-                                    {flowComparison.with.title}
-                                </h3>
+                                <h3 className="font-mono text-xs font-semibold tracking-widest text-brand-400 uppercase">{flowComparison.with.title}</h3>
                             </div>
 
                             <ol className="space-y-3">
@@ -183,9 +173,7 @@ export const FlowComparisonSection = ({ className }: FlowComparisonSectionProps)
                                         />
                                         <div className="relative size-2.5 rounded-full bg-brand-400" />
                                     </div>
-                                    <p className="font-mono text-sm text-brand-400">
-                                        {flowComparison.with.tagline}
-                                    </p>
+                                    <p className="font-mono text-sm text-brand-400">{flowComparison.with.tagline}</p>
                                 </div>
                             </motion.div>
 

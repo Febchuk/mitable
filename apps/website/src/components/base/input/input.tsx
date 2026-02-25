@@ -192,9 +192,7 @@ interface BaseProps {
 }
 
 interface TextFieldProps
-    extends BaseProps,
-        AriaTextFieldProps,
-        Pick<InputBaseProps, "size" | "wrapperClassName" | "inputClassName" | "iconClassName" | "tooltipClassName"> {
+    extends BaseProps, AriaTextFieldProps, Pick<InputBaseProps, "size" | "wrapperClassName" | "inputClassName" | "iconClassName" | "tooltipClassName"> {
     ref?: Ref<HTMLDivElement>;
 }
 

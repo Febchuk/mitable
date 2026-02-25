@@ -2,8 +2,8 @@
 
 import { motion } from "motion/react";
 import { Button } from "@/components/base/buttons/button";
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 interface CTASectionProps {
     className?: string;
@@ -21,7 +21,7 @@ export const CTASection = ({ className }: CTASectionProps) => {
 
             {/* Background glow */}
             <div
-                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
                 style={{
                     width: "800px",
                     height: "500px",
@@ -48,13 +48,13 @@ export const CTASection = ({ className }: CTASectionProps) => {
                                 />
                                 <div className="relative size-2 rounded-full bg-brand-400" />
                             </div>
-                            <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400">Ready to record</span>
+                            <span className="font-mono text-[11px] tracking-wider text-gray-400 uppercase">Ready to record</span>
                         </div>
                     </motion.div>
 
                     {/* Headline */}
                     <motion.h2
-                        className="mb-5 font-display text-3xl font-extrabold uppercase tracking-tight text-white md:text-4xl lg:text-5xl"
+                        className="mb-5 font-display text-3xl font-extrabold tracking-tight text-white uppercase md:text-4xl lg:text-5xl"
                         initial={{ opacity: 0, y: 16 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -82,14 +82,17 @@ export const CTASection = ({ className }: CTASectionProps) => {
                         viewport={{ once: true }}
                         transition={{ duration: 0.5, delay: 0.3 }}
                     >
-                        <Button
-                            color="primary"
-                            size="xl"
-                            href="/download"
-                            className="btn-pill"
-                        >
+                        <Button color="primary" size="xl" href="/download" className="btn-pill">
                             <span className="inline-flex items-center gap-2">
-                                <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <svg
+                                    className="size-5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                                     <polyline points="7 10 12 15 17 10" />
                                     <line x1="12" y1="15" x2="12" y2="3" />
@@ -110,7 +113,7 @@ export const CTASection = ({ className }: CTASectionProps) => {
                         {cta.trustIndicators.map((indicator) => (
                             <div key={indicator} className="flex items-center gap-2">
                                 <div className="size-1.5 rounded-full bg-brand-400/50" />
-                                <span className="font-mono text-[11px] uppercase tracking-wider text-gray-500">{indicator}</span>
+                                <span className="font-mono text-[11px] tracking-wider text-gray-500 uppercase">{indicator}</span>
                             </div>
                         ))}
                     </motion.div>

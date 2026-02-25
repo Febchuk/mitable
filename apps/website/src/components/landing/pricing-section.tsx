@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { PRICING_TIERS, type PricingRegion } from "@mitable/shared";
 import { Check } from "@untitledui/icons";
 import { motion } from "motion/react";
-import { PRICING_TIERS, type PricingRegion } from "@mitable/shared";
 import { Button } from "@/components/base/buttons/button";
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 type DisplayRegion = "US/AUS" | "Nigeria";
 
@@ -72,7 +72,7 @@ export const PricingSection = ({ className }: PricingSectionProps) => {
                 {/* Section header */}
                 <div className="mb-14 text-center md:mb-20">
                     <motion.p
-                        className="mb-4 font-mono text-xs uppercase tracking-widest text-brand-400"
+                        className="mb-4 font-mono text-xs tracking-widest text-brand-400 uppercase"
                         initial={{ opacity: 0, y: 12 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -81,7 +81,7 @@ export const PricingSection = ({ className }: PricingSectionProps) => {
                         {pricing.sectionLabel}
                     </motion.p>
                     <motion.h2
-                        className="mb-5 font-display text-3xl font-extrabold uppercase tracking-tight text-white md:text-4xl lg:text-5xl"
+                        className="mb-5 font-display text-3xl font-extrabold tracking-tight text-white uppercase md:text-4xl lg:text-5xl"
                         initial={{ opacity: 0, y: 16 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -113,10 +113,8 @@ export const PricingSection = ({ className }: PricingSectionProps) => {
                                     key={r}
                                     onClick={() => handleRegionToggle(r)}
                                     className={cx(
-                                        "rounded-full px-5 py-2 font-mono text-xs font-medium uppercase tracking-wider transition-all duration-200",
-                                        region === r
-                                            ? "bg-brand-600 text-white shadow-sm"
-                                            : "text-gray-400 hover:text-white"
+                                        "rounded-full px-5 py-2 font-mono text-xs font-medium tracking-wider uppercase transition-all duration-200",
+                                        region === r ? "bg-brand-600 text-white shadow-sm" : "text-gray-400 hover:text-white",
                                     )}
                                 >
                                     {r}
@@ -137,7 +135,7 @@ export const PricingSection = ({ className }: PricingSectionProps) => {
                                     "relative flex flex-col overflow-hidden rounded-2xl border p-6 transition-all duration-300 md:p-8",
                                     tier.highlighted
                                         ? "border-brand-500/40 bg-brand-950/20 shadow-[0_0_40px_rgba(138,97,247,0.08)]"
-                                        : "border-gray-800/60 bg-gray-900/30 hover:border-gray-700/60"
+                                        : "border-gray-800/60 bg-gray-900/30 hover:border-gray-700/60",
                                 )}
                                 initial={{ opacity: 0, y: 20 }}
                                 whileInView={{ opacity: 1, y: 0 }}
@@ -146,38 +144,28 @@ export const PricingSection = ({ className }: PricingSectionProps) => {
                             >
                                 {/* Popular badge */}
                                 {tier.highlighted && (
-                                    <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-brand-400 to-transparent" />
+                                    <div className="absolute -top-px right-0 left-0 h-px bg-gradient-to-r from-transparent via-brand-400 to-transparent" />
                                 )}
 
                                 {/* Badge */}
                                 {tier.highlighted && (
-                                    <span className="mb-5 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-900/40 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-brand-400">
+                                    <span className="mb-5 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-900/40 px-3 py-1 font-mono text-[10px] tracking-widest text-brand-400 uppercase">
                                         <span className="size-1.5 rounded-full bg-brand-400" />
                                         Most Popular
                                     </span>
                                 )}
 
                                 {/* Tier name */}
-                                <h3 className="mb-2 font-mono text-xs font-semibold uppercase tracking-widest text-brand-400">
-                                    {tier.name}
-                                </h3>
+                                <h3 className="mb-2 font-mono text-xs font-semibold tracking-widest text-brand-400 uppercase">{tier.name}</h3>
 
                                 {/* Price */}
                                 <div className="mb-1 flex items-baseline gap-1">
-                                    <span className="font-display text-4xl font-extrabold tracking-tight text-white">
-                                        {regionPrice.displayPrice}
-                                    </span>
-                                    {regionPrice.period && (
-                                        <span className="font-mono text-sm text-gray-500">
-                                            {regionPrice.period}
-                                        </span>
-                                    )}
+                                    <span className="font-display text-4xl font-extrabold tracking-tight text-white">{regionPrice.displayPrice}</span>
+                                    {regionPrice.period && <span className="font-mono text-sm text-gray-500">{regionPrice.period}</span>}
                                 </div>
 
                                 {/* Description */}
-                                <p className="mb-6 text-sm text-gray-500">
-                                    {tier.description}
-                                </p>
+                                <p className="mb-6 text-sm text-gray-500">{tier.description}</p>
 
                                 {/* CTA button */}
                                 <Button
@@ -196,20 +184,15 @@ export const PricingSection = ({ className }: PricingSectionProps) => {
                                 <ul className="flex flex-1 flex-col gap-3">
                                     {tier.features.map((feature) => (
                                         <li key={feature} className="flex items-start gap-3">
-                                            <div className={cx(
-                                                "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full",
-                                                tier.highlighted ? "bg-brand-900/40" : "bg-gray-800/60"
-                                            )}>
-                                                <Check
-                                                    className={cx(
-                                                        "size-3",
-                                                        tier.highlighted ? "text-brand-400" : "text-gray-500"
-                                                    )}
-                                                />
+                                            <div
+                                                className={cx(
+                                                    "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full",
+                                                    tier.highlighted ? "bg-brand-900/40" : "bg-gray-800/60",
+                                                )}
+                                            >
+                                                <Check className={cx("size-3", tier.highlighted ? "text-brand-400" : "text-gray-500")} />
                                             </div>
-                                            <span className="text-sm text-gray-300">
-                                                {feature}
-                                            </span>
+                                            <span className="text-sm text-gray-300">{feature}</span>
                                         </li>
                                     ))}
                                 </ul>

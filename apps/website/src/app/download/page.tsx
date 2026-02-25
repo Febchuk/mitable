@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { siteContent } from "@/config/site-content";
 import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { siteContent } from "@/config/site-content";
 
 export const metadata: Metadata = {
     title: "Download Mitable",
@@ -44,22 +44,26 @@ export default function DownloadPage() {
                 <section className="relative overflow-hidden">
                     {/* Background glow */}
                     <div
-                        className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2"
+                        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2"
                         style={{
                             width: "800px",
                             height: "600px",
-                            background:
-                                "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
+                            background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
                         }}
                     />
 
                     <div className="relative mx-auto max-w-container px-4 py-20 md:px-8 md:py-28 lg:py-36">
                         {/* Back link */}
-                        <a
-                            href="/"
-                            className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white"
-                        >
-                            <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <a href="/" className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white">
+                            <svg
+                                className="size-4"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
                                 <line x1="19" y1="12" x2="5" y2="12" />
                                 <polyline points="12 19 5 12 12 5" />
                             </svg>
@@ -68,12 +72,10 @@ export default function DownloadPage() {
 
                         {/* Headline */}
                         <div className="mb-16 text-center">
-                            <h1 className="font-display text-4xl font-extrabold uppercase tracking-tight text-white md:text-5xl lg:text-6xl">
+                            <h1 className="font-display text-4xl font-extrabold tracking-tight text-white uppercase md:text-5xl lg:text-6xl">
                                 {downloads.headline}
                             </h1>
-                            <p className="mt-4 text-lg text-gray-400 md:text-xl">
-                                {downloads.subheadline}
-                            </p>
+                            <p className="mt-4 text-lg text-gray-400 md:text-xl">{downloads.subheadline}</p>
                         </div>
 
                         {/* Download cards */}
@@ -91,14 +93,10 @@ export default function DownloadPage() {
                                         </div>
 
                                         {/* Platform name */}
-                                        <h2 className="mb-1 text-lg font-semibold text-white">
-                                            {build.platform}
-                                        </h2>
+                                        <h2 className="mb-1 text-lg font-semibold text-white">{build.platform}</h2>
 
                                         {/* Description */}
-                                        <p className="mb-6 text-sm text-gray-400">
-                                            {build.description}
-                                        </p>
+                                        <p className="mb-6 text-sm text-gray-400">{build.description}</p>
 
                                         {/* Download button */}
                                         <a

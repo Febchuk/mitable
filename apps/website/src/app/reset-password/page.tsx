@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
-import { Input } from "@/components/base/input/input";
+import { type FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/base/buttons/button";
+import { Input } from "@/components/base/input/input";
+import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
 import { supabase } from "@/lib/supabase";
 
 const darkInput = {
@@ -35,7 +35,9 @@ export default function ResetPasswordPage() {
 
     useEffect(() => {
         // Listen for auth state changes (Supabase sets session from URL hash)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((event) => {
             if (event === "PASSWORD_RECOVERY") {
                 setStatus("ready");
             } else if (event === "SIGNED_IN") {
@@ -101,21 +103,17 @@ export default function ResetPasswordPage() {
                 <section className="relative overflow-hidden">
                     {/* Background glow */}
                     <div
-                        className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2"
+                        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2"
                         style={{
                             width: "800px",
                             height: "600px",
-                            background:
-                                "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
+                            background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
                         }}
                     />
 
                     <div className="relative mx-auto max-w-container px-4 py-20 md:px-8 md:py-28 lg:py-36">
                         {/* Back link */}
-                        <a
-                            href="/"
-                            className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white"
-                        >
+                        <a href="/" className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white">
                             <svg
                                 className="size-4"
                                 viewBox="0 0 24 24"
@@ -133,7 +131,7 @@ export default function ResetPasswordPage() {
 
                         {/* Headline */}
                         <div className="mb-12 text-center">
-                            <h1 className="font-display text-4xl font-extrabold uppercase tracking-tight text-white md:text-5xl lg:text-6xl">
+                            <h1 className="font-display text-4xl font-extrabold tracking-tight text-white uppercase md:text-5xl lg:text-6xl">
                                 {status === "success" ? "Password Updated" : "Set New Password"}
                             </h1>
                             <p className="mt-4 text-lg text-gray-400 md:text-xl">
@@ -148,19 +146,8 @@ export default function ResetPasswordPage() {
                         <div className="mx-auto max-w-md">
                             {status === "loading" && (
                                 <div className="flex justify-center">
-                                    <svg
-                                        className="size-8 animate-spin text-brand-400"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                    >
-                                        <circle
-                                            className="opacity-25"
-                                            cx="12"
-                                            cy="12"
-                                            r="10"
-                                            stroke="currentColor"
-                                            strokeWidth="4"
-                                        />
+                                    <svg className="size-8 animate-spin text-brand-400" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                         <path
                                             className="opacity-75"
                                             fill="currentColor"
@@ -186,7 +173,7 @@ export default function ResetPasswordPage() {
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 top-[38px] text-gray-400 transition-colors hover:text-white"
+                                            className="absolute top-[38px] right-3 text-gray-400 transition-colors hover:text-white"
                                             aria-label={showPassword ? "Hide password" : "Show password"}
                                         >
                                             {showPassword ? <EyeOffIcon /> : <EyeIcon />}
@@ -207,23 +194,16 @@ export default function ResetPasswordPage() {
                                         <button
                                             type="button"
                                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            className="absolute right-3 top-[38px] text-gray-400 transition-colors hover:text-white"
+                                            className="absolute top-[38px] right-3 text-gray-400 transition-colors hover:text-white"
                                             aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                                         >
                                             {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
                                         </button>
                                     </div>
 
-                                    {errorMessage && (
-                                        <p className="text-sm text-red-400">{errorMessage}</p>
-                                    )}
+                                    {errorMessage && <p className="text-sm text-red-400">{errorMessage}</p>}
 
-                                    <Button
-                                        type="submit"
-                                        color="primary"
-                                        size="lg"
-                                        className="btn-pill mt-2 w-full"
-                                    >
+                                    <Button type="submit" color="primary" size="lg" className="btn-pill mt-2 w-full">
                                         Update Password
                                     </Button>
                                 </form>
@@ -244,14 +224,8 @@ export default function ResetPasswordPage() {
                                             <polyline points="20 6 9 17 4 12" />
                                         </svg>
                                     </div>
-                                    <p className="mb-6 text-gray-300">
-                                        You can now sign in with your new password.
-                                    </p>
-                                    <Button
-                                        color="primary"
-                                        className="btn-pill"
-                                        href="/"
-                                    >
+                                    <p className="mb-6 text-gray-300">You can now sign in with your new password.</p>
+                                    <Button color="primary" className="btn-pill" href="/">
                                         Back to Home
                                     </Button>
                                 </div>
@@ -275,11 +249,7 @@ export default function ResetPasswordPage() {
                                         </svg>
                                     </div>
                                     <p className="mb-6 text-gray-300">{errorMessage}</p>
-                                    <Button
-                                        color="secondary"
-                                        className="btn-pill"
-                                        href="/"
-                                    >
+                                    <Button color="secondary" className="btn-pill" href="/">
                                         Back to Home
                                     </Button>
                                 </div>

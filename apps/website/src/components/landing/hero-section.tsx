@@ -2,16 +2,13 @@
 
 import { motion } from "motion/react";
 import { Button } from "@/components/base/buttons/button";
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 /* ─── VS Code icon (simplified for the pill) ─── */
 const VSCodeIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" className="size-4">
-        <path
-            d="M17.5 0L7.5 8.5L3 5.5L0 7l7.5 5.5L0 18l3 1.5 4.5-3L17.5 25l4.5-2V2L17.5 0zm0 3.5v18l-7-5.5V9l7-5.5z"
-            fill="currentColor"
-        />
+        <path d="M17.5 0L7.5 8.5L3 5.5L0 7l7.5 5.5L0 18l3 1.5 4.5-3L17.5 25l4.5-2V2L17.5 0zm0 3.5v18l-7-5.5V9l7-5.5z" fill="currentColor" />
     </svg>
 );
 
@@ -51,24 +48,19 @@ export const HeroSection = ({ className }: HeroSectionProps) => {
 
             {/* Radial glow behind pill */}
             <div
-                className="pointer-events-none absolute left-1/2 top-[60%] -translate-x-1/2 -translate-y-1/2"
+                className="pointer-events-none absolute top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2"
                 style={{
                     width: "800px",
                     height: "600px",
-                    background:
-                        "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.08) 0%, rgba(138,97,247,0.02) 50%, transparent 100%)",
+                    background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.08) 0%, rgba(138,97,247,0.02) 50%, transparent 100%)",
                 }}
             />
 
-            <div className="relative mx-auto max-w-container px-4 pb-20 pt-14 md:px-8 md:pb-28 md:pt-24 lg:pb-36 lg:pt-28">
+            <div className="relative mx-auto max-w-container px-4 pt-14 pb-20 md:px-8 md:pt-24 md:pb-28 lg:pt-28 lg:pb-36">
                 <div className="flex flex-col items-center text-center">
                     {/* ── Badge ── */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5 }}
-                    >
-                        <span className="inline-flex items-center gap-2 rounded-full border border-gray-800 bg-gray-900/60 px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest text-gray-400 backdrop-blur-sm">
+                    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+                        <span className="inline-flex items-center gap-2 rounded-full border border-gray-800 bg-gray-900/60 px-4 py-1.5 font-mono text-[11px] tracking-widest text-gray-400 uppercase backdrop-blur-sm">
                             <span className="size-1.5 rounded-full bg-brand-400" />
                             {hero.badge}
                         </span>
@@ -76,13 +68,12 @@ export const HeroSection = ({ className }: HeroSectionProps) => {
 
                     {/* ── Headline ── */}
                     <motion.h1
-                        className="mt-8 max-w-5xl font-display text-4xl font-extrabold uppercase leading-[1.05] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-[5rem]"
+                        className="mt-8 max-w-5xl font-display text-4xl leading-[1.05] font-extrabold tracking-tight text-white uppercase sm:text-5xl md:text-6xl lg:text-[5rem]"
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
                     >
-                        {hero.headline}{" "}
-                        <span className="underline-accent text-brand-400">{hero.headlineAccent}</span>
+                        {hero.headline} <span className="underline-accent text-brand-400">{hero.headlineAccent}</span>
                     </motion.h1>
 
                     {/* ── Subheadline ── */}
@@ -102,12 +93,7 @@ export const HeroSection = ({ className }: HeroSectionProps) => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 0.4 }}
                     >
-                        <Button
-                            color="primary"
-                            size="xl"
-                            href="/download"
-                            className="btn-pill"
-                        >
+                        <Button color="primary" size="xl" href="/download" className="btn-pill">
                             <span className="inline-flex items-center gap-2">
                                 <DownloadIcon />
                                 {hero.primaryCta}
@@ -149,10 +135,7 @@ export const HeroSection = ({ className }: HeroSectionProps) => {
                         </div>
 
                         {/* Perspective container for the angled pill */}
-                        <div
-                            className="relative mx-auto"
-                            style={{ perspective: "1200px" }}
-                        >
+                        <div className="relative mx-auto" style={{ perspective: "1200px" }}>
                             {/* The Pill */}
                             <motion.div
                                 className="relative mx-auto w-fit"
@@ -187,18 +170,14 @@ export const HeroSection = ({ className }: HeroSectionProps) => {
                                             />
                                             <div className="relative size-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
                                         </div>
-                                        <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-red-400">
-                                            REC
-                                        </span>
+                                        <span className="font-mono text-[11px] font-medium tracking-wider text-red-400 uppercase">REC</span>
                                     </div>
 
                                     {/* Divider */}
                                     <div className="h-5 w-px bg-gray-700/50" />
 
                                     {/* Timer */}
-                                    <div className="font-mono text-base font-semibold tabular-nums tracking-tight text-white sm:text-lg">
-                                        02:15:33
-                                    </div>
+                                    <div className="font-mono text-base font-semibold tracking-tight text-white tabular-nums sm:text-lg">02:15:33</div>
 
                                     {/* Divider */}
                                     <div className="h-5 w-px bg-gray-700/50" />
@@ -208,16 +187,14 @@ export const HeroSection = ({ className }: HeroSectionProps) => {
                                         <div className="flex size-7 items-center justify-center rounded-lg bg-[#007ACC]/20 text-[#4FC1FF]">
                                             <VSCodeIcon />
                                         </div>
-                                        <span className="hidden font-mono text-xs text-gray-400 sm:inline">
-                                            VS Code
-                                        </span>
+                                        <span className="hidden font-mono text-xs text-gray-400 sm:inline">VS Code</span>
                                     </div>
 
                                     {/* Divider */}
                                     <div className="hidden h-5 w-px bg-gray-700/50 sm:block" />
 
                                     {/* Stop button */}
-                                    <button className="hidden items-center gap-1.5 rounded-full bg-gray-800 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-gray-300 transition-colors hover:bg-gray-700 sm:flex">
+                                    <button className="hidden items-center gap-1.5 rounded-full bg-gray-800 px-3 py-1.5 font-mono text-[11px] tracking-wider text-gray-300 uppercase transition-colors hover:bg-gray-700 sm:flex">
                                         <div className="size-2 rounded-sm bg-gray-400" />
                                         Stop
                                     </button>
@@ -225,7 +202,7 @@ export const HeroSection = ({ className }: HeroSectionProps) => {
 
                                 {/* Reflection / glass edge at bottom */}
                                 <div
-                                    className="pointer-events-none absolute -bottom-px left-6 right-6 h-px"
+                                    className="pointer-events-none absolute right-6 -bottom-px left-6 h-px"
                                     style={{
                                         background: "linear-gradient(90deg, transparent, rgba(138,97,247,0.2), transparent)",
                                     }}

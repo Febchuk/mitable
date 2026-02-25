@@ -1,9 +1,9 @@
 "use client";
 
-import { Lock01, EyeOff, Trash01, ShieldTick } from "@untitledui/icons";
+import { EyeOff, Lock01, ShieldTick, Trash01 } from "@untitledui/icons";
 import { motion } from "motion/react";
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 const iconMap = {
     lock: Lock01,
@@ -30,7 +30,7 @@ export const PrivacySection = ({ className }: PrivacySectionProps) => {
                 {/* Section header */}
                 <div className="mb-14 text-center md:mb-20">
                     <motion.p
-                        className="mb-4 font-mono text-xs uppercase tracking-widest text-brand-400"
+                        className="mb-4 font-mono text-xs tracking-widest text-brand-400 uppercase"
                         initial={{ opacity: 0, y: 12 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -39,7 +39,7 @@ export const PrivacySection = ({ className }: PrivacySectionProps) => {
                         {privacy.sectionLabel}
                     </motion.p>
                     <motion.h2
-                        className="mb-5 font-display text-3xl font-extrabold uppercase tracking-tight text-white md:text-4xl lg:text-5xl"
+                        className="mb-5 font-display text-3xl font-extrabold tracking-tight text-white uppercase md:text-4xl lg:text-5xl"
                         initial={{ opacity: 0, y: 16 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -59,7 +59,7 @@ export const PrivacySection = ({ className }: PrivacySectionProps) => {
                 </div>
 
                 {/* Privacy cards */}
-                <div className="mx-auto grid max-w-5xl gap-6 grid-cols-2 md:grid-cols-4 lg:gap-8">
+                <div className="mx-auto grid max-w-5xl grid-cols-2 gap-6 md:grid-cols-4 lg:gap-8">
                     {privacy.features.map((feature, index) => {
                         const Icon = iconMap[feature.icon as keyof typeof iconMap] || Lock01;
 
@@ -82,14 +82,10 @@ export const PrivacySection = ({ className }: PrivacySectionProps) => {
                                     </div>
 
                                     {/* Title */}
-                                    <h3 className="mb-2 font-mono text-sm font-semibold uppercase tracking-widest text-white">
-                                        {feature.title}
-                                    </h3>
+                                    <h3 className="mb-2 font-mono text-sm font-semibold tracking-widest text-white uppercase">{feature.title}</h3>
 
                                     {/* Description */}
-                                    <p className="text-sm leading-relaxed text-gray-400">
-                                        {feature.description}
-                                    </p>
+                                    <p className="text-sm leading-relaxed text-gray-400">{feature.description}</p>
                                 </div>
                             </motion.div>
                         );

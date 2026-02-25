@@ -1,8 +1,8 @@
 "use client";
 
 import { MitableLogo } from "@/components/foundations/logo/mitable-logo";
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 const SocialIcon = ({ href, label, children }: { href: string; label: string; children: React.ReactNode }) => (
     <a
@@ -34,19 +34,15 @@ export const Footer = ({ className }: FooterProps) => {
                     {/* Logo and description */}
                     <div className="lg:col-span-2">
                         <MitableLogo className="mb-5 h-7 text-white" />
-                        <p className="mb-2 font-display text-base font-semibold text-white">
-                            {footer.tagline}
-                        </p>
-                        <p className="max-w-xs text-sm leading-relaxed text-gray-500">
-                            {footer.description}
-                        </p>
+                        <p className="mb-2 font-display text-base font-semibold text-white">{footer.tagline}</p>
+                        <p className="max-w-xs text-sm leading-relaxed text-gray-500">{footer.description}</p>
                         {/* Platform badges */}
                         {footer.platforms && (
                             <div className="mt-4 flex gap-2">
                                 {footer.platforms.map((platform) => (
                                     <span
                                         key={platform}
-                                        className="rounded-full border border-gray-800/60 bg-gray-900/40 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-gray-500"
+                                        className="rounded-full border border-gray-800/60 bg-gray-900/40 px-3 py-1 font-mono text-[10px] tracking-wider text-gray-500 uppercase"
                                     >
                                         {platform}
                                     </span>
@@ -59,9 +55,7 @@ export const Footer = ({ className }: FooterProps) => {
                     {/* {(["product", "company", "resources", "legal"] as const).map((category) => ( */}
                     {(["product"] as const).map((category) => (
                         <div key={category}>
-                            <h3 className="mb-4 font-mono text-[10px] font-semibold uppercase tracking-widest text-gray-600">
-                                {category}
-                            </h3>
+                            <h3 className="mb-4 font-mono text-[10px] font-semibold tracking-widest text-gray-600 uppercase">{category}</h3>
                             <ul className="flex flex-col gap-2.5">
                                 {footer.links[category].map((link) => (
                                     <li key={link.label}>
@@ -77,7 +71,7 @@ export const Footer = ({ className }: FooterProps) => {
 
                 {/* Bottom section */}
                 <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-gray-800/40 pt-8 md:flex-row">
-                    <p className="font-mono text-[10px] uppercase tracking-wider text-gray-600">{footer.copyright}</p>
+                    <p className="font-mono text-[10px] tracking-wider text-gray-600 uppercase">{footer.copyright}</p>
 
                     {/* Social icons */}
                     <div className="flex items-center gap-1">

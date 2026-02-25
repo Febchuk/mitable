@@ -1,14 +1,6 @@
 "use client";
 
-import {
-    CTASection,
-    FeaturesSection,
-    Footer,
-    HeroSection,
-    PricingSection,
-    PrivacySection,
-    TimelineSection,
-} from "@/components/landing";
+import { CTASection, FeaturesSection, Footer, HeroSection, PricingSection, PrivacySection, TimelineSection } from "@/components/landing";
 import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
 
 // import { UseCasesSection } from "@/components/landing/use-cases-section";

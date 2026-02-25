@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { type FormEvent, useState } from "react";
+import { Button } from "@/components/base/buttons/button";
 import { Input } from "@/components/base/input/input";
 import { TextArea } from "@/components/base/textarea/textarea";
-import { Button } from "@/components/base/buttons/button";
+import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
 
 const darkInput = {
     wrapperClassName: "!bg-gray-900/50 !ring-gray-800/60 focus-within:!ring-brand",
     inputClassName: "!text-white !placeholder-gray-500",
 };
 
-const darkTextArea =
-    "!bg-gray-900/50 !ring-gray-800/60 !text-white !placeholder-gray-500 focus:!ring-brand";
+const darkTextArea = "!bg-gray-900/50 !ring-gray-800/60 !text-white !placeholder-gray-500 focus:!ring-brand";
 
 export default function ContactPage() {
     const [name, setName] = useState("");
@@ -23,19 +22,9 @@ export default function ContactPage() {
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
 
-        const subject = encodeURIComponent(
-            `Enterprise Inquiry from ${name}${company ? ` (${company})` : ""}`,
-        );
+        const subject = encodeURIComponent(`Enterprise Inquiry from ${name}${company ? ` (${company})` : ""}`);
 
-        const bodyParts = [
-            `Name: ${name}`,
-            `Email: ${email}`,
-            company && `Company: ${company}`,
-            "",
-            message,
-        ]
-            .filter(Boolean)
-            .join("\n");
+        const bodyParts = [`Name: ${name}`, `Email: ${email}`, company && `Company: ${company}`, "", message].filter(Boolean).join("\n");
 
         const body = encodeURIComponent(bodyParts);
 
@@ -50,21 +39,17 @@ export default function ContactPage() {
                 <section className="relative overflow-hidden">
                     {/* Background glow */}
                     <div
-                        className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2"
+                        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2"
                         style={{
                             width: "800px",
                             height: "600px",
-                            background:
-                                "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
+                            background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
                         }}
                     />
 
                     <div className="relative mx-auto max-w-container px-4 py-20 md:px-8 md:py-28 lg:py-36">
                         {/* Back link */}
-                        <a
-                            href="/"
-                            className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white"
-                        >
+                        <a href="/" className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white">
                             <svg
                                 className="size-4"
                                 viewBox="0 0 24 24"
@@ -82,19 +67,12 @@ export default function ContactPage() {
 
                         {/* Headline */}
                         <div className="mb-12 text-center">
-                            <h1 className="font-display text-4xl font-extrabold uppercase tracking-tight text-white md:text-5xl lg:text-6xl">
-                                Contact Sales
-                            </h1>
-                            <p className="mt-4 text-lg text-gray-400 md:text-xl">
-                                Tell us about your team and we&apos;ll get back to you.
-                            </p>
+                            <h1 className="font-display text-4xl font-extrabold tracking-tight text-white uppercase md:text-5xl lg:text-6xl">Contact Sales</h1>
+                            <p className="mt-4 text-lg text-gray-400 md:text-xl">Tell us about your team and we&apos;ll get back to you.</p>
                         </div>
 
                         {/* Form */}
-                        <form
-                            onSubmit={handleSubmit}
-                            className="mx-auto flex max-w-lg flex-col gap-5"
-                        >
+                        <form onSubmit={handleSubmit} className="mx-auto flex max-w-lg flex-col gap-5">
                             <Input
                                 label="Name"
                                 placeholder="Your full name"
@@ -135,12 +113,7 @@ export default function ContactPage() {
                                 textAreaClassName={darkTextArea}
                             />
 
-                            <Button
-                                type="submit"
-                                color="primary"
-                                size="lg"
-                                className="btn-pill mt-2 w-full"
-                            >
+                            <Button type="submit" color="primary" size="lg" className="btn-pill mt-2 w-full">
                                 Send Message
                             </Button>
                         </form>

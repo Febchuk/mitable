@@ -1,8 +1,8 @@
 "use client";
 
-import { Clock, FileX02, List, FaceFrown } from "@untitledui/icons";
-import { cx } from "@/utils/cx";
+import { Clock, FaceFrown, FileX02, List } from "@untitledui/icons";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 const problemIcons = [Clock, FileX02, List, FaceFrown] as const;
 
@@ -18,12 +18,8 @@ export const ProblemSection = ({ className }: ProblemSectionProps) => {
             <div className="mx-auto max-w-container px-4 py-20 md:px-8 md:py-28 lg:py-32">
                 {/* Section header */}
                 <div className="mb-12 text-center md:mb-16">
-                    <h2 className="mb-4 font-display text-3xl font-semibold tracking-tight text-carbon md:text-4xl lg:text-5xl">
-                        {problems.headline}
-                    </h2>
-                    <p className="mx-auto max-w-2xl text-lg text-secondary">
-                        {problems.subheadline}
-                    </p>
+                    <h2 className="text-carbon mb-4 font-display text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl">{problems.headline}</h2>
+                    <p className="mx-auto max-w-2xl text-lg text-secondary">{problems.subheadline}</p>
                 </div>
 
                 {/* Problems grid */}
@@ -40,12 +36,8 @@ export const ProblemSection = ({ className }: ProblemSectionProps) => {
                                     <Icon className="size-6" />
                                 </div>
                                 <div>
-                                    <h3 className="mb-2 text-lg font-semibold text-carbon md:text-xl">
-                                        {problem.title}
-                                    </h3>
-                                    <p className="text-md text-secondary">
-                                        {problem.description}
-                                    </p>
+                                    <h3 className="text-carbon mb-2 text-lg font-semibold md:text-xl">{problem.title}</h3>
+                                    <p className="text-md text-secondary">{problem.description}</p>
                                 </div>
                             </div>
                         );

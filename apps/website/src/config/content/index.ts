@@ -5,7 +5,6 @@
  * - Set NEXT_PUBLIC_REGION=ng for Nigerian market (mitable.ng)
  * - Set NEXT_PUBLIC_REGION=global (or leave unset) for global market (mitable.ai)
  */
-
 import { globalContent } from "./global";
 import { ngContent } from "./ng";
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useState, useEffect, type FormEvent } from "react";
+import { type FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
-import { Input } from "@/components/base/input/input";
 import { Button } from "@/components/base/buttons/button";
+import { Input } from "@/components/base/input/input";
+import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
 import { supabase } from "@/lib/supabase";
 
 const darkInput = {
@@ -69,12 +69,8 @@ function SignupForm() {
     return (
         <>
             <div className="mb-12 text-center">
-                <h1 className="font-display text-4xl font-extrabold uppercase tracking-tight text-white md:text-5xl">
-                    Create Account
-                </h1>
-                <p className="mt-4 text-lg text-gray-400">
-                    Sign up to get started with Mitable.
-                </p>
+                <h1 className="font-display text-4xl font-extrabold tracking-tight text-white uppercase md:text-5xl">Create Account</h1>
+                <p className="mt-4 text-lg text-gray-400">Sign up to get started with Mitable.</p>
             </div>
 
             {success ? (
@@ -94,8 +90,7 @@ function SignupForm() {
                     </div>
                     <h2 className="mb-2 text-lg font-bold text-white">Check your email</h2>
                     <p className="text-gray-400">
-                        We sent a confirmation link to <span className="text-white">{email}</span>.
-                        Click the link to activate your account.
+                        We sent a confirmation link to <span className="text-white">{email}</span>. Click the link to activate your account.
                     </p>
                 </div>
             ) : (
@@ -134,13 +129,7 @@ function SignupForm() {
 
                     {error && <p className="text-sm text-red-400">{error}</p>}
 
-                    <Button
-                        type="submit"
-                        color="primary"
-                        size="lg"
-                        className="btn-pill mt-2 w-full"
-                        isDisabled={loading}
-                    >
+                    <Button type="submit" color="primary" size="lg" className="btn-pill mt-2 w-full" isDisabled={loading}>
                         {loading ? "Creating account..." : "Create Account"}
                     </Button>
 
@@ -164,20 +153,16 @@ export default function SignupPage() {
             <main className="flex-1 pt-18 md:pt-20">
                 <section className="relative overflow-hidden">
                     <div
-                        className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2"
+                        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2"
                         style={{
                             width: "800px",
                             height: "600px",
-                            background:
-                                "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
+                            background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
                         }}
                     />
 
                     <div className="relative mx-auto max-w-container px-4 py-20 md:px-8 md:py-28 lg:py-36">
-                        <a
-                            href="/"
-                            className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white"
-                        >
+                        <a href="/" className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white">
                             <svg
                                 className="size-4"
                                 viewBox="0 0 24 24"

@@ -1,7 +1,7 @@
 "use client";
 
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 // Platform icons as SVG components
 const VSCodeIcon = ({ className }: { className?: string }) => (
@@ -93,21 +93,14 @@ export const PlatformsSection = ({ className }: PlatformsSectionProps) => {
             <div className="mx-auto max-w-container px-4 py-16 md:px-8 md:py-24">
                 {/* Section header */}
                 <div className="mb-12 text-center md:mb-16">
-                    <h2 className="mb-4 text-display-xs font-semibold tracking-tight text-primary md:text-display-sm">
-                        {siteContent.platforms.headline}
-                    </h2>
-                    <p className="mx-auto max-w-2xl text-lg text-secondary">
-                        {siteContent.platforms.subheadline}
-                    </p>
+                    <h2 className="mb-4 text-display-xs font-semibold tracking-tight text-primary md:text-display-sm">{siteContent.platforms.headline}</h2>
+                    <p className="mx-auto max-w-2xl text-lg text-secondary">{siteContent.platforms.subheadline}</p>
                 </div>
 
                 {/* Platform icons grid */}
                 <div className="mx-auto grid max-w-4xl grid-cols-4 gap-8 md:grid-cols-8 md:gap-12">
                     {platforms.map((platform) => (
-                        <div
-                            key={platform.name}
-                            className="group flex flex-col items-center gap-3 transition-transform hover:scale-110"
-                        >
+                        <div key={platform.name} className="group flex flex-col items-center gap-3 transition-transform hover:scale-110">
                             <div className="flex size-14 items-center justify-center rounded-xl bg-primary p-3 shadow-sm ring-1 ring-secondary_alt transition-shadow group-hover:shadow-md md:size-16">
                                 <platform.icon className="size-full text-quaternary transition-colors group-hover:text-primary" />
                             </div>
@@ -117,9 +110,7 @@ export const PlatformsSection = ({ className }: PlatformsSectionProps) => {
                 </div>
 
                 {/* Emphasis text */}
-                <p className="mt-12 text-center text-sm font-medium text-tertiary md:mt-16">
-                    No browser extensions. No plugins. Just native desktop capture.
-                </p>
+                <p className="mt-12 text-center text-sm font-medium text-tertiary md:mt-16">No browser extensions. No plugins. Just native desktop capture.</p>
             </div>
         </section>
     );

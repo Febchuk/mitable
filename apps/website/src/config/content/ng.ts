@@ -5,7 +5,6 @@
  * Key Message: "See what your team accomplished"
  * App Default: Always-on (continuous tracking)
  */
-
 import { baseContent } from "./base";
 
 export const ngContent = {

@@ -5,7 +5,6 @@
  * Key Message: "Your AI work journal"
  * App Default: Session-based (start/stop)
  */
-
 import { baseContent } from "./base";
 
 export const globalContent = {
@@ -140,7 +139,11 @@ export const globalContent = {
                 role: "DOCS",
                 description: "Never start from a blank page again.",
                 quote: "Draft ready: API Migration Guide based on your Figma → Code session.",
-                highlights: ["Proactively identifies documentation opportunities", "Automatically generates SOPs, reports, knowledge articles, and more", "Export docs to Notion and Google Drive"],
+                highlights: [
+                    "Proactively identifies documentation opportunities",
+                    "Automatically generates SOPs, reports, knowledge articles, and more",
+                    "Export docs to Notion and Google Drive",
+                ],
             },
         ],
     },
@@ -251,7 +254,14 @@ export const globalContent = {
                 price: "$12",
                 period: "/month",
                 description: "For serious makers",
-                features: ["Everything in Free", "Unlimited sessions", "Doc & artefact export", "30-day history", "Priority support", "24/7 Access to Founders"],
+                features: [
+                    "Everything in Free",
+                    "Unlimited sessions",
+                    "Doc & artefact export",
+                    "30-day history",
+                    "Priority support",
+                    "24/7 Access to Founders",
+                ],
                 cta: "Start Free Trial",
                 highlighted: true,
             },

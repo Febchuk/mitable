@@ -1,13 +1,17 @@
 "use client";
 
 import { motion } from "motion/react";
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 const iconMap = {
     "pen-tool": (
         <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+            />
         </svg>
     ),
     terminal: (
@@ -17,7 +21,11 @@ const iconMap = {
     ),
     book: (
         <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+            />
         </svg>
     ),
 } as const;
@@ -35,7 +43,7 @@ export const UseCasesSection = ({ className }: UseCasesSectionProps) => {
                 {/* Section header */}
                 <div className="mb-14 text-center md:mb-20">
                     <motion.p
-                        className="mb-4 font-mono text-xs uppercase tracking-widest text-brand-400"
+                        className="mb-4 font-mono text-xs tracking-widest text-brand-400 uppercase"
                         initial={{ opacity: 0, y: 12 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -44,7 +52,7 @@ export const UseCasesSection = ({ className }: UseCasesSectionProps) => {
                         {useCases.sectionLabel}
                     </motion.p>
                     <motion.h2
-                        className="mb-5 font-display text-3xl font-extrabold uppercase tracking-tight text-white md:text-4xl lg:text-5xl"
+                        className="mb-5 font-display text-3xl font-extrabold tracking-tight text-white uppercase md:text-4xl lg:text-5xl"
                         initial={{ opacity: 0, y: 16 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -87,19 +95,13 @@ export const UseCasesSection = ({ className }: UseCasesSectionProps) => {
                                     </div>
 
                                     {/* Title */}
-                                    <h3 className="mb-2 font-display text-lg font-bold uppercase tracking-tight text-white">
-                                        {useCase.title}
-                                    </h3>
+                                    <h3 className="mb-2 font-display text-lg font-bold tracking-tight text-white uppercase">{useCase.title}</h3>
 
                                     {/* Question */}
-                                    <p className="mb-4 font-mono text-sm italic leading-relaxed text-gray-500">
-                                        {useCase.question}
-                                    </p>
+                                    <p className="mb-4 font-mono text-sm leading-relaxed text-gray-500 italic">{useCase.question}</p>
 
                                     {/* Value prop */}
-                                    <p className="text-sm leading-relaxed text-gray-300">
-                                        {useCase.value}
-                                    </p>
+                                    <p className="text-sm leading-relaxed text-gray-300">{useCase.value}</p>
 
                                     {/* Bottom accent */}
                                     <div className="mt-6 h-px w-10 bg-gray-800 transition-all duration-500 group-hover:w-16 group-hover:bg-brand-400" />

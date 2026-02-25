@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef } from "react";
-import { Play, File06 } from "@untitledui/icons";
+import { File06, Play } from "@untitledui/icons";
 import { motion, useScroll, useTransform } from "motion/react";
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 const roleIcons = {
     SESSIONS: Play,
@@ -23,13 +23,13 @@ const SessionsMockup = () => (
                 <div className="size-2.5 rounded-full bg-gray-700" />
             </div>
             <div className="flex items-center gap-2">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-brand-400">Sessions</span>
+                <span className="font-mono text-[10px] tracking-wider text-brand-400 uppercase">Sessions</span>
                 <span className="font-mono text-[10px] text-gray-700">|</span>
                 <span className="font-mono text-[10px] text-gray-600">Docs</span>
             </div>
         </div>
         {/* Session rows */}
-        <div className="p-3 space-y-2">
+        <div className="space-y-2 p-3">
             {[
                 { app: "VS Code", time: "2h 15m", color: "bg-brand-400", w: "w-[60%]" },
                 { app: "Figma", time: "1h 30m", color: "bg-purple-400", w: "w-[40%]" },
@@ -41,7 +41,7 @@ const SessionsMockup = () => (
                     <div className="flex-1">
                         <div className={cx("h-3 rounded-full", s.color, s.w, "opacity-60")} />
                     </div>
-                    <span className="font-mono text-[10px] tabular-nums text-gray-600">{s.time}</span>
+                    <span className="font-mono text-[10px] text-gray-600 tabular-nums">{s.time}</span>
                 </div>
             ))}
             {/* Footer */}
@@ -65,11 +65,11 @@ const DocsMockup = () => (
             <div className="flex items-center gap-2">
                 <span className="font-mono text-[10px] text-gray-600">Sessions</span>
                 <span className="font-mono text-[10px] text-gray-700">|</span>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-brand-400">Docs</span>
+                <span className="font-mono text-[10px] tracking-wider text-brand-400 uppercase">Docs</span>
             </div>
         </div>
         {/* Doc preview */}
-        <div className="p-4 space-y-3">
+        <div className="space-y-3 p-4">
             <div className="flex items-center gap-2">
                 <File06 className="size-3.5 text-brand-400" />
                 <span className="text-xs font-medium text-white">API Migration Guide</span>
@@ -119,7 +119,7 @@ export const FeaturesSection = ({ className }: FeaturesSectionProps) => {
                     {/* Section header */}
                     <div className="mb-16 text-center">
                         <motion.p
-                            className="mb-4 font-mono text-xs uppercase tracking-widest text-brand-400"
+                            className="mb-4 font-mono text-xs tracking-widest text-brand-400 uppercase"
                             initial={{ opacity: 0, y: 12 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
@@ -128,7 +128,7 @@ export const FeaturesSection = ({ className }: FeaturesSectionProps) => {
                             {features.sectionLabel}
                         </motion.p>
                         <motion.h2
-                            className="mb-5 font-display text-3xl font-extrabold uppercase tracking-tight text-white"
+                            className="mb-5 font-display text-3xl font-extrabold tracking-tight text-white uppercase"
                             initial={{ opacity: 0, y: 16 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
@@ -164,20 +164,12 @@ export const FeaturesSection = ({ className }: FeaturesSectionProps) => {
                                     <div>
                                         <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-800/30 bg-brand-950/30 px-3.5 py-1.5">
                                             <Icon className="size-3.5 text-brand-400" />
-                                            <span className="font-mono text-[11px] uppercase tracking-widest text-brand-400">
-                                                {feature.role}
-                                            </span>
+                                            <span className="font-mono text-[11px] tracking-widest text-brand-400 uppercase">{feature.role}</span>
                                         </div>
-                                        <h3 className="mb-3 font-display text-2xl font-bold uppercase tracking-tight text-white">
-                                            {feature.title}
-                                        </h3>
-                                        <p className="mb-6 text-lg leading-relaxed text-gray-400">
-                                            {feature.description}
-                                        </p>
+                                        <h3 className="mb-3 font-display text-2xl font-bold tracking-tight text-white uppercase">{feature.title}</h3>
+                                        <p className="mb-6 text-lg leading-relaxed text-gray-400">{feature.description}</p>
                                         <div className="mb-6 rounded-lg border-l-2 border-brand-400/40 bg-brand-950/20 px-4 py-3">
-                                            <p className="font-mono text-sm leading-relaxed text-brand-300/70">
-                                                {feature.quote}
-                                            </p>
+                                            <p className="font-mono text-sm leading-relaxed text-brand-300/70">{feature.quote}</p>
                                         </div>
                                         {feature.highlights && (
                                             <ul className="space-y-2.5">
@@ -212,15 +204,12 @@ export const FeaturesSection = ({ className }: FeaturesSectionProps) => {
 
             {/* Desktop: horizontal scroll-jacking */}
             <div className="hidden md:block">
-                <div
-                    ref={scrollRef}
-                    style={{ height: `${panelCount * 100}vh` }}
-                >
+                <div ref={scrollRef} style={{ height: `${panelCount * 100}vh` }}>
                     <div className="sticky top-0 flex h-screen flex-col overflow-hidden">
                         {/* Section header */}
                         <div className="mx-auto w-full max-w-container px-8 pt-20 pb-8 text-center lg:pt-24">
                             <motion.p
-                                className="mb-4 font-mono text-xs uppercase tracking-widest text-brand-400"
+                                className="mb-4 font-mono text-xs tracking-widest text-brand-400 uppercase"
                                 initial={{ opacity: 0, y: 12 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
@@ -229,7 +218,7 @@ export const FeaturesSection = ({ className }: FeaturesSectionProps) => {
                                 {features.sectionLabel}
                             </motion.p>
                             <motion.h2
-                                className="mb-5 font-display text-3xl font-extrabold uppercase tracking-tight text-white md:text-4xl lg:text-5xl"
+                                className="mb-5 font-display text-3xl font-extrabold tracking-tight text-white uppercase md:text-4xl lg:text-5xl"
                                 initial={{ opacity: 0, y: 16 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
@@ -250,10 +239,7 @@ export const FeaturesSection = ({ className }: FeaturesSectionProps) => {
 
                         {/* Horizontal scroll panels */}
                         <div className="flex-1 overflow-hidden">
-                            <motion.div
-                                className="flex h-full"
-                                style={{ x, width: `${panelCount * 100}%` }}
-                            >
+                            <motion.div className="flex h-full" style={{ x, width: `${panelCount * 100}%` }}>
                                 {features.items.map((feature, index) => {
                                     const Icon = roleIcons[feature.role as keyof typeof roleIcons] || Play;
                                     const Mockup = mockups[index] || SessionsMockup;
@@ -269,20 +255,14 @@ export const FeaturesSection = ({ className }: FeaturesSectionProps) => {
                                                 <div>
                                                     <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-800/30 bg-brand-950/30 px-3.5 py-1.5">
                                                         <Icon className="size-3.5 text-brand-400" />
-                                                        <span className="font-mono text-[11px] uppercase tracking-widest text-brand-400">
-                                                            {feature.role}
-                                                        </span>
+                                                        <span className="font-mono text-[11px] tracking-widest text-brand-400 uppercase">{feature.role}</span>
                                                     </div>
-                                                    <h3 className="mb-3 font-display text-2xl font-bold uppercase tracking-tight text-white md:text-3xl">
+                                                    <h3 className="mb-3 font-display text-2xl font-bold tracking-tight text-white uppercase md:text-3xl">
                                                         {feature.title}
                                                     </h3>
-                                                    <p className="mb-6 text-lg leading-relaxed text-gray-400">
-                                                        {feature.description}
-                                                    </p>
+                                                    <p className="mb-6 text-lg leading-relaxed text-gray-400">{feature.description}</p>
                                                     <div className="mb-6 rounded-lg border-l-2 border-brand-400/40 bg-brand-950/20 px-4 py-3">
-                                                        <p className="font-mono text-sm leading-relaxed text-brand-300/70">
-                                                            {feature.quote}
-                                                        </p>
+                                                        <p className="font-mono text-sm leading-relaxed text-brand-300/70">{feature.quote}</p>
                                                     </div>
                                                     {feature.highlights && (
                                                         <ul className="space-y-2.5">
@@ -320,12 +300,7 @@ export const FeaturesSection = ({ className }: FeaturesSectionProps) => {
                         {/* Progress dots */}
                         <div className="flex items-center justify-center gap-3 pb-8">
                             {features.items.map((feature, index) => (
-                                <ProgressDot
-                                    key={feature.title}
-                                    index={index}
-                                    total={panelCount}
-                                    scrollYProgress={scrollYProgress}
-                                />
+                                <ProgressDot key={feature.title} index={index} total={panelCount} scrollYProgress={scrollYProgress} />
                             ))}
                         </div>
                     </div>
@@ -336,15 +311,7 @@ export const FeaturesSection = ({ className }: FeaturesSectionProps) => {
 };
 
 /* ─── Progress Dot ─── */
-function ProgressDot({
-    index,
-    total,
-    scrollYProgress,
-}: {
-    index: number;
-    total: number;
-    scrollYProgress: ReturnType<typeof useScroll>["scrollYProgress"];
-}) {
+function ProgressDot({ index, total, scrollYProgress }: { index: number; total: number; scrollYProgress: ReturnType<typeof useScroll>["scrollYProgress"] }) {
     const segmentSize = 1 / total;
     const start = index * segmentSize;
     const end = start + segmentSize;
@@ -352,10 +319,5 @@ function ProgressDot({
     const opacity = useTransform(scrollYProgress, [start, start + segmentSize * 0.3, end - segmentSize * 0.3, end], [0.3, 1, 1, 0.3]);
     const scale = useTransform(scrollYProgress, [start, start + segmentSize * 0.3, end - segmentSize * 0.3, end], [1, 1.4, 1.4, 1]);
 
-    return (
-        <motion.div
-            className="size-2 rounded-full bg-brand-400"
-            style={{ opacity, scale }}
-        />
-    );
+    return <motion.div className="size-2 rounded-full bg-brand-400" style={{ opacity, scale }} />;
 }

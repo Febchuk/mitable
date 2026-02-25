@@ -1,7 +1,7 @@
 "use client";
 
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 /* ─── Logo SVG Components ─── */
 
@@ -85,18 +85,16 @@ interface LogoMarqueeProps {
 
 export const LogoMarquee = ({ className }: LogoMarqueeProps) => {
     return (
-        <section className={cx("overflow-hidden bg-surface py-10 md:py-14", className)}>
+        <section className={cx("bg-surface overflow-hidden py-10 md:py-14", className)}>
             <div className="mx-auto max-w-container px-4 md:px-8">
-                <p className="mb-8 text-center font-mono text-[10px] uppercase tracking-widest text-gray-600 md:mb-10">
-                    {siteContent.logoMarquee.heading}
-                </p>
+                <p className="mb-8 text-center font-mono text-[10px] tracking-widest text-gray-600 uppercase md:mb-10">{siteContent.logoMarquee.heading}</p>
             </div>
 
             {/* Marquee container */}
             <div className="relative">
                 {/* Gradient masks */}
-                <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-20 bg-gradient-to-r from-[#151515] to-transparent md:w-32" />
-                <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-20 bg-gradient-to-l from-[#151515] to-transparent md:w-32" />
+                <div className="pointer-events-none absolute top-0 left-0 z-10 h-full w-20 bg-gradient-to-r from-[#151515] to-transparent md:w-32" />
+                <div className="pointer-events-none absolute top-0 right-0 z-10 h-full w-20 bg-gradient-to-l from-[#151515] to-transparent md:w-32" />
 
                 {/* Scrolling logos */}
                 <div className="flex animate-marquee gap-14 md:gap-20">

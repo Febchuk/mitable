@@ -3,8 +3,8 @@
 import { ChevronRight } from "@untitledui/icons";
 import { motion } from "motion/react";
 import { Button } from "@/components/base/buttons/button";
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 const appColors: Record<string, { bar: string; bg: string; text: string }> = {
     "VS Code": { bar: "bg-brand-400", bg: "bg-brand-950/50", text: "text-brand-400" },
@@ -26,7 +26,7 @@ export const TimelineSection = ({ className }: TimelineSectionProps) => {
                 {/* Section header */}
                 <div className="mb-16 text-center md:mb-20">
                     <motion.p
-                        className="mb-4 font-mono text-xs uppercase tracking-widest text-brand-400"
+                        className="mb-4 font-mono text-xs tracking-widest text-brand-400 uppercase"
                         initial={{ opacity: 0, y: 12 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -35,7 +35,7 @@ export const TimelineSection = ({ className }: TimelineSectionProps) => {
                         {timeline.sectionLabel}
                     </motion.p>
                     <motion.h2
-                        className="mb-5 font-display text-3xl font-extrabold uppercase tracking-tight text-white md:text-4xl lg:text-5xl"
+                        className="mb-5 font-display text-3xl font-extrabold tracking-tight text-white uppercase md:text-4xl lg:text-5xl"
                         initial={{ opacity: 0, y: 16 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -71,9 +71,9 @@ export const TimelineSection = ({ className }: TimelineSectionProps) => {
                                     <div className="size-2.5 rounded-full bg-gray-700" />
                                     <div className="size-2.5 rounded-full bg-gray-700" />
                                 </div>
-                                <span className="font-mono text-[10px] uppercase tracking-wider text-gray-500">Timeline</span>
+                                <span className="font-mono text-[10px] tracking-wider text-gray-500 uppercase">Timeline</span>
                             </div>
-                            <span className="font-mono text-[10px] uppercase tracking-wider text-gray-600">Today</span>
+                            <span className="font-mono text-[10px] tracking-wider text-gray-600 uppercase">Today</span>
                         </div>
 
                         {/* Time axis bar chart */}
@@ -103,7 +103,7 @@ export const TimelineSection = ({ className }: TimelineSectionProps) => {
                                             className={cx(
                                                 "group relative h-full cursor-pointer rounded-md transition-all hover:brightness-110",
                                                 colors.bar,
-                                                "opacity-70 hover:opacity-100"
+                                                "opacity-70 hover:opacity-100",
                                             )}
                                             style={{ width: `${widthPercent}%` }}
                                             initial={{ scaleX: 0, originX: 0 }}
@@ -112,7 +112,7 @@ export const TimelineSection = ({ className }: TimelineSectionProps) => {
                                             transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
                                         >
                                             {/* Tooltip */}
-                                            <div className="pointer-events-none absolute -top-12 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                                            <div className="pointer-events-none absolute -top-12 left-1/2 z-10 -translate-x-1/2 rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 whitespace-nowrap opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
                                                 <span className="font-mono text-[11px] text-white">
                                                     {session.app} &middot; {session.duration}
                                                 </span>
@@ -132,9 +132,9 @@ export const TimelineSection = ({ className }: TimelineSectionProps) => {
                                         <motion.div
                                             key={index}
                                             className={cx(
-                                                "flex items-center gap-3 rounded-xl p-3.5 transition-all cursor-pointer",
+                                                "flex cursor-pointer items-center gap-3 rounded-xl p-3.5 transition-all",
                                                 colors.bg,
-                                                "hover:brightness-110"
+                                                "hover:brightness-110",
                                             )}
                                             initial={{ opacity: 0, y: 8 }}
                                             whileInView={{ opacity: 1, y: 0 }}
@@ -177,9 +177,7 @@ export const TimelineSection = ({ className }: TimelineSectionProps) => {
                                             </svg>
                                         </div>
                                         <div>
-                                            <span className="text-sm font-medium text-white">
-                                                {timeline.expandedSession.app} Session
-                                            </span>
+                                            <span className="text-sm font-medium text-white">{timeline.expandedSession.app} Session</span>
                                             <p className="text-xs text-gray-500">Expand for details</p>
                                         </div>
                                     </div>
@@ -189,21 +187,14 @@ export const TimelineSection = ({ className }: TimelineSectionProps) => {
                                 <div className="border-t border-brand-800/20 px-4 py-3.5">
                                     <div className="space-y-2">
                                         {timeline.expandedSession.details.map((detail, index) => (
-                                            <div
-                                                key={index}
-                                                className="flex items-center gap-2.5 text-sm text-gray-400"
-                                            >
+                                            <div key={index} className="flex items-center gap-2.5 text-sm text-gray-400">
                                                 <div className="size-1.5 rounded-full bg-brand-400/60" />
                                                 {detail}
                                             </div>
                                         ))}
                                     </div>
                                     <div className="mt-4">
-                                        <Button
-                                            color="primary"
-                                            size="sm"
-                                            className="btn-pill"
-                                        >
+                                        <Button color="primary" size="sm" className="btn-pill">
                                             {timeline.expandedSession.action}
                                         </Button>
                                     </div>

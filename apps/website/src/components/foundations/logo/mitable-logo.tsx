@@ -11,12 +11,7 @@ import { cx } from "@/utils/cx";
 export const MitableLogo = (props: HTMLAttributes<HTMLDivElement>) => {
     return (
         <div {...props} className={cx("flex h-8 w-max items-center text-ink", props.className)}>
-            <svg
-                viewBox="0 0 468 102"
-                fill="currentColor"
-                className="h-8 w-auto"
-                aria-label="Mitable"
-            >
+            <svg viewBox="0 0 468 102" fill="currentColor" className="h-8 w-auto" aria-label="Mitable">
                 <g clipPath="url(#clip0_mitable_logo)">
                     <path d="M2 20H13.5C20.6797 20 26.5 25.8203 26.5 33V71C26.5 78.1797 20.6797 84 13.5 84C6.3203 84 0.5 78.1797 0.5 71V21.5C0.5 20.6716 1.17157 20 2 20Z" />
                     <rect x="33.5" y="2.5" width="25" height="99" rx="12.5" />
@@ -45,13 +40,7 @@ export const MitableLogo = (props: HTMLAttributes<HTMLDivElement>) => {
  */
 export const MitableLogoMinimal = (props: HTMLAttributes<SVGSVGElement>) => {
     return (
-        <svg
-            {...props}
-            viewBox="0 0 92 100"
-            fill="currentColor"
-            className={cx("h-8 w-auto text-ink", props.className)}
-            aria-label="Mitable"
-        >
+        <svg {...props} viewBox="0 0 92 100" fill="currentColor" className={cx("h-8 w-auto text-ink", props.className)} aria-label="Mitable">
             <g clipPath="url(#clip0_mitable_icon)">
                 <path d="M2 18H13.5C20.6797 18 26.5 23.8203 26.5 31V69C26.5 76.1797 20.6797 82 13.5 82C6.3203 82 0.5 76.1797 0.5 69V19.5C0.5 18.6716 1.17157 18 2 18Z" />
                 <rect x="33.5" y="0.5" width="25" height="99" rx="12.5" />
@@ -73,12 +62,7 @@ export const MitableLogoMinimal = (props: HTMLAttributes<SVGSVGElement>) => {
 export const MitableLogoWhite = (props: HTMLAttributes<HTMLDivElement>) => {
     return (
         <div {...props} className={cx("flex h-8 w-max items-center text-white", props.className)}>
-            <svg
-                viewBox="0 0 468 102"
-                fill="currentColor"
-                className="h-8 w-auto"
-                aria-label="Mitable"
-            >
+            <svg viewBox="0 0 468 102" fill="currentColor" className="h-8 w-auto" aria-label="Mitable">
                 <g clipPath="url(#clip0_mitable_logo_white)">
                     <path d="M2 20H13.5C20.6797 20 26.5 25.8203 26.5 33V71C26.5 78.1797 20.6797 84 13.5 84C6.3203 84 0.5 78.1797 0.5 71V21.5C0.5 20.6716 1.17157 20 2 20Z" />
                     <rect x="33.5" y="2.5" width="25" height="99" rx="12.5" />

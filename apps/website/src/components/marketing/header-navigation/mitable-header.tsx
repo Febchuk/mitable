@@ -6,8 +6,8 @@ import { Button as AriaButton, Dialog as AriaDialog, DialogTrigger as AriaDialog
 import { Button } from "@/components/base/buttons/button";
 import { MitableLogo } from "@/components/foundations/logo/mitable-logo";
 import { MitableLogoMinimal } from "@/components/foundations/logo/mitable-logo";
-import { cx } from "@/utils/cx";
 import { siteContent } from "@/config/site-content";
+import { cx } from "@/utils/cx";
 
 type NavItem = {
     label: string;
@@ -17,10 +17,7 @@ type NavItem = {
 const MobileNavItem = ({ label, href }: NavItem) => {
     return (
         <li>
-            <a
-                href={href}
-                className="flex items-center justify-between px-4 py-3 text-md font-semibold text-gray-200 hover:bg-gray-800"
-            >
+            <a href={href} className="flex items-center justify-between px-4 py-3 text-md font-semibold text-gray-200 hover:bg-gray-800">
                 {label}
             </a>
         </li>
@@ -51,8 +48,8 @@ export const MitableHeader = ({ className }: MitableHeaderProps) => {
         <header
             ref={headerRef}
             className={cx(
-                "fixed top-0 left-0 right-0 z-50 flex h-18 w-full items-center justify-center md:h-20",
-                "bg-ink/80 border-b border-gray-800/50 backdrop-blur-xl",
+                "fixed top-0 right-0 left-0 z-50 flex h-18 w-full items-center justify-center md:h-20",
+                "border-b border-gray-800/50 bg-ink/80 backdrop-blur-xl",
                 className,
             )}
         >

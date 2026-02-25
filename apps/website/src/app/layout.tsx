@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Manrope, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Manrope } from "next/font/google";
 import { RouteProvider } from "@/providers/router-provider";
 import { Theme } from "@/providers/theme";
 import "@/styles/globals.css";
@@ -26,7 +26,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
     title: "Mitable - Your work, documented automatically",
-    description: "Mitable watches your screen during work sessions, generates AI summaries, creates process docs, and builds smart to-do lists. Never forget what you worked on.",
+    description:
+        "Mitable watches your screen during work sessions, generates AI summaries, creates process docs, and builds smart to-do lists. Never forget what you worked on.",
 };
 
 export const viewport: Viewport = {

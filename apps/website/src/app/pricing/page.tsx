@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { PRICING_TIERS, type PricingRegion } from "@mitable/shared";
 import { Check as CheckIcon } from "@untitledui/icons";
+import { motion } from "motion/react";
+import { Button } from "@/components/base/buttons/button";
+import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { supabase } from "@/lib/supabase";
+import { cx } from "@/utils/cx";
 
 // Cast to fix React 19 type compat with @untitledui/icons
 const Check = CheckIcon as React.FC<{ className?: string }>;
-import { motion } from "motion/react";
-import { PRICING_TIERS, type PricingRegion } from "@mitable/shared";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
-import { Button } from "@/components/base/buttons/button";
-import { cx } from "@/utils/cx";
-import { supabase } from "@/lib/supabase";
 
 type DisplayRegion = "US/AUS" | "Nigeria";
 
@@ -71,7 +71,9 @@ export default function PricingPage() {
 
         setLoading(tierId);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
             if (!session) {
                 window.location.href = "/login?redirect=/pricing";
                 return;
@@ -111,12 +113,11 @@ export default function PricingPage() {
                 <section className="relative overflow-hidden">
                     {/* Background glow */}
                     <div
-                        className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2"
+                        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2"
                         style={{
                             width: "800px",
                             height: "600px",
-                            background:
-                                "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
+                            background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
                         }}
                     />
 
@@ -124,7 +125,7 @@ export default function PricingPage() {
                         {/* Section header */}
                         <div className="mb-14 text-center md:mb-20">
                             <motion.p
-                                className="mb-4 font-mono text-xs uppercase tracking-widest text-brand-400"
+                                className="mb-4 font-mono text-xs tracking-widest text-brand-400 uppercase"
                                 initial={{ opacity: 0, y: 12 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
@@ -133,7 +134,7 @@ export default function PricingPage() {
                                 Pricing
                             </motion.p>
                             <motion.h1
-                                className="mb-5 font-display text-4xl font-extrabold uppercase tracking-tight text-white md:text-5xl lg:text-6xl"
+                                className="mb-5 font-display text-4xl font-extrabold tracking-tight text-white uppercase md:text-5xl lg:text-6xl"
                                 initial={{ opacity: 0, y: 16 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
@@ -165,10 +166,8 @@ export default function PricingPage() {
                                             key={r}
                                             onClick={() => handleRegionToggle(r)}
                                             className={cx(
-                                                "rounded-full px-5 py-2 font-mono text-xs font-medium uppercase tracking-wider transition-all duration-200",
-                                                region === r
-                                                    ? "bg-brand-600 text-white shadow-sm"
-                                                    : "text-gray-400 hover:text-white",
+                                                "rounded-full px-5 py-2 font-mono text-xs font-medium tracking-wider uppercase transition-all duration-200",
+                                                region === r ? "bg-brand-600 text-white shadow-sm" : "text-gray-400 hover:text-white",
                                             )}
                                         >
                                             {r}
@@ -197,40 +196,27 @@ export default function PricingPage() {
                                         transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
                                     >
                                         {tier.highlighted && (
-                                            <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-brand-400 to-transparent" />
+                                            <div className="absolute -top-px right-0 left-0 h-px bg-gradient-to-r from-transparent via-brand-400 to-transparent" />
                                         )}
 
                                         {tier.highlighted && (
-                                            <span className="mb-5 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-900/40 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-brand-400">
+                                            <span className="mb-5 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-900/40 px-3 py-1 font-mono text-[10px] tracking-widest text-brand-400 uppercase">
                                                 <span className="size-1.5 rounded-full bg-brand-400" />
                                                 Most Popular
                                             </span>
                                         )}
 
-                                        <h3 className="mb-2 font-mono text-xs font-semibold uppercase tracking-widest text-brand-400">
-                                            {tier.name}
-                                        </h3>
+                                        <h3 className="mb-2 font-mono text-xs font-semibold tracking-widest text-brand-400 uppercase">{tier.name}</h3>
 
                                         <div className="mb-1 flex items-baseline gap-1">
-                                            <span className="font-display text-4xl font-extrabold tracking-tight text-white">
-                                                {regionPrice.displayPrice}
-                                            </span>
-                                            {regionPrice.period && (
-                                                <span className="font-mono text-sm text-gray-500">
-                                                    {regionPrice.period}
-                                                </span>
-                                            )}
+                                            <span className="font-display text-4xl font-extrabold tracking-tight text-white">{regionPrice.displayPrice}</span>
+                                            {regionPrice.period && <span className="font-mono text-sm text-gray-500">{regionPrice.period}</span>}
                                         </div>
 
                                         <p className="mb-6 text-sm text-gray-500">{tier.description}</p>
 
                                         {tier.contactSales ? (
-                                            <Button
-                                                color="secondary"
-                                                size="lg"
-                                                className="btn-pill mb-7 w-full"
-                                                href="/contact"
-                                            >
+                                            <Button color="secondary" size="lg" className="btn-pill mb-7 w-full" href="/contact">
                                                 {tier.cta}
                                             </Button>
                                         ) : regionPrice.stripePriceId ? (
@@ -262,19 +248,10 @@ export default function PricingPage() {
                                                     <div
                                                         className={cx(
                                                             "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full",
-                                                            tier.highlighted
-                                                                ? "bg-brand-900/40"
-                                                                : "bg-gray-800/60",
+                                                            tier.highlighted ? "bg-brand-900/40" : "bg-gray-800/60",
                                                         )}
                                                     >
-                                                        <Check
-                                                            className={cx(
-                                                                "size-3",
-                                                                tier.highlighted
-                                                                    ? "text-brand-400"
-                                                                    : "text-gray-500",
-                                                            )}
-                                                        />
+                                                        <Check className={cx("size-3", tier.highlighted ? "text-brand-400" : "text-gray-500")} />
                                                     </div>
                                                     <span className="text-sm text-gray-300">{feature}</span>
                                                 </li>

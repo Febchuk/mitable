@@ -51,12 +51,7 @@ export const PRICING_TIERS: PricingTier[] = [
     highlighted: false,
     cta: "Get Started",
     contactSales: false,
-    features: [
-      "5 Sessions/month",
-      "Local storage",
-      "Smart summaries",
-      "24/7 Access to Founders",
-    ],
+    features: ["5 Sessions/month", "Local storage", "Smart summaries", "24/7 Access to Founders"],
     pricing: {
       global: {
         amount: 0,
