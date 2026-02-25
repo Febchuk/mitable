@@ -257,7 +257,7 @@ export default function App() {
           className={`flex flex-col items-center gap-1.5 transition-all duration-300 ease-in-out ${
             isExpanded ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
           }`}
-          style={{ clipPath: isExpanded ? 'inset(0 -10px 0 -10px)' : 'inset(0 -10px 100% -10px)' }}
+          style={{ clipPath: isExpanded ? "inset(0 -10px 0 -10px)" : "inset(0 -10px 100% -10px)" }}
         >
           {/* Divider */}
           <div className="w-5 h-px bg-white/10" />
