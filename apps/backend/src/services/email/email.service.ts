@@ -31,7 +31,10 @@ interface SendEmailOptions {
 
 async function send(options: SendEmailOptions): Promise<boolean> {
   if (!resend) {
-    logger.warn({ to: options.to, subject: options.subject }, "Email skipped (Resend not configured)");
+    logger.warn(
+      { to: options.to, subject: options.subject },
+      "Email skipped (Resend not configured)"
+    );
     return false;
   }
 

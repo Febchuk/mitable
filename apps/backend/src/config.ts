@@ -189,7 +189,7 @@ export const config = {
   // Resend Email Configuration (transactional emails)
   resend: {
     apiKey: (process.env.RESEND_API_KEY || "").trim(),
-    fromAddress: (process.env.RESEND_FROM_ADDRESS || "Mitable <noreply@mitable.ai>").trim(),
+    fromAddress: (process.env.RESEND_FROM_ADDRESS || "Mitable AI <noreply@mitable.ai>").trim(),
   },
 
   // Backend URL (used for password reset redirects, etc.)

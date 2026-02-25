@@ -1350,6 +1350,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
 
     // Validate required fields
     if (!firstName || !lastName) {
+      console.log("[admin/users] 400: missing name", { firstName, lastName });
       res.status(400).json({
         success: false,
         error: {
@@ -1361,6 +1362,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
     }
 
     if (!email) {
+      console.log("[admin/users] 400: missing email");
       res.status(400).json({
         success: false,
         error: {
@@ -1372,6 +1374,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
     }
 
     if (!role) {
+      console.log("[admin/users] 400: missing role", { body: req.body });
       res.status(400).json({
         success: false,
         error: {
@@ -1390,6 +1393,7 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
       .limit(1);
 
     if (existingUser) {
+      console.log("[admin/users] 400: email already exists", { email });
       res.status(400).json({
         success: false,
         error: {

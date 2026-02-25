@@ -1481,12 +1481,11 @@ authRouter.post("/forgot-password", async (req: Request, res: Response) => {
     const redirectTo = `${config.backendUrl}/api/auth/reset-password`;
 
     try {
-      const { data: linkData, error: linkError } =
-        await supabaseAdmin.auth.admin.generateLink({
-          type: "recovery",
-          email,
-          options: { redirectTo },
-        });
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: { redirectTo },
+      });
 
       if (linkError || !linkData?.properties?.action_link) {
         // Fallback: use Supabase's built-in email
