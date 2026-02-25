@@ -767,7 +767,7 @@ function stopNotificationTimer() {
 // (Auto session start removed — passive monitoring handles session lifecycle)
 
 /**
- * Auto-enable passive monitoring if the user's preference allows it (default: false, opt-in).
+ * Auto-enable passive monitoring if the user's preference allows it (default: true).
  * Called after user context is established (login or session restore).
  */
 function autoEnablePassiveMonitoring(userId: string) {
