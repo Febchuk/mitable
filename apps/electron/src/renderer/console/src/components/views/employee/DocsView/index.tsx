@@ -70,12 +70,19 @@ export default function DocsView() {
 
   const documents = data?.documents || [];
 
-  // Sort by updated date (most recent first)
+  // Apply type + status filters, then sort by updated date (most recent first)
   const sortedDocuments = useMemo(() => {
-    return [...documents].sort(
+    let filtered = documents;
+    if (docTypeFilter !== "all") {
+      filtered = filtered.filter((d) => d.docType === docTypeFilter);
+    }
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((d) => d.status === statusFilter);
+    }
+    return [...filtered].sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
-  }, [documents]);
+  }, [documents, docTypeFilter, statusFilter]);
 
   // Group by date
   const groupedDocuments = useMemo(() => groupDocumentsByDate(sortedDocuments), [sortedDocuments]);

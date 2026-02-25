@@ -307,7 +307,7 @@ export default function DaySummary({ day }: DaySummaryProps) {
           /* Prose view - markdown summary */
           day.summary ? (
             <div
-              className="text-sm text-ink-secondary leading-relaxed prose prose-sm prose-invert max-w-none max-h-[200px] overflow-y-auto pr-2 scrollbar-thin"
+              className="text-sm text-ink-secondary leading-relaxed prose prose-sm prose-invert max-w-none"
               dangerouslySetInnerHTML={{ __html: renderedSummaryHtml }}
             />
           ) : (
