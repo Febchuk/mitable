@@ -59,6 +59,9 @@ app.use(
   })
 );
 
+// Stripe webhooks require the raw body for signature verification — must come BEFORE json parser
+app.use("/api/stripe/webhooks", express.raw({ type: "application/json" }));
+
 app.use(express.json({ limit: "100mb" })); // Large limit for batch screenshot uploads (16+ captures with base64 images)
 
 // Swagger API Documentation
