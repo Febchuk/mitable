@@ -62,10 +62,6 @@ interface ActiveSession {
   lastSuccessfulCaptureAt: number; // Timestamp of last successful capture
 }
 
-// If N consecutive capture cycles produce 0 captures, auto-pause the session.
-// With a 30s interval, 20 failures = ~10 minutes of no captures.
-const MAX_CONSECUTIVE_EMPTY_CAPTURES = 20;
-
 // ===========================
 // MonitoringSessionService Class
 // ===========================
@@ -728,8 +724,9 @@ class MonitoringSessionService {
   }
 
   /**
-   * Check capture health — auto-pause if too many consecutive empty cycles.
-   * Prevents sessions from running for hours with no actual data.
+   * Check capture health — log warnings for debugging.
+   * Session lifecycle is managed by PassiveMonitorService (auto-stop on 5min idle)
+   * or manual stop by the user. We never auto-pause here.
    */
   private checkCaptureHealth(): void {
     if (!this.activeSession || this.activeSession.status !== "active") return;
@@ -738,24 +735,10 @@ class MonitoringSessionService {
     const lastCapture = this.activeSession.lastSuccessfulCaptureAt;
     const gapMinutes = Math.round((Date.now() - lastCapture) / 60000);
 
-    if (emptyCount >= MAX_CONSECUTIVE_EMPTY_CAPTURES) {
-      logger.warn(
-        `[CaptureHealth] ${emptyCount} consecutive empty capture cycles (~${gapMinutes}min without data). Auto-pausing session.`
-      );
-
-      // Auto-pause the session
-      this.stopCaptureLoop();
-      this.activeSession.status = "paused";
-      this.activeSession.pausedAt = Date.now();
-
-      // Update local storage status
-      localFrameStorage.updateSessionStatus(this.activeSession.id, "paused").catch(() => {});
-      checkpointService.onSessionPaused().catch(() => {});
-
-      // Broadcast so UI shows "Paused — no screen activity detected"
-      this.broadcastSessionUpdate();
-    } else if (emptyCount > 0 && emptyCount % 5 === 0) {
-      // Log a warning every 5 empty cycles for debugging
+    // Log warnings for debugging but don't auto-pause.
+    // Session lifecycle is managed by PassiveMonitorService (auto-stop on 5min idle)
+    // or manual stop by the user.
+    if (emptyCount > 0 && emptyCount % 10 === 0) {
       logger.warn(
         `[CaptureHealth] ${emptyCount} consecutive empty captures (~${gapMinutes}min without data)`
       );
