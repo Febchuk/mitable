@@ -30,7 +30,7 @@ function extractSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | nul
   if (!subDetails) return null;
   return typeof subDetails.subscription === "string"
     ? subDetails.subscription
-    : subDetails.subscription?.id ?? null;
+    : (subDetails.subscription?.id ?? null);
 }
 
 /**
@@ -136,9 +136,7 @@ class StripeService {
     }
 
     const subscriptionId =
-      typeof session.subscription === "string"
-        ? session.subscription
-        : session.subscription?.id;
+      typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
 
     if (!subscriptionId) {
       console.warn("[Stripe] checkout.session.completed missing subscription ID");
@@ -153,7 +151,8 @@ class StripeService {
     await db
       .update(subscriptions)
       .set({
-        stripeCustomerId: typeof session.customer === "string" ? session.customer : session.customer?.id,
+        stripeCustomerId:
+          typeof session.customer === "string" ? session.customer : session.customer?.id,
         stripeSubscriptionId: subscriptionId,
         stripePriceId: priceId,
         tier,
@@ -196,7 +195,9 @@ class StripeService {
       })
       .where(eq(subscriptions.organizationId, organizationId));
 
-    console.info(`[Stripe] Subscription updated for org ${organizationId}: tier=${tier}, status=${status}`);
+    console.info(
+      `[Stripe] Subscription updated for org ${organizationId}: tier=${tier}, status=${status}`
+    );
   }
 
   /**
