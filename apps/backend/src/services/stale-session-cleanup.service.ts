@@ -9,7 +9,8 @@
  *   2. Check if the last capture is older than MAX_CAPTURE_GAP (30 min)
  *      OR total elapsed time exceeds MAX_SESSION_DURATION (12 hours)
  *   3. Set endedAt to the last capture timestamp (real end, not current time)
- *   4. Mark status as 'ended' and run the activity materializer
+ *   4. Mark status as 'ended', run the activity materializer,
+ *      and trigger storyteller summarization if enough data exists
  *
  * Triggered by:
  *   - Cron job (every 15 minutes) — catches orphans server-side
@@ -18,9 +19,10 @@
 
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, sql } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { materializeSession } from "./activity-materializer.service";
+import { masterStoryService } from "./master-story.service";
 
 const logger = createLogger({ context: "stale-session-cleanup" });
 
@@ -169,6 +171,43 @@ export async function cleanupStaleSessions(userId?: string): Promise<CleanupResu
           );
         }
 
+        // Trigger summarization if the session has enough data
+        // (same guard thresholds as the /sessions/:id/end route)
+        const MIN_DURATION_MS = 3 * 60 * 1000; // 3 minutes
+        const MIN_CLASSIFIED_CAPTURES = 5;
+        const activeDurationMs =
+          effectiveEndTime.getTime() - new Date(session.startedAt).getTime() - totalPausedMs;
+
+        const [{ count: classifiedCount }] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(schema.sessionCaptures)
+          .where(
+            and(
+              eq(schema.sessionCaptures.sessionId, session.id),
+              isNotNull(schema.sessionCaptures.activityDescription)
+            )
+          );
+
+        if (activeDurationMs >= MIN_DURATION_MS && classifiedCount >= MIN_CLASSIFIED_CAPTURES) {
+          // Session qualifies for summarization — fire async (don't block cleanup loop)
+          triggerSummarization(session.id, session.userId).catch((err) => {
+            logger.error(
+              { sessionId: session.id, error: String(err) },
+              "Stale session summarization trigger failed"
+            );
+          });
+        } else {
+          // Short session — apply the same friendly-message treatment as /end
+          logger.info(
+            { sessionId: session.id, activeDurationMs, classifiedCount },
+            "Stale session too short for summarization"
+          );
+          await db
+            .update(schema.monitoringSessions)
+            .set({ status: "ready", name: "Short session" })
+            .where(eq(schema.monitoringSessions.id, session.id));
+        }
+
         result.sessionsEnded++;
         result.details.push({
           sessionId: session.id,
@@ -196,4 +235,80 @@ export async function cleanupStaleSessions(userId?: string): Promise<CleanupResu
   }
 
   return result;
+}
+
+/**
+ * Trigger the storyteller summarization pipeline for a stale session.
+ * Mirrors the async summarization logic from POST /sessions/:id/end.
+ */
+async function triggerSummarization(sessionId: string, userId: string): Promise<void> {
+  logger.info({ sessionId }, "Triggering summarization for stale session");
+
+  // Set status to summarizing
+  await db
+    .update(schema.monitoringSessions)
+    .set({ status: "summarizing", summarizationProgress: "generating_title" })
+    .where(eq(schema.monitoringSessions.id, sessionId));
+
+  try {
+    // Generate title + story in parallel (same pattern as /end route)
+    const [, storyResult] = await Promise.all([
+      // Generate AI session title
+      (async () => {
+        try {
+          const { sessionTitleService } = await import("./session-title.service.js");
+          const aiTitle = await sessionTitleService.generateTitle(sessionId);
+          const finalTitle = aiTitle && aiTitle.trim().length > 0 ? aiTitle : "Work session";
+          await db
+            .update(schema.monitoringSessions)
+            .set({ name: finalTitle })
+            .where(eq(schema.monitoringSessions.id, sessionId));
+          logger.info({ sessionId, title: finalTitle }, "Stale session title generated");
+        } catch (error) {
+          logger.error(
+            { sessionId, error: String(error) },
+            "Stale session title generation failed"
+          );
+          await db
+            .update(schema.monitoringSessions)
+            .set({ name: "Work session" })
+            .where(eq(schema.monitoringSessions.id, sessionId));
+        }
+      })(),
+      // Generate master story
+      (async () => {
+        await db
+          .update(schema.monitoringSessions)
+          .set({ summarizationProgress: "analyzing_activities" })
+          .where(eq(schema.monitoringSessions.id, sessionId));
+        return masterStoryService.generateStory({
+          sessionId,
+          userId,
+          formatPreference: { style: "concise", format: "bullets", includeScreenshots: false },
+        });
+      })(),
+    ]);
+
+    // Success — set to ready with the story
+    await db
+      .update(schema.monitoringSessions)
+      .set({
+        status: "ready",
+        summarizationProgress: null,
+        ...(storyResult ? { finalSummary: storyResult } : {}),
+      })
+      .where(eq(schema.monitoringSessions.id, sessionId));
+
+    logger.info({ sessionId }, "Stale session summarization completed");
+  } catch (error) {
+    logger.error(
+      { sessionId, error: String(error) },
+      "Stale session summarization failed — marking as ready anyway"
+    );
+    // Don't leave stuck at 'summarizing' — mark as ready even on failure
+    await db
+      .update(schema.monitoringSessions)
+      .set({ status: "ready", summarizationProgress: null })
+      .where(eq(schema.monitoringSessions.id, sessionId));
+  }
 }
