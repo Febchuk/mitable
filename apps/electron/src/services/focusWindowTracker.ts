@@ -6,6 +6,8 @@
  * - When a window is focused, it's added to the watch list
  * - Each focus resets the 10-minute timer
  * - Windows are removed after 10 minutes of not being focused
+ * - The last-focused window is never removed by TTL (keeps watch list non-empty
+ *   when user stays on one window, e.g. a call, without refocusing)
  * - Excludes: Mitable Electron renderers, policy-blocked windows, and Spotify
  *
  * @module focusWindowTracker
@@ -15,6 +17,7 @@ import { BrowserWindow } from "electron";
 import { createLogger } from "../lib/logger";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
 import { windowDetectionService } from "./windowDetectionService";
+import { isSystemApp } from "../utils/browserTitleParser";
 import { IPC_CHANNELS } from "@mitable/shared";
 import type { SelectedWindowInfo } from "@mitable/shared";
 
@@ -265,7 +268,10 @@ class FocusWindowTracker {
       const activeWin = (await import("active-win")).default;
       const activeWindow = await activeWin();
 
+      // active-win can return null for full-screen apps (own Space) and other edge cases.
+      // Fallback: use openWindows() which enumerates all windows — it sees full-screen apps.
       if (!activeWindow) {
+        await this.tryAddFrontmostFromOpenWindows();
         return;
       }
 
@@ -332,6 +338,70 @@ class FocusWindowTracker {
   }
 
   /**
+   * Fallback when active-win returns null (e.g. full-screen apps on their own Space).
+   * openWindows() enumerates all windows and sees full-screen apps; first in list is frontmost.
+   */
+  private async tryAddFrontmostFromOpenWindows(): Promise<void> {
+    try {
+      const { openWindows } = await import("get-windows");
+      const windows = await openWindows();
+      if (!windows || windows.length === 0) return;
+
+      const policy = getCapturePolicy();
+      const browserApps = [
+        "Google Chrome",
+        "Safari",
+        "Firefox",
+        "Arc",
+        "Microsoft Edge",
+        "Brave Browser",
+        "Opera",
+        "Opera GX",
+      ];
+
+      for (const win of windows) {
+        const windowId = String(win.id);
+        const appName = win.owner?.name ?? "";
+        const windowTitle = win.title ?? "";
+
+        // Skip windows with no title (except RDP/Citrix)
+        if (!windowTitle || windowTitle.trim() === "") {
+          if (!isRemoteDesktopApp(appName)) continue;
+        }
+
+        if (isSystemApp(appName)) continue;
+
+        const exclusionCheck = shouldExcludeWindow(
+          windowTitle,
+          appName,
+          policy,
+          this.currentUserId
+        );
+        if (exclusionCheck.excluded) continue;
+
+        const isBrowser = browserApps.includes(appName);
+        const effectiveTitle = windowTitle || appName;
+
+        this.lastActiveWindowId = windowId;
+        this.addOrRefreshWindow({
+          windowId,
+          appName,
+          windowTitle: effectiveTitle,
+          displayName: appName,
+          tabTitle: isBrowser ? windowTitle : undefined,
+          isBrowser,
+        });
+        logger.info(
+          ` Added window via openWindows fallback: ${appName} (${effectiveTitle.substring(0, 40)}...)`
+        );
+        return; // Only add the frontmost
+      }
+    } catch (error) {
+      logger.error(" openWindows fallback failed:", error);
+    }
+  }
+
+  /**
    * Add a new window or refresh its TTL
    */
   private addOrRefreshWindow(window: Omit<TrackedWindow, "lastFocusedAt" | "expiresAt">): void {
@@ -349,9 +419,13 @@ class FocusWindowTracker {
         ` Refreshed TTL for window: ${window.appName} (${window.windowTitle.substring(0, 40)}...)`
       );
     } else {
-      // Different OS window — check if we already track another window for the same app
-      // (e.g., Chrome main window vs DevTools, Windsurf editor vs terminal panel).
-      // Replace the old entry so the badge count stays at one-per-app.
+      // Different OS window
+      // We no longer replace the old entry. This allows tracking multiple windows of the same app
+      // (e.g. multiple Chrome windows, or VS Code window + terminal).
+      
+      /* 
+      // LEGACY: Replaced old entry so badge count stayed at one-per-app.
+      // Removed to support multi-window tracking per app.
       for (const [existingId, existingWin] of this.trackedWindows) {
         if (existingWin.appName === window.appName) {
           this.trackedWindows.delete(existingId);
@@ -362,6 +436,7 @@ class FocusWindowTracker {
           break;
         }
       }
+      */
 
       // Add new window
       const trackedWindow: TrackedWindow = {
@@ -425,6 +500,11 @@ class FocusWindowTracker {
 
   /**
    * Remove expired windows from tracking
+   *
+   * The last-focused window is never removed by TTL, even if expired. This prevents
+   * the watch list from going empty when the user stays on one window (e.g., a call)
+   * for 10+ minutes without refocusing — they would otherwise have to manually
+   * re-add it or switch away and back.
    */
   private cleanupExpiredWindows(): void {
     // Also re-check block list so mid-session changes take effect
@@ -440,6 +520,14 @@ class FocusWindowTracker {
         if (isRemoteDesktopApp(window.appName)) {
           logger.info(
             ` Keeping RDP/Citrix window past TTL: ${window.appName} (${window.windowTitle.substring(0, 40)})`
+          );
+          continue;
+        }
+        // Never remove the last-focused window — keeps watch list non-empty when
+        // user stays on one window (e.g., call) without refocusing
+        if (windowId === this.lastActiveWindowId) {
+          logger.info(
+            ` Keeping last-focused window past TTL: ${window.appName} (${window.windowTitle.substring(0, 40)})`
           );
           continue;
         }
