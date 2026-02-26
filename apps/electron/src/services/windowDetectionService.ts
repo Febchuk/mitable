@@ -73,6 +73,10 @@ class WindowDetectionService {
   // Track which RDP/Citrix windows we've already logged (to avoid spam every 2s)
   private rdpWindowsLogged: Set<string> = new Set();
 
+  // Throttle "window not found" logs per window (avoid spam every 2s)
+  private lastMissingLogTime: Map<string, number> = new Map();
+  private static readonly MISSING_LOG_THROTTLE_MS = 60_000;
+
   // Track apps that have been detected (for block list management)
   // Key: normalized app name (lowercase), Value: original app name
   private detectedApps: Map<string, string> = new Map();
@@ -506,6 +510,7 @@ class WindowDetectionService {
     const lastDetectedCount = this.lastDetectedWindows.size;
     this.lastDetectedWindows.clear();
     this.rdpWindowsLogged.clear();
+    this.lastMissingLogTime.clear();
     logger.info(
       `[WindowDetectionService] Cleared ${lastDetectedCount} entries from lastDetectedWindows`
     );
@@ -701,11 +706,23 @@ class WindowDetectionService {
             }
             continue;
           }
-          closedWindows.push(windowInfo);
-          this.selectedWindows.delete(windowId);
-          logger.info(
-            `[WindowDetectionService] Window closed, removed from watch list: ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowId}]`
-          );
+          // NOTE: We no longer auto-remove windows based on get-windows enumeration failures.
+          // Windows stay in the watch list until:
+          // 1. User manually removes them (X button)
+          // 2. Focus tracker's TTL expires (10 minutes for auto-tracked windows)
+          //
+          // This handles cases where windows are temporarily invisible (e.g. other Spaces, full-screen)
+          // or get-windows fails to enumerate them reliably.
+          const now = Date.now();
+          const lastLog = this.lastMissingLogTime.get(windowId) ?? 0;
+          if (now - lastLog >= WindowDetectionService.MISSING_LOG_THROTTLE_MS) {
+            this.lastMissingLogTime.set(windowId, now);
+            logger.info(
+              `[WindowDetectionService] Window not found in enumeration (keeping it): ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowId}]`
+            );
+          }
+          continue; 
+
         }
       }
 
