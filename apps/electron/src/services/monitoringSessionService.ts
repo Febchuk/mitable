@@ -853,10 +853,16 @@ class MonitoringSessionService {
     }
 
     try {
+      // Add 60-second timeout to prevent ECONNABORTED errors
+      // AI API calls (Gemini + Classifier) can be slow but should complete within 60s
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
       const response = await authManager.authenticatedFetch(
         `/api/monitoring/sessions/${sessionId}/analyze-frame`,
         {
           method: "POST",
+          signal: controller.signal,
           body: JSON.stringify({
             frameId,
             currentImage,
@@ -874,6 +880,8 @@ class MonitoringSessionService {
           }),
         }
       );
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -910,6 +918,14 @@ class MonitoringSessionService {
         });
       }
     } catch (error) {
+      // Handle timeout separately
+      if (error instanceof Error && error.name === "AbortError") {
+        logger.warn(
+          ` Frame analysis timeout after 60s (frame will retry on next capture): ${frameId}`
+        );
+        return;
+      }
+
       // Log but don't throw - analysis failure shouldn't stop session
       logger.error(" Error analyzing frame:", error);
     }
