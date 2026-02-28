@@ -5,10 +5,9 @@ import { PRICING_TIERS, type QuotaStatus, type SubscriptionResponse } from "@mit
 import { motion } from "motion/react";
 import { Button } from "@/components/base/buttons/button";
 import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { cx } from "@/utils/cx";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 interface BillingData {
     subscription: SubscriptionResponse | null;
@@ -72,6 +71,13 @@ export default function BillingPage() {
                 fetch(`${API_URL}/api/billing/quota`, { headers }),
             ]);
 
+            // If either returns 401, session is stale — sign out and redirect to login
+            if (subRes.status === 401 || quotaRes.status === 401) {
+                await supabase.auth.signOut();
+                window.location.href = "/login?redirect=/billing";
+                return;
+            }
+
             const subscription = subRes.ok ? await subRes.json() : null;
             const quota = quotaRes.ok ? await quotaRes.json() : null;
 
@@ -99,6 +105,12 @@ export default function BillingPage() {
                     returnUrl: window.location.href,
                 }),
             });
+
+            if (res.status === 401) {
+                await supabase.auth.signOut();
+                window.location.href = "/login?redirect=/billing";
+                return;
+            }
 
             const result = await res.json();
             if (result.url) {

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/base/buttons/button";
 import { Input } from "@/components/base/input/input";
 import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
 const darkInput = {
@@ -21,11 +22,21 @@ function LoginForm() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    // If already logged in, redirect
+    // If already logged in with a valid session, redirect
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
-                window.location.href = redirect;
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
+            if (!session) return;
+            try {
+                const res = await fetch(`${API_URL}/api/auth/me`, {
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                });
+                if (res.ok) {
+                    window.location.href = redirect;
+                } else {
+                    await supabase.auth.signOut();
+                }
+            } catch {
+                await supabase.auth.signOut();
             }
         });
     }, [redirect]);
@@ -36,13 +47,65 @@ function LoginForm() {
         setLoading(true);
 
         try {
-            const { error: authError } = await supabase.auth.signInWithPassword({
+            const { data: signInData, error: authError } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
 
             if (authError) {
                 setError(authError.message);
+                return;
+            }
+
+            // Verify the user has a backend profile (org + subscription)
+            const meRes = await fetch(`${API_URL}/api/auth/me`, {
+                headers: { Authorization: `Bearer ${signInData.session?.access_token}` },
+            });
+
+            if (meRes.status === 404) {
+                // User exists in Auth but has no DB profile (orphaned from old signup).
+                // Auto-repair: call signup-organization which handles orphan cleanup + creates org/user/subscription.
+                await supabase.auth.signOut();
+
+                const fullName = signInData.user?.user_metadata?.full_name || "";
+                const nameParts = fullName.trim().split(/\s+/);
+                const firstName = nameParts[0] || email.split("@")[0];
+                const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "User";
+
+                const repairRes = await fetch(`${API_URL}/api/auth/signup-organization`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email,
+                        password,
+                        firstName,
+                        lastName,
+                        organizationName: `${firstName}'s Workspace`,
+                        accountType: "personal",
+                    }),
+                });
+
+                const repairData = await repairRes.json();
+
+                if (!repairRes.ok) {
+                    setError(repairData.error?.message || "Failed to set up your account. Please try signing up instead.");
+                    return;
+                }
+
+                if (repairData.session?.access_token && repairData.session?.refresh_token) {
+                    await supabase.auth.setSession({
+                        access_token: repairData.session.access_token,
+                        refresh_token: repairData.session.refresh_token,
+                    });
+                }
+
+                window.location.href = redirect;
+                return;
+            }
+
+            if (!meRes.ok) {
+                await supabase.auth.signOut();
+                setError("Something went wrong verifying your account. Please try again.");
                 return;
             }
 
