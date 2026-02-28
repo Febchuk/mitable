@@ -90,15 +90,14 @@ export const PRICING_TIERS: PricingTier[] = [
         currency: "usd",
         displayPrice: "$20",
         period: "/month",
-        // Set via STRIPE_PRO_PRICE_ID env var on the backend; placeholder here
-        stripePriceId: null,
+        stripePriceId: "price_1T4I4v1Utpl6gAFBS9gmi7Jz",
       },
       ng: {
         amount: 1000000, // ₦10,000
         currency: "ngn",
         displayPrice: "₦10,000",
         period: "/month",
-        stripePriceId: null,
+        stripePriceId: "price_1T4I5L1Utpl6gAFBEROKDHDH",
       },
     },
   },
