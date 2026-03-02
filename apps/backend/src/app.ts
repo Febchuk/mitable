@@ -41,7 +41,14 @@ app.use(
       }
 
       // Validate origin header if present (web browsers)
-      if (config.cors.allowedOrigins.includes(origin)) {
+      const isAllowed =
+        config.cors.allowedOrigins.includes(origin) ||
+        origin.endsWith(".vercel.app") ||
+        origin.endsWith(".mitable.ai") ||
+        origin === "https://mitable.ai" ||
+        origin === "https://www.mitable.ai";
+
+      if (isAllowed) {
         callback(null, true);
       } else {
         callback(new Error(`Origin ${origin} not allowed by CORS`));
