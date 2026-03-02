@@ -152,7 +152,8 @@ export class DocumentGenerationAgent {
   async *generateDocument(
     docType: DocType,
     userPrompt: string,
-    environment: DocumentGenerationEnvironment
+    environment: DocumentGenerationEnvironment,
+    authorName?: string
   ): AsyncGenerator<GenerationStep, string, unknown> {
     console.log(`[DocGenAgent] Starting RLM generation for ${docType}`);
     console.log(`[DocGenAgent] Environment: ${environment.sessionIds.length} sessions`);
@@ -161,7 +162,7 @@ export class DocumentGenerationAgent {
     const messages: any[] = [
       {
         role: "system",
-        content: this.buildSystemPrompt(docType, userPrompt, environment),
+        content: this.buildSystemPrompt(docType, userPrompt, environment, authorName),
       },
       {
         role: "user",
@@ -395,12 +396,20 @@ export class DocumentGenerationAgent {
   private buildSystemPrompt(
     docType: DocType,
     userPrompt: string,
-    environment: DocumentGenerationEnvironment
+    environment: DocumentGenerationEnvironment,
+    authorName?: string
   ): string {
     const docTypeInstructions = this.getDocTypeInstructions(docType);
     const hasArtifacts = environment.artifactIds && environment.artifactIds.length > 0;
 
     return `You are an expert document generation agent. Your task is to create a ${docType} document based on the user's work sessions.
+${
+  authorName
+    ? `
+**Author:** ${authorName}
+When the document requires a name (e.g. "Prepared by", author attribution, signatures), use "${authorName}". Never use placeholder names like "[Name]" or "[Your Name]".`
+    : ""
+}
 
 **User Request:**
 "${userPrompt}"
@@ -425,6 +434,7 @@ ${docTypeInstructions}
 - Include specific details from the session data
 - Be concise but comprehensive
 - If a template was found via parse_template_structure, replicate its section headings, ordering, and formatting style
+- Never use placeholder text like "[Name]", "[Date]", or "[Your Name]" — use real data
 
 **Important:**
 - Call tools to gather data BEFORE generating content

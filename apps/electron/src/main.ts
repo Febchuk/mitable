@@ -307,8 +307,8 @@ function createWatchingPillWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
 
-  const windowWidth = 50; // Just the pill width
-  const windowHeight = 180; // Pill height with mic button (increased from 130 to accommodate 4 buttons + rounded caps)
+  const windowWidth = 64; // Pill (~50px) + outer padding (12px) + 2px safety
+  const windowHeight = 200; // Pill expanded height + top padding
   const rightMargin = 5;
 
   watchingPillWindow = new BrowserWindow({
@@ -765,57 +765,7 @@ function stopNotificationTimer() {
   }
 }
 
-// Setup powerMonitor listeners for auto session start
-function setupPowerMonitor() {
-  const powerLogger = createLogger("PowerMonitor");
-
-  // Listen for system resume (wake from sleep or unlock)
-  powerMonitor.on("resume", async () => {
-    powerLogger.info(" System resumed (wake from sleep/unlock)");
-
-    // Check if auto session start is enabled for current user
-    if (!currentUserContext?.userId) {
-      powerLogger.info(" No user context, skipping auto session start");
-      return;
-    }
-
-    const autoSessionStartEnabled = preferencesService.getUserAutoSessionStart(
-      currentUserContext.userId
-    );
-    if (!autoSessionStartEnabled) {
-      powerLogger.info(" Auto session start disabled, skipping");
-      return;
-    }
-
-    // Check if there's already an active session
-    const sessionState = monitoringSessionService.getSessionState();
-    const isSessionActive = sessionState?.status === "active" || sessionState?.status === "paused";
-
-    if (isSessionActive) {
-      powerLogger.info(" Session already active, continuing existing session");
-      // If session was paused, resume it
-      if (sessionState?.status === "paused") {
-        await monitoringSessionService.resumeSession();
-      }
-      return;
-    }
-
-    // No active session - start a new one
-    powerLogger.info(" No active session, starting new session via auto-start");
-    try {
-      const result = await startSessionFromMain();
-      if (result.success) {
-        powerLogger.info(" Auto session started successfully:", result.sessionId);
-      } else {
-        powerLogger.warn(" Auto session start failed:", result.error);
-      }
-    } catch (error) {
-      powerLogger.error(" Error starting auto session:", error);
-    }
-  });
-
-  powerLogger.info(" PowerMonitor listeners registered");
-}
+// (Auto session start removed — passive monitoring handles session lifecycle)
 
 /**
  * Auto-enable passive monitoring if the user's preference allows it (default: true).
@@ -1797,8 +1747,17 @@ function setupMonitoringSessionHandlers() {
       watchingPillWindow.hide();
     }
 
-    // Resume passive monitoring detection after manual session ends
-    passiveMonitorService.onManualSessionEnd();
+    // Only resume passive monitoring if user has it enabled
+    if (currentUserContext?.userId) {
+      const passiveEnabled = preferencesService.getUserPassiveMonitoringEnabled(
+        currentUserContext.userId
+      );
+      if (passiveEnabled) {
+        passiveMonitorService.onManualSessionEnd();
+      } else {
+        monitoringLogger.info(" Passive monitoring disabled, not resuming after manual end");
+      }
+    }
 
     return result;
   });
@@ -1893,7 +1852,17 @@ function setupMonitoringSessionHandlers() {
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESET, async () => {
     monitoringLogger.info(" Resetting session state");
     monitoringSessionService.resetSession();
-    passiveMonitorService.onManualSessionEnd();
+
+    // Only resume passive monitoring if user has it enabled
+    if (currentUserContext?.userId) {
+      const passiveEnabled = preferencesService.getUserPassiveMonitoringEnabled(
+        currentUserContext.userId
+      );
+      if (passiveEnabled) {
+        passiveMonitorService.onManualSessionEnd();
+      }
+    }
+
     return { success: true };
   });
 
@@ -2042,7 +2011,19 @@ function setupMonitoringSessionHandlers() {
       };
     }
 
-    // Connect WebSocket to backend for audio streaming
+    // Proactively refresh the access token before connecting the audio WebSocket.
+    // Supabase JWTs expire after ~1 hour. If the user clicks mic after a long
+    // idle period, the main-process token may be stale.
+    const userCtx = currentUserContext
+      ? { orgId: currentUserContext.organizationId, userId: currentUserContext.userId }
+      : undefined;
+    const freshToken = await authManager.refreshAccessToken(userCtx);
+    if (freshToken) {
+      authTokens.accessToken = freshToken;
+      authTokens.refreshToken = authManager.getRefreshToken();
+      monitoringLogger.info("🔑 Access token refreshed before audio WebSocket connect");
+    }
+
     const token = authTokens.accessToken;
     if (!token) {
       return {
@@ -2151,16 +2132,6 @@ function setupMonitoringSessionHandlers() {
       }
     }
 
-    return { success: true };
-  });
-
-  // Auto session start IPC handlers (user-scoped)
-  ipcMain.handle(IPC_CHANNELS.AUTO_SESSION_START_GET, (_, userId: string) => {
-    return preferencesService.getUserAutoSessionStart(userId);
-  });
-
-  ipcMain.handle(IPC_CHANNELS.AUTO_SESSION_START_SET, (_, userId: string, enabled: boolean) => {
-    preferencesService.setUserAutoSessionStart(userId, enabled);
     return { success: true };
   });
 
@@ -2602,6 +2573,65 @@ async function endPassiveSessionFromMain(sessionId: string): Promise<void> {
   }
 }
 
+/**
+ * End all active sessions (focused or passive) with a timeout.
+ * Used by before-quit, suspend, and shutdown handlers.
+ * Best-effort: if backend call fails, stale cleanup catches it on next startup.
+ */
+async function endAllActiveSessions(timeoutMs: number): Promise<void> {
+  const passiveState = passiveMonitorService.getState();
+  const sessionState = monitoringSessionService.getSessionState();
+
+  // Determine the active session ID from either source
+  const sessionId = sessionState?.id ?? passiveState.sessionId;
+
+  if (!sessionId) {
+    shutdownLogger.info("No active session to end");
+    return;
+  }
+
+  shutdownLogger.info(
+    `Ending active session ${sessionId} (timeout: ${timeoutMs}ms, ` +
+      `focused: ${sessionState?.status ?? "none"}, passive: ${passiveState.state})`
+  );
+
+  // 1. Stop audio recording
+  await cleanupAudioRecording(sessionId);
+
+  // 2. End local session (stops capture loop, activity tracker, saves checkpoint)
+  try {
+    const result = await monitoringSessionService.endSession();
+    if (result.success) {
+      shutdownLogger.info(`Local session ended, ${result.captureCount} captures`);
+    }
+  } catch (error) {
+    shutdownLogger.error("Error ending local session:", error);
+  }
+
+  // 3. Best-effort backend /end call with timeout
+  try {
+    const autoRecap = currentUserContext?.userId
+      ? preferencesService.getUserAutoRecap(currentUserContext.userId)
+      : true;
+    await authManager.authenticatedFetch(`/api/monitoring/sessions/${sessionId}/end`, {
+      method: "POST",
+      body: JSON.stringify({ autoRecap }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    shutdownLogger.info("Session ended successfully on backend");
+  } catch (error) {
+    shutdownLogger.error("Backend /end call failed (stale cleanup will handle):", error);
+  }
+
+  // 4. Reset passive monitor state (avoids double-end via callback)
+  passiveMonitorService.forceReset();
+
+  // 5. Hide watching pill
+  if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+    watchingPillWindow.hide();
+  }
+}
+
 // Track sequence for Cmd+M+M detection (Mac) or Ctrl+M+M (Windows)
 let shortcutSequence: string[] = [];
 let lastShortcutKeyTime = 0;
@@ -2807,9 +2837,6 @@ app.whenReady().then(async () => {
     authLogger.error("Session restore failed on startup:", error);
   }
 
-  // Setup powerMonitor listeners for auto session start
-  setupPowerMonitor();
-
   // Start automatic update checks (every 4 hours)
   updateService.startPeriodicChecks(240);
 
@@ -2880,45 +2907,83 @@ app.on("activate", () => {
   }
 });
 
-// Graceful shutdown: end active session on backend before exit
-let isQuitting = false;
+// Graceful shutdown: end active sessions on quit, suspend, and shutdown
+let isEndingSession = false;
+let wasPassiveRunning = false;
+
 app.on("before-quit", async (event) => {
-  // Prevent infinite loop
-  if (isQuitting) return;
+  // Prevent re-entry (suspend/shutdown handler may already be running)
+  if (isEndingSession) return;
 
-  // Check if there's an active session
+  // Check if there's any active session (focused or passive)
   const sessionState = monitoringSessionService.getSessionState();
-  if (sessionState && (sessionState.status === "active" || sessionState.status === "paused")) {
-    event.preventDefault(); // Prevent immediate quit
-    isQuitting = true;
+  const passiveState = passiveMonitorService.getState();
+  const hasActiveSession =
+    (sessionState && (sessionState.status === "active" || sessionState.status === "paused")) ||
+    passiveState.sessionId !== null;
 
-    shutdownLogger.info(" Ending active session before quit...");
+  if (hasActiveSession) {
+    event.preventDefault();
+    isEndingSession = true;
 
-    // Stop audio recording before ending session
-    await cleanupAudioRecording(sessionState.id);
-
-    try {
-      // End local session and get captures
-      const result = await monitoringSessionService.endSession();
-
-      if (result.success && result.sessionId) {
-        // End on backend (triggers summarization)
-        const autoRecapShutdown = currentUserContext?.userId
-          ? preferencesService.getUserAutoRecap(currentUserContext.userId)
-          : true;
-        await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
-          method: "POST",
-          body: JSON.stringify({ autoRecap: autoRecapShutdown }),
-        });
-        shutdownLogger.info(" Session ended successfully on backend");
-      }
-    } catch (error) {
-      shutdownLogger.error(" Error ending session:", error);
-    }
+    shutdownLogger.info("Ending active session before quit...");
+    await endAllActiveSessions(5000);
 
     // Now quit for real
     app.quit();
   }
+});
+
+// Suspend — laptop lid close / system sleep
+powerMonitor.on("suspend", async () => {
+  shutdownLogger.info("System suspending (lid close / sleep)");
+  if (isEndingSession) return;
+
+  wasPassiveRunning = passiveMonitorService.wasEnabled();
+  isEndingSession = true;
+
+  await endAllActiveSessions(3000);
+
+  // Reset flag so quit-after-resume still works
+  isEndingSession = false;
+});
+
+// Resume — laptop lid open / system wake
+powerMonitor.on("resume", () => {
+  shutdownLogger.info("System resumed from suspend");
+
+  if (wasPassiveRunning) {
+    // Check if user preference still has passive monitoring enabled
+    const userId = currentUserContext?.userId;
+    const prefEnabled = userId ? preferencesService.getUserPassiveMonitoringEnabled(userId) : false;
+
+    if (prefEnabled) {
+      shutdownLogger.info("Restarting passive monitoring after resume (5s delay)");
+      setTimeout(() => {
+        // Re-check: user may have toggled preference during the delay
+        const stillEnabled = userId
+          ? preferencesService.getUserPassiveMonitoringEnabled(userId)
+          : false;
+        if (stillEnabled && passiveMonitorService.getState().state === "disabled") {
+          passiveMonitorService.enable({
+            startSession: () => startSessionFromMain("passive"),
+            endSession: (sessionId) => endPassiveSessionFromMain(sessionId),
+            isAudioActive: () => audioWebSocketService.isConnected(),
+          });
+        }
+      }, 5000);
+    }
+    wasPassiveRunning = false;
+  }
+});
+
+// Shutdown — system shutdown / restart
+powerMonitor.on("shutdown", async () => {
+  shutdownLogger.info("System shutting down");
+  if (isEndingSession) return;
+  isEndingSession = true;
+
+  await endAllActiveSessions(3000);
 });
 
 // PDF Export — generate PDF from HTML via hidden BrowserWindow
@@ -3004,4 +3069,6 @@ app.on("before-quit", () => {
   stopNotificationTimer();
   // Ensure focus window tracker is stopped even if session state is corrupted
   focusWindowTracker.stop();
+  // Ensure passive polling stops on quit
+  passiveMonitorService.forceReset();
 });

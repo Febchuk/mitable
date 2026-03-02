@@ -806,12 +806,14 @@ export async function sendAskChat(
 ): Promise<{
   message: string;
   threadId: string;
+  messageId: string;
   report?: { title: string; subtitle: string; html: string };
 }> {
   try {
     const response = await apiRequest<{
       message: string;
       threadId: string;
+      messageId: string;
       report?: { title: string; subtitle: string; html: string };
     }>("/admin/ask/chat", {
       method: "POST",

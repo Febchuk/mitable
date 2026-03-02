@@ -3,11 +3,13 @@ import { eq, sql, desc, and, inArray, isNull, isNotNull } from "drizzle-orm";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { requireAuth } from "../middleware/auth.js";
+import { config } from "../config.js";
 import {
   sessionDeliveryService,
   type MultiDeliveryTarget,
 } from "../services/session-delivery.service.js";
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
+import { recapRLMService } from "../services/recap-rlm.service.js";
 import { frameAnalysisService } from "../services/frame-analysis.service.js";
 import { classifierService } from "../services/classifier.service.js";
 import { masterStoryService } from "../services/master-story.service.js";
@@ -345,6 +347,30 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
       appCaptureMap.set(row.sessionId, existing);
     }
 
+    // Fallback: for sessions missing finalSummary, check session_summaries table
+    const missingSummaryIds = sessions
+      .filter((s) => !s.finalSummary && !s.rawActivitySummary)
+      .map((s) => s.id);
+
+    const storyFallbacks = new Map<string, string>();
+    if (missingSummaryIds.length > 0) {
+      const stories = await db
+        .select({
+          sessionId: schema.sessionSummaries.sessionId,
+          narrativeSummary: schema.sessionSummaries.narrativeSummary,
+        })
+        .from(schema.sessionSummaries)
+        .where(
+          and(
+            inArray(schema.sessionSummaries.sessionId, missingSummaryIds),
+            eq(schema.sessionSummaries.summaryType, "master_story")
+          )
+        );
+      for (const story of stories) {
+        storyFallbacks.set(story.sessionId, story.narrativeSummary);
+      }
+    }
+
     // Build response with duration, captureCount, and timeBreakdown
     const sessionsWithDuration = sessions.map((session) => {
       const now = Date.now();
@@ -376,8 +402,16 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
         }
       }
 
+      // Use story from session_summaries as fallback when finalSummary is missing
+      const finalSummary =
+        session.finalSummary ||
+        session.rawActivitySummary ||
+        storyFallbacks.get(session.id) ||
+        null;
+
       return {
         ...session,
+        finalSummary,
         captureCount,
         timeBreakdown,
         duration: {
@@ -964,8 +998,6 @@ router.post(
               const [completedSession] = await db
                 .select({
                   name: schema.monitoringSessions.name,
-                  finalSummary: schema.monitoringSessions.finalSummary,
-                  rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
                   sessionGoal: schema.monitoringSessions.sessionGoal,
                   startedAt: schema.monitoringSessions.startedAt,
                   endedAt: schema.monitoringSessions.endedAt,
@@ -975,51 +1007,30 @@ router.post(
                 .where(eq(schema.monitoringSessions.id, id))
                 .limit(1);
 
-              // Summary lives in session_summaries table (Storyteller output), not monitoringSessions
-              const storyRow = await db.query.sessionSummaries.findFirst({
-                where: and(
-                  eq(schema.sessionSummaries.sessionId, id),
-                  eq(schema.sessionSummaries.summaryType, "master_story")
-                ),
-                orderBy: [desc(schema.sessionSummaries.createdAt)],
-                columns: { narrativeSummary: true },
-              });
-
-              const summary =
-                storyRow?.narrativeSummary ||
-                completedSession?.finalSummary ||
-                completedSession?.rawActivitySummary;
-
               if (!completedSession) {
                 log.warn("Recap skipped — session not found after story generation", {
                   sessionId: id,
                 });
-              } else if (!summary) {
-                log.warn("Recap skipped — no summary available", { sessionId: id });
-              }
-
-              if (completedSession && summary) {
+              } else {
                 const sessionStart = new Date(completedSession.startedAt);
-                const endMs = completedSession.endedAt
-                  ? new Date(completedSession.endedAt).getTime()
-                  : Date.now();
-                const activeMinutes = Math.round(
-                  Math.max(
-                    0,
-                    endMs - sessionStart.getTime() - (completedSession.totalPausedMs || 0)
-                  ) / 60000
-                );
-
-                // Shape must match frontend RecapBlockSnapshot: {id, startTime, endTime, duration, summary, goal}
                 const sessionEnd = completedSession.endedAt
                   ? new Date(completedSession.endedAt)
                   : new Date();
+                const activeMinutes = Math.round(
+                  Math.max(
+                    0,
+                    sessionEnd.getTime() -
+                      sessionStart.getTime() -
+                      (completedSession.totalPausedMs || 0)
+                  ) / 60000
+                );
+
+                // Block shape for the recap DB row (frontend expects this)
                 const newBlock = {
                   id,
                   startTime: sessionStart.toISOString(),
                   endTime: sessionEnd.toISOString(),
                   duration: activeMinutes,
-                  summary,
                   goal: completedSession.sessionGoal || undefined,
                   sessionId: id,
                   title: completedSession.name || "Work session",
@@ -1027,7 +1038,6 @@ router.post(
                 };
 
                 // Check for an existing recap on the session's calendar day
-                // Use session start date (not server time) to group by the user's actual work day
                 const sessionDay = new Date(completedSession.startedAt);
                 const todayStart = new Date(sessionDay);
                 todayStart.setHours(0, 0, 0, 0);
@@ -1062,23 +1072,9 @@ router.post(
                       0
                     );
 
-                    // Build session data for recap regeneration from ALL blocks
-                    const sessionDataForRecap = allBlocks.map((b, i) => ({
-                      sessionId: String(b.id || b.sessionId),
-                      summary: String(b.summary || b.title || ""),
-                      goal: b.goal ? String(b.goal) : null,
-                      durationMinutes: Number(b.duration) || Number(b.durationMinutes) || 0,
-                      startTime: b.startTime
-                        ? new Date(String(b.startTime)).toLocaleString()
-                        : `Block ${i + 1}`,
-                    }));
-
-                    const recapContent = await sessionSummarizationService.generateRecap(
-                      sessionDataForRecap,
-                      "professional",
-                      "standard",
-                      userId
-                    );
+                    // Generate recap from raw classifications for ALL blocks in this recap
+                    const allSessionIds = allBlocks.map((b) => String(b.id || b.sessionId));
+                    const recapContent = await recapRLMService.generateRecap(allSessionIds, userId);
 
                     // Multi-block title: "Daily Recap — Mon DD"
                     const dateLabel = sessionDay.toLocaleDateString("en-US", {
@@ -1107,20 +1103,7 @@ router.post(
                   }
                 } else {
                   // First session of the day — create new recap
-                  const recapContent = await sessionSummarizationService.generateRecap(
-                    [
-                      {
-                        sessionId: id,
-                        summary,
-                        goal: completedSession.sessionGoal,
-                        durationMinutes: activeMinutes,
-                        startTime: sessionStart.toLocaleString(),
-                      },
-                    ],
-                    "professional",
-                    "standard",
-                    userId
-                  );
+                  const recapContent = await recapRLMService.generateRecap([id], userId);
 
                   const recapTitle = completedSession.name || "Work session recap";
                   await db.insert(schema.recaps).values({
@@ -1190,13 +1173,12 @@ router.post(
             .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
-          // Still attempt recap using rawActivitySummary when story generation failed
+          // Still attempt recap from raw classifications even when story generation failed
           if (autoRecap !== false) {
             try {
               const [fallbackSession] = await db
                 .select({
                   name: schema.monitoringSessions.name,
-                  rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
                   sessionGoal: schema.monitoringSessions.sessionGoal,
                   startedAt: schema.monitoringSessions.startedAt,
                   endedAt: schema.monitoringSessions.endedAt,
@@ -1206,32 +1188,21 @@ router.post(
                 .where(eq(schema.monitoringSessions.id, id))
                 .limit(1);
 
-              if (fallbackSession?.rawActivitySummary) {
+              if (fallbackSession) {
                 const sessionStart = new Date(fallbackSession.startedAt);
-                const endMs = fallbackSession.endedAt
-                  ? new Date(fallbackSession.endedAt).getTime()
-                  : Date.now();
+                const sessionEnd = fallbackSession.endedAt
+                  ? new Date(fallbackSession.endedAt)
+                  : new Date();
                 const activeMinutes = Math.round(
                   Math.max(
                     0,
-                    endMs - sessionStart.getTime() - (fallbackSession.totalPausedMs || 0)
+                    sessionEnd.getTime() -
+                      sessionStart.getTime() -
+                      (fallbackSession.totalPausedMs || 0)
                   ) / 60000
                 );
 
-                const recapContent = await sessionSummarizationService.generateRecap(
-                  [
-                    {
-                      sessionId: id,
-                      summary: fallbackSession.rawActivitySummary,
-                      goal: fallbackSession.sessionGoal,
-                      durationMinutes: activeMinutes,
-                      startTime: sessionStart.toLocaleString(),
-                    },
-                  ],
-                  "professional",
-                  "standard",
-                  userId
-                );
+                const recapContent = await recapRLMService.generateRecap([id], userId);
 
                 const recapTitle = fallbackSession.name || "Work session recap";
                 await db.insert(schema.recaps).values({
@@ -1243,12 +1214,8 @@ router.post(
                     {
                       id,
                       startTime: sessionStart.toISOString(),
-                      endTime: (fallbackSession.endedAt
-                        ? new Date(fallbackSession.endedAt)
-                        : new Date()
-                      ).toISOString(),
+                      endTime: sessionEnd.toISOString(),
                       duration: activeMinutes,
-                      summary: fallbackSession.rawActivitySummary,
                       goal: fallbackSession.sessionGoal || undefined,
                       sessionId: id,
                       title: fallbackSession.name || "Work session",
@@ -1258,7 +1225,9 @@ router.post(
                   totalDuration: activeMinutes,
                   sessionId: id,
                 });
-                log.info("Auto-created fallback recap (story failed)", { sessionId: id });
+                log.info("Auto-created recap from raw classifications (story failed)", {
+                  sessionId: id,
+                });
               }
             } catch (recapError) {
               log.error("Fallback recap creation failed (non-blocking)", {
@@ -3437,6 +3406,180 @@ router.patch(
 );
 
 /**
+ * POST /api/monitoring/day-summary
+ * Generate a day summary from block summaries using Groq.
+ * Skips blocks that have no summary. Returns a cohesive narrative for the day.
+ */
+router.post("/day-summary", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const { date, sessionIds }: { date?: string; sessionIds?: string[] } = req.body;
+
+  if (!date && (!sessionIds || sessionIds.length === 0)) {
+    res.status(400).json({
+      error: "Bad Request",
+      message: "Either date (YYYY-MM-DD) or sessionIds array is required",
+    });
+    return;
+  }
+
+  try {
+    // Fetch sessions for the given day or session IDs
+    let sessions;
+    if (sessionIds && sessionIds.length > 0) {
+      sessions = await db
+        .select({
+          id: schema.monitoringSessions.id,
+          name: schema.monitoringSessions.name,
+          finalSummary: schema.monitoringSessions.finalSummary,
+          rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+          sessionGoal: schema.monitoringSessions.sessionGoal,
+          startedAt: schema.monitoringSessions.startedAt,
+          endedAt: schema.monitoringSessions.endedAt,
+          totalPausedMs: schema.monitoringSessions.totalPausedMs,
+        })
+        .from(schema.monitoringSessions)
+        .where(
+          and(
+            inArray(schema.monitoringSessions.id, sessionIds),
+            eq(schema.monitoringSessions.userId, userId)
+          )
+        );
+    } else {
+      // Fetch by date range
+      const dayStart = new Date(date + "T00:00:00.000Z");
+      const dayEnd = new Date(date + "T23:59:59.999Z");
+      sessions = await db
+        .select({
+          id: schema.monitoringSessions.id,
+          name: schema.monitoringSessions.name,
+          finalSummary: schema.monitoringSessions.finalSummary,
+          rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+          sessionGoal: schema.monitoringSessions.sessionGoal,
+          startedAt: schema.monitoringSessions.startedAt,
+          endedAt: schema.monitoringSessions.endedAt,
+          totalPausedMs: schema.monitoringSessions.totalPausedMs,
+        })
+        .from(schema.monitoringSessions)
+        .where(
+          and(
+            eq(schema.monitoringSessions.userId, userId),
+            sql`${schema.monitoringSessions.startedAt} >= ${dayStart.toISOString()}`,
+            sql`${schema.monitoringSessions.startedAt} <= ${dayEnd.toISOString()}`
+          )
+        );
+    }
+
+    if (sessions.length === 0) {
+      res.status(404).json({
+        error: "Not Found",
+        message: "No sessions found for the given date or IDs",
+      });
+      return;
+    }
+
+    // Build block summaries — skip blocks without a summary
+    const blockSummaries = sessions
+      .map((s) => {
+        const summary = s.finalSummary || s.rawActivitySummary;
+        if (!summary) return null;
+
+        const startTime = new Date(s.startedAt).getTime();
+        const endTime = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
+        const pausedMs = s.totalPausedMs || 0;
+        const activeMinutes = Math.round(Math.max(0, endTime - startTime - pausedMs) / 60000);
+
+        return {
+          name: s.name || "Work session",
+          goal: s.sessionGoal,
+          summary,
+          durationMinutes: activeMinutes,
+          startTime: new Date(s.startedAt).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }),
+        };
+      })
+      .filter(Boolean) as Array<{
+      name: string;
+      goal: string | null;
+      summary: string;
+      durationMinutes: number;
+      startTime: string;
+    }>;
+
+    if (blockSummaries.length === 0) {
+      res.json({
+        summary: null,
+        message: "No blocks have summaries yet",
+        skippedCount: sessions.length,
+      });
+      return;
+    }
+
+    // Build prompt
+    const blockList = blockSummaries
+      .map((b, i) => {
+        const parts = [`${i + 1}. ${b.name} (${b.durationMinutes}m, started ${b.startTime})`];
+        if (b.goal) parts.push(`   Goal: ${b.goal}`);
+        parts.push(`   Summary: ${b.summary}`);
+        return parts.join("\n");
+      })
+      .join("\n\n");
+
+    const totalMinutes = blockSummaries.reduce((sum, b) => sum + b.durationMinutes, 0);
+    const prompt = `Summarize the following work blocks into a single cohesive day summary.
+
+<blocks>
+${blockList}
+</blocks>
+
+<context>
+Total blocks: ${blockSummaries.length} (${sessions.length - blockSummaries.length} skipped — no summary)
+Total active time: ${totalMinutes} minutes
+</context>
+
+<instructions>
+- Write 2-4 sentences max
+- Write in third person ("The user worked on..." or use passive voice)
+- Focus on what was accomplished, not individual sessions
+- Combine related activities into themes
+- Do not use markdown formatting — plain text only
+- Be concise and factual
+</instructions>
+
+Write the day summary now:`;
+
+    // Groq-only call
+    const Groq = (await import("groq-sdk")).default;
+    const groq = new Groq({ apiKey: config.groq.apiKey });
+    const completion = await groq.chat.completions.create({
+      model: config.groq.chatModel || "openai/gpt-oss-120b",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 300,
+    });
+
+    const daySummary = completion.choices[0]?.message?.content?.trim() || null;
+
+    res.json({
+      summary: daySummary,
+      blockCount: blockSummaries.length,
+      skippedCount: sessions.length - blockSummaries.length,
+    });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error), userId },
+      "[Monitoring] Error generating day summary"
+    );
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to generate day summary",
+    });
+  }
+});
+
+/**
  * POST /api/monitoring/recaps/generate
  * Generate a recap from multiple session summaries using AI
  */
@@ -3457,17 +3600,9 @@ router.post("/recaps/generate", requireAuth, async (req: Request, res: Response)
   }
 
   try {
-    // Fetch sessions that belong to this user
+    // Verify sessions belong to this user
     const sessions = await db
-      .select({
-        id: schema.monitoringSessions.id,
-        rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
-        finalSummary: schema.monitoringSessions.finalSummary,
-        sessionGoal: schema.monitoringSessions.sessionGoal,
-        startedAt: schema.monitoringSessions.startedAt,
-        endedAt: schema.monitoringSessions.endedAt,
-        totalPausedMs: schema.monitoringSessions.totalPausedMs,
-      })
+      .select({ id: schema.monitoringSessions.id })
       .from(schema.monitoringSessions)
       .where(
         and(
@@ -3484,29 +3619,8 @@ router.post("/recaps/generate", requireAuth, async (req: Request, res: Response)
       return;
     }
 
-    // Build session data for the recap generator
-    const sessionData = sessions.map((s) => {
-      const startTime = new Date(s.startedAt).getTime();
-      const endTime = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
-      const totalMs = endTime - startTime;
-      const pausedMs = s.totalPausedMs || 0;
-      const activeMinutes = Math.round(Math.max(0, totalMs - pausedMs) / 60000);
-
-      return {
-        sessionId: s.id,
-        summary: s.finalSummary || s.rawActivitySummary || "No summary available",
-        goal: s.sessionGoal,
-        durationMinutes: activeMinutes,
-        startTime: new Date(s.startedAt).toLocaleString(),
-      };
-    });
-
-    const recap = await sessionSummarizationService.generateRecap(
-      sessionData,
-      tone,
-      length,
-      userId
-    );
+    const validSessionIds = sessions.map((s) => s.id);
+    const recap = await recapRLMService.generateRecap(validSessionIds, userId, { tone, length });
 
     res.json({ recap });
   } catch (error) {

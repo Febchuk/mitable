@@ -49,6 +49,8 @@ interface GenerateStreamParams {
   sessionIds?: string[];
   /** Optional artifact IDs to include as reference material */
   artifactIds?: string[];
+  /** User's real name for document content (replaces generic placeholders) */
+  authorName?: string;
 }
 
 interface ProgressEvent {
@@ -75,7 +77,10 @@ class DocGenerationStreamService {
       userId,
       sessionIds: hintSessionIds,
       artifactIds,
+      authorName,
     } = params;
+
+    let documentId: string | null = null;
 
     try {
       // Phase 1: Create document record immediately (status='generating')
@@ -99,7 +104,7 @@ class DocGenerationStreamService {
         })
         .returning();
 
-      const documentId = document.id;
+      documentId = document.id;
 
       // Phase 2: Search sessions using RAG
       yield {
@@ -404,7 +409,8 @@ class DocGenerationStreamService {
       for await (const step of documentGenerationAgent.generateDocument(
         docType,
         prompt,
-        environment
+        environment,
+        authorName
       )) {
         if (step.type === "tool_call") {
           toolCallCount += step.toolCalls?.length || 0;
@@ -491,6 +497,17 @@ class DocGenerationStreamService {
       } as any;
     } catch (error) {
       console.error("[DocGenerationStream] Error:", error);
+
+      // Clean up orphan document record if it was created but generation failed
+      if (documentId) {
+        try {
+          await db.delete(schema.documents).where(eq(schema.documents.id, documentId));
+          console.log(`[DocGenerationStream] Cleaned up orphan document ${documentId}`);
+        } catch (cleanupError) {
+          console.error("[DocGenerationStream] Failed to clean up orphan document:", cleanupError);
+        }
+      }
+
       yield {
         type: "error",
         error: error instanceof Error ? error.message : "Document generation failed",

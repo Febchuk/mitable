@@ -5,9 +5,11 @@ import { subscriptions, organizations } from "../db/schema/index.js";
 import { config } from "../config.js";
 import type { SubscriptionTier } from "../db/schema/billing.schema.js";
 
-const stripe = new Stripe(config.stripe.secretKey, {
-  apiVersion: "2026-01-28.clover",
-});
+const stripe = config.stripe.secretKey
+  ? new Stripe(config.stripe.secretKey, {
+      apiVersion: "2026-01-28.clover",
+    })
+  : (null as unknown as Stripe);
 
 /**
  * Extract billing period from a Stripe subscription's first item.

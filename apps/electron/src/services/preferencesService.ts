@@ -262,7 +262,7 @@ class PreferencesService {
   // Passive monitoring preference (user-scoped)
   getUserPassiveMonitoringEnabled(userId: string): boolean {
     const userPrefs = this.store.get(`users.${userId}`, {});
-    // Default to true — passive monitoring is on unless explicitly disabled
+    // Default to true — passive monitoring is enabled by default
     return userPrefs.passiveMonitoringEnabled ?? true;
   }
 

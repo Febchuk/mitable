@@ -81,7 +81,9 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
       error: "Unknown Error",
       message: response.statusText,
     }));
-    throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
+    throw new Error(
+      error.error?.message || error.message || `HTTP ${response.status}: ${response.statusText}`
+    );
   }
 
   return response.json();

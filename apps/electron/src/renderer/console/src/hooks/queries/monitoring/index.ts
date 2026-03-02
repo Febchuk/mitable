@@ -404,6 +404,16 @@ export function useDeleteRecap() {
 }
 
 /**
+ * Generate a day summary from block summaries (Groq)
+ */
+export function useGenerateDaySummary() {
+  return useMutation({
+    mutationFn: (params: { date?: string; sessionIds?: string[] }) =>
+      monitoringService.generateDaySummary(params),
+  });
+}
+
+/**
  * Generate a recap from multiple sessions
  */
 export function useGenerateRecap() {

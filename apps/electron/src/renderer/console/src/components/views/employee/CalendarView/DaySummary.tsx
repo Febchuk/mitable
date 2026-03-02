@@ -6,6 +6,8 @@
  */
 
 import { useState, useMemo } from "react";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import {
   Code,
   Globe,
@@ -256,6 +258,13 @@ export default function DaySummary({ day }: DaySummaryProps) {
   const analysis = useMemo(() => analyzeDayActivity(day.workBlocks), [day.workBlocks]);
   const listItems = useMemo(() => generateListItems(day, analysis), [day, analysis]);
 
+  // Render markdown summary to sanitized HTML
+  const renderedSummaryHtml = useMemo(() => {
+    if (!day.summary) return "";
+    const result = marked.parse(day.summary);
+    return typeof result === "string" ? DOMPurify.sanitize(result) : "";
+  }, [day.summary]);
+
   if (day.workBlocks.length === 0) {
     return null;
   }
@@ -295,10 +304,17 @@ export default function DaySummary({ day }: DaySummaryProps) {
 
       <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-4">
         {viewMode === "prose" ? (
-          /* Prose view - paragraph summary */
-          <p className="text-sm text-ink-secondary leading-relaxed">
-            {day.summary || "No summary available for this day."}
-          </p>
+          /* Prose view - markdown summary */
+          day.summary ? (
+            <div
+              className="text-sm text-ink-secondary leading-relaxed prose prose-sm prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: renderedSummaryHtml }}
+            />
+          ) : (
+            <p className="text-sm text-ink-secondary leading-relaxed">
+              No summary available for this day.
+            </p>
+          )
         ) : (
           /* List view - bullet points with icons */
           <ul className="space-y-2.5">

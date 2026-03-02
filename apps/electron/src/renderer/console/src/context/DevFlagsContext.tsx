@@ -1,15 +1,13 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 
 export interface DevFlags {
   newExperience: boolean; // Calendar + Recaps (true) vs Sessions-only (false)
-  passiveMonitoring: boolean; // Auto-detect activity to start/end sessions
 }
 
 const STORAGE_KEY = "mitable-dev-flags";
 
 const DEFAULT_FLAGS: DevFlags = {
   newExperience: true,
-  passiveMonitoring: true,
 };
 
 function loadFlags(): DevFlags {
@@ -40,20 +38,8 @@ export function DevFlagsProvider({ children }: { children: ReactNode }) {
       const next = { ...prev, [key]: value };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 
-      // Sync passive monitoring flag to main process
-      if (key === "passiveMonitoring" && window.consoleAPI?.setPassiveMonitoringEnabled) {
-        window.consoleAPI.setPassiveMonitoringEnabled(value as boolean);
-      }
-
       return next;
     });
-  }, []);
-
-  // Sync passive monitoring state on mount
-  useEffect(() => {
-    if (flags.passiveMonitoring && window.consoleAPI?.setPassiveMonitoringEnabled) {
-      window.consoleAPI.setPassiveMonitoringEnabled(true);
-    }
   }, []);
 
   return <DevFlagsContext.Provider value={{ flags, setFlag }}>{children}</DevFlagsContext.Provider>;

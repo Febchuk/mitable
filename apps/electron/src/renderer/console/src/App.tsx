@@ -134,6 +134,15 @@ function NavigationHandler() {
     };
   }, [navigate, queryClient]);
 
+  // Track last visited path per nav section (e.g. /docs/abc-123 → section "docs")
+  // so sidebar nav can return users to where they left off
+  useEffect(() => {
+    const section = location.pathname.split("/")[1]; // e.g. "docs", "recaps", "calendar"
+    if (section) {
+      sessionStorage.setItem(`nav:last:${section}`, location.pathname + location.search);
+    }
+  }, [location.pathname, location.search]);
+
   return null;
 }
 

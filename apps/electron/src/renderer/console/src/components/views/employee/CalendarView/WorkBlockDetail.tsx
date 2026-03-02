@@ -5,29 +5,48 @@
  * Supports block status display and recap actions.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
-/** Strip markdown formatting for clean plain-text display */
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/#{1,6}\s*/g, "") // headings
-    .replace(/\*\*([^*]+)\*\*/g, "$1") // bold
-    .replace(/\*([^*]+)\*/g, "$1") // italic
-    .replace(/__([^_]+)__/g, "$1") // bold alt
-    .replace(/_([^_]+)_/g, "$1") // italic alt
-    .replace(/^[-*+]\s+/gm, "• ") // list bullets
-    .replace(/\n{2,}/g, " — ") // paragraph breaks → dash separator
-    .replace(/\n/g, " ") // remaining newlines → space
-    .replace(/\s{2,}/g, " ") // collapse whitespace
+/** Metadata-like patterns to skip when building a preview */
+const METADATA_RE =
+  /^(session metadata|date:|start time:|end time:|duration:|total activities recorded:|context &|---)/i;
+
+/** Extract a clean 1-2 sentence preview, skipping metadata preambles */
+function extractPreview(text: string): string {
+  // Strip markdown formatting first
+  const plain = text
+    .replace(/#{1,6}\s*/g, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/^[-*+]\s+/gm, "")
     .trim();
+
+  // Split into segments (paragraphs, dash-separated, or bullet items)
+  const segments = plain
+    .split(/\n{2,}|\n|(?:\s—\s)/)
+    .map((s) => s.replace(/^[•·]\s*/, "").trim())
+    .filter((s) => s.length > 20 && !METADATA_RE.test(s));
+
+  if (segments.length === 0) {
+    // Fallback: just clean up and truncate the whole thing
+    const fallback = plain.replace(/\n/g, " ").replace(/\s{2,}/g, " ");
+    return fallback.length > 160 ? fallback.slice(0, 157) + "..." : fallback;
+  }
+
+  // Take the first meaningful segment, truncate if needed
+  const preview = segments[0];
+  return preview.length > 160 ? preview.slice(0, 157) + "..." : preview;
 }
 import {
   ChevronDown,
   ChevronRight,
   Clock,
   Coffee,
-  Activity,
   BarChart3,
   Target,
   MoreVertical,
@@ -38,7 +57,6 @@ import {
   Pause,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
-import CaptureTimeline from "./CaptureTimeline";
 import { useBlockDetail } from "../../../../hooks/queries/calendar";
 import { useDeleteSession } from "../../../../hooks/queries/monitoring";
 
@@ -119,7 +137,6 @@ export default function WorkBlockDetail({
 }: WorkBlockDetailProps) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  const [showCaptures, setShowCaptures] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -148,6 +165,13 @@ export default function WorkBlockDetail({
   // Get summary from block detail if available
   const displaySummary =
     blockDetail?.finalSummary || blockDetail?.rawActivitySummary || block.summary;
+
+  // Render markdown summary to sanitized HTML
+  const renderedSummaryHtml = useMemo(() => {
+    if (!displaySummary) return "";
+    const result = marked.parse(displaySummary);
+    return typeof result === "string" ? DOMPurify.sanitize(result) : "";
+  }, [displaySummary]);
 
   // Handle creating a recap from this block
   const handleCreateRecap = () => {
@@ -238,7 +262,7 @@ export default function WorkBlockDetail({
               </div>
             )}
             <p className="text-sm text-ink-primary line-clamp-2">
-              {displaySummary ? stripMarkdown(displaySummary) : "No summary yet"}
+              {displaySummary ? extractPreview(displaySummary) : "No summary yet"}
             </p>
           </div>
 
@@ -248,12 +272,6 @@ export default function WorkBlockDetail({
             <span className="text-sm font-medium tabular-nums">
               {formatDuration(block.duration)}
             </span>
-          </div>
-
-          {/* Capture count */}
-          <div className="flex-shrink-0 flex items-center gap-1.5 text-ink-tertiary">
-            <Activity size={14} />
-            <span className="text-sm tabular-nums">{block.captures.length}</span>
           </div>
 
           {/* Status badge */}
@@ -351,9 +369,12 @@ export default function WorkBlockDetail({
                     <Loader2 size={12} className="text-ink-tertiary animate-spin" />
                   )}
                 </div>
-                <p className="text-sm text-ink-secondary leading-relaxed whitespace-pre-line">
-                  {displaySummary ? stripMarkdown(displaySummary) : "Loading..."}
-                </p>
+                <div
+                  className="text-sm text-ink-secondary leading-relaxed prose prose-sm prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{
+                    __html: displaySummary ? renderedSummaryHtml : "<p>Loading...</p>",
+                  }}
+                />
                 {/* Create Recap action */}
                 {block.status !== "active" && block.status !== "paused" && (
                   <button
@@ -404,31 +425,6 @@ export default function WorkBlockDetail({
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* Captures toggle */}
-            <div className="border-t border-stroke-subtle">
-              <button
-                onClick={() => setShowCaptures(!showCaptures)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-canvas-muted/30 transition-colors"
-              >
-                <span className="text-sm text-ink-secondary">
-                  {showCaptures ? "Hide" : "View"} capture timeline
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`text-ink-tertiary transition-transform ${
-                    showCaptures ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {/* Capture timeline */}
-              {showCaptures && (
-                <div className="border-t border-stroke-subtle max-h-80 overflow-y-auto">
-                  <CaptureTimeline captures={block.captures} maxVisible={30} />
-                </div>
-              )}
             </div>
           </div>
         )}
