@@ -1,13 +1,20 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu01, X } from "@untitledui/icons";
+import { useRouter } from "next/navigation";
 import { Button as AriaButton, Dialog as AriaDialog, DialogTrigger as AriaDialogTrigger, Popover as AriaPopover } from "react-aria-components";
 import { Button } from "@/components/base/buttons/button";
 import { MitableLogo } from "@/components/foundations/logo/mitable-logo";
 import { MitableLogoMinimal } from "@/components/foundations/logo/mitable-logo";
 import { siteContent } from "@/config/site-content";
+import { supabase } from "@/lib/supabase";
 import { cx } from "@/utils/cx";
+
+const signedInLinks = [
+    { label: "Billing", href: "/billing" },
+    { label: "Pricing", href: "/pricing" },
+];
 
 type NavItem = {
     label: string;
@@ -24,12 +31,21 @@ const MobileNavItem = ({ label, href }: NavItem) => {
     );
 };
 
-const MobileFooter = () => {
+const MobileFooter = ({ isSignedIn, onSignOut }: { isSignedIn: boolean; onSignOut: () => void }) => {
     const { navigation } = siteContent;
 
     return (
         <div className="flex flex-col gap-3 border-t border-gray-800 px-4 py-6">
-            <Button size="lg" href="/download" className="rounded-full">
+            {isSignedIn ? (
+                <Button size="lg" className="rounded-full" onPress={onSignOut}>
+                    Sign Out
+                </Button>
+            ) : (
+                <Button size="lg" href="/login" className="rounded-full">
+                    Sign In
+                </Button>
+            )}
+            <Button color="primary" size="lg" href="/download" className="rounded-full">
                 {navigation.cta}
             </Button>
         </div>
@@ -42,7 +58,23 @@ interface MitableHeaderProps {
 
 export const MitableHeader = ({ className }: MitableHeaderProps) => {
     const headerRef = useRef<HTMLElement>(null);
+    const router = useRouter();
     const { navigation } = siteContent;
+    const [isSignedIn, setIsSignedIn] = useState(false);
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setIsSignedIn(!!session);
+        });
+    }, []);
+
+    const handleSignOut = async () => {
+        await supabase.auth.signOut();
+        setIsSignedIn(false);
+        router.push("/");
+    };
+
+    const navLinks = isSignedIn ? signedInLinks : navigation.links;
 
     return (
         <header
@@ -65,7 +97,7 @@ export const MitableHeader = ({ className }: MitableHeaderProps) => {
                         {/* Desktop navigation */}
                         <nav className="max-md:hidden">
                             <ul className="flex items-center gap-1">
-                                {navigation.links.map((item) => (
+                                {navLinks.map((item) => (
                                     <li key={item.label}>
                                         <a
                                             href={item.href}
@@ -80,7 +112,22 @@ export const MitableHeader = ({ className }: MitableHeaderProps) => {
                     </div>
 
                     {/* Desktop CTA */}
-                    <div className="hidden items-center md:flex">
+                    <div className="hidden items-center gap-3 md:flex">
+                        {isSignedIn ? (
+                            <button
+                                onClick={handleSignOut}
+                                className="cursor-pointer rounded-lg px-3 py-2 text-md font-semibold text-gray-300 transition duration-100 ease-linear hover:text-white"
+                            >
+                                Sign Out
+                            </button>
+                        ) : (
+                            <a
+                                href="/login"
+                                className="rounded-lg px-3 py-2 text-md font-semibold text-gray-300 transition duration-100 ease-linear hover:text-white"
+                            >
+                                Sign In
+                            </a>
+                        )}
                         <Button color="primary" size="lg" href="/download" className="rounded-full">
                             {navigation.cta}
                         </Button>
@@ -113,11 +160,11 @@ export const MitableHeader = ({ className }: MitableHeaderProps) => {
                             <AriaDialog className="outline-hidden">
                                 <nav className="w-full bg-ink shadow-lg">
                                     <ul className="flex flex-col gap-0.5 py-5">
-                                        {navigation.links.map((item) => (
+                                        {navLinks.map((item) => (
                                             <MobileNavItem key={item.label} {...item} />
                                         ))}
                                     </ul>
-                                    <MobileFooter />
+                                    <MobileFooter isSignedIn={isSignedIn} onSignOut={handleSignOut} />
                                 </nav>
                             </AriaDialog>
                         </AriaPopover>

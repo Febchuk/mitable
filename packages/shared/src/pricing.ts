@@ -86,18 +86,18 @@ export const PRICING_TIERS: PricingTier[] = [
     ],
     pricing: {
       global: {
-        amount: 2000, // $20.00
+        amount: 1200, // $12.00
         currency: "usd",
-        displayPrice: "$20",
+        displayPrice: "$12",
         period: "/month",
-        stripePriceId: "price_1T4I4v1Utpl6gAFBS9gmi7Jz",
+        stripePriceId: "price_1T6Plv1Utpl6gAFBJzpOKlDH",
       },
       ng: {
         amount: 1000000, // ₦10,000
         currency: "ngn",
         displayPrice: "₦10,000",
         period: "/month",
-        stripePriceId: "price_1T4I5L1Utpl6gAFBEROKDHDH",
+        stripePriceId: "price_1T6Plz1Utpl6gAFBZBFgt5SD",
       },
     },
   },

@@ -200,7 +200,7 @@ export const config = {
 
   // CORS Configuration
   cors: {
-    allowedOrigins: (process.env.ALLOWED_ORIGINS || "http://localhost:5173")
+    allowedOrigins: (process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:3003")
       .split(",")
       .map((origin) => origin.trim()),
   },

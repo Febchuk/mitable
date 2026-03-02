@@ -6,6 +6,7 @@ import { Check as CheckIcon } from "@untitledui/icons";
 import { motion } from "motion/react";
 import { Button } from "@/components/base/buttons/button";
 import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { cx } from "@/utils/cx";
 
@@ -43,8 +44,6 @@ function setRegionCookie(region: DisplayRegion) {
     if (typeof document === "undefined") return;
     document.cookie = `mitable-region=${region};path=/;max-age=${60 * 60 * 24 * 365};SameSite=Lax`;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function PricingPage() {
     const [region, setRegion] = useState<DisplayRegion>("US/AUS");
@@ -91,6 +90,12 @@ export default function PricingPage() {
                     cancelUrl: `${window.location.origin}/checkout/cancel`,
                 }),
             });
+
+            if (res.status === 401) {
+                await supabase.auth.signOut();
+                window.location.href = "/login?redirect=/pricing";
+                return;
+            }
 
             const data = await res.json();
             if (data.url) {

@@ -75,7 +75,7 @@ export const baseContent = {
     navigation: {
         links: [
             { label: "Product", href: "#features" },
-            { label: "Pricing", href: "#pricing" },
+            { label: "Pricing", href: "/pricing" },
         ],
         cta: "Download",
     },

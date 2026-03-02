@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/base/buttons/button";
 import { Input } from "@/components/base/input/input";
 import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
 const darkInput = {
@@ -18,16 +19,28 @@ function SignupForm() {
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [fullName, setFullName] = useState("");
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [success, setSuccess] = useState(false);
 
-    // If already logged in, redirect
+    // If already logged in with a valid session, redirect
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
-                window.location.href = redirect;
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
+            if (!session) return;
+            // Verify the session is actually valid before redirecting
+            try {
+                const res = await fetch(`${API_URL}/api/auth/me`, {
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                });
+                if (res.ok) {
+                    window.location.href = redirect;
+                } else {
+                    // Stale session — clear it so the user can sign up fresh
+                    await supabase.auth.signOut();
+                }
+            } catch {
+                await supabase.auth.signOut();
             }
         });
     }, [redirect]);
@@ -44,21 +57,35 @@ function SignupForm() {
         }
 
         try {
-            const { error: authError } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: { full_name: fullName },
-                    emailRedirectTo: `${window.location.origin}${redirect}`,
-                },
+            const res = await fetch(`${API_URL}/api/auth/signup-organization`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email,
+                    password,
+                    firstName,
+                    lastName,
+                    organizationName: `${firstName}'s Workspace`,
+                    accountType: "personal",
+                }),
             });
 
-            if (authError) {
-                setError(authError.message);
+            const data = await res.json();
+
+            if (!res.ok) {
+                setError(data.error?.message || "Signup failed. Please try again.");
                 return;
             }
 
-            setSuccess(true);
+            // Set the Supabase session client-side using the returned tokens
+            if (data.session?.access_token && data.session?.refresh_token) {
+                await supabase.auth.setSession({
+                    access_token: data.session.access_token,
+                    refresh_token: data.session.refresh_token,
+                });
+            }
+
+            window.location.href = redirect;
         } catch {
             setError("An unexpected error occurred.");
         } finally {
@@ -73,74 +100,63 @@ function SignupForm() {
                 <p className="mt-4 text-lg text-gray-400">Sign up to get started with Mitable.</p>
             </div>
 
-            {success ? (
-                <div className="mx-auto max-w-md rounded-2xl border border-gray-800/60 bg-gray-900/50 p-8 text-center">
-                    <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-brand-900/40">
-                        <svg
-                            className="size-6 text-brand-400"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                    </div>
-                    <h2 className="mb-2 text-lg font-bold text-white">Check your email</h2>
-                    <p className="text-gray-400">
-                        We sent a confirmation link to <span className="text-white">{email}</span>. Click the link to activate your account.
-                    </p>
+            <form onSubmit={handleSubmit} className="mx-auto flex max-w-md flex-col gap-5">
+                <div className="grid grid-cols-2 gap-4">
+                    <Input
+                        label="First Name"
+                        placeholder="Jane"
+                        isRequired
+                        value={firstName}
+                        onChange={setFirstName}
+                        wrapperClassName={darkInput.wrapperClassName}
+                        inputClassName={darkInput.inputClassName}
+                    />
+                    <Input
+                        label="Last Name"
+                        placeholder="Smith"
+                        isRequired
+                        value={lastName}
+                        onChange={setLastName}
+                        wrapperClassName={darkInput.wrapperClassName}
+                        inputClassName={darkInput.inputClassName}
+                    />
                 </div>
-            ) : (
-                <form onSubmit={handleSubmit} className="mx-auto flex max-w-md flex-col gap-5">
-                    <Input
-                        label="Full Name"
-                        placeholder="Your full name"
-                        isRequired
-                        value={fullName}
-                        onChange={setFullName}
-                        wrapperClassName={darkInput.wrapperClassName}
-                        inputClassName={darkInput.inputClassName}
-                    />
 
-                    <Input
-                        label="Email"
-                        placeholder="you@company.com"
-                        type="email"
-                        isRequired
-                        value={email}
-                        onChange={setEmail}
-                        wrapperClassName={darkInput.wrapperClassName}
-                        inputClassName={darkInput.inputClassName}
-                    />
+                <Input
+                    label="Email"
+                    placeholder="you@company.com"
+                    type="email"
+                    isRequired
+                    value={email}
+                    onChange={setEmail}
+                    wrapperClassName={darkInput.wrapperClassName}
+                    inputClassName={darkInput.inputClassName}
+                />
 
-                    <Input
-                        label="Password"
-                        placeholder="At least 8 characters"
-                        type="password"
-                        isRequired
-                        value={password}
-                        onChange={setPassword}
-                        wrapperClassName={darkInput.wrapperClassName}
-                        inputClassName={darkInput.inputClassName}
-                    />
+                <Input
+                    label="Password"
+                    placeholder="At least 8 characters"
+                    type="password"
+                    isRequired
+                    value={password}
+                    onChange={setPassword}
+                    wrapperClassName={darkInput.wrapperClassName}
+                    inputClassName={darkInput.inputClassName}
+                />
 
-                    {error && <p className="text-sm text-red-400">{error}</p>}
+                {error && <p className="text-sm text-red-400">{error}</p>}
 
-                    <Button type="submit" color="primary" size="lg" className="btn-pill mt-2 w-full" isDisabled={loading}>
-                        {loading ? "Creating account..." : "Create Account"}
-                    </Button>
+                <Button type="submit" color="primary" size="lg" className="btn-pill mt-2 w-full" isDisabled={loading}>
+                    {loading ? "Creating account..." : "Create Account"}
+                </Button>
 
-                    <p className="text-center text-sm text-gray-500">
-                        Already have an account?{" "}
-                        <a href={`/login?redirect=${encodeURIComponent(redirect)}`} className="text-brand-400 hover:text-brand-300">
-                            Sign in
-                        </a>
-                    </p>
-                </form>
-            )}
+                <p className="text-center text-sm text-gray-500">
+                    Already have an account?{" "}
+                    <a href={`/login?redirect=${encodeURIComponent(redirect)}`} className="text-brand-400 hover:text-brand-300">
+                        Sign in
+                    </a>
+                </p>
+            </form>
         </>
     );
 }
