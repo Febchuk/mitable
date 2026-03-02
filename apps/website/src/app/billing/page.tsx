@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { PRICING_TIERS, type QuotaStatus, type SubscriptionResponse } from "@mitable/shared";
 import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/base/buttons/button";
 import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
 import { API_URL } from "@/lib/api";
