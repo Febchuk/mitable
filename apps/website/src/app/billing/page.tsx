@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PRICING_TIERS, type QuotaStatus, type SubscriptionResponse } from "@mitable/shared";
 import { motion } from "motion/react";
 import { Button } from "@/components/base/buttons/button";
@@ -37,6 +38,7 @@ function UsageBar({ label, used, limit, percent }: { label: string; used: number
 }
 
 export default function BillingPage() {
+    const router = useRouter();
     const [data, setData] = useState<BillingData>({ subscription: null, quota: null });
     const [loading, setLoading] = useState(true);
     const [portalLoading, setPortalLoading] = useState(false);
@@ -44,6 +46,11 @@ export default function BillingPage() {
     useEffect(() => {
         loadBillingData();
     }, []);
+
+    async function handleSignOut() {
+        await supabase.auth.signOut();
+        router.push("/");
+    }
 
     async function getAccessToken(): Promise<string | null> {
         const {
@@ -143,23 +150,6 @@ export default function BillingPage() {
                     />
 
                     <div className="relative mx-auto max-w-3xl px-4 py-20 md:px-8 md:py-28">
-                        {/* Back link */}
-                        <a href="/" className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white">
-                            <svg
-                                className="size-4"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <line x1="19" y1="12" x2="5" y2="12" />
-                                <polyline points="12 19 5 12 12 5" />
-                            </svg>
-                            Back to home
-                        </a>
-
                         <motion.h1
                             className="mb-2 font-display text-3xl font-extrabold tracking-tight text-white uppercase md:text-4xl"
                             initial={{ opacity: 0, y: 16 }}
@@ -271,6 +261,21 @@ export default function BillingPage() {
                                         </p>
                                     </motion.div>
                                 )}
+
+                                {/* Actions */}
+                                <motion.div
+                                    className="flex items-center gap-3"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.35 }}
+                                >
+                                    <Button color="primary" size="md" className="btn-pill" href="/download">
+                                        Download App
+                                    </Button>
+                                    <Button color="secondary" size="md" className="btn-pill" onPress={handleSignOut}>
+                                        Sign Out
+                                    </Button>
+                                </motion.div>
                             </div>
                         )}
                     </div>
