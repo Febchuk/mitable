@@ -66,7 +66,7 @@ const CONFIG = {
   captureThreshold: 10, // Trigger after 10 new captures
   timeThresholdMs: 180000, // Trigger after 3 minutes (180000ms)
   minIntervalMs: 60000, // Minimum 60s between analyses (debounce)
-  model: "llama-3.3-70b-versatile", // Groq model for RLM tool-call loop
+  model: config.groq.chatModel || "openai/gpt-oss-120b", // Groq model for RLM tool-call loop
   maxTokens: 1024, // Per-iteration token limit (one tool call per response)
   temperature: 0.2,
   maxIterations: 25, // Safety limit for RLM loop (typical: 10-18 iterations)

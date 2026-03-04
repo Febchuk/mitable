@@ -8,7 +8,6 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import Groq from "groq-sdk";
 import { config } from "../../config";
 import {
   REFINEMENT_TOOL_DEFINITIONS,
@@ -137,7 +136,7 @@ function parseResponse(raw: string): { message: string; suggestedEdit: string | 
 class RefinementRLMService {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
-  private groq: Groq | null = null;
+  private deepseek: OpenAI | null = null;
   private maxToolRounds = 6; // Safety limit for tool-calling rounds
 
   constructor() {
@@ -149,9 +148,12 @@ class RefinementRLMService {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
       logger.info("GPT-5 fallback configured for Refinement RLM");
     }
-    if (config.groq.apiKey) {
-      this.groq = new Groq({ apiKey: config.groq.apiKey });
-      logger.info("Groq GPT-OSS-120B configured for Refinement RLM (last resort)");
+    if (config.deepseek.apiKey) {
+      this.deepseek = new OpenAI({
+        apiKey: config.deepseek.apiKey,
+        baseURL: "https://api.deepseek.com",
+      });
+      logger.info("DeepSeek V3.2 (deepseek-chat) configured for Refinement RLM (last resort)");
     }
   }
 
@@ -174,11 +176,14 @@ class RefinementRLMService {
       try {
         return await this.refineWithOpenAI(input, ctx);
       } catch (error) {
-        logger.warn({ error: String(error) }, "OpenAI refinement also failed — trying Groq");
+        logger.warn(
+          { error: String(error) },
+          "OpenAI refinement also failed — trying DeepSeek V3.2"
+        );
       }
     }
 
-    return this.refineWithGroq(input);
+    return this.refineWithDeepSeek(input);
   }
 
   // --------------------------------------------------------------------------
@@ -338,20 +343,20 @@ ${prefsResult}`;
   }
 
   // --------------------------------------------------------------------------
-  // Last resort: Groq GPT-OSS-120B single-shot
+  // Last resort: DeepSeek V3.2 (deepseek-chat) single-shot
   // --------------------------------------------------------------------------
 
-  private async refineWithGroq(input: RefinementRLMInput): Promise<RefinementRLMResult> {
-    if (!this.groq) {
+  private async refineWithDeepSeek(input: RefinementRLMInput): Promise<RefinementRLMResult> {
+    if (!this.deepseek) {
       throw new Error(
-        "No LLM available — all providers (Anthropic, OpenAI, Groq) failed or unconfigured"
+        "No LLM available — all providers (Anthropic, OpenAI, DeepSeek) failed or unconfigured"
       );
     }
 
-    logger.info("⚠️⚠️ Refinement via Groq GPT-OSS-120B (last resort)");
+    logger.info("⚠️⚠️ Refinement via DeepSeek V3.2 (last resort)");
 
     const systemPrompt = buildSystemPrompt(input.currentSummary);
-    const groqMessages = [
+    const deepseekMessages = [
       {
         role: "system" as const,
         content: systemPrompt + "\n\nIMPORTANT: Do NOT call any tools. Respond directly.",
@@ -362,9 +367,9 @@ ${prefsResult}`;
       })),
     ];
 
-    const completion = await this.groq.chat.completions.create({
-      messages: groqMessages,
-      model: config.groq.chatModel || "openai/gpt-oss-120b",
+    const completion = await this.deepseek.chat.completions.create({
+      messages: deepseekMessages,
+      model: "deepseek-chat",
       max_tokens: 4000,
     });
 
