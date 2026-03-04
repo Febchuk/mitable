@@ -11,6 +11,7 @@ import { ClassifierEnvironment, ClassifierContext } from "./classifier-environme
 import { getToolByName } from "./classifier-tools";
 import { getClassifierSystemPrompt, getClassifierUserPrompt } from "./classifier-rlm-prompts";
 import { createTimer } from "../../lib/sessionLogger";
+import { parseJsonResponse } from "../../lib/parse-json";
 
 export interface ClassifierRLMInput {
   userId: string;
@@ -197,13 +198,12 @@ class ClassifierRLMService {
       messages: messages as any,
       model: "openai/gpt-oss-120b",
       temperature: 0.05, // Cognition not creativity - low temp for deterministic reasoning
-      response_format: { type: "json_object" },
     });
 
     const content = completion.choices[0]?.message?.content;
     if (!content) throw new Error("Empty response from Classifier RLM");
 
-    return JSON.parse(content);
+    return parseJsonResponse(content);
   }
 
   /**

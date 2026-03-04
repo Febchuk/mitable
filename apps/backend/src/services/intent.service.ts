@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import { config } from "../config.js";
 import type { IntentAnalysis, IntentOptions } from "../types/trust.types.js";
+import { parseJsonResponse } from "../lib/parse-json";
 
 /**
  * Intent Detection Service
@@ -88,12 +89,11 @@ Examples:
         model: config.groq.chatModel, // openai/gpt-oss-120b
         messages,
         temperature: 0.3, // Lower temp for consistent classification
-        response_format: { type: "json_object" },
       });
 
       const content = response.choices[0]?.message?.content || "{}";
 
-      const analysis = JSON.parse(content) as IntentAnalysis;
+      const analysis = parseJsonResponse<IntentAnalysis>(content);
 
       console.log(
         `[IntentService] Intent: ${analysis.type} (confidence: ${analysis.confidence}, needsContext: ${analysis.needsContext})`

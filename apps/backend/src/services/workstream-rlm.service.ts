@@ -12,6 +12,7 @@ import * as schema from "../db/schema/index.js";
 import { eq, and, isNull, asc } from "drizzle-orm";
 import { config } from "../config.js";
 import { logger } from "../lib/logger.js";
+import { parseJsonResponse } from "../lib/parse-json";
 import {
   getWorkstreamSystemPrompt,
   getWorkstreamUserPrompt,
@@ -66,7 +67,7 @@ const CONFIG = {
   captureThreshold: 10, // Trigger after 10 new captures
   timeThresholdMs: 180000, // Trigger after 3 minutes (180000ms)
   minIntervalMs: 60000, // Minimum 60s between analyses (debounce)
-  model: "llama-3.3-70b-versatile", // Groq model for RLM tool-call loop
+  model: config.groq.chatModel || "openai/gpt-oss-120b", // Groq model for RLM tool-call loop
   maxTokens: 1024, // Per-iteration token limit (one tool call per response)
   temperature: 0.2,
   maxIterations: 25, // Safety limit for RLM loop (typical: 10-18 iterations)
@@ -522,79 +523,12 @@ class WorkstreamRLMService extends EventEmitter {
       throw new Error("Empty response from LLM");
     }
 
-    return this.parseToolCallResponse(content);
-  }
-
-  /**
-   * Parse LLM response into a tool call or done signal.
-   * Handles markdown code fences and concatenated JSON objects.
-   */
-  private parseToolCallResponse(raw: string): {
-    tool?: string;
-    parameters?: any;
-    reasoning?: string;
-    done?: boolean;
-  } {
-    let cleaned = raw.trim();
-    if (cleaned.startsWith("```json")) {
-      cleaned = cleaned.slice(7);
-    } else if (cleaned.startsWith("```")) {
-      cleaned = cleaned.slice(3);
-    }
-    if (cleaned.endsWith("```")) {
-      cleaned = cleaned.slice(0, -3);
-    }
-    cleaned = cleaned.trim();
-
-    try {
-      return JSON.parse(cleaned);
-    } catch {
-      const firstObj = this.extractFirstJsonObject(cleaned);
-      if (firstObj) return firstObj;
-      throw new Error(`Failed to parse LLM response: ${cleaned.substring(0, 200)}`);
-    }
-  }
-
-  /**
-   * Extract the first complete JSON object from potentially concatenated output.
-   */
-  private extractFirstJsonObject(text: string): any | null {
-    let depth = 0;
-    let start = -1;
-    let inString = false;
-    let escape = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i];
-      if (escape) {
-        escape = false;
-        continue;
-      }
-      if (ch === "\\" && inString) {
-        escape = true;
-        continue;
-      }
-      if (ch === '"') {
-        inString = !inString;
-        continue;
-      }
-      if (inString) continue;
-
-      if (ch === "{") {
-        if (depth === 0) start = i;
-        depth++;
-      } else if (ch === "}") {
-        depth--;
-        if (depth === 0 && start >= 0) {
-          try {
-            return JSON.parse(text.substring(start, i + 1));
-          } catch {
-            start = -1;
-          }
-        }
-      }
-    }
-    return null;
+    return parseJsonResponse<{
+      tool?: string;
+      parameters?: any;
+      reasoning?: string;
+      done?: boolean;
+    }>(content);
   }
 
   /**

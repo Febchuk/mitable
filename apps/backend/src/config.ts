@@ -67,7 +67,7 @@ export const config = {
     apiKey: (process.env.ANTHROPIC_API_KEY || "").trim(),
   },
 
-  // DeepSeek Configuration (fallback for Storyteller — DeepSeek R1 reasoning model)
+  // DeepSeek Configuration (fallback for narrative services — DeepSeek V3.2 frontier model)
   deepseek: {
     apiKey: (process.env.DEEPSEEK_API_KEY || "").trim(),
   },

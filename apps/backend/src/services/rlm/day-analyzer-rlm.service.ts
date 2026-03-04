@@ -13,7 +13,6 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import Groq from "groq-sdk";
 import { config } from "../../config";
 import {
   DayAnalyzerEnvironment,
@@ -72,7 +71,7 @@ interface LLMResponse {
 class DayAnalyzerRLMService {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
-  private groq: Groq | null = null;
+  private deepseek: OpenAI | null = null;
   private maxIterations = 30; // Higher limit than storyteller — full day analysis needs more steps
 
   constructor() {
@@ -90,9 +89,12 @@ class DayAnalyzerRLMService {
       logger.warn("OPENAI_API_KEY not set");
     }
 
-    if (config.groq.apiKey) {
-      this.groq = new Groq({ apiKey: config.groq.apiKey });
-      logger.info("Groq GPT-OSS-120B configured for Day Analyzer (last resort)");
+    if (config.deepseek.apiKey) {
+      this.deepseek = new OpenAI({
+        apiKey: config.deepseek.apiKey,
+        baseURL: "https://api.deepseek.com",
+      });
+      logger.info("DeepSeek V3.2 (deepseek-chat) configured for Day Analyzer (last resort)");
     }
   }
 
@@ -244,22 +246,48 @@ class DayAnalyzerRLMService {
     messages: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<LLMResponse> {
     if (this.anthropic) {
-      try {
-        return await this.getLLMDecisionClaude(systemPrompt, messages);
-      } catch (error) {
-        logger.warn({ error: String(error) }, "Claude call failed — falling back to GPT-5");
-        this.anthropic = null;
+      const MAX_RETRIES = 2;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          return await this.getLLMDecisionClaude(systemPrompt, messages);
+        } catch (error) {
+          const errStr = String(error);
+          const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+          if (isFatal) {
+            logger.error(
+              { error: errStr },
+              "Claude auth/billing error — permanently disabling for this process"
+            );
+            this.anthropic = null;
+            break;
+          }
+          const isRetryable = /429|rate.?limit|529|overloaded/i.test(errStr);
+          if (isRetryable && attempt < MAX_RETRIES) {
+            const delayMs = (attempt + 1) * 5000;
+            logger.warn(
+              { error: errStr, attempt: attempt + 1, delayMs },
+              `Claude rate-limited/overloaded — retrying in ${delayMs / 1000}s`
+            );
+            await new Promise((r) => setTimeout(r, delayMs));
+            continue;
+          }
+          logger.warn(
+            { error: errStr, attempt: attempt + 1 },
+            "Claude call failed — falling back to GPT-5 for this call only"
+          );
+          break;
+        }
       }
     }
     if (this.openai) {
       try {
         return await this.getLLMDecisionOpenAI(systemPrompt, messages);
       } catch (error) {
-        logger.warn({ error: String(error) }, "OpenAI also failed — trying Groq");
+        logger.warn({ error: String(error) }, "OpenAI also failed — trying DeepSeek V3.2");
       }
     }
-    if (this.groq) {
-      return this.getLLMDecisionGroq(systemPrompt, messages);
+    if (this.deepseek) {
+      return this.getLLMDecisionDeepSeek(systemPrompt, messages);
     }
     throw new Error("No LLM available — all providers exhausted");
   }
@@ -339,17 +367,17 @@ class DayAnalyzerRLMService {
   }
 
   /**
-   * Groq GPT-OSS-120B last resort
+   * DeepSeek V3.2 (deepseek-chat) last resort — frontier model, non-thinking mode
    */
-  private async getLLMDecisionGroq(
+  private async getLLMDecisionDeepSeek(
     systemPrompt: string,
     messages: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<LLMResponse> {
-    if (!this.groq) {
-      throw new Error("Groq client not configured");
+    if (!this.deepseek) {
+      throw new Error("DeepSeek client not configured");
     }
 
-    const groqMessages = [
+    const deepseekMessages = [
       {
         role: "system" as const,
         content:
@@ -359,15 +387,15 @@ class DayAnalyzerRLMService {
       ...messages,
     ];
 
-    const completion = await this.groq.chat.completions.create({
-      messages: groqMessages as any,
-      model: config.groq.chatModel || "openai/gpt-oss-120b",
+    const completion = await this.deepseek.chat.completions.create({
+      messages: deepseekMessages as any,
+      model: "deepseek-chat",
       max_tokens: 8000,
     });
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {
-      throw new Error("Empty response from Groq");
+      throw new Error("Empty response from DeepSeek V3.2");
     }
 
     return this.parseToolCallResponse(content);

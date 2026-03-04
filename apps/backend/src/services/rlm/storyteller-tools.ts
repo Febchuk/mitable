@@ -7,7 +7,6 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import Groq from "groq-sdk";
 import { config } from "../../config";
 import { StorytellerEnvironment } from "./storyteller-environment";
 import { createSessionLogger } from "../../lib/sessionLogger";
@@ -23,10 +22,13 @@ if (config.openai.apiKey) {
   openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
 }
 
-// Groq GPT-OSS-120B last resort client
-let groqClient: Groq | null = null;
-if (config.groq.apiKey) {
-  groqClient = new Groq({ apiKey: config.groq.apiKey });
+// DeepSeek V3.2 (deepseek-chat) last resort client
+let deepseekClient: OpenAI | null = null;
+if (config.deepseek.apiKey) {
+  deepseekClient = new OpenAI({
+    apiKey: config.deepseek.apiKey,
+    baseURL: "https://api.deepseek.com",
+  });
 }
 
 /**
@@ -102,25 +104,25 @@ async function callSummarizationLLM(
       });
       return completion.choices[0]?.message?.content || "Failed to generate summary";
     } catch (error) {
-      console.warn("[storyteller-tools] OpenAI also failed — trying Groq:", String(error));
+      console.warn("[storyteller-tools] OpenAI also failed — trying DeepSeek V3.2:", String(error));
     }
   }
 
-  // Groq GPT-OSS-120B last resort
-  if (groqClient) {
-    const completion = await groqClient.chat.completions.create({
+  // DeepSeek V3.2 (deepseek-chat) last resort
+  if (deepseekClient) {
+    const completion = await deepseekClient.chat.completions.create({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      model: config.groq.chatModel || "openai/gpt-oss-120b",
+      model: "deepseek-chat",
       max_tokens: maxOutputTokens,
     });
     return completion.choices[0]?.message?.content || "Failed to generate summary";
   }
 
   throw new Error(
-    "No LLM available for summarization — all providers (Anthropic, OpenAI, Groq) are missing"
+    "No LLM available for summarization — all providers (Anthropic, OpenAI, DeepSeek) are missing"
   );
 }
 

@@ -1548,6 +1548,7 @@ router.get(
 
 // LLM clients (lazy init)
 let anthropicClient: Anthropic | null = null;
+let openaiClient: OpenAI | null = null;
 let deepseekClient: OpenAI | null = null;
 
 function getAnthropicClient(): Anthropic | null {
@@ -1555,6 +1556,13 @@ function getAnthropicClient(): Anthropic | null {
     anthropicClient = new Anthropic({ apiKey: config.anthropic.apiKey });
   }
   return anthropicClient;
+}
+
+function getOpenaiClient(): OpenAI | null {
+  if (!openaiClient && config.openai.apiKey) {
+    openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
+  }
+  return openaiClient;
 }
 
 function getDeepseekClient(): OpenAI | null {
@@ -1632,8 +1640,30 @@ async function callDashboardLLM(
       }
       throw new Error("No text block in Claude response");
     } catch (error) {
-      logger.warn({ error: String(error) }, "Claude dashboard chat failed, trying DeepSeek");
-      anthropicClient = null;
+      const errStr = String(error);
+      const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+      if (isFatal) {
+        logger.error({ error: errStr }, "Claude auth/billing error — permanently disabling");
+        anthropicClient = null;
+      } else {
+        logger.warn({ error: errStr }, "Claude dashboard chat failed (transient) — trying OpenAI");
+      }
+    }
+  }
+
+  const oai = getOpenaiClient();
+  if (oai) {
+    try {
+      const completion = await oai.chat.completions.create({
+        model: "gpt-5",
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        temperature: 0.7,
+        max_completion_tokens: 1000,
+      });
+      const content = completion.choices[0]?.message?.content?.trim();
+      if (content) return content;
+    } catch (error) {
+      logger.warn({ error: String(error) }, "OpenAI dashboard chat failed — trying DeepSeek");
     }
   }
 
@@ -1993,7 +2023,7 @@ function parseAskResponse(raw: string): {
   }
 
   if (reportMatch) {
-    const openTag = raw.match(/<report\s+[^>]*?>/i)?.[0] || "";
+    const openTag = raw.match(/<report\s+[^>]*?>([\s\S]*)<\/report>/i)?.[0] || "";
     const titleMatch = openTag.match(/title=["']([^"']*?)["']/);
     const subtitleMatch = openTag.match(/subtitle=["']([^"']*?)["']/);
     const message = raw.replace(/<report[\s\S]*/i, "").trim();
@@ -2248,8 +2278,31 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
           }
         }
       } catch (error) {
-        logger.warn({ error: String(error) }, "Claude ask chat failed, trying DeepSeek");
-        anthropicClient = null;
+        const errStr = String(error);
+        const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+        if (isFatal) {
+          logger.error({ error: errStr }, "Claude auth/billing error — permanently disabling");
+          anthropicClient = null;
+        } else {
+          logger.warn({ error: errStr }, "Claude ask chat failed (transient) — trying OpenAI");
+        }
+      }
+    }
+
+    if (!rawResponse) {
+      const oai = getOpenaiClient();
+      if (oai) {
+        try {
+          const completion = await oai.chat.completions.create({
+            model: "gpt-5",
+            messages: [{ role: "system", content: systemPrompt }, ...llmMessages],
+            temperature: 0.7,
+            max_completion_tokens: 8000,
+          });
+          rawResponse = completion.choices[0]?.message?.content?.trim() || "";
+        } catch (error) {
+          logger.warn({ error: String(error) }, "OpenAI ask chat failed — trying DeepSeek");
+        }
       }
     }
 

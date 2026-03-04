@@ -560,7 +560,7 @@ class MonitoringSessionService {
   /**
    * Check for recoverable sessions on startup
    */
-  async getRecoverableSessions(): Promise<
+  async getRecoverableSessions(currentUserId?: string): Promise<
     Array<{
       sessionId: string;
       frameCount: number;
@@ -569,7 +569,10 @@ class MonitoringSessionService {
     }>
   > {
     const checkpoints = await checkpointService.getIncompleteCheckpoints();
-    return checkpoints.map((c) => ({
+    const filtered = currentUserId
+      ? checkpoints.filter((c) => c.userId === currentUserId)
+      : checkpoints;
+    return filtered.map((c) => ({
       sessionId: c.sessionId,
       frameCount: c.frameCount,
       lastCheckpoint: c.checkpointAt,
