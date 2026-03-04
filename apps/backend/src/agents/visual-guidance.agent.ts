@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config";
+import { parseJsonResponse } from "../lib/parse-json";
 import { BaseAgent } from "./base.agent";
 import { KnowledgeAgent } from "./knowledge.agent";
 import { TextResponseAgent } from "./text-response.agent";
@@ -534,7 +535,6 @@ Generate the complete JSON object now with ALL required fields.`;
             content: "Generate the complete JSON object with all required fields now.",
           },
         ],
-        response_format: { type: "json_object" }, // Force JSON output
         temperature: 0.7,
         max_tokens: 2000,
       });
@@ -542,7 +542,7 @@ Generate the complete JSON object now with ALL required fields.`;
       // Parse GPT-4's response
       let aiGeneratedParams;
       try {
-        aiGeneratedParams = JSON.parse(response.choices[0].message.content || "{}");
+        aiGeneratedParams = parseJsonResponse<any>(response.choices[0].message.content || "{}");
       } catch (parseError) {
         console.error("[VisualGuidanceAgent] Failed to parse GPT-4 response:", parseError);
         throw new Error("Failed to parse workflow JSON from GPT-4");
