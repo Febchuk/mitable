@@ -246,11 +246,37 @@ class DayAnalyzerRLMService {
     messages: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<LLMResponse> {
     if (this.anthropic) {
-      try {
-        return await this.getLLMDecisionClaude(systemPrompt, messages);
-      } catch (error) {
-        logger.warn({ error: String(error) }, "Claude call failed — falling back to GPT-5");
-        this.anthropic = null;
+      const MAX_RETRIES = 2;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          return await this.getLLMDecisionClaude(systemPrompt, messages);
+        } catch (error) {
+          const errStr = String(error);
+          const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+          if (isFatal) {
+            logger.error(
+              { error: errStr },
+              "Claude auth/billing error — permanently disabling for this process"
+            );
+            this.anthropic = null;
+            break;
+          }
+          const isRetryable = /429|rate.?limit|529|overloaded/i.test(errStr);
+          if (isRetryable && attempt < MAX_RETRIES) {
+            const delayMs = (attempt + 1) * 5000;
+            logger.warn(
+              { error: errStr, attempt: attempt + 1, delayMs },
+              `Claude rate-limited/overloaded — retrying in ${delayMs / 1000}s`
+            );
+            await new Promise((r) => setTimeout(r, delayMs));
+            continue;
+          }
+          logger.warn(
+            { error: errStr, attempt: attempt + 1 },
+            "Claude call failed — falling back to GPT-5 for this call only"
+          );
+          break;
+        }
       }
     }
     if (this.openai) {
