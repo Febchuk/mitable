@@ -1902,7 +1902,7 @@ function setupMonitoringSessionHandlers() {
   // Session Recovery handlers
   ipcMain.handle(IPC_CHANNELS.SESSION_GET_RECOVERABLE, async () => {
     recoveryLogger.info(" Getting recoverable sessions");
-    return monitoringSessionService.getRecoverableSessions();
+    return monitoringSessionService.getRecoverableSessions(currentUserContext?.userId);
   });
 
   ipcMain.handle(IPC_CHANNELS.SESSION_RECOVER, async (_, sessionId: string) => {
@@ -2868,7 +2868,9 @@ app.whenReady().then(async () => {
 
   // Check for recoverable sessions on startup (crash recovery)
   try {
-    const recoverableSessions = await monitoringSessionService.getRecoverableSessions();
+    const recoverableSessions = await monitoringSessionService.getRecoverableSessions(
+      currentUserContext?.userId
+    );
     if (recoverableSessions.length > 0) {
       recoveryLogger.info(` Found ${recoverableSessions.length} recoverable session(s)`);
       // Notify console window to show recovery dialog
