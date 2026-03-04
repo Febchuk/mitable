@@ -523,7 +523,12 @@ class WorkstreamRLMService extends EventEmitter {
       throw new Error("Empty response from LLM");
     }
 
-    return parseJsonResponse<{ tool?: string; parameters?: any; reasoning?: string; done?: boolean }>(content);
+    return parseJsonResponse<{
+      tool?: string;
+      parameters?: any;
+      reasoning?: string;
+      done?: boolean;
+    }>(content);
   }
 
   /**
