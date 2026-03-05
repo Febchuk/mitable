@@ -68,7 +68,7 @@ const CONFIG = {
   timeThresholdMs: 180000, // Trigger after 3 minutes (180000ms)
   minIntervalMs: 60000, // Minimum 60s between analyses (debounce)
   model: config.groq.chatModel || "openai/gpt-oss-120b", // Groq model for RLM tool-call loop
-  maxTokens: 4096, // Per-iteration token limit — must fit assign_captures with many UUIDs
+  maxTokens: 16384, // Per-iteration token limit — model supports 65K, 16K gives ample room for large UUID arrays
   temperature: 0.2,
   maxIterations: 25, // Safety limit for RLM loop (typical: 10-18 iterations)
 };
@@ -509,7 +509,8 @@ class WorkstreamRLMService extends EventEmitter {
    * Groq json_validate_failed errors.
    */
   private async getLLMDecision(
-    messages: Array<{ role: string; content: string }>
+    messages: Array<{ role: string; content: string }>,
+    retryOnTruncation = true
   ): Promise<{ tool?: string; parameters?: any; reasoning?: string; done?: boolean }> {
     const completion = await this.groq.chat.completions.create({
       messages: messages as any,
@@ -521,10 +522,22 @@ class WorkstreamRLMService extends EventEmitter {
     // Detect truncation before parsing
     const finishReason = completion.choices[0]?.finish_reason;
     if (finishReason === "length") {
-      logger.warn(
-        "Workstream RLM response truncated (finish_reason=length) — retrying is unlikely to help"
-      );
-      throw new Error("LLM response truncated — output exceeded max_tokens");
+      if (retryOnTruncation) {
+        logger.warn(
+          "Workstream RLM response truncated (finish_reason=length) — retrying with batch nudge"
+        );
+        // Nudge the LLM to use smaller batches and retry once
+        messages.push({
+          role: "user",
+          content:
+            "Your previous response was truncated because it was too long. " +
+            "Use SMALLER batches: assign at most 10 captures per assign_captures call. " +
+            "Split large assignments across multiple tool calls. Try again.",
+        });
+        return this.getLLMDecision(messages, false);
+      }
+      logger.error("Workstream RLM response truncated twice — giving up");
+      throw new Error("LLM response truncated — output exceeded max_tokens after retry");
     }
 
     const content = completion.choices[0]?.message?.content;
