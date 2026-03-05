@@ -1832,6 +1832,77 @@ Revised recap:`;
       );
     }
   }
+  /**
+   * Re-parse a markdown summary into structured task breakdown.
+   * Used when admin edits a summary — keeps task_breakdown in sync.
+   */
+  async parseTaskBreakdownFromSummary(
+    summary: string,
+    totalMinutes: number
+  ): Promise<TaskBreakdownItem[]> {
+    const prompt = `You are given an edited work session summary. Extract the structured tasks from it.
+
+<summary>
+${summary}
+</summary>
+
+<total_minutes>${totalMinutes}</total_minutes>
+
+Respond with valid JSON only:
+{
+  "tasks": [
+    { "shortTitle": "Short Label (3-4 words max)", "description": "1-3 sentence description of what was done.", "minutes": X }
+  ]
+}
+
+RULES:
+- Extract each distinct task/activity from the summary bullets or paragraphs.
+- "shortTitle": Max 3-4 words. Concise label.
+- "description": 1-3 sentences. First person, casual tone. Taken from the summary content.
+- "minutes": Estimated time. If the summary includes time hints (e.g., "(15m)"), use those. Otherwise distribute total_minutes proportionally by content length.
+- Minutes must sum to total_minutes.
+- If the summary is a single paragraph with no clear task separation, return a single task.`;
+
+    try {
+      const completion = await this.groq.chat.completions.create({
+        model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.1,
+        max_tokens: 2000,
+        response_format: { type: "json_object" },
+      });
+
+      const raw = completion.choices[0]?.message?.content || "{}";
+      const parsed = JSON.parse(raw);
+      const tasks: TaskBreakdownItem[] = (parsed.tasks || []).map((t: any) => ({
+        shortTitle: String(t.shortTitle || "Task"),
+        description: String(t.description || ""),
+        minutes: Number(t.minutes) || 0,
+      }));
+
+      if (tasks.length === 0) return [];
+
+      // Normalize minutes to sum to totalMinutes
+      const sum = tasks.reduce((acc, t) => acc + t.minutes, 0);
+      if (sum > 0 && Math.abs(sum - totalMinutes) > 1) {
+        const ratio = totalMinutes / sum;
+        let remaining = totalMinutes;
+        for (let i = 0; i < tasks.length - 1; i++) {
+          tasks[i].minutes = Math.round(tasks[i].minutes * ratio);
+          remaining -= tasks[i].minutes;
+        }
+        tasks[tasks.length - 1].minutes = remaining;
+      }
+
+      return tasks;
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Failed to parse task breakdown from edited summary"
+      );
+      return [];
+    }
+  }
 }
 
 // Export singleton

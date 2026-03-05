@@ -2588,11 +2588,25 @@ router.patch(
         return;
       }
 
-      // Update session with edited summary
+      // Compute session duration for task breakdown re-parse
+      const startMs = new Date(session.startedAt).getTime();
+      const endMs = session.endedAt ? new Date(session.endedAt).getTime() : Date.now();
+      const totalMinutes = Math.round(
+        Math.max(0, endMs - startMs - (session.totalPausedMs || 0)) / 60000
+      );
+
+      // Re-parse task breakdown from edited summary (AI call)
+      const taskBreakdown = await sessionSummarizationService.parseTaskBreakdownFromSummary(
+        finalSummary,
+        totalMinutes
+      );
+
+      // Update session with edited summary + re-parsed task breakdown
       await db
         .update(schema.monitoringSessions)
         .set({
           finalSummary,
+          taskBreakdown,
           updatedAt: new Date(),
         })
         .where(eq(schema.monitoringSessions.id, id));
@@ -2615,11 +2629,15 @@ router.patch(
         .returning();
 
       const log = createSessionLogger({ sessionId: id, userId });
-      log.info("Summary updated by user", { version: newSummary.version });
+      log.info("Summary updated by user", {
+        version: newSummary.version,
+        taskCount: taskBreakdown.length,
+      });
 
       res.json({
         success: true,
         summary: newSummary,
+        taskBreakdown,
       });
     } catch (error) {
       const log = createSessionLogger({ sessionId: id, userId });

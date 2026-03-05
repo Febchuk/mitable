@@ -55,9 +55,9 @@ import {
   Loader2,
   Send,
   Pause,
-  ListChecks,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
+import TaskBreakdownSection from "../../../shared/TaskBreakdownSection";
 import { useBlockDetail } from "../../../../hooks/queries/calendar";
 import { useDeleteSession } from "../../../../hooks/queries/monitoring";
 
@@ -128,96 +128,6 @@ function getStatusColor(status: WorkBlock["status"]): { bg: string; text: string
     delivered: { bg: "bg-violet/20", text: "text-violet" },
   };
   return colors[status] || colors.ended;
-}
-
-// Task color palette for progress bars
-const TASK_COLOR_PALETTE = [
-  "bg-indigo-500",
-  "bg-cyan-500",
-  "bg-amber-500",
-  "bg-emerald-500",
-  "bg-rose-500",
-  "bg-violet-500",
-  "bg-teal-500",
-  "bg-orange-500",
-];
-
-function TaskBreakdownSection({
-  tasks,
-  totalDuration,
-  isLoading,
-}: {
-  tasks: Array<{ shortTitle: string; description: string; minutes: number }>;
-  totalDuration: number;
-  isLoading: boolean;
-}) {
-  const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
-
-  return (
-    <div className="p-4 border-b border-stroke-subtle">
-      <div className="flex items-center gap-2 mb-3">
-        <ListChecks size={14} className="text-ink-tertiary" />
-        <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-          Tasks
-        </span>
-        {isLoading && <Loader2 size={12} className="text-ink-tertiary animate-spin" />}
-      </div>
-
-      <div className="space-y-1">
-        {tasks.map((task, idx) => {
-          const percentage =
-            totalDuration > 0 ? Math.round((task.minutes / totalDuration) * 100) : 0;
-          const isOpen = expandedTasks.has(idx);
-          const color = TASK_COLOR_PALETTE[idx % TASK_COLOR_PALETTE.length];
-
-          return (
-            <div key={idx}>
-              {/* Task row — clickable */}
-              <button
-                onClick={() => {
-                  const next = new Set(expandedTasks);
-                  if (isOpen) next.delete(idx);
-                  else next.add(idx);
-                  setExpandedTasks(next);
-                }}
-                className="w-full flex items-center gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-canvas-muted/50 transition-colors text-left"
-              >
-                <div className="flex-shrink-0 text-ink-tertiary">
-                  {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                </div>
-                {/* Short title */}
-                <span className="flex-shrink-0 text-sm font-medium text-ink-primary max-w-[200px] truncate">
-                  {task.shortTitle}
-                </span>
-                {/* Progress bar */}
-                <div className="flex-1 h-2 bg-canvas-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${color} transition-all duration-300`}
-                    style={{ width: `${percentage}%` }}
-                  />
-                </div>
-                {/* Duration */}
-                <span className="flex-shrink-0 text-xs text-ink-tertiary tabular-nums w-10 text-right">
-                  {formatDuration(task.minutes)}
-                </span>
-                {/* Percentage */}
-                <span className="flex-shrink-0 text-xs text-ink-tertiary tabular-nums w-10 text-right">
-                  {percentage}%
-                </span>
-              </button>
-
-              {/* Expanded description */}
-              {isOpen && (
-                <div className="ml-8 mr-2 mb-2 pl-3 border-l-2 border-stroke-subtle">
-                  <p className="text-sm text-ink-secondary leading-relaxed">{task.description}</p>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 export default function WorkBlockDetail({
@@ -454,6 +364,7 @@ export default function WorkBlockDetail({
                 tasks={block.taskBreakdown}
                 totalDuration={block.duration}
                 isLoading={isLoadingDetail}
+                className="border-b border-stroke-subtle"
               />
             ) : displaySummary || isLoadingDetail ? (
               <div className="p-4 border-b border-stroke-subtle">

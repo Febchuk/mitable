@@ -793,6 +793,7 @@ router.get(
           totalPausedMs: schema.monitoringSessions.totalPausedMs,
           keyActivities: schema.monitoringSessions.keyActivities,
           finalSummary: schema.monitoringSessions.finalSummary,
+          taskBreakdown: schema.monitoringSessions.taskBreakdown,
         })
         .from(schema.monitoringSessions)
         .where(eq(schema.monitoringSessions.userId, targetUserId))
@@ -919,6 +920,7 @@ router.get(
             endedAt: s.endedAt,
             durationMinutes: Math.round(activeMs / 60000),
             summary: s.finalSummary,
+            taskBreakdown: (s.taskBreakdown as any[]) || [],
             activities: (s.keyActivities as any[]) || [],
           };
         }),

@@ -339,7 +339,11 @@ export async function fetchSessionStory(sessionId: string): Promise<SessionStory
 export async function updateSessionSummary(
   sessionId: string,
   finalSummary: string
-): Promise<{ success: boolean; summary: unknown }> {
+): Promise<{
+  success: boolean;
+  summary: unknown;
+  taskBreakdown?: Array<{ shortTitle: string; description: string; minutes: number }>;
+}> {
   return apiRequest(`/monitoring/sessions/${sessionId}/summary`, {
     method: "PATCH",
     body: JSON.stringify({ finalSummary }),

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import TaskBreakdownSection from "../../../shared/TaskBreakdownSection";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -49,6 +50,7 @@ interface RecentWorkItem {
   durationMinutes?: number;
   category?: string;
   docType?: string;
+  taskBreakdown?: Array<{ shortTitle: string; description: string; minutes: number }>;
 }
 
 interface PersonViewModel {
@@ -246,6 +248,7 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
         time: timeStr,
         durationMinutes: session.durationMinutes,
         category: topCat,
+        taskBreakdown: session.taskBreakdown || [],
       });
     }
   }
@@ -563,8 +566,12 @@ export default function PersonDetail() {
         subtitle={selectedWork.title}
         initialContent={selectedWork.fullContent}
         onSave={async (content: string) => {
-          await updateSessionSummary(selectedWork.id, content);
-          setSelectedWork({ ...selectedWork, fullContent: content });
+          const result = await updateSessionSummary(selectedWork.id, content);
+          setSelectedWork({
+            ...selectedWork,
+            fullContent: content,
+            taskBreakdown: result.taskBreakdown || selectedWork.taskBreakdown,
+          });
           setIsEditingSummary(false);
         }}
         onAutoSave={async (content: string) => {
@@ -662,17 +669,26 @@ export default function PersonDetail() {
               </div>
             </div>
 
-            {/* Summary body — rich text rendering */}
-            <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-5">
-              <DocEditor
-                key={selectedWork.id}
-                initialContent={selectedWork.fullContent}
-                readOnly
-                showToolbar={false}
-                placeholder=""
-                className="h-full"
-              />
-            </div>
+            {/* Task breakdown accordion or fallback to markdown */}
+            {selectedWork.taskBreakdown && selectedWork.taskBreakdown.length > 0 ? (
+              <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50">
+                <TaskBreakdownSection
+                  tasks={selectedWork.taskBreakdown}
+                  totalDuration={selectedWork.durationMinutes || 0}
+                />
+              </div>
+            ) : (
+              <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-5">
+                <DocEditor
+                  key={selectedWork.id}
+                  initialContent={selectedWork.fullContent}
+                  readOnly
+                  showToolbar={false}
+                  placeholder=""
+                  className="h-full"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
