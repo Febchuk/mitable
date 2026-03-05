@@ -60,6 +60,7 @@ export interface SessionListItem {
   finalSummary: string | null;
   rawActivitySummary: string | null;
   timeBreakdown: Record<string, number> | null;
+  taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }> | null;
 }
 
 export interface CreateSessionRequest {

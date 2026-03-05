@@ -35,7 +35,6 @@ import {
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { useCalendarDays } from "../../../../hooks/queries/calendar";
-import { mockDays } from "../CalendarView/mockData";
 import type { WorkBlock, ActivityDay } from "../CalendarView/types";
 import {
   useRecaps,
@@ -218,8 +217,7 @@ export default function RecapDetail() {
 
   // Pull blocks from the same source as CalendarView
   const { data: realDays } = useCalendarDays();
-  const useMockData = !realDays || realDays.length === 0;
-  const allDays: ActivityDay[] = useMockData ? mockDays : realDays;
+  const allDays: ActivityDay[] = realDays || [];
 
   // Flatten all blocks from all days
   const allBlocks = useMemo(() => {
@@ -295,8 +293,8 @@ export default function RecapDetail() {
   const selectedBlocks = allBlocks.filter((b) => selectedBlockIds.has(b.id));
   const totalDuration = selectedBlocks.reduce((acc, b) => acc + b.duration, 0);
 
-  // Can we use AI generation? Only with real data and blocks selected
-  const canGenerate = !useMockData && selectedBlocks.length > 0;
+  // Can we use AI generation? Only with blocks selected
+  const canGenerate = selectedBlocks.length > 0;
   const isGenerating = generateRecapMutation.isPending;
 
   // Convert content to sanitized HTML for markdown preview
@@ -307,20 +305,6 @@ export default function RecapDetail() {
   }, [content]);
 
   const wordCount = content.split(/\s+/).filter(Boolean).length;
-
-  // Auto-generate content for mock data when selection/settings change
-  useEffect(() => {
-    if (!useMockData) return; // Real data: user clicks Generate explicitly
-    if (existingRecap && content === existingRecap.content) return;
-    if (selectedBlocks.length === 0) {
-      setContent("");
-      setTitle("");
-      return;
-    }
-    const result = generateRecapContent(selectedBlocks, tone, length);
-    setTitle(result.title);
-    setContent(result.content);
-  }, [selectedBlockIds, tone, length, allBlocks, useMockData]);
 
   const toggleBlock = (blockId: string) => {
     const next = new Set(selectedBlockIds);
@@ -335,15 +319,7 @@ export default function RecapDetail() {
   const handleGenerate = async () => {
     if (selectedBlocks.length === 0) return;
 
-    // Mock data: use local generation
-    if (useMockData) {
-      const result = generateRecapContent(selectedBlocks, tone, length);
-      setTitle(result.title);
-      setContent(result.content);
-      return;
-    }
-
-    // Real data: call AI backend
+    // Call AI backend
     try {
       const sessionIds = selectedBlocks.map((b) => b.id);
       const result = await generateRecapMutation.mutateAsync({

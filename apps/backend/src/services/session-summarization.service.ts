@@ -91,10 +91,17 @@ interface Episode {
   confidence: "high" | "medium" | "low";
 }
 
+interface TaskBreakdownItem {
+  shortTitle: string;
+  description: string;
+  minutes: number;
+}
+
 interface SessionSummaryResult {
   narrativeSummary: string;
   activities: string[];
   timeBreakdown: Record<string, number>;
+  taskBreakdown: TaskBreakdownItem[];
   keyActivities: Array<{
     activity: string;
     timestamp: string;
@@ -263,6 +270,7 @@ class SessionSummarizationService {
       narrativeSummary: refinedSummary.summary,
       activities: refinedSummary.activities,
       timeBreakdown: {},
+      taskBreakdown: refinedSummary.taskBreakdown,
       keyActivities,
       accomplishments: refinedSummary.accomplishments,
       blockers: refinedSummary.blockers,
@@ -418,6 +426,7 @@ class SessionSummarizationService {
     activities: string[];
     accomplishments: string[];
     blockers: string[];
+    taskBreakdown: TaskBreakdownItem[];
     tokenCount: number;
   }> {
     const log = createSessionLogger({ sessionId });
@@ -632,14 +641,29 @@ RULES:
 Respond with valid JSON only:
 {
   "summary": "- **Task Label** (Xm): Description of what was done\\n- **Task Label 2** (Ym): Description...",
+  "tasks": [
+    { "shortTitle": "Short Label", "description": "Description of what was done for this task.", "minutes": X },
+    { "shortTitle": "Short Label 2", "description": "Description...", "minutes": Y }
+  ],
   "activities": ["Task Label", "Task Label 2"],
   "accomplishments": ["Accomplishment 1"] or [],
   "blockers": ["Blocker 1"] or []
 }
 
+TASK OBJECT RULES:
+- "shortTitle": Max 3-4 words. Concise label for the task (e.g., "Disk Space Incident", "Team Standup", "IPDF Code Review")
+- "description": 1-3 sentences describing what was done. First person, casual tone.
+- "minutes": Time spent on this task (from time_breakdown). Must sum to total_minutes.
+- The tasks array MUST match the summary bullets 1:1 in order.
+
 EXAMPLE (structure only — your content must come from the actual master story, never these placeholders):
 {
   "summary": "- **[Customer A] — Support Ticket Triage** (15m): I reviewed three open tickets for [Customer A] in the helpdesk, escalated the billing issue, and closed the two resolved ones.\\n- **Weekly Standup** (10m): Joined the team standup, shared progress on the migration project and flagged the API dependency blocker.\\n- **Search Feature Refactor** (20m): Refactored the search indexing logic to support fuzzy matching, ran tests locally and pushed the branch for review.",
+  "tasks": [
+    { "shortTitle": "Ticket Triage", "description": "I reviewed three open tickets for Customer A, escalated the billing issue, and closed the two resolved ones.", "minutes": 15 },
+    { "shortTitle": "Weekly Standup", "description": "Joined the team standup, shared progress on the migration project and flagged the API dependency blocker.", "minutes": 10 },
+    { "shortTitle": "Search Refactor", "description": "Refactored the search indexing logic to support fuzzy matching, ran tests locally and pushed the branch for review.", "minutes": 20 }
+  ],
   "activities": ["[Customer A] — Support Ticket Triage", "Weekly Standup", "Search Feature Refactor"],
   "accomplishments": ["Closed 2 resolved support tickets"],
   "blockers": ["Waiting on API credentials for migration"]
@@ -741,11 +765,19 @@ EXAMPLE (structure only — your content must come from the actual master story,
       activitiesCount: (parsed.activities || []).length,
     });
 
+    // Parse tasks array for structured task breakdown
+    const taskBreakdown: TaskBreakdownItem[] = (parsed.tasks || []).map((t: any) => ({
+      shortTitle: t.shortTitle || "Task",
+      description: t.description || "",
+      minutes: t.minutes || 0,
+    }));
+
     return {
       summary: outputSummary,
       activities: parsed.activities || [],
       accomplishments: parsed.accomplishments || [],
       blockers: parsed.blockers || [],
+      taskBreakdown,
       tokenCount: tokensUsed,
     };
   }
@@ -1385,6 +1417,7 @@ Example good output:
       keyActivities,
       accomplishments,
       blockers,
+      taskBreakdown: [],
       modelUsed: SUMMARIZATION_CONFIG.TEXT_MODEL,
       tokenCount: completion.usage?.total_tokens || 0,
     };
@@ -1469,6 +1502,7 @@ Example good output:
         accomplishments: summary.accomplishments,
         blockers: summary.blockers,
         timeBreakdown: summary.timeBreakdown,
+        taskBreakdown: summary.taskBreakdown,
         status: "ready",
         updatedAt: new Date(),
       })

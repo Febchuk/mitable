@@ -316,6 +316,7 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
         finalSummary: schema.monitoringSessions.finalSummary,
         rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
         timeBreakdown: schema.monitoringSessions.timeBreakdown,
+        taskBreakdown: schema.monitoringSessions.taskBreakdown,
         deliveryStatus: schema.monitoringSessions.deliveryStatus,
         deliveryChannel: schema.monitoringSessions.deliveryChannel,
         createdAt: schema.monitoringSessions.createdAt,
