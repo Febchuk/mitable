@@ -68,7 +68,7 @@ const CONFIG = {
   timeThresholdMs: 180000, // Trigger after 3 minutes (180000ms)
   minIntervalMs: 60000, // Minimum 60s between analyses (debounce)
   model: config.groq.chatModel || "openai/gpt-oss-120b", // Groq model for RLM tool-call loop
-  maxTokens: 1024, // Per-iteration token limit (one tool call per response)
+  maxTokens: 4096, // Per-iteration token limit — must fit assign_captures with many UUIDs
   temperature: 0.2,
   maxIterations: 25, // Safety limit for RLM loop (typical: 10-18 iterations)
 };
@@ -517,6 +517,15 @@ class WorkstreamRLMService extends EventEmitter {
       temperature: CONFIG.temperature,
       max_tokens: CONFIG.maxTokens,
     });
+
+    // Detect truncation before parsing
+    const finishReason = completion.choices[0]?.finish_reason;
+    if (finishReason === "length") {
+      logger.warn(
+        "Workstream RLM response truncated (finish_reason=length) — retrying is unlikely to help"
+      );
+      throw new Error("LLM response truncated — output exceeded max_tokens");
+    }
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {
