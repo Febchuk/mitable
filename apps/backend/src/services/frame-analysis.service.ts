@@ -223,17 +223,42 @@ class FrameAnalysisService {
             context: null,
           };
         }
-        return null;
+        // Fall through to partial extraction below
       }
 
-      const parsed = JSON.parse(jsonMatch[0]);
+      // Try full JSON parse first
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return {
+            changed: typeof parsed.changed === "boolean" ? parsed.changed : false,
+            change_type: parsed.change_type || "none",
+            description: parsed.description || "No visual change detected",
+            context: parsed.context || null,
+          };
+        } catch {
+          // JSON truncated — fall through to partial extraction
+        }
+      }
 
-      return {
-        changed: typeof parsed.changed === "boolean" ? parsed.changed : false,
-        change_type: parsed.change_type || "none",
-        description: parsed.description || "No visual change detected",
-        context: parsed.context || null,
-      };
+      // Partial extraction: recover fields from truncated/incomplete JSON
+      // Gemini sometimes returns truncated responses (~31% of frames)
+      const text = cleaned || rawResponse;
+      const changedMatch = text.match(/"changed"\s*:\s*(true|false)/);
+      const typeMatch = text.match(/"change_type"\s*:\s*"([^"]+)"/);
+      const descMatch = text.match(/"description"\s*:\s*"((?:[^"\\]|\\.)*)(?:"|$)/);
+      const ctxMatch = text.match(/"context"\s*:\s*"((?:[^"\\]|\\.)*)(?:"|$)/);
+
+      if (changedMatch) {
+        return {
+          changed: changedMatch[1] === "true",
+          change_type: (typeMatch?.[1] as ChangeType) || "none",
+          description: descMatch?.[1] || "Visual change detected (truncated response)",
+          context: ctxMatch?.[1] || null,
+        };
+      }
+
+      return null;
     } catch (e) {
       return null;
     }
