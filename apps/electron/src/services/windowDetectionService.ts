@@ -721,8 +721,7 @@ class WindowDetectionService {
               `[WindowDetectionService] Window not found in enumeration (keeping it): ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowId}]`
             );
           }
-          continue; 
-
+          continue;
         }
       }
 

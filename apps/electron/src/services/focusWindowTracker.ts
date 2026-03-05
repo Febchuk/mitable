@@ -451,7 +451,7 @@ class FocusWindowTracker {
       // Different OS window
       // We no longer replace the old entry. This allows tracking multiple windows of the same app
       // (e.g. multiple Chrome windows, or VS Code window + terminal).
-      
+
       /* 
       // LEGACY: Replaced old entry so badge count stayed at one-per-app.
       // Removed to support multi-window tracking per app.
