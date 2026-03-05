@@ -13,7 +13,7 @@
  * @module focusWindowTracker
  */
 
-import { BrowserWindow } from "electron";
+import { BrowserWindow, desktopCapturer } from "electron";
 import { createLogger } from "../lib/logger";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
 import { windowDetectionService } from "./windowDetectionService";
@@ -269,9 +269,9 @@ class FocusWindowTracker {
       const activeWindow = await activeWin();
 
       // active-win can return null for full-screen apps (own Space) and other edge cases.
-      // Fallback: use openWindows() which enumerates all windows — it sees full-screen apps.
+      // Fallback: use desktopCapturer directly (get-windows fails in same scenarios, so skip it).
       if (!activeWindow) {
-        await this.tryAddFrontmostFromOpenWindows();
+        await this.tryAddFrontmostFromDesktopCapturer();
         return;
       }
 
@@ -332,20 +332,26 @@ class FocusWindowTracker {
         isBrowser,
       });
     } catch (error) {
-      // Log but don't throw - polling should continue
+      // active-win can throw (e.g. Command failed in full-screen Space) — use desktopCapturer
       logger.error(" Error checking active window:", error);
+      await this.tryAddFrontmostFromDesktopCapturer();
     }
   }
 
   /**
-   * Fallback when active-win returns null (e.g. full-screen apps on their own Space).
-   * openWindows() enumerates all windows and sees full-screen apps; first in list is frontmost.
+   * Fallback when active-win returns null or throws (e.g. full-screen apps on their own Space).
+   * Uses desktopCapturer directly — get-windows fails in the same scenarios, so we skip it
+   * to avoid a slow failing call. Real apps (Chrome, Cursor, etc.) are prioritized over
+   * system/Electron windows when multiple are returned.
    */
-  private async tryAddFrontmostFromOpenWindows(): Promise<void> {
+  private async tryAddFrontmostFromDesktopCapturer(): Promise<void> {
     try {
-      const { openWindows } = await import("get-windows");
-      const windows = await openWindows();
-      if (!windows || windows.length === 0) return;
+      const sources = await desktopCapturer.getSources({
+        types: ["window"],
+        fetchWindowIcons: false,
+      });
+
+      if (!sources || sources.length === 0) return;
 
       const policy = getCapturePolicy();
       const browserApps = [
@@ -359,17 +365,22 @@ class FocusWindowTracker {
         "Opera GX",
       ];
 
-      for (const win of windows) {
-        const windowId = String(win.id);
-        const appName = win.owner?.name ?? "";
-        const windowTitle = win.title ?? "";
+      // Parse sources into candidates with app name from title (desktopCapturer format: "Title - App")
+      const candidates: Array<{
+        windowId: string;
+        appName: string;
+        windowTitle: string;
+        isSystemOrElectron: boolean;
+      }> = [];
 
-        // Skip windows with no title (except RDP/Citrix)
-        if (!windowTitle || windowTitle.trim() === "") {
-          if (!isRemoteDesktopApp(appName)) continue;
-        }
+      for (const source of sources) {
+        const windowTitle = source.name;
+        if (!windowTitle || windowTitle.trim() === "") continue;
 
-        if (isSystemApp(appName)) continue;
+        if (MITABLE_WINDOW_TITLES.has(windowTitle)) continue;
+
+        const titleParts = windowTitle.split(" - ");
+        const appName = titleParts.length > 1 ? titleParts[titleParts.length - 1] : windowTitle;
 
         const exclusionCheck = shouldExcludeWindow(
           windowTitle,
@@ -379,25 +390,43 @@ class FocusWindowTracker {
         );
         if (exclusionCheck.excluded) continue;
 
-        const isBrowser = browserApps.includes(appName);
-        const effectiveTitle = windowTitle || appName;
+        const isSystemOrElectron =
+          isSystemApp(appName) || normalizeAppName(appName).toLowerCase() === "electron";
 
-        this.lastActiveWindowId = windowId;
-        this.addOrRefreshWindow({
-          windowId,
+        candidates.push({
+          windowId: source.id,
           appName,
-          windowTitle: effectiveTitle,
-          displayName: appName,
-          tabTitle: isBrowser ? windowTitle : undefined,
-          isBrowser,
+          windowTitle,
+          isSystemOrElectron,
         });
-        logger.info(
-          ` Added window via openWindows fallback: ${appName} (${effectiveTitle.substring(0, 40)}...)`
-        );
-        return; // Only add the frontmost
       }
+
+      if (candidates.length === 0) return;
+
+      // Sort: real apps first, system/Electron last
+      candidates.sort((a, b) => {
+        if (a.isSystemOrElectron === b.isSystemOrElectron) return 0;
+        return a.isSystemOrElectron ? 1 : -1;
+      });
+
+      const chosen = candidates[0];
+      const isBrowser = browserApps.includes(chosen.appName);
+      const effectiveTitle = chosen.windowTitle || chosen.appName;
+
+      this.lastActiveWindowId = chosen.windowId;
+      this.addOrRefreshWindow({
+        windowId: chosen.windowId,
+        appName: chosen.appName,
+        windowTitle: effectiveTitle,
+        displayName: chosen.appName,
+        tabTitle: isBrowser ? chosen.windowTitle : undefined,
+        isBrowser,
+      });
+      logger.info(
+        ` Added window via desktopCapturer fallback: ${chosen.appName} (${effectiveTitle.substring(0, 40)}...)`
+      );
     } catch (error) {
-      logger.error(" openWindows fallback failed:", error);
+      logger.error(" desktopCapturer fallback failed:", error);
     }
   }
 
