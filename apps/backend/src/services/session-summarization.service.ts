@@ -23,7 +23,7 @@ import { promises as fs } from "fs";
 import { config } from "../config";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, asc, desc } from "drizzle-orm";
 import { masterStoryService } from "./master-story.service";
 import { graphContextBuilderService } from "./graph/graph-context-builder.service";
 import {
@@ -468,9 +468,101 @@ class SessionSummarizationService {
       }
     }
 
-    // Use Groq to extract structured data from the master story
+    // Build time-per-app breakdown from captures
+    // Strategy: attribute each capture-to-capture interval to the app active at that moment.
+    // This ensures every second between captures is accounted for (no dropped sub-minute gaps).
+    const captures = await db
+      .select({
+        capturedAt: schema.sessionCaptures.capturedAt,
+        appName: schema.sessionCaptures.appName,
+      })
+      .from(schema.sessionCaptures)
+      .where(eq(schema.sessionCaptures.sessionId, sessionId))
+      .orderBy(asc(schema.sessionCaptures.capturedAt));
+
+    // Fetch session endedAt to extend the last segment to actual session end
+    const sessionRow = await db.query.monitoringSessions.findFirst({
+      where: eq(schema.monitoringSessions.id, sessionId),
+      columns: { endedAt: true },
+    });
+
+    let timeBreakdownBlock = "";
+    if (captures.length >= 2) {
+      // Step 1: Build per-interval milliseconds by app
+      const appMs = new Map<string, number>();
+      const segments: { app: string; startTime: Date; endTime: Date; ms: number }[] = [];
+      let currentApp = captures[0].appName || "Unknown";
+      let segStart = new Date(captures[0].capturedAt);
+
+      for (let i = 1; i < captures.length; i++) {
+        const app = captures[i].appName || "Unknown";
+        const captureTime = new Date(captures[i].capturedAt);
+        const intervalMs = captureTime.getTime() - new Date(captures[i - 1].capturedAt).getTime();
+
+        // Attribute this interval to the previous capture's app
+        const prevApp = captures[i - 1].appName || "Unknown";
+        appMs.set(prevApp, (appMs.get(prevApp) || 0) + intervalMs);
+
+        // Track chronological segments (merge consecutive same-app)
+        if (app !== currentApp) {
+          segments.push({
+            app: currentApp,
+            startTime: segStart,
+            endTime: captureTime,
+            ms: captureTime.getTime() - segStart.getTime(),
+          });
+          currentApp = app;
+          segStart = captureTime;
+        }
+      }
+
+      // Extend final segment to session endedAt (if available) so tail time isn't lost
+      const lastCapture = new Date(captures[captures.length - 1].capturedAt);
+      const segEnd = sessionRow?.endedAt ? new Date(sessionRow.endedAt) : lastCapture;
+      const tailMs = segEnd.getTime() - lastCapture.getTime();
+      if (tailMs > 0) {
+        const lastApp = captures[captures.length - 1].appName || "Unknown";
+        appMs.set(lastApp, (appMs.get(lastApp) || 0) + tailMs);
+      }
+      segments.push({
+        app: currentApp,
+        startTime: segStart,
+        endTime: segEnd,
+        ms: segEnd.getTime() - segStart.getTime(),
+      });
+
+      // Convert ms to minutes (round to nearest)
+      const totalMinutes = Math.round([...appMs.values()].reduce((a, b) => a + b, 0) / 60000);
+
+      // Build the chronological segment list + app totals
+      const fmt = (d: Date) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      const segmentLines = segments
+        .filter((s) => s.ms >= 30000) // drop segments < 30s
+        .map(
+          (s) => `- ${s.app}: ${Math.round(s.ms / 60000)}m (${fmt(s.startTime)}-${fmt(s.endTime)})`
+        );
+      const appTotalLines = [...appMs.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([app, ms]) => `- ${app}: ${Math.round(ms / 60000)}m`);
+
+      timeBreakdownBlock = `\n<time_breakdown total_minutes="${totalMinutes}">
+CHRONOLOGICAL SEGMENTS:
+${segmentLines.join("\n")}
+
+APP TOTALS:
+${appTotalLines.join("\n")}
+</time_breakdown>\n`;
+
+      log.debug("Built time breakdown for extraction", {
+        segments: segments.length,
+        totalMinutes,
+        apps: appMs.size,
+      });
+    }
+
+    // Use Claude to extract structured data from the master story
     const prompt = `<task>
-Extract structured information from a work session narrative written in first person. Transform the detailed narrative into a concise, delivery-ready summary with key insights.
+Extract structured information from a work session narrative written in first person. Transform the detailed narrative into a task-oriented summary grouped by observed tasks.
 </task>
 
 <input>
@@ -478,35 +570,60 @@ Extract structured information from a work session narrative written in first pe
 ${masterStory}
 </master_story>
 </input>
-${userPrefsBlock}
+${timeBreakdownBlock}${userPrefsBlock}
 ${graphContextBlock}
 <instructions>
 <summary_requirements>
-- Length: Under 10 sentences
-- Style: Casual first person (like a Slack update)
-- Focus: Accomplishments and outcomes, not process details
-- Tone: Conversational and natural
-- Content: Highlight what was achieved and why it matters
+TASK-ORIENTED FORMAT:
+Break the session into distinct tasks. Each task is a bullet point with a bold label and a description.
+
+A "task" is a coherent unit of work. Examples:
+- Working on a customer issue → the task label includes the customer name
+- Attending a meeting → the meeting is the task
+- Debugging a feature → the feature/ticket is the task
+- Researching a topic → the topic is the task
+- Casual browsing → "General Browsing" is the task
+
+TASK LABEL RULES:
+- If a customer, client, or external entity is involved, include their name: "**[Customer] — [Topic]**"
+- If it's a meeting, name it: "**[Meeting Name]**" or "**1:1 with [Person]**"
+- If it's internal work, name the feature/project: "**[Feature/Project Name]**" or "**[Ticket] Review**"
+- If it's general/unrelated, use a descriptive label: "**Email Triage**" or "**General Browsing**"
+
+FORMAT:
+- **Task Label** (Xm): Description of what was done for this task. Keep it to 1-3 sentences.
+
+TIME ATTRIBUTION:
+- If a <time_breakdown> is provided, use it to calculate minutes per task
+- Map the chronological app segments to tasks based on the narrative context
+- Include the duration in parentheses after each task label: "**Task Label** (12m):"
+- All task durations MUST sum to the total_minutes from the time breakdown
+- If no time breakdown is available, omit the duration parentheses
+
+RULES:
+- First person ("I"), casual tone (like a Slack update)
+- 2-7 task bullets depending on session length
+- Each bullet = one task, with everything done for that task grouped under it
+- Customer/client names MUST appear in the task label when identifiable
+- All names, topics, and systems must come from the actual master story — never invent
+- Collapse related micro-actions into the task description (outcomes, not keystrokes)
 </summary_requirements>
 
 <activities_requirements>
-- Count: Top 3-5 key activities
-- Format: Short phrases describing what was actually done
-- Focus: Concrete actions, not tools or technical details
-- Examples: "Fixed login bug", "Merged PR #42", "Reviewed customer tickets"
+- Count: One entry per task (matching the summary bullets)
+- Format: The task labels only (without the ** markdown)
+- Examples: "[Customer] — Ticket Triage", "Weekly Standup", "Search Feature Refactor"
 </activities_requirements>
 
 <accomplishments_requirements>
 - Include: Completed items, shipped features, unblocked work
 - Format: Short, specific descriptions
-- Examples: "Deployed payment service fix", "Merged auth refactor PR", "Resolved production timeout issue"
 - If none: Return empty array []
 </accomplishments_requirements>
 
 <blockers_requirements>
 - Include: Waiting states, errors, repeated attempts, blocked progress
 - Format: Short descriptions of what blocked progress
-- Examples: "OAuth integration timeout", "Waiting on API credentials", "Test failures blocking merge"
 - If none: Return empty array []
 </blockers_requirements>
 </instructions>
@@ -514,10 +631,18 @@ ${graphContextBlock}
 <output_format>
 Respond with valid JSON only:
 {
-  "summary": "Refined casual summary here (under 10 sentences, first person)",
-  "activities": ["Activity 1", "Activity 2", "Activity 3"],
+  "summary": "- **Task Label** (Xm): Description of what was done\\n- **Task Label 2** (Ym): Description...",
+  "activities": ["Task Label", "Task Label 2"],
   "accomplishments": ["Accomplishment 1"] or [],
   "blockers": ["Blocker 1"] or []
+}
+
+EXAMPLE (structure only — your content must come from the actual master story, never these placeholders):
+{
+  "summary": "- **[Customer A] — Support Ticket Triage** (15m): I reviewed three open tickets for [Customer A] in the helpdesk, escalated the billing issue, and closed the two resolved ones.\\n- **Weekly Standup** (10m): Joined the team standup, shared progress on the migration project and flagged the API dependency blocker.\\n- **Search Feature Refactor** (20m): Refactored the search indexing logic to support fuzzy matching, ran tests locally and pushed the branch for review.",
+  "activities": ["[Customer A] — Support Ticket Triage", "Weekly Standup", "Search Feature Refactor"],
+  "accomplishments": ["Closed 2 resolved support tickets"],
+  "blockers": ["Waiting on API credentials for migration"]
 }
 </output_format>`;
 
@@ -540,14 +665,42 @@ Respond with valid JSON only:
       }
     );
 
-    const completion = await this.groq.chat.completions.create({
-      model: SUMMARIZATION_CONFIG.TEXT_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-      max_tokens: 800,
-    });
+    let response = "";
+    let tokensUsed = 0;
+    let modelUsed = "";
 
-    const response = completion.choices[0]?.message?.content || "";
+    if (this.anthropic) {
+      try {
+        const claudeResult = await this.anthropic.messages.create({
+          model: "claude-sonnet-4-5-20250929",
+          max_tokens: 1200,
+          messages: [{ role: "user", content: prompt }],
+        });
+        response = claudeResult.content[0]?.type === "text" ? claudeResult.content[0].text : "";
+        tokensUsed =
+          (claudeResult.usage?.input_tokens || 0) + (claudeResult.usage?.output_tokens || 0);
+        modelUsed = "claude-sonnet-4-5-20250929";
+        log.debug("Extraction via Claude Sonnet 4.5");
+      } catch (claudeError) {
+        log.warn("Claude extraction failed, falling back to Groq", {
+          error: claudeError instanceof Error ? claudeError.message : String(claudeError),
+        });
+      }
+    }
+
+    // Fallback to Groq if Claude unavailable or failed
+    if (!response) {
+      const completion = await this.groq.chat.completions.create({
+        model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 1200,
+      });
+      response = completion.choices[0]?.message?.content || "";
+      tokensUsed = completion.usage?.total_tokens || 0;
+      modelUsed = SUMMARIZATION_CONFIG.TEXT_MODEL;
+      log.debug("Extraction via Groq fallback");
+    }
     const parsed = this.parseJsonResponse(response);
 
     const outputSummary = parsed.summary || masterStory;
@@ -555,10 +708,10 @@ Respond with valid JSON only:
 
     // Log AI response for debugging
     log.logAIInteraction("refinement_response", "", response, {
-      model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+      model: modelUsed,
       inputHash,
       outputHash,
-      tokensUsed: completion.usage?.total_tokens,
+      tokensUsed,
       parsedSuccessfully: !!parsed.summary,
     });
 
@@ -569,12 +722,10 @@ Respond with valid JSON only:
       "", // Prompt already logged
       response,
       {
-        model: SUMMARIZATION_CONFIG.TEXT_MODEL,
+        model: modelUsed,
         inputHash,
         outputHash,
-        tokensUsed: completion.usage?.total_tokens,
-        promptTokens: completion.usage?.prompt_tokens,
-        completionTokens: completion.usage?.completion_tokens,
+        tokensUsed,
         parsedSuccessfully: !!parsed.summary,
         parsedSummaryLength: parsed.summary?.length || 0,
         parsedActivitiesCount: parsed.activities?.length || 0,
@@ -595,7 +746,7 @@ Respond with valid JSON only:
       activities: parsed.activities || [],
       accomplishments: parsed.accomplishments || [],
       blockers: parsed.blockers || [],
-      tokenCount: completion.usage?.total_tokens || 0,
+      tokenCount: tokensUsed,
     };
   }
 
