@@ -692,6 +692,21 @@ class MonitoringSessionService {
       }
 
       if (!result.screenshots || result.screenshots.length === 0) {
+        // Fallback: when we have tracked windows but got 0 captures (e.g. full-screen
+        // or other edge case), try screen capture as last resort.
+        if (trackedWindowIds.length > 0) {
+          const screenshot = await captureService.captureScreen();
+          if (screenshot) {
+            this.activeSession.consecutiveEmptyCaptures = 0;
+            this.activeSession.lastSuccessfulCaptureAt = Date.now();
+            await this.processCapture(screenshot, trigger);
+            this.broadcastCaptureProgress();
+            logger.info(
+              "[CaptureService] Window capture returned 0 matches; used screen capture fallback."
+            );
+            return;
+          }
+        }
         this.activeSession.consecutiveEmptyCaptures++;
         this.checkCaptureHealth();
         return;
@@ -810,17 +825,35 @@ class MonitoringSessionService {
       // Get and reset interval evidence (activity metadata since last capture)
       const intervalEvidence = activityTracker.reset();
 
+      // Validate payload before analysis - backend requires frameId, currentImage, windowInfo
+      // Empty base64 can occur when desktopCapturer returns empty/corrupt thumbnails
+      // (e.g. Cursor, GPU-rendered apps, or certain full-screen states)
+      if (!base64Data || base64Data.length < 100) {
+        logger.warn(
+          `[MonitoringSessionService] Skipping analysis for ${frameMetadata.frameId}: empty or invalid image data (window: ${screenshot.windowId}, app: ${screenshot.appName})`
+        );
+        return;
+      }
+
+      const windowInfo = {
+        windowSourceId: screenshot.windowId,
+        appName: screenshot.appName ?? "",
+        windowTitle: screenshot.windowTitle ?? "",
+      };
+      if (!windowInfo.windowSourceId) {
+        logger.warn(
+          `[MonitoringSessionService] Skipping analysis for ${frameMetadata.frameId}: missing windowSourceId`
+        );
+        return;
+      }
+
       // Trigger async frame analysis (don't block capture loop)
       this.analyzeFrameAsync(
         this.activeSession.id,
         frameMetadata.frameId,
         base64Data,
         previousFrame?.imageData || null,
-        {
-          windowSourceId: screenshot.windowId,
-          appName: screenshot.appName,
-          windowTitle: screenshot.windowTitle,
-        },
+        windowInfo,
         {
           sequenceNumber: frameMetadata.sequenceNumber,
           captureTrigger: trigger,

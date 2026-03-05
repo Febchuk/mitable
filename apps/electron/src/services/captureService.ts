@@ -587,6 +587,48 @@ class CaptureService {
   }
 
   /**
+   * Capture the primary screen (for full-screen Space fallback on macOS).
+   * Uses desktopCapturer with type 'screen' when window sources are unavailable.
+   * Returns a screenshot object compatible with the same downstream processing as window capture.
+   */
+  async captureScreen(): Promise<{
+    windowId: string;
+    windowTitle: string;
+    appName: string;
+    dataUrl: string;
+  } | null> {
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ["screen"],
+        thumbnailSize: {
+          width: this.MAX_WIDTH * 2,
+          height: this.MAX_HEIGHT * 2,
+        },
+      });
+
+      const primarySource = sources[0];
+      if (!primarySource) {
+        logger.warn(" No screen source available for full-screen capture.");
+        return null;
+      }
+
+      let image = primarySource.thumbnail;
+      image = this.resizeIfNeeded(image, this.MAX_WIDTH, this.MAX_HEIGHT);
+      const dataUrl = image.toDataURL();
+
+      return {
+        windowId: "screen:primary",
+        windowTitle: "Full Screen",
+        appName: "Screen",
+        dataUrl,
+      };
+    } catch (err) {
+      logger.error(" Screen capture failed:", err);
+      return null;
+    }
+  }
+
+  /**
    * Capture visible windows with cache fallback for selected apps
    *
    * This method:

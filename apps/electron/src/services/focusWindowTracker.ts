@@ -6,15 +6,18 @@
  * - When a window is focused, it's added to the watch list
  * - Each focus resets the 10-minute timer
  * - Windows are removed after 10 minutes of not being focused
+ * - The last-focused window is never removed by TTL (keeps watch list non-empty
+ *   when user stays on one window, e.g. a call, without refocusing)
  * - Excludes: Mitable Electron renderers, policy-blocked windows, and Spotify
  *
  * @module focusWindowTracker
  */
 
-import { BrowserWindow } from "electron";
+import { BrowserWindow, desktopCapturer } from "electron";
 import { createLogger } from "../lib/logger";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
 import { windowDetectionService } from "./windowDetectionService";
+import { isSystemApp } from "../utils/browserTitleParser";
 import { IPC_CHANNELS } from "@mitable/shared";
 import type { SelectedWindowInfo } from "@mitable/shared";
 
@@ -265,7 +268,10 @@ class FocusWindowTracker {
       const activeWin = (await import("active-win")).default;
       const activeWindow = await activeWin();
 
+      // active-win can return null for full-screen apps (own Space) and other edge cases.
+      // Fallback: use desktopCapturer directly (get-windows fails in same scenarios, so skip it).
       if (!activeWindow) {
+        await this.tryAddFrontmostFromDesktopCapturer();
         return;
       }
 
@@ -326,8 +332,101 @@ class FocusWindowTracker {
         isBrowser,
       });
     } catch (error) {
-      // Log but don't throw - polling should continue
+      // active-win can throw (e.g. Command failed in full-screen Space) — use desktopCapturer
       logger.error(" Error checking active window:", error);
+      await this.tryAddFrontmostFromDesktopCapturer();
+    }
+  }
+
+  /**
+   * Fallback when active-win returns null or throws (e.g. full-screen apps on their own Space).
+   * Uses desktopCapturer directly — get-windows fails in the same scenarios, so we skip it
+   * to avoid a slow failing call. Real apps (Chrome, Cursor, etc.) are prioritized over
+   * system/Electron windows when multiple are returned.
+   */
+  private async tryAddFrontmostFromDesktopCapturer(): Promise<void> {
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ["window"],
+        fetchWindowIcons: false,
+      });
+
+      if (!sources || sources.length === 0) return;
+
+      const policy = getCapturePolicy();
+      const browserApps = [
+        "Google Chrome",
+        "Safari",
+        "Firefox",
+        "Arc",
+        "Microsoft Edge",
+        "Brave Browser",
+        "Opera",
+        "Opera GX",
+      ];
+
+      // Parse sources into candidates with app name from title (desktopCapturer format: "Title - App")
+      const candidates: Array<{
+        windowId: string;
+        appName: string;
+        windowTitle: string;
+        isSystemOrElectron: boolean;
+      }> = [];
+
+      for (const source of sources) {
+        const windowTitle = source.name;
+        if (!windowTitle || windowTitle.trim() === "") continue;
+
+        if (MITABLE_WINDOW_TITLES.has(windowTitle)) continue;
+
+        const titleParts = windowTitle.split(" - ");
+        const appName = titleParts.length > 1 ? titleParts[titleParts.length - 1] : windowTitle;
+
+        const exclusionCheck = shouldExcludeWindow(
+          windowTitle,
+          appName,
+          policy,
+          this.currentUserId
+        );
+        if (exclusionCheck.excluded) continue;
+
+        const isSystemOrElectron =
+          isSystemApp(appName) || normalizeAppName(appName).toLowerCase() === "electron";
+
+        candidates.push({
+          windowId: source.id,
+          appName,
+          windowTitle,
+          isSystemOrElectron,
+        });
+      }
+
+      if (candidates.length === 0) return;
+
+      // Sort: real apps first, system/Electron last
+      candidates.sort((a, b) => {
+        if (a.isSystemOrElectron === b.isSystemOrElectron) return 0;
+        return a.isSystemOrElectron ? 1 : -1;
+      });
+
+      const chosen = candidates[0];
+      const isBrowser = browserApps.includes(chosen.appName);
+      const effectiveTitle = chosen.windowTitle || chosen.appName;
+
+      this.lastActiveWindowId = chosen.windowId;
+      this.addOrRefreshWindow({
+        windowId: chosen.windowId,
+        appName: chosen.appName,
+        windowTitle: effectiveTitle,
+        displayName: chosen.appName,
+        tabTitle: isBrowser ? chosen.windowTitle : undefined,
+        isBrowser,
+      });
+      logger.info(
+        ` Added window via desktopCapturer fallback: ${chosen.appName} (${effectiveTitle.substring(0, 40)}...)`
+      );
+    } catch (error) {
+      logger.error(" desktopCapturer fallback failed:", error);
     }
   }
 
@@ -349,9 +448,13 @@ class FocusWindowTracker {
         ` Refreshed TTL for window: ${window.appName} (${window.windowTitle.substring(0, 40)}...)`
       );
     } else {
-      // Different OS window — check if we already track another window for the same app
-      // (e.g., Chrome main window vs DevTools, Windsurf editor vs terminal panel).
-      // Replace the old entry so the badge count stays at one-per-app.
+      // Different OS window
+      // We no longer replace the old entry. This allows tracking multiple windows of the same app
+      // (e.g. multiple Chrome windows, or VS Code window + terminal).
+
+      /* 
+      // LEGACY: Replaced old entry so badge count stayed at one-per-app.
+      // Removed to support multi-window tracking per app.
       for (const [existingId, existingWin] of this.trackedWindows) {
         if (existingWin.appName === window.appName) {
           this.trackedWindows.delete(existingId);
@@ -362,6 +465,7 @@ class FocusWindowTracker {
           break;
         }
       }
+      */
 
       // Add new window
       const trackedWindow: TrackedWindow = {
@@ -425,6 +529,11 @@ class FocusWindowTracker {
 
   /**
    * Remove expired windows from tracking
+   *
+   * The last-focused window is never removed by TTL, even if expired. This prevents
+   * the watch list from going empty when the user stays on one window (e.g., a call)
+   * for 10+ minutes without refocusing — they would otherwise have to manually
+   * re-add it or switch away and back.
    */
   private cleanupExpiredWindows(): void {
     // Also re-check block list so mid-session changes take effect
@@ -440,6 +549,14 @@ class FocusWindowTracker {
         if (isRemoteDesktopApp(window.appName)) {
           logger.info(
             ` Keeping RDP/Citrix window past TTL: ${window.appName} (${window.windowTitle.substring(0, 40)})`
+          );
+          continue;
+        }
+        // Never remove the last-focused window — keeps watch list non-empty when
+        // user stays on one window (e.g., call) without refocusing
+        if (windowId === this.lastActiveWindowId) {
+          logger.info(
+            ` Keeping last-focused window past TTL: ${window.appName} (${window.windowTitle.substring(0, 40)})`
           );
           continue;
         }
