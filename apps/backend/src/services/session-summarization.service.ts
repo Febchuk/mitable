@@ -697,7 +697,7 @@ EXAMPLE (structure only — your content must come from the actual master story,
       try {
         const claudeResult = await this.anthropic.messages.create({
           model: "claude-sonnet-4-5-20250929",
-          max_tokens: 1200,
+          max_tokens: 16384,
           messages: [{ role: "user", content: prompt }],
         });
         response = claudeResult.content[0]?.type === "text" ? claudeResult.content[0].text : "";
@@ -706,24 +706,50 @@ EXAMPLE (structure only — your content must come from the actual master story,
         modelUsed = "claude-sonnet-4-5-20250929";
         log.debug("Extraction via Claude Sonnet 4.5");
       } catch (claudeError) {
-        log.warn("Claude extraction failed, falling back to Groq", {
+        log.warn("Claude extraction failed, falling back to OpenAI", {
           error: claudeError instanceof Error ? claudeError.message : String(claudeError),
         });
       }
     }
 
-    // Fallback to Groq if Claude unavailable or failed
-    if (!response) {
-      const completion = await this.groq.chat.completions.create({
-        model: SUMMARIZATION_CONFIG.TEXT_MODEL,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        max_tokens: 1200,
-      });
-      response = completion.choices[0]?.message?.content || "";
-      tokensUsed = completion.usage?.total_tokens || 0;
-      modelUsed = SUMMARIZATION_CONFIG.TEXT_MODEL;
-      log.debug("Extraction via Groq fallback");
+    // Fallback to OpenAI if Claude unavailable or failed
+    if (!response && this.openai) {
+      try {
+        const openaiResult = await this.openai.chat.completions.create({
+          model: "gpt-5",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.3,
+          max_tokens: 16384,
+        });
+        response = openaiResult.choices[0]?.message?.content || "";
+        tokensUsed = openaiResult.usage?.total_tokens || 0;
+        modelUsed = "gpt-5";
+        log.debug("Extraction via OpenAI fallback");
+      } catch (openaiError) {
+        log.warn("OpenAI extraction failed, falling back to DeepSeek", {
+          error: openaiError instanceof Error ? openaiError.message : String(openaiError),
+        });
+      }
+    }
+
+    // Fallback to DeepSeek if OpenAI also failed
+    if (!response && this.deepseek) {
+      try {
+        const dsResult = await this.deepseek.chat.completions.create({
+          model: "deepseek-chat",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.3,
+          max_tokens: 16384,
+        });
+        response = dsResult.choices[0]?.message?.content || "";
+        tokensUsed = dsResult.usage?.total_tokens || 0;
+        modelUsed = "deepseek-chat";
+        log.debug("Extraction via DeepSeek fallback");
+      } catch (dsError) {
+        log.warn("DeepSeek extraction also failed", {
+          error: dsError instanceof Error ? dsError.message : String(dsError),
+        });
+      }
     }
     const parsed = this.parseJsonResponse(response);
 
@@ -1864,15 +1890,67 @@ RULES:
 - If the summary is a single paragraph with no clear task separation, return a single task.`;
 
     try {
-      const completion = await this.groq.chat.completions.create({
-        model: SUMMARIZATION_CONFIG.TEXT_MODEL,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.1,
-        max_tokens: 2000,
-        response_format: { type: "json_object" },
-      });
+      let raw = "";
 
-      const raw = completion.choices[0]?.message?.content || "{}";
+      // Try Claude first
+      if (this.anthropic) {
+        try {
+          const completion = await this.anthropic.messages.create({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 2000,
+            temperature: 0.1,
+            messages: [{ role: "user", content: prompt }],
+          });
+          raw = completion.content[0]?.type === "text" ? completion.content[0].text : "";
+        } catch (claudeErr) {
+          logger.warn(
+            { error: claudeErr instanceof Error ? claudeErr.message : String(claudeErr) },
+            "Claude task breakdown failed, trying OpenAI"
+          );
+        }
+      }
+
+      // Fallback to OpenAI
+      if (!raw && this.openai) {
+        try {
+          const openaiResult = await this.openai.chat.completions.create({
+            model: "gpt-5",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.1,
+            max_tokens: 2000,
+          });
+          raw = openaiResult.choices[0]?.message?.content || "";
+        } catch (openaiErr) {
+          logger.warn(
+            { error: openaiErr instanceof Error ? openaiErr.message : String(openaiErr) },
+            "OpenAI task breakdown failed, trying DeepSeek"
+          );
+        }
+      }
+
+      // Fallback to DeepSeek
+      if (!raw && this.deepseek) {
+        try {
+          const dsResult = await this.deepseek.chat.completions.create({
+            model: "deepseek-chat",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.1,
+            max_tokens: 2000,
+          });
+          raw = dsResult.choices[0]?.message?.content || "";
+        } catch (dsErr) {
+          logger.warn(
+            { error: dsErr instanceof Error ? dsErr.message : String(dsErr) },
+            "DeepSeek task breakdown also failed"
+          );
+        }
+      }
+
+      if (!raw) return [];
+
+      // Strip markdown code fences if present
+      const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) raw = jsonMatch[1].trim();
       const parsed = JSON.parse(raw);
       const tasks: TaskBreakdownItem[] = (parsed.tasks || []).map((t: any) => ({
         shortTitle: String(t.shortTitle || "Task"),

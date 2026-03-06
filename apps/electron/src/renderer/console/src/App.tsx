@@ -247,29 +247,35 @@ function RecapNotificationHandler() {
     knownRecapKeysRef.current = new Set(recaps.map(recapKey));
   }, [recaps, queryClient]);
 
-  // Navigate to recap when notification is clicked (window regains focus)
-  // or via IPC from the main process showRecapNotification click handler
+  // Navigate to recap when notification is clicked.
+  // In Electron: IPC onNavigateToRecaps fires when user clicks the OS notification.
+  // Fallback (non-Electron): use window focus event (assumes focus = notification click).
   useEffect(() => {
-    const handleFocus = () => {
-      const recapId = latestRecapIdRef.current;
-      if (recapId) {
-        latestRecapIdRef.current = null;
-        navigate(`/recaps/${recapId}`);
-      }
-    };
-    window.addEventListener("focus", handleFocus);
-
+    let removeFocusListener: (() => void) | undefined;
     let unsubscribe: (() => void) | undefined;
+
     if (window.consoleAPI?.onNavigateToRecaps) {
+      // Electron: use IPC — only fires on actual notification click, not random focus events
       unsubscribe = window.consoleAPI.onNavigateToRecaps(() => {
         const recapId = latestRecapIdRef.current;
         latestRecapIdRef.current = null;
         navigate(recapId ? `/recaps/${recapId}` : "/recaps");
       });
+    } else {
+      // Non-Electron fallback: navigate on window focus (best-effort)
+      const handleFocus = () => {
+        const recapId = latestRecapIdRef.current;
+        if (recapId) {
+          latestRecapIdRef.current = null;
+          navigate(`/recaps/${recapId}`);
+        }
+      };
+      window.addEventListener("focus", handleFocus);
+      removeFocusListener = () => window.removeEventListener("focus", handleFocus);
     }
 
     return () => {
-      window.removeEventListener("focus", handleFocus);
+      removeFocusListener?.();
       unsubscribe?.();
     };
   }, [navigate]);

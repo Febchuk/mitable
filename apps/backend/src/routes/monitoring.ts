@@ -998,6 +998,28 @@ router.post(
         )
         .then(async ([_, storyResult]) => {
           log.info("Session end processing completed", { sessionId: id });
+
+          // Extract structured task breakdown from the generated story
+          let taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }> =
+            [];
+          if (storyResult) {
+            try {
+              const totalMinutes = Math.round(Math.max(0, activeDurationMs) / 60000);
+              taskBreakdown = await sessionSummarizationService.parseTaskBreakdownFromSummary(
+                storyResult,
+                totalMinutes
+              );
+              log.info("Task breakdown extracted", {
+                sessionId: id,
+                taskCount: taskBreakdown.length,
+              });
+            } catch (tbError) {
+              log.warn("Task breakdown extraction failed (non-fatal)", {
+                error: tbError instanceof Error ? tbError.message : String(tbError),
+              });
+            }
+          }
+
           // Update status to ready and persist the story summary on the session record
           await db
             .update(schema.monitoringSessions)
@@ -1006,6 +1028,7 @@ router.post(
               summarizationProgress: null,
               ingestionStatus: "ingesting",
               ...(storyResult ? { finalSummary: storyResult } : {}),
+              ...(taskBreakdown.length > 0 ? { taskBreakdown } : {}),
             })
             .where(eq(schema.monitoringSessions.id, id));
 
