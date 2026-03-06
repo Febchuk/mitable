@@ -9,8 +9,10 @@
  */
 
 import { randomUUID } from "crypto";
+import { spawn, type ChildProcess } from "child_process";
 import { createLogger } from "../lib/logger";
 import { authManager } from "./authManager";
+import { contextFileService } from "./contextFileService";
 import type { BrowserWindow } from "electron";
 
 const logger = createLogger("AgentLauncher");
@@ -43,6 +45,7 @@ export interface AgentTask {
 
 class AgentLauncherService {
   private activeTasks: Map<string, AgentTask> = new Map();
+  private activeProcesses: Map<string, ChildProcess> = new Map();
   private taskHistory: AgentTask[] = [];
   private consoleWindow: BrowserWindow | null = null;
 
@@ -69,7 +72,7 @@ class AgentLauncherService {
     if (params.agentType === "claude-code") {
       this.runClaudeCodeTask(taskId, params, abortController);
     } else {
-      this.completeTask(taskId, { error: `Agent type "${params.agentType}" not yet supported` });
+      this.runExternalAgentTask(taskId, params, abortController);
     }
 
     return { taskId };
@@ -221,6 +224,100 @@ class AgentLauncherService {
     }
   }
 
+  private async runExternalAgentTask(
+    taskId: string,
+    params: AgentTaskParams,
+    abortController: AbortController
+  ): Promise<void> {
+    try {
+      // Generate context file if requested
+      let contextFilePath: string | undefined;
+      if (params.enableContextTools) {
+        try {
+          contextFilePath = await contextFileService.generateContextFile(params.taskDescription);
+          logger.info(`Context file generated at ${contextFilePath}`);
+        } catch (err) {
+          logger.warn("Failed to generate context file, proceeding without it:", err);
+        }
+      }
+
+      // Build environment for the child process
+      const env: Record<string, string | undefined> = { ...process.env };
+      if (contextFilePath) {
+        env.MITABLE_CONTEXT_FILE = contextFilePath;
+      }
+      env.MITABLE_API_URL = authManager.getApiBaseUrl();
+      const token = authManager.getAccessToken();
+      if (token) {
+        env.MITABLE_AUTH_TOKEN = token;
+      }
+
+      // Determine command and args based on agent type
+      let child: ChildProcess;
+      const cwd = params.projectDirectory;
+
+      if (params.agentType === "cursor") {
+        child = spawn("cursor", ["--task", params.taskDescription], { cwd, env });
+      } else {
+        // generic-cli
+        child = spawn("bash", ["-c", params.taskDescription], { cwd, env });
+      }
+
+      this.activeProcesses.set(taskId, child);
+      const startTime = Date.now();
+
+      // Abort handler — kill the child process on cancel
+      const onAbort = () => child.kill("SIGTERM");
+      abortController.signal.addEventListener("abort", onAbort);
+
+      // Stream stdout to console renderer
+      child.stdout?.on("data", (chunk: Buffer) => {
+        this.sendToConsole("agent:message", {
+          taskId,
+          message: {
+            type: "assistant",
+            message: { content: [{ type: "text", text: chunk.toString() }] },
+          },
+        });
+      });
+
+      // Stream stderr to console renderer
+      child.stderr?.on("data", (chunk: Buffer) => {
+        this.sendToConsole("agent:message", {
+          taskId,
+          message: {
+            type: "assistant",
+            message: { content: [{ type: "text", text: `[stderr] ${chunk.toString()}` }] },
+          },
+        });
+      });
+
+      // Handle process exit
+      child.on("close", (code) => {
+        abortController.signal.removeEventListener("abort", onAbort);
+        this.activeProcesses.delete(taskId);
+
+        const durationMs = Date.now() - startTime;
+        if (code === 0 || code === null) {
+          this.completeTask(taskId, { durationMs });
+        } else {
+          this.completeTask(taskId, { durationMs, error: `Process exited with code ${code}` });
+        }
+      });
+
+      // Handle spawn errors (e.g., command not found)
+      child.on("error", (err) => {
+        abortController.signal.removeEventListener("abort", onAbort);
+        this.activeProcesses.delete(taskId);
+        this.completeTask(taskId, { error: `Failed to spawn process: ${err.message}` });
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      logger.error(`External agent task ${taskId} failed:`, error);
+      this.completeTask(taskId, { error });
+    }
+  }
+
   private completeTask(
     taskId: string,
     result: { costUsd?: number; durationMs?: number; error?: string }
@@ -254,6 +351,12 @@ class AgentLauncherService {
     }
 
     task.abortController?.abort();
+    // Kill child process if this is an external agent task
+    const child = this.activeProcesses.get(taskId);
+    if (child) {
+      child.kill("SIGTERM");
+      this.activeProcesses.delete(taskId);
+    }
     task.status = "cancelled";
     task.completedAt = Date.now();
     task.durationMs = Date.now() - task.startedAt;
@@ -280,13 +383,19 @@ class AgentLauncherService {
 
   cleanup(): void {
     logger.info("Cleaning up — cancelling all active tasks");
-    for (const [, task] of this.activeTasks) {
+    for (const [taskId, task] of this.activeTasks) {
       task.abortController?.abort();
+      // Kill child processes for external agent tasks
+      const child = this.activeProcesses.get(taskId);
+      if (child) {
+        child.kill("SIGTERM");
+      }
       task.status = "cancelled";
       task.completedAt = Date.now();
       this.taskHistory.unshift(task);
     }
     this.activeTasks.clear();
+    this.activeProcesses.clear();
   }
 
   private sendToConsole(channel: string, data: unknown) {
