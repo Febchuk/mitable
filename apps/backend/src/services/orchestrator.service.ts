@@ -7,6 +7,7 @@ import { VisualGuidanceAgent } from "../agents/visual-guidance.agent";
 import { BaseAgent } from "../agents/base.agent";
 import { guideGenerationService } from "./guideGeneration.service";
 import { logger } from "../lib/logger.js";
+import { graphContextBuilderService } from "./graph/graph-context-builder.service";
 
 /**
  * Intent classification types
@@ -87,11 +88,28 @@ export class OrchestratorService {
       }
       context.workflowState = workflowState || undefined;
 
+      // Step 1b: Pre-load graph context for personalization and retrieval shaping.
+      // Failures are non-blocking to keep chat availability stable.
+      if (config.graph.enabled) {
+        try {
+          context.graphContext = await graphContextBuilderService.buildForUser(
+            context.userId,
+            context.organizationId
+          );
+        } catch (error) {
+          logger.warn(
+            { err: error instanceof Error ? error : new Error(String(error)) },
+            "[Orchestrator] Graph context prefetch failed (non-critical)"
+          );
+        }
+      }
+
       logger.info(
         {
           conversationId: context.conversationId,
           screenshotCount: context.screenshots?.length || 0,
           hasWorkflowState: !!workflowState,
+          hasGraphContext: !!context.graphContext,
           workflowAction: context.metadata?.workflowAction,
         },
         "[Orchestrator] Processing message"

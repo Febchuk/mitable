@@ -16,6 +16,7 @@ import { createLogger } from "../lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { config } from "../config";
+import { graphRetrievalService } from "../services/graph/graph-retrieval.service";
 
 const logger = createLogger({ context: "admin-dashboard-routes" });
 const router = Router();
@@ -2296,5 +2297,265 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
     res.status(500).json({ error: "Internal Server Error", message: "Failed to process request" });
   }
 });
+
+/**
+ * GET /admin/graph/users/:userId/work-insights?window=7d|30d|90d
+ * Returns graph-derived work profile for a single employee in the same org.
+ */
+router.get(
+  "/graph/users/:userId/work-insights",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
+
+      if (!config.graph.enabled) {
+        res.status(503).json({ error: "GraphDisabled", message: "Graph features are disabled" });
+        return;
+      }
+
+      const targetUserId = req.params.userId;
+      const [targetUser] = await db
+        .select({ id: schema.users.id, organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, targetUserId))
+        .limit(1);
+
+      if (!targetUser || targetUser.organizationId !== admin.organizationId) {
+        res.status(404).json({ error: "Not Found", message: "User not found in your organization" });
+        return;
+      }
+
+      const profile = await graphRetrievalService.getUserGraphProfile(
+        targetUser.id,
+        targetUser.organizationId
+      );
+
+      res.json({
+        window: (req.query.window as string) || "30d",
+        generatedAt: new Date().toISOString(),
+        profile,
+      });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error fetching user graph work insights");
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch work insights" });
+    }
+  }
+);
+
+/**
+ * GET /admin/graph/orgs/:orgId/common-tasks?limit=20
+ * Returns organization-level common tasks inferred from workstreams.
+ */
+router.get(
+  "/graph/orgs/:orgId/common-tasks",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
+
+      if (!config.graph.enabled) {
+        res.status(503).json({ error: "GraphDisabled", message: "Graph features are disabled" });
+        return;
+      }
+
+      const orgId = req.params.orgId;
+      if (orgId !== admin.organizationId) {
+        res.status(403).json({ error: "Forbidden", message: "Cross-org access is not allowed" });
+        return;
+      }
+
+      const limit = Math.min(50, Math.max(1, Number(req.query.limit || 20)));
+
+      const rows = await db
+        .select({
+          task: schema.sessionWorkstreams.name,
+          totalDurationMinutes: sql<number>`sum(${schema.sessionWorkstreams.totalDurationMinutes})::int`,
+          evidenceCount: sql<number>`count(*)::int`,
+          distinctUsers: sql<number>`count(distinct ${schema.monitoringSessions.userId})::int`,
+        })
+        .from(schema.sessionWorkstreams)
+        .innerJoin(
+          schema.monitoringSessions,
+          eq(schema.sessionWorkstreams.sessionId, schema.monitoringSessions.id)
+        )
+        .where(eq(schema.monitoringSessions.organizationId, orgId))
+        .groupBy(schema.sessionWorkstreams.name)
+        .orderBy(desc(sql`sum(${schema.sessionWorkstreams.totalDurationMinutes})`))
+        .limit(limit);
+
+      res.json({
+        generatedAt: new Date().toISOString(),
+        orgId,
+        commonTasks: rows.map((row) => ({
+          task: row.task,
+          totalDurationMinutes: Number(row.totalDurationMinutes || 0),
+          evidenceCount: Number(row.evidenceCount || 0),
+          distinctUsers: Number(row.distinctUsers || 0),
+        })),
+      });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error fetching org common tasks");
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch common tasks" });
+    }
+  }
+);
+
+/**
+ * GET /admin/graph/orgs/:orgId/workflow-insights?window=7d|30d|90d
+ * Returns org-level workflow visibility metrics.
+ */
+router.get(
+  "/graph/orgs/:orgId/workflow-insights",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
+
+      if (!config.graph.enabled) {
+        res.status(503).json({ error: "GraphDisabled", message: "Graph features are disabled" });
+        return;
+      }
+
+      const orgId = req.params.orgId;
+      if (orgId !== admin.organizationId) {
+        res.status(403).json({ error: "Forbidden", message: "Cross-org access is not allowed" });
+        return;
+      }
+
+      const window = ((req.query.window as string) || "30d").toLowerCase();
+      const lookbackDays = window === "7d" ? 7 : window === "90d" ? 90 : 30;
+      const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+
+      const [overview] = await db
+        .select({
+          sessionCount: sql<number>`count(distinct ${schema.monitoringSessions.id})::int`,
+          userCount: sql<number>`count(distinct ${schema.monitoringSessions.userId})::int`,
+          workstreamCount: sql<number>`count(${schema.sessionWorkstreams.id})::int`,
+          totalDurationMinutes: sql<number>`coalesce(sum(${schema.sessionWorkstreams.totalDurationMinutes}), 0)::int`,
+        })
+        .from(schema.monitoringSessions)
+        .leftJoin(
+          schema.sessionWorkstreams,
+          eq(schema.monitoringSessions.id, schema.sessionWorkstreams.sessionId)
+        )
+        .where(
+          and(
+            eq(schema.monitoringSessions.organizationId, orgId),
+            gte(schema.monitoringSessions.updatedAt, since)
+          )
+        );
+
+      const byCategory = await db
+        .select({
+          category: schema.sessionWorkstreams.category,
+          totalDurationMinutes: sql<number>`sum(${schema.sessionWorkstreams.totalDurationMinutes})::int`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(schema.sessionWorkstreams)
+        .innerJoin(
+          schema.monitoringSessions,
+          eq(schema.sessionWorkstreams.sessionId, schema.monitoringSessions.id)
+        )
+        .where(
+          and(
+            eq(schema.monitoringSessions.organizationId, orgId),
+            gte(schema.sessionWorkstreams.updatedAt, since),
+            isNotNull(schema.sessionWorkstreams.category)
+          )
+        )
+        .groupBy(schema.sessionWorkstreams.category)
+        .orderBy(desc(sql`sum(${schema.sessionWorkstreams.totalDurationMinutes})`));
+
+      res.json({
+        window,
+        generatedAt: new Date().toISOString(),
+        orgId,
+        overview: {
+          sessionCount: Number(overview?.sessionCount || 0),
+          userCount: Number(overview?.userCount || 0),
+          workstreamCount: Number(overview?.workstreamCount || 0),
+          totalDurationMinutes: Number(overview?.totalDurationMinutes || 0),
+        },
+        categories: byCategory.map((row) => ({
+          category: row.category || "uncategorized",
+          totalDurationMinutes: Number(row.totalDurationMinutes || 0),
+          count: Number(row.count || 0),
+        })),
+      });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error fetching org workflow insights");
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch workflow insights" });
+    }
+  }
+);
+
+/**
+ * GET /admin/graph/users/:userId/workflow-patterns?limit=20
+ * Returns ordered task patterns based on the user's most recent workstreams.
+ */
+router.get(
+  "/graph/users/:userId/workflow-patterns",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
+
+      if (!config.graph.enabled) {
+        res.status(503).json({ error: "GraphDisabled", message: "Graph features are disabled" });
+        return;
+      }
+
+      const targetUserId = req.params.userId;
+      const [targetUser] = await db
+        .select({ id: schema.users.id, organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, targetUserId))
+        .limit(1);
+
+      if (!targetUser || targetUser.organizationId !== admin.organizationId) {
+        res.status(404).json({ error: "Not Found", message: "User not found in your organization" });
+        return;
+      }
+
+      const limit = Math.min(50, Math.max(1, Number(req.query.limit || 20)));
+      const rows = await db
+        .select({
+          sessionId: schema.monitoringSessions.id,
+          startedAt: schema.monitoringSessions.startedAt,
+          taskName: schema.sessionWorkstreams.name,
+          duration: schema.sessionWorkstreams.totalDurationMinutes,
+          category: schema.sessionWorkstreams.category,
+        })
+        .from(schema.monitoringSessions)
+        .innerJoin(
+          schema.sessionWorkstreams,
+          eq(schema.monitoringSessions.id, schema.sessionWorkstreams.sessionId)
+        )
+        .where(eq(schema.monitoringSessions.userId, targetUser.id))
+        .orderBy(desc(schema.monitoringSessions.startedAt), desc(schema.sessionWorkstreams.updatedAt))
+        .limit(limit);
+
+      res.json({
+        generatedAt: new Date().toISOString(),
+        userId: targetUser.id,
+        patterns: rows.map((row) => ({
+          sessionId: row.sessionId,
+          startedAt: row.startedAt,
+          taskName: row.taskName,
+          category: row.category || "uncategorized",
+          durationMinutes: row.duration,
+        })),
+      });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error fetching user workflow patterns");
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch workflow patterns" });
+    }
+  }
+);
 
 export default router;

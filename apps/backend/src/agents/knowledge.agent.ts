@@ -288,6 +288,20 @@ export class KnowledgeAgent extends BaseAgent {
       // Build messages array from memory (not full history)
       const messages: Groq.Chat.ChatCompletionMessageParam[] = [];
       const ephemeralMessageIds = new Set<string>(); // Track ephemeral tool results
+      const graphContextInstructions =
+        context.graphContext &&
+        (context.graphContext.summaryFacts.length > 0 ||
+          context.graphContext.personalizationHints.length > 0 ||
+          context.graphContext.confidenceNotes.length > 0)
+          ? "\n\nINFERRED WORKFLOW CONTEXT (use as soft guidance, not absolute truth):\n" +
+            [
+              ...context.graphContext.summaryFacts,
+              ...context.graphContext.personalizationHints,
+              ...context.graphContext.confidenceNotes,
+            ]
+              .map((line) => `- ${line}`)
+              .join("\n")
+          : "";
 
       // Add system prompt to guide multi-query decomposition and thorough research
       messages.push({
@@ -383,7 +397,8 @@ export class KnowledgeAgent extends BaseAgent {
           'search_code({"query": "slack integration"})\n' +
           "→ Found: integrations.ts (routes), slack.service.ts, slack-sync.ts\n" +
           'view_code({"files": [{"filePath": "apps/backend/src/routes/integrations.ts", "startLine": 80, "endLine": 120}, {"filePath": "apps/backend/src/services/slack.service.ts"}, {"filePath": "apps/backend/src/scripts/sync-slack.ts", "startLine": 1, "endLine": 100}]})\n' +
-          "→ Now you see the complete integration flow",
+          "→ Now you see the complete integration flow" +
+          graphContextInstructions,
       });
 
       // Add conversation summary if exists

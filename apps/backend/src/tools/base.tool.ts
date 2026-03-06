@@ -58,6 +58,11 @@ export interface ToolContext {
     [key: string]: any; // Allow additional metadata fields
   };
   workflowState?: SolutionObject; // Pre-loaded by orchestrator for workflow context
+  graphContext?: {
+    summaryFacts: string[];
+    personalizationHints: string[];
+    confidenceNotes: string[];
+  };
 }
 
 // ============================================================================

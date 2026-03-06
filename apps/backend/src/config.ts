@@ -186,6 +186,17 @@ export const config = {
     apiKey: (process.env.DEEPGRAM_API_KEY || "").trim(),
   },
 
+  // Graph Intelligence Configuration (Neo4j-backed, staged rollout)
+  graph: {
+    enabled: (process.env.GRAPH_ENABLED || "false").trim().toLowerCase() === "true",
+    uri: (process.env.GRAPH_URI || "").trim(),
+    user: (process.env.GRAPH_USER || "").trim(),
+    password: (process.env.GRAPH_PASSWORD || "").trim(),
+    database: (process.env.GRAPH_DATABASE || "neo4j").trim(),
+    topKFacts: parseInt(process.env.GRAPH_TOP_K_FACTS || "5", 10),
+    lookbackDays: parseInt(process.env.GRAPH_LOOKBACK_DAYS || "30", 10),
+  },
+
   // Resend Email Configuration (transactional emails)
   resend: {
     apiKey: (process.env.RESEND_API_KEY || "").trim(),
@@ -232,6 +243,24 @@ export function validateConfig() {
       `Missing required environment variables: ${missingKeys}. ` +
         `Please check your .env file and ensure all required keys are set.`
     );
+  }
+
+  // Graph config is required only when the feature is enabled.
+  if (config.graph.enabled) {
+    const graphRequired = [
+      { key: "GRAPH_URI", value: config.graph.uri },
+      { key: "GRAPH_USER", value: config.graph.user },
+      { key: "GRAPH_PASSWORD", value: config.graph.password },
+    ];
+
+    const graphMissing = graphRequired.filter((item) => !item.value);
+    if (graphMissing.length > 0) {
+      const missingKeys = graphMissing.map((item) => item.key).join(", ");
+      throw new Error(
+        `Missing required graph environment variables: ${missingKeys}. ` +
+          `Set GRAPH_ENABLED=false to disable graph features.`
+      );
+    }
   }
 
   return true;

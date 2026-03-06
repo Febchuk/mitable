@@ -13,6 +13,8 @@
 import cron from "node-cron";
 import { cleanupStaleSessions } from "../services/stale-session-cleanup.service";
 import { createLogger } from "../lib/logger";
+import { runGraphSyncJob } from "./jobs/graph-sync.job";
+import { config } from "../config";
 
 const logger = createLogger({ context: "cron-scheduler" });
 
@@ -53,6 +55,19 @@ export function initCronJobs(): void {
       isStaleCleanupRunning = false;
     }
   });
+
+  // ──────────────────────────────────────────────
+  // Graph Sync: Nightly at 02:15
+  // Extracts recent activity and refreshes graph intelligence views.
+  // ──────────────────────────────────────────────
+  if (config.graph.enabled) {
+    cron.schedule("15 2 * * *", async () => {
+      await runGraphSyncJob();
+    });
+    logger.info("Graph sync scheduled — daily at 02:15");
+  } else {
+    logger.info("Graph sync disabled (GRAPH_ENABLED=false)");
+  }
 
   logger.info("Cron scheduler initialized — Stale cleanup every 15min");
 }
