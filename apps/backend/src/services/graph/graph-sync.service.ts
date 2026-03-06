@@ -4,11 +4,93 @@ import * as schema from "../../db/schema";
 import { config } from "../../config";
 import { createLogger } from "../../lib/logger";
 import { graphClientService } from "./graph-client.service";
+import { graphRetrievalService } from "./graph-retrieval.service";
 import type { GraphSyncResult } from "./types";
 
 const logger = createLogger({ context: "graph-sync" });
 
 class GraphSyncService {
+  private async syncUsersToGraph(since: Date): Promise<number> {
+    const users = await db
+      .selectDistinct({
+        userId: schema.monitoringSessions.userId,
+        orgId: schema.monitoringSessions.organizationId,
+      })
+      .from(schema.monitoringSessions)
+      .where(gte(schema.monitoringSessions.updatedAt, since));
+
+    if (users.length === 0) return 0;
+
+    let synced = 0;
+    for (const user of users) {
+      const profile = await graphRetrievalService.getUserGraphProfile(user.userId, user.orgId);
+
+      await graphClientService.runQuery(
+        `
+        MERGE (org:Organization {orgId: $orgId})
+        MERGE (person:Person {personKey: $personKey})
+        SET person.orgId = $orgId, person.updatedAt = datetime()
+        MERGE (person)-[:MEMBER_OF]->(org)
+        `,
+        { orgId: user.orgId, personKey: profile.personKey }
+      );
+
+      for (const task of profile.topTasks) {
+        await graphClientService.runQuery(
+          `
+          MERGE (person:Person {personKey: $personKey})
+          MERGE (task:TaskArchetype {name: $taskName})
+          MERGE (person)-[r:PERFORMS]->(task)
+          SET r.weight = $score, r.evidenceCount = $evidenceCount, r.lastSeenAt = datetime()
+          `,
+          {
+            personKey: profile.personKey,
+            taskName: task.object,
+            score: task.score,
+            evidenceCount: task.evidenceCount,
+          }
+        );
+      }
+
+      for (const app of profile.topApps) {
+        await graphClientService.runQuery(
+          `
+          MERGE (person:Person {personKey: $personKey})
+          MERGE (app:App {name: $appName})
+          MERGE (person)-[r:USES_APP]->(app)
+          SET r.weight = $score, r.evidenceCount = $evidenceCount, r.lastSeenAt = datetime()
+          `,
+          {
+            personKey: profile.personKey,
+            appName: app.object,
+            score: app.score,
+            evidenceCount: app.evidenceCount,
+          }
+        );
+      }
+
+      for (const pref of profile.preferences) {
+        await graphClientService.runQuery(
+          `
+          MERGE (person:Person {personKey: $personKey})
+          MERGE (pref:Preference {value: $value})
+          MERGE (person)-[r:PREFERS]->(pref)
+          SET r.weight = $score, r.lastSeenAt = datetime()
+          `,
+          {
+            personKey: profile.personKey,
+            value: pref.object,
+            score: pref.score,
+          }
+        );
+      }
+
+      synced++;
+    }
+
+    return synced;
+  }
+
   private async getSinceFromWatermark(defaultLookbackDays: number): Promise<Date> {
     const [row] = await db
       .select({ watermarkTs: schema.graphSyncWatermarks.watermarkTs })
@@ -169,9 +251,13 @@ class GraphSyncService {
     }
 
     try {
-      await graphClientService.healthCheck();
+      const healthy = await graphClientService.healthCheck();
+      if (!healthy) {
+        throw new Error("Neo4j health check failed");
+      }
 
       const since = await this.getSinceFromWatermark(config.graph.lookbackDays);
+      const syncedUsersToGraph = await this.syncUsersToGraph(since);
 
       const [userCountRow] = await db
         .select({ count: sql<number>`count(distinct ${schema.monitoringSessions.userId})::int` })
@@ -198,7 +284,7 @@ class GraphSyncService {
       const finishedAt = new Date();
       const result: GraphSyncResult = {
         success: true,
-        syncedUsers: Number(userCountRow?.count || 0),
+        syncedUsers: syncedUsersToGraph || Number(userCountRow?.count || 0),
         syncedWorkstreams: Number(workstreamCountRow?.count || 0),
         syncedPreferences: Number(preferenceCountRow?.count || 0),
         durationMs: finishedAt.getTime() - startedAt.getTime(),
