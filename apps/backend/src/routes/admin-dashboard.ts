@@ -17,6 +17,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { config } from "../config";
 import { graphRetrievalService } from "../services/graph/graph-retrieval.service";
+import { graphSyncService } from "../services/graph/graph-sync.service";
 
 const logger = createLogger({ context: "admin-dashboard-routes" });
 const router = Router();
@@ -2429,6 +2430,42 @@ router.get(
       const window = ((req.query.window as string) || "30d").toLowerCase();
       const lookbackDays = window === "7d" ? 7 : window === "90d" ? 90 : 30;
       const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+      const forceLive = String(req.query.forceLive || "false").toLowerCase() === "true";
+
+      if (!forceLive) {
+        const [latestSnapshot] = await db
+          .select({
+            payload: schema.workflowVisibilitySnapshots.payload,
+            snapshotDate: schema.workflowVisibilitySnapshots.snapshotDate,
+          })
+          .from(schema.workflowVisibilitySnapshots)
+          .where(
+            and(
+              eq(schema.workflowVisibilitySnapshots.organizationId, orgId),
+              eq(schema.workflowVisibilitySnapshots.window, window),
+              sql`${schema.workflowVisibilitySnapshots.userId} is null`
+            )
+          )
+          .orderBy(desc(schema.workflowVisibilitySnapshots.snapshotDate))
+          .limit(1);
+
+        if (latestSnapshot?.payload) {
+          const payload = latestSnapshot.payload as {
+            generatedAt?: string;
+            overview?: Record<string, unknown>;
+            categories?: unknown[];
+          };
+          res.json({
+            window,
+            generatedAt: payload.generatedAt || new Date(latestSnapshot.snapshotDate).toISOString(),
+            orgId,
+            source: "snapshot",
+            overview: payload.overview || {},
+            categories: payload.categories || [],
+          });
+          return;
+        }
+      }
 
       const [overview] = await db
         .select({
@@ -2474,6 +2511,7 @@ router.get(
         window,
         generatedAt: new Date().toISOString(),
         orgId,
+        source: "live",
         overview: {
           sessionCount: Number(overview?.sessionCount || 0),
           userCount: Number(overview?.userCount || 0),
@@ -2492,6 +2530,37 @@ router.get(
     }
   }
 );
+
+/**
+ * POST /admin/graph/sync
+ * Triggers a manual graph sync run for admin troubleshooting and refresh.
+ */
+router.post("/graph/sync", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const admin = await verifyAdmin(req, res);
+    if (!admin) return;
+
+    if (!config.graph.enabled) {
+      res.status(503).json({ error: "GraphDisabled", message: "Graph features are disabled" });
+      return;
+    }
+
+    const result = await graphSyncService.runNightlySync();
+    if (!result.success) {
+      res.status(500).json({
+        error: "GraphSyncFailed",
+        message: result.error || "Graph sync failed",
+        result,
+      });
+      return;
+    }
+
+    res.json({ ok: true, result });
+  } catch (error) {
+    logger.error({ error: String(error) }, "Error triggering manual graph sync");
+    res.status(500).json({ error: "Internal Server Error", message: "Failed to run graph sync" });
+  }
+});
 
 /**
  * GET /admin/graph/users/:userId/workflow-patterns?limit=20

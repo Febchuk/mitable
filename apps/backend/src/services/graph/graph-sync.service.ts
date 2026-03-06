@@ -9,6 +9,115 @@ import type { GraphSyncResult } from "./types";
 const logger = createLogger({ context: "graph-sync" });
 
 class GraphSyncService {
+  private async getSinceFromWatermark(defaultLookbackDays: number): Promise<Date> {
+    const [row] = await db
+      .select({ watermarkTs: schema.graphSyncWatermarks.watermarkTs })
+      .from(schema.graphSyncWatermarks)
+      .where(eq(schema.graphSyncWatermarks.source, "monitoring_sessions"))
+      .limit(1);
+
+    if (row?.watermarkTs) {
+      return new Date(row.watermarkTs);
+    }
+
+    return new Date(Date.now() - defaultLookbackDays * 24 * 60 * 60 * 1000);
+  }
+
+  private async upsertWatermark(source: string, watermarkTs: Date, watermarkValue?: string) {
+    await db
+      .insert(schema.graphSyncWatermarks)
+      .values({
+        source,
+        watermarkTs,
+        watermarkValue: watermarkValue || null,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: schema.graphSyncWatermarks.source,
+        set: {
+          watermarkTs,
+          watermarkValue: watermarkValue || null,
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  private async materializeVisibilitySnapshots(lookbackDays: number): Promise<number> {
+    const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+
+    const orgs = await db
+      .selectDistinct({ organizationId: schema.monitoringSessions.organizationId })
+      .from(schema.monitoringSessions)
+      .where(gte(schema.monitoringSessions.updatedAt, since));
+
+    if (orgs.length === 0) return 0;
+
+    let snapshotCount = 0;
+    for (const org of orgs) {
+      const [overview] = await db
+        .select({
+          sessionCount: sql<number>`count(distinct ${schema.monitoringSessions.id})::int`,
+          userCount: sql<number>`count(distinct ${schema.monitoringSessions.userId})::int`,
+          workstreamCount: sql<number>`count(${schema.sessionWorkstreams.id})::int`,
+          totalDurationMinutes: sql<number>`coalesce(sum(${schema.sessionWorkstreams.totalDurationMinutes}), 0)::int`,
+        })
+        .from(schema.monitoringSessions)
+        .leftJoin(
+          schema.sessionWorkstreams,
+          eq(schema.monitoringSessions.id, schema.sessionWorkstreams.sessionId)
+        )
+        .where(
+          and(
+            eq(schema.monitoringSessions.organizationId, org.organizationId),
+            gte(schema.monitoringSessions.updatedAt, since)
+          )
+        );
+
+      const categories = await db
+        .select({
+          category: schema.sessionWorkstreams.category,
+          totalDurationMinutes: sql<number>`sum(${schema.sessionWorkstreams.totalDurationMinutes})::int`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(schema.sessionWorkstreams)
+        .innerJoin(
+          schema.monitoringSessions,
+          eq(schema.sessionWorkstreams.sessionId, schema.monitoringSessions.id)
+        )
+        .where(
+          and(
+            eq(schema.monitoringSessions.organizationId, org.organizationId),
+            gte(schema.sessionWorkstreams.updatedAt, since)
+          )
+        )
+        .groupBy(schema.sessionWorkstreams.category);
+
+      await db.insert(schema.workflowVisibilitySnapshots).values({
+        organizationId: org.organizationId,
+        userId: null,
+        window: `${lookbackDays}d`,
+        snapshotDate: new Date(),
+        payload: {
+          generatedAt: new Date().toISOString(),
+          overview: {
+            sessionCount: Number(overview?.sessionCount || 0),
+            userCount: Number(overview?.userCount || 0),
+            workstreamCount: Number(overview?.workstreamCount || 0),
+            totalDurationMinutes: Number(overview?.totalDurationMinutes || 0),
+          },
+          categories: categories.map((row) => ({
+            category: row.category || "uncategorized",
+            totalDurationMinutes: Number(row.totalDurationMinutes || 0),
+            count: Number(row.count || 0),
+          })),
+        },
+      });
+      snapshotCount++;
+    }
+
+    return snapshotCount;
+  }
+
   async runNightlySync(): Promise<GraphSyncResult> {
     const startedAt = new Date();
     let runId: string | null = null;
@@ -62,7 +171,7 @@ class GraphSyncService {
     try {
       await graphClientService.healthCheck();
 
-      const since = new Date(Date.now() - config.graph.lookbackDays * 24 * 60 * 60 * 1000);
+      const since = await this.getSinceFromWatermark(config.graph.lookbackDays);
 
       const [userCountRow] = await db
         .select({ count: sql<number>`count(distinct ${schema.monitoringSessions.userId})::int` })
@@ -84,8 +193,8 @@ class GraphSyncService {
           )
         );
 
-      // Neo4j write operations are intentionally staged for the next iteration.
-      // This sync currently provides extraction counts and observability hooks.
+      const snapshotsCreated = await this.materializeVisibilitySnapshots(config.graph.lookbackDays);
+
       const finishedAt = new Date();
       const result: GraphSyncResult = {
         success: true,
@@ -107,9 +216,20 @@ class GraphSyncService {
             syncedUsers: result.syncedUsers,
             syncedWorkstreams: result.syncedWorkstreams,
             syncedPreferences: result.syncedPreferences,
+            metadata: {
+              mode: "nightly",
+              lookbackDays: config.graph.lookbackDays,
+              snapshotsCreated,
+            },
           })
           .where(eq(schema.graphSyncRuns.id, runId));
       }
+
+      await Promise.all([
+        this.upsertWatermark("monitoring_sessions", finishedAt, finishedAt.toISOString()),
+        this.upsertWatermark("session_workstreams", finishedAt, finishedAt.toISOString()),
+        this.upsertWatermark("user_memories", finishedAt, finishedAt.toISOString()),
+      ]);
 
       logger.info(result, "Graph nightly sync completed");
       return result;

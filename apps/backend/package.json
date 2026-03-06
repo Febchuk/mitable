@@ -39,6 +39,7 @@
     "test-search": "tsx src/scripts/test-search.ts",
     "sync-slack": "tsx src/scripts/sync-slack.ts",
     "sync-notion": "tsx src/scripts/sync-notion.ts",
+    "graph:sync": "tsx src/scripts/run-graph-sync.ts",
     "sync-integrations": "tsx src/scripts/sync-integrations.ts",
     "backfill-tokens": "tsx src/scripts/backfill-encrypted-tokens.ts",
     "inspect-security": "tsx src/scripts/inspect-data-security.ts",
