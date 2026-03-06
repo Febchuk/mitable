@@ -30,6 +30,7 @@ import { captureService } from "./services/captureService";
 import { isBlockedByPolicy } from "./services/capturePolicy";
 import { passiveMonitorService } from "./services/passiveMonitorService";
 import { notificationService } from "./services/notificationService";
+import { agentLauncherService } from "./services/agentLauncherService";
 
 // Force dark theme for consistent vibrancy effect regardless of system settings
 nativeTheme.themeSource = "dark";
@@ -50,6 +51,7 @@ const monitoringLogger = createLogger("MonitoringSession");
 const recoveryLogger = createLogger("SessionRecovery");
 const updateLogger = createLogger("Update");
 const shutdownLogger = createLogger("Shutdown");
+const agentLogger = createLogger("AgentLauncher");
 const notificationLogger = createLogger("Notification");
 
 // Window references
@@ -300,6 +302,9 @@ function createConsoleWindow() {
   consoleWindow.on("closed", () => {
     app.quit(); // Quit app when main console window is closed
   });
+
+  // Give agent launcher access to console window for streaming messages
+  agentLauncherService.setConsoleWindow(consoleWindow);
 }
 
 function createWatchingPillWindow() {
@@ -2365,6 +2370,27 @@ function setupUpdateHandlers() {
   });
 
   ipcLogger.info(" Update handlers registered successfully");
+
+  // ── Agent Launcher ──
+  ipcMain.handle(IPC_CHANNELS.AGENT_LAUNCH_TASK, async (_event, params) => {
+    agentLogger.info(" Launch task requested:", params.taskDescription?.slice(0, 80));
+    return agentLauncherService.launchTask(params);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AGENT_CANCEL_TASK, async (_event, taskId: string) => {
+    agentLogger.info(" Cancel task requested:", taskId);
+    return agentLauncherService.cancelTask(taskId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AGENT_GET_ACTIVE_TASKS, () => {
+    return agentLauncherService.getActiveTasks();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AGENT_GET_TASK_HISTORY, () => {
+    return agentLauncherService.getTaskHistory();
+  });
+
+  ipcLogger.info(" Agent launcher handlers registered successfully");
 }
 
 function isBrowserProcess(appName: string, appPath?: string): boolean {
@@ -3071,4 +3097,6 @@ app.on("before-quit", () => {
   focusWindowTracker.stop();
   // Ensure passive polling stops on quit
   passiveMonitorService.forceReset();
+  // Cancel any running agent tasks
+  agentLauncherService.cleanup();
 });

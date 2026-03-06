@@ -8,6 +8,7 @@ import {
   Target,
   History,
   Sparkles,
+  Bot,
 } from "lucide-react";
 import NavItem from "./NavItem";
 import { useUser } from "../../context/UserContext";
@@ -40,6 +41,7 @@ export default function Nav() {
         {!flags.newExperience && <NavItem to="/monitoring" icon={Target} label="Sessions" />}
         <NavItem to="/docs" icon={FileText} label={labels.docs} />
         <NavItem to="/artefacts" icon={Paperclip} label={labels.artifacts} />
+        <NavItem to="/agents" icon={Bot} label="Agents" />
         {/* <NavItem to="/todos" icon={CheckSquare} label="Todos" /> */}
       </nav>
     );
@@ -53,6 +55,7 @@ export default function Nav() {
         <NavItem to="/people" icon={Users} label="People" />
         <NavItem to="/ask" icon={Sparkles} label="Ask" />
         <NavItem to="/integrations" icon={Plug} label="Integrations" />
+        <NavItem to="/agents" icon={Bot} label="Agents" />
       </nav>
     );
   }
@@ -65,6 +68,7 @@ export default function Nav() {
       {!flags.newExperience && <NavItem to="/monitoring" icon={Target} label="Sessions" />}
       <NavItem to="/docs" icon={FileText} label={labels.docs} />
       <NavItem to="/artefacts" icon={Paperclip} label={labels.artifacts} />
+      <NavItem to="/agents" icon={Bot} label="Agents" />
       {/* <NavItem to="/todos" icon={CheckSquare} label="Todos" /> */}
     </nav>
   );

@@ -39,6 +39,7 @@ import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
 import AskView from "./components/views/admin/AskView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
+import AgentsView from "./components/views/employee/AgentsView";
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as monitoringService from "./services/monitoringService";
@@ -371,6 +372,7 @@ function App() {
                         <Route path="docs/:docId" element={<DocDetail />} />
                         <Route path="artefacts" element={<ArtifactsView />} />
                         <Route path="todos" element={<TodosView />} />
+                        <Route path="agents" element={<AgentsView />} />
                         {/* Calendar/Journal Routes */}
                         <Route path="calendar" element={<CalendarView />} />
                         <Route path="recaps" element={<RecapsView />} />

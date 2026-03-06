@@ -96,6 +96,13 @@ const IPC_CHANNELS = {
   SHOW_RECAP_NOTIFICATION: "show-recap-notification",
   // Update Navigation
   NAVIGATE_TO_UPDATE: "navigate-to-update",
+  // Agent Launcher
+  AGENT_LAUNCH_TASK: "agent:launch-task",
+  AGENT_CANCEL_TASK: "agent:cancel-task",
+  AGENT_MESSAGE: "agent:message",
+  AGENT_TASK_COMPLETE: "agent:task-complete",
+  AGENT_GET_ACTIVE_TASKS: "agent:get-active-tasks",
+  AGENT_GET_TASK_HISTORY: "agent:get-task-history",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -614,6 +621,70 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.on(IPC_CHANNELS.NAVIGATE_TO_UPDATE, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.NAVIGATE_TO_UPDATE, handler);
   },
+
+  // Agent Launcher
+  launchAgentTask: (params: {
+    taskDescription: string;
+    projectDirectory: string;
+    agentType: "claude-code" | "cursor" | "generic-cli";
+    enableContextTools: boolean;
+    permissionMode: "plan" | "acceptEdits" | "bypassPermissions";
+    costCap?: number;
+    model?: string;
+  }): Promise<{ taskId: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_LAUNCH_TASK, params),
+
+  cancelAgentTask: (taskId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_CANCEL_TASK, taskId),
+
+  onAgentMessage: (
+    callback: (data: { taskId: string; message: unknown }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, data: { taskId: string; message: unknown }) =>
+      callback(data);
+    ipcRenderer.on(IPC_CHANNELS.AGENT_MESSAGE, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_MESSAGE, handler);
+  },
+
+  onAgentTaskComplete: (
+    callback: (data: {
+      taskId: string;
+      result: { costUsd?: number; durationMs?: number; error?: string };
+    }) => void
+  ): (() => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      data: {
+        taskId: string;
+        result: { costUsd?: number; durationMs?: number; error?: string };
+      }
+    ) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.AGENT_TASK_COMPLETE, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_TASK_COMPLETE, handler);
+  },
+
+  getActiveAgentTasks: (): Promise<
+    Array<{
+      taskId: string;
+      description: string;
+      agentType: string;
+      status: string;
+      startedAt: number;
+    }>
+  > => ipcRenderer.invoke(IPC_CHANNELS.AGENT_GET_ACTIVE_TASKS),
+
+  getAgentTaskHistory: (): Promise<
+    Array<{
+      taskId: string;
+      description: string;
+      agentType: string;
+      status: string;
+      startedAt: number;
+      completedAt?: number;
+      costUsd?: number;
+      error?: string;
+    }>
+  > => ipcRenderer.invoke(IPC_CHANNELS.AGENT_GET_TASK_HISTORY),
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

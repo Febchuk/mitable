@@ -131,6 +131,14 @@ export const IPC_CHANNELS = {
 
   // Update Navigation
   NAVIGATE_TO_UPDATE: "navigate-to-update", // Main → Console: navigate to profile/update section
+
+  // Agent Launcher
+  AGENT_LAUNCH_TASK: "agent:launch-task", // Console → Main: launch an agent task
+  AGENT_CANCEL_TASK: "agent:cancel-task", // Console → Main: cancel a running task
+  AGENT_MESSAGE: "agent:message", // Main → Console: streaming SDKMessage from agent
+  AGENT_TASK_COMPLETE: "agent:task-complete", // Main → Console: task finished
+  AGENT_GET_ACTIVE_TASKS: "agent:get-active-tasks", // Console → Main: list running tasks
+  AGENT_GET_TASK_HISTORY: "agent:get-task-history", // Console → Main: list completed tasks
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

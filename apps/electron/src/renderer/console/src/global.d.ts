@@ -283,6 +283,48 @@ interface ConsoleAPI {
 
   // Navigation - Navigate to update/profile page (from update notification click)
   onNavigateToUpdate: (callback: () => void) => () => void;
+
+  // Agent Launcher
+  launchAgentTask: (params: {
+    taskDescription: string;
+    projectDirectory: string;
+    agentType: "claude-code" | "cursor" | "generic-cli";
+    enableContextTools: boolean;
+    permissionMode: "plan" | "acceptEdits" | "bypassPermissions";
+    costCap?: number;
+    model?: string;
+  }) => Promise<{ taskId: string; error?: string }>;
+  cancelAgentTask: (taskId: string) => Promise<{ success: boolean; error?: string }>;
+  onAgentMessage: (
+    callback: (data: { taskId: string; message: unknown }) => void
+  ) => () => void;
+  onAgentTaskComplete: (
+    callback: (data: {
+      taskId: string;
+      result: { costUsd?: number; durationMs?: number; error?: string };
+    }) => void
+  ) => () => void;
+  getActiveAgentTasks: () => Promise<
+    Array<{
+      taskId: string;
+      description: string;
+      agentType: string;
+      status: string;
+      startedAt: number;
+    }>
+  >;
+  getAgentTaskHistory: () => Promise<
+    Array<{
+      taskId: string;
+      description: string;
+      agentType: string;
+      status: string;
+      startedAt: number;
+      completedAt?: number;
+      costUsd?: number;
+      error?: string;
+    }>
+  >;
 }
 
 declare global {
