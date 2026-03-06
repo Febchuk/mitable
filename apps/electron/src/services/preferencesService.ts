@@ -30,7 +30,6 @@ interface AudioPreferences {
 interface NotificationPreferences {
   updateNotifications: boolean;
   sessionNotifications: boolean;
-  nudgeNotifications: boolean;
 }
 
 // Preferences schema
@@ -340,7 +339,6 @@ class PreferencesService {
     return {
       updateNotifications: userPrefs.updateNotifications ?? true,
       sessionNotifications: userPrefs.sessionNotifications ?? true,
-      nudgeNotifications: userPrefs.nudgeNotifications ?? true,
     };
   }
 

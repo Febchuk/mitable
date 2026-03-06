@@ -35,7 +35,7 @@ class IntentService {
   async analyzeIntent(options: IntentOptions): Promise<IntentAnalysis> {
     const { message, conversationHistory = [] } = options;
 
-    const systemPrompt = `You are an intent classifier for a company knowledge assistant named Mitable (an onboarding platform).
+    const systemPrompt = `You are an intent classifier for a company knowledge assistant named Mitable (a work context capture and time insights platform).
 
 Analyze the user's message and classify it into ONE of these categories:
 

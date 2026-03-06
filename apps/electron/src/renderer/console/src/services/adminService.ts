@@ -14,61 +14,6 @@ export interface User {
   createdAt?: string;
 }
 
-export interface Template {
-  id: string;
-  organizationId: string;
-  title: string;
-  description: string;
-  icon: string;
-  color: string;
-  roleTags: string[];
-  totalWeeks: number;
-  tasks: number;
-  usedCount: number;
-}
-
-export interface TemplateTask {
-  id: string;
-  title: string;
-  description: string | null;
-  timeEstimate: string | null;
-  orderIndex: number;
-  sources: any[]; // Source materials to be implemented
-}
-
-export interface TemplateWeek {
-  weekNumber: number;
-  tasks: TemplateTask[];
-}
-
-export interface AssignedUser {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  progress: number;
-  assignedAt: Date | string;
-}
-
-export interface TemplateDetail {
-  id: string;
-  organizationId: string;
-  title: string;
-  description: string | null;
-  icon: string | null;
-  color: string | null;
-  roleTags: string[];
-  totalWeeks: number;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  tasksByWeek: TemplateWeek[];
-  usageStats: {
-    assignedCount: number;
-    assignedUsers: AssignedUser[];
-  };
-  taskCount: number;
-}
-
 export interface Integration {
   id: string;
   provider: "slack" | "notion" | "github" | "google-drive" | "linear" | "gmail";
@@ -98,27 +43,6 @@ export interface GmailConnectedUser {
   connectedAt?: Date;
 }
 
-export interface UserRoadmapInstance {
-  id: string;
-  title: string;
-  tasks: number;
-  completion: number;
-  description: string;
-}
-
-export interface Conversation {
-  id: string;
-  timestamp: string;
-  question: string;
-  status: "resolved" | "nudge";
-}
-
-export interface NudgeTheme {
-  theme: string;
-  count: number;
-  nudges: Array<{ name: string; count: number }>;
-}
-
 export interface ActivityData {
   date: string;
   hours: number;
@@ -129,7 +53,7 @@ export interface UserDetail {
   name: string;
   role: string;
   startDate: string;
-  status: "Onboarding" | "Active";
+  status: "Active" | "Inactive";
   progress: number;
   manager: { name: string; id: string } | null;
   metrics: {
@@ -137,9 +61,6 @@ export interface UserDetail {
     completedTasks: number;
     overdueTasks: number;
   };
-  assignedRoadmaps: UserRoadmapInstance[];
-  conversations: Conversation[];
-  nudgeThemes: NudgeTheme[];
   activityData: ActivityData[];
 }
 
@@ -152,32 +73,6 @@ export async function fetchUsers(): Promise<User[]> {
     return response.users;
   } catch (error) {
     logger.error("Error fetching users:", error);
-    throw error;
-  }
-}
-
-/**
- * Fetch all templates (admin only)
- */
-export async function fetchTemplates(): Promise<Template[]> {
-  try {
-    const response = await apiRequest<{ templates: Template[] }>("/admin/templates");
-    return response.templates;
-  } catch (error) {
-    logger.error("Error fetching templates:", error);
-    throw error;
-  }
-}
-
-/**
- * Fetch template details by ID (admin only)
- */
-export async function fetchTemplateDetail(id: string): Promise<TemplateDetail> {
-  try {
-    const response = await apiRequest<{ template: TemplateDetail }>(`/admin/templates/${id}`);
-    return response.template;
-  } catch (error) {
-    logger.error("Error fetching template detail:", error);
     throw error;
   }
 }
@@ -367,49 +262,6 @@ export async function updateIntegrationSettings(
     return response;
   } catch (error) {
     logger.error("Error updating integration settings:", error);
-    throw error;
-  }
-}
-
-export interface CreateTemplateTask {
-  weekNumber: number;
-  title: string;
-  description?: string | null;
-  timeEstimate?: string | null;
-  orderIndex?: number;
-}
-
-export interface CreateTemplatePayload {
-  title: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  roleTags?: string[];
-  totalWeeks?: number;
-  notionUrl?: string;
-  tasks?: CreateTemplateTask[];
-}
-
-export interface CreateTemplateResponse {
-  success: boolean;
-  template: Template;
-  tasksCreated: number;
-}
-
-/**
- * Create a new roadmap template (admin only)
- */
-export async function createTemplate(
-  payload: CreateTemplatePayload
-): Promise<CreateTemplateResponse> {
-  try {
-    const response = await apiRequest<CreateTemplateResponse>("/admin/templates", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    return response;
-  } catch (error) {
-    logger.error("Error creating template:", error);
     throw error;
   }
 }

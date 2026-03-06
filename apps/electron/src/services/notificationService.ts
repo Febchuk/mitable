@@ -17,7 +17,7 @@ const logger = createLogger("NotificationService");
 // 4-hour deduplication window
 const DEDUPE_WINDOW_MS = 4 * 60 * 60 * 1000;
 
-type NotificationCategory = "update" | "session" | "nudge" | "recap" | "general";
+type NotificationCategory = "update" | "session" | "recap" | "general";
 
 interface NotificationOptions {
   title: string;
@@ -139,16 +139,6 @@ class NotificationService {
     });
   }
 
-  notifyNudgeReceived(name: string): void {
-    this.show({
-      title: "New Nudge",
-      body: `${name} is available to help`,
-      category: "nudge",
-      dedupeKey: `nudge-${name}`,
-      clickAction: "focus",
-    });
-  }
-
   notifyRecapReady(title: string): void {
     this.show({
       title: "Recap Ready",
@@ -171,8 +161,6 @@ class NotificationService {
         return prefs.updateNotifications;
       case "session":
         return prefs.sessionNotifications;
-      case "nudge":
-        return prefs.nudgeNotifications;
       case "recap":
         return prefs.sessionNotifications; // Recaps are session-related
       case "general":

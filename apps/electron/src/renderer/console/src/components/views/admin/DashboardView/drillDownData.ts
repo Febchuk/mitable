@@ -46,7 +46,7 @@ const metricDrillDowns: Record<string, DrillDownItem> = {
       { label: "Customer Churn Report", value: "Completed Wed", bar: 100 },
       { label: "Weekly Status Update (x4)", value: "Mon–Thu", bar: 100 },
       { label: "Incident Post-mortem", value: "Completed Thu", bar: 100 },
-      { label: "Onboarding Metrics", value: "Completed Fri", bar: 80 },
+      { label: "Team Activity Report", value: "Completed Fri", bar: 80 },
     ],
     trend: [
       { label: "Mon", value: 2 },

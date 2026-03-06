@@ -1,9 +1,7 @@
 export { useUsers } from "./useUsers";
-export { useTemplates } from "./useTemplates";
 export { useIntegrations } from "./useIntegrations";
 export { useUserDetail } from "./useUserDetail";
 export { useCreateUser } from "./useCreateUser";
-export { useCreateTemplate } from "./useCreateTemplate";
 export { useConnectIntegration } from "./useConnectIntegration";
 export { useDisconnectIntegration } from "./useDisconnectIntegration";
 export { useSyncIntegration } from "./useSyncIntegration";

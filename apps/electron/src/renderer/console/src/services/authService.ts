@@ -190,7 +190,7 @@ class AuthService {
     localStorage.setItem("access_token", accessToken);
     localStorage.setItem("refresh_token", refreshToken);
 
-    // Send tokens to main process for sharing with other windows (Agent, Guide, Nudge)
+    // Send tokens to main process for sharing with other windows
     if (window.consoleAPI?.setAuthTokens) {
       window.consoleAPI.setAuthTokens(accessToken, refreshToken);
     }

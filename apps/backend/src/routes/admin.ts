@@ -1,12 +1,9 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, sql, count, desc, and, asc } from "drizzle-orm";
+import { eq, sql, count, desc, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { supabaseAdmin } from "../lib/supabase";
-import { extractNotionPageId } from "../utils/notion-url-parser.js";
-import { notionService } from "../services/notion.service.js";
-import { llmService } from "../services/llm.service.js";
 import { encryptionService } from "../services/encryption.service.js";
 import { config } from "../config.js";
 import { sendWelcomeEmployeeEmail } from "../services/email/email.service.js";
@@ -38,7 +35,7 @@ function formatTimestamp(date: Date): string {
  *     tags:
  *       - Admin - People Management
  *     summary: Get detailed user information
- *     description: Retrieve comprehensive user profile including roadmaps, conversations, nudges, and activity data. Admin access required.
+ *     description: Retrieve user profile including conversations and activity data. Admin access required.
  *     parameters:
  *       - in: path
  *         name: id
@@ -69,38 +66,10 @@ function formatTimestamp(date: Date): string {
  *                       type: string
  *                     status:
  *                       type: string
- *                       enum: [Active, Onboarding]
- *                     progress:
- *                       type: integer
- *                       description: Overall completion percentage
+ *                       enum: [Active]
  *                     manager:
  *                       type: string
  *                       nullable: true
- *                     metrics:
- *                       type: object
- *                       properties:
- *                         totalTasks:
- *                           type: integer
- *                         completedTasks:
- *                           type: integer
- *                         overdueTasks:
- *                           type: integer
- *                     assignedRoadmaps:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: string
- *                             format: uuid
- *                           title:
- *                             type: string
- *                           description:
- *                             type: string
- *                           tasks:
- *                             type: integer
- *                           completion:
- *                             type: integer
  *                     conversations:
  *                       type: array
  *                       items:
@@ -115,25 +84,7 @@ function formatTimestamp(date: Date): string {
  *                             type: string
  *                           status:
  *                             type: string
- *                             enum: [resolved, nudge]
- *                     nudgeThemes:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           theme:
- *                             type: string
- *                           count:
- *                             type: integer
- *                           nudges:
- *                             type: array
- *                             items:
- *                               type: object
- *                               properties:
- *                                 name:
- *                                   type: string
- *                                 count:
- *                                   type: integer
+ *                             enum: [resolved]
  *                     activityData:
  *                       type: array
  *                       items:
@@ -209,51 +160,6 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
       return;
     }
 
-    // Get assigned roadmap templates with completion stats
-    const assignedRoadmaps = await db
-      .select({
-        templateId: schema.userTemplateAssignments.templateId,
-        templateTitle: schema.roadmapTemplates.title,
-        templateDescription: schema.roadmapTemplates.description,
-        assignedAt: schema.userTemplateAssignments.assignedAt,
-      })
-      .from(schema.userTemplateAssignments)
-      .innerJoin(
-        schema.roadmapTemplates,
-        eq(schema.userTemplateAssignments.templateId, schema.roadmapTemplates.id)
-      )
-      .where(eq(schema.userTemplateAssignments.userId, targetUserId));
-
-    // For each roadmap, calculate completion
-    const roadmapsWithStats = await Promise.all(
-      assignedRoadmaps.map(async (roadmap) => {
-        const [taskStats] = await db
-          .select({
-            total: count(),
-            completed: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
-          })
-          .from(schema.userRoadmapTasks)
-          .where(
-            and(
-              eq(schema.userRoadmapTasks.userId, targetUserId),
-              eq(schema.userRoadmapTasks.templateId, roadmap.templateId)
-            )
-          );
-
-        const totalTasks = Number(taskStats?.total || 0);
-        const completedTasks = Number(taskStats?.completed || 0);
-        const completion = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-        return {
-          id: roadmap.templateId,
-          title: roadmap.templateTitle,
-          description: roadmap.templateDescription || "",
-          tasks: totalTasks,
-          completion,
-        };
-      })
-    );
-
     // Get recent conversations (last 5)
     const recentConversations = await db
       .select({
@@ -275,21 +181,6 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
       status: "resolved" as const,
     }));
 
-    // Calculate task metrics
-    const [taskMetrics] = await db
-      .select({
-        totalTasks: count(),
-        completedTasks: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
-        overdueTasks: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = false)`,
-      })
-      .from(schema.userRoadmapTasks)
-      .where(eq(schema.userRoadmapTasks.userId, targetUserId));
-
-    const totalTasks = Number(taskMetrics?.totalTasks || 0);
-    const completedTasks = Number(taskMetrics?.completedTasks || 0);
-    const overdueTasks = Number(taskMetrics?.overdueTasks || 0);
-    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
     // Activity data (simplified - can be enhanced with actual analytics later)
     const activityData = [
       { date: "Oct 13", hours: 0 },
@@ -303,15 +194,8 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
       name: `${user.firstName} ${user.lastName}`,
       role: user.role,
       startDate: user.startDate || "N/A",
-      status: progress === 100 ? "Active" : "Onboarding",
-      progress,
+      status: "Active" as const,
       manager: null, // TODO: Add manager relationship to schema
-      metrics: {
-        totalTasks,
-        completedTasks,
-        overdueTasks,
-      },
-      assignedRoadmaps: roadmapsWithStats,
       conversations: conversationsWithStatus,
       activityData,
     };
@@ -333,7 +217,7 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
  *     tags:
  *       - Admin - People Management
  *     summary: Get all users in organization
- *     description: Retrieve list of all employees with onboarding progress and status. Admin access required.
+ *     description: Retrieve list of all employees with status. Admin access required.
  *     responses:
  *       200:
  *         description: Users retrieved successfully
@@ -358,15 +242,8 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
  *                         format: email
  *                       role:
  *                         type: string
- *                       startDate:
- *                         type: string
  *                       status:
  *                         type: string
- *                         enum: [Active, Onboarding]
- *                         description: Calculated based on completion (100% = Active)
- *                       progress:
- *                         type: integer
- *                         description: Overall completion percentage (0-100)
  *                       avatarUrl:
  *                         type: string
  *                         nullable: true
@@ -432,317 +309,6 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
     res.status(500).json({
       error: "Internal Server Error",
       message: "Failed to fetch users",
-    });
-  }
-});
-
-/**
- * @openapi
- * /admin/templates:
- *   get:
- *     tags:
- *       - Admin - Templates
- *     summary: Get all roadmap templates
- *     description: Retrieve all onboarding roadmap templates with usage statistics and task counts. Admin access required.
- *     responses:
- *       200:
- *         description: Templates retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 templates:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Template'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- *       500:
- *         $ref: '#/components/responses/InternalError'
- *     security:
- *       - BearerAuth: []
- */
-router.get("/templates", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-
-    // Verify user is admin
-    const [currentUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
-
-    if (!currentUser || currentUser.role !== "admin") {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "Admin access required",
-      });
-      return;
-    }
-
-    // Fetch all templates for the organization
-    const templates = await db
-      .select({
-        id: schema.roadmapTemplates.id,
-        organizationId: schema.roadmapTemplates.organizationId,
-        title: schema.roadmapTemplates.title,
-        description: schema.roadmapTemplates.description,
-        icon: schema.roadmapTemplates.icon,
-        color: schema.roadmapTemplates.color,
-        roleTags: schema.roadmapTemplates.roleTags,
-        totalWeeks: schema.roadmapTemplates.totalWeeks,
-      })
-      .from(schema.roadmapTemplates)
-      .where(eq(schema.roadmapTemplates.organizationId, currentUser.organizationId))
-      .orderBy(desc(schema.roadmapTemplates.createdAt));
-
-    // Get usage stats and task count for each template
-    const templatesWithStats = await Promise.all(
-      templates.map(async (template) => {
-        // Count how many users are assigned this template
-        const [usageStats] = await db
-          .select({
-            usedCount: count(),
-          })
-          .from(schema.userTemplateAssignments)
-          .where(eq(schema.userTemplateAssignments.templateId, template.id));
-
-        // Count total tasks in this template
-        const [taskCount] = await db
-          .select({
-            tasks: count(),
-          })
-          .from(schema.roadmapTemplateTasks)
-          .where(eq(schema.roadmapTemplateTasks.templateId, template.id));
-
-        return {
-          id: template.id,
-          organizationId: template.organizationId,
-          title: template.title,
-          description: template.description || "",
-          icon: template.icon,
-          color: template.color,
-          roleTags: template.roleTags || [],
-          totalWeeks: template.totalWeeks,
-          tasks: Number(taskCount?.tasks || 0),
-          usedCount: Number(usageStats?.usedCount || 0),
-        };
-      })
-    );
-
-    res.json({ templates: templatesWithStats });
-  } catch (error) {
-    console.error("Error fetching admin templates:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: "Failed to fetch templates",
-    });
-  }
-});
-
-/**
- * @openapi
- * /admin/templates/{id}:
- *   get:
- *     tags:
- *       - Admin - Templates
- *     summary: Get template details
- *     description: Retrieve detailed information about a specific template including tasks, usage stats, and assigned users
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: Template ID
- *     responses:
- *       200:
- *         description: Template details retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 template:
- *                   type: object
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *     security:
- *       - BearerAuth: []
- */
-router.get("/templates/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { id: templateId } = req.params;
-
-    // Verify user is admin
-    const [currentUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
-
-    if (!currentUser || currentUser.role !== "admin") {
-      res.status(403).json({
-        success: false,
-        error: {
-          code: "FORBIDDEN",
-          message: "Admin access required",
-        },
-      });
-      return;
-    }
-
-    // Fetch template
-    const [template] = await db
-      .select()
-      .from(schema.roadmapTemplates)
-      .where(
-        and(
-          eq(schema.roadmapTemplates.id, templateId),
-          eq(schema.roadmapTemplates.organizationId, currentUser.organizationId)
-        )
-      )
-      .limit(1);
-
-    if (!template) {
-      res.status(404).json({
-        success: false,
-        error: {
-          code: "NOT_FOUND",
-          message: "Template not found",
-        },
-      });
-      return;
-    }
-
-    // Fetch all tasks for this template
-    const tasks = await db
-      .select()
-      .from(schema.roadmapTemplateTasks)
-      .where(eq(schema.roadmapTemplateTasks.templateId, templateId))
-      .orderBy(
-        asc(schema.roadmapTemplateTasks.weekNumber),
-        asc(schema.roadmapTemplateTasks.orderIndex)
-      );
-
-    // Group tasks by week
-    const tasksByWeek: Record<number, any[]> = {};
-    for (const task of tasks) {
-      if (!tasksByWeek[task.weekNumber]) {
-        tasksByWeek[task.weekNumber] = [];
-      }
-      tasksByWeek[task.weekNumber].push({
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        timeEstimate: task.timeEstimate,
-        orderIndex: task.orderIndex,
-        sources: [], // TODO: Fetch source materials when schema is ready
-      });
-    }
-
-    // Convert to array format sorted by week
-    const tasksByWeekArray = Object.entries(tasksByWeek)
-      .sort(([weekA], [weekB]) => Number(weekA) - Number(weekB))
-      .map(([weekNumber, weekTasks]) => ({
-        weekNumber: Number(weekNumber),
-        tasks: weekTasks,
-      }));
-
-    // Get usage statistics
-    const assignments = await db
-      .select({
-        userId: schema.userTemplateAssignments.userId,
-        assignedAt: schema.userTemplateAssignments.assignedAt,
-      })
-      .from(schema.userTemplateAssignments)
-      .where(eq(schema.userTemplateAssignments.templateId, templateId));
-
-    // Fetch assigned user details
-    const assignedUsers = await Promise.all(
-      assignments.map(async (assignment) => {
-        const [user] = await db
-          .select({
-            id: schema.users.id,
-            firstName: schema.users.firstName,
-            lastName: schema.users.lastName,
-            email: schema.users.email,
-            role: schema.users.role,
-          })
-          .from(schema.users)
-          .where(eq(schema.users.id, assignment.userId))
-          .limit(1);
-
-        if (!user) return null;
-
-        // Calculate progress (count completed tasks)
-        const [completedCount] = await db
-          .select({
-            count: count(),
-          })
-          .from(schema.userRoadmapTasks)
-          .where(
-            and(
-              eq(schema.userRoadmapTasks.userId, user.id),
-              eq(schema.userRoadmapTasks.completed, true)
-            )
-          );
-
-        const totalTasks = tasks.length;
-        const progress =
-          totalTasks > 0 ? Math.round((Number(completedCount?.count || 0) / totalTasks) * 100) : 0;
-
-        return {
-          id: user.id,
-          name: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          role: user.role,
-          progress,
-          assignedAt: assignment.assignedAt,
-        };
-      })
-    );
-
-    // Filter out null values
-    const validAssignedUsers = assignedUsers.filter((user) => user !== null);
-
-    res.json({
-      success: true,
-      template: {
-        id: template.id,
-        organizationId: template.organizationId,
-        title: template.title,
-        description: template.description,
-        icon: template.icon,
-        color: template.color,
-        roleTags: template.roleTags || [],
-        totalWeeks: template.totalWeeks,
-        createdAt: template.createdAt,
-        updatedAt: template.updatedAt,
-        tasksByWeek: tasksByWeekArray,
-        usageStats: {
-          assignedCount: validAssignedUsers.length,
-          assignedUsers: validAssignedUsers,
-        },
-        taskCount: tasks.length,
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching template details:", error);
-    res.status(500).json({
-      success: false,
-      error: {
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to fetch template details",
-      },
     });
   }
 });
@@ -1496,341 +1062,6 @@ router.post("/users", requireAuth, async (req: Request, res: Response): Promise<
       error: {
         code: "INTERNAL_ERROR",
         message: "Failed to create user",
-      },
-    });
-  }
-});
-
-/**
- * @openapi
- * /admin/templates:
- *   post:
- *     tags:
- *       - Admin - Templates
- *     summary: Create a new roadmap template
- *     description: Create a reusable onboarding template with optional tasks or import from Notion. When a Notion URL is provided, AI automatically extracts tasks from the page content. Admin access required.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - title
- *             properties:
- *               title:
- *                 type: string
- *                 example: Engineering Onboarding
- *               description:
- *                 type: string
- *                 example: Complete onboarding path for software engineers
- *               icon:
- *                 type: string
- *                 example: Bot
- *                 default: Settings
- *               color:
- *                 type: string
- *                 example: "#3b82f6"
- *                 default: "#3b82f6"
- *               roleTags:
- *                 type: array
- *                 items:
- *                   type: string
- *                 example: ["Software Engineer", "Frontend"]
- *               totalWeeks:
- *                 type: integer
- *                 example: 4
- *                 default: 4
- *               notionUrl:
- *                 type: string
- *                 description: Optional Notion page URL to import tasks from. When provided, AI extracts tasks from the page content. Requires Notion integration to be connected.
- *                 example: "https://notion.so/Engineering-Onboarding-abc123def456"
- *               tasks:
- *                 type: array
- *                 description: Optional tasks to create with template
- *                 items:
- *                   type: object
- *                   required:
- *                     - weekNumber
- *                     - title
- *                   properties:
- *                     weekNumber:
- *                       type: integer
- *                     title:
- *                       type: string
- *                     description:
- *                       type: string
- *                     timeEstimate:
- *                       type: string
- *                     orderIndex:
- *                       type: integer
- *     responses:
- *       201:
- *         description: Template created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 template:
- *                   $ref: '#/components/schemas/Template'
- *                 tasksCreated:
- *                   type: integer
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- *     security:
- *       - BearerAuth: []
- */
-router.post("/templates", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { title, description, icon, color, roleTags, totalWeeks, notionUrl } = req.body;
-
-    // Verify requester is admin
-    const [currentUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
-
-    if (!currentUser || currentUser.role !== "admin") {
-      res.status(403).json({
-        success: false,
-        error: {
-          code: "FORBIDDEN",
-          message: "Admin access required",
-        },
-      });
-      return;
-    }
-
-    // Validate required fields
-    if (!title) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Template title is required",
-        },
-      });
-      return;
-    }
-
-    // Handle Notion URL if provided
-    // This will be used to automatically extract tasks from a Notion page
-    let notionPageId: string | null = null;
-
-    if (notionUrl && notionUrl.trim()) {
-      try {
-        // Step 1: Extract page ID from the Notion URL
-        // Supports various formats: https://notion.so/Page-abc123, direct IDs, etc.
-        notionPageId = extractNotionPageId(notionUrl);
-        console.log(`✓ Extracted Notion page ID: ${notionPageId}`);
-
-        // Step 2: Validate that organization has a connected Notion integration
-        // This is required because we need OAuth tokens to fetch page content
-        const [integration] = await db
-          .select()
-          .from(schema.integrations)
-          .where(
-            and(
-              eq(schema.integrations.organizationId, currentUser.organizationId),
-              eq(schema.integrations.provider, "notion"),
-              eq(schema.integrations.status, "connected")
-            )
-          )
-          .limit(1);
-
-        if (!integration) {
-          // User hasn't connected Notion yet - provide helpful error
-          res.status(400).json({
-            success: false,
-            error: {
-              code: "NOTION_NOT_CONNECTED",
-              message:
-                "Notion integration required. Please connect Notion in your integrations settings before importing templates.",
-            },
-          });
-          return;
-        }
-
-        console.log(`✓ Notion integration found for organization: ${currentUser.organizationId}`);
-
-        // Step 3: Fetch all blocks from the Notion page
-        // This uses the existing notionService which handles:
-        // - OAuth token management and refresh
-        // - Rate limiting (350ms between requests)
-        // - Recursive fetching of nested blocks
-        // - Text extraction from various block types
-        const blocks = await notionService.getPageBlocks(currentUser.organizationId, notionPageId);
-
-        // Filter out blocks with no meaningful text content
-        // Empty blocks or blocks with only whitespace won't help the AI
-        const validBlocks = blocks.filter((block) => block.text && block.text.trim().length > 0);
-
-        console.log(
-          `✓ Fetched ${blocks.length} total blocks, ${validBlocks.length} with content from Notion page`
-        );
-
-        // Handle case where page has no extractable content
-        if (validBlocks.length === 0) {
-          console.warn(`⚠ No content found in Notion page: ${notionPageId}`);
-          // Continue with template creation but no tasks
-          // This allows users to create the template structure even if the page is empty
-        } else {
-          // Step 4: Extract tasks from Notion blocks using AI
-          // The LLM analyzes block structure (headings, paragraphs, lists) to:
-          // - Identify week numbers from headings (e.g., "Week 1: Onboarding")
-          // - Extract task titles from action items
-          // - Parse time estimates (e.g., "2 hours", "by Friday")
-          // - Generate descriptions from supporting text
-          // - Determine proper ordering within each week
-          const extractedTasks = await llmService.extractTasksFromNotionBlocks(validBlocks);
-
-          console.log(`✓ AI extracted ${extractedTasks.length} tasks from Notion content`);
-
-          // Override the tasks array with AI-extracted tasks
-          // This replaces any manually provided tasks in the request
-          // The extracted tasks are already in the correct format for our database schema
-          req.body.tasks = extractedTasks;
-        }
-      } catch (error) {
-        // Handle URL parsing errors
-        if (error instanceof Error && error.message.includes("Invalid Notion URL")) {
-          res.status(400).json({
-            success: false,
-            error: {
-              code: "INVALID_NOTION_URL",
-              message: error.message,
-            },
-          });
-          return;
-        }
-
-        // Handle Notion API errors (page not found, not shared, etc.)
-        if (error instanceof Error && error.message.includes("Could not find page")) {
-          res.status(403).json({
-            success: false,
-            error: {
-              code: "NOTION_PAGE_NOT_ACCESSIBLE",
-              message:
-                "Unable to access this Notion page. Please ensure the page is shared with your Notion integration. " +
-                "You can share pages during the OAuth connection or update sharing settings in Notion.",
-            },
-          });
-          return;
-        }
-
-        // Handle AI extraction errors
-        if (
-          error instanceof Error &&
-          (error.message.includes("AI returned invalid JSON") ||
-            error.message.includes("Failed to process Notion content"))
-        ) {
-          res.status(500).json({
-            success: false,
-            error: {
-              code: "AI_EXTRACTION_FAILED",
-              message:
-                "Failed to extract tasks from Notion page using AI. " +
-                "This may be due to complex page formatting. You can try simplifying the page or create tasks manually.",
-            },
-          });
-          return;
-        }
-
-        // Re-throw other errors to be caught by outer try/catch
-        throw error;
-      }
-    }
-
-    // Create the template
-    const [template] = await db
-      .insert(schema.roadmapTemplates)
-      .values({
-        organizationId: currentUser.organizationId,
-        title,
-        description: description || null,
-        icon: icon || "Settings",
-        color: color || "#3b82f6",
-        roleTags: roleTags || [],
-        totalWeeks: totalWeeks || 4,
-      })
-      .returning();
-
-    // Create tasks if provided
-    let tasksCreated = 0;
-    if (req.body.tasks && Array.isArray(req.body.tasks) && req.body.tasks.length > 0) {
-      for (const task of req.body.tasks) {
-        if (!task.weekNumber || !task.title) {
-          continue; // Skip invalid tasks
-        }
-
-        await db.insert(schema.roadmapTemplateTasks).values({
-          templateId: template.id,
-          weekNumber: task.weekNumber,
-          title: task.title,
-          description: task.description || null,
-          timeEstimate: task.timeEstimate || null,
-          orderIndex: task.orderIndex || 0,
-        });
-        tasksCreated++;
-      }
-    }
-
-    // Build response with template info and task count
-    const response: any = {
-      success: true,
-      template: {
-        id: template.id,
-        organizationId: template.organizationId,
-        title: template.title,
-        description: template.description,
-        icon: template.icon,
-        color: template.color,
-        roleTags: template.roleTags,
-        totalWeeks: template.totalWeeks,
-      },
-      tasksCreated,
-    };
-
-    // Add metadata if tasks were imported from Notion
-    // This helps the frontend show a success message with details
-    if (notionPageId) {
-      response.importedFromNotion = true;
-      response.notionPageId = notionPageId;
-      console.log(
-        `✅ Template "${title}" created successfully with ${tasksCreated} tasks imported from Notion page ${notionPageId}`
-      );
-    } else {
-      console.log(`✅ Template "${title}" created successfully with ${tasksCreated} tasks`);
-    }
-
-    res.status(201).json(response);
-  } catch (error) {
-    // Log the full error for debugging
-    console.error("Error creating template:", error);
-
-    // Provide detailed error response
-    // If error has already been handled (responded to client), don't send again
-    if (res.headersSent) {
-      return;
-    }
-
-    // Handle any unexpected errors with helpful message
-    res.status(500).json({
-      success: false,
-      error: {
-        code: "INTERNAL_ERROR",
-        message:
-          "Failed to create template. " +
-          (error instanceof Error ? error.message : "An unexpected error occurred."),
       },
     });
   }

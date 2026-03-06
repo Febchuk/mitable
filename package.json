@@ -2,7 +2,7 @@
   "name": "mitable",
   "version": "0.1.6",
   "private": true,
-  "description": "Mitable AI Onboarding Buddy - Intelligent desktop assistant for contextual employee onboarding",
+  "description": "Mitable - Desktop app that captures work context for time insights and updates",
   "workspaces": [
     "apps/*",
     "packages/*"

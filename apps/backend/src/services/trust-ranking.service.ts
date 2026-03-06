@@ -77,7 +77,7 @@ class TrustRankingService {
 
     // Extract important keywords from query
     const keywords = queryLower.match(
-      /\b(prd|prds|product requirements?|roadmap|spec|specification|business model|onboarding|guide|documentation?)\b/gi
+      /\b(prd|prds|product requirements?|roadmap|spec|specification|business model|guide|documentation?)\b/gi
     );
 
     if (!keywords) return false;

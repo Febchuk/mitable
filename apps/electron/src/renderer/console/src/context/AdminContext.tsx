@@ -1,11 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import type { DashboardMetric, ProductivityData, NudgeTheme } from "../types";
+import type { DashboardMetric, ProductivityData } from "../types";
 import {
   fetchIntegrations,
   fetchUsers,
-  fetchTemplates,
   type User,
-  type Template,
   type Integration,
 } from "../services/adminService";
 import { authService } from "../services/authService";
@@ -18,7 +16,6 @@ const logger = createLogger("AdminContext");
 interface AdminContextType {
   integrations: Integration[];
   users: User[];
-  templates: Template[];
   loading: boolean;
   error: string | null;
   connectIntegration: (id: string, token?: string) => void;
@@ -29,7 +26,6 @@ interface AdminContextType {
   savingsMetric: DashboardMetric;
   timeToProductivity: DashboardMetric;
   productivityData: ProductivityData;
-  nudgeThemes: NudgeTheme[];
   refetchData: () => void;
 }
 
@@ -39,7 +35,6 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const { user } = useUser();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,14 +42,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     label: "Total Savings",
     value: "$50,000",
     description:
-      "Cost savings from AI-powered onboarding, helping new employees complete tasks faster and answering questions.",
+      "Cost savings from AI-powered work insights, helping employees understand time allocation and productivity.",
     type: "currency",
   });
 
   const [timeToProductivity] = useState<DashboardMetric>({
     label: "Time to Productivity",
     value: "20 days",
-    description: "Time for an employee to reach key milestones with AI-guided onboarding.",
+    description: "Average time for employees to reach peak productivity with AI-powered insights.",
     type: "time",
   });
 
@@ -62,15 +57,6 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     automated: 10,
     manual: 0,
   });
-
-  const [nudgeThemes] = useState<NudgeTheme[]>([
-    { id: "1", label: "Ticket debugging", category: "support" },
-    { id: "2", label: "Ticket debugging", category: "support" },
-    { id: "3", label: "Ticket debugging", category: "support" },
-    { id: "4", label: "Ticket debugging", category: "support" },
-    { id: "5", label: "Ticket debugging", category: "support" },
-    { id: "6", label: "Ticket debugging", category: "support" },
-  ]);
 
   // Fetch admin data from APIs
   const fetchAdminData = async () => {
@@ -81,15 +67,13 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
     try {
       // Fetch all admin data in parallel
-      const [integrationsData, usersData, templatesData] = await Promise.all([
+      const [integrationsData, usersData] = await Promise.all([
         fetchIntegrations().catch(() => []),
         fetchUsers().catch(() => []),
-        fetchTemplates().catch(() => []),
       ]);
 
       setIntegrations(integrationsData);
       setUsers(usersData);
-      setTemplates(templatesData);
     } catch (err) {
       logger.error("Error fetching admin data:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch admin data");
@@ -175,14 +159,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
       // Show success message (you can add a toast here)
       alert(
-        `✅ Sync Complete!\n\n` +
+        `Sync Complete!\n\n` +
           `Messages Embedded: ${result.messagesEmbedded}\n` +
           `Channels Processed: ${result.channelsProcessed}\n` +
           `Duration: ${(result.duration / 1000).toFixed(2)}s`
       );
     } catch (error) {
       logger.error("Sync failed:", error);
-      alert(`❌ Sync Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      alert(`Sync Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
@@ -197,7 +181,6 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       value={{
         integrations,
         users,
-        templates,
         loading,
         error,
         connectIntegration,
@@ -208,7 +191,6 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         savingsMetric,
         timeToProductivity,
         productivityData,
-        nudgeThemes,
         refetchData,
       }}
     >

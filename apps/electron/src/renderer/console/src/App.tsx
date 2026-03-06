@@ -18,9 +18,6 @@ import LoginPage from "./pages/LoginPage";
 import SignupOrganizationPage from "./pages/SignupOrganizationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
-import ChatsView from "./components/views/employee/ChatsView";
-import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
-import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
 import CalendarView from "./components/views/employee/CalendarView";
@@ -58,10 +55,10 @@ function NavigationHandler() {
       return;
     }
 
-    // Listen for navigation requests from main process (e.g., from Agent window)
+    // Listen for navigation requests from main process
     const unsubscribeChat = window.consoleAPI.onNavigateToChat?.((conversationId: string) => {
       logger.info(" Navigating to chat:", conversationId);
-      navigate(`/chats/${conversationId}`);
+      navigate(`/monitoring`);
     });
 
     // Listen for active session navigation (from native notification click)
@@ -379,10 +376,6 @@ function App() {
                         <Route path="monitoring" element={<MonitoringView />} />
                         <Route path="monitoring/:sessionId" element={<SessionDetail />} />
                         <Route path="profile" element={<UserProfilePage />} />
-                        {/* Legacy routes (hidden from nav but accessible via URL) */}
-                        <Route path="chats" element={<ChatsView />} />
-                        <Route path="chats/new" element={<NewChat />} />
-                        <Route path="chats/:chatId" element={<ChatDetail />} />
                       </Route>
                     </Routes>
                   </RecapsProvider>

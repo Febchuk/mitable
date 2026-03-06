@@ -1,48 +1,3 @@
-// View types
-export type ViewType = "home" | "roadmap" | "nudges" | "chats";
-
-// Roadmap types
-export interface Week {
-  number: number;
-  percentage: number;
-  tasks: Task[];
-}
-
-export interface SourceMaterial {
-  id: string;
-  title: string;
-  type: string;
-  url?: string;
-  description?: string;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  timeEstimate: string;
-  completed: boolean;
-  isActive?: boolean;
-  week: number;
-  sources?: SourceMaterial[];
-}
-
-// Nudge types
-export type NudgeStatus = "waiting" | "accepted" | "declined" | "resolved";
-
-export interface Nudge {
-  id: string;
-  expertName: string;
-  expertRole: string;
-  avatarUrl?: string;
-  description: string;
-  context?: string;
-  timestamp: Date;
-  status: NudgeStatus;
-  matchScore?: number;
-  online?: boolean;
-}
-
 // Chat types
 export interface Message {
   id: string;
@@ -81,54 +36,6 @@ export interface User {
   role: UserRole;
   originalRole?: UserRole;
   organizationId: string;
-}
-
-// ============================================
-// Template Types (Admin-Created)
-// ============================================
-
-export interface Template {
-  id: string;
-  organizationId: string;
-  title: string;
-  description?: string;
-  icon?: string;
-  roleTags: string[];
-  totalWeeks: number;
-  tasks?: number; // Computed field for UI
-  usedCount?: number; // Computed field for UI
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-export interface TemplateTask {
-  id: string;
-  templateId: string;
-  weekNumber: number;
-  title: string;
-  description?: string;
-  timeEstimate?: string;
-  orderIndex: number;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-// ============================================
-// User Roadmap Types
-// ============================================
-
-export interface UserTemplateAssignment {
-  id: string;
-  userId: string;
-  templateId: string;
-  assignedAt: Date;
-  status: "active" | "completed" | "archived";
-}
-
-export interface UserRoadmapTask extends Task {
-  templateId?: string; // null if custom task
-  templateTaskId?: string; // original template task reference
-  isCustom: boolean; // true if manually added by admin
 }
 
 // Status badge variants
@@ -174,10 +81,4 @@ export interface DashboardMetric {
 export interface ProductivityData {
   automated: number;
   manual: number;
-}
-
-export interface NudgeTheme {
-  id: string;
-  label: string;
-  category: string;
 }
