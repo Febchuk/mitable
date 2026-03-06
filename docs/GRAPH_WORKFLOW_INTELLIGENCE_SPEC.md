@@ -369,3 +369,57 @@ Targets:
 4. Update cadence: nightly batch only.
 5. Agent integration: prefetched deterministic Top-K graph facts.
 
+## 19. Implementation Instructions (Neo4j + Backend)
+
+Use this checklist to run graph workflow intelligence end-to-end in this repo.
+
+1. Start Neo4j (local dev):
+
+```bash
+docker run \
+  --name mitable-neo4j \
+  -p 7474:7474 -p 7687:7687 \
+  -e NEO4J_AUTH=neo4j/mitable-dev-password \
+  -v neo4j_data:/data \
+  neo4j:5
+```
+
+2. Set backend env vars:
+
+```bash
+GRAPH_ENABLED=true
+GRAPH_URI=http://localhost:7474
+GRAPH_USER=neo4j
+GRAPH_PASSWORD=mitable-dev-password
+GRAPH_DATABASE=neo4j
+GRAPH_TOP_K_FACTS=5
+GRAPH_LOOKBACK_DAYS=30
+```
+
+3. Run migration:
+
+```bash
+npm --workspace @mitable/backend run migrate:0042
+```
+
+4. Run manual graph sync:
+
+```bash
+npm --workspace @mitable/backend run graph:sync
+```
+
+5. Verify graph endpoints:
+
+- `GET /api/admin/graph/users/:userId/work-insights`
+- `GET /api/admin/graph/users/:userId/workflow-patterns`
+- `GET /api/admin/graph/orgs/:orgId/common-tasks`
+- `GET /api/admin/graph/orgs/:orgId/workflow-insights`
+- `POST /api/admin/graph/sync`
+
+6. Use live (non-snapshot) org workflow insights when needed:
+
+- `GET /api/admin/graph/orgs/:orgId/workflow-insights?forceLive=true`
+
+Detailed operational runbook:
+
+- `docs/NEO4J_GRAPH_SETUP.md`
