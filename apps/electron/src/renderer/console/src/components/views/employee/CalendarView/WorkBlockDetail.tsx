@@ -166,7 +166,7 @@ export default function WorkBlockDetail({
   
   // End session mutation (used for retrying failed summaries)
   const endSessionMutation = useEndSession();
-
+  
   // Start session hook (used for retrying failed starts)
   const { startSession, isStarting } = useStartSession({ showToasts: true, navigateOnSuccess: false });
   

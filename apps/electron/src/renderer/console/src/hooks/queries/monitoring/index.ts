@@ -268,8 +268,12 @@ export function useTriggerIntermediateSummary() {
   return useMutation({
     mutationFn: (sessionId: string) => monitoringService.triggerIntermediateSummary(sessionId),
     onSuccess: (_, sessionId) => {
-      // Invalidate story query to show new summary
+      // Invalidate story query to show new summary in MonitoringView
       queryClient.invalidateQueries({ queryKey: monitoringKeys.story(sessionId) });
+      // Invalidate the session detail to update the block specifically
+      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+      // Invalidate the calendar days to ensure the whole calendar refreshes
+      queryClient.invalidateQueries({ queryKey: ["calendar", "days"] });
     },
   });
 }
