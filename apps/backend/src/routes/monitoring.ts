@@ -48,6 +48,25 @@ function formatDuration(ms: number): string {
 }
 
 /**
+ * Check if the requesting user owns the session OR is an admin in the same org.
+ * Used for summary editing endpoints where admins can edit employee summaries.
+ */
+async function isOwnerOrOrgAdmin(
+  userId: string,
+  session: { userId: string; organizationId: string }
+): Promise<boolean> {
+  if (session.userId === userId) return true;
+
+  const [user] = await db
+    .select({ role: schema.users.role, organizationId: schema.users.organizationId })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+
+  return user?.role === "admin" && user.organizationId === session.organizationId;
+}
+
+/**
  * POST /api/monitoring/sessions
  * Start a new monitoring session
  *
@@ -2560,7 +2579,7 @@ router.patch(
         return;
       }
 
-      if (session.userId !== userId) {
+      if (!(await isOwnerOrOrgAdmin(userId, session))) {
         res.status(403).json({
           error: "Forbidden",
           message: "You do not have permission to modify this session",
@@ -2651,7 +2670,7 @@ router.post(
         return;
       }
 
-      if (session.userId !== userId) {
+      if (!(await isOwnerOrOrgAdmin(userId, session))) {
         res.status(403).json({
           error: "Forbidden",
           message: "You do not have permission to revise this session",
@@ -2785,7 +2804,7 @@ router.post(
         return;
       }
 
-      if (session.userId !== userId) {
+      if (!(await isOwnerOrOrgAdmin(userId, session))) {
         res.status(403).json({ error: "Forbidden", message: "Not your session" });
         return;
       }

@@ -1,3 +1,5 @@
+import { parseJsonResponse } from "../../lib/parse-json";
+
 /**
  * Capture Rollup Job (Lightweight Layer 1)
  *
@@ -71,13 +73,12 @@ ${uniqueLines.map((l) => `• ${l}`).join("\n")}`;
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
       max_tokens: 800,
-      response_format: { type: "json_object" },
     });
 
     const content = response.choices[0]?.message?.content;
     if (!content) throw new Error("Empty Groq response");
 
-    const parsed = JSON.parse(content) as { activities?: ClassifiedActivity[] };
+    const parsed = parseJsonResponse<{ activities?: ClassifiedActivity[] }>(content);
     if (!Array.isArray(parsed.activities) || parsed.activities.length === 0) {
       throw new Error("No activities in Groq response");
     }

@@ -2,13 +2,12 @@
  * Document Generation Agent
  *
  * RLM-based document generation using tool-calling loop.
- * Uses Claude Sonnet 4.5 (primary), OpenAI GPT-5 (fallback), Groq GPT-OSS-120B (last resort).
+ * Uses Claude Sonnet 4.5 (primary), OpenAI GPT-5 (fallback), DeepSeek V3.2 (last resort).
  * Native tool-calling for Claude/OpenAI with per-call fallback chain.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import Groq from "groq-sdk";
 import { config } from "../../config.js";
 import type { DocType } from "@mitable/shared";
 import type { DocumentGenerationEnvironment } from "./environment.js";
@@ -22,7 +21,7 @@ import {
 const MAX_TOOL_ITERATIONS = 30;
 const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
 const OPENAI_MODEL = "gpt-5";
-const GROQ_MODEL = config.groq?.chatModel || "openai/gpt-oss-120b";
+const DEEPSEEK_MODEL = "deepseek-chat";
 const MAX_RETRIES = 2;
 
 interface GenerationStep {
@@ -120,7 +119,7 @@ function toClaudeMessages(openaiMessages: any[]): {
 export class DocumentGenerationAgent {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
-  private groq: Groq | null = null;
+  private deepseek: OpenAI | null = null;
 
   constructor() {
     if (config.anthropic.apiKey) {
@@ -137,11 +136,14 @@ export class DocumentGenerationAgent {
       console.warn("[DocGenAgent] OPENAI_API_KEY not set");
     }
 
-    if (config.groq.apiKey) {
-      this.groq = new Groq({ apiKey: config.groq.apiKey });
-      console.log(`[DocGenAgent] Groq ${GROQ_MODEL} configured (last resort)`);
+    if (config.deepseek.apiKey) {
+      this.deepseek = new OpenAI({
+        apiKey: config.deepseek.apiKey,
+        baseURL: "https://api.deepseek.com",
+      });
+      console.log(`[DocGenAgent] DeepSeek V3.2 (${DEEPSEEK_MODEL}) configured (last resort)`);
     } else {
-      console.warn("[DocGenAgent] GROQ_API_KEY not set — no last-resort fallback");
+      console.warn("[DocGenAgent] DEEPSEEK_API_KEY not set — no last-resort fallback");
     }
   }
 
@@ -269,17 +271,17 @@ export class DocumentGenerationAgent {
         console.log("[DocGenAgent] ⚠️ Using OpenAI GPT-5 (fallback)");
         return await this.callOpenAI(openaiMessages);
       } catch (error) {
-        console.warn("[DocGenAgent] OpenAI also failed — trying Groq:", String(error));
+        console.warn("[DocGenAgent] OpenAI also failed — trying DeepSeek V3.2:", String(error));
       }
     }
 
-    if (this.groq) {
-      console.log(`[DocGenAgent] ⚠️⚠️ Using Groq ${GROQ_MODEL} (last resort)`);
-      return this.callGroq(openaiMessages);
+    if (this.deepseek) {
+      console.log(`[DocGenAgent] ⚠️⚠️ Using DeepSeek V3.2 (${DEEPSEEK_MODEL}) (last resort)`);
+      return this.callDeepSeek(openaiMessages);
     }
 
     throw new Error(
-      "No LLM available — all providers (Anthropic, OpenAI, Groq) failed or unconfigured"
+      "No LLM available — all providers (Anthropic, OpenAI, DeepSeek) failed or unconfigured"
     );
   }
 
@@ -350,18 +352,18 @@ export class DocumentGenerationAgent {
     return { toolCalls: [], content: message.content || null };
   }
 
-  /** Call Groq GPT-OSS-120B (last resort — single-shot, no tool-calling) */
-  private async callGroq(openaiMessages: any[]): Promise<LLMCallResult> {
-    if (!this.groq) {
-      throw new Error("Groq client not configured");
+  /** Call DeepSeek V3.2 (last resort — single-shot, no tool-calling) */
+  private async callDeepSeek(openaiMessages: any[]): Promise<LLMCallResult> {
+    if (!this.deepseek) {
+      throw new Error("DeepSeek client not configured");
     }
 
-    // Groq doesn't support tool_choice/tools — collapse to single-shot prompt
+    // DeepSeek reasoner doesn't support tool_choice/tools — collapse to single-shot prompt
     const systemMsg = openaiMessages.find((m: any) => m.role === "system");
     const nonSystemMsgs = openaiMessages.filter(
       (m: any) => m.role !== "system" && m.role !== "tool"
     );
-    const groqMessages = [
+    const deepseekMessages = [
       ...(systemMsg
         ? [
             {
@@ -378,11 +380,10 @@ export class DocumentGenerationAgent {
       })),
     ];
 
-    const completion = await this.groq.chat.completions.create({
-      model: GROQ_MODEL,
-      messages: groqMessages,
+    const completion = await this.deepseek.chat.completions.create({
+      model: DEEPSEEK_MODEL,
+      messages: deepseekMessages,
       max_tokens: 8000,
-      temperature: 0.4,
     });
 
     const content = completion.choices[0]?.message?.content;

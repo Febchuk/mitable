@@ -301,37 +301,32 @@ Targets:
 
 ## 15. Rollout Plan
 
-### Phase 0: Foundation — COMPLETE
+### Phase 0: Foundation
 
-1. ~~Add Neo4j client, health checks, and config.~~
-2. ~~Create sync control tables.~~
-3. ~~Implement dry-run sync (extract/normalize only).~~
+1. Add Neo4j client, health checks, and config.
+2. Create sync control tables.
+3. Implement dry-run sync (extract/normalize only).
 
-### Phase 1: Core Inference — COMPLETE
+### Phase 1: Core Inference
 
-1. ~~Enable writes for Person-App-Task edges.~~
-2. ~~Validate idempotency and watermark resume.~~
-3. ~~Backfill last 90 days.~~
-4. ~~Activity resolution pipeline (Stages A-D): extract, normalize, deduplicate, derive app behaviors, map to archetypes, mine patterns.~~
-5. ~~Decay-weighted edge scoring (30-day half-life).~~
+1. Enable writes for Person-App-Task edges.
+2. Validate idempotency and watermark resume.
+3. Backfill last 90 days.
 
 ### Phase 2: Personalization Launch
 
 1. Integrate graph context into recap and summary prompts.
 2. Run A/B test versus current baseline.
 
-### Phase 3: Management Visibility — COMPLETE
+### Phase 3: Management Visibility
 
-1. ~~Add admin insight endpoints (work-insights, workflow-patterns, workflow-insights, common-tasks).~~
-2. ~~Add snapshot generation and caching.~~
-3. ~~Workflow distribution, confidence metadata, and period-over-period trend in org insights.~~
-4. ~~AppBehavior nodes and DOES_IN_APP edges for per-app usage summaries.~~
+1. Add admin insight endpoints.
+2. Add snapshot generation and caching.
 
-### Phase 4: Pattern Intelligence — COMPLETE
+### Phase 4: Pattern Intelligence
 
-1. ~~Enable workflow pattern mining and sequence edges.~~
-2. ~~Add org-level workflow benchmarks.~~
-3. ~~WorkflowPattern nodes with INCLUDES_TASK edges, ordered task chains, support counts.~~
+1. Enable workflow pattern mining and sequence edges.
+2. Add org-level workflow benchmarks.
 
 ## 16. Test Plan
 

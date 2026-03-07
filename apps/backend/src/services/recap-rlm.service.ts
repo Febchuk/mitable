@@ -8,13 +8,12 @@
  * 1. Fetch raw classifications from sessionCaptures for given session IDs
  * 2. Deduplicate & cluster consecutive similar activities
  * 3. Build structured activity timeline
- * 4. Send to LLM with recap prompt (Claude → OpenAI → Groq)
+ * 4. Send to LLM with recap prompt (Claude → OpenAI → DeepSeek V3.2)
  * 5. Return markdown recap content
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import Groq from "groq-sdk";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, inArray, asc } from "drizzle-orm";
@@ -28,7 +27,9 @@ const anthropic = config.anthropic.apiKey
   ? new Anthropic({ apiKey: config.anthropic.apiKey })
   : null;
 const openai = config.openai.apiKey ? new OpenAI({ apiKey: config.openai.apiKey }) : null;
-const groq = config.groq.apiKey ? new Groq({ apiKey: config.groq.apiKey }) : null;
+const deepseek = config.deepseek.apiKey
+  ? new OpenAI({ apiKey: config.deepseek.apiKey, baseURL: "https://api.deepseek.com" })
+  : null;
 
 interface ActivityCluster {
   timeRange: string;
@@ -401,7 +402,7 @@ Write the recap now (markdown only, no JSON wrapping):`;
   }
 
   /**
-   * Call LLM with Claude → OpenAI → Groq fallback chain.
+   * Call LLM with Claude → OpenAI → DeepSeek V3.2 fallback chain.
    */
   private async callLLM(prompt: string): Promise<string> {
     // Primary: Claude
@@ -442,29 +443,29 @@ Write the recap now (markdown only, no JSON wrapping):`;
       } catch (error) {
         logger.warn(
           { error: error instanceof Error ? error.message : String(error) },
-          "OpenAI failed for recap — falling back to Groq"
+          "OpenAI failed for recap — falling back to DeepSeek V3.2"
         );
       }
     }
 
-    // Last resort: Groq
-    if (groq) {
+    // Last resort: DeepSeek V3.2
+    if (deepseek) {
       try {
-        const completion = await groq.chat.completions.create({
-          model: config.groq.chatModel || "openai/gpt-oss-120b",
+        const completion = await deepseek.chat.completions.create({
+          model: "deepseek-chat",
           messages: [{ role: "user", content: prompt }],
           temperature: 0.4,
           max_tokens: 1000,
         });
         const content = completion.choices[0]?.message?.content?.trim();
         if (content) {
-          logger.info("Recap generated via Groq (last resort)");
+          logger.info("Recap generated via DeepSeek V3.2 (last resort)");
           return content;
         }
       } catch (error) {
         logger.warn(
           { error: error instanceof Error ? error.message : String(error) },
-          "Groq also failed for recap"
+          "DeepSeek also failed for recap"
         );
       }
     }

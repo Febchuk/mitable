@@ -113,6 +113,7 @@ class SessionSummarizationService {
   private groq: Groq;
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
+  private deepseek: OpenAI | null = null;
 
   constructor() {
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
@@ -126,6 +127,12 @@ class SessionSummarizationService {
     }
     if (config.openai.apiKey) {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+    }
+    if (config.deepseek.apiKey) {
+      this.deepseek = new OpenAI({
+        apiKey: config.deepseek.apiKey,
+        baseURL: "https://api.deepseek.com",
+      });
     }
   }
 
@@ -1384,7 +1391,7 @@ Example good output:
   }
 
   /**
-   * Call LLM with Claude → OpenAI → Groq fallback chain
+   * Call LLM with Claude → OpenAI → DeepSeek V3.2 fallback chain
    */
   private async callLLM(prompt: string, maxTokens: number = 1000): Promise<string> {
     // Primary: Claude
@@ -1425,12 +1432,23 @@ Example good output:
       } catch (error) {
         logger.warn(
           { error: error instanceof Error ? error.message : String(error) },
-          "OpenAI failed for recap — falling back to Groq"
+          "OpenAI failed for recap — falling back to DeepSeek V3.2"
         );
       }
     }
 
-    // Last resort: Groq
+    // Last resort: DeepSeek V3.2
+    if (this.deepseek) {
+      const completion = await this.deepseek.chat.completions.create({
+        model: "deepseek-chat",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.4,
+        max_tokens: maxTokens,
+      });
+      return (completion.choices[0]?.message?.content || "").trim();
+    }
+
+    // Final fallback: Groq (legacy)
     const completion = await this.groq.chat.completions.create({
       model: SUMMARIZATION_CONFIG.TEXT_MODEL,
       messages: [{ role: "user", content: prompt }],

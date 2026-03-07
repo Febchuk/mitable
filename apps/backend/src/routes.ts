@@ -2,7 +2,9 @@ import { Router } from "express";
 import { authRouter } from "./routes/auth.js";
 import { requireAuth, optionalAuth } from "./middleware/auth.js";
 import roadmapsRouter from "./routes/roadmaps.js";
-import conversationsRouter from "./routes/conversations.js";
+// DEPRECATED: Old multi-agent chat system (OrchestratorService → KnowledgeAgent/Groq)
+// Admin Ask now uses /admin/ask/chat (Claude). Employees have no chat UI.
+// import conversationsRouter from "./routes/conversations.js";
 import adminRouter from "./routes/admin.js";
 import adminDashboardRouter from "./routes/admin-dashboard.js";
 import integrationsRouter from "./routes/integrations.js";
@@ -23,7 +25,8 @@ router.use("/auth", authLimiter, authRouter);
 
 // Mount route modules (these already have auth middleware built-in)
 router.use("/roadmaps", roadmapsRouter);
-router.use("/conversations", conversationsRouter); // Screenshot limiter applied within conversations.ts
+// DEPRECATED: Unmounted — no UI calls this. Was causing ghost Groq tool_use_failed errors.
+// router.use("/conversations", conversationsRouter);
 router.use("/admin", adminRouter);
 router.use("/admin", adminDashboardRouter);
 router.use("/integrations", integrationsRouter);

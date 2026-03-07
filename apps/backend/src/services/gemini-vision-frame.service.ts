@@ -90,6 +90,7 @@ class GeminiVisionFrameService {
           generationConfig: {
             maxOutputTokens: request.maxTokens || VISION_CONFIG.MAX_TOKENS,
             temperature: request.temperature ?? VISION_CONFIG.TEMPERATURE,
+            responseMimeType: "application/json",
           },
         });
       },

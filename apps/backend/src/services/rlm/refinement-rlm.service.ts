@@ -8,7 +8,6 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import Groq from "groq-sdk";
 import { config } from "../../config";
 import {
   REFINEMENT_TOOL_DEFINITIONS,
@@ -83,11 +82,11 @@ User memories are the core of personalization. You MUST follow this protocol:
 - User mentions something not in the summary → get_activities to find it
 - Simple style changes (tone, format, length) → rewrite directly, no tools needed
 
-## Response Format
-When rewriting the summary, respond with TWO parts:
+## Response Format — CRITICAL
+Whenever you make ANY change to the summary (corrections, additions, rewrites, restructuring), you MUST respond with BOTH:
 
 1. A brief conversational message (1-2 sentences) explaining what you changed
-2. The full rewritten summary wrapped in <summary> tags
+2. The COMPLETE rewritten summary wrapped in <summary> tags
 
 Example:
 I've restructured it as a narrative focusing on outcomes. I also added the debugging context from the transcripts.
@@ -96,7 +95,9 @@ I've restructured it as a narrative focusing on outcomes. I also added the debug
 [full rewritten summary here — use markdown formatting]
 </summary>
 
-If the user is just chatting or asking a question (not requesting a rewrite), respond conversationally WITHOUT <summary> tags.
+**NEVER claim you've made changes without including the <summary> block.** If you say "I've corrected/updated/revised" but omit <summary> tags, the user will NOT see any changes. The <summary> block is the ONLY mechanism that applies your edits.
+
+Only omit <summary> tags when you are genuinely just answering a question or chatting — NOT when making any edit.
 
 ## CRITICAL: Data Boundary Rules
 - You are STRICTLY limited to data from THIS session only. Never invent, assume, or hallucinate information.
@@ -127,6 +128,16 @@ function parseResponse(raw: string): { message: string; suggestedEdit: string | 
     const message = raw.replace(/<summary>[\s\S]*?<\/summary>/, "").trim();
     return { message: message || "Here's the revised summary:", suggestedEdit };
   }
+
+  // Safety net: detect when LLM claims to have edited but didn't include <summary> tags
+  const claimsEdit =
+    /\b(corrected|revised|updated|rewritten|restructured|rewrote|changed|modified|added|removed|replaced|adjusted)\b/i.test(
+      raw
+    );
+  if (claimsEdit) {
+    logger.warn("LLM claimed to edit summary but did not include <summary> tags — nudging retry");
+  }
+
   return { message: raw.trim(), suggestedEdit: null };
 }
 
@@ -137,7 +148,7 @@ function parseResponse(raw: string): { message: string; suggestedEdit: string | 
 class RefinementRLMService {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
-  private groq: Groq | null = null;
+  private deepseek: OpenAI | null = null;
   private maxToolRounds = 6; // Safety limit for tool-calling rounds
 
   constructor() {
@@ -149,9 +160,12 @@ class RefinementRLMService {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
       logger.info("GPT-5 fallback configured for Refinement RLM");
     }
-    if (config.groq.apiKey) {
-      this.groq = new Groq({ apiKey: config.groq.apiKey });
-      logger.info("Groq GPT-OSS-120B configured for Refinement RLM (last resort)");
+    if (config.deepseek.apiKey) {
+      this.deepseek = new OpenAI({
+        apiKey: config.deepseek.apiKey,
+        baseURL: "https://api.deepseek.com",
+      });
+      logger.info("DeepSeek V3.2 (deepseek-chat) configured for Refinement RLM (last resort)");
     }
   }
 
@@ -174,11 +188,14 @@ class RefinementRLMService {
       try {
         return await this.refineWithOpenAI(input, ctx);
       } catch (error) {
-        logger.warn({ error: String(error) }, "OpenAI refinement also failed — trying Groq");
+        logger.warn(
+          { error: String(error) },
+          "OpenAI refinement also failed — trying DeepSeek V3.2"
+        );
       }
     }
 
-    return this.refineWithGroq(input);
+    return this.refineWithDeepSeek(input);
   }
 
   // --------------------------------------------------------------------------
@@ -261,14 +278,32 @@ class RefinementRLMService {
         }
       }
 
-      const { message, suggestedEdit } = parseResponse(rawText);
+      const parsed = parseResponse(rawText);
+
+      // If the LLM claimed to edit but didn't include <summary> tags, nudge it once
+      if (
+        !parsed.suggestedEdit &&
+        rounds < this.maxToolRounds &&
+        /\b(corrected|revised|updated|rewritten|restructured|rewrote|changed|modified|added|removed|replaced|adjusted)\b/i.test(
+          rawText
+        )
+      ) {
+        logger.warn("Claude claimed edit without <summary> tags — nudging for actual output");
+        anthropicMessages.push({ role: "assistant", content: rawText });
+        anthropicMessages.push({
+          role: "user",
+          content:
+            "You said you made changes but didn't include the rewritten summary. Please output the COMPLETE updated summary inside <summary> tags so the changes can be applied.",
+        });
+        continue;
+      }
 
       logger.info(
-        { toolCallCount, rounds, hasSuggestedEdit: !!suggestedEdit },
+        { toolCallCount, rounds, hasSuggestedEdit: !!parsed.suggestedEdit },
         "Refinement RLM completed (Claude)"
       );
 
-      return { message, suggestedEdit, toolCallCount };
+      return { message: parsed.message, suggestedEdit: parsed.suggestedEdit, toolCallCount };
     }
 
     // Safety: if we hit max rounds, return whatever we have
@@ -329,29 +364,57 @@ ${prefsResult}`;
       max_completion_tokens: 4000,
     });
 
-    const rawText = completion.choices[0]?.message?.content || "";
-    const { message, suggestedEdit } = parseResponse(rawText);
+    let rawText = completion.choices[0]?.message?.content || "";
+    let parsed = parseResponse(rawText);
 
-    logger.info({ hasSuggestedEdit: !!suggestedEdit }, "Refinement RLM completed (GPT-5 fallback)");
+    // Nudge retry if LLM claimed edit without <summary> tags
+    if (
+      !parsed.suggestedEdit &&
+      /\b(corrected|revised|updated|rewritten|restructured|rewrote|changed|modified|added|removed|replaced|adjusted)\b/i.test(
+        rawText
+      )
+    ) {
+      logger.warn("GPT-5 claimed edit without <summary> tags — nudging retry");
+      const retryCompletion = await this.openai.chat.completions.create({
+        messages: [
+          ...openaiMessages,
+          { role: "assistant" as const, content: rawText },
+          {
+            role: "user" as const,
+            content:
+              "You said you made changes but didn't include the rewritten summary. Please output the COMPLETE updated summary inside <summary> tags so the changes can be applied.",
+          },
+        ],
+        model: "gpt-5",
+        max_completion_tokens: 4000,
+      });
+      rawText = retryCompletion.choices[0]?.message?.content || rawText;
+      parsed = parseResponse(rawText);
+    }
 
-    return { message, suggestedEdit, toolCallCount: 0 };
+    logger.info(
+      { hasSuggestedEdit: !!parsed.suggestedEdit },
+      "Refinement RLM completed (GPT-5 fallback)"
+    );
+
+    return { message: parsed.message, suggestedEdit: parsed.suggestedEdit, toolCallCount: 0 };
   }
 
   // --------------------------------------------------------------------------
-  // Last resort: Groq GPT-OSS-120B single-shot
+  // Last resort: DeepSeek V3.2 (deepseek-chat) single-shot
   // --------------------------------------------------------------------------
 
-  private async refineWithGroq(input: RefinementRLMInput): Promise<RefinementRLMResult> {
-    if (!this.groq) {
+  private async refineWithDeepSeek(input: RefinementRLMInput): Promise<RefinementRLMResult> {
+    if (!this.deepseek) {
       throw new Error(
-        "No LLM available — all providers (Anthropic, OpenAI, Groq) failed or unconfigured"
+        "No LLM available — all providers (Anthropic, OpenAI, DeepSeek) failed or unconfigured"
       );
     }
 
-    logger.info("⚠️⚠️ Refinement via Groq GPT-OSS-120B (last resort)");
+    logger.info("⚠️⚠️ Refinement via DeepSeek V3.2 (last resort)");
 
     const systemPrompt = buildSystemPrompt(input.currentSummary);
-    const groqMessages = [
+    const deepseekMessages = [
       {
         role: "system" as const,
         content: systemPrompt + "\n\nIMPORTANT: Do NOT call any tools. Respond directly.",
@@ -362,16 +425,41 @@ ${prefsResult}`;
       })),
     ];
 
-    const completion = await this.groq.chat.completions.create({
-      messages: groqMessages,
-      model: config.groq.chatModel || "openai/gpt-oss-120b",
+    const completion = await this.deepseek.chat.completions.create({
+      messages: deepseekMessages,
+      model: "deepseek-chat",
       max_tokens: 4000,
     });
 
-    const rawText = completion.choices[0]?.message?.content || "";
-    const { message, suggestedEdit } = parseResponse(rawText);
+    let rawText = completion.choices[0]?.message?.content || "";
+    let parsed = parseResponse(rawText);
 
-    return { message, suggestedEdit, toolCallCount: 0 };
+    // Nudge retry if LLM claimed edit without <summary> tags
+    if (
+      !parsed.suggestedEdit &&
+      /\b(corrected|revised|updated|rewritten|restructured|rewrote|changed|modified|added|removed|replaced|adjusted)\b/i.test(
+        rawText
+      )
+    ) {
+      logger.warn("DeepSeek claimed edit without <summary> tags — nudging retry");
+      const retryCompletion = await this.deepseek.chat.completions.create({
+        messages: [
+          ...deepseekMessages,
+          { role: "assistant" as const, content: rawText },
+          {
+            role: "user" as const,
+            content:
+              "You said you made changes but didn't include the rewritten summary. Please output the COMPLETE updated summary inside <summary> tags so the changes can be applied.",
+          },
+        ],
+        model: "deepseek-chat",
+        max_tokens: 4000,
+      });
+      rawText = retryCompletion.choices[0]?.message?.content || rawText;
+      parsed = parseResponse(rawText);
+    }
+
+    return { message: parsed.message, suggestedEdit: parsed.suggestedEdit, toolCallCount: 0 };
   }
 }
 

@@ -37,16 +37,14 @@ function loadPolicyFromEnv(): CapturePolicy {
  * Only used if ENV variables are not set
  *
  * These patterns are checked against BOTH:
- * 1. Window titles (e.g., "Gmail - Inbox", "Slack - #general")
- * 2. App names (e.g., "Slack.app", "Outlook.exe")
+ * 1. Window titles (e.g., "Slack - #general", "1Password - Vault")
+ * 2. App names (e.g., "Slack.app", "1Password.exe")
  *
- * This dual-check provides defense-in-depth with a single configuration.
+ * Email (Gmail, Outlook, etc.) is intentionally allowed so email tasks
+ * can be captured and summarized.
  */
 const defaultDenyList: CapturePolicy = {
   appsDeny: [
-    /outlook/i,
-    /gmail/i,
-    /mail/i,
     /messages/i,
     /1password|lastpass|bitwarden|okta/i,
     /bank|financial|payroll|paystub|tax/i,
