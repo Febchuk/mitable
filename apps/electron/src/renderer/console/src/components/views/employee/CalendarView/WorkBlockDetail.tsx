@@ -62,15 +62,14 @@ import {
 } from "lucide-react";
 import type { WorkBlock } from "./types";
 import { useBlockDetail } from "../../../../hooks/queries/calendar";
-import { useDeleteSession, useEndSession, useTriggerIntermediateSummary } from "../../../../hooks/queries/monitoring";
+import {
+  useDeleteSession,
+  useEndSession,
+  useTriggerIntermediateSummary,
+} from "../../../../hooks/queries/monitoring";
 import { useStartSession } from "../../../../hooks/useStartSession";
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface WorkBlockDetailProps {
   block: WorkBlock;
@@ -163,13 +162,16 @@ export default function WorkBlockDetail({
 
   // Delete mutation
   const deleteSession = useDeleteSession();
-  
+
   // End session mutation (used for retrying failed summaries)
   const endSessionMutation = useEndSession();
-  
+
   // Start session hook (used for retrying failed starts)
-  const { startSession, isStarting } = useStartSession({ showToasts: true, navigateOnSuccess: false });
-  
+  const { startSession, isStarting } = useStartSession({
+    showToasts: true,
+    navigateOnSuccess: false,
+  });
+
   // Intermediate summary mutation
   const intermediateSummaryMutation = useTriggerIntermediateSummary();
 
@@ -213,12 +215,12 @@ export default function WorkBlockDetail({
         // Stop Electron capture loop locally if it's the active session
         await window.consoleAPI.endMonitoringSession();
       }
-      
-      // We don't need an optimistic update here because the delete mutation 
+
+      // We don't need an optimistic update here because the delete mutation
       // onSuccess will invalidate the query, but we want to avoid the "summarizing" flash.
       // Set the block state locally to 'deleting' for optimistic feedback
       // This is handled via UI if needed, but the main issue is that CalendarView
-      // has an optimistic UI effect where it sets "active" blocks to "summarizing" 
+      // has an optimistic UI effect where it sets "active" blocks to "summarizing"
       // when the electron session becomes inactive.
       await deleteSession.mutateAsync(block.id);
       onDelete?.(block.id);
@@ -391,14 +393,15 @@ export default function WorkBlockDetail({
                       </TooltipTrigger>
                       <TooltipContent side="top">
                         <p className="max-w-[200px] text-xs">
-                          Clicking this button will allow you to summarize the work that you have done so far without ending the block.
+                          Clicking this button will allow you to summarize the work that you have
+                          done so far without ending the block.
                         </p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </div>
               )}
-              
+
               {block.status === "failed" && (
                 <button
                   onClick={async (e) => {
@@ -418,11 +421,26 @@ export default function WorkBlockDetail({
                       setIsRetrying(false);
                     }
                   }}
-                  disabled={isRetrying || endSessionMutation.isPending || deleteSession.isPending || isStarting}
+                  disabled={
+                    isRetrying ||
+                    endSessionMutation.isPending ||
+                    deleteSession.isPending ||
+                    isStarting
+                  }
                   className="p-1 text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted rounded transition-colors disabled:opacity-50"
-                  title={`Retry ${block.failedAction || 'summary generation'}`}
+                  title={`Retry ${block.failedAction || "summary generation"}`}
                 >
-                  <RefreshCw size={12} className={isRetrying || endSessionMutation.isPending || deleteSession.isPending || isStarting ? "animate-spin" : ""} />
+                  <RefreshCw
+                    size={12}
+                    className={
+                      isRetrying ||
+                      endSessionMutation.isPending ||
+                      deleteSession.isPending ||
+                      isStarting
+                        ? "animate-spin"
+                        : ""
+                    }
+                  />
                 </button>
               )}
             </div>

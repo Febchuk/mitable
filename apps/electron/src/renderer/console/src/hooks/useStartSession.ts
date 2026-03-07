@@ -104,13 +104,13 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
           // Find today's date in local timezone
           const today = new Date();
           const todayIndex = newDays.findIndex((d: any) => {
-             return (
-               d.date.getFullYear() === today.getFullYear() &&
-               d.date.getMonth() === today.getMonth() &&
-               d.date.getDate() === today.getDate()
-             );
+            return (
+              d.date.getFullYear() === today.getFullYear() &&
+              d.date.getMonth() === today.getMonth() &&
+              d.date.getDate() === today.getDate()
+            );
           });
-          
+
           if (todayIndex !== -1) {
             newDays[todayIndex] = {
               ...newDays[todayIndex],
@@ -207,20 +207,22 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
 
       // Fire OS notification
       const notifMsg = `Failed to start session. Click to return and retry.`;
-      
+
       // We set a global flag so that the app navigates to /calendar on window focus
       (window as any)._pendingFailureNavigation = true;
-      
+
       if (window.consoleAPI?.showNotification) {
-        window.consoleAPI.showNotification({ 
-          title: "Session Start Failed", 
-          message: notifMsg, 
-          actions: [{ id: "focus", label: "Retry" }] 
+        window.consoleAPI.showNotification({
+          title: "Session Start Failed",
+          message: notifMsg,
+          actions: [{ id: "focus", label: "Retry" }],
         });
       } else {
         try {
           new Notification("Session Start Failed", { body: notifMsg });
-        } catch {}
+        } catch (e) {
+          console.error("Failed to show notification", e);
+        }
       }
 
       return null;

@@ -17,7 +17,6 @@ import {
   ChevronRight,
   Calendar,
   CalendarDays,
-  Sparkles,
   Circle,
   Square,
   LayoutGrid,
@@ -34,7 +33,6 @@ import {
   type CalendarEvent,
 } from "@/components/application/calendar/calendar";
 import type { ActivityDay } from "./types";
-import { useToast } from "@/hooks/use-toast";
 import { useCalendarDays, calendarKeys } from "../../../../hooks/queries/calendar";
 import { useStartSession } from "../../../../hooks/useStartSession";
 import {
@@ -136,7 +134,6 @@ type ViewMode = "detail" | "week" | "month";
 
 export default function CalendarView() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
@@ -214,18 +211,18 @@ export default function CalendarView() {
             }
             if (isDeleting) {
               return {
-                 ...block,
-                 status: "deleting" as const,
-              }
+                ...block,
+                status: "deleting" as const,
+              };
             }
             return block;
           })
           .filter((block) => {
             // If it was originally an active/paused block and < 3 mins, filter it out
             // We check the original block in day.workBlocks, or just its current optimistic summarizing state with the id
-            const originalBlock = day.workBlocks.find(b => b.id === block.id);
+            const originalBlock = day.workBlocks.find((b) => b.id === block.id);
             if (
-              originalBlock && 
+              originalBlock &&
               (originalBlock.status === "active" || originalBlock.status === "paused") &&
               block.duration < 3
             ) {

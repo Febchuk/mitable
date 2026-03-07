@@ -168,22 +168,24 @@ export function useEndSession() {
     onError: () => {
       // Fire OS notification
       const notifMsg = `Failed to end session. Click to return and retry.`;
-      
+
       // We set a global flag so that the app navigates to /calendar on window focus
       (window as any)._pendingFailureNavigation = true;
-      
+
       if (window.consoleAPI?.showNotification) {
-        window.consoleAPI.showNotification({ 
-          title: "End Failed", 
-          message: notifMsg, 
-          actions: [{ id: "focus", label: "Retry" }] 
+        window.consoleAPI.showNotification({
+          title: "End Failed",
+          message: notifMsg,
+          actions: [{ id: "focus", label: "Retry" }],
         });
       } else {
         try {
           new Notification("End Failed", { body: notifMsg });
-        } catch {}
+        } catch (e) {
+          console.error("Failed to show notification", e);
+        }
       }
-    }
+    },
   });
 }
 
@@ -250,31 +252,31 @@ export function useDeleteSession() {
         return oldData.map((day: any) => ({
           ...day,
           workBlocks: day.workBlocks.map((block: any) =>
-            block.id === sessionId
-              ? { ...block, status: "failed", failedAction: "delete" }
-              : block
+            block.id === sessionId ? { ...block, status: "failed", failedAction: "delete" } : block
           ),
         }));
       });
 
       // Fire OS notification
       const notifMsg = `Failed to delete block. Click to return and retry.`;
-      
+
       // We set a global flag so that the app navigates to /calendar on window focus
       (window as any)._pendingFailureNavigation = true;
-      
+
       if (window.consoleAPI?.showNotification) {
-        window.consoleAPI.showNotification({ 
-          title: "Delete Failed", 
-          message: notifMsg, 
-          actions: [{ id: "focus", label: "Retry" }] 
+        window.consoleAPI.showNotification({
+          title: "Delete Failed",
+          message: notifMsg,
+          actions: [{ id: "focus", label: "Retry" }],
         });
       } else {
         try {
           new Notification("Delete Failed", { body: notifMsg });
-        } catch {}
+        } catch (e) {
+          console.error("Failed to show notification", e);
+        }
       }
-    }
+    },
   });
 }
 

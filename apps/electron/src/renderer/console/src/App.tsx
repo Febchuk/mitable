@@ -326,10 +326,10 @@ function FailedSummaryNotificationHandler() {
         // Fire notification
         const notifMsg = `The summary for your recent session failed to generate. Click to retry.`;
         if (window.consoleAPI?.showNotification) {
-          window.consoleAPI.showNotification({ 
-            title: "Summary Failed", 
-            message: notifMsg, 
-            actions: [{ id: "focus", label: "Retry" }] 
+          window.consoleAPI.showNotification({
+            title: "Summary Failed",
+            message: notifMsg,
+            actions: [{ id: "focus", label: "Retry" }],
           });
         } else {
           try {
@@ -360,7 +360,7 @@ function FailedSummaryNotificationHandler() {
         (window as any)._pendingFailureNavigation = false;
         shouldNavigate = true;
       }
-      
+
       if (shouldNavigate) {
         navigate("/calendar");
       }

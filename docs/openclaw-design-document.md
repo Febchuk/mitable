@@ -70,6 +70,7 @@ OpenClaw follows a **hub-and-spoke architecture** with a single Gateway as the c
 The Gateway is a **single-process WebSocket server** (default `127.0.0.1:18789`) that acts as the control plane. It is the single source of truth for sessions, routing, and channel connections.
 
 **Responsibilities:**
+
 - Manages all messaging platform connections via channel adapters
 - Routes inbound messages to the correct session context
 - Handles CLI, WebChat, macOS app, and mobile node connections
@@ -83,17 +84,18 @@ The Gateway is a **single-process WebSocket server** (default `127.0.0.1:18789`)
 
 Each messaging platform gets a dedicated adapter implementing a unified interface:
 
-| Platform | Library | Auth Method |
-|----------|---------|-------------|
-| WhatsApp | Baileys | QR code |
-| Telegram | grammY | Bot token |
-| Discord | discord.js | Bot token |
-| Slack | Bolt | OAuth |
-| iMessage | BlueBubbles | Native integration |
-| Signal | signal-cli | Linked device |
-| + 15 more | Various | Various |
+| Platform  | Library     | Auth Method        |
+| --------- | ----------- | ------------------ |
+| WhatsApp  | Baileys     | QR code            |
+| Telegram  | grammY      | Bot token          |
+| Discord   | discord.js  | Bot token          |
+| Slack     | Bolt        | OAuth              |
+| iMessage  | BlueBubbles | Native integration |
+| Signal    | signal-cli  | Linked device      |
+| + 15 more | Various     | Various            |
 
 Each adapter handles:
+
 - **Authentication**: Platform-specific auth flows
 - **Message normalization**: Converts platform formats to a unified internal schema
 - **Access control**: Per-channel allowlists, DM pairing policies, group mention requirements
@@ -119,6 +121,7 @@ The Pi agent runtime (`src/agents/piembeddedruntime.ts`) executes the core AI lo
 ```
 
 **Key design decisions:**
+
 - Streaming throughout — responses start delivering before generation completes
 - Tool calls are intercepted mid-stream, executed, and results fed back
 - Sessions are append-only event logs supporting branching and recovery
@@ -128,11 +131,11 @@ The Pi agent runtime (`src/agents/piembeddedruntime.ts`) executes the core AI lo
 
 Sessions encode trust boundaries and permissions:
 
-| Session Type | ID Pattern | Trust Level |
-|---|---|---|
-| Main | `agent:<id>:main` | Full host access (operator) |
-| DM | `agent:<id>:<channel>:dm:<senderId>` | Sandboxed by default |
-| Group | `agent:<id>:<channel>:group:<groupId>` | Sandboxed by default |
+| Session Type | ID Pattern                             | Trust Level                 |
+| ------------ | -------------------------------------- | --------------------------- |
+| Main         | `agent:<id>:main`                      | Full host access (operator) |
+| DM           | `agent:<id>:<channel>:dm:<senderId>`   | Sandboxed by default        |
+| Group        | `agent:<id>:<channel>:group:<groupId>` | Sandboxed by default        |
 
 **Per-session controls:** thinking level, verbose mode, model override, send policy, activation mode.
 
@@ -146,11 +149,11 @@ OpenClaw composes prompts from **layered sources** — behavior is modified by e
 
 ### Static Files (in workspace)
 
-| File | Purpose |
-|------|---------|
+| File        | Purpose                                        |
+| ----------- | ---------------------------------------------- |
 | `AGENTS.md` | Core operational constraints (bundled default) |
-| `SOUL.md` | Personality and tone guidance (optional) |
-| `TOOLS.md` | User-specific tool conventions (optional) |
+| `SOUL.md`   | Personality and tone guidance (optional)       |
+| `TOOLS.md`  | User-specific tool conventions (optional)      |
 
 ### Dynamic Context (assembled at runtime)
 
@@ -177,10 +180,10 @@ Skills are **selectively injected** — only relevant ones load to avoid prompt 
 
 Combines two signals for robust retrieval:
 
-| Signal | Weight | Strength |
-|--------|--------|----------|
-| Vector similarity (cosine) | 70% | Conceptual matching ("Mac Studio gateway" ≈ "the machine running the gateway") |
-| BM25 keyword | 30% | Exact token matching (IDs, env vars, code symbols) |
+| Signal                     | Weight | Strength                                                                       |
+| -------------------------- | ------ | ------------------------------------------------------------------------------ |
+| Vector similarity (cosine) | 70%    | Conceptual matching ("Mac Studio gateway" ≈ "the machine running the gateway") |
+| BM25 keyword               | 30%    | Exact token matching (IDs, env vars, code symbols)                             |
 
 **Embedding providers** (auto-selected): Local model → OpenAI → Gemini → disabled
 
@@ -203,11 +206,10 @@ A skill is simply a **directory containing a `SKILL.md` file** — no SDK, no co
 name: my-skill
 description: What this skill does
 requires:
-  bins: [ffmpeg, jq]       # CLI tools needed
-  env: [API_KEY]            # Env vars needed
-  config: [some.setting]    # Config keys needed
+  bins: [ffmpeg, jq] # CLI tools needed
+  env: [API_KEY] # Env vars needed
+  config: [some.setting] # Config keys needed
 ---
-
 # Instructions
 
 Markdown instructions that teach the agent how to perform this skill...
@@ -237,21 +239,22 @@ OpenClaw provides a rich set of built-in tools, declared via TypeBox schemas and
 
 ### Built-in Tools
 
-| Tool | Description |
-|------|-------------|
-| **Browser** | Chrome/Chromium automation via CDP (snapshots, navigation, uploads, profiles) |
-| **Canvas** | A2UI — agent-driven interactive visual workspaces (see section 8) |
-| **Bash** | Shell command execution (elevated mode with per-session toggle + allowlisting) |
-| **Cron** | Scheduled recurring tasks + webhook triggers |
-| **File ops** | Read/write workspace files |
-| **Node commands** | Camera snap/clip, screen recording, location, notifications (via paired devices) |
-| **Sessions** | Agent-to-agent: `sessions_list`, `sessions_send`, `sessions_history`, `sessions_spawn` |
+| Tool              | Description                                                                            |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| **Browser**       | Chrome/Chromium automation via CDP (snapshots, navigation, uploads, profiles)          |
+| **Canvas**        | A2UI — agent-driven interactive visual workspaces (see section 8)                      |
+| **Bash**          | Shell command execution (elevated mode with per-session toggle + allowlisting)         |
+| **Cron**          | Scheduled recurring tasks + webhook triggers                                           |
+| **File ops**      | Read/write workspace files                                                             |
+| **Node commands** | Camera snap/clip, screen recording, location, notifications (via paired devices)       |
+| **Sessions**      | Agent-to-agent: `sessions_list`, `sessions_send`, `sessions_history`, `sessions_spawn` |
 
 ### Cron & Webhooks (Autonomous Agent)
 
 A key architectural concept: **cron-triggered agentic loop**. Instead of only responding to human input, the agent is periodically woken up to evaluate tasks.
 
 Use cases:
+
 - Daily briefings sent to your WhatsApp
 - Website change monitoring
 - Calendar conflict surfacing
@@ -300,12 +303,12 @@ UI refreshes automatically
 
 ### Multi-Platform Rendering
 
-| Platform | Renderer |
-|----------|----------|
-| macOS | Native WebKit view |
-| iOS | Swift UI component |
-| Android | WebView |
-| Web | Browser tab |
+| Platform | Renderer           |
+| -------- | ------------------ |
+| macOS    | Native WebKit view |
+| iOS      | Swift UI component |
+| Android  | WebView            |
+| Web      | Browser tab        |
 
 ---
 
@@ -362,6 +365,7 @@ OpenClaw supports running **multiple isolated agent instances** from a single Ga
 ```
 
 Each agent gets:
+
 - Independent workspace and files
 - Own model configuration
 - Isolated session state
@@ -383,12 +387,12 @@ Environment variables → config file → defaults
 
 ### Key Sections
 
-| Section | Purpose |
-|---------|---------|
-| `channels.<platform>` | Authentication, allowlists, group policies |
-| `agents.mapping` | Route channels to agent instances |
-| `gateway` | Network binding, auth mode, control UI settings |
-| `experimental` | Feature flags for beta functionality |
+| Section               | Purpose                                         |
+| --------------------- | ----------------------------------------------- |
+| `channels.<platform>` | Authentication, allowlists, group policies      |
+| `agents.mapping`      | Route channels to agent instances               |
+| `gateway`             | Network binding, auth mode, control UI settings |
+| `experimental`        | Feature flags for beta functionality            |
 
 ---
 
@@ -417,25 +421,25 @@ Environment variables → config file → defaults
 
 ## 13. Deployment Patterns
 
-| Environment | Method |
-|-------------|--------|
-| **Local dev** | `openclaw gateway --verbose` in foreground, loopback-only |
+| Environment          | Method                                                      |
+| -------------------- | ----------------------------------------------------------- |
+| **Local dev**        | `openclaw gateway --verbose` in foreground, loopback-only   |
 | **macOS production** | LaunchAgent service + menu bar app for lifecycle management |
-| **Linux/VPS** | systemd user service + SSH tunnel or Tailscale Serve |
-| **Container** | Docker/Fly.io with persistent volume + strong auth |
-| **Cloudflare** | `cloudflare/moltworker` — runs on Workers |
+| **Linux/VPS**        | systemd user service + SSH tunnel or Tailscale Serve        |
+| **Container**        | Docker/Fly.io with persistent volume + strong auth          |
+| **Cloudflare**       | `cloudflare/moltworker` — runs on Workers                   |
 
 ---
 
 ## 14. Companion Apps & Nodes
 
-| Platform | Type | Capabilities |
-|----------|------|--------------|
-| **macOS** | Native Swift app | Menu bar control, Voice Wake, PTT overlay, WebChat, Canvas |
-| **iOS** | Native app | Device pairing, Canvas, camera, screen recording, voice |
-| **Android** | Native app | Connect/Chat/Voice tabs, device commands |
-| **Web** | Browser | WebChat UI served from Gateway |
-| **CLI** | Terminal | `openclaw` command: gateway, agent, message, pairing |
+| Platform    | Type             | Capabilities                                               |
+| ----------- | ---------------- | ---------------------------------------------------------- |
+| **macOS**   | Native Swift app | Menu bar control, Voice Wake, PTT overlay, WebChat, Canvas |
+| **iOS**     | Native app       | Device pairing, Canvas, camera, screen recording, voice    |
+| **Android** | Native app       | Connect/Chat/Voice tabs, device commands                   |
+| **Web**     | Browser          | WebChat UI served from Gateway                             |
+| **CLI**     | Terminal         | `openclaw` command: gateway, agent, message, pairing       |
 
 Device nodes connect as WebSocket clients and expose local capabilities (camera, location, notifications) to the agent via `node.invoke`.
 

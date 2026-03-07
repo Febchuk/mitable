@@ -368,4 +368,3 @@ Targets:
 3. Initial launch focus: summary/recap personalization first.
 4. Update cadence: nightly batch only.
 5. Agent integration: prefetched deterministic Top-K graph facts.
-
