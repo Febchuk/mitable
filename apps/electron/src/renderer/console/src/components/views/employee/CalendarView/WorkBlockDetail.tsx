@@ -57,10 +57,20 @@ import {
   Pause,
   AlertTriangle,
   RefreshCw,
+  Info,
+  Sparkles,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
 import { useBlockDetail } from "../../../../hooks/queries/calendar";
-import { useDeleteSession, useEndSession } from "../../../../hooks/queries/monitoring";
+import { useDeleteSession, useEndSession, useTriggerIntermediateSummary } from "../../../../hooks/queries/monitoring";
+import { useStartSession } from "../../../../hooks/useStartSession";
+
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface WorkBlockDetailProps {
   block: WorkBlock;
@@ -128,6 +138,8 @@ function getStatusColor(status: WorkBlock["status"]): { bg: string; text: string
     ready: { bg: "bg-cyan/20", text: "text-cyan" },
     delivered: { bg: "bg-violet/20", text: "text-violet" },
     failed: { bg: "bg-rose/20", text: "text-rose" },
+    starting: { bg: "bg-indigo/20", text: "text-indigo" },
+    deleting: { bg: "bg-rose/10", text: "text-rose" },
   };
   return colors[status] || colors.ended;
 }
@@ -154,6 +166,12 @@ export default function WorkBlockDetail({
   
   // End session mutation (used for retrying failed summaries)
   const endSessionMutation = useEndSession();
+
+  // Start session hook (used for retrying failed starts)
+  const { startSession, isStarting } = useStartSession({ showToasts: true, navigateOnSuccess: false });
+  
+  // Intermediate summary mutation
+  const intermediateSummaryMutation = useTriggerIntermediateSummary();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -191,6 +209,10 @@ export default function WorkBlockDetail({
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this block?")) return;
     try {
+      if (block.isActive) {
+        // Stop Electron capture loop locally if it's the active session
+        await window.consoleAPI.endMonitoringSession();
+      }
       await deleteSession.mutateAsync(block.id);
       onDelete?.(block.id);
     } catch (error) {
@@ -246,16 +268,6 @@ export default function WorkBlockDetail({
               <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
                 Block {blockNumber}
               </span>
-
-              {block.isActive && (
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald/20 text-emerald text-[10px] font-semibold uppercase tracking-wider">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald"></span>
-                  </span>
-                  Active
-                </span>
-              )}
             </div>
             <div className="text-sm text-ink-secondary mt-0.5 tabular-nums">{timeRange}</div>
           </div>
@@ -302,6 +314,18 @@ export default function WorkBlockDetail({
                     Paused
                   </span>
                 )}
+                {block.status === "starting" && (
+                  <span className="flex items-center gap-1">
+                    <Loader2 size={10} className="animate-spin" />
+                    Starting
+                  </span>
+                )}
+                {block.status === "deleting" && (
+                  <span className="flex items-center gap-1">
+                    <Loader2 size={10} className="animate-spin" />
+                    Deleting
+                  </span>
+                )}
                 {block.status === "summarizing" && (
                   <span className="flex items-center gap-1">
                     <Loader2 size={10} className="animate-spin" />
@@ -322,6 +346,46 @@ export default function WorkBlockDetail({
                   </span>
                 )}
               </div>
+
+              {(block.status === "active" || block.status === "paused") && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      intermediateSummaryMutation.mutate(block.id);
+                    }}
+                    disabled={intermediateSummaryMutation.isPending}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-indigo/10 hover:bg-indigo/20 text-indigo transition-colors border border-indigo/20 disabled:opacity-50"
+                  >
+                    {intermediateSummaryMutation.isPending ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={12} />
+                    )}
+                    <span className="text-[10px] font-semibold uppercase tracking-wider">
+                      Summarize
+                    </span>
+                  </button>
+                  <TooltipProvider>
+                    <Tooltip delayDuration={300}>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="text-ink-tertiary hover:text-ink-secondary cursor-help z-10 p-1"
+                          onClick={(e) => e.stopPropagation()}
+                          type="button"
+                        >
+                          <Info size={14} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p className="max-w-[200px] text-xs">
+                          Clicking this button will allow you to summarize the work that you have done so far without ending the block.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
               
               {block.status === "failed" && (
                 <button
@@ -329,18 +393,24 @@ export default function WorkBlockDetail({
                     e.stopPropagation();
                     setIsRetrying(true);
                     try {
-                      await endSessionMutation.mutateAsync({ sessionId: block.id });
+                      if (block.failedAction === "start") {
+                        await startSession();
+                      } else if (block.failedAction === "delete") {
+                        await deleteSession.mutateAsync(block.id);
+                      } else {
+                        await endSessionMutation.mutateAsync({ sessionId: block.id });
+                      }
                     } catch (err) {
                       console.error("Retry failed:", err);
                     } finally {
                       setIsRetrying(false);
                     }
                   }}
-                  disabled={isRetrying || endSessionMutation.isPending}
+                  disabled={isRetrying || endSessionMutation.isPending || deleteSession.isPending || isStarting}
                   className="p-1 text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted rounded transition-colors disabled:opacity-50"
-                  title="Retry summary generation"
+                  title={`Retry ${block.failedAction || 'summary generation'}`}
                 >
-                  <RefreshCw size={12} className={isRetrying || endSessionMutation.isPending ? "animate-spin" : ""} />
+                  <RefreshCw size={12} className={isRetrying || endSessionMutation.isPending || deleteSession.isPending || isStarting ? "animate-spin" : ""} />
                 </button>
               )}
             </div>
