@@ -195,8 +195,52 @@ export default function CalendarView() {
   // Fetch real data from backend
   const { data: realDays, isLoading: isLoadingDays, error: daysError } = useCalendarDays();
 
-  // Use real data only — no mock fallback (mock IDs cause backend 500 errors)
-  const allDays = realDays || [];
+  // Apply optimistic UI based on Electron state
+  // This instantly hides/updates blocks when "End Session" is clicked, masking backend delays
+  const allDays = useMemo(() => {
+    if (!realDays) return [];
+
+    // If Electron says session is ended, but backend still says active/paused
+    if (electronSessionActive === false) {
+      return realDays.map((day) => {
+        const optimisticBlocks = day.workBlocks
+          .map((block) => {
+            if (block.status === "active" || block.status === "paused") {
+              // Optimistic update
+              return {
+                ...block,
+                status: "summarizing" as const,
+              };
+            }
+            return block;
+          })
+          .filter((block) => {
+            // If it was originally an active/paused block and < 3 mins, filter it out
+            // We check the original block in day.workBlocks, or just its current optimistic summarizing state with the id
+            const originalBlock = day.workBlocks.find(b => b.id === block.id);
+            if (
+              originalBlock && 
+              (originalBlock.status === "active" || originalBlock.status === "paused") &&
+              block.duration < 3
+            ) {
+              return false;
+            }
+            return true;
+          });
+
+        // Recalculate total duration
+        const newTotalWorkTime = optimisticBlocks.reduce((sum, b) => sum + b.duration, 0);
+
+        return {
+          ...day,
+          workBlocks: optimisticBlocks,
+          totalWorkTime: newTotalWorkTime,
+        };
+      });
+    }
+
+    return realDays;
+  }, [realDays, electronSessionActive]);
 
   // Get week days with activity data
   const weekDays = useMemo(() => {

@@ -1116,56 +1116,13 @@ function setupIPC() {
           return monitoringSessionService.resumeSession();
         }
         case "end-session": {
-          // Check if user wants to be asked for summary preferences
-          const alwaysAsk = preferencesService.getAlwaysAskOnSessionEnd();
-
           const sessionState = monitoringSessionService.getSessionState();
           if (!sessionState?.id) {
             monitoringLogger.warn(" No active session found for end-session action");
             return { success: false, error: "No active session" };
           }
 
-          const sessionId = sessionState.id;
-
-          const sendToConsole = (send: () => void) => {
-            if (!consoleWindow || consoleWindow.isDestroyed()) {
-              createConsoleWindow();
-            }
-
-            if (consoleWindow && !consoleWindow.isDestroyed()) {
-              consoleWindow.show();
-              consoleWindow.focus();
-
-              if (consoleWindow.webContents.isLoading()) {
-                consoleWindow.webContents.once("did-finish-load", send);
-              } else {
-                send();
-              }
-            }
-          };
-
-          if (alwaysAsk) {
-            // Open Console and trigger the EndSessionDialog
-            monitoringLogger.info(" Always ask is enabled - showing Console with dialog");
-            sendToConsole(() => {
-              consoleWindow?.webContents.send(IPC_CHANNELS.NAVIGATE_TO_SESSION_DETAIL, {
-                sessionId,
-                openEndDialog: true,
-              });
-            });
-            return { success: true, dialogTriggered: true };
-          }
-
-          // User doesn't want dialog - use stored defaults
-          monitoringLogger.info(" Using stored summary defaults (dialog disabled)");
           const summaryDefaults = preferencesService.getSummaryDefaults();
-
-          sendToConsole(() => {
-            consoleWindow?.webContents.send(IPC_CHANNELS.NAVIGATE_TO_SESSION_DETAIL, {
-              sessionId,
-              showSummaryToast: true,
-            });
-          });
 
           const runEndSession = async () => {
             // 0. Stop audio recording before ending session (prevents runaway AudioWorklet)

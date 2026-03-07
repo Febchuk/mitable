@@ -55,10 +55,12 @@ import {
   Loader2,
   Send,
   Pause,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
 import { useBlockDetail } from "../../../../hooks/queries/calendar";
-import { useDeleteSession } from "../../../../hooks/queries/monitoring";
+import { useDeleteSession, useEndSession } from "../../../../hooks/queries/monitoring";
 
 interface WorkBlockDetailProps {
   block: WorkBlock;
@@ -125,6 +127,7 @@ function getStatusColor(status: WorkBlock["status"]): { bg: string; text: string
     summarizing: { bg: "bg-indigo/20", text: "text-indigo" },
     ready: { bg: "bg-cyan/20", text: "text-cyan" },
     delivered: { bg: "bg-violet/20", text: "text-violet" },
+    failed: { bg: "bg-rose/20", text: "text-rose" },
   };
   return colors[status] || colors.ended;
 }
@@ -139,6 +142,7 @@ export default function WorkBlockDetail({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   // Fetch full block details (includes summary) on demand
   const { data: blockDetail, isLoading: isLoadingDetail } = useBlockDetail(block.id, {
@@ -147,6 +151,9 @@ export default function WorkBlockDetail({
 
   // Delete mutation
   const deleteSession = useDeleteSession();
+  
+  // End session mutation (used for retrying failed summaries)
+  const endSessionMutation = useEndSession();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -274,41 +281,70 @@ export default function WorkBlockDetail({
             </span>
           </div>
 
-          {/* Status badge */}
-          {block.status && block.status !== "ended" && (
-            <div
-              className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${getStatusColor(block.status).bg} ${getStatusColor(block.status).text}`}
-            >
-              {block.status === "active" && (
-                <span className="flex items-center gap-1">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald"></span>
+          {/* Status badge and retry */}
+          {block.status && block.status !== "ended" ? (
+            <div className="flex items-center gap-2">
+              <div
+                className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${getStatusColor(block.status).bg} ${getStatusColor(block.status).text}`}
+              >
+                {block.status === "active" && (
+                  <span className="flex items-center gap-1">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald"></span>
+                    </span>
+                    Active
                   </span>
-                  Active
-                </span>
-              )}
-              {block.status === "paused" && (
-                <span className="flex items-center gap-1">
-                  <Pause size={10} />
-                  Paused
-                </span>
-              )}
-              {block.status === "summarizing" && (
-                <span className="flex items-center gap-1">
-                  <Loader2 size={10} className="animate-spin" />
-                  Summarizing
-                </span>
-              )}
-              {block.status === "ready" && "Ready"}
-              {block.status === "delivered" && (
-                <span className="flex items-center gap-1">
-                  <Send size={10} />
-                  Delivered
-                </span>
+                )}
+                {block.status === "paused" && (
+                  <span className="flex items-center gap-1">
+                    <Pause size={10} />
+                    Paused
+                  </span>
+                )}
+                {block.status === "summarizing" && (
+                  <span className="flex items-center gap-1">
+                    <Loader2 size={10} className="animate-spin" />
+                    Summarizing
+                  </span>
+                )}
+                {block.status === "ready" && "Ready"}
+                {block.status === "delivered" && (
+                  <span className="flex items-center gap-1">
+                    <Send size={10} />
+                    Delivered
+                  </span>
+                )}
+                {block.status === "failed" && (
+                  <span className="flex items-center gap-1">
+                    <AlertTriangle size={10} />
+                    Failed
+                  </span>
+                )}
+              </div>
+              
+              {block.status === "failed" && (
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    setIsRetrying(true);
+                    try {
+                      await endSessionMutation.mutateAsync({ sessionId: block.id });
+                    } catch (err) {
+                      console.error("Retry failed:", err);
+                    } finally {
+                      setIsRetrying(false);
+                    }
+                  }}
+                  disabled={isRetrying || endSessionMutation.isPending}
+                  className="p-1 text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted rounded transition-colors disabled:opacity-50"
+                  title="Retry summary generation"
+                >
+                  <RefreshCw size={12} className={isRetrying || endSessionMutation.isPending ? "animate-spin" : ""} />
+                </button>
               )}
             </div>
-          )}
+          ) : null}
 
           {/* Block menu */}
           <div className="relative" ref={menuRef}>

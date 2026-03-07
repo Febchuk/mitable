@@ -184,6 +184,7 @@ function mapStatus(sessionStatus: string): WorkBlockStatus {
     summarizing: "summarizing",
     ready: "ready",
     delivered: "delivered",
+    failed: "failed",
   };
   return statusMap[sessionStatus] || "ended";
 }

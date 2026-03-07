@@ -754,7 +754,7 @@ router.post(
       });
 
       // Calculate final duration
-      let endTime = new Date();
+      let endTime = session.endedAt ? new Date(session.endedAt) : new Date();
       const startTime = new Date(session.startedAt).getTime();
       let totalPausedMs = session.totalPausedMs || 0;
 
@@ -1186,10 +1186,10 @@ router.post(
           log.error("Session end processing failed", {
             error: error instanceof Error ? error.message : String(error),
           });
-          // Update status to indicate completion (even without story)
+          // Update status to indicate failure
           await db
             .update(schema.monitoringSessions)
-            .set({ status: "ready", summarizationProgress: null, ingestionStatus: "ingesting" })
+            .set({ status: "failed", summarizationProgress: null, ingestionStatus: "ingesting" })
             .where(eq(schema.monitoringSessions.id, id));
 
           // Still attempt recap from raw classifications even when story generation failed

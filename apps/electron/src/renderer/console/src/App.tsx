@@ -277,6 +277,91 @@ function RecapNotificationHandler() {
   return null;
 }
 
+// Failed summary notification handler — polls sessions to detect newly failed ones and fires OS notification.
+function FailedSummaryNotificationHandler() {
+  const { user } = useUser();
+  const navigate = useNavigate();
+  // Track known failed sessions to avoid spamming
+  const knownFailedKeysRef = useRef<Set<string> | null>(null); // null = not yet initialized
+  const latestFailedIdRef = useRef<string | null>(null);
+
+  // Poll sessions directly to find ones with status="failed"
+  const { data: failedSessions } = useQuery({
+    queryKey: ["failed-summary-notification-poll"],
+    queryFn: async () => {
+      const res = await monitoringService.fetchAllSessions();
+      return res.filter((s: any) => s.status === "failed");
+    },
+    enabled: !!user,
+    refetchInterval: 10000, // check every 10s
+    refetchIntervalInBackground: true,
+  });
+
+  useEffect(() => {
+    if (!failedSessions) return;
+
+    const failedKey = (s: { id: string }) => s.id;
+    const known = knownFailedKeysRef.current;
+
+    // First load — seed known keys, don't fire notifications
+    if (known === null) {
+      knownFailedKeysRef.current = new Set(failedSessions.map(failedKey));
+      return;
+    }
+
+    // Check for new failed sessions
+    for (const session of failedSessions) {
+      const key = failedKey(session);
+      if (!known.has(key)) {
+        logger.info("New failed session detected, firing notification", {
+          sessionId: session.id,
+        });
+
+        latestFailedIdRef.current = session.id;
+        // Auto-expire after 60s
+        setTimeout(() => {
+          if (latestFailedIdRef.current === session.id) latestFailedIdRef.current = null;
+        }, 60000);
+
+        // Fire notification
+        const notifMsg = `The summary for your recent session failed to generate. Click to retry.`;
+        if (window.consoleAPI?.showRecapNotification) {
+          window.consoleAPI.showRecapNotification({ title: "Summary Failed", message: notifMsg });
+        } else {
+          try {
+            new Notification("Summary Failed", { body: notifMsg });
+          } catch {
+            /* ignore */
+          }
+        }
+
+        // Only notify once per poll cycle
+        break;
+      }
+    }
+
+    // Update known set
+    knownFailedKeysRef.current = new Set(failedSessions.map(failedKey));
+  }, [failedSessions]);
+
+  // Navigate to calendar when window gets focus after notification click
+  useEffect(() => {
+    const handleFocus = () => {
+      if (latestFailedIdRef.current) {
+        latestFailedIdRef.current = null;
+        navigate("/calendar");
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [navigate]);
+
+  return null;
+}
+
 // Default route
 function DefaultRoute() {
   const { user } = useUser();
@@ -339,6 +424,7 @@ function App() {
           <UpdateProvider>
             <UserProvider>
               <RecapNotificationHandler />
+              <FailedSummaryNotificationHandler />
               <VariantWrapper>
                 <DevFlagsProvider>
                   <RecapsProvider>
