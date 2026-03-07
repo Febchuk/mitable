@@ -24,8 +24,12 @@ async function run() {
     console.log(`  - Synced users: ${result.syncedUsers}`);
     console.log(`  - Synced workstreams: ${result.syncedWorkstreams}`);
     console.log(`  - Synced preferences: ${result.syncedPreferences}`);
-    console.log(`  - Synced app behaviors: ${"syncedAppBehaviors" in result ? (result as any).syncedAppBehaviors : "n/a"}`);
-    console.log(`  - Synced patterns: ${"syncedPatterns" in result ? (result as any).syncedPatterns : "n/a"}`);
+    console.log(
+      `  - Synced app behaviors: ${"syncedAppBehaviors" in result ? (result as any).syncedAppBehaviors : "n/a"}`
+    );
+    console.log(
+      `  - Synced patterns: ${"syncedPatterns" in result ? (result as any).syncedPatterns : "n/a"}`
+    );
     console.log(`  - Duration: ${result.durationMs}ms`);
     console.log(`  - Started: ${result.startedAt}`);
     console.log(`  - Finished: ${result.finishedAt}`);

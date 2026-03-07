@@ -2325,7 +2325,9 @@ router.get(
         .limit(1);
 
       if (!targetUser || targetUser.organizationId !== admin.organizationId) {
-        res.status(404).json({ error: "Not Found", message: "User not found in your organization" });
+        res
+          .status(404)
+          .json({ error: "Not Found", message: "User not found in your organization" });
         return;
       }
 
@@ -2349,7 +2351,9 @@ router.get(
       });
     } catch (error) {
       logger.error({ error: String(error) }, "Error fetching user graph work insights");
-      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch work insights" });
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: "Failed to fetch work insights" });
     }
   }
 );
@@ -2408,7 +2412,9 @@ router.get(
       });
     } catch (error) {
       logger.error({ error: String(error) }, "Error fetching org common tasks");
-      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch common tasks" });
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: "Failed to fetch common tasks" });
     }
   }
 );
@@ -2473,7 +2479,11 @@ router.get(
             overview: payload.overview || {},
             categories: payload.categories || [],
             workflowDistribution: [],
-            confidenceMetadata: { dataWindow: window, sourceTypes: ["snapshot"], confidenceLevel: "medium" },
+            confidenceMetadata: {
+              dataWindow: window,
+              sourceTypes: ["snapshot"],
+              confidenceLevel: "medium",
+            },
             trend: { direction: "flat", delta: 0 },
           });
           return;
@@ -2563,7 +2573,8 @@ router.get(
 
       const currentMinutes = Number(overview?.totalDurationMinutes || 0);
       const prevMinutes = Number(prevOverview?.totalDurationMinutes || 0);
-      const delta = prevMinutes > 0 ? Math.round(((currentMinutes - prevMinutes) / prevMinutes) * 100) : 0;
+      const delta =
+        prevMinutes > 0 ? Math.round(((currentMinutes - prevMinutes) / prevMinutes) * 100) : 0;
       const direction = delta > 5 ? "up" : delta < -5 ? "down" : "flat";
 
       // Confidence metadata
@@ -2604,7 +2615,9 @@ router.get(
       });
     } catch (error) {
       logger.error({ error: String(error) }, "Error fetching org workflow insights");
-      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch workflow insights" });
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: "Failed to fetch workflow insights" });
     }
   }
 );
@@ -2665,7 +2678,9 @@ router.get(
         .limit(1);
 
       if (!targetUser || targetUser.organizationId !== admin.organizationId) {
-        res.status(404).json({ error: "Not Found", message: "User not found in your organization" });
+        res
+          .status(404)
+          .json({ error: "Not Found", message: "User not found in your organization" });
         return;
       }
 
@@ -2688,7 +2703,9 @@ router.get(
       });
     } catch (error) {
       logger.error({ error: String(error) }, "Error fetching user workflow patterns");
-      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch workflow patterns" });
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: "Failed to fetch workflow patterns" });
     }
   }
 );

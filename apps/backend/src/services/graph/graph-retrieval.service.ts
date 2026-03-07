@@ -3,7 +3,11 @@ import { db } from "../../db/client";
 import * as schema from "../../db/schema/index";
 import { config } from "../../config";
 import type { GraphFact, AppBehaviorFact, UserGraphProfileV2 } from "./types";
-import { APP_NAME_ALIASES, TOP_ACTIVITIES_PER_APP, MIN_PATTERN_SUPPORT } from "./task-archetype-map";
+import {
+  APP_NAME_ALIASES,
+  TOP_ACTIVITIES_PER_APP,
+  MIN_PATTERN_SUPPORT,
+} from "./task-archetype-map";
 
 class GraphRetrievalService {
   async getUserGraphProfile(userId: string, orgId: string): Promise<UserGraphProfileV2> {
@@ -250,9 +254,7 @@ class GraphRetrievalService {
       });
     }
 
-    return patterns
-      .sort((a, b) => b.score - a.score)
-      .slice(0, config.graph.topKFacts);
+    return patterns.sort((a, b) => b.score - a.score).slice(0, config.graph.topKFacts);
   }
 
   /**

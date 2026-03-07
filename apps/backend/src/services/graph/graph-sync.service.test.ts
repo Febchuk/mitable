@@ -19,8 +19,19 @@ jest.mock("../../db/client", () => ({
   },
 }));
 jest.mock("../../db/schema/index", () => ({
-  monitoringSessions: { userId: "userId", organizationId: "organizationId", updatedAt: "updatedAt", id: "id" },
-  sessionWorkstreams: { id: "id", updatedAt: "updatedAt", sessionId: "sessionId", totalDurationMinutes: "totalDurationMinutes", category: "category" },
+  monitoringSessions: {
+    userId: "userId",
+    organizationId: "organizationId",
+    updatedAt: "updatedAt",
+    id: "id",
+  },
+  sessionWorkstreams: {
+    id: "id",
+    updatedAt: "updatedAt",
+    sessionId: "sessionId",
+    totalDurationMinutes: "totalDurationMinutes",
+    category: "category",
+  },
   userMemories: { updatedAt: "updatedAt", category: "category" },
   graphSyncRuns: { id: "id" },
   graphSyncWatermarks: { source: "source", watermarkTs: "watermarkTs" },
@@ -28,7 +39,15 @@ jest.mock("../../db/schema/index", () => ({
 }));
 jest.mock("../../config", () => ({
   config: {
-    graph: { enabled: true, lookbackDays: 30, topKFacts: 10, uri: "http://localhost:7474", database: "neo4j", user: "neo4j", password: "test" },
+    graph: {
+      enabled: true,
+      lookbackDays: 30,
+      topKFacts: 10,
+      uri: "http://localhost:7474",
+      database: "neo4j",
+      user: "neo4j",
+      password: "test",
+    },
   },
 }));
 jest.mock("../../lib/logger", () => ({
@@ -56,14 +75,37 @@ jest.mock("./graph-retrieval.service", () => ({
       personKey: "cGVyc29uS2V5",
       orgId: "org-1",
       topTasks: [
-        { factType: "top_task", subject: "user", relation: "PERFORMS", object: "coding", score: 120, evidenceCount: 5, lastSeenAt: new Date().toISOString() },
+        {
+          factType: "top_task",
+          subject: "user",
+          relation: "PERFORMS",
+          object: "coding",
+          score: 120,
+          evidenceCount: 5,
+          lastSeenAt: new Date().toISOString(),
+        },
       ],
       topApps: [
-        { factType: "top_app", subject: "user", relation: "USES_APP", object: "VS Code", score: 50, evidenceCount: 50, lastSeenAt: new Date().toISOString() },
+        {
+          factType: "top_app",
+          subject: "user",
+          relation: "USES_APP",
+          object: "VS Code",
+          score: 50,
+          evidenceCount: 50,
+          lastSeenAt: new Date().toISOString(),
+        },
       ],
       patterns: [],
       preferences: [
-        { factType: "style_preference", subject: "user", relation: "PREFERS", object: "summary_style: concise", score: 1, evidenceCount: 1 },
+        {
+          factType: "style_preference",
+          subject: "user",
+          relation: "PREFERS",
+          object: "summary_style: concise",
+          score: 1,
+          evidenceCount: 1,
+        },
       ],
       domains: [],
       appBehaviors: [],
@@ -108,7 +150,13 @@ jest.mock("./graph-mapper.service", () => ({
       stats: {
         rawEventCount: 100,
         afterDedupeCount: 80,
-        stageTimingsMs: { stageA_extractMs: 50, stageA_dedupeMs: 5, stageB_ms: 10, stageC_ms: 15, stageD_ms: 20 },
+        stageTimingsMs: {
+          stageA_extractMs: 50,
+          stageA_dedupeMs: 5,
+          stageB_ms: 10,
+          stageC_ms: 15,
+          stageD_ms: 20,
+        },
       },
     }),
   },
@@ -145,7 +193,11 @@ describe("GraphSyncService", () => {
           }),
         }),
         leftJoin: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([{ sessionCount: 0, userCount: 0, workstreamCount: 0, totalDurationMinutes: 0 }]),
+          where: jest
+            .fn()
+            .mockResolvedValue([
+              { sessionCount: 0, userCount: 0, workstreamCount: 0, totalDurationMinutes: 0 },
+            ]),
         }),
         innerJoin: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
@@ -189,6 +241,7 @@ describe("GraphSyncService", () => {
     });
 
     it("calls mapper pipeline on successful sync", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { graphMapperService } = require("./graph-mapper.service");
       const result = await graphSyncService.runNightlySync();
       expect(result.success).toBe(true);

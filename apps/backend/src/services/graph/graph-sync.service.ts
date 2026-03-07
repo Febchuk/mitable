@@ -38,7 +38,13 @@ class GraphSyncService {
       .where(gte(schema.monitoringSessions.updatedAt, since));
 
     if (users.length === 0) {
-      return { syncedUsers: 0, syncedAppBehaviors: 0, syncedPatterns: 0, syncedPreferences: 0, pipelineStats: undefined };
+      return {
+        syncedUsers: 0,
+        syncedAppBehaviors: 0,
+        syncedPatterns: 0,
+        syncedPreferences: 0,
+        pipelineStats: undefined,
+      };
     }
 
     // Run the full pipeline (Stages A-D)

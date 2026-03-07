@@ -49,13 +49,7 @@ export interface GraphSyncResult {
 
 export type SourceType = "session_capture" | "workstream" | "workflow_interaction" | "persona_seed";
 
-export type ActionType =
-  | "typing"
-  | "clicking"
-  | "scrolling"
-  | "viewing"
-  | "navigating"
-  | "unknown";
+export type ActionType = "typing" | "clicking" | "scrolling" | "viewing" | "navigating" | "unknown";
 
 export interface ActivityEvent {
   eventId: string;

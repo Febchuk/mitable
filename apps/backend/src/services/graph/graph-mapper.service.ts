@@ -145,7 +145,10 @@ class GraphMapperService {
         actionType: null,
         sourceType: "workstream",
         confidence: SOURCE_RELIABILITY_WEIGHTS.workstream!,
-        metadata: { category: row.category, appsUsed: appsUsed.map((a) => this.normalizeAppName(a as string)) },
+        metadata: {
+          category: row.category,
+          appsUsed: appsUsed.map((a) => this.normalizeAppName(a as string)),
+        },
       });
     }
 
@@ -279,9 +282,8 @@ class GraphMapperService {
       const sameWindow = current.windowTitle === last.windowTitle;
       const sameActivity = current.activityDescription === last.activityDescription;
       const withinWindow =
-        Math.abs(
-          new Date(current.occurredAt).getTime() - new Date(last.occurredAt).getTime()
-        ) <= DEDUPE_WINDOW_MS;
+        Math.abs(new Date(current.occurredAt).getTime() - new Date(last.occurredAt).getTime()) <=
+        DEDUPE_WINDOW_MS;
 
       if (sameUser && sameApp && sameWindow && sameActivity && withinWindow) {
         // Keep higher confidence
@@ -337,8 +339,7 @@ class GraphMapperService {
       const topThree = topActivities.slice(0, 3).join(", ");
       const behaviorStatement = `User primarily uses ${first.appName} for ${topThree}`;
 
-      const avgConfidence =
-        group.reduce((sum, e) => sum + e.confidence, 0) / group.length;
+      const avgConfidence = group.reduce((sum, e) => sum + e.confidence, 0) / group.length;
 
       behaviors.push({
         appName: first.appName!,
@@ -471,8 +472,7 @@ class GraphMapperService {
 
       for (let i = 1; i < sorted.length; i++) {
         const gap =
-          new Date(sorted[i]!.occurredAt).getTime() -
-          new Date(sorted[i - 1]!.occurredAt).getTime();
+          new Date(sorted[i]!.occurredAt).getTime() - new Date(sorted[i - 1]!.occurredAt).getTime();
 
         if (gap > EPISODE_GAP_MS) {
           episodes.push(currentEpisode);
@@ -490,7 +490,10 @@ class GraphMapperService {
           const archetype = this.resolveArchetype(event);
           if (!archetype) continue;
           // Dedup consecutive duplicates
-          if (archetypeChain.length === 0 || archetypeChain[archetypeChain.length - 1] !== archetype) {
+          if (
+            archetypeChain.length === 0 ||
+            archetypeChain[archetypeChain.length - 1] !== archetype
+          ) {
             archetypeChain.push(archetype);
           }
         }

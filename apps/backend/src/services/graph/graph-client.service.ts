@@ -15,10 +15,7 @@ class GraphClientService {
       throw new Error("GRAPH_URI is not configured");
     }
 
-    this.driver = neo4j.driver(
-      uri,
-      neo4j.auth.basic(config.graph.user, config.graph.password)
-    );
+    this.driver = neo4j.driver(uri, neo4j.auth.basic(config.graph.user, config.graph.password));
 
     return this.driver;
   }
@@ -31,7 +28,10 @@ class GraphClientService {
     return config.graph.database;
   }
 
-  async runQuery<T = unknown>(statement: string, parameters: Record<string, unknown> = {}): Promise<T[]> {
+  async runQuery<T = unknown>(
+    statement: string,
+    parameters: Record<string, unknown> = {}
+  ): Promise<T[]> {
     if (!this.isEnabled()) return [];
 
     const driver = this.getDriver();

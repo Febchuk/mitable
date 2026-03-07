@@ -1,4 +1,13 @@
-import { pgTable, uuid, timestamp, integer, text, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  timestamp,
+  integer,
+  text,
+  boolean,
+  jsonb,
+  index,
+} from "drizzle-orm/pg-core";
 
 /**
  * Tracks each graph sync execution for observability and incident debugging.
@@ -56,7 +65,10 @@ export const workflowVisibilitySnapshots = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    orgWindowIdx: index("idx_workflow_visibility_org_window").on(table.organizationId, table.window),
+    orgWindowIdx: index("idx_workflow_visibility_org_window").on(
+      table.organizationId,
+      table.window
+    ),
     userWindowIdx: index("idx_workflow_visibility_user_window").on(table.userId, table.window),
   })
 );

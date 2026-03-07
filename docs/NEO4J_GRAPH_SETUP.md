@@ -69,28 +69,28 @@ Expected outcome:
 
 ### Node Types
 
-| Label | Key Properties | Description |
-|-------|---------------|-------------|
-| `Organization` | `orgId` | Tenant org |
-| `Person` | `personKey`, `orgId` | Pseudonymized user |
-| `App` | `name` | Normalized application (e.g., "VS Code", "Chrome") |
-| `AppBehavior` | `key` | Per-user app usage summary with `statement`, `topActivities`, `evidenceCount` |
-| `TaskArchetype` | `name` | Canonical task type (e.g., "code_authoring", "debugging") with `displayName`, `domainKey` |
-| `Preference` | `value` | User style/recap preference |
-| `WorkflowPattern` | `patternKey` | Recurring task sequence with `taskChain`, `supportCount`, `avgDurationMinutes` |
+| Label             | Key Properties       | Description                                                                               |
+| ----------------- | -------------------- | ----------------------------------------------------------------------------------------- |
+| `Organization`    | `orgId`              | Tenant org                                                                                |
+| `Person`          | `personKey`, `orgId` | Pseudonymized user                                                                        |
+| `App`             | `name`               | Normalized application (e.g., "VS Code", "Chrome")                                        |
+| `AppBehavior`     | `key`                | Per-user app usage summary with `statement`, `topActivities`, `evidenceCount`             |
+| `TaskArchetype`   | `name`               | Canonical task type (e.g., "code_authoring", "debugging") with `displayName`, `domainKey` |
+| `Preference`      | `value`              | User style/recap preference                                                               |
+| `WorkflowPattern` | `patternKey`         | Recurring task sequence with `taskChain`, `supportCount`, `avgDurationMinutes`            |
 
 ### Edge Types
 
-| Edge | From | To | Properties | Description |
-|------|------|----|------------|-------------|
-| `MEMBER_OF` | Person | Organization | — | Org membership |
-| `USES_APP` | Person | App | `weight`, `evidenceCount` | User uses application |
-| `DOES_IN_APP` | Person | AppBehavior | `weight` | User's behavior within an app |
-| `FOR_APP` | AppBehavior | App | — | Links behavior to its application |
-| `PERFORMS` | Person | TaskArchetype | `weight`, `evidenceCount` | User performs this task type |
-| `PREFERS` | Person | Preference | `weight` | User style preference |
-| `FOLLOWS_PATTERN` | Person | WorkflowPattern | — | User exhibits this workflow pattern |
-| `INCLUDES_TASK` | WorkflowPattern | TaskArchetype | `orderIndex` | Task in the pattern chain |
+| Edge              | From            | To              | Properties                | Description                         |
+| ----------------- | --------------- | --------------- | ------------------------- | ----------------------------------- |
+| `MEMBER_OF`       | Person          | Organization    | —                         | Org membership                      |
+| `USES_APP`        | Person          | App             | `weight`, `evidenceCount` | User uses application               |
+| `DOES_IN_APP`     | Person          | AppBehavior     | `weight`                  | User's behavior within an app       |
+| `FOR_APP`         | AppBehavior     | App             | —                         | Links behavior to its application   |
+| `PERFORMS`        | Person          | TaskArchetype   | `weight`, `evidenceCount` | User performs this task type        |
+| `PREFERS`         | Person          | Preference      | `weight`                  | User style preference               |
+| `FOLLOWS_PATTERN` | Person          | WorkflowPattern | —                         | User exhibits this workflow pattern |
+| `INCLUDES_TASK`   | WorkflowPattern | TaskArchetype   | `orderIndex`              | Task in the pattern chain           |
 
 ### Activity Resolution Pipeline
 
