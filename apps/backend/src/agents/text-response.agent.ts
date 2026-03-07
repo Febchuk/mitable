@@ -68,11 +68,23 @@ export class TextResponseAgent extends BaseAgent {
       // Use Gemini Flash for cost-effective generation
       const model = this.gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
 
+      const graphContextBlock =
+        context.graphContext &&
+        (context.graphContext.summaryFacts.length > 0 ||
+          context.graphContext.personalizationHints.length > 0)
+          ? `\nINFERRED WORKFLOW CONTEXT:\n- ${[
+              ...context.graphContext.summaryFacts,
+              ...context.graphContext.personalizationHints,
+            ].join(
+              "\n- "
+            )}\nUse this context for relevance and personalization, but do not claim certainty beyond the provided facts.`
+          : "";
+
       // Simple system context
       const systemPrompt = `You are an experienced employee assistant helping new hires ramp up quickly at their company.
 You have deep product knowledge and guide people through their work like an expert colleague who's always available to help.
 
-Be DIRECT and FACTUAL. Answer the question with facts, then stop. You're a colleague, not a professor analyzing their work.`;
+Be DIRECT and FACTUAL. Answer the question with facts, then stop. You're a colleague, not a professor analyzing their work.${graphContextBlock}`;
 
       let prompt: string;
 

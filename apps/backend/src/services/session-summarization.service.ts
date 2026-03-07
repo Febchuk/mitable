@@ -25,6 +25,7 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, and, desc } from "drizzle-orm";
 import { masterStoryService } from "./master-story.service";
+import { graphContextBuilderService } from "./graph/graph-context-builder.service";
 import {
   createSessionLogger,
   createContentHash,
@@ -380,6 +381,35 @@ class SessionSummarizationService {
    * Refine master story for delivery
    * Optionally formats and extracts structured data
    */
+  private buildGraphContextPromptBlock(block?: {
+    summaryFacts: string[];
+    personalizationHints: string[];
+    confidenceNotes: string[];
+  }): string {
+    if (!block) return "";
+
+    const sections: string[] = [];
+    if (block.summaryFacts.length > 0) {
+      sections.push(
+        `- Observed work profile:\n${block.summaryFacts.map((v) => `  - ${v}`).join("\n")}`
+      );
+    }
+    if (block.personalizationHints.length > 0) {
+      sections.push(
+        `- Personalization hints:\n${block.personalizationHints.map((v) => `  - ${v}`).join("\n")}`
+      );
+    }
+    if (block.confidenceNotes.length > 0) {
+      sections.push(
+        `- Confidence notes:\n${block.confidenceNotes.map((v) => `  - ${v}`).join("\n")}`
+      );
+    }
+
+    if (sections.length === 0) return "";
+
+    return `\n<graph_context>\nUse these inferred workflow insights to shape emphasis and wording, but do not invent facts that are not in the session data:\n${sections.join("\n")}\n</graph_context>\n`;
+  }
+
   private async refineMasterStoryForDelivery(
     masterStory: string,
     sessionId: string
@@ -401,7 +431,7 @@ class SessionSummarizationService {
     // Look up user preferences from user_memories
     const session = await db.query.monitoringSessions.findFirst({
       where: eq(schema.monitoringSessions.id, sessionId),
-      columns: { userId: true },
+      columns: { userId: true, organizationId: true },
     });
 
     let userPrefsBlock = "";
@@ -423,6 +453,21 @@ class SessionSummarizationService {
       }
     }
 
+    let graphContextBlock = "";
+    if (session?.userId && session.organizationId && config.graph.enabled) {
+      try {
+        const graphContext = await graphContextBuilderService.buildForUser(
+          session.userId,
+          session.organizationId
+        );
+        graphContextBlock = this.buildGraphContextPromptBlock(graphContext);
+      } catch (error) {
+        log.warn("Failed to load graph context for summary refinement", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     // Use Groq to extract structured data from the master story
     const prompt = `<task>
 Extract structured information from a work session narrative written in first person. Transform the detailed narrative into a concise, delivery-ready summary with key insights.
@@ -434,6 +479,7 @@ ${masterStory}
 </master_story>
 </input>
 ${userPrefsBlock}
+${graphContextBlock}
 <instructions>
 <summary_requirements>
 - Length: Under 10 sentences
@@ -1483,6 +1529,30 @@ Example good output:
       }
     }
 
+    let graphContextSection = "";
+    if (userId && config.graph.enabled) {
+      try {
+        const [user] = await db
+          .select({ organizationId: schema.users.organizationId })
+          .from(schema.users)
+          .where(eq(schema.users.id, userId))
+          .limit(1);
+
+        if (user?.organizationId) {
+          const graphContext = await graphContextBuilderService.buildForUser(
+            userId,
+            user.organizationId
+          );
+          graphContextSection = this.buildGraphContextPromptBlock(graphContext);
+        }
+      } catch (error) {
+        logger.warn(
+          { error: error instanceof Error ? error.message : String(error), userId },
+          "Failed to load graph context for recap generation"
+        );
+      }
+    }
+
     const prompt = `You are writing a work recap that combines multiple work sessions into a single update.
 
 <sessions>
@@ -1492,6 +1562,7 @@ ${sessionList}
 <tone>${toneInstructions[tone] || toneInstructions.professional}</tone>
 <length>${lengthInstructions[length] || lengthInstructions.standard}</length>
 ${styleSection}
+${graphContextSection}
 <instructions>
 - Write in first person ("I worked on...", "I completed...")
 - Combine related activities across sessions into coherent themes

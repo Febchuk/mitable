@@ -21,6 +21,7 @@ export * from "./document-refinement-chats.schema";
 export * from "./recaps.schema";
 export * from "./daily-activities.schema";
 export * from "./ask-threads.schema";
+export * from "./graph-sync.schema";
 
 // GitHub schemas
 export * from "./github/github-repos.schema";

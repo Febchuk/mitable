@@ -19,6 +19,7 @@ import * as schema from "../db/schema/index.js";
 import { eq, and, inArray, asc } from "drizzle-orm";
 import { config } from "../config.js";
 import { createLogger } from "../lib/logger.js";
+import { graphContextBuilderService } from "./graph/graph-context-builder.service";
 
 const logger = createLogger({ context: "recap-rlm" });
 
@@ -52,6 +53,24 @@ interface SessionBlock {
 }
 
 class RecapRLMService {
+  private buildGraphContextPromptBlock(block?: {
+    summaryFacts: string[];
+    personalizationHints: string[];
+    confidenceNotes: string[];
+  }): string {
+    if (!block) return "";
+
+    const lines = [
+      ...block.summaryFacts,
+      ...block.personalizationHints,
+      ...block.confidenceNotes,
+    ].filter(Boolean);
+
+    if (lines.length === 0) return "";
+
+    return `\n<graph_context>\nUse these inferred workflow insights to improve relevance and personalization, but do not invent facts not present in activity_data:\n${lines.map((line) => `- ${line}`).join("\n")}\n</graph_context>\n`;
+  }
+
   /**
    * Generate a recap from raw capture classifications for given session IDs.
    * Never depends on session summaries.
@@ -141,8 +160,32 @@ class RecapRLMService {
       return "No activity data was captured during these sessions.";
     }
 
+    let graphContextBlock = "";
+    if (config.graph.enabled) {
+      try {
+        const [user] = await db
+          .select({ organizationId: schema.users.organizationId })
+          .from(schema.users)
+          .where(eq(schema.users.id, userId))
+          .limit(1);
+
+        if (user?.organizationId) {
+          const context = await graphContextBuilderService.buildForUser(
+            userId,
+            user.organizationId
+          );
+          graphContextBlock = this.buildGraphContextPromptBlock(context);
+        }
+      } catch (error) {
+        logger.warn(
+          { userId, error: error instanceof Error ? error.message : String(error) },
+          "Failed to load graph context for recap RLM"
+        );
+      }
+    }
+
     // 3. Build prompt and call LLM
-    const prompt = this.buildPrompt(blocks, tone, length);
+    const prompt = this.buildPrompt(blocks, tone, length, graphContextBlock);
     const recap = await this.callLLM(prompt);
 
     logger.info(
@@ -294,7 +337,12 @@ class RecapRLMService {
   /**
    * Build the LLM prompt from clustered activity data.
    */
-  private buildPrompt(blocks: SessionBlock[], tone: string, length: string): string {
+  private buildPrompt(
+    blocks: SessionBlock[],
+    tone: string,
+    length: string,
+    graphContextBlock: string = ""
+  ): string {
     const toneInstructions: Record<string, string> = {
       professional:
         "Use a professional, polished tone suitable for a manager or stakeholder update.",
@@ -339,6 +387,7 @@ ${blockSections}
 
 <tone>${toneInstructions[tone] || toneInstructions.professional}</tone>
 <length>${lengthInstructions[length] || lengthInstructions.standard}</length>
+${graphContextBlock}
 
 <instructions>
 - Write in first person ("I worked on...", "I completed...")
