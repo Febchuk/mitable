@@ -317,6 +317,7 @@ function createWatchingPillWindow() {
     height: windowHeight,
     x: screenWidth - windowWidth - rightMargin,
     y: Math.floor((screenHeight - windowHeight) / 2),
+    type: "panel",
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -332,7 +333,7 @@ function createWatchingPillWindow() {
 
   // Platform-specific always-on-top behavior
   if (process.platform === "darwin") {
-    watchingPillWindow.setAlwaysOnTop(true, "modal-panel");
+    watchingPillWindow.setAlwaysOnTop(true, "screen-saver", 1);
     watchingPillWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillWindow.setAlwaysOnTop(true, "normal", 1);
@@ -404,6 +405,7 @@ function createWatchingPillEyeDropdown() {
     height: 280,
     x: pillBounds.x - 250, // Left of pill
     y: pillBounds.y + 40, // Below eye button position
+    type: "panel",
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -420,7 +422,8 @@ function createWatchingPillEyeDropdown() {
 
   // Platform-specific always-on-top
   if (process.platform === "darwin") {
-    watchingPillEyeDropdown.setAlwaysOnTop(true, "modal-panel");
+    watchingPillEyeDropdown.setAlwaysOnTop(true, "screen-saver", 1);
+    watchingPillEyeDropdown.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillEyeDropdown.setAlwaysOnTop(true, "normal", 1);
   }
@@ -464,6 +467,7 @@ function createWatchingPillMenuDropdown() {
     height: 100,
     x: pillBounds.x - 170, // Left of pill
     y: pillBounds.y + 90, // Below menu button position
+    type: "panel",
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -480,7 +484,8 @@ function createWatchingPillMenuDropdown() {
 
   // Platform-specific always-on-top
   if (process.platform === "darwin") {
-    watchingPillMenuDropdown.setAlwaysOnTop(true, "modal-panel");
+    watchingPillMenuDropdown.setAlwaysOnTop(true, "screen-saver", 1);
+    watchingPillMenuDropdown.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillMenuDropdown.setAlwaysOnTop(true, "normal", 1);
   }
