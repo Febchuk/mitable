@@ -1,32 +1,26 @@
+import neo4j, { type Driver, type Session } from "neo4j-driver";
 import { config } from "../../config";
 import { createLogger } from "../../lib/logger";
 
 const logger = createLogger({ context: "graph-client" });
 
-interface Neo4jHttpResponse {
-  results?: Array<{ data?: Array<{ row?: any[] }> }>;
-  errors?: Array<{ code: string; message: string }>;
-}
-
 class GraphClientService {
-  private getBaseHttpUri(): string {
+  private driver: Driver | null = null;
+
+  private getDriver(): Driver {
+    if (this.driver) return this.driver;
+
     const uri = config.graph.uri;
     if (!uri) {
       throw new Error("GRAPH_URI is not configured");
     }
 
-    if (uri.startsWith("bolt://") || uri.startsWith("neo4j://")) {
-      throw new Error(
-        "GRAPH_URI must be an HTTP(S) Neo4j endpoint (e.g., http://localhost:7474 or Aura https endpoint)"
-      );
-    }
+    this.driver = neo4j.driver(
+      uri,
+      neo4j.auth.basic(config.graph.user, config.graph.password)
+    );
 
-    return uri.replace(/\/+$/, "");
-  }
-
-  private getTxCommitUrl(): string {
-    const base = this.getBaseHttpUri();
-    return `${base}/db/${config.graph.database}/tx/commit`;
+    return this.driver;
   }
 
   isEnabled(): boolean {
@@ -40,32 +34,15 @@ class GraphClientService {
   async runQuery<T = unknown>(statement: string, parameters: Record<string, unknown> = {}): Promise<T[]> {
     if (!this.isEnabled()) return [];
 
-    const url = this.getTxCommitUrl();
-    const auth = Buffer.from(`${config.graph.user}:${config.graph.password}`).toString("base64");
+    const driver = this.getDriver();
+    const session: Session = driver.session({ database: config.graph.database });
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        statements: [{ statement, parameters }],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Neo4j HTTP request failed (${response.status} ${response.statusText})`);
+    try {
+      const result = await session.run(statement, parameters);
+      return result.records.map((record) => record.get(0) as T);
+    } finally {
+      await session.close();
     }
-
-    const payload = (await response.json()) as Neo4jHttpResponse;
-    if (payload.errors && payload.errors.length > 0) {
-      const first = payload.errors[0];
-      throw new Error(`Neo4j error: ${first?.code || "UNKNOWN"} - ${first?.message || "Unknown error"}`);
-    }
-
-    const rows = payload.results?.[0]?.data?.map((entry) => (entry.row ? entry.row[0] : undefined)) || [];
-    return rows as T[];
   }
 
   async healthCheck(): Promise<boolean> {
@@ -82,6 +59,13 @@ class GraphClientService {
         "Graph health check failed"
       );
       return false;
+    }
+  }
+
+  async close(): Promise<void> {
+    if (this.driver) {
+      await this.driver.close();
+      this.driver = null;
     }
   }
 }
