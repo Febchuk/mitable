@@ -170,7 +170,10 @@ class RecapRLMService {
           .limit(1);
 
         if (user?.organizationId) {
-          const context = await graphContextBuilderService.buildForUser(userId, user.organizationId);
+          const context = await graphContextBuilderService.buildForUser(
+            userId,
+            user.organizationId
+          );
           graphContextBlock = this.buildGraphContextPromptBlock(context);
         }
       } catch (error) {

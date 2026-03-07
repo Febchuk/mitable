@@ -390,7 +390,9 @@ class SessionSummarizationService {
 
     const sections: string[] = [];
     if (block.summaryFacts.length > 0) {
-      sections.push(`- Observed work profile:\n${block.summaryFacts.map((v) => `  - ${v}`).join("\n")}`);
+      sections.push(
+        `- Observed work profile:\n${block.summaryFacts.map((v) => `  - ${v}`).join("\n")}`
+      );
     }
     if (block.personalizationHints.length > 0) {
       sections.push(

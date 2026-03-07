@@ -75,7 +75,9 @@ export class TextResponseAgent extends BaseAgent {
           ? `\nINFERRED WORKFLOW CONTEXT:\n- ${[
               ...context.graphContext.summaryFacts,
               ...context.graphContext.personalizationHints,
-            ].join("\n- ")}\nUse this context for relevance and personalization, but do not claim certainty beyond the provided facts.`
+            ].join(
+              "\n- "
+            )}\nUse this context for relevance and personalization, but do not claim certainty beyond the provided facts.`
           : "";
 
       // Simple system context
