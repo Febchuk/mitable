@@ -41,6 +41,7 @@ import {
   useSessions,
   monitoringKeys,
   useUpdateSession,
+  useDeleteSession,
 } from "../../../../hooks/queries/monitoring";
 import {
   endSession,
@@ -189,6 +190,8 @@ export default function CalendarView() {
   // Fetch real data from backend
   const { data: realDays, isLoading: isLoadingDays, error: daysError } = useCalendarDays();
 
+  const deleteSession = useDeleteSession();
+
   // Apply optimistic UI based on Electron state
   // This instantly hides/updates blocks when "End Session" is clicked, masking backend delays
   const allDays = useMemo(() => {
@@ -199,12 +202,21 @@ export default function CalendarView() {
       return realDays.map((day) => {
         const optimisticBlocks = day.workBlocks
           .map((block) => {
-            if (block.status === "active" || block.status === "paused") {
-              // Optimistic update
+            // Check if the block is being deleted
+            const isDeleting = deleteSession.variables === block.id && deleteSession.isPending;
+
+            if ((block.status === "active" || block.status === "paused") && !isDeleting) {
+              // Optimistic update for regular session end, NOT for deletion
               return {
                 ...block,
                 status: "summarizing" as const,
               };
+            }
+            if (isDeleting) {
+              return {
+                 ...block,
+                 status: "deleting" as const,
+              }
             }
             return block;
           })

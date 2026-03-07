@@ -213,6 +213,13 @@ export default function WorkBlockDetail({
         // Stop Electron capture loop locally if it's the active session
         await window.consoleAPI.endMonitoringSession();
       }
+      
+      // We don't need an optimistic update here because the delete mutation 
+      // onSuccess will invalidate the query, but we want to avoid the "summarizing" flash.
+      // Set the block state locally to 'deleting' for optimistic feedback
+      // This is handled via UI if needed, but the main issue is that CalendarView
+      // has an optimistic UI effect where it sets "active" blocks to "summarizing" 
+      // when the electron session becomes inactive.
       await deleteSession.mutateAsync(block.id);
       onDelete?.(block.id);
     } catch (error) {
@@ -351,7 +358,9 @@ export default function WorkBlockDetail({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
+                      console.log("Triggering intermediate summary for block", block.id);
                       intermediateSummaryMutation.mutate(block.id);
                     }}
                     disabled={intermediateSummaryMutation.isPending}
@@ -371,7 +380,10 @@ export default function WorkBlockDetail({
                       <TooltipTrigger asChild>
                         <button
                           className="text-ink-tertiary hover:text-ink-secondary cursor-help z-10 p-1"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
                           type="button"
                         >
                           <Info size={14} />

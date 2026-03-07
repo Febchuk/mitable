@@ -325,8 +325,12 @@ function FailedSummaryNotificationHandler() {
 
         // Fire notification
         const notifMsg = `The summary for your recent session failed to generate. Click to retry.`;
-        if (window.consoleAPI?.showRecapNotification) {
-          window.consoleAPI.showRecapNotification({ title: "Summary Failed", message: notifMsg });
+        if (window.consoleAPI?.showNotification) {
+          window.consoleAPI.showNotification({ 
+            title: "Summary Failed", 
+            message: notifMsg, 
+            actions: [{ id: "focus", label: "Retry" }] 
+          });
         } else {
           try {
             new Notification("Summary Failed", { body: notifMsg });
@@ -347,8 +351,17 @@ function FailedSummaryNotificationHandler() {
   // Navigate to calendar when window gets focus after notification click
   useEffect(() => {
     const handleFocus = () => {
+      let shouldNavigate = false;
       if (latestFailedIdRef.current) {
         latestFailedIdRef.current = null;
+        shouldNavigate = true;
+      }
+      if ((window as any)._pendingFailureNavigation) {
+        (window as any)._pendingFailureNavigation = false;
+        shouldNavigate = true;
+      }
+      
+      if (shouldNavigate) {
         navigate("/calendar");
       }
     };

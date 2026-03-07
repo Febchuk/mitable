@@ -95,6 +95,46 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
         logger.warn("No access token available for main process sync");
       }
 
+      // 0.5 Optimistic update for calendar view
+      const tempId = `temp-start-${Date.now()}`;
+      queryClient.setQueryData(["calendar", "days"], (oldData: any) => {
+        if (!oldData) return oldData;
+        const newDays = [...oldData];
+        if (newDays.length > 0) {
+          // Find today's date in local timezone
+          const today = new Date();
+          const todayIndex = newDays.findIndex((d: any) => {
+             return (
+               d.date.getFullYear() === today.getFullYear() &&
+               d.date.getMonth() === today.getMonth() &&
+               d.date.getDate() === today.getDate()
+             );
+          });
+          
+          if (todayIndex !== -1) {
+            newDays[todayIndex] = {
+              ...newDays[todayIndex],
+              workBlocks: [
+                ...newDays[todayIndex].workBlocks,
+                {
+                  id: tempId,
+                  startTime: new Date(),
+                  endTime: null,
+                  duration: 0,
+                  idleGapBefore: null,
+                  summary: "",
+                  captures: [],
+                  appBreakdown: [],
+                  isActive: false,
+                  status: "starting",
+                },
+              ],
+            };
+          }
+        }
+        return newDays;
+      });
+
       // 1. Create backend session
       const backendResult = await createSession({
         selectedWindows: [], // Focus tracker adds windows dynamically
@@ -123,6 +163,7 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
 
       // 3. Invalidate sessions query to refresh list
       queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+      queryClient.invalidateQueries({ queryKey: ["calendar", "days"] });
 
       // 4. Show success toast
       if (showToasts) {
@@ -139,6 +180,19 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
 
       return sessionId;
     } catch (err) {
+      // Mark optimistic block as failed
+      queryClient.setQueryData(["calendar", "days"], (oldData: any) => {
+        if (!oldData) return oldData;
+        return oldData.map((day: any) => ({
+          ...day,
+          workBlocks: day.workBlocks.map((block: any) =>
+            block.status === "starting" && block.id.startsWith("temp-start-")
+              ? { ...block, status: "failed", failedAction: "start" }
+              : block
+          ),
+        }));
+      });
+
       const errorMsg = err instanceof Error ? err.message : "Failed to start session";
       logger.error("Failed to start session:", err);
       setError(errorMsg);
@@ -149,6 +203,24 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
           description: errorMsg,
           variant: "destructive",
         });
+      }
+
+      // Fire OS notification
+      const notifMsg = `Failed to start session. Click to return and retry.`;
+      
+      // We set a global flag so that the app navigates to /calendar on window focus
+      (window as any)._pendingFailureNavigation = true;
+      
+      if (window.consoleAPI?.showNotification) {
+        window.consoleAPI.showNotification({ 
+          title: "Session Start Failed", 
+          message: notifMsg, 
+          actions: [{ id: "focus", label: "Retry" }] 
+        });
+      } else {
+        try {
+          new Notification("Session Start Failed", { body: notifMsg });
+        } catch {}
       }
 
       return null;

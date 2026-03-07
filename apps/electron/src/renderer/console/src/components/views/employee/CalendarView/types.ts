@@ -35,7 +35,7 @@ export interface Capture {
 /**
  * WorkBlock status - aligns with MonitoringSession status
  */
-export type WorkBlockStatus = "active" | "paused" | "ended" | "summarizing" | "ready" | "delivered" | "failed";
+export type WorkBlockStatus = "active" | "paused" | "ended" | "summarizing" | "ready" | "delivered" | "failed" | "starting" | "deleting";
 
 /**
  * Delivery channel for block summaries (via Recaps)
@@ -68,6 +68,7 @@ export interface WorkBlock {
   deliveredAt?: Date;
   rawActivitySummary?: string; // AI-generated raw summary
   finalSummary?: string; // User-edited final summary
+  failedAction?: "start" | "end" | "delete"; // Which action failed, if status is 'failed'
 }
 
 export interface ActivityDay {
