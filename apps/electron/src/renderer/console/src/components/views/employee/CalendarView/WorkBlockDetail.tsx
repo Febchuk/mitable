@@ -57,10 +57,12 @@ import {
   Pause,
   AlertTriangle,
   RefreshCw,
+  Info,
+  Sparkles,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
 import { useBlockDetail } from "../../../../hooks/queries/calendar";
-import { useDeleteSession, useEndSession } from "../../../../hooks/queries/monitoring";
+import { useDeleteSession, useEndSession, useTriggerIntermediateSummary } from "../../../../hooks/queries/monitoring";
 
 interface WorkBlockDetailProps {
   block: WorkBlock;
@@ -154,6 +156,9 @@ export default function WorkBlockDetail({
   
   // End session mutation (used for retrying failed summaries)
   const endSessionMutation = useEndSession();
+  
+  // Intermediate summary mutation
+  const intermediateSummaryMutation = useTriggerIntermediateSummary();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -255,6 +260,34 @@ export default function WorkBlockDetail({
                   </span>
                   Active
                 </span>
+              )}
+
+              {(block.status === "active" || block.status === "paused") && (
+                <div className="flex items-center gap-1 ml-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      intermediateSummaryMutation.mutate(block.id);
+                    }}
+                    disabled={intermediateSummaryMutation.isPending}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-indigo/10 hover:bg-indigo/20 text-indigo transition-colors border border-indigo/20 disabled:opacity-50"
+                  >
+                    {intermediateSummaryMutation.isPending ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={12} />
+                    )}
+                    <span className="text-[10px] font-semibold uppercase tracking-wider">
+                      Summarize
+                    </span>
+                  </button>
+                  <div
+                    className="text-ink-tertiary hover:text-ink-secondary cursor-help"
+                    title="Clicking this button will allow you to summarize the work that you have done so far without ending the block."
+                  >
+                    <Info size={14} />
+                  </div>
+                </div>
               )}
             </div>
             <div className="text-sm text-ink-secondary mt-0.5 tabular-nums">{timeRange}</div>

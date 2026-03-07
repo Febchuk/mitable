@@ -28,7 +28,6 @@ import {
   Play,
 } from "lucide-react";
 import DayCard from "./DayCard";
-import DaySummary from "./DaySummary";
 import WorkBlockList from "./WorkBlockList";
 import {
   Calendar as UntitledCalendar,
@@ -41,7 +40,6 @@ import { useStartSession } from "../../../../hooks/useStartSession";
 import {
   useSessions,
   monitoringKeys,
-  useGenerateDaySummary,
   useUpdateSession,
 } from "../../../../hooks/queries/monitoring";
 import {
@@ -155,10 +153,6 @@ export default function CalendarView() {
   const [electronSessionId, setElectronSessionId] = useState<string | null>(null);
   const [electronSessionStatus, setElectronSessionStatus] = useState<string | null>(null);
   const updateSessionMutation = useUpdateSession();
-
-  // Day summary state
-  const [daySummaries, setDaySummaries] = useState<Record<string, string>>({});
-  const daySummaryMutation = useGenerateDaySummary();
 
   // Listen to Electron-local session state for immediate button response
   useEffect(() => {
@@ -662,70 +656,7 @@ export default function CalendarView() {
                   <h2 className="font-display text-xl font-semibold text-ink-primary">
                     {formatDayHeader(selectedDate)}
                   </h2>
-
-                  {/* AI Summary button */}
-                  {selectedDay.workBlocks.length > 0 && (
-                    <button
-                      onClick={async () => {
-                        const dateKey = selectedDate.toISOString().split("T")[0];
-                        const sessionIds = selectedDay.workBlocks.map((b) => b.id);
-                        try {
-                          const result = await daySummaryMutation.mutateAsync({
-                            date: dateKey,
-                            sessionIds,
-                          });
-                          if (result.summary) {
-                            setDaySummaries((prev) => ({ ...prev, [dateKey]: result.summary! }));
-                            toast({
-                              title: "Summary generated",
-                              description: `Summarized ${result.blockCount} block${result.blockCount !== 1 ? "s" : ""}`,
-                            });
-                          } else {
-                            toast({
-                              title: "No summary available",
-                              description:
-                                result.message ||
-                                "Blocks don't have summaries yet. Try again later.",
-                              variant: "destructive",
-                            });
-                          }
-                        } catch (error) {
-                          toast({
-                            title: "Summary generation failed",
-                            description:
-                              error instanceof Error
-                                ? error.message
-                                : "Something went wrong. Please try again.",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      disabled={daySummaryMutation.isPending}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:border-indigo/30 hover:bg-indigo/5 text-ink-secondary hover:text-indigo transition-all disabled:opacity-40"
-                    >
-                      {daySummaryMutation.isPending ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <Sparkles size={16} />
-                      )}
-                      <span className="text-sm font-medium">
-                        {daySummaries[selectedDate.toISOString().split("T")[0]] ||
-                        selectedDay.summary
-                          ? "Regenerate Summary"
-                          : "Generate Summary"}
-                      </span>
-                    </button>
-                  )}
                 </div>
-
-                {/* Day Summary with toggle */}
-                <DaySummary
-                  day={{
-                    ...selectedDay,
-                    summary:
-                      daySummaries[selectedDate.toISOString().split("T")[0]] || selectedDay.summary,
-                  }}
-                />
 
                 {/* Work blocks */}
                 <WorkBlockList
