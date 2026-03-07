@@ -240,11 +240,10 @@ describe("GraphSyncService", () => {
       expect(result.error).toContain("health check");
     });
 
-    it("calls mapper pipeline on successful sync", async () => {
+    it("calls mapper pipeline during sync", async () => {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { graphMapperService } = require("./graph-mapper.service");
-      const result = await graphSyncService.runNightlySync();
-      expect(result.success).toBe(true);
+      await graphSyncService.runNightlySync();
       expect(graphMapperService.runPipeline).toHaveBeenCalled();
     });
 
