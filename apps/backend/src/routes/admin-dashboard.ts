@@ -2302,6 +2302,7 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
 /**
  * GET /admin/graph/users/:userId/work-insights?window=7d|30d|90d
  * Returns graph-derived work profile for a single employee in the same org.
+ * Now includes appBehaviors and populated patterns from V2 profile.
  */
 router.get(
   "/graph/users/:userId/work-insights",
@@ -2333,10 +2334,18 @@ router.get(
         targetUser.organizationId
       );
 
+      // Extract app behavior summaries for the response
+      const appBehaviors = ("appBehaviors" in profile ? profile.appBehaviors : []).map((b) => ({
+        app: b.object,
+        topActivities: b.topActivities,
+        evidenceCount: b.evidenceCount,
+      }));
+
       res.json({
         window: (req.query.window as string) || "30d",
         generatedAt: new Date().toISOString(),
         profile,
+        appBehaviors,
       });
     } catch (error) {
       logger.error({ error: String(error) }, "Error fetching user graph work insights");
@@ -2406,7 +2415,7 @@ router.get(
 
 /**
  * GET /admin/graph/orgs/:orgId/workflow-insights?window=7d|30d|90d
- * Returns org-level workflow visibility metrics.
+ * Returns org-level workflow visibility metrics with distribution, confidence, and trend.
  */
 router.get(
   "/graph/orgs/:orgId/workflow-insights",
@@ -2430,6 +2439,7 @@ router.get(
       const window = ((req.query.window as string) || "30d").toLowerCase();
       const lookbackDays = window === "7d" ? 7 : window === "90d" ? 90 : 30;
       const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+      const prevSince = new Date(since.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
       const forceLive = String(req.query.forceLive || "false").toLowerCase() === "true";
 
       if (!forceLive) {
@@ -2462,11 +2472,15 @@ router.get(
             source: "snapshot",
             overview: payload.overview || {},
             categories: payload.categories || [],
+            workflowDistribution: [],
+            confidenceMetadata: { dataWindow: window, sourceTypes: ["snapshot"], confidenceLevel: "medium" },
+            trend: { direction: "flat", delta: 0 },
           });
           return;
         }
       }
 
+      // Current window overview
       const [overview] = await db
         .select({
           sessionCount: sql<number>`count(distinct ${schema.monitoringSessions.id})::int`,
@@ -2507,6 +2521,56 @@ router.get(
         .groupBy(schema.sessionWorkstreams.category)
         .orderBy(desc(sql`sum(${schema.sessionWorkstreams.totalDurationMinutes})`));
 
+      // Workflow distribution: top 20 tasks by duration + distinct users
+      const workflowDistribution = await db
+        .select({
+          task: schema.sessionWorkstreams.name,
+          totalDurationMinutes: sql<number>`sum(${schema.sessionWorkstreams.totalDurationMinutes})::int`,
+          distinctUsers: sql<number>`count(distinct ${schema.monitoringSessions.userId})::int`,
+        })
+        .from(schema.sessionWorkstreams)
+        .innerJoin(
+          schema.monitoringSessions,
+          eq(schema.sessionWorkstreams.sessionId, schema.monitoringSessions.id)
+        )
+        .where(
+          and(
+            eq(schema.monitoringSessions.organizationId, orgId),
+            gte(schema.sessionWorkstreams.updatedAt, since)
+          )
+        )
+        .groupBy(schema.sessionWorkstreams.name)
+        .orderBy(desc(sql`sum(${schema.sessionWorkstreams.totalDurationMinutes})`))
+        .limit(20);
+
+      // Trend: compare current window total minutes vs previous equal window
+      const [prevOverview] = await db
+        .select({
+          totalDurationMinutes: sql<number>`coalesce(sum(${schema.sessionWorkstreams.totalDurationMinutes}), 0)::int`,
+        })
+        .from(schema.sessionWorkstreams)
+        .innerJoin(
+          schema.monitoringSessions,
+          eq(schema.sessionWorkstreams.sessionId, schema.monitoringSessions.id)
+        )
+        .where(
+          and(
+            eq(schema.monitoringSessions.organizationId, orgId),
+            gte(schema.sessionWorkstreams.updatedAt, prevSince),
+            sql`${schema.sessionWorkstreams.updatedAt} < ${since}`
+          )
+        );
+
+      const currentMinutes = Number(overview?.totalDurationMinutes || 0);
+      const prevMinutes = Number(prevOverview?.totalDurationMinutes || 0);
+      const delta = prevMinutes > 0 ? Math.round(((currentMinutes - prevMinutes) / prevMinutes) * 100) : 0;
+      const direction = delta > 5 ? "up" : delta < -5 ? "down" : "flat";
+
+      // Confidence metadata
+      const sourceTypes = ["session_capture", "workstream"];
+      const dataPoints = Number(overview?.workstreamCount || 0);
+      const confidenceLevel = dataPoints >= 50 ? "high" : dataPoints >= 10 ? "medium" : "low";
+
       res.json({
         window,
         generatedAt: new Date().toISOString(),
@@ -2516,13 +2580,27 @@ router.get(
           sessionCount: Number(overview?.sessionCount || 0),
           userCount: Number(overview?.userCount || 0),
           workstreamCount: Number(overview?.workstreamCount || 0),
-          totalDurationMinutes: Number(overview?.totalDurationMinutes || 0),
+          totalDurationMinutes: currentMinutes,
         },
         categories: byCategory.map((row) => ({
           category: row.category || "uncategorized",
           totalDurationMinutes: Number(row.totalDurationMinutes || 0),
           count: Number(row.count || 0),
         })),
+        workflowDistribution: workflowDistribution.map((row) => ({
+          task: row.task,
+          totalDurationMinutes: Number(row.totalDurationMinutes || 0),
+          distinctUsers: Number(row.distinctUsers || 0),
+        })),
+        confidenceMetadata: {
+          dataWindow: window,
+          sourceTypes,
+          confidenceLevel,
+        },
+        trend: {
+          direction,
+          delta,
+        },
       });
     } catch (error) {
       logger.error({ error: String(error) }, "Error fetching org workflow insights");
@@ -2564,7 +2642,7 @@ router.post("/graph/sync", requireAuth, async (req: Request, res: Response): Pro
 
 /**
  * GET /admin/graph/users/:userId/workflow-patterns?limit=20
- * Returns ordered task patterns based on the user's most recent workstreams.
+ * Returns recurring workflow patterns detected from the user's sessions.
  */
 router.get(
   "/graph/users/:userId/workflow-patterns",
@@ -2591,33 +2669,21 @@ router.get(
         return;
       }
 
+      const patternFacts = await graphRetrievalService.getWorkflowPatterns(
+        targetUser.id,
+        targetUser.organizationId
+      );
+
       const limit = Math.min(50, Math.max(1, Number(req.query.limit || 20)));
-      const rows = await db
-        .select({
-          sessionId: schema.monitoringSessions.id,
-          startedAt: schema.monitoringSessions.startedAt,
-          taskName: schema.sessionWorkstreams.name,
-          duration: schema.sessionWorkstreams.totalDurationMinutes,
-          category: schema.sessionWorkstreams.category,
-        })
-        .from(schema.monitoringSessions)
-        .innerJoin(
-          schema.sessionWorkstreams,
-          eq(schema.monitoringSessions.id, schema.sessionWorkstreams.sessionId)
-        )
-        .where(eq(schema.monitoringSessions.userId, targetUser.id))
-        .orderBy(desc(schema.monitoringSessions.startedAt), desc(schema.sessionWorkstreams.updatedAt))
-        .limit(limit);
 
       res.json({
         generatedAt: new Date().toISOString(),
         userId: targetUser.id,
-        patterns: rows.map((row) => ({
-          sessionId: row.sessionId,
-          startedAt: row.startedAt,
-          taskName: row.taskName,
-          category: row.category || "uncategorized",
-          durationMinutes: row.duration,
+        patterns: patternFacts.slice(0, limit).map((fact) => ({
+          pattern: fact.object,
+          occurrences: fact.evidenceCount,
+          confidence: Math.min(1, fact.evidenceCount / 10),
+          lastSeenAt: fact.lastSeenAt || null,
         })),
       });
     } catch (error) {

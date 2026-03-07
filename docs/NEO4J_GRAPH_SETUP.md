@@ -60,28 +60,67 @@ npm --workspace @mitable/backend run graph:sync
 
 Expected outcome:
 
-1. `graph_sync_runs` gets a successful run row.
+1. `graph_sync_runs` gets a successful run row with pipeline stats in metadata.
 2. Watermarks updated for monitored sources.
 3. Snapshot rows inserted for org workflow visibility.
-4. Neo4j receives `Organization`, `Person`, `TaskArchetype`, `App`, `Preference` nodes and edges.
+4. Neo4j receives nodes and edges (see Graph Schema below).
 
-## 5) Validate Admin Endpoints
+## 5) Graph Schema
+
+### Node Types
+
+| Label | Key Properties | Description |
+|-------|---------------|-------------|
+| `Organization` | `orgId` | Tenant org |
+| `Person` | `personKey`, `orgId` | Pseudonymized user |
+| `App` | `name` | Normalized application (e.g., "VS Code", "Chrome") |
+| `AppBehavior` | `key` | Per-user app usage summary with `statement`, `topActivities`, `evidenceCount` |
+| `TaskArchetype` | `name` | Canonical task type (e.g., "code_authoring", "debugging") with `displayName`, `domainKey` |
+| `Preference` | `value` | User style/recap preference |
+| `WorkflowPattern` | `patternKey` | Recurring task sequence with `taskChain`, `supportCount`, `avgDurationMinutes` |
+
+### Edge Types
+
+| Edge | From | To | Properties | Description |
+|------|------|----|------------|-------------|
+| `MEMBER_OF` | Person | Organization | — | Org membership |
+| `USES_APP` | Person | App | `weight`, `evidenceCount` | User uses application |
+| `DOES_IN_APP` | Person | AppBehavior | `weight` | User's behavior within an app |
+| `FOR_APP` | AppBehavior | App | — | Links behavior to its application |
+| `PERFORMS` | Person | TaskArchetype | `weight`, `evidenceCount` | User performs this task type |
+| `PREFERS` | Person | Preference | `weight` | User style preference |
+| `FOLLOWS_PATTERN` | Person | WorkflowPattern | — | User exhibits this workflow pattern |
+| `INCLUDES_TASK` | WorkflowPattern | TaskArchetype | `orderIndex` | Task in the pattern chain |
+
+### Activity Resolution Pipeline
+
+The sync process runs a 4-stage pipeline:
+
+- **Stage A** — Extract events from `session_captures`, `session_workstreams`, `workflow_interactions`. Normalize app names. Deduplicate within 90s windows.
+- **Stage B** — Derive `AppBehavior` nodes: group by (user, app), extract top-5 activities, generate behavior statement.
+- **Stage C** — Map to `TaskArchetype` via keyword matching against 13 archetype rules (code_authoring, debugging, testing, etc.).
+- **Stage D** — Mine `WorkflowPattern`: segment events into episodes (30-min gap), extract task chains, count recurring sequences (support >= 2).
+
+Edge weights use a 30-day half-life exponential decay formula: `clamp(oldWeight * decay + sourceReliability * confidence, 0, 1)`.
+
+## 6) Validate Admin Endpoints
 
 With admin auth token:
 
-1. `GET /api/admin/graph/users/:userId/work-insights`
-2. `GET /api/admin/graph/users/:userId/workflow-patterns`
-3. `GET /api/admin/graph/orgs/:orgId/common-tasks`
-4. `GET /api/admin/graph/orgs/:orgId/workflow-insights`
-5. `POST /api/admin/graph/sync`
+1. `GET /api/admin/graph/users/:userId/work-insights` — profile + appBehaviors
+2. `GET /api/admin/graph/users/:userId/workflow-patterns` — recurring patterns (not just recent rows)
+3. `GET /api/admin/graph/orgs/:orgId/common-tasks` — org-level task distribution
+4. `GET /api/admin/graph/orgs/:orgId/workflow-insights` — overview + workflowDistribution + confidence + trend
+5. `POST /api/admin/graph/sync` — manual sync trigger
 
 For live bypass:
 
 - `GET /api/admin/graph/orgs/:orgId/workflow-insights?forceLive=true`
 
-## 6) Troubleshooting
+## 7) Troubleshooting
 
 1. If you get `Neo4j health check failed`, verify `GRAPH_URI`, credentials, and container status.
 2. If routes return `GraphDisabled`, set `GRAPH_ENABLED=true` and restart backend.
 3. If snapshots are empty, confirm there is recent data in `monitoring_sessions` and `session_workstreams`.
 4. If auth fails on admin endpoints, ensure requester is an admin in same organization.
+5. Check `graph_sync_runs.metadata` for pipeline timing stats (`stageTimingsMs`) and mutation counts.
