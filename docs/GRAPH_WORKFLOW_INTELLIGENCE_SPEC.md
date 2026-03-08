@@ -369,7 +369,6 @@ Targets:
 4. Update cadence: nightly batch only.
 5. Agent integration: prefetched deterministic Top-K graph facts.
 
-
 ## 19. Implementation Instructions (Neo4j + Backend)
 
 Use this checklist to run graph workflow intelligence end-to-end in this repo.
