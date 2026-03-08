@@ -65,7 +65,7 @@ export default function TaskBreakdownSection({
           const color = TASK_COLOR_PALETTE[idx % TASK_COLOR_PALETTE.length];
 
           return (
-            <div key={idx}>
+            <div key={`${task.shortTitle}-${idx}`}>
               {/* Task row — clickable */}
               <button
                 onClick={() => {

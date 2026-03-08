@@ -575,7 +575,16 @@ export default function PersonDetail() {
           setIsEditingSummary(false);
         }}
         onAutoSave={async (content: string) => {
-          await updateSessionSummary(selectedWork.id, content);
+          const result = await updateSessionSummary(selectedWork.id, content);
+          setSelectedWork((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  fullContent: content,
+                  taskBreakdown: result.taskBreakdown ?? prev.taskBreakdown,
+                }
+              : prev
+          );
         }}
         onCancel={() => setIsEditingSummary(false)}
         onRevise={async (instruction: string, currentContent: string) => {
