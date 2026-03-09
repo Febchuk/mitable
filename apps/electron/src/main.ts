@@ -14,6 +14,7 @@ import {
   powerMonitor,
   screen,
   shell,
+  systemPreferences,
 } from "electron";
 import { join } from "path";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
@@ -51,6 +52,35 @@ const recoveryLogger = createLogger("SessionRecovery");
 const updateLogger = createLogger("Update");
 const shutdownLogger = createLogger("Shutdown");
 const notificationLogger = createLogger("Notification");
+
+type ScreenPermissionStatus = "granted" | "denied" | "restricted" | "not-determined" | "unknown";
+
+function getScreenPermissionStatus(): ScreenPermissionStatus {
+  if (process.platform !== "darwin") {
+    return "granted";
+  }
+
+  try {
+    const status = systemPreferences.getMediaAccessStatus("screen");
+    if (
+      status === "granted" ||
+      status === "denied" ||
+      status === "restricted" ||
+      status === "not-determined"
+    ) {
+      return status;
+    }
+    return "unknown";
+  } catch (error) {
+    monitoringLogger.warn("Failed to read screen recording permission status:", error);
+    return "unknown";
+  }
+}
+
+function getScreenPermissionErrorMessage(status: ScreenPermissionStatus): string {
+  if (status === "granted") return "";
+  return "Screen recording permission is required. Enable it in System Settings > Privacy & Security > Screen Recording, then reopen Mitable.";
+}
 
 // Window references
 let consoleWindow: BrowserWindow | null = null;
@@ -1612,6 +1642,16 @@ function setupWatchModeHandlers() {
 
 // Monitoring Session handlers for work session tracking
 function setupMonitoringSessionHandlers() {
+  // Check screen recording permission status (macOS only)
+  ipcMain.handle(IPC_CHANNELS.MONITORING_SCREEN_PERMISSION_STATUS, async () => {
+    const status = getScreenPermissionStatus();
+    return {
+      granted: status === "granted",
+      status,
+      error: status === "granted" ? undefined : getScreenPermissionErrorMessage(status),
+    };
+  });
+
   // Start a new monitoring session
   ipcMain.handle(
     IPC_CHANNELS.MONITORING_SESSION_START,
@@ -1631,6 +1671,34 @@ function setupMonitoringSessionHandlers() {
         windowCount: config.selectedWindows.length,
         intervalMs: config.captureIntervalMs,
       });
+
+      const permissionStatus = getScreenPermissionStatus();
+      if (permissionStatus !== "granted") {
+        const permissionError = getScreenPermissionErrorMessage(permissionStatus);
+        monitoringLogger.warn("Cannot start monitoring session: screen permission not granted", {
+          sessionId: config.sessionId,
+          permissionStatus,
+        });
+
+        // Best-effort rollback: the renderer creates backend session first, so close it
+        // to avoid leaving a dangling active session that blocks future starts.
+        try {
+          await authManager.authenticatedFetch(`/api/monitoring/sessions/${config.sessionId}/end`, {
+            method: "POST",
+            body: JSON.stringify({ autoRecap: false }),
+          });
+          monitoringLogger.info("Rolled back backend session after permission denial", {
+            sessionId: config.sessionId,
+          });
+        } catch (rollbackError) {
+          monitoringLogger.warn("Failed to rollback backend session after permission denial", {
+            sessionId: config.sessionId,
+            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          });
+        }
+
+        return { sessionId: "", error: permissionError };
+      }
 
       // Clear old windows before registering new ones (ensures clean slate for each session)
       windowDetectionService.clearAll();
@@ -2425,6 +2493,14 @@ async function startSessionFromMain(sessionType: "focused" | "passive" = "focuse
     return { success: false, error: "A session is already active" };
   }
 
+  const permissionStatus = getScreenPermissionStatus();
+  if (permissionStatus !== "granted") {
+    shortcutLogger.warn("Start session blocked: screen permission not granted", {
+      permissionStatus,
+    });
+    return { success: false, error: getScreenPermissionErrorMessage(permissionStatus) };
+  }
+
   try {
     // Notify passive monitor that a manual session is starting (only for focused sessions)
     if (sessionType === "focused") {
@@ -2673,6 +2749,71 @@ function registerGlobalShortcuts() {
   });
 }
 
+async function cleanupOrphanZeroCaptureSessionOnStartup(
+  recoverableSessions: Array<{
+    sessionId: string;
+    frameCount: number;
+    lastCheckpoint: string;
+    status: string;
+  }>
+): Promise<boolean> {
+  if (!authManager.getAccessToken() || recoverableSessions.length === 0) {
+    return false;
+  }
+
+  try {
+    const activeRes = await authManager.authenticatedFetch("/api/monitoring/sessions/active", {
+      method: "GET",
+    });
+    if (!activeRes.ok) {
+      return false;
+    }
+
+    const activeData = (await activeRes.json()) as {
+      session: { id: string; status: string; captureCount?: number } | null;
+    };
+    const activeSession = activeData.session;
+    if (!activeSession || activeSession.status !== "active") {
+      return false;
+    }
+
+    const matchesRecoverable = recoverableSessions.some((s) => s.sessionId === activeSession.id);
+    const captureCount = activeSession.captureCount || 0;
+    if (!matchesRecoverable || captureCount > 0) {
+      return false;
+    }
+
+    recoveryLogger.warn("Auto-cleaning orphan active session (zero captures + recoverable checkpoint)", {
+      sessionId: activeSession.id,
+      captureCount,
+    });
+
+    const endRes = await authManager.authenticatedFetch(
+      `/api/monitoring/sessions/${activeSession.id}/end`,
+      {
+        method: "POST",
+        body: JSON.stringify({ autoRecap: false }),
+      }
+    );
+    if (!endRes.ok) {
+      recoveryLogger.warn("Failed to auto-end orphan active session", {
+        sessionId: activeSession.id,
+        status: endRes.status,
+      });
+      return false;
+    }
+
+    await monitoringSessionService.discardRecoverableSession(activeSession.id);
+    recoveryLogger.info("Orphan active session cleaned successfully", {
+      sessionId: activeSession.id,
+    });
+    return true;
+  } catch (error) {
+    recoveryLogger.warn("Orphan active session cleanup failed (non-fatal):", error);
+    return false;
+  }
+}
+
 app.whenReady().then(async () => {
   // Enforce Single Instance Lock - must be first to prevent duplicate initialization
   const gotTheLock = app.requestSingleInstanceLock();
@@ -2830,9 +2971,20 @@ app.whenReady().then(async () => {
 
   // Check for recoverable sessions on startup (crash recovery)
   try {
-    const recoverableSessions = await monitoringSessionService.getRecoverableSessions(
+    let recoverableSessions = await monitoringSessionService.getRecoverableSessions(
       currentUserContext?.userId
     );
+
+    // Auto-heal crash orphan edge case:
+    // If backend reports an active session with zero captures and we also have a matching
+    // local recoverable checkpoint, this is likely a session that died during startup/permission flow.
+    const cleanedOrphan = await cleanupOrphanZeroCaptureSessionOnStartup(recoverableSessions);
+    if (cleanedOrphan) {
+      recoverableSessions = await monitoringSessionService.getRecoverableSessions(
+        currentUserContext?.userId
+      );
+    }
+
     if (recoverableSessions.length > 0) {
       recoveryLogger.info(` Found ${recoverableSessions.length} recoverable session(s)`);
       // Notify console window to show recovery dialog

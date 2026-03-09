@@ -32,6 +32,7 @@ const IPC_CHANNELS = {
   MONITORING_SESSION_END: "monitoring-session-end",
   MONITORING_SESSION_RESET: "monitoring-session-reset",
   MONITORING_SESSION_STATUS: "monitoring-session-status",
+  MONITORING_SCREEN_PERMISSION_STATUS: "monitoring-screen-permission-status",
   MONITORING_SESSION_UPDATE: "monitoring-session-update",
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress",
   // Window detection
@@ -199,6 +200,12 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     organizationId: string;
   }): Promise<{ sessionId: string; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_START, config),
+
+  getMonitoringScreenPermissionStatus: (): Promise<{
+    granted: boolean;
+    status: "granted" | "denied" | "restricted" | "not-determined" | "unknown";
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SCREEN_PERMISSION_STATUS),
 
   pauseMonitoringSession: (): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_PAUSE),

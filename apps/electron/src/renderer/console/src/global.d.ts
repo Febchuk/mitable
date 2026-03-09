@@ -69,6 +69,11 @@ interface ConsoleAPI {
     userId: string;
     organizationId: string;
   }) => Promise<{ sessionId: string; error?: string }>;
+  getMonitoringScreenPermissionStatus: () => Promise<{
+    granted: boolean;
+    status: "granted" | "denied" | "restricted" | "not-determined" | "unknown";
+    error?: string;
+  }>;
   pauseMonitoringSession: () => Promise<{ success: boolean; error?: string }>;
   resumeMonitoringSession: () => Promise<{ success: boolean; error?: string }>;
   endMonitoringSession: () => Promise<{

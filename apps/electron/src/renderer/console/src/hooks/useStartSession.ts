@@ -95,6 +95,18 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
         logger.warn("No access token available for main process sync");
       }
 
+      // 0.25 Check screen-recording permission BEFORE creating backend session.
+      // This prevents dangling "active" sessions when macOS restarts the app during permission grant.
+      if (window.consoleAPI?.getMonitoringScreenPermissionStatus) {
+        const permission = await window.consoleAPI.getMonitoringScreenPermissionStatus();
+        if (!permission.granted) {
+          throw new Error(
+            permission.error ||
+              "Screen recording permission is required before starting a session."
+          );
+        }
+      }
+
       // 0.5 Optimistic update for calendar view
       const tempId = `temp-start-${Date.now()}`;
       queryClient.setQueryData(["calendar", "days"], (oldData: any) => {
