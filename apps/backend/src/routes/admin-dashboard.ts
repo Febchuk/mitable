@@ -18,6 +18,10 @@ import OpenAI from "openai";
 import { config } from "../config";
 import { graphRetrievalService } from "../services/graph/graph-retrieval.service";
 import { graphSyncService } from "../services/graph/graph-sync.service";
+import { AskEnvironment } from "../services/rlm/ask-environment";
+import { getAskToolByName } from "../services/rlm/ask-tools";
+import { getAskSystemPrompt } from "../services/rlm/ask-rlm-prompts";
+import { parseJsonResponse } from "../lib/parse-json";
 
 const logger = createLogger({ context: "admin-dashboard-routes" });
 const router = Router();
@@ -789,6 +793,7 @@ router.get(
           totalPausedMs: schema.monitoringSessions.totalPausedMs,
           keyActivities: schema.monitoringSessions.keyActivities,
           finalSummary: schema.monitoringSessions.finalSummary,
+          taskBreakdown: schema.monitoringSessions.taskBreakdown,
         })
         .from(schema.monitoringSessions)
         .where(eq(schema.monitoringSessions.userId, targetUserId))
@@ -915,6 +920,7 @@ router.get(
             endedAt: s.endedAt,
             durationMinutes: Math.round(activeMs / 60000),
             summary: s.finalSummary,
+            taskBreakdown: (s.taskBreakdown as any[]) || [],
             activities: (s.keyActivities as any[]) || [],
           };
         }),
@@ -1823,195 +1829,6 @@ router.post("/dashboard/chat", requireAuth, async (req: Request, res: Response):
   }
 });
 
-// ============================================================================
-// POST /admin/ask/chat
-// Full-featured AI assistant for org-wide questions and report generation
-// ============================================================================
-
-const ASK_SYSTEM_PROMPT = `You are Mitable AI, an advanced analytics assistant for organization leaders.
-
-You have access to comprehensive team productivity data. Your capabilities:
-
-1. **Answer questions** about team metrics, individual performance, trends, and comparisons.
-2. **Generate formal reports** when asked. Reports should be in HTML format wrapped in <report> tags.
-3. **Compare** team members, periods, and metrics.
-4. **Surface insights** proactively when relevant.
-
-## Response rules:
-- For greetings or casual messages (like "hello", "hi", "hey"), respond with a brief, friendly greeting using the admin's first name if available. Example: "Hey Sarah! What can I help you with today?" Do NOT dump data or metrics in a greeting — keep it to 1-2 sentences max.
-- Be data-driven. Reference actual numbers from the context below.
-- Do NOT fabricate data. If something isn't available, say so.
-- Format responses with markdown: bold for emphasis, tables for comparisons, bullet lists for insights.
-- Keep normal responses concise but thorough (200-400 words max).
-
-## Report generation:
-When the user asks you to generate, create, draft, or put together a report, formal document, or exportable summary:
-- Respond with a brief message explaining what you've prepared
-- Then include the full report HTML inside <report title="..." subtitle="...">...</report> tags
-- The HTML should include: h2 title, h3 sections, tables with thead/tbody, ul/ol lists, p paragraphs
-- Use inline styles for colors: green (#22c55e) for positive, yellow (#f59e0b) for neutral, red (#ef4444) for negative
-- Include sections like: Executive Summary, Key Metrics, Strengths, Areas for Improvement, Recommendations, Overall Assessment
-- Make the report professional and ready to share with stakeholders`;
-
-async function buildAskContext(organizationId: string): Promise<string> {
-  // Fetch month data for comprehensive context
-  const { startDate, endDate } = resolveDateRange("month");
-
-  const userActivities = await db
-    .select({
-      userId: schema.userDailyActivities.userId,
-      firstName: schema.users.firstName,
-      lastName: schema.users.lastName,
-      totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
-      totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
-      totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
-      workPercentage: schema.userDailyActivities.workPercentage,
-      meetingPercentage: schema.userDailyActivities.meetingPercentage,
-      daySummary: schema.userDailyActivities.daySummary,
-      activityDate: schema.userDailyActivities.activityDate,
-      categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
-      keyAccomplishments: schema.userDailyActivities.keyAccomplishments,
-    })
-    .from(schema.userDailyActivities)
-    .innerJoin(schema.users, eq(schema.userDailyActivities.userId, schema.users.id))
-    .where(
-      and(
-        eq(schema.userDailyActivities.organizationId, organizationId),
-        eq(schema.userDailyActivities.periodType, "daily"),
-        gte(schema.userDailyActivities.activityDate, startDate),
-        lte(schema.userDailyActivities.activityDate, endDate)
-      )
-    )
-    .orderBy(desc(schema.userDailyActivities.totalActiveMinutes));
-
-  let ctx = `## Organization Data (This Month: ${startDate} to ${endDate})\n`;
-
-  if (userActivities.length > 0) {
-    // Group by date for per-day averages
-    const byDate = new Map<string, typeof userActivities>();
-    for (const row of userActivities) {
-      const existing = byDate.get(row.activityDate) || [];
-      existing.push(row);
-      byDate.set(row.activityDate, existing);
-    }
-
-    let sumAvgWork = 0,
-      sumAvgMeeting = 0,
-      sumAvgActive = 0,
-      maxUsers = 0;
-    const dailyTrend: { date: string; avgWork: number; avgMeeting: number; users: number }[] = [];
-
-    for (const [date, rows] of byDate.entries()) {
-      const n = rows.length;
-      const dw = rows.reduce((s, r) => s + r.totalWorkMinutes, 0);
-      const dm = rows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
-      const da = rows.reduce((s, r) => s + r.totalActiveMinutes, 0);
-      sumAvgWork += dw / n;
-      sumAvgMeeting += dm / n;
-      sumAvgActive += da / n;
-      if (n > maxUsers) maxUsers = n;
-      dailyTrend.push({ date, avgWork: dw / n, avgMeeting: dm / n, users: n });
-    }
-
-    const dayCount = byDate.size;
-    const avgWork = sumAvgWork / dayCount;
-    const avgMeeting = sumAvgMeeting / dayCount;
-    const avgActive = sumAvgActive / dayCount;
-
-    ctx += `\n### Org Averages (${dayCount} days of data)
-- Avg Focus Time: ${Math.round((avgWork / 60) * 10) / 10}h/day per person
-- Avg Meeting Load: ${Math.round((avgMeeting / 60) * 10) / 10}h/day per person
-- Avg Active Time: ${Math.round((avgActive / 60) * 10) / 10}h/day per person
-- Work/Meeting Split: ${avgActive > 0 ? Math.round((avgWork / avgActive) * 100) : 0}% / ${avgActive > 0 ? Math.round((avgMeeting / avgActive) * 100) : 0}%
-- People Tracked: ${maxUsers}`;
-
-    // Category distribution
-    const catTotals = new Map<string, number>();
-    let totalActive = 0;
-    for (const row of userActivities) {
-      totalActive += row.totalActiveMinutes;
-      for (const entry of (row.categoryBreakdown || []) as {
-        category: string;
-        minutes: number;
-      }[]) {
-        catTotals.set(entry.category, (catTotals.get(entry.category) || 0) + entry.minutes);
-      }
-    }
-    if (catTotals.size > 0) {
-      ctx += `\n\n### Activity Categories`;
-      for (const [category, totalMinutes] of [...catTotals.entries()].sort((a, b) => b[1] - a[1])) {
-        ctx += `\n- ${category}: ${Math.round((totalMinutes / 60) * 10) / 10}h (${totalActive > 0 ? Math.round((totalMinutes / totalActive) * 100) : 0}%)`;
-      }
-    }
-
-    if (dailyTrend.length > 1) {
-      ctx += `\n\n### Daily Trend`;
-      for (const day of dailyTrend.sort((a, b) => a.date.localeCompare(b.date))) {
-        ctx += `\n- ${day.date}: ${Math.round((day.avgWork / 60) * 10) / 10}h work, ${Math.round((day.avgMeeting / 60) * 10) / 10}h meetings (${day.users} users)`;
-      }
-    }
-  }
-
-  // Aggregate per-user data
-  if (userActivities.length > 0) {
-    const userMap = new Map<
-      string,
-      {
-        name: string;
-        days: number;
-        totalActive: number;
-        totalWork: number;
-        totalMeeting: number;
-        summaries: string[];
-        categories: any[];
-      }
-    >();
-
-    for (const ua of userActivities) {
-      const name = [ua.firstName, ua.lastName].filter(Boolean).join(" ") || "Unknown";
-      const key = ua.userId;
-      const existing = userMap.get(key) || {
-        name,
-        days: 0,
-        totalActive: 0,
-        totalWork: 0,
-        totalMeeting: 0,
-        summaries: [],
-        categories: [],
-      };
-      existing.days++;
-      existing.totalActive += ua.totalActiveMinutes;
-      existing.totalWork += ua.totalWorkMinutes;
-      existing.totalMeeting += ua.totalMeetingMinutes;
-      if (ua.daySummary) existing.summaries.push(ua.daySummary);
-      if (ua.categoryBreakdown && Array.isArray(ua.categoryBreakdown)) {
-        existing.categories.push(...(ua.categoryBreakdown as any[]));
-      }
-      userMap.set(key, existing);
-    }
-
-    ctx += `\n\n### Per-Person Details (${userMap.size} people)`;
-    for (const [, user] of userMap) {
-      const avgActiveH = Math.round((user.totalActive / Math.max(user.days, 1) / 60) * 10) / 10;
-      const avgWorkH = Math.round((user.totalWork / Math.max(user.days, 1) / 60) * 10) / 10;
-      const avgMeetH = Math.round((user.totalMeeting / Math.max(user.days, 1) / 60) * 10) / 10;
-      const workPct =
-        user.totalActive > 0 ? Math.round((user.totalWork / user.totalActive) * 100) : 0;
-      const meetPct =
-        user.totalActive > 0 ? Math.round((user.totalMeeting / user.totalActive) * 100) : 0;
-
-      ctx += `\n\n**${user.name}** (${user.days} days tracked)`;
-      ctx += `\n  - Avg: ${avgActiveH}h active, ${avgWorkH}h focus, ${avgMeetH}h meetings`;
-      ctx += `\n  - Split: ${workPct}% work / ${meetPct}% meetings`;
-      if (user.summaries.length > 0) {
-        ctx += `\n  - Recent: ${user.summaries[0]}`;
-      }
-    }
-  }
-
-  return ctx;
-}
-
 function parseAskResponse(raw: string): {
   message: string;
   report?: { title: string; subtitle: string; html: string };
@@ -2187,7 +2004,11 @@ router.patch(
   }
 );
 
-// ── POST /admin/ask/chat — send message, get AI response, persist both ──
+// ── POST /admin/ask/chat — RLM tool-calling loop ──
+// The LLM fetches data on demand via tools (max 31 days per query)
+// instead of receiving everything in a single context dump.
+const ASK_MAX_ITERATIONS = 10;
+
 router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const admin = await verifyAdmin(req, res);
@@ -2206,7 +2027,6 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
     // Create or verify thread
     let activeThreadId = threadId;
     if (!activeThreadId) {
-      // Create a new thread
       const title = message.length > 40 ? message.slice(0, 40) + "…" : message;
       const [newThread] = await db
         .insert(schema.askThreads)
@@ -2218,7 +2038,6 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
         .returning();
       activeThreadId = newThread.id;
     } else {
-      // Verify thread belongs to user
       const [thread] = await db
         .select()
         .from(schema.askThreads)
@@ -2240,91 +2059,95 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
       content: message.trim(),
     });
 
-    // Load full conversation history for LLM context
+    // Load conversation history (only final messages, not tool calls)
     const dbMessages = await db
       .select()
       .from(schema.askMessages)
       .where(eq(schema.askMessages.threadId, activeThreadId))
       .orderBy(asc(schema.askMessages.createdAt));
 
-    const llmMessages = dbMessages.map((m) => ({
+    const conversationHistory = dbMessages.map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     }));
 
-    // Build comprehensive org context
-    const orgContext = await buildAskContext(admin.organizationId);
+    // Initialize RLM environment + system prompt
+    const environment = new AskEnvironment(admin.organizationId);
     const adminName = admin.firstName || "there";
-    const systemPrompt =
-      ASK_SYSTEM_PROMPT +
-      `\n\nThe admin you are speaking with is named **${adminName}**.` +
-      "\n\n" +
-      orgContext;
+    const systemPrompt = getAskSystemPrompt(adminName);
 
-    // Call LLM
-    const claude = getAnthropicClient();
-    let rawResponse = "";
+    // RLM conversation: conversation history + tool calls for this turn
+    const rlmMessages: Array<{ role: "user" | "assistant"; content: string }> = [
+      ...conversationHistory,
+    ];
 
-    if (claude) {
+    // RLM tool-calling loop
+    let iterations = 0;
+    let toolCalls = 0;
+    let finalResponse = "";
+
+    while (iterations < ASK_MAX_ITERATIONS) {
+      iterations++;
+
+      // Get LLM decision (Claude → OpenAI → DeepSeek fallback)
+      const llmRaw = await callAskLLM(systemPrompt, rlmMessages);
+
+      let llmDecision: {
+        tool?: string;
+        parameters?: any;
+        reasoning?: string;
+        done?: boolean;
+        response?: string;
+      };
       try {
-        const response = await claude.messages.create({
-          model: "claude-sonnet-4-5-20250929",
-          max_tokens: 8000,
-          system: systemPrompt,
-          messages: llmMessages,
-        });
-        for (const block of response.content) {
-          if (block.type === "text") {
-            rawResponse = block.text.trim();
-            break;
-          }
-        }
-      } catch (error) {
-        const errStr = String(error);
-        const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
-        if (isFatal) {
-          logger.error({ error: errStr }, "Claude auth/billing error — permanently disabling");
-          anthropicClient = null;
-        } else {
-          logger.warn({ error: errStr }, "Claude ask chat failed (transient) — trying OpenAI");
-        }
+        llmDecision = parseJsonResponse(llmRaw);
+      } catch {
+        // LLM returned plain text instead of JSON — treat as final response
+        finalResponse = llmRaw;
+        break;
       }
-    }
 
-    if (!rawResponse) {
-      const oai = getOpenaiClient();
-      if (oai) {
-        try {
-          const completion = await oai.chat.completions.create({
-            model: "gpt-5",
-            messages: [{ role: "system", content: systemPrompt }, ...llmMessages],
-            temperature: 0.7,
-            max_completion_tokens: 8000,
+      // Append assistant response to RLM conversation
+      rlmMessages.push({ role: "assistant", content: JSON.stringify(llmDecision) });
+
+      // Check if LLM is done
+      if (llmDecision.done && llmDecision.response) {
+        finalResponse = llmDecision.response;
+        break;
+      }
+
+      // Execute the tool
+      if (llmDecision.tool && llmDecision.parameters !== undefined) {
+        const tool = getAskToolByName(llmDecision.tool);
+        if (!tool) {
+          rlmMessages.push({
+            role: "user",
+            content: `Error: Unknown tool "${llmDecision.tool}". Available tools: list_team_members, query_org_metrics, query_user_metrics, query_session_summaries.`,
           });
-          rawResponse = completion.choices[0]?.message?.content?.trim() || "";
-        } catch (error) {
-          logger.warn({ error: String(error) }, "OpenAI ask chat failed — trying DeepSeek");
+          continue;
         }
-      }
-    }
 
-    if (!rawResponse) {
-      const deepseek = getDeepseekClient();
-      if (deepseek) {
-        const completion = await deepseek.chat.completions.create({
-          model: "deepseek-chat",
-          messages: [{ role: "system", content: systemPrompt }, ...llmMessages],
-          temperature: 0.7,
-          max_tokens: 8000,
+        const toolResult = await tool.execute(llmDecision.parameters, environment);
+        toolCalls++;
+
+        rlmMessages.push({
+          role: "user",
+          content: `Tool "${llmDecision.tool}" returned:\n${JSON.stringify(toolResult, null, 2)}\n\nContinue with the next step.`,
         });
-        rawResponse =
-          completion.choices[0]?.message?.content?.trim() || "I couldn't generate a response.";
       } else {
-        throw new Error("No LLM available");
+        // No tool call and not done — break to avoid infinite loop
+        if (llmDecision.response) finalResponse = llmDecision.response;
+        break;
       }
     }
 
-    const parsed = parseAskResponse(rawResponse);
+    if (!finalResponse) {
+      finalResponse = "I wasn't able to generate a response. Please try rephrasing your question.";
+    }
+
+    logger.info({ threadId: activeThreadId, iterations, toolCalls }, "Ask RLM completed");
+
+    const parsed = parseAskResponse(finalResponse);
 
     // Save assistant message (with report data if present)
     const [savedMsg] = await db
@@ -2353,6 +2176,7 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
 });
 
 /**
+<<<<<<< HEAD
  * GET /admin/graph/users/:userId/work-insights?window=7d|30d|90d
  * Returns graph-derived work profile for a single employee in the same org.
  * Now includes appBehaviors and populated patterns from V2 profile.
@@ -2762,5 +2586,67 @@ router.get(
     }
   }
 );
+
+/**
+ * Call LLM for Ask RLM loop (Claude → OpenAI → DeepSeek fallback).
+ * Returns raw text content from the LLM.
+ */
+async function callAskLLM(
+  systemPrompt: string,
+  messages: Array<{ role: "user" | "assistant"; content: string }>
+): Promise<string> {
+  const claude = getAnthropicClient();
+  if (claude) {
+    try {
+      const response = await claude.messages.create({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages,
+      });
+      for (const block of response.content) {
+        if (block.type === "text") return block.text.trim();
+      }
+    } catch (error) {
+      const errStr = String(error);
+      const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+      if (isFatal) {
+        logger.error({ error: errStr }, "Claude auth/billing error — permanently disabling");
+        anthropicClient = null;
+      } else {
+        logger.warn({ error: errStr }, "Claude Ask RLM failed (transient) — trying OpenAI");
+      }
+    }
+  }
+
+  const oai = getOpenaiClient();
+  if (oai) {
+    try {
+      const completion = await oai.chat.completions.create({
+        model: "gpt-5",
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        temperature: 0.7,
+        max_completion_tokens: 4000,
+      });
+      const content = completion.choices[0]?.message?.content?.trim();
+      if (content) return content;
+    } catch (error) {
+      logger.warn({ error: String(error) }, "OpenAI Ask RLM failed — trying DeepSeek");
+    }
+  }
+
+  const deepseek = getDeepseekClient();
+  if (deepseek) {
+    const completion = await deepseek.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [{ role: "system", content: systemPrompt }, ...messages],
+      temperature: 0.7,
+      max_tokens: 4000,
+    });
+    return completion.choices[0]?.message?.content?.trim() || "I couldn't generate a response.";
+  }
+
+  throw new Error("No LLM available — all providers exhausted");
+}
 
 export default router;

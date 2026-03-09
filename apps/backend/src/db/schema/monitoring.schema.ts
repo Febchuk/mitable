@@ -102,6 +102,7 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
   accomplishments: jsonb("accomplishments").default("[]"),
   blockers: jsonb("blockers").default("[]"),
   timeBreakdown: jsonb("time_breakdown"), // { appName: durationMs }
+  taskBreakdown: jsonb("task_breakdown"), // [{ shortTitle, description, minutes }]
 
   // Delivery tracking
   deliveryStatus: varchar("delivery_status", { length: 50 }),

@@ -316,6 +316,7 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
         finalSummary: schema.monitoringSessions.finalSummary,
         rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
         timeBreakdown: schema.monitoringSessions.timeBreakdown,
+        taskBreakdown: schema.monitoringSessions.taskBreakdown,
         deliveryStatus: schema.monitoringSessions.deliveryStatus,
         deliveryChannel: schema.monitoringSessions.deliveryChannel,
         createdAt: schema.monitoringSessions.createdAt,
@@ -997,6 +998,28 @@ router.post(
         )
         .then(async ([_, storyResult]) => {
           log.info("Session end processing completed", { sessionId: id });
+
+          // Extract structured task breakdown from the generated story
+          let taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }> =
+            [];
+          if (storyResult) {
+            try {
+              const totalMinutes = Math.round(Math.max(0, activeDurationMs) / 60000);
+              taskBreakdown = await sessionSummarizationService.parseTaskBreakdownFromSummary(
+                storyResult,
+                totalMinutes
+              );
+              log.info("Task breakdown extracted", {
+                sessionId: id,
+                taskCount: taskBreakdown.length,
+              });
+            } catch (tbError) {
+              log.warn("Task breakdown extraction failed (non-fatal)", {
+                error: tbError instanceof Error ? tbError.message : String(tbError),
+              });
+            }
+          }
+
           // Update status to ready and persist the story summary on the session record
           await db
             .update(schema.monitoringSessions)
@@ -1005,6 +1028,7 @@ router.post(
               summarizationProgress: null,
               ingestionStatus: "ingesting",
               ...(storyResult ? { finalSummary: storyResult } : {}),
+              ...(taskBreakdown.length > 0 ? { taskBreakdown } : {}),
             })
             .where(eq(schema.monitoringSessions.id, id));
 
@@ -2587,11 +2611,25 @@ router.patch(
         return;
       }
 
-      // Update session with edited summary
+      // Compute session duration for task breakdown re-parse
+      const startMs = new Date(session.startedAt).getTime();
+      const endMs = session.endedAt ? new Date(session.endedAt).getTime() : Date.now();
+      const totalMinutes = Math.round(
+        Math.max(0, endMs - startMs - (session.totalPausedMs || 0)) / 60000
+      );
+
+      // Re-parse task breakdown from edited summary (AI call)
+      const taskBreakdown = await sessionSummarizationService.parseTaskBreakdownFromSummary(
+        finalSummary,
+        totalMinutes
+      );
+
+      // Update session with edited summary + re-parsed task breakdown
       await db
         .update(schema.monitoringSessions)
         .set({
           finalSummary,
+          taskBreakdown,
           updatedAt: new Date(),
         })
         .where(eq(schema.monitoringSessions.id, id));
@@ -2614,11 +2652,15 @@ router.patch(
         .returning();
 
       const log = createSessionLogger({ sessionId: id, userId });
-      log.info("Summary updated by user", { version: newSummary.version });
+      log.info("Summary updated by user", {
+        version: newSummary.version,
+        taskCount: taskBreakdown.length,
+      });
 
       res.json({
         success: true,
         summary: newSummary,
+        taskBreakdown,
       });
     } catch (error) {
       const log = createSessionLogger({ sessionId: id, userId });

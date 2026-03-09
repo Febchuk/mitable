@@ -6,6 +6,8 @@ const getLogLevel = (): string => {
   return "debug";
 };
 
+const isDev = process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test";
+
 export const logger = pino({
   level: getLogLevel(),
   formatters: {
@@ -31,6 +33,14 @@ export const logger = pino({
     ],
     censor: "[REDACTED]",
   },
+  // In dev, pretty-print via a worker thread to avoid stdout backpressure
+  // blocking the event loop (pino writes synchronously to stdout by default).
+  ...(isDev && {
+    transport: {
+      target: "pino-pretty",
+      options: { colorize: true },
+    },
+  }),
 });
 
 export const createLogger = (context: Record<string, unknown>) => logger.child(context);

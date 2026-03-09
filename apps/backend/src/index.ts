@@ -19,7 +19,7 @@ import * as schema from "./db/schema/index.js";
 import { isNotNull, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { initializeAudioWebSocket } from "./routes/audio.js";
-import { initCronJobs } from "./cron/index.js";
+// Cron loaded dynamically to avoid node-cron blocking event loop on module init
 
 async function startServer() {
   // Validate environment variables
@@ -80,6 +80,7 @@ async function startServer() {
   setupWorkstreamSocketEmitter();
 
   // Initialize cron jobs for admin dashboard data pipeline
+  const { initCronJobs } = await import("./cron/index.js");
   initCronJobs();
 
   // Startup cleanup: clear stale imageData from sessions that ended >1 hour ago

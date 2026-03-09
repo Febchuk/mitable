@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import TaskBreakdownSection from "../../../shared/TaskBreakdownSection";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -11,6 +12,7 @@ import {
   Edit,
   Check,
   Clipboard,
+  Search,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import {
@@ -48,6 +50,7 @@ interface RecentWorkItem {
   durationMinutes?: number;
   category?: string;
   docType?: string;
+  taskBreakdown?: Array<{ shortTitle: string; description: string; minutes: number }>;
 }
 
 interface PersonViewModel {
@@ -245,6 +248,7 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
         time: timeStr,
         durationMinutes: session.durationMinutes,
         category: topCat,
+        taskBreakdown: session.taskBreakdown || [],
       });
     }
   }
@@ -385,6 +389,7 @@ export default function PersonDetail() {
   const [selectedWork, setSelectedWork] = useState<RecentWorkItem | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [workFilter, setWorkFilter] = useState<"all" | "session" | "doc">("all");
+  const [workSearchQuery, setWorkSearchQuery] = useState("");
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
 
@@ -561,12 +566,25 @@ export default function PersonDetail() {
         subtitle={selectedWork.title}
         initialContent={selectedWork.fullContent}
         onSave={async (content: string) => {
-          await updateSessionSummary(selectedWork.id, content);
-          setSelectedWork({ ...selectedWork, fullContent: content });
+          const result = await updateSessionSummary(selectedWork.id, content);
+          setSelectedWork({
+            ...selectedWork,
+            fullContent: content,
+            taskBreakdown: result.taskBreakdown || selectedWork.taskBreakdown,
+          });
           setIsEditingSummary(false);
         }}
         onAutoSave={async (content: string) => {
-          await updateSessionSummary(selectedWork.id, content);
+          const result = await updateSessionSummary(selectedWork.id, content);
+          setSelectedWork((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  fullContent: content,
+                  taskBreakdown: result.taskBreakdown ?? prev.taskBreakdown,
+                }
+              : prev
+          );
         }}
         onCancel={() => setIsEditingSummary(false)}
         onRevise={async (instruction: string, currentContent: string) => {
@@ -660,17 +678,26 @@ export default function PersonDetail() {
               </div>
             </div>
 
-            {/* Summary body — rich text rendering */}
-            <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-5">
-              <DocEditor
-                key={selectedWork.id}
-                initialContent={selectedWork.fullContent}
-                readOnly
-                showToolbar={false}
-                placeholder=""
-                className="h-full"
-              />
-            </div>
+            {/* Task breakdown accordion or fallback to markdown */}
+            {selectedWork.taskBreakdown && selectedWork.taskBreakdown.length > 0 ? (
+              <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50">
+                <TaskBreakdownSection
+                  tasks={selectedWork.taskBreakdown}
+                  totalDuration={selectedWork.durationMinutes || 0}
+                />
+              </div>
+            ) : (
+              <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-5">
+                <DocEditor
+                  key={selectedWork.id}
+                  initialContent={selectedWork.fullContent}
+                  readOnly
+                  showToolbar={false}
+                  placeholder=""
+                  className="h-full"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -875,49 +902,80 @@ export default function PersonDetail() {
           {/* Recent work — session summaries + docs */}
           <div className="col-span-2 relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-            <div className="relative flex items-center justify-between mb-4">
+            <div className="relative space-y-3 mb-4">
               <h3 className="text-sm font-semibold text-text-primary">
                 Recent Work
                 <span className="text-text-secondary font-normal ml-2">
                   What they've been doing
                 </span>
               </h3>
-              <div className="flex items-center gap-1 bg-canvas-overlay rounded-lg p-0.5">
-                {(["all", "session", "doc"] as const).map((f) => {
-                  const label = f === "all" ? "All" : f === "session" ? "Blocks" : "Docs";
-                  const count =
-                    f === "all"
-                      ? person.recentWork.length
-                      : person.recentWork.filter((w) => w.type === f).length;
-                  return (
+              <div className="flex items-center justify-between gap-3">
+                <div className="relative flex-1 max-w-xs">
+                  <Search
+                    size={14}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none"
+                  />
+                  <input
+                    type="text"
+                    value={workSearchQuery}
+                    onChange={(e) => setWorkSearchQuery(e.target.value)}
+                    placeholder="Filter by topic or customer..."
+                    className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-canvas-overlay border border-stroke-subtle text-xs text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-indigo/50 transition-colors"
+                  />
+                  {workSearchQuery && (
                     <button
-                      key={f}
-                      onClick={() => setWorkFilter(f)}
-                      className={`text-[11px] px-2.5 py-1 rounded-md transition-colors ${
-                        workFilter === f
-                          ? "bg-canvas-raised text-text-primary font-medium shadow-sm"
-                          : "text-text-tertiary hover:text-text-secondary"
-                      }`}
+                      onClick={() => setWorkSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary"
                     >
-                      {label}
-                      {count > 0 ? ` (${count})` : ""}
+                      <X size={12} />
                     </button>
-                  );
-                })}
+                  )}
+                </div>
+                <div className="flex items-center gap-1 bg-canvas-overlay rounded-lg p-0.5 shrink-0">
+                  {(["all", "session", "doc"] as const).map((f) => {
+                    const label = f === "all" ? "All" : f === "session" ? "Blocks" : "Docs";
+                    const count =
+                      f === "all"
+                        ? person.recentWork.length
+                        : person.recentWork.filter((w) => w.type === f).length;
+                    return (
+                      <button
+                        key={f}
+                        onClick={() => setWorkFilter(f)}
+                        className={`text-[11px] px-2.5 py-1 rounded-md transition-colors ${
+                          workFilter === f
+                            ? "bg-canvas-raised text-text-primary font-medium shadow-sm"
+                            : "text-text-tertiary hover:text-text-secondary"
+                        }`}
+                      >
+                        {label}
+                        {count > 0 ? ` (${count})` : ""}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             {(() => {
-              const filtered =
-                workFilter === "all"
-                  ? person.recentWork
-                  : person.recentWork.filter((w) => w.type === workFilter);
+              const query = workSearchQuery.toLowerCase().trim();
+              const filtered = person.recentWork.filter((w) => {
+                const matchesType = workFilter === "all" || w.type === workFilter;
+                const matchesSearch =
+                  !query ||
+                  w.title.toLowerCase().includes(query) ||
+                  w.preview.toLowerCase().includes(query) ||
+                  (w.category && w.category.toLowerCase().includes(query));
+                return matchesType && matchesSearch;
+              });
               return (
                 <div className="relative space-y-1 max-h-[440px] overflow-y-auto pr-1">
                   {filtered.length === 0 ? (
                     <p className="text-sm text-text-tertiary py-4 text-center">
-                      {workFilter === "all"
-                        ? "No activity yet"
-                        : `No ${workFilter === "doc" ? "documents" : "blocks"} yet`}
+                      {query
+                        ? `No results for "${workSearchQuery}"`
+                        : workFilter === "all"
+                          ? "No activity yet"
+                          : `No ${workFilter === "doc" ? "documents" : "blocks"} yet`}
                     </p>
                   ) : (
                     filtered.map((item) => (

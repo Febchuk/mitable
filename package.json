@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "node scripts/fix-esbuild.js || true",
+    "postinstall": "(node scripts/fix-esbuild.js || true) && (node scripts/patch-node-cron.js || true)",
     "dev": "turbo run dev",
     "dev:debug-screenshots": "cross-env DEBUG_SAVE_SCREENSHOTS=true turbo run dev",
     "dev:backend": "npm run dev --workspace=apps/backend",

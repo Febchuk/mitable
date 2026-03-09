@@ -1,5 +1,16 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { ArrowUp, Sparkles, ChevronDown, Plus, Trash2, FileText, Download, X } from "lucide-react";
+import {
+  ArrowUp,
+  Sparkles,
+  ChevronDown,
+  Plus,
+  Trash2,
+  FileText,
+  Download,
+  X,
+  Copy,
+  Check,
+} from "lucide-react";
 import {
   sendAskChat,
   fetchAskThreads,
@@ -364,6 +375,17 @@ function mdToHtml(md: string): string {
 // ── Components ────────────────────────────────────────────────
 function MessageBubble({ message, onOpenReport }: { message: Message; onOpenReport?: () => void }) {
   const isUser = message.role === "user";
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Silently fail
+    }
+  };
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
@@ -377,12 +399,21 @@ function MessageBubble({ message, onOpenReport }: { message: Message; onOpenRepo
           </div>
         )}
         <div
-          className={`rounded-xl px-4 py-3 text-sm leading-relaxed ${
+          className={`relative group rounded-xl px-4 py-3 text-sm leading-relaxed ${
             isUser
               ? "bg-indigo text-white rounded-br-sm"
               : "bg-canvas-raised border border-stroke-subtle text-text-primary rounded-bl-sm"
           }`}
         >
+          {!isUser && (
+            <button
+              onClick={handleCopy}
+              className="absolute top-2 right-2 p-1 rounded-md bg-canvas-overlay/80 border border-stroke-subtle text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+              title="Copy response"
+            >
+              {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+            </button>
+          )}
           {isUser ? (
             <p>{message.content}</p>
           ) : (

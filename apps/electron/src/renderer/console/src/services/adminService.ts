@@ -558,6 +558,7 @@ export interface SessionActivity {
   endedAt: string | null;
   durationMinutes: number;
   summary: string | null;
+  taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }>;
   activities: ClassifiedActivity[];
 }
 

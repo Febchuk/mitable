@@ -60,6 +60,7 @@ export interface SessionListItem {
   finalSummary: string | null;
   rawActivitySummary: string | null;
   timeBreakdown: Record<string, number> | null;
+  taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }> | null;
 }
 
 export interface CreateSessionRequest {
@@ -338,7 +339,11 @@ export async function fetchSessionStory(sessionId: string): Promise<SessionStory
 export async function updateSessionSummary(
   sessionId: string,
   finalSummary: string
-): Promise<{ success: boolean; summary: unknown }> {
+): Promise<{
+  success: boolean;
+  summary: unknown;
+  taskBreakdown?: Array<{ shortTitle: string; description: string; minutes: number }>;
+}> {
   return apiRequest(`/monitoring/sessions/${sessionId}/summary`, {
     method: "PATCH",
     body: JSON.stringify({ finalSummary }),

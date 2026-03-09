@@ -57,6 +57,7 @@ import {
   Pause,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
+import TaskBreakdownSection from "../../../shared/TaskBreakdownSection";
 import { useBlockDetail } from "../../../../hooks/queries/calendar";
 import { useDeleteSession } from "../../../../hooks/queries/monitoring";
 
@@ -357,8 +358,15 @@ export default function WorkBlockDetail({
         {/* Expanded content */}
         {isExpanded && (
           <div className="border-t border-stroke-subtle">
-            {/* Full Summary */}
-            {(displaySummary || isLoadingDetail) && (
+            {/* Task Breakdown (structured) or fallback to markdown summary */}
+            {block.taskBreakdown && block.taskBreakdown.length > 0 ? (
+              <TaskBreakdownSection
+                tasks={block.taskBreakdown}
+                totalDuration={block.duration}
+                isLoading={isLoadingDetail}
+                className="border-b border-stroke-subtle"
+              />
+            ) : displaySummary || isLoadingDetail ? (
               <div className="p-4 border-b border-stroke-subtle">
                 <div className="flex items-center gap-2 mb-2">
                   <FileText size={14} className="text-ink-tertiary" />
@@ -375,16 +383,19 @@ export default function WorkBlockDetail({
                     __html: displaySummary ? renderedSummaryHtml : "<p>Loading...</p>",
                   }}
                 />
-                {/* Create Recap action */}
-                {block.status !== "active" && block.status !== "paused" && (
-                  <button
-                    onClick={handleCreateRecap}
-                    className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-indigo/30 bg-indigo/5 text-indigo text-sm font-medium hover:bg-indigo/10 transition-colors"
-                  >
-                    <FileText size={14} />
-                    Create Recap from this block
-                  </button>
-                )}
+              </div>
+            ) : null}
+
+            {/* Create Recap action */}
+            {block.status !== "active" && block.status !== "paused" && (
+              <div className="px-4 py-3 border-b border-stroke-subtle">
+                <button
+                  onClick={handleCreateRecap}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-indigo/30 bg-indigo/5 text-indigo text-sm font-medium hover:bg-indigo/10 transition-colors"
+                >
+                  <FileText size={14} />
+                  Create Recap from this block
+                </button>
               </div>
             )}
 

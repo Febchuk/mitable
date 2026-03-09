@@ -56,6 +56,7 @@ export interface WorkBlock {
   summary: string;
   captures: Capture[];
   appBreakdown: { app: string; minutes: number; percentage: number }[];
+  taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }>;
   isActive?: boolean;
   isFocusedSession?: boolean; // True if user explicitly started this block
   goal?: string; // Optional goal for focused sessions

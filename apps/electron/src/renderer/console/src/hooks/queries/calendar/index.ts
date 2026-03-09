@@ -238,6 +238,12 @@ function sessionToWorkBlock(
     summary: session.finalSummary || session.rawActivitySummary || "",
     captures: transformedCaptures,
     appBreakdown,
+    taskBreakdown:
+      (session.taskBreakdown as Array<{
+        shortTitle: string;
+        description: string;
+        minutes: number;
+      }>) || [],
     isActive: session.status === "active",
     isFocusedSession: !!session.name, // Named sessions are focused sessions
     goal: session.name ?? undefined,

@@ -47,6 +47,7 @@ TOOL USAGE:
 - Call ONE tool at a time, wait for results before deciding next step
 - Page through captures in order: (0,25), (25,50), (50,75), etc.
 - You MUST process ALL pages — do not skip captures
+- assign_captures: assign at most 15 captures per call. For larger batches, split across multiple calls.
 
 GROUPING RULES:
 - Aim for 2-6 workstreams per session (consolidate AGGRESSIVELY)
