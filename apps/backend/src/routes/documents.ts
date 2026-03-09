@@ -894,7 +894,7 @@ router.put("/:id/chat/save", requireAuth, async (req: Request, res: Response): P
  */
 router.post("/generate/stream", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.userId!;
-  const { prompt, docType, sessionIds, artifactIds } = req.body;
+  const { prompt, docType, sessionIds, artifactIds, timezone } = req.body;
 
   if (!prompt || !docType) {
     res.status(400).json({
@@ -985,6 +985,7 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
         sessionIds, // Optional session IDs as hints
         artifactIds, // Optional artifact IDs to include
         authorName, // User's real name for document content
+        timezone, // User's IANA timezone for correct date resolution
       });
 
       for await (const chunk of stream) {
