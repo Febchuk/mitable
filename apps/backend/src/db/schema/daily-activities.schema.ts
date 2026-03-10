@@ -57,6 +57,10 @@ export const userDailyActivities = pgTable(
     // Activity category breakdown (JSONB array)
     categoryBreakdown: jsonb("category_breakdown").notNull().default("[]"),
 
+    // Topic & subscriber breakdowns (JSONB arrays)
+    topicBreakdown: jsonb("topic_breakdown").default("[]"),
+    subscriberBreakdown: jsonb("subscriber_breakdown").default("[]"),
+
     // AI-generated content (from Day Analyzer RLM)
     daySummary: text("day_summary"),
     keyAccomplishments: jsonb("key_accomplishments").notNull().default("[]"),
@@ -120,6 +124,10 @@ export const activityBlocks = pgTable(
     // Source tracking
     sessionId: uuid("session_id").references(() => monitoringSessions.id, { onDelete: "set null" }),
     sourceSessionIds: jsonb("source_session_ids").notNull().default("[]"),
+
+    // AI-extracted topic & subscriber (denormalized strings for GROUP BY queries)
+    topicName: varchar("topic_name", { length: 200 }),
+    subscriberName: varchar("subscriber_name", { length: 200 }),
 
     // Ordering within the day
     sequenceNumber: integer("sequence_number").notNull().default(0),
@@ -262,4 +270,16 @@ export interface OrgUserSummaryEntry {
   activeMinutes: number;
   workPct: number;
   meetingPct: number;
+}
+
+export interface TopicBreakdownEntry {
+  topicName: string;
+  minutes: number;
+  percentage: number;
+}
+
+export interface SubscriberBreakdownEntry {
+  subscriberName: string;
+  minutes: number;
+  percentage: number;
 }
