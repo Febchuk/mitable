@@ -588,8 +588,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
             const key = normalizeName(entry.topicName);
             topicTotals.set(key, (topicTotals.get(key) || 0) + entry.minutes);
             const prev = topicNames.get(key);
-            if (!prev || entry.topicName.length > prev.length)
-              topicNames.set(key, entry.topicName);
+            if (!prev || entry.topicName.length > prev.length) topicNames.set(key, entry.topicName);
           }
         }
         return [...topicTotals.entries()]

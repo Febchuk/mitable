@@ -258,7 +258,10 @@ export async function materializeSession(sessionId: string): Promise<void> {
  * from all its activity_blocks.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db): Promise<void> {
+export async function recalculateDailyStats(
+  dailyActivityId: string,
+  txOrDb: any = db
+): Promise<void> {
   // Fetch all blocks for this day
   const blocks = await txOrDb
     .select({

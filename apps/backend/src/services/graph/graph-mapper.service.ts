@@ -559,7 +559,6 @@ class GraphMapperService {
 
   // ── Stage E: Topic & Subscriber Extraction ──
 
-
   async extractTopicsAndSubscribers(
     users: Array<{ userId: string; orgId: string }>,
     since: Date
