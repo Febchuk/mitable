@@ -33,6 +33,12 @@ import {
   SESSION_SEARCH_TOP_K,
   SESSION_SEARCH_MIN_SIMILARITY,
 } from "./doc-generation-config.js";
+import * as chrono from "chrono-node";
+import {
+  getUserLocalComponents,
+  startOfDayInTimezone,
+  endOfDayInTimezone,
+} from "../utils/timezone.js";
 
 const DOC_GEN_CONFIG = {
   TEXT_MODEL: DOC_GEN_MODEL,
@@ -51,6 +57,8 @@ interface GenerateStreamParams {
   artifactIds?: string[];
   /** User's real name for document content (replaces generic placeholders) */
   authorName?: string;
+  /** User's IANA timezone (e.g. "America/New_York", "Africa/Lagos"). Used to resolve relative dates like "today" correctly. */
+  timezone?: string;
 }
 
 interface ProgressEvent {
@@ -78,6 +86,7 @@ class DocGenerationStreamService {
       sessionIds: hintSessionIds,
       artifactIds,
       authorName,
+      timezone,
     } = params;
 
     let documentId: string | null = null;
@@ -114,7 +123,7 @@ class DocGenerationStreamService {
       } as ProgressEvent;
 
       // Parse date range from prompt (e.g., "this week", "last week", "today")
-      const dateRange = this.parseDateRangeFromPrompt(prompt);
+      const dateRange = this.parseDateRangeFromPrompt(prompt, timezone);
 
       if (dateRange) {
         console.log(
@@ -516,79 +525,318 @@ class DocGenerationStreamService {
   }
 
   /**
-   * Parse date range from natural language prompt
+   * Parse date range from natural language prompt.
+   *
+   * Hybrid strategy:
+   * 1. chrono-node for explicit date ranges (e.g. "March 3 to March 7")
+   * 2. Keyword matching for relative phrases (chrono returns single dates for these)
+   * 3. chrono-node single-date fallback for specific days/months
+   *
+   * When timezone is provided (IANA string like "Africa/Lagos"), all date boundaries
+   * are computed in the user's local timezone and converted to UTC for DB queries.
+   * Without timezone, falls back to server time (UTC on Railway).
    */
-  private parseDateRangeFromPrompt(prompt: string): { start: Date; end: Date } | undefined {
+  private parseDateRangeFromPrompt(
+    prompt: string,
+    timezone?: string
+  ): { start: Date; end: Date } | undefined {
     const now = new Date();
     const lowerPrompt = prompt.toLowerCase();
+    const tz = timezone || undefined;
 
-    // Helper: Get start of week (Monday)
-    const getStartOfWeek = (date: Date): Date => {
-      const d = new Date(date);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
-      d.setDate(diff);
-      d.setHours(0, 0, 0, 0);
-      return d;
+    if (tz) {
+      console.log(`[DocGenDateParser] Using timezone: ${tz}`);
+    }
+
+    // --- Timezone-aware date boundary helpers ---
+    // When tz is set, "start of March 9" means 00:00 in user's timezone → UTC equivalent.
+    // Without tz, uses server local time.
+
+    const startOfDay = (year: number, month: number, day: number): Date => {
+      if (tz) return startOfDayInTimezone(year, month, day, tz);
+      return new Date(year, month - 1, day, 0, 0, 0, 0);
     };
 
-    // Helper: Get end of day
-    const getEndOfDay = (date: Date): Date => {
-      const d = new Date(date);
-      d.setHours(23, 59, 59, 999);
-      return d;
+    const endOfDay = (year: number, month: number, day: number): Date => {
+      if (tz) return endOfDayInTimezone(year, month, day, tz);
+      return new Date(year, month - 1, day, 23, 59, 59, 999);
     };
 
-    // "this week" or "weekly report"
-    if (lowerPrompt.includes("this week") || lowerPrompt.includes("weekly report")) {
-      const start = getStartOfWeek(now);
-      const end = getEndOfDay(now);
+    // Get user's "now" components in their timezone
+    const userNow = tz
+      ? getUserLocalComponents(tz, now)
+      : {
+          year: now.getFullYear(),
+          month: now.getMonth() + 1, // 1-indexed to match getUserLocalComponents
+          day: now.getDate(),
+          dayOfWeek: now.getDay(),
+          hour: now.getHours(),
+          minute: now.getMinutes(),
+        };
+
+    // "End of today" in user's timezone
+    const endOfToday = (): Date => endOfDay(userNow.year, userNow.month, userNow.day);
+
+    // Get Monday of the week containing the user's "today"
+    const getMondayOffset = (): number => {
+      return userNow.dayOfWeek === 0 ? -6 : 1 - userNow.dayOfWeek;
+    };
+
+    const log = (label: string, s: Date, e: Date) => {
+      console.log(`[DocGenDateParser] ${label} → ${s.toISOString()} to ${e.toISOString()}`);
+    };
+
+    // --- Priority 1: Try chrono-node for explicit date ranges FIRST ---
+    const chronoResults = chrono.parse(prompt, now);
+
+    if (chronoResults.length === 1 && chronoResults[0].end) {
+      const cs = chronoResults[0].start;
+      const ce = chronoResults[0].end;
+      const start = startOfDay(cs.get("year")!, cs.get("month")!, cs.get("day")!);
+      const end = endOfDay(ce.get("year")!, ce.get("month")!, ce.get("day")!);
+      log(`Chrono range: "${chronoResults[0].text}"`, start, end);
+      return { start, end };
+    }
+
+    if (chronoResults.length >= 2) {
+      const a = chronoResults[0].start;
+      const b = chronoResults[chronoResults.length - 1].start;
+      const dateA = a.date();
+      const dateB = b.date();
+      const [first, last] = dateA < dateB ? [a, b] : [b, a];
+      const start = startOfDay(first.get("year")!, first.get("month")!, first.get("day")!);
+      const end = endOfDay(last.get("year")!, last.get("month")!, last.get("day")!);
+      log(`Chrono multi-date: "${chronoResults.map((r) => r.text).join('" + "')}"`, start, end);
+      return { start, end };
+    }
+
+    // --- Priority 2: Keyword matching for relative phrases ---
+
+    const nDaysMatch = lowerPrompt.match(/(?:last|past)\s+(\d+)\s+days?/);
+    if (nDaysMatch) {
+      const days = parseInt(nDaysMatch[1]);
+      const startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - days);
+      const sc = tz
+        ? getUserLocalComponents(tz, startDate)
+        : {
+            year: startDate.getFullYear(),
+            month: startDate.getMonth() + 1,
+            day: startDate.getDate(),
+          };
+      const start = startOfDay(sc.year, sc.month, sc.day);
+      const end = endOfToday();
+      log(`"last ${days} days"`, start, end);
+      return { start, end };
+    }
+
+    const nWeeksMatch = lowerPrompt.match(/(?:last|past)\s+(\d+)\s+weeks?/);
+    if (nWeeksMatch) {
+      const weeks = parseInt(nWeeksMatch[1]);
+      const startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - weeks * 7);
+      const sc = tz
+        ? getUserLocalComponents(tz, startDate)
+        : {
+            year: startDate.getFullYear(),
+            month: startDate.getMonth() + 1,
+            day: startDate.getDate(),
+          };
+      const start = startOfDay(sc.year, sc.month, sc.day);
+      const end = endOfToday();
+      log(`"last ${weeks} weeks"`, start, end);
+      return { start, end };
+    }
+
+    // "last N months" / "past N months"
+    const nMonthsMatch = lowerPrompt.match(/(?:last|past)\s+(\d+)\s+months?/);
+    if (nMonthsMatch) {
+      const months = parseInt(nMonthsMatch[1]);
+      const startDate = new Date(now);
+      startDate.setMonth(startDate.getMonth() - months);
+      const sc = tz
+        ? getUserLocalComponents(tz, startDate)
+        : {
+            year: startDate.getFullYear(),
+            month: startDate.getMonth() + 1,
+            day: startDate.getDate(),
+          };
+      const start = startOfDay(sc.year, sc.month, sc.day);
+      const end = endOfToday();
+      log(`"last ${months} months"`, start, end);
       return { start, end };
     }
 
     // "last week"
     if (lowerPrompt.includes("last week")) {
-      const lastWeekStart = getStartOfWeek(now);
-      lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-      const lastWeekEnd = new Date(lastWeekStart);
-      lastWeekEnd.setDate(lastWeekEnd.getDate() + 6);
-      lastWeekEnd.setHours(23, 59, 59, 999);
-      return { start: lastWeekStart, end: lastWeekEnd };
+      const mondayDate = new Date(now);
+      mondayDate.setDate(mondayDate.getDate() + getMondayOffset() - 7);
+      const mc = tz
+        ? getUserLocalComponents(tz, mondayDate)
+        : {
+            year: mondayDate.getFullYear(),
+            month: mondayDate.getMonth() + 1,
+            day: mondayDate.getDate(),
+          };
+      const sundayDate = new Date(mondayDate);
+      sundayDate.setDate(mondayDate.getDate() + 6);
+      const sc = tz
+        ? getUserLocalComponents(tz, sundayDate)
+        : {
+            year: sundayDate.getFullYear(),
+            month: sundayDate.getMonth() + 1,
+            day: sundayDate.getDate(),
+          };
+      const start = startOfDay(mc.year, mc.month, mc.day);
+      const end = endOfDay(sc.year, sc.month, sc.day);
+      log(`"last week"`, start, end);
+      return { start, end };
+    }
+
+    // "this week" (explicit only — "weekly report" handled as last-resort below)
+    if (lowerPrompt.includes("this week")) {
+      const mondayDate = new Date(now);
+      mondayDate.setDate(mondayDate.getDate() + getMondayOffset());
+      const mc = tz
+        ? getUserLocalComponents(tz, mondayDate)
+        : {
+            year: mondayDate.getFullYear(),
+            month: mondayDate.getMonth() + 1,
+            day: mondayDate.getDate(),
+          };
+      const start = startOfDay(mc.year, mc.month, mc.day);
+      const end = endOfToday();
+      log(`"this week"`, start, end);
+      return { start, end };
     }
 
     // "today"
     if (lowerPrompt.includes("today")) {
-      const start = new Date(now);
-      start.setHours(0, 0, 0, 0);
-      const end = getEndOfDay(now);
+      const start = startOfDay(userNow.year, userNow.month, userNow.day);
+      const end = endOfToday();
+      log(`"today"`, start, end);
       return { start, end };
     }
 
     // "yesterday"
     if (lowerPrompt.includes("yesterday")) {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(0, 0, 0, 0);
-      const end = new Date(yesterday);
-      end.setHours(23, 59, 59, 999);
-      return { start: yesterday, end };
+      const yd = new Date(now);
+      yd.setDate(yd.getDate() - 1);
+      const yc = tz
+        ? getUserLocalComponents(tz, yd)
+        : {
+            year: yd.getFullYear(),
+            month: yd.getMonth() + 1,
+            day: yd.getDate(),
+          };
+      const start = startOfDay(yc.year, yc.month, yc.day);
+      const end = endOfDay(yc.year, yc.month, yc.day);
+      log(`"yesterday"`, start, end);
+      return { start, end };
     }
 
     // "this month"
     if (lowerPrompt.includes("this month")) {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-      const end = getEndOfDay(now);
+      const start = startOfDay(userNow.year, userNow.month, 1);
+      const end = endOfToday();
+      log(`"this month"`, start, end);
       return { start, end };
     }
 
     // "last month"
     if (lowerPrompt.includes("last month")) {
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-      return { start: lastMonth, end: lastMonthEnd };
+      const lm =
+        userNow.month === 1
+          ? { year: userNow.year - 1, month: 12 }
+          : { year: userNow.year, month: userNow.month - 1 };
+      const lastDay = new Date(lm.year, lm.month, 0).getDate();
+      const start = startOfDay(lm.year, lm.month, 1);
+      const end = endOfDay(lm.year, lm.month, lastDay);
+      log(`"last month"`, start, end);
+      return { start, end };
     }
 
-    // No date range detected
+    // "this year"
+    if (lowerPrompt.includes("this year")) {
+      const start = startOfDay(userNow.year, 1, 1);
+      const end = endOfToday();
+      log(`"this year"`, start, end);
+      return { start, end };
+    }
+
+    // "last year"
+    if (lowerPrompt.includes("last year")) {
+      const start = startOfDay(userNow.year - 1, 1, 1);
+      const end = endOfDay(userNow.year - 1, 12, 31);
+      log(`"last year"`, start, end);
+      return { start, end };
+    }
+
+    // --- Priority 3: chrono single-date fallback (specific day or month) ---
+    if (chronoResults.length === 1) {
+      const parsed = chronoResults[0];
+      const hasDay = parsed.start.isCertain("day");
+      const hasMonth = parsed.start.isCertain("month");
+
+      if (hasDay) {
+        const y = parsed.start.get("year")!;
+        const m = parsed.start.get("month")!;
+        const d = parsed.start.get("day")!;
+        const start = startOfDay(y, m, d);
+        const end = endOfDay(y, m, d);
+        log(`Chrono single day: "${parsed.text}"`, start, end);
+        return { start, end };
+      }
+
+      if (hasMonth && !hasDay) {
+        const y = parsed.start.get("year") || userNow.year;
+        const m = parsed.start.get("month")!;
+        const lastDay = new Date(y, m, 0).getDate();
+        const start = startOfDay(y, m, 1);
+        const end = endOfDay(y, m, lastDay);
+        log(`Chrono month: "${parsed.text}"`, start, end);
+        return { start, end };
+      }
+
+      // Chrono matched something but no certain day/month — use as start to now
+      const pd = parsed.start.date();
+      const pc = tz
+        ? getUserLocalComponents(tz, pd)
+        : {
+            year: pd.getFullYear(),
+            month: pd.getMonth() + 1,
+            day: pd.getDate(),
+          };
+      const start = startOfDay(pc.year, pc.month, pc.day);
+      const end = endOfToday();
+      log(`Chrono fallback: "${parsed.text}"`, start, end);
+      return { start, end };
+    }
+
+    // --- Priority 4: "weekly report/update/summary/recap" without any specific date ---
+    // Only triggers as a LAST RESORT when no other time expression was found.
+    // "weekly report for last week" → caught by "last week" above
+    // "weekly report for last month" → caught by "last month" above
+    // "weekly report" alone → defaults to this week
+    if (/weekly\s*(report|update|summary|recap)/i.test(prompt)) {
+      const mondayDate = new Date(now);
+      mondayDate.setDate(mondayDate.getDate() + getMondayOffset());
+      const mc = tz
+        ? getUserLocalComponents(tz, mondayDate)
+        : {
+            year: mondayDate.getFullYear(),
+            month: mondayDate.getMonth() + 1,
+            day: mondayDate.getDate(),
+          };
+      const start = startOfDay(mc.year, mc.month, mc.day);
+      const end = endOfToday();
+      log(`"weekly report" (no other date → this week)`, start, end);
+      return { start, end };
+    }
+
+    console.log(
+      `[DocGenDateParser] No date expression found in prompt: "${prompt.substring(0, 80)}..."`
+    );
     return undefined;
   }
 

@@ -45,6 +45,7 @@ export async function generateDocumentStream(
     body: JSON.stringify({
       prompt,
       docType,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       ...(options?.sessionIds &&
         options.sessionIds.length > 0 && { sessionIds: options.sessionIds }),
       ...(options?.artifactIds &&

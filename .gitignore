@@ -69,6 +69,9 @@ coverage/
 # Debug/temp files
 temp/
 
+# electron-vite temp compiled configs
+apps/electron/electron.vite.config.*.mjs
+
 # OCR/ML Models (auto-downloaded by tesseract.js)
 *.traineddata
 
