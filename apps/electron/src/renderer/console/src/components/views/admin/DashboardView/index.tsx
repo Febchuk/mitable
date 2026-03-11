@@ -188,10 +188,34 @@ export default function DashboardView() {
     }
     return {
       metrics: [
-        { label: "Avg Focus Time", value: "0h", change: "No data yet", changeType: "neutral" as const, description: "Average deep work per person" },
-        { label: "Avg Active Time", value: "0h", change: "No data yet", changeType: "neutral" as const, description: "Average total tracked time per person" },
-        { label: "Avg Meeting Load", value: "0h", change: "No data yet", changeType: "neutral" as const, description: "Average meeting time per person" },
-        { label: "People Tracked", value: "0", change: "No data yet", changeType: "neutral" as const, description: "Users with activity data" },
+        {
+          label: "Avg Focus Time",
+          value: "0h",
+          change: "No data yet",
+          changeType: "neutral" as const,
+          description: "Average deep work per person",
+        },
+        {
+          label: "Avg Active Time",
+          value: "0h",
+          change: "No data yet",
+          changeType: "neutral" as const,
+          description: "Average total tracked time per person",
+        },
+        {
+          label: "Avg Meeting Load",
+          value: "0h",
+          change: "No data yet",
+          changeType: "neutral" as const,
+          description: "Average meeting time per person",
+        },
+        {
+          label: "People Tracked",
+          value: "0",
+          change: "No data yet",
+          changeType: "neutral" as const,
+          description: "Users with activity data",
+        },
       ],
       activityBreakdown: [],
       workBlocks: [],

@@ -165,9 +165,7 @@ export default function SetupView() {
                 </div>
                 <Switch
                   checked={orgSettings?.settings?.showCustomerBreakdown !== false}
-                  onCheckedChange={(checked) =>
-                    updateSettings({ showCustomerBreakdown: checked })
-                  }
+                  onCheckedChange={(checked) => updateSettings({ showCustomerBreakdown: checked })}
                   disabled={isUpdating}
                 />
               </div>
@@ -182,9 +180,7 @@ export default function SetupView() {
                 </div>
                 <Switch
                   checked={orgSettings?.settings?.showTopicBreakdown !== false}
-                  onCheckedChange={(checked) =>
-                    updateSettings({ showTopicBreakdown: checked })
-                  }
+                  onCheckedChange={(checked) => updateSettings({ showTopicBreakdown: checked })}
                   disabled={isUpdating}
                 />
               </div>

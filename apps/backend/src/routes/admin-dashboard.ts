@@ -949,10 +949,18 @@ router.get(
       const subscriberMinutes = new Map<string, number>();
       for (const day of dailyActivities) {
         for (const t of (day.topicBreakdown || []) as { topicName: string; minutes: number }[]) {
-          if (t.topicName) topicMinutes.set(t.topicName, (topicMinutes.get(t.topicName) || 0) + t.minutes);
+          if (t.topicName)
+            topicMinutes.set(t.topicName, (topicMinutes.get(t.topicName) || 0) + t.minutes);
         }
-        for (const s of (day.subscriberBreakdown || []) as { subscriberName: string; minutes: number }[]) {
-          if (s.subscriberName) subscriberMinutes.set(s.subscriberName, (subscriberMinutes.get(s.subscriberName) || 0) + s.minutes);
+        for (const s of (day.subscriberBreakdown || []) as {
+          subscriberName: string;
+          minutes: number;
+        }[]) {
+          if (s.subscriberName)
+            subscriberMinutes.set(
+              s.subscriberName,
+              (subscriberMinutes.get(s.subscriberName) || 0) + s.minutes
+            );
         }
       }
 
@@ -1187,32 +1195,35 @@ router.get(
 
       // Fetch user profiles for team breakdown
       const userIds = [...userProjectMap.keys()];
-      const userDetails = userIds.length > 0
-        ? await db
-            .select({
-              id: schema.users.id,
-              firstName: schema.users.firstName,
-              lastName: schema.users.lastName,
-              email: schema.users.email,
-              jobTitle: schema.users.jobTitle,
-              avatarUrl: schema.users.avatarUrl,
-            })
-            .from(schema.users)
-            .where(inArray(schema.users.id, userIds))
-        : [];
+      const userDetails =
+        userIds.length > 0
+          ? await db
+              .select({
+                id: schema.users.id,
+                firstName: schema.users.firstName,
+                lastName: schema.users.lastName,
+                email: schema.users.email,
+                jobTitle: schema.users.jobTitle,
+                avatarUrl: schema.users.avatarUrl,
+              })
+              .from(schema.users)
+              .where(inArray(schema.users.id, userIds))
+          : [];
 
       // Build teamBreakdown sorted by hours desc
-      const teamBreakdown = userDetails.map((u) => ({
-        userId: u.id,
-        name: [u.firstName, u.lastName].filter(Boolean).join(" "),
-        email: u.email,
-        jobTitle: u.jobTitle,
-        avatarUrl: u.avatarUrl,
-        totalHours: Math.round(((userTotalMap.get(u.id) || 0) / 60) * 10) / 10,
-        projects: [...(userProjectMap.get(u.id) || new Map()).entries()]
-          .sort((a, b) => b[1] - a[1])
-          .map(([topicName, mins]) => ({ topicName, hours: Math.round((mins / 60) * 10) / 10 })),
-      })).sort((a, b) => b.totalHours - a.totalHours);
+      const teamBreakdown = userDetails
+        .map((u) => ({
+          userId: u.id,
+          name: [u.firstName, u.lastName].filter(Boolean).join(" "),
+          email: u.email,
+          jobTitle: u.jobTitle,
+          avatarUrl: u.avatarUrl,
+          totalHours: Math.round(((userTotalMap.get(u.id) || 0) / 60) * 10) / 10,
+          projects: [...(userProjectMap.get(u.id) || new Map()).entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([topicName, mins]) => ({ topicName, hours: Math.round((mins / 60) * 10) / 10 })),
+        }))
+        .sort((a, b) => b.totalHours - a.totalHours);
 
       res.json({
         title: subscriberName,

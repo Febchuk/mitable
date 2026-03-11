@@ -241,12 +241,23 @@ export async function materializeSession(sessionId: string): Promise<void> {
     const personKey = Buffer.from(`${session.organizationId}:${session.userId}`).toString("base64");
     for (const block of blocks) {
       if (block.subscriberName) {
-        syncSubscriberToGraph(session.organizationId, block.subscriberName, personKey, block.durationMinutes)
-          .catch(err => logger.warn({ err: String(err) }, "Graph subscriber sync failed (non-fatal)"));
+        syncSubscriberToGraph(
+          session.organizationId,
+          block.subscriberName,
+          personKey,
+          block.durationMinutes
+        ).catch((err) =>
+          logger.warn({ err: String(err) }, "Graph subscriber sync failed (non-fatal)")
+        );
       }
       if (block.topicName) {
-        syncTopicToGraph(session.organizationId, block.topicName, personKey, block.category, block.durationMinutes)
-          .catch(err => logger.warn({ err: String(err) }, "Graph topic sync failed (non-fatal)"));
+        syncTopicToGraph(
+          session.organizationId,
+          block.topicName,
+          personKey,
+          block.category,
+          block.durationMinutes
+        ).catch((err) => logger.warn({ err: String(err) }, "Graph topic sync failed (non-fatal)"));
       }
     }
 

@@ -47,8 +47,7 @@ export default function SubscriberBreakdown({
   periodLabel,
   onDrillDown,
 }: SubscriberBreakdownProps) {
-  const isClickable = (label: string) =>
-    onDrillDown && label !== "Internal / Unattributed";
+  const isClickable = (label: string) => onDrillDown && label !== "Internal / Unattributed";
 
   if (subscribers.length === 0) {
     return (

@@ -100,13 +100,28 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const SUBSCRIBER_COLORS = [
-  "#6366F1", "#F472B6", "#F59E0B", "#818CF8", "#34D399",
-  "#60A5FA", "#A78BFA", "#FB923C", "#A1A1A1",
+  "#6366F1",
+  "#F472B6",
+  "#F59E0B",
+  "#818CF8",
+  "#34D399",
+  "#60A5FA",
+  "#A78BFA",
+  "#FB923C",
+  "#A1A1A1",
 ];
 
 const TOPIC_COLORS = [
-  "#6366F1", "#F472B6", "#F59E0B", "#818CF8", "#34D399",
-  "#60A5FA", "#A78BFA", "#FB923C", "#2DD4BF", "#E879F9",
+  "#6366F1",
+  "#F472B6",
+  "#F59E0B",
+  "#818CF8",
+  "#34D399",
+  "#60A5FA",
+  "#A78BFA",
+  "#FB923C",
+  "#2DD4BF",
+  "#E879F9",
 ];
 
 function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange): PersonViewModel {
@@ -346,8 +361,15 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     }
   } else {
     for (const day of api.dailyActivities) {
-      for (const s of (day.subscriberBreakdown || []) as { subscriberName: string; minutes: number }[]) {
-        if (s.subscriberName) subscriberMinutes.set(s.subscriberName, (subscriberMinutes.get(s.subscriberName) || 0) + s.minutes);
+      for (const s of (day.subscriberBreakdown || []) as {
+        subscriberName: string;
+        minutes: number;
+      }[]) {
+        if (s.subscriberName)
+          subscriberMinutes.set(
+            s.subscriberName,
+            (subscriberMinutes.get(s.subscriberName) || 0) + s.minutes
+          );
       }
     }
   }
@@ -371,7 +393,8 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
   } else {
     for (const day of api.dailyActivities) {
       for (const t of (day.topicBreakdown || []) as { topicName: string; minutes: number }[]) {
-        if (t.topicName) topicMinutes.set(t.topicName, (topicMinutes.get(t.topicName) || 0) + t.minutes);
+        if (t.topicName)
+          topicMinutes.set(t.topicName, (topicMinutes.get(t.topicName) || 0) + t.minutes);
       }
     }
   }

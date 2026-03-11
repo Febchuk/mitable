@@ -1,15 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronRight } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useSubscriberDrillDown } from "@/console/src/hooks/queries/admin";
 import type { DashboardPeriod } from "@/console/src/services/adminService";
 
@@ -70,7 +62,11 @@ export default function CustomerDetailView() {
   // Format trend dates for chart
   const chartData = (data?.trend || []).map((point) => {
     const d = new Date(point.label + "T00:00:00");
-    const dayLabel = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    const dayLabel = d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
     return { name: dayLabel, hours: point.value };
   });
 
@@ -294,8 +290,7 @@ export default function CustomerDetailView() {
                       <div
                         className="w-1.5 h-1.5 rounded-full shrink-0"
                         style={{
-                          backgroundColor:
-                            projectColorMap.get(proj.topicName) || "#A1A1A1",
+                          backgroundColor: projectColorMap.get(proj.topicName) || "#A1A1A1",
                         }}
                       />
                       <span className="text-xs text-text-secondary">{proj.topicName}</span>
