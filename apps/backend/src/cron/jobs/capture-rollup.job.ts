@@ -22,6 +22,11 @@ import { eq, and, gte, lte, asc, sql } from "drizzle-orm";
 import { AppBreakdownEntry, CategoryBreakdownEntry } from "../../db/schema/daily-activities.schema";
 import { config } from "../../config";
 import { createLogger } from "../../lib/logger";
+import {
+  getKnownCustomers,
+  getOrgName,
+  addDiscoveredCustomers,
+} from "../../services/known-customers.service";
 
 const groq = new Groq({ apiKey: config.groq.apiKey });
 
@@ -45,19 +50,30 @@ interface ClassifiedActivity {
  */
 async function classifyActivitiesWithGroq(
   captureLines: string[],
-  totalActiveMinutes: number
+  totalActiveMinutes: number,
+  knownCustomers: string[] = [],
+  orgName: string | null = null
 ): Promise<ClassifiedActivity[]> {
   // Deduplicate and limit to keep prompt small
   const uniqueLines = [...new Set(captureLines)].slice(0, 80);
 
+  const orgContext = orgName
+    ? `**Organization:** ${orgName} (this is the user's own company — NOT an external customer)\n\n`
+    : "";
+
+  const knownCustomerSection =
+    knownCustomers.length > 0
+      ? `**KNOWN CUSTOMERS (external clients — check these first):**\n${knownCustomers.map((c) => `- ${c}`).join("\n")}\n\n`
+      : "";
+
   const prompt = `You are a work activity classifier. Given a list of screen capture observations from a user's workday, classify them into high-level activities.
 
-For each activity, provide:
+${orgContext}${knownCustomerSection}For each activity, provide:
 - "activity": A short description of the activity (e.g., "Code review in VS Code", "Team standup on Zoom", "Writing docs in Notion")
 - "category": The type of activity (e.g., "Development", "Meeting", "Communication", "Documentation", "Design", "Research", "Project Management", etc.)
 - "minutes": Estimated duration in minutes
 - "topic": A higher-level theme (3-5 words) grouping related activities (e.g., "Debugging API Issues", "Sprint Planning", "Client Onboarding"). Use consistent names across related activities.
-- "subscriber": Client/customer name if the work is for an external client. Look for clues in Slack channel names (#acme-support → "Acme"), ticket titles (ACME-1234 → "Acme"), window titles with company names. null if internal work.
+- "subscriber": Client/customer name. FIRST check against the known customers list above. Look for partial matches in window titles, Slack channels (#acme-support → "Acme"), ticket titles (ACME-1234 → "Acme"). Assign a known customer whenever there's a reasonable match. If clearly a NEW customer not in the list, include them. null only if clearly internal work.
 
 Rules:
 - Merge similar/consecutive captures into single activities (don't list every capture separately)
@@ -204,6 +220,12 @@ async function processUserCaptures(
 
   if (!user) return;
 
+  // Fetch known customers and org name for this org
+  const [knownCustomers, orgName] = await Promise.all([
+    getKnownCustomers(user.organizationId),
+    getOrgName(user.organizationId),
+  ]);
+
   // Fetch all sessions for today
   const sessions = await db
     .select({
@@ -319,7 +341,18 @@ async function processUserCaptures(
 
   // ── Classify activities via Groq ───────────────────────────
 
-  const activities = await classifyActivitiesWithGroq(captureLines, totalActiveMinutes);
+  const activities = await classifyActivitiesWithGroq(
+    captureLines,
+    totalActiveMinutes,
+    knownCustomers,
+    orgName
+  );
+
+  // Auto-discover new customers from Groq output
+  const newSubscribers = activities.map((a) => a.subscriber).filter((s): s is string => !!s);
+  addDiscoveredCustomers(user.organizationId, newSubscribers).catch((err) =>
+    logger.warn({ err: String(err) }, "Failed to persist discovered customers from capture-rollup")
+  );
 
   // Derive category breakdown from Groq's classification
   const categoryMap = new Map<string, number>();

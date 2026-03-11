@@ -10,7 +10,10 @@ import { DAY_ANALYZER_TOOLS } from "./day-analyzer-tools";
 /**
  * Generate the system prompt for Day Analyzer RLM
  */
-export function getDayAnalyzerSystemPrompt(): string {
+export function getDayAnalyzerSystemPrompt(
+  knownCustomers: string[] = [],
+  orgName: string | null = null
+): string {
   const toolDescriptions = DAY_ANALYZER_TOOLS.map((tool) => {
     const params = tool.parameters
       .map((p) => `${p.name}: ${p.type}${p.required ? " (required)" : " (optional)"}`)
@@ -95,7 +98,10 @@ BLOCK QUALITY:
 
 TOPIC & SUBSCRIBER TAGGING:
 - When emitting blocks, provide a **topic** (3-5 word higher-level theme) that groups related activities. E.g., "Debugging API Issues", "Sprint Planning", "Client Onboarding". Aim for 2-4 unique topics across the day. Use consistent naming — if two blocks relate to the same theme, use the same topic string.
-- If the work is for a specific client, customer, or external stakeholder, provide their **subscriber** name. Look for clues in: Slack channel names (#acme-support → "Acme"), ticket/issue titles (ACME-1234 → "Acme"), window titles with company names, project names referencing clients. If internal work, omit the subscriber field.
+- **Organization:** ${orgName || "Unknown"} — this is the user's own company, NOT an external customer. Never assign it as a subscriber.
+- **KNOWN CUSTOMERS (external clients):**
+${knownCustomers.length > 0 ? knownCustomers.map((c) => `  - ${c}`).join("\n") : "  (none known yet)"}
+- When emitting blocks, ALWAYS check the subscriber field against the known customer list above first. Look for partial matches in window titles, Slack channels, ticket IDs. Assign a known customer whenever there's a reasonable match. Only invent new customer names if the evidence is clear and distinct from all known customers. When in doubt, assign a customer. Never assign the org's own name or "internal/unattributed" as a subscriber.
 
 GROUNDING:
 - Only reference apps, people, topics, and activities that appear in the actual data

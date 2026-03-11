@@ -27,6 +27,21 @@ import { parseJsonResponse } from "../lib/parse-json";
 const logger = createLogger({ context: "admin-dashboard-routes" });
 const router = Router();
 
+/** Subscriber names to exclude from pie charts / distributions */
+const EXCLUDED_SUBSCRIBERS = new Set([
+  "internal",
+  "unattributed",
+  "internal/unattributed",
+  "n/a",
+  "none",
+  "unknown",
+  "self",
+]);
+
+function isExcludedSubscriber(name: string): boolean {
+  return EXCLUDED_SUBSCRIBERS.has(name.toLowerCase().trim());
+}
+
 /**
  * Helper: Verify the requesting user is an admin and return their org ID.
  */
@@ -273,6 +288,7 @@ async function computeLiveOrgMetrics(
       minutes: number;
     }[];
     for (const entry of breakdown) {
+      if (isExcludedSubscriber(entry.subscriberName)) continue;
       const key = normalizeName(entry.subscriberName);
       subscriberTotals.set(key, (subscriberTotals.get(key) || 0) + entry.minutes);
       const prev = subscriberNames.get(key);
@@ -609,6 +625,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
             minutes: number;
           }[];
           for (const entry of breakdown) {
+            if (isExcludedSubscriber(entry.subscriberName)) continue;
             const key = normalizeName(entry.subscriberName);
             subscriberTotals.set(key, (subscriberTotals.get(key) || 0) + entry.minutes);
             const prev = subscriberNames.get(key);
@@ -956,7 +973,7 @@ router.get(
           subscriberName: string;
           minutes: number;
         }[]) {
-          if (s.subscriberName)
+          if (s.subscriberName && !isExcludedSubscriber(s.subscriberName))
             subscriberMinutes.set(
               s.subscriberName,
               (subscriberMinutes.get(s.subscriberName) || 0) + s.minutes
@@ -3088,6 +3105,7 @@ router.get(
           minutes: number;
         }[];
         for (const entry of breakdown) {
+          if (isExcludedSubscriber(entry.subscriberName)) continue;
           const key = normalizeName(entry.subscriberName);
           const existing = subscriberData.get(key) || {
             totalMinutes: 0,

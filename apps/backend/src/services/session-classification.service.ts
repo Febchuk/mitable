@@ -20,6 +20,7 @@ import * as schema from "../db/schema/index";
 import { eq, asc } from "drizzle-orm";
 import { config } from "../config";
 import { createLogger } from "../lib/logger";
+import { getKnownCustomers, getOrgName, addDiscoveredCustomers } from "./known-customers.service";
 
 const logger = createLogger({ context: "session-classification" });
 
@@ -61,7 +62,7 @@ export async function classifySession(sessionId: string): Promise<ClassifiedActi
     return [];
   }
 
-  // Fetch session metadata for duration
+  // Fetch session metadata for duration + org for known customers
   const [session] = await db
     .select({
       startedAt: schema.monitoringSessions.startedAt,
@@ -70,12 +71,19 @@ export async function classifySession(sessionId: string): Promise<ClassifiedActi
       name: schema.monitoringSessions.name,
       finalSummary: schema.monitoringSessions.finalSummary,
       rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+      organizationId: schema.monitoringSessions.organizationId,
     })
     .from(schema.monitoringSessions)
     .where(eq(schema.monitoringSessions.id, sessionId))
     .limit(1);
 
   if (!session) return [];
+
+  // Fetch known customers and org name for customer-first classification
+  const [knownCustomers, orgName] = await Promise.all([
+    getKnownCustomers(session.organizationId),
+    getOrgName(session.organizationId),
+  ]);
 
   const startMs = new Date(session.startedAt).getTime();
   const endMs = session.endedAt ? new Date(session.endedAt).getTime() : Date.now();
@@ -133,7 +141,18 @@ export async function classifySession(sessionId: string): Promise<ClassifiedActi
     ? `\n\nAudio transcript excerpt:\n${transcriptSnippet}`
     : "";
 
+  const knownCustomersList =
+    knownCustomers.length > 0
+      ? knownCustomers.map((c) => `- ${c}`).join("\n")
+      : "(none known yet — discover new ones from the data)";
+
   const prompt = `You are a work-activity analyst. Given timestamped screen capture observations from a ${totalMinutes}-minute work session, build a **narrative timeline** of what the person actually did and classify it into distinct activities.
+
+**Organization:** ${orgName || "Unknown"}
+**IMPORTANT:** "${orgName || "this organization"}" is the user's own company — it is NOT an external customer. Do NOT list it as a subscriber. Only list EXTERNAL clients/customers as subscribers.
+
+**KNOWN CUSTOMERS (external clients):**
+${knownCustomersList}
 
 **Your job is to think like a human looking at this data:**
 - Multiple window titles from "Microsoft Teams" (meeting views, chat, sharing, control bar, compact view) during the same time period = ONE meeting activity
@@ -148,16 +167,22 @@ Meeting, Development, Communication, Documentation, Design, Research, Project Ma
 **Output format — strict JSON, no markdown:**
 {"activities":[{"activity":"Short descriptive name","category":"Category","minutes":N,"description":"1-2 sentence description","topic":"Higher-level theme","subscriber":"Client name or null"}]}
 
-**Rules:**
-1. Total minutes across all activities MUST equal ${totalMinutes}
-2. Each activity should be at least 1 minute
-3. Prefer fewer, larger activities (3-6 is typical) over many tiny ones
-4. If multiple apps are used for the same goal, that's ONE activity
-5. Meeting-related windows (Teams meeting, Zoom call, Google Meet, etc.) = "Meeting"
-6. Be specific in names: "Sprint planning with team" not "Meeting in Teams"
-7. If a session summary exists below, use it to inform your classification
-8. **topic**: A higher-level theme grouping (3-5 words). More specific than category, broader than the activity name. E.g., "Debugging API Issues" (under Development), "Sprint Planning" (under Meeting). Aim for 2-4 unique topics per session.
-9. **subscriber**: If work is for/about a specific client, subscriber, or external stakeholder, provide their name. Clues: Slack channel names (#acme-support → "Acme"), ticket titles (ACME-1234 → "Acme"), window titles with company names, project names referencing clients. If internal work or no client context → null.
+**Rules (in priority order):**
+1. **SUBSCRIBER IDENTIFICATION (DO THIS FIRST):**
+   - Check EVERY activity against the known customers list above
+   - Look for partial matches in window titles, Slack channels, ticket IDs, project names
+   - Example: known customer "Acme" matches "#acme-support", "ACME-1234", "Acme Dashboard"
+   - If you find a match, assign that customer. Prefer known customers over inventing new ones.
+   - If you see a clear NEW customer not in the list, include them — they'll be added automatically.
+   - When in doubt between internal work and client work, assign a customer if there's any evidence.
+2. **topic**: A higher-level theme grouping (3-5 words). More specific than category, broader than the activity name. E.g., "Debugging API Issues" (under Development), "Sprint Planning" (under Meeting). Aim for 2-4 unique topics per session.
+3. Total minutes across all activities MUST equal ${totalMinutes}
+4. Each activity should be at least 1 minute
+5. Prefer fewer, larger activities (3-6 is typical) over many tiny ones
+6. If multiple apps are used for the same goal, that's ONE activity
+7. Meeting-related windows (Teams meeting, Zoom call, Google Meet, etc.) = "Meeting"
+8. Be specific in names: "Sprint planning with team" not "Meeting in Teams"
+9. If a session summary exists below, use it to inform your classification
 
 ${session.name ? `Session name: "${session.name}"` : ""}
 ${summaryContext ? `Session summary: ${summaryContext.slice(0, 500)}` : ""}
@@ -176,6 +201,12 @@ ${lines.join("\n")}${transcriptContext}`;
       .update(schema.monitoringSessions)
       .set({ keyActivities: activities })
       .where(eq(schema.monitoringSessions.id, sessionId));
+
+    // Auto-discover new customers from classification output
+    const newSubscribers = activities.map((a) => a.subscriber).filter((s): s is string => !!s);
+    addDiscoveredCustomers(session.organizationId, newSubscribers).catch((err) =>
+      logger.warn({ err: String(err) }, "Failed to persist discovered customers")
+    );
 
     logger.debug(
       { sessionId, activityCount: activities.length, totalMinutes },

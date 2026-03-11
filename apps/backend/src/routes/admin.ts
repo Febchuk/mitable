@@ -2510,7 +2510,7 @@ router.patch(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = req.userId!;
-      const { variant, showCustomerBreakdown, showTopicBreakdown } = req.body;
+      const { variant, showCustomerBreakdown, showTopicBreakdown, knownCustomers } = req.body;
 
       // Verify user is admin
       const [currentUser] = await db
@@ -2563,11 +2563,29 @@ router.patch(
 
       // Merge new settings with existing
       const currentSettings = (organization.settings as Record<string, unknown>) || {};
+      // Validate knownCustomers if provided
+      if (knownCustomers !== undefined) {
+        if (
+          !Array.isArray(knownCustomers) ||
+          !knownCustomers.every((c: unknown) => typeof c === "string")
+        ) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "knownCustomers must be an array of strings",
+            },
+          });
+          return;
+        }
+      }
+
       const updatedSettings = {
         ...currentSettings,
         ...(variant !== undefined && { variant }),
         ...(showCustomerBreakdown !== undefined && { showCustomerBreakdown }),
         ...(showTopicBreakdown !== undefined && { showTopicBreakdown }),
+        ...(knownCustomers !== undefined && { knownCustomers }),
       };
 
       // Update organization settings

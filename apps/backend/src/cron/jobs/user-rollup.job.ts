@@ -25,6 +25,11 @@ import {
   DayAnalyzerUserProfile,
 } from "../../services/rlm/day-analyzer-environment";
 import { createLogger } from "../../lib/logger";
+import {
+  getKnownCustomers,
+  getOrgName,
+  addDiscoveredCustomers,
+} from "../../services/known-customers.service";
 
 const logger = createLogger({ context: "user-rollup-job" });
 
@@ -244,6 +249,12 @@ export async function processUserDay(
     regularApps: (user.regularApps as string[]) || [],
   };
 
+  // Fetch known customers and org name for customer-first classification
+  const [knownCustomers, orgName] = await Promise.all([
+    getKnownCustomers(user.organizationId),
+    getOrgName(user.organizationId),
+  ]);
+
   const input: DayAnalyzerInput = {
     date: today,
     userProfile,
@@ -251,6 +262,8 @@ export async function processUserDay(
     captures: dayCaptures,
     transcripts: dayTranscripts,
     masterStories: dayMasterStories,
+    knownCustomers,
+    orgName,
   };
 
   // Mark as processing
@@ -286,6 +299,12 @@ export async function processUserDay(
     result,
     sessions.length,
     captures.length
+  );
+
+  // Auto-discover customers from Day Analyzer output
+  const subscribers = result.blocks.map((b) => b.subscriberName).filter((s): s is string => !!s);
+  addDiscoveredCustomers(user.organizationId, subscribers).catch((err) =>
+    logger.warn({ err: String(err) }, "Failed to persist discovered customers")
   );
 
   return "processed";
