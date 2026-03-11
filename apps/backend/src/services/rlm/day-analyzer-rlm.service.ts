@@ -37,6 +37,7 @@ export interface DayAnalyzerInput {
   transcripts: DayTranscript[];
   masterStories: DayMasterStory[];
   knownCustomers?: string[];
+  orgName?: string | null;
 }
 
 export interface DayAnalyzerResult {
@@ -129,7 +130,7 @@ class DayAnalyzerRLMService {
     );
 
     // Build conversation
-    const systemPrompt = getDayAnalyzerSystemPrompt(input.knownCustomers || []);
+    const systemPrompt = getDayAnalyzerSystemPrompt(input.knownCustomers || [], input.orgName);
     const initialUserPrompt = getDayAnalyzerUserPrompt([]);
 
     const messages: Array<{ role: "user" | "assistant"; content: string }> = [

@@ -25,7 +25,11 @@ import {
   DayAnalyzerUserProfile,
 } from "../../services/rlm/day-analyzer-environment";
 import { createLogger } from "../../lib/logger";
-import { getKnownCustomers, addDiscoveredCustomers } from "../../services/known-customers.service";
+import {
+  getKnownCustomers,
+  getOrgName,
+  addDiscoveredCustomers,
+} from "../../services/known-customers.service";
 
 const logger = createLogger({ context: "user-rollup-job" });
 
@@ -245,8 +249,11 @@ export async function processUserDay(
     regularApps: (user.regularApps as string[]) || [],
   };
 
-  // Fetch known customers for customer-first classification
-  const knownCustomers = await getKnownCustomers(user.organizationId);
+  // Fetch known customers and org name for customer-first classification
+  const [knownCustomers, orgName] = await Promise.all([
+    getKnownCustomers(user.organizationId),
+    getOrgName(user.organizationId),
+  ]);
 
   const input: DayAnalyzerInput = {
     date: today,
@@ -256,6 +263,7 @@ export async function processUserDay(
     transcripts: dayTranscripts,
     masterStories: dayMasterStories,
     knownCustomers,
+    orgName,
   };
 
   // Mark as processing

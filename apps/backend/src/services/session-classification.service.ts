@@ -20,7 +20,7 @@ import * as schema from "../db/schema/index";
 import { eq, asc } from "drizzle-orm";
 import { config } from "../config";
 import { createLogger } from "../lib/logger";
-import { getKnownCustomers, addDiscoveredCustomers } from "./known-customers.service";
+import { getKnownCustomers, getOrgName, addDiscoveredCustomers } from "./known-customers.service";
 
 const logger = createLogger({ context: "session-classification" });
 
@@ -79,8 +79,11 @@ export async function classifySession(sessionId: string): Promise<ClassifiedActi
 
   if (!session) return [];
 
-  // Fetch known customers for customer-first classification
-  const knownCustomers = await getKnownCustomers(session.organizationId);
+  // Fetch known customers and org name for customer-first classification
+  const [knownCustomers, orgName] = await Promise.all([
+    getKnownCustomers(session.organizationId),
+    getOrgName(session.organizationId),
+  ]);
 
   const startMs = new Date(session.startedAt).getTime();
   const endMs = session.endedAt ? new Date(session.endedAt).getTime() : Date.now();
@@ -145,7 +148,10 @@ export async function classifySession(sessionId: string): Promise<ClassifiedActi
 
   const prompt = `You are a work-activity analyst. Given timestamped screen capture observations from a ${totalMinutes}-minute work session, build a **narrative timeline** of what the person actually did and classify it into distinct activities.
 
-**KNOWN CUSTOMERS for this organization:**
+**Organization:** ${orgName || "Unknown"}
+**IMPORTANT:** "${orgName || "this organization"}" is the user's own company — it is NOT an external customer. Do NOT list it as a subscriber. Only list EXTERNAL clients/customers as subscribers.
+
+**KNOWN CUSTOMERS (external clients):**
 ${knownCustomersList}
 
 **Your job is to think like a human looking at this data:**

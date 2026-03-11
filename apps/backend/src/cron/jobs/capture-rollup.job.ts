@@ -22,7 +22,11 @@ import { eq, and, gte, lte, asc, sql } from "drizzle-orm";
 import { AppBreakdownEntry, CategoryBreakdownEntry } from "../../db/schema/daily-activities.schema";
 import { config } from "../../config";
 import { createLogger } from "../../lib/logger";
-import { getKnownCustomers, addDiscoveredCustomers } from "../../services/known-customers.service";
+import {
+  getKnownCustomers,
+  getOrgName,
+  addDiscoveredCustomers,
+} from "../../services/known-customers.service";
 
 const groq = new Groq({ apiKey: config.groq.apiKey });
 
@@ -47,19 +51,24 @@ interface ClassifiedActivity {
 async function classifyActivitiesWithGroq(
   captureLines: string[],
   totalActiveMinutes: number,
-  knownCustomers: string[] = []
+  knownCustomers: string[] = [],
+  orgName: string | null = null
 ): Promise<ClassifiedActivity[]> {
   // Deduplicate and limit to keep prompt small
   const uniqueLines = [...new Set(captureLines)].slice(0, 80);
 
+  const orgContext = orgName
+    ? `**Organization:** ${orgName} (this is the user's own company — NOT an external customer)\n\n`
+    : "";
+
   const knownCustomerSection =
     knownCustomers.length > 0
-      ? `**KNOWN CUSTOMERS (check these first):**\n${knownCustomers.map((c) => `- ${c}`).join("\n")}\n\n`
+      ? `**KNOWN CUSTOMERS (external clients — check these first):**\n${knownCustomers.map((c) => `- ${c}`).join("\n")}\n\n`
       : "";
 
   const prompt = `You are a work activity classifier. Given a list of screen capture observations from a user's workday, classify them into high-level activities.
 
-${knownCustomerSection}For each activity, provide:
+${orgContext}${knownCustomerSection}For each activity, provide:
 - "activity": A short description of the activity (e.g., "Code review in VS Code", "Team standup on Zoom", "Writing docs in Notion")
 - "category": The type of activity (e.g., "Development", "Meeting", "Communication", "Documentation", "Design", "Research", "Project Management", etc.)
 - "minutes": Estimated duration in minutes
@@ -211,8 +220,11 @@ async function processUserCaptures(
 
   if (!user) return;
 
-  // Fetch known customers for this org
-  const knownCustomers = await getKnownCustomers(user.organizationId);
+  // Fetch known customers and org name for this org
+  const [knownCustomers, orgName] = await Promise.all([
+    getKnownCustomers(user.organizationId),
+    getOrgName(user.organizationId),
+  ]);
 
   // Fetch all sessions for today
   const sessions = await db
@@ -332,7 +344,8 @@ async function processUserCaptures(
   const activities = await classifyActivitiesWithGroq(
     captureLines,
     totalActiveMinutes,
-    knownCustomers
+    knownCustomers,
+    orgName
   );
 
   // Auto-discover new customers from Groq output
