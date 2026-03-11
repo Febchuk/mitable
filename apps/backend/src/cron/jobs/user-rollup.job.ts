@@ -16,6 +16,7 @@ import {
   dayAnalyzerRLMService,
   DayAnalyzerInput,
 } from "../../services/rlm/day-analyzer-rlm.service";
+import { recalculateDailyStats } from "../../services/activity-materializer.service";
 import {
   DaySession,
   DayCapture,
@@ -456,12 +457,18 @@ async function writeResults(
           description: block.description,
           apps: JSON.stringify(block.apps),
           category: block.category,
+          topicName: block.topicName || null,
+          subscriberName: block.subscriberName || null,
           participants: block.participants ? JSON.stringify(block.participants) : "[]",
           sourceSessionIds: JSON.stringify(block.sourceSessionIds),
           sequenceNumber: index,
         }))
       );
     }
+
+    // Recalculate daily aggregates (categoryBreakdown, topicBreakdown, subscriberBreakdown)
+    // from the freshly-inserted blocks — single source of truth
+    await recalculateDailyStats(dailyActivityId, tx);
   });
 
   logger.info(

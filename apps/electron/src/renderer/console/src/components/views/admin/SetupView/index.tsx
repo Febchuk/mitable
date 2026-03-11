@@ -1,4 +1,4 @@
-import { Settings, Globe, Check } from "lucide-react";
+import { Settings, Globe, Check, BarChart3 } from "lucide-react";
 import {
   useOrganizationSettings,
   useUpdateOrganizationSettings,
@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import type { OrgVariant } from "@mitable/shared";
 
 const VARIANT_OPTIONS: { value: OrgVariant; label: string; description: string }[] = [
@@ -133,6 +134,59 @@ export default function SetupView() {
                     {isUpdating && <p className="text-xs text-ink-tertiary mt-2">Saving...</p>}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Dashboard Panels Card */}
+          <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay p-6 mb-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo/10 border border-indigo/20">
+                <BarChart3 size={20} className="text-indigo" />
+              </div>
+              <div>
+                <h2 className="font-display text-lg font-semibold text-ink-primary tracking-tight">
+                  Dashboard Panels
+                </h2>
+                <p className="text-ink-tertiary text-sm">
+                  Choose which breakdowns appear on the dashboard
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Customer / Client toggle */}
+              <div className="flex items-center justify-between p-4 rounded-lg bg-canvas-muted/50 border border-stroke-subtle">
+                <div>
+                  <h3 className="font-medium text-ink-primary">Customer / Client Breakdown</h3>
+                  <p className="text-ink-tertiary text-sm mt-0.5">
+                    Show time allocation by customer
+                  </p>
+                </div>
+                <Switch
+                  checked={orgSettings?.settings?.showCustomerBreakdown !== false}
+                  onCheckedChange={(checked) =>
+                    updateSettings({ showCustomerBreakdown: checked })
+                  }
+                  disabled={isUpdating}
+                />
+              </div>
+
+              {/* Project / Topic toggle */}
+              <div className="flex items-center justify-between p-4 rounded-lg bg-canvas-muted/50 border border-stroke-subtle">
+                <div>
+                  <h3 className="font-medium text-ink-primary">Project / Topic Breakdown</h3>
+                  <p className="text-ink-tertiary text-sm mt-0.5">
+                    Show time allocation by project
+                  </p>
+                </div>
+                <Switch
+                  checked={orgSettings?.settings?.showTopicBreakdown !== false}
+                  onCheckedChange={(checked) =>
+                    updateSettings({ showTopicBreakdown: checked })
+                  }
+                  disabled={isUpdating}
+                />
               </div>
             </div>
           </div>

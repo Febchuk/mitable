@@ -14,11 +14,23 @@ import {
   Clipboard,
   Search,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import {
   useDashboardPersonDetail,
   useUserDrillDown,
   useCategoryActivities,
+  useOrganizationSettings,
 } from "@/console/src/hooks/queries/admin";
 import type {
   DashboardPeriod,
@@ -66,6 +78,8 @@ interface PersonViewModel {
   weeklyTrend: { day: string; focus: number; meetings: number; other: number }[];
   recentWork: RecentWorkItem[];
   topTopics: { label: string; count: number }[];
+  customerBreakdown: { label: string; value: number; hours: number; color: string }[];
+  projectBreakdown: { label: string; hours: number; color: string }[];
 }
 
 type TimeRange = "yesterday" | "week" | "month" | "ytd" | "all";
@@ -84,6 +98,16 @@ const CATEGORY_COLORS: Record<string, string> = {
   documentation: "#60A5FA",
   other: "#A1A1A1",
 };
+
+const SUBSCRIBER_COLORS = [
+  "#6366F1", "#F472B6", "#F59E0B", "#818CF8", "#34D399",
+  "#60A5FA", "#A78BFA", "#FB923C", "#A1A1A1",
+];
+
+const TOPIC_COLORS = [
+  "#6366F1", "#F472B6", "#F59E0B", "#818CF8", "#34D399",
+  "#60A5FA", "#A78BFA", "#FB923C", "#2DD4BF", "#E879F9",
+];
 
 function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange): PersonViewModel {
   const u = api.user;
@@ -314,6 +338,52 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     .slice(0, 4)
     .map(([label, count]) => ({ label, count }));
 
+  // Aggregate subscriber (customer) breakdown from dailyActivities or API-provided distribution
+  const subscriberMinutes = new Map<string, number>();
+  if (api.subscriberDistribution && api.subscriberDistribution.length > 0) {
+    for (const s of api.subscriberDistribution) {
+      subscriberMinutes.set(s.subscriberName, s.totalMinutes);
+    }
+  } else {
+    for (const day of api.dailyActivities) {
+      for (const s of (day.subscriberBreakdown || []) as { subscriberName: string; minutes: number }[]) {
+        if (s.subscriberName) subscriberMinutes.set(s.subscriberName, (subscriberMinutes.get(s.subscriberName) || 0) + s.minutes);
+      }
+    }
+  }
+
+  const totalSubMin = [...subscriberMinutes.values()].reduce((a, b) => a + b, 0);
+  const customerBreakdown: PersonViewModel["customerBreakdown"] = [...subscriberMinutes.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, mins], i) => ({
+      label,
+      value: totalSubMin > 0 ? Math.round((mins / totalSubMin) * 100) : 0,
+      hours: Math.round((mins / 60) * 10) / 10,
+      color: SUBSCRIBER_COLORS[i % SUBSCRIBER_COLORS.length]!,
+    }));
+
+  // Aggregate topic (project) breakdown from dailyActivities or API-provided distribution
+  const topicMinutes = new Map<string, number>();
+  if (api.topicDistribution && api.topicDistribution.length > 0) {
+    for (const t of api.topicDistribution) {
+      topicMinutes.set(t.topicName, t.totalMinutes);
+    }
+  } else {
+    for (const day of api.dailyActivities) {
+      for (const t of (day.topicBreakdown || []) as { topicName: string; minutes: number }[]) {
+        if (t.topicName) topicMinutes.set(t.topicName, (topicMinutes.get(t.topicName) || 0) + t.minutes);
+      }
+    }
+  }
+
+  const projectBreakdown: PersonViewModel["projectBreakdown"] = [...topicMinutes.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, mins], i) => ({
+      label,
+      hours: Math.round((mins / 60) * 10) / 10,
+      color: TOPIC_COLORS[i % TOPIC_COLORS.length]!,
+    }));
+
   return {
     name: u.name,
     role: u.role || "Employee",
@@ -344,6 +414,8 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     weeklyTrend: trend.length > 0 ? trend : [{ day: "—", focus: 0, meetings: 0, other: 0 }],
     recentWork,
     topTopics: topTopics.length > 0 ? topTopics : [{ label: "No data", count: 0 }],
+    customerBreakdown,
+    projectBreakdown,
   };
 }
 
@@ -392,6 +464,10 @@ export default function PersonDetail() {
   const [workSearchQuery, setWorkSearchQuery] = useState("");
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
+
+  const { data: orgSettings } = useOrganizationSettings();
+  const showCustomer = orgSettings?.settings?.showCustomerBreakdown !== false;
+  const showTopic = orgSettings?.settings?.showTopicBreakdown !== false;
 
   const { data: apiDetail } = useDashboardPersonDetail(id || "", timeRangeToPeriod[timeRange]);
   const { data: drillDownData } = useUserDrillDown(
@@ -896,6 +972,111 @@ export default function PersonDetail() {
             </div>
           </div>
         </div>
+
+        {/* Customer / Client + Project / Topic breakdown */}
+        {(showCustomer || showTopic) &&
+          (person.customerBreakdown.length > 0 || person.projectBreakdown.length > 0) && (
+            <div className="grid grid-cols-2 gap-4">
+              {/* Customer / Client breakdown (donut) */}
+              {showCustomer && person.customerBreakdown.length > 0 && (
+                <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
+                  <h3 className="relative text-sm font-semibold text-text-primary mb-4">
+                    Customer / Client
+                    <span className="text-text-secondary font-normal ml-2">
+                      {timeRangeLabels[timeRange]}
+                    </span>
+                  </h3>
+                  <div className="relative flex items-center gap-6">
+                    <div className="w-[140px] h-[140px] shrink-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={person.customerBreakdown}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={40}
+                            outerRadius={65}
+                            dataKey="value"
+                            strokeWidth={0}
+                          >
+                            {person.customerBreakdown.map((entry, i) => (
+                              <Cell key={i} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            content={({ active, payload }: any) => {
+                              if (!active || !payload?.length) return null;
+                              const { label, value, hours } = payload[0].payload;
+                              return (
+                                <div className="bg-canvas-overlay border border-stroke-subtle rounded-lg px-3 py-2 text-xs shadow-lg">
+                                  <span className="text-text-primary font-medium">{label}</span>
+                                  <span className="text-text-secondary ml-2">
+                                    {hours}h ({value}%)
+                                  </span>
+                                </div>
+                              );
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      {person.customerBreakdown.map((entry) => (
+                        <div key={entry.label} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: entry.color }}
+                            />
+                            <span className="text-xs text-text-primary">{entry.label}</span>
+                          </div>
+                          <span className="text-xs text-text-secondary">
+                            {entry.hours}h ({entry.value}%)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Project / Topic breakdown (bar list) */}
+              {showTopic && person.projectBreakdown.length > 0 && (
+                <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
+                  <h3 className="relative text-sm font-semibold text-text-primary mb-4">
+                    Projects / Topics
+                    <span className="text-text-secondary font-normal ml-2">
+                      {timeRangeLabels[timeRange]}
+                    </span>
+                  </h3>
+                  <div className="relative space-y-3">
+                    {person.projectBreakdown.map((project) => {
+                      const maxHours = person.projectBreakdown[0]?.hours || 1;
+                      return (
+                        <div key={project.label}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-text-primary">{project.label}</span>
+                            <span className="text-xs text-text-secondary">{project.hours}h</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-canvas-overlay overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-normal"
+                              style={{
+                                width: `${maxHours > 0 ? (project.hours / maxHours) * 100 : 0}%`,
+                                backgroundColor: project.color,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
         {/* Recent work + Top topics */}
         <div className="grid grid-cols-3 gap-4">

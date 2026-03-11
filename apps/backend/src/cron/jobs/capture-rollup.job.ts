@@ -33,6 +33,8 @@ interface ClassifiedActivity {
   activity: string;
   category: string;
   minutes: number;
+  topic?: string;
+  subscriber?: string;
 }
 
 /**
@@ -54,6 +56,8 @@ For each activity, provide:
 - "activity": A short description of the activity (e.g., "Code review in VS Code", "Team standup on Zoom", "Writing docs in Notion")
 - "category": The type of activity (e.g., "Development", "Meeting", "Communication", "Documentation", "Design", "Research", "Project Management", etc.)
 - "minutes": Estimated duration in minutes
+- "topic": A higher-level theme (3-5 words) grouping related activities (e.g., "Debugging API Issues", "Sprint Planning", "Client Onboarding"). Use consistent names across related activities.
+- "subscriber": Client/customer name if the work is for an external client. Look for clues in Slack channel names (#acme-support → "Acme"), ticket titles (ACME-1234 → "Acme"), window titles with company names. null if internal work.
 
 Rules:
 - Merge similar/consecutive captures into single activities (don't list every capture separately)
@@ -62,7 +66,7 @@ Rules:
 - If it looks like a meeting (video call, conference, huddle), category must be "Meeting"
 
 Respond in JSON:
-{ "activities": [ { "activity": "...", "category": "...", "minutes": N }, ... ] }
+{ "activities": [ { "activity": "...", "category": "...", "minutes": N, "topic": "...", "subscriber": "..." or null }, ... ] }
 
 Capture observations (chronological):
 ${uniqueLines.map((l) => `• ${l}`).join("\n")}`;
@@ -343,6 +347,44 @@ async function processUserCaptures(
   const meetingPercentage =
     totalActiveMinutes > 0 ? Math.round((totalMeetingMinutes / totalActiveMinutes) * 100) : 0;
 
+  // Derive topic breakdown from Groq's classification
+  const topicMap = new Map<string, number>();
+  const topicDisplayNames = new Map<string, string>();
+  const subscriberMap = new Map<string, number>();
+  const subscriberDisplayNames = new Map<string, string>();
+
+  for (const act of activities) {
+    if (act.topic) {
+      const tKey = act.topic.toLowerCase().trim();
+      topicMap.set(tKey, (topicMap.get(tKey) || 0) + act.minutes);
+      const prev = topicDisplayNames.get(tKey);
+      if (!prev || act.topic.length > prev.length) topicDisplayNames.set(tKey, act.topic);
+    }
+    if (act.subscriber) {
+      const sKey = act.subscriber.toLowerCase().trim();
+      subscriberMap.set(sKey, (subscriberMap.get(sKey) || 0) + act.minutes);
+      const prev = subscriberDisplayNames.get(sKey);
+      if (!prev || act.subscriber.length > prev.length)
+        subscriberDisplayNames.set(sKey, act.subscriber);
+    }
+  }
+
+  const topicBreakdown = [...topicMap.entries()]
+    .map(([key, minutes]) => ({
+      topicName: topicDisplayNames.get(key) || key,
+      minutes: Math.round(minutes),
+      percentage: totalActiveMinutes > 0 ? Math.round((minutes / totalActiveMinutes) * 100) : 0,
+    }))
+    .sort((a, b) => b.minutes - a.minutes);
+
+  const subscriberBreakdown = [...subscriberMap.entries()]
+    .map(([key, minutes]) => ({
+      subscriberName: subscriberDisplayNames.get(key) || key,
+      minutes: Math.round(minutes),
+      percentage: totalActiveMinutes > 0 ? Math.round((minutes / totalActiveMinutes) * 100) : 0,
+    }))
+    .sort((a, b) => b.minutes - a.minutes);
+
   // Build key accomplishments from the activity list
   const keyAccomplishments = activities.map((a) => `${a.activity} (${a.minutes}min)`);
   const daySummary = activities.length > 0 ? activities.map((a) => a.activity).join("; ") : null;
@@ -362,6 +404,8 @@ async function processUserCaptures(
     meetingPercentage,
     appBreakdown: JSON.stringify(appBreakdown),
     categoryBreakdown: JSON.stringify(categoryBreakdown),
+    topicBreakdown,
+    subscriberBreakdown,
     daySummary,
     keyAccomplishments: JSON.stringify(keyAccomplishments),
     status: "completed" as const,

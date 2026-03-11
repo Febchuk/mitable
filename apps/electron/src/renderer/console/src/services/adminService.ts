@@ -424,6 +424,8 @@ export interface OrganizationSettings {
   domain?: string | null;
   settings: {
     variant?: "global" | "nigeria";
+    showCustomerBreakdown?: boolean;
+    showTopicBreakdown?: boolean;
   };
 }
 
@@ -447,6 +449,8 @@ export async function fetchOrganizationSettings(): Promise<OrganizationSettings>
 
 export interface UpdateOrganizationSettingsPayload {
   variant?: "global" | "nigeria";
+  showCustomerBreakdown?: boolean;
+  showTopicBreakdown?: boolean;
 }
 
 /**
@@ -594,6 +598,8 @@ export interface DashboardPersonDetail {
     meetingPercentage: number;
     daysTracked: number;
   };
+  topicDistribution?: TopicDistributionEntry[];
+  subscriberDistribution?: SubscriberDistributionEntry[];
   dailyActivities: Array<{
     date: string;
     totalWorkMinutes: number;
@@ -605,6 +611,8 @@ export interface DashboardPersonDetail {
     keyAccomplishments: string[];
     categoryBreakdown: any;
     appBreakdown: any;
+    topicBreakdown?: any;
+    subscriberBreakdown?: any;
   }>;
   blocks: ActivityBlock[];
   blocksByDate: Record<string, ActivityBlock[]>;
@@ -678,6 +686,20 @@ export interface DrillDownData {
   trend: { label: string; value: number }[];
 }
 
+export interface TeamMemberEntry {
+  userId: string;
+  name: string;
+  email: string | null;
+  jobTitle: string | null;
+  avatarUrl: string | null;
+  totalHours: number;
+  projects: Array<{ topicName: string; hours: number }>;
+}
+
+export interface SubscriberDetailData extends DrillDownData {
+  teamBreakdown: TeamMemberEntry[];
+}
+
 /**
  * Fetch drill-down breakdown for a specific metric or category (admin only)
  * Metrics: focus_time, active_time, meeting_load, people_tracked
@@ -693,6 +715,23 @@ export async function fetchDrillDown(
     );
   } catch (error) {
     logger.error("Error fetching drill-down data:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch subscriber (customer/client) drill-down (admin only)
+ */
+export async function fetchSubscriberDrillDown(
+  name: string,
+  period: DashboardPeriod = "yesterday"
+): Promise<SubscriberDetailData> {
+  try {
+    return await apiRequest<SubscriberDetailData>(
+      `/admin/dashboard/drill-down/subscriber/${encodeURIComponent(name)}?period=${period}`
+    );
+  } catch (error) {
+    logger.error("Error fetching subscriber drill-down:", error);
     throw error;
   }
 }

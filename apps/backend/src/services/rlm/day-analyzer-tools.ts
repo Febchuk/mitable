@@ -217,6 +217,20 @@ export const EMIT_WORK_BLOCK: DayAnalyzerTool = {
       description: "Array of session IDs that contributed to this block",
       required: true,
     },
+    {
+      name: "topic",
+      type: "string",
+      description:
+        "Higher-level topic/theme (3-5 words). E.g., 'Debugging API Issues', 'Sprint Planning', 'Code Review'. Use consistent names across related blocks.",
+      required: false,
+    },
+    {
+      name: "subscriber",
+      type: "string",
+      description:
+        "Client/subscriber name if this work is for an external client/customer. Look for clues in window titles, project names, Slack channels (#acme-support → 'Acme'), ticket titles (ACME-1234 → 'Acme'). Omit if internal work.",
+      required: false,
+    },
   ],
   execute: (params, env) => {
     const block: EmittedBlock = {
@@ -231,6 +245,8 @@ export const EMIT_WORK_BLOCK: DayAnalyzerTool = {
       apps: params.apps || [],
       category: params.category || "other",
       sourceSessionIds: params.sourceSessionIds || [],
+      topicName: params.topic || null,
+      subscriberName: params.subscriber || null,
     };
     return env.emitBlock(block);
   },
@@ -296,6 +312,20 @@ export const EMIT_MEETING_BLOCK: DayAnalyzerTool = {
       description: "Array of session IDs that contributed to this block",
       required: true,
     },
+    {
+      name: "topic",
+      type: "string",
+      description:
+        "Higher-level topic/theme (3-5 words). E.g., 'Sprint Planning', 'Client Sync', 'Design Review'. Use consistent names across related blocks.",
+      required: false,
+    },
+    {
+      name: "subscriber",
+      type: "string",
+      description:
+        "Client/subscriber name if this meeting is with/about an external client/customer. Omit if internal meeting.",
+      required: false,
+    },
   ],
   execute: (params, env) => {
     const block: EmittedBlock = {
@@ -311,6 +341,8 @@ export const EMIT_MEETING_BLOCK: DayAnalyzerTool = {
       category: params.category || "other",
       participants: params.participants || [],
       sourceSessionIds: params.sourceSessionIds || [],
+      topicName: params.topic || null,
+      subscriberName: params.subscriber || null,
     };
     return env.emitBlock(block);
   },

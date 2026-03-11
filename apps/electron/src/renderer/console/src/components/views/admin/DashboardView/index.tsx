@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import MetricCards from "./MetricCards";
 import ActivityBreakdown from "./ActivityBreakdown";
@@ -8,7 +9,11 @@ import OrgInsights from "./OrgInsights";
 import ChatPanel from "./ChatPanel";
 import DrillDownPanel from "./DrillDownPanel";
 import type { TimeRange, MetricData, ActivityEntry, WorkBlock, WeeklyTrendPoint } from "./mockData";
-import { useDashboardMetrics, useDrillDown } from "@/console/src/hooks/queries/admin";
+import {
+  useDashboardMetrics,
+  useDrillDown,
+  useOrganizationSettings,
+} from "@/console/src/hooks/queries/admin";
 import type { DashboardPeriod, DashboardMetrics } from "@/console/src/services/adminService";
 
 // Map UI labels → API metric keys for drill-down
@@ -42,6 +47,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   design: "#818CF8",
   review: "#34D399",
   documentation: "#60A5FA",
+  meeting: "#F59E0B",
   standup: "#F59E0B",
   planning: "#F59E0B",
   team_sync: "#818CF8",
@@ -164,48 +170,28 @@ function transformApiData(api: DashboardMetrics): {
 }
 
 export default function DashboardView() {
+  const navigate = useNavigate();
   const [chatOpen, setChatOpen] = useState(false);
   const [drillDownMetric, setDrillDownMetric] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("yesterday");
 
   const { data: apiData } = useDashboardMetrics(timeRangeToPeriod[timeRange]);
   const { data: drillDownData } = useDrillDown(drillDownMetric, timeRangeToPeriod[timeRange]);
+  const { data: orgSettings } = useOrganizationSettings();
+
+  const showCustomer = orgSettings?.settings?.showCustomerBreakdown !== false;
+  const showTopic = orgSettings?.settings?.showTopicBreakdown !== false;
 
   const data = useMemo(() => {
     if (apiData?.hasData) {
       return transformApiData(apiData);
     }
-    // No data — return empty structure instead of mock data
     return {
       metrics: [
-        {
-          label: "Avg Focus Time",
-          value: "0h",
-          change: "No data yet",
-          changeType: "neutral" as const,
-          description: "Average deep work per person",
-        },
-        {
-          label: "Avg Active Time",
-          value: "0h",
-          change: "No data yet",
-          changeType: "neutral" as const,
-          description: "Average total tracked time per person",
-        },
-        {
-          label: "Avg Meeting Load",
-          value: "0h",
-          change: "No data yet",
-          changeType: "neutral" as const,
-          description: "Average meeting time per person",
-        },
-        {
-          label: "People Tracked",
-          value: "0",
-          change: "No data yet",
-          changeType: "neutral" as const,
-          description: "Users with activity data",
-        },
+        { label: "Avg Focus Time", value: "0h", change: "No data yet", changeType: "neutral" as const, description: "Average deep work per person" },
+        { label: "Avg Active Time", value: "0h", change: "No data yet", changeType: "neutral" as const, description: "Average total tracked time per person" },
+        { label: "Avg Meeting Load", value: "0h", change: "No data yet", changeType: "neutral" as const, description: "Average meeting time per person" },
+        { label: "People Tracked", value: "0", change: "No data yet", changeType: "neutral" as const, description: "Users with activity data" },
       ],
       activityBreakdown: [],
       workBlocks: [],
@@ -213,7 +199,7 @@ export default function DashboardView() {
       topicBreakdown: [],
       subscriberBreakdown: [],
     };
-  }, [apiData, timeRange]);
+  }, [apiData]);
 
   const handleDrillDown = (label: string) => {
     // Map label to API key: check metric cards first, then treat as category
@@ -222,7 +208,14 @@ export default function DashboardView() {
     setDrillDownMetric(metricKey);
   };
 
-  const closeDrillDown = () => setDrillDownMetric(null);
+  const handleSubscriberDrillDown = (label: string) => {
+    if (label === "Internal / Unattributed") return;
+    navigate(`/customer/${encodeURIComponent(label)}`);
+  };
+
+  const closeDrillDown = () => {
+    setDrillDownMetric(null);
+  };
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -269,15 +262,20 @@ export default function DashboardView() {
             periodLabel={timeRangeLabels[timeRange]}
             onDrillDown={handleDrillDown}
           />
-          <TopicBreakdown
-            topics={data.topicBreakdown}
-            periodLabel={timeRangeLabels[timeRange]}
-            onDrillDown={handleDrillDown}
-          />
-          <SubscriberBreakdown
-            subscribers={data.subscriberBreakdown}
-            periodLabel={timeRangeLabels[timeRange]}
-          />
+          {showTopic && (
+            <TopicBreakdown
+              topics={data.topicBreakdown}
+              periodLabel={timeRangeLabels[timeRange]}
+              onDrillDown={handleDrillDown}
+            />
+          )}
+          {showCustomer && (
+            <SubscriberBreakdown
+              subscribers={data.subscriberBreakdown}
+              periodLabel={timeRangeLabels[timeRange]}
+              onDrillDown={handleSubscriberDrillDown}
+            />
+          )}
           <OrgInsights
             workBlocks={data.workBlocks}
             weeklyTrend={data.trend}

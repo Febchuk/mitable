@@ -39,7 +39,7 @@ export default function TopicBreakdown({ topics, periodLabel, onDrillDown }: Top
           Topic Breakdown
           <span className="text-text-secondary font-normal ml-2">{periodLabel}</span>
         </h3>
-        <p className="text-sm text-text-tertiary">No topic data yet.</p>
+        <p className="relative text-sm text-text-tertiary">No topic data yet.</p>
       </div>
     );
   }
@@ -57,7 +57,6 @@ export default function TopicBreakdown({ topics, periodLabel, onDrillDown }: Top
         {topics.map((topic) => (
           <div
             key={topic.id}
-            className="transition-all duration-normal"
             style={{
               width: `${totalHours > 0 ? (topic.hours / totalHours) * 100 : 0}%`,
               backgroundColor: topic.color,
@@ -67,13 +66,13 @@ export default function TopicBreakdown({ topics, periodLabel, onDrillDown }: Top
       </div>
 
       {/* Legend list */}
-      <div className="relative space-y-3">
+      <div className="relative space-y-2">
         {topics.map((topic) => {
           const pct = totalHours > 0 ? Math.round((topic.hours / totalHours) * 100) : 0;
           return (
             <div
               key={topic.id}
-              className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors duration-normal"
+              className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
               onClick={() => onDrillDown(topic.label)}
             >
               <div className="flex items-center gap-2.5">

@@ -15,3 +15,4 @@ export { useDashboardPersonDetail } from "./useDashboardPersonDetail";
 export { useDrillDown } from "./useDrillDown";
 export { useUserDrillDown } from "./useUserDrillDown";
 export { useCategoryActivities } from "./useCategoryActivities";
+export { useSubscriberDrillDown } from "./useSubscriberDrillDown";

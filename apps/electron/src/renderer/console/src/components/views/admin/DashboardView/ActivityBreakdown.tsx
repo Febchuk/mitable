@@ -13,6 +13,19 @@ export default function ActivityBreakdown({
 }: ActivityBreakdownProps) {
   const totalHours = activities.reduce((sum, a) => sum + a.hours, 0);
 
+  if (activities.length === 0) {
+    return (
+      <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
+        <h3 className="relative text-sm font-semibold text-text-primary mb-4">
+          Activity Breakdown
+          <span className="text-text-secondary font-normal ml-2">{periodLabel}</span>
+        </h3>
+        <p className="relative text-sm text-text-tertiary">No activity data yet.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
       <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
@@ -26,9 +39,8 @@ export default function ActivityBreakdown({
         {activities.map((activity) => (
           <div
             key={activity.id}
-            className="transition-all duration-normal"
             style={{
-              width: `${(activity.hours / totalHours) * 100}%`,
+              width: `${totalHours > 0 ? (activity.hours / totalHours) * 100 : 0}%`,
               backgroundColor: activity.color,
             }}
           />
@@ -36,13 +48,13 @@ export default function ActivityBreakdown({
       </div>
 
       {/* Legend list */}
-      <div className="relative space-y-3">
+      <div className="relative space-y-2">
         {activities.map((activity) => {
-          const pct = Math.round((activity.hours / totalHours) * 100);
+          const pct = totalHours > 0 ? Math.round((activity.hours / totalHours) * 100) : 0;
           return (
             <div
               key={activity.label}
-              className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors duration-normal"
+              className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
               onClick={() => onDrillDown(activity.label)}
             >
               <div className="flex items-center gap-2.5">
