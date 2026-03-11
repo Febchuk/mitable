@@ -10,6 +10,7 @@ interface SubscriberEntry {
 interface SubscriberBreakdownProps {
   subscribers: SubscriberEntry[];
   periodLabel: string;
+  onDrillDown?: (label: string) => void;
 }
 
 const SUBSCRIBER_COLORS = [
@@ -44,16 +45,19 @@ function SubscriberTooltip({ active, payload }: any) {
 export default function SubscriberBreakdown({
   subscribers,
   periodLabel,
+  onDrillDown,
 }: SubscriberBreakdownProps) {
+  const isClickable = (label: string) => onDrillDown && label !== "Internal / Unattributed";
+
   if (subscribers.length === 0) {
     return (
       <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
         <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
         <h3 className="relative text-sm font-semibold text-text-primary mb-4">
-          Client / Subscriber Time
+          Customer / Client Time
           <span className="text-text-secondary font-normal ml-2">{periodLabel}</span>
         </h3>
-        <p className="text-sm text-text-tertiary">No subscriber data yet.</p>
+        <p className="text-sm text-text-tertiary">No customer data yet.</p>
       </div>
     );
   }
@@ -62,7 +66,7 @@ export default function SubscriberBreakdown({
     <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
       <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
       <h3 className="relative text-sm font-semibold text-text-primary mb-4">
-        Client / Subscriber Time
+        Customer / Client Time
         <span className="text-text-secondary font-normal ml-2">{periodLabel}</span>
       </h3>
       <div className="relative flex items-center gap-6">
@@ -77,6 +81,11 @@ export default function SubscriberBreakdown({
                 outerRadius={80}
                 dataKey="value"
                 strokeWidth={0}
+                style={{ cursor: onDrillDown ? "pointer" : undefined }}
+                onClick={(_, index) => {
+                  const entry = subscribers[index];
+                  if (entry && isClickable(entry.label)) onDrillDown!(entry.label);
+                }}
               >
                 {subscribers.map((entry, i) => (
                   <Cell key={i} fill={entry.color} />
@@ -88,7 +97,15 @@ export default function SubscriberBreakdown({
         </div>
         <div className="flex-1 space-y-2">
           {subscribers.map((entry) => (
-            <div key={entry.label} className="flex items-center justify-between">
+            <div
+              key={entry.label}
+              className={`flex items-center justify-between ${
+                isClickable(entry.label)
+                  ? "cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
+                  : "px-2 py-1.5 -mx-2"
+              }`}
+              onClick={() => isClickable(entry.label) && onDrillDown!(entry.label)}
+            >
               <div className="flex items-center gap-2">
                 <div
                   className="w-2.5 h-2.5 rounded-full shrink-0"

@@ -70,6 +70,8 @@ export interface EmittedBlock {
   category: string;
   participants?: string[];
   sourceSessionIds: string[];
+  topicName?: string;
+  subscriberName?: string;
 }
 
 export interface DayAnalyzerUserProfile {

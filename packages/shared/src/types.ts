@@ -273,7 +273,8 @@ export type OrgVariant = "global" | "nigeria";
  */
 export interface OrgSettings {
   variant?: OrgVariant;
-  // Future: branding, feature flags, etc.
+  showCustomerBreakdown?: boolean; // default true
+  showTopicBreakdown?: boolean; // default true
 }
 
 /**

@@ -23,6 +23,7 @@ import * as schema from "../db/schema/index";
 import { eq, and, sql } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { normalizeName } from "./normalize-name.js";
+import { syncSubscriberToGraph, syncTopicToGraph } from "./graph/graph-incremental-sync.service.js";
 
 const logger = createLogger({ context: "activity-materializer" });
 
@@ -235,6 +236,30 @@ export async function materializeSession(sessionId: string): Promise<void> {
       // 8. Recalculate daily aggregate stats from ALL blocks for this day
       await recalculateDailyStats(dailyActivityId, tx);
     });
+
+    // Fire-and-forget: sync topics/subscribers to Neo4j graph
+    const personKey = Buffer.from(`${session.organizationId}:${session.userId}`).toString("base64");
+    for (const block of blocks) {
+      if (block.subscriberName) {
+        syncSubscriberToGraph(
+          session.organizationId,
+          block.subscriberName,
+          personKey,
+          block.durationMinutes
+        ).catch((err) =>
+          logger.warn({ err: String(err) }, "Graph subscriber sync failed (non-fatal)")
+        );
+      }
+      if (block.topicName) {
+        syncTopicToGraph(
+          session.organizationId,
+          block.topicName,
+          personKey,
+          block.category,
+          block.durationMinutes
+        ).catch((err) => logger.warn({ err: String(err) }, "Graph topic sync failed (non-fatal)"));
+      }
+    }
 
     const elapsed = Date.now() - startMs;
     logger.info(

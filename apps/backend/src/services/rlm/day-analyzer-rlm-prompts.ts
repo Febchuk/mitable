@@ -93,6 +93,10 @@ BLOCK QUALITY:
 - Small gaps (< 5 min) between blocks are fine (bathroom, coffee)
 - Large gaps (> 30 min) might indicate the user was away — do NOT fill them with fake blocks
 
+TOPIC & SUBSCRIBER TAGGING:
+- When emitting blocks, provide a **topic** (3-5 word higher-level theme) that groups related activities. E.g., "Debugging API Issues", "Sprint Planning", "Client Onboarding". Aim for 2-4 unique topics across the day. Use consistent naming — if two blocks relate to the same theme, use the same topic string.
+- If the work is for a specific client, customer, or external stakeholder, provide their **subscriber** name. Look for clues in: Slack channel names (#acme-support → "Acme"), ticket/issue titles (ACME-1234 → "Acme"), window titles with company names, project names referencing clients. If internal work, omit the subscriber field.
+
 GROUNDING:
 - Only reference apps, people, topics, and activities that appear in the actual data
 - If the master story is vague, use captures to get specifics

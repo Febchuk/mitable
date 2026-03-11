@@ -2510,7 +2510,7 @@ router.patch(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = req.userId!;
-      const { variant } = req.body;
+      const { variant, showCustomerBreakdown, showTopicBreakdown } = req.body;
 
       // Verify user is admin
       const [currentUser] = await db
@@ -2566,6 +2566,8 @@ router.patch(
       const updatedSettings = {
         ...currentSettings,
         ...(variant !== undefined && { variant }),
+        ...(showCustomerBreakdown !== undefined && { showCustomerBreakdown }),
+        ...(showTopicBreakdown !== undefined && { showTopicBreakdown }),
       };
 
       // Update organization settings

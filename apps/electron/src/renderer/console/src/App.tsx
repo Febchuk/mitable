@@ -33,6 +33,7 @@ import TodosView from "./components/views/employee/TodosView";
 import ArtifactsView from "./components/views/employee/ArtifactsView";
 import UserProfilePage from "./pages/UserProfilePage";
 import DashboardView from "./components/views/admin/DashboardView";
+import CustomerDetailView from "./components/views/admin/DashboardView/CustomerDetailView";
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
 import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
@@ -366,6 +367,7 @@ function App() {
                         <Route index element={<DefaultRoute />} />
                         {/* Admin Routes */}
                         <Route path="dashboard" element={<DashboardView />} />
+                        <Route path="customer/:name" element={<CustomerDetailView />} />
                         <Route path="people" element={<PeopleView />} />
                         <Route path="people/new" element={<AddNewUser />} />
                         <Route path="people/:id" element={<PersonDetail />} />

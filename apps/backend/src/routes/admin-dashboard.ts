@@ -944,6 +944,44 @@ router.get(
       const totalMeeting = dailyActivities.reduce((s, d) => s + d.totalMeetingMinutes, 0);
       const totalActive = dailyActivities.reduce((s, d) => s + d.totalActiveMinutes, 0);
 
+      // Aggregate topic & subscriber distributions across the period
+      const topicMinutes = new Map<string, number>();
+      const subscriberMinutes = new Map<string, number>();
+      for (const day of dailyActivities) {
+        for (const t of (day.topicBreakdown || []) as { topicName: string; minutes: number }[]) {
+          if (t.topicName)
+            topicMinutes.set(t.topicName, (topicMinutes.get(t.topicName) || 0) + t.minutes);
+        }
+        for (const s of (day.subscriberBreakdown || []) as {
+          subscriberName: string;
+          minutes: number;
+        }[]) {
+          if (s.subscriberName)
+            subscriberMinutes.set(
+              s.subscriberName,
+              (subscriberMinutes.get(s.subscriberName) || 0) + s.minutes
+            );
+        }
+      }
+
+      const totalTopicMin = [...topicMinutes.values()].reduce((a, b) => a + b, 0);
+      const topicDistribution = [...topicMinutes.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([topicName, mins]) => ({
+          topicName,
+          totalMinutes: mins,
+          percentage: totalTopicMin > 0 ? Math.round((mins / totalTopicMin) * 100) : 0,
+        }));
+
+      const totalSubMin = [...subscriberMinutes.values()].reduce((a, b) => a + b, 0);
+      const subscriberDistribution = [...subscriberMinutes.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([subscriberName, mins]) => ({
+          subscriberName,
+          totalMinutes: mins,
+          percentage: totalSubMin > 0 ? Math.round((mins / totalSubMin) * 100) : 0,
+        }));
+
       // Group blocks by date
       const blocksByDate = new Map<string, typeof blocks>();
       for (const block of blocks) {
@@ -971,6 +1009,8 @@ router.get(
           meetingPercentage: totalActive > 0 ? Math.round((totalMeeting / totalActive) * 100) : 0,
           daysTracked: dailyActivities.length,
         },
+        topicDistribution,
+        subscriberDistribution,
         dailyActivities: dailyActivities.map((d) => ({
           date: d.activityDate,
           totalWorkMinutes: d.totalWorkMinutes,
@@ -982,6 +1022,8 @@ router.get(
           keyAccomplishments: d.keyAccomplishments,
           categoryBreakdown: d.categoryBreakdown,
           appBreakdown: d.appBreakdown,
+          topicBreakdown: d.topicBreakdown,
+          subscriberBreakdown: d.subscriberBreakdown,
         })),
         blocks: blocks.map((b) => ({
           id: b.id,
@@ -1046,6 +1088,161 @@ router.get(
       res.status(500).json({
         error: "Internal Server Error",
         message: "Failed to fetch user activity details",
+      });
+    }
+  }
+);
+
+// ============================================================================
+// GET /admin/dashboard/drill-down/subscriber/:name?period=...
+// Returns drill-down for a specific subscriber: projects, daily trend, stats
+// ============================================================================
+router.get(
+  "/dashboard/drill-down/subscriber/:name",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
+
+      const subscriberName = decodeURIComponent(req.params.name);
+      const period = (req.query.period as string) || "yesterday";
+      const { startDate, endDate } = resolveDateRange(period);
+
+      // Fetch all activity blocks for this subscriber within the org + period
+      // Join through userDailyActivities to scope to org
+      const dailyActivities = await db
+        .select({
+          id: schema.userDailyActivities.id,
+          userId: schema.userDailyActivities.userId,
+          activityDate: schema.userDailyActivities.activityDate,
+        })
+        .from(schema.userDailyActivities)
+        .where(
+          and(
+            eq(schema.userDailyActivities.organizationId, admin.organizationId),
+            eq(schema.userDailyActivities.periodType, "daily"),
+            gte(schema.userDailyActivities.activityDate, startDate),
+            lte(schema.userDailyActivities.activityDate, endDate)
+          )
+        );
+
+      const dailyActivityIds = dailyActivities.map((d) => d.id);
+
+      let blocks: (typeof schema.activityBlocks.$inferSelect)[] = [];
+      if (dailyActivityIds.length > 0) {
+        blocks = await db
+          .select()
+          .from(schema.activityBlocks)
+          .where(
+            and(
+              inArray(schema.activityBlocks.dailyActivityId, dailyActivityIds),
+              eq(schema.activityBlocks.subscriberName, subscriberName)
+            )
+          );
+      }
+
+      // Aggregate: total minutes, unique people, projects breakdown, daily trend
+      const totalMinutes = blocks.reduce((s, b) => s + b.durationMinutes, 0);
+      const uniqueUsers = new Set(blocks.map((b) => b.userId));
+
+      // Group by topic/project
+      const projectMap = new Map<string, number>();
+      for (const b of blocks) {
+        const topic = b.topicName || "Uncategorized";
+        projectMap.set(topic, (projectMap.get(topic) || 0) + b.durationMinutes);
+      }
+      const projectBreakdown = [...projectMap.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([label, mins]) => ({
+          label,
+          value: `${Math.round((mins / 60) * 10) / 10}h`,
+          bar: totalMinutes > 0 ? Math.round((mins / totalMinutes) * 100) : 0,
+        }));
+
+      const uniqueProjects = new Set(blocks.map((b) => b.topicName || "Uncategorized"));
+
+      // Daily trend
+      const dailyMap = new Map<string, number>();
+      for (const b of blocks) {
+        const dateKey = new Date(b.startTime).toISOString().split("T")[0]!;
+        dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + b.durationMinutes);
+      }
+      const trend = [...dailyMap.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, mins]) => ({ label: date, value: Math.round((mins / 60) * 10) / 10 }));
+
+      // Total across org for percentage
+      const totalOrgMinutes = (
+        await db
+          .select()
+          .from(schema.activityBlocks)
+          .where(inArray(schema.activityBlocks.dailyActivityId, dailyActivityIds))
+      ).reduce((s, b) => s + b.durationMinutes, 0);
+
+      const teamPct = totalOrgMinutes > 0 ? Math.round((totalMinutes / totalOrgMinutes) * 100) : 0;
+
+      // Group blocks by userId → topicName for team breakdown
+      const userProjectMap = new Map<string, Map<string, number>>();
+      const userTotalMap = new Map<string, number>();
+      for (const b of blocks) {
+        if (!userProjectMap.has(b.userId)) userProjectMap.set(b.userId, new Map());
+        userTotalMap.set(b.userId, (userTotalMap.get(b.userId) || 0) + b.durationMinutes);
+        const pm = userProjectMap.get(b.userId)!;
+        const topic = b.topicName || "Uncategorized";
+        pm.set(topic, (pm.get(topic) || 0) + b.durationMinutes);
+      }
+
+      // Fetch user profiles for team breakdown
+      const userIds = [...userProjectMap.keys()];
+      const userDetails =
+        userIds.length > 0
+          ? await db
+              .select({
+                id: schema.users.id,
+                firstName: schema.users.firstName,
+                lastName: schema.users.lastName,
+                email: schema.users.email,
+                jobTitle: schema.users.jobTitle,
+                avatarUrl: schema.users.avatarUrl,
+              })
+              .from(schema.users)
+              .where(inArray(schema.users.id, userIds))
+          : [];
+
+      // Build teamBreakdown sorted by hours desc
+      const teamBreakdown = userDetails
+        .map((u) => ({
+          userId: u.id,
+          name: [u.firstName, u.lastName].filter(Boolean).join(" "),
+          email: u.email,
+          jobTitle: u.jobTitle,
+          avatarUrl: u.avatarUrl,
+          totalHours: Math.round(((userTotalMap.get(u.id) || 0) / 60) * 10) / 10,
+          projects: [...(userProjectMap.get(u.id) || new Map()).entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([topicName, mins]) => ({ topicName, hours: Math.round((mins / 60) * 10) / 10 })),
+        }))
+        .sort((a, b) => b.totalHours - a.totalHours);
+
+      res.json({
+        title: subscriberName,
+        subtitle: `${Math.round((totalMinutes / 60) * 10) / 10}h total across the team`,
+        stats: [
+          { label: "Total", value: `${Math.round((totalMinutes / 60) * 10) / 10}h` },
+          { label: "% Team", value: `${teamPct}%` },
+          { label: "People", value: `${uniqueUsers.size}` },
+          { label: "Projects", value: `${uniqueProjects.size}` },
+        ],
+        breakdown: projectBreakdown,
+        trend,
+        teamBreakdown,
+      });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error fetching subscriber drill-down");
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to fetch subscriber drill-down",
       });
     }
   }
