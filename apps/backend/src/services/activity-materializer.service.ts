@@ -22,6 +22,7 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, and, sql } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
+import { normalizeName } from "./normalize-name.js";
 
 const logger = createLogger({ context: "activity-materializer" });
 
@@ -38,6 +39,8 @@ interface MaterializedBlock {
   description: string;
   apps: string[];
   category: string;
+  topicName: string | null;
+  subscriberName: string | null;
 }
 
 // ============================================================================
@@ -132,6 +135,8 @@ export async function materializeSession(sessionId: string): Promise<void> {
           description: act.description || act.activity || "",
           apps: [],
           category,
+          topicName: act.topic || null,
+          subscriberName: act.subscriber || null,
         });
 
         offsetMs += fractionMs;
@@ -151,6 +156,8 @@ export async function materializeSession(sessionId: string): Promise<void> {
         description: "Unclassified session.",
         apps: [],
         category: "other",
+        topicName: null,
+        subscriberName: null,
       });
     }
 
@@ -216,6 +223,8 @@ export async function materializeSession(sessionId: string): Promise<void> {
             description: block.description,
             apps: block.apps,
             category: block.category,
+            topicName: block.topicName,
+            subscriberName: block.subscriberName,
             sessionId,
             sourceSessionIds: [sessionId],
             sequenceNumber: nextSeq + i,
@@ -249,7 +258,10 @@ export async function materializeSession(sessionId: string): Promise<void> {
  * from all its activity_blocks.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db): Promise<void> {
+export async function recalculateDailyStats(
+  dailyActivityId: string,
+  txOrDb: any = db
+): Promise<void> {
   // Fetch all blocks for this day
   const blocks = await txOrDb
     .select({
@@ -258,6 +270,8 @@ async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db):
       apps: schema.activityBlocks.apps,
       category: schema.activityBlocks.category,
       sessionId: schema.activityBlocks.sessionId,
+      topicName: schema.activityBlocks.topicName,
+      subscriberName: schema.activityBlocks.subscriberName,
     })
     .from(schema.activityBlocks)
     .where(eq(schema.activityBlocks.dailyActivityId, dailyActivityId));
@@ -266,6 +280,10 @@ async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db):
   let totalMeetingMinutes = 0;
   const appMinutes: Record<string, number> = {};
   const categoryMinutes: Record<string, number> = {};
+  const topicMinutes: Record<string, number> = {};
+  const topicDisplayNames: Record<string, string> = {};
+  const subscriberMinutes: Record<string, number> = {};
+  const subscriberDisplayNames: Record<string, string> = {};
   const sessionIds = new Set<string>();
 
   for (const block of blocks) {
@@ -287,6 +305,27 @@ async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db):
     // Category breakdown — use the classified category from the block
     const cat = (block.category as string) || "other";
     categoryMinutes[cat] = (categoryMinutes[cat] || 0) + block.durationMinutes;
+
+    // Topic breakdown (normalize key, keep longest display name)
+    if (block.topicName) {
+      const tKey = normalizeName(block.topicName);
+      topicMinutes[tKey] = (topicMinutes[tKey] || 0) + block.durationMinutes;
+      if (!topicDisplayNames[tKey] || block.topicName.length > topicDisplayNames[tKey].length) {
+        topicDisplayNames[tKey] = block.topicName;
+      }
+    }
+
+    // Subscriber breakdown (normalize key, keep longest display name)
+    if (block.subscriberName) {
+      const sKey = normalizeName(block.subscriberName);
+      subscriberMinutes[sKey] = (subscriberMinutes[sKey] || 0) + block.durationMinutes;
+      if (
+        !subscriberDisplayNames[sKey] ||
+        block.subscriberName.length > subscriberDisplayNames[sKey].length
+      ) {
+        subscriberDisplayNames[sKey] = block.subscriberName;
+      }
+    }
   }
 
   const totalActiveMinutes = totalWorkMinutes + totalMeetingMinutes;
@@ -307,6 +346,22 @@ async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db):
     }))
     .sort((a, b) => b.minutes - a.minutes);
 
+  const topicBreakdown = Object.entries(topicMinutes)
+    .map(([key, minutes]) => ({
+      topicName: topicDisplayNames[key] || key,
+      minutes: Math.round(minutes),
+      percentage: totalActiveMinutes > 0 ? Math.round((minutes / totalActiveMinutes) * 100) : 0,
+    }))
+    .sort((a, b) => b.minutes - a.minutes);
+
+  const subscriberBreakdown = Object.entries(subscriberMinutes)
+    .map(([key, minutes]) => ({
+      subscriberName: subscriberDisplayNames[key] || key,
+      minutes: Math.round(minutes),
+      percentage: totalActiveMinutes > 0 ? Math.round((minutes / totalActiveMinutes) * 100) : 0,
+    }))
+    .sort((a, b) => b.minutes - a.minutes);
+
   await txOrDb
     .update(schema.userDailyActivities)
     .set({
@@ -319,6 +374,8 @@ async function recalculateDailyStats(dailyActivityId: string, txOrDb: any = db):
       meetingPercentage: Math.round(meetingPercentage * 10) / 10,
       appBreakdown,
       categoryBreakdown,
+      topicBreakdown,
+      subscriberBreakdown,
       status: "completed",
       updatedAt: new Date(),
     })

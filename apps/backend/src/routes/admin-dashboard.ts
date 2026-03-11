@@ -13,6 +13,7 @@ import * as schema from "../db/schema/index";
 import { eq, and, desc, asc, gte, lte, inArray, isNotNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { createLogger } from "../lib/logger";
+import { normalizeName } from "../services/normalize-name.js";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { config } from "../config";
@@ -134,6 +135,8 @@ interface LiveOrgMetrics {
     workPct: number;
     meetingPct: number;
   }[];
+  topicDistribution: { topicName: string; totalMinutes: number; percentage: number }[];
+  subscriberDistribution: { subscriberName: string; totalMinutes: number; percentage: number }[];
 }
 
 async function computeLiveOrgMetrics(
@@ -151,6 +154,8 @@ async function computeLiveOrgMetrics(
       meetingPercentage: schema.userDailyActivities.meetingPercentage,
       appBreakdown: schema.userDailyActivities.appBreakdown,
       categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
+      topicBreakdown: schema.userDailyActivities.topicBreakdown,
+      subscriberBreakdown: schema.userDailyActivities.subscriberBreakdown,
     })
     .from(schema.userDailyActivities)
     .where(
@@ -239,6 +244,50 @@ async function computeLiveOrgMetrics(
     meetingPct: r.meetingPercentage,
   }));
 
+  // Topic distribution (aggregate topic breakdowns)
+  const topicTotals = new Map<string, number>();
+  const topicNames = new Map<string, string>();
+  for (const row of userRows) {
+    const breakdown = (row.topicBreakdown || []) as { topicName: string; minutes: number }[];
+    for (const entry of breakdown) {
+      const key = normalizeName(entry.topicName);
+      topicTotals.set(key, (topicTotals.get(key) || 0) + entry.minutes);
+      const prev = topicNames.get(key);
+      if (!prev || entry.topicName.length > prev.length) topicNames.set(key, entry.topicName);
+    }
+  }
+  const topicDistribution = [...topicTotals.entries()]
+    .map(([key, totalMinutes]) => ({
+      topicName: topicNames.get(key) || key,
+      totalMinutes,
+      percentage: totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
+    }))
+    .sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+  // Subscriber distribution (aggregate subscriber breakdowns)
+  const subscriberTotals = new Map<string, number>();
+  const subscriberNames = new Map<string, string>();
+  for (const row of userRows) {
+    const breakdown = (row.subscriberBreakdown || []) as {
+      subscriberName: string;
+      minutes: number;
+    }[];
+    for (const entry of breakdown) {
+      const key = normalizeName(entry.subscriberName);
+      subscriberTotals.set(key, (subscriberTotals.get(key) || 0) + entry.minutes);
+      const prev = subscriberNames.get(key);
+      if (!prev || entry.subscriberName.length > prev.length)
+        subscriberNames.set(key, entry.subscriberName);
+    }
+  }
+  const subscriberDistribution = [...subscriberTotals.entries()]
+    .map(([key, totalMinutes]) => ({
+      subscriberName: subscriberNames.get(key) || key,
+      totalMinutes,
+      percentage: totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
+    }))
+    .sort((a, b) => b.totalMinutes - a.totalMinutes);
+
   return {
     avgWorkMinutes,
     avgMeetingMinutes,
@@ -253,6 +302,8 @@ async function computeLiveOrgMetrics(
     activityDistribution,
     topApps,
     userSummaries,
+    topicDistribution,
+    subscriberDistribution,
   };
 }
 
@@ -293,6 +344,8 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
           activityDistribution: [],
           topApps: [],
           userSummaries: [],
+          topicDistribution: [],
+          subscriberDistribution: [],
           dailyTrend: [],
         });
         return;
@@ -314,6 +367,8 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
         activityDistribution: live.activityDistribution,
         topApps: live.topApps,
         userSummaries: live.userSummaries,
+        topicDistribution: live.topicDistribution,
+        subscriberDistribution: live.subscriberDistribution,
         dailyTrend: [
           {
             date: todayStr,
@@ -342,6 +397,8 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
         meetingPercentage: schema.userDailyActivities.meetingPercentage,
         categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
         appBreakdown: schema.userDailyActivities.appBreakdown,
+        topicBreakdown: schema.userDailyActivities.topicBreakdown,
+        subscriberBreakdown: schema.userDailyActivities.subscriberBreakdown,
       })
       .from(schema.userDailyActivities)
       .where(
@@ -371,6 +428,8 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
         activityDistribution: [],
         topApps: [],
         userSummaries: [],
+        topicDistribution: [],
+        subscriberDistribution: [],
         dailyTrend: [],
       });
       return;
@@ -520,6 +579,52 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
       activityDistribution,
       topApps,
       userSummaries,
+      topicDistribution: (() => {
+        const topicTotals = new Map<string, number>();
+        const topicNames = new Map<string, string>();
+        for (const row of allUserRows) {
+          const breakdown = (row.topicBreakdown || []) as { topicName: string; minutes: number }[];
+          for (const entry of breakdown) {
+            const key = normalizeName(entry.topicName);
+            topicTotals.set(key, (topicTotals.get(key) || 0) + entry.minutes);
+            const prev = topicNames.get(key);
+            if (!prev || entry.topicName.length > prev.length) topicNames.set(key, entry.topicName);
+          }
+        }
+        return [...topicTotals.entries()]
+          .map(([key, totalMinutes]) => ({
+            topicName: topicNames.get(key) || key,
+            totalMinutes,
+            percentage:
+              totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
+          }))
+          .sort((a, b) => b.totalMinutes - a.totalMinutes);
+      })(),
+      subscriberDistribution: (() => {
+        const subscriberTotals = new Map<string, number>();
+        const subscriberNames = new Map<string, string>();
+        for (const row of allUserRows) {
+          const breakdown = (row.subscriberBreakdown || []) as {
+            subscriberName: string;
+            minutes: number;
+          }[];
+          for (const entry of breakdown) {
+            const key = normalizeName(entry.subscriberName);
+            subscriberTotals.set(key, (subscriberTotals.get(key) || 0) + entry.minutes);
+            const prev = subscriberNames.get(key);
+            if (!prev || entry.subscriberName.length > prev.length)
+              subscriberNames.set(key, entry.subscriberName);
+          }
+        }
+        return [...subscriberTotals.entries()]
+          .map(([key, totalMinutes]) => ({
+            subscriberName: subscriberNames.get(key) || key,
+            totalMinutes,
+            percentage:
+              totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
+          }))
+          .sort((a, b) => b.totalMinutes - a.totalMinutes);
+      })(),
       dailyTrend,
     });
   } catch (error) {
@@ -1689,6 +1794,64 @@ async function callDashboardLLM(
   throw new Error("No LLM available — need ANTHROPIC_API_KEY or DEEPSEEK_API_KEY");
 }
 
+async function callAskLLM(
+  systemPrompt: string,
+  messages: Array<{ role: "user" | "assistant"; content: string }>
+): Promise<string> {
+  const claude = getAnthropicClient();
+  if (claude) {
+    try {
+      const response = await claude.messages.create({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages,
+      });
+      for (const block of response.content) {
+        if (block.type === "text") return block.text.trim();
+      }
+    } catch (error) {
+      const errStr = String(error);
+      const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+      if (isFatal) {
+        logger.error({ error: errStr }, "Claude auth/billing error — permanently disabling");
+        anthropicClient = null;
+      } else {
+        logger.warn({ error: errStr }, "Claude Ask RLM failed (transient) — trying OpenAI");
+      }
+    }
+  }
+
+  const oai = getOpenaiClient();
+  if (oai) {
+    try {
+      const completion = await oai.chat.completions.create({
+        model: "gpt-5",
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        temperature: 0.7,
+        max_completion_tokens: 4000,
+      });
+      const content = completion.choices[0]?.message?.content?.trim();
+      if (content) return content;
+    } catch (error) {
+      logger.warn({ error: String(error) }, "OpenAI Ask RLM failed — trying DeepSeek");
+    }
+  }
+
+  const deepseek = getDeepseekClient();
+  if (deepseek) {
+    const completion = await deepseek.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [{ role: "system", content: systemPrompt }, ...messages],
+      temperature: 0.7,
+      max_tokens: 4000,
+    });
+    return completion.choices[0]?.message?.content?.trim() || "I couldn't generate a response.";
+  }
+
+  throw new Error("No LLM available — all providers exhausted");
+}
+
 router.post("/dashboard/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const admin = await verifyAdmin(req, res);
@@ -2587,66 +2750,216 @@ router.get(
   }
 );
 
-/**
- * Call LLM for Ask RLM loop (Claude → OpenAI → DeepSeek fallback).
- * Returns raw text content from the LLM.
- */
-async function callAskLLM(
-  systemPrompt: string,
-  messages: Array<{ role: "user" | "assistant"; content: string }>
-): Promise<string> {
-  const claude = getAnthropicClient();
-  if (claude) {
-    try {
-      const response = await claude.messages.create({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: 4000,
-        system: systemPrompt,
-        messages,
-      });
-      for (const block of response.content) {
-        if (block.type === "text") return block.text.trim();
-      }
-    } catch (error) {
-      const errStr = String(error);
-      const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
-      if (isFatal) {
-        logger.error({ error: errStr }, "Claude auth/billing error — permanently disabling");
-        anthropicClient = null;
-      } else {
-        logger.warn({ error: errStr }, "Claude Ask RLM failed (transient) — trying OpenAI");
+// ============================================================================
+// GET /admin/dashboard/topics?period=
+// Detailed topic breakdown with per-user attribution
+// ============================================================================
+router.get("/dashboard/topics", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const admin = await verifyAdmin(req, res);
+    if (!admin) return;
+
+    const period = (req.query.period as string) || "yesterday";
+    const { startDate, endDate } = resolveDateRange(period);
+
+    const userRows = await db
+      .select({
+        userId: schema.userDailyActivities.userId,
+        topicBreakdown: schema.userDailyActivities.topicBreakdown,
+        totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
+      })
+      .from(schema.userDailyActivities)
+      .where(
+        and(
+          eq(schema.userDailyActivities.organizationId, admin.organizationId),
+          eq(schema.userDailyActivities.periodType, "daily"),
+          gte(schema.userDailyActivities.activityDate, startDate),
+          lte(schema.userDailyActivities.activityDate, endDate)
+        )
+      );
+
+    // Aggregate per topic, with per-user breakdown
+    const topicData = new Map<
+      string,
+      { totalMinutes: number; displayName: string; users: Map<string, number> }
+    >();
+    let totalMinutesAll = 0;
+
+    for (const row of userRows) {
+      totalMinutesAll += row.totalActiveMinutes;
+      const breakdown = (row.topicBreakdown || []) as {
+        topicName: string;
+        minutes: number;
+      }[];
+      for (const entry of breakdown) {
+        const key = normalizeName(entry.topicName);
+        const existing = topicData.get(key) || {
+          totalMinutes: 0,
+          displayName: entry.topicName,
+          users: new Map<string, number>(),
+        };
+        existing.totalMinutes += entry.minutes;
+        if (entry.topicName.length > existing.displayName.length)
+          existing.displayName = entry.topicName;
+        existing.users.set(row.userId, (existing.users.get(row.userId) || 0) + entry.minutes);
+        topicData.set(key, existing);
       }
     }
-  }
 
-  const oai = getOpenaiClient();
-  if (oai) {
+    // Fetch user names
+    const allUserIds = [...new Set(userRows.map((r) => r.userId))];
+    const userProfiles =
+      allUserIds.length > 0
+        ? await db
+            .select({
+              id: schema.users.id,
+              firstName: schema.users.firstName,
+              lastName: schema.users.lastName,
+            })
+            .from(schema.users)
+            .where(inArray(schema.users.id, allUserIds))
+        : [];
+    const nameMap = new Map(
+      userProfiles.map((u) => [
+        u.id,
+        [u.firstName, u.lastName].filter(Boolean).join(" ") || "Unknown",
+      ])
+    );
+
+    const topics = [...topicData.entries()]
+      .map(([, data]) => ({
+        topicName: data.displayName,
+        totalMinutes: data.totalMinutes,
+        percentage:
+          totalMinutesAll > 0 ? Math.round((data.totalMinutes / totalMinutesAll) * 100) : 0,
+        users: [...data.users.entries()].map(([userId, minutes]) => ({
+          userId,
+          name: nameMap.get(userId) || "Unknown",
+          minutes,
+        })),
+      }))
+      .sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+    res.json({ period, topics });
+  } catch (error) {
+    logger.error({ error: String(error) }, "Error fetching topic breakdown");
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// ============================================================================
+// GET /admin/dashboard/subscribers?period=
+// Detailed subscriber breakdown with per-user attribution
+// ============================================================================
+router.get(
+  "/dashboard/subscribers",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
     try {
-      const completion = await oai.chat.completions.create({
-        model: "gpt-5",
-        messages: [{ role: "system", content: systemPrompt }, ...messages],
-        temperature: 0.7,
-        max_completion_tokens: 4000,
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
+
+      const period = (req.query.period as string) || "yesterday";
+      const { startDate, endDate } = resolveDateRange(period);
+
+      const userRows = await db
+        .select({
+          userId: schema.userDailyActivities.userId,
+          subscriberBreakdown: schema.userDailyActivities.subscriberBreakdown,
+          totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
+        })
+        .from(schema.userDailyActivities)
+        .where(
+          and(
+            eq(schema.userDailyActivities.organizationId, admin.organizationId),
+            eq(schema.userDailyActivities.periodType, "daily"),
+            gte(schema.userDailyActivities.activityDate, startDate),
+            lte(schema.userDailyActivities.activityDate, endDate)
+          )
+        );
+
+      const subscriberData = new Map<
+        string,
+        { totalMinutes: number; displayName: string; users: Map<string, number> }
+      >();
+      let totalMinutesAll = 0;
+
+      for (const row of userRows) {
+        totalMinutesAll += row.totalActiveMinutes;
+        const breakdown = (row.subscriberBreakdown || []) as {
+          subscriberName: string;
+          minutes: number;
+        }[];
+        for (const entry of breakdown) {
+          const key = normalizeName(entry.subscriberName);
+          const existing = subscriberData.get(key) || {
+            totalMinutes: 0,
+            displayName: entry.subscriberName,
+            users: new Map<string, number>(),
+          };
+          existing.totalMinutes += entry.minutes;
+          if (entry.subscriberName.length > existing.displayName.length)
+            existing.displayName = entry.subscriberName;
+          existing.users.set(row.userId, (existing.users.get(row.userId) || 0) + entry.minutes);
+          subscriberData.set(key, existing);
+        }
+      }
+
+      // Fetch user names
+      const allUserIds = [...new Set(userRows.map((r) => r.userId))];
+      const userProfiles =
+        allUserIds.length > 0
+          ? await db
+              .select({
+                id: schema.users.id,
+                firstName: schema.users.firstName,
+                lastName: schema.users.lastName,
+              })
+              .from(schema.users)
+              .where(inArray(schema.users.id, allUserIds))
+          : [];
+      const nameMap = new Map(
+        userProfiles.map((u) => [
+          u.id,
+          [u.firstName, u.lastName].filter(Boolean).join(" ") || "Unknown",
+        ])
+      );
+
+      // Calculate unattributed minutes
+      const attributedMinutes = [...subscriberData.values()].reduce(
+        (s, d) => s + d.totalMinutes,
+        0
+      );
+      const unattributedMinutes = Math.max(0, totalMinutesAll - attributedMinutes);
+
+      const subscribers = [...subscriberData.entries()]
+        .map(([, data]) => ({
+          subscriberName: data.displayName,
+          totalMinutes: data.totalMinutes,
+          percentage:
+            totalMinutesAll > 0 ? Math.round((data.totalMinutes / totalMinutesAll) * 100) : 0,
+          users: [...data.users.entries()].map(([userId, minutes]) => ({
+            userId,
+            name: nameMap.get(userId) || "Unknown",
+            minutes,
+          })),
+        }))
+        .sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+      res.json({
+        period,
+        subscribers,
+        unattributed: {
+          totalMinutes: unattributedMinutes,
+          percentage:
+            totalMinutesAll > 0 ? Math.round((unattributedMinutes / totalMinutesAll) * 100) : 0,
+        },
       });
-      const content = completion.choices[0]?.message?.content?.trim();
-      if (content) return content;
     } catch (error) {
-      logger.warn({ error: String(error) }, "OpenAI Ask RLM failed — trying DeepSeek");
+      logger.error({ error: String(error) }, "Error fetching subscriber breakdown");
+      res.status(500).json({ error: "Internal Server Error" });
     }
   }
-
-  const deepseek = getDeepseekClient();
-  if (deepseek) {
-    const completion = await deepseek.chat.completions.create({
-      model: "deepseek-chat",
-      messages: [{ role: "system", content: systemPrompt }, ...messages],
-      temperature: 0.7,
-      max_tokens: 4000,
-    });
-    return completion.choices[0]?.message?.content?.trim() || "I couldn't generate a response.";
-  }
-
-  throw new Error("No LLM available — all providers exhausted");
-}
+);
 
 export default router;

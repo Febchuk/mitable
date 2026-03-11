@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Sparkles } from "lucide-react";
 import MetricCards from "./MetricCards";
 import ActivityBreakdown from "./ActivityBreakdown";
+import TopicBreakdown, { getTopicColor } from "./TopicBreakdown";
+import SubscriberBreakdown, { getSubscriberColor } from "./SubscriberBreakdown";
 import OrgInsights from "./OrgInsights";
 import ChatPanel from "./ChatPanel";
 import DrillDownPanel from "./DrillDownPanel";
@@ -48,11 +50,27 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: "#A1A1A1",
 };
 
+interface TopicEntry {
+  id: string;
+  label: string;
+  hours: number;
+  color: string;
+}
+
+interface SubscriberEntry {
+  label: string;
+  value: number;
+  hours: number;
+  color: string;
+}
+
 function transformApiData(api: DashboardMetrics): {
   metrics: MetricData[];
   activityBreakdown: ActivityEntry[];
   workBlocks: WorkBlock[];
   trend: WeeklyTrendPoint[];
+  topicBreakdown: TopicEntry[];
+  subscriberBreakdown: SubscriberEntry[];
 } {
   const m = api.metrics;
   const workHours = Math.round((m.avgWorkMinutes / 60) * 10) / 10;
@@ -109,7 +127,40 @@ function transformApiData(api: DashboardMetrics): {
     docs: 0,
   }));
 
-  return { metrics, activityBreakdown, workBlocks, trend };
+  const topicBreakdown: TopicEntry[] = (api.topicDistribution || []).map((t, i) => ({
+    id: t.topicName.toLowerCase().replace(/\s+/g, "-"),
+    label: t.topicName,
+    hours: Math.round((t.totalMinutes / 60) * 10) / 10,
+    color: getTopicColor(i),
+  }));
+
+  const subscriberBreakdown: SubscriberEntry[] = (() => {
+    const dist = api.subscriberDistribution || [];
+    const totalSubMinutes = dist.reduce((s, d) => s + d.totalMinutes, 0);
+    const totalAllMinutes =
+      (api.metrics.totalTeamWorkMinutes || 0) + (api.metrics.totalTeamMeetingMinutes || 0);
+    const unattributedMinutes = Math.max(0, totalAllMinutes - totalSubMinutes);
+
+    const entries: SubscriberEntry[] = dist.map((s, i) => ({
+      label: s.subscriberName,
+      value: s.percentage,
+      hours: Math.round((s.totalMinutes / 60) * 10) / 10,
+      color: getSubscriberColor(i),
+    }));
+
+    if (unattributedMinutes > 0 && totalAllMinutes > 0) {
+      entries.push({
+        label: "Internal / Unattributed",
+        value: Math.round((unattributedMinutes / totalAllMinutes) * 100),
+        hours: Math.round((unattributedMinutes / 60) * 10) / 10,
+        color: "#A1A1A1",
+      });
+    }
+
+    return entries;
+  })();
+
+  return { metrics, activityBreakdown, workBlocks, trend, topicBreakdown, subscriberBreakdown };
 }
 
 export default function DashboardView() {
@@ -159,6 +210,8 @@ export default function DashboardView() {
       activityBreakdown: [],
       workBlocks: [],
       trend: [],
+      topicBreakdown: [],
+      subscriberBreakdown: [],
     };
   }, [apiData, timeRange]);
 
@@ -209,12 +262,21 @@ export default function DashboardView() {
           <MetricCards metrics={data.metrics} onDrillDown={handleDrillDown} />
         </div>
 
-        {/* Charts row: Activity breakdown + Work block distribution */}
-        <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
+        {/* Charts grid: 2x2 layout */}
+        <div className="grid grid-cols-2 gap-4 flex-1 min-h-0 overflow-y-auto">
           <ActivityBreakdown
             activities={data.activityBreakdown}
             periodLabel={timeRangeLabels[timeRange]}
             onDrillDown={handleDrillDown}
+          />
+          <TopicBreakdown
+            topics={data.topicBreakdown}
+            periodLabel={timeRangeLabels[timeRange]}
+            onDrillDown={handleDrillDown}
+          />
+          <SubscriberBreakdown
+            subscribers={data.subscriberBreakdown}
+            periodLabel={timeRangeLabels[timeRange]}
           />
           <OrgInsights
             workBlocks={data.workBlocks}

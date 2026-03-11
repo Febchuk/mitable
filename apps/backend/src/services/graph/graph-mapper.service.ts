@@ -27,8 +27,11 @@ import type {
   TaskArchetypeMapping,
   WorkflowPatternResult,
   MapperPipelineResult,
+  TopicMapping,
+  SubscriberMapping,
   ActionType,
 } from "./types";
+import { normalizeName } from "../normalize-name.js";
 
 const logger = createLogger({ context: "graph-mapper" });
 
@@ -68,6 +71,14 @@ class GraphMapperService {
     const workflowPatterns = this.minePatterns(events, archetypeMappings);
     timings.stageD_ms = Date.now() - t0;
 
+    // Stage E: Topic & subscriber extraction from activity_blocks
+    t0 = Date.now();
+    const { topicMappings, subscriberMappings } = await this.extractTopicsAndSubscribers(
+      users,
+      since
+    );
+    timings.stageE_ms = Date.now() - t0;
+
     logger.info(
       {
         rawEventCount,
@@ -75,6 +86,8 @@ class GraphMapperService {
         appBehaviors: appBehaviors.length,
         archetypes: archetypeMappings.length,
         patterns: workflowPatterns.length,
+        topics: topicMappings.length,
+        subscribers: subscriberMappings.length,
         timings,
       },
       "Mapper pipeline completed"
@@ -84,6 +97,8 @@ class GraphMapperService {
       appBehaviors,
       archetypeMappings,
       workflowPatterns,
+      topicMappings,
+      subscriberMappings,
       stats: {
         rawEventCount,
         afterDedupeCount,
@@ -540,6 +555,115 @@ class GraphMapperService {
     }
 
     return patterns.sort((a, b) => b.supportCount - a.supportCount);
+  }
+
+  // ── Stage E: Topic & Subscriber Extraction ──
+
+  async extractTopicsAndSubscribers(
+    users: Array<{ userId: string; orgId: string }>,
+    since: Date
+  ): Promise<{ topicMappings: TopicMapping[]; subscriberMappings: SubscriberMapping[] }> {
+    if (users.length === 0) return { topicMappings: [], subscriberMappings: [] };
+
+    const userIds = users.map((u) => u.userId);
+    const orgMap = new Map(users.map((u) => [u.userId, u.orgId]));
+
+    // Query activity_blocks with topic_name or subscriber_name populated
+    const rows = await db
+      .select({
+        userId: schema.activityBlocks.userId,
+        topicName: schema.activityBlocks.topicName,
+        subscriberName: schema.activityBlocks.subscriberName,
+        category: schema.activityBlocks.category,
+        durationMinutes: schema.activityBlocks.durationMinutes,
+      })
+      .from(schema.activityBlocks)
+      .where(
+        and(
+          sql`${schema.activityBlocks.userId} = ANY(ARRAY[${sql.raw(userIds.map((id) => `'${id}'`).join(","))}]::uuid[])`,
+          gte(schema.activityBlocks.createdAt, since),
+          sql`(${schema.activityBlocks.topicName} IS NOT NULL OR ${schema.activityBlocks.subscriberName} IS NOT NULL)`
+        )
+      );
+
+    // Aggregate topics per org
+    const topicAccum = new Map<
+      string,
+      {
+        name: string;
+        orgId: string;
+        parentCategory: string;
+        totalMinutes: number;
+        evidenceCount: number;
+      }
+    >();
+    const subscriberAccum = new Map<
+      string,
+      {
+        name: string;
+        orgId: string;
+        aliases: Set<string>;
+        totalMinutes: number;
+        evidenceCount: number;
+      }
+    >();
+
+    for (const row of rows) {
+      const orgId = orgMap.get(row.userId) || "";
+
+      if (row.topicName) {
+        const normalized = normalizeName(row.topicName);
+        const key = `${orgId}::${normalized}`;
+        const existing = topicAccum.get(key) || {
+          name: row.topicName,
+          orgId,
+          parentCategory: row.category || "other",
+          totalMinutes: 0,
+          evidenceCount: 0,
+        };
+        existing.totalMinutes += row.durationMinutes;
+        existing.evidenceCount++;
+        topicAccum.set(key, existing);
+      }
+
+      if (row.subscriberName) {
+        const normalized = normalizeName(row.subscriberName);
+        const key = `${orgId}::${normalized}`;
+        const existing = subscriberAccum.get(key) || {
+          name: row.subscriberName,
+          orgId,
+          aliases: new Set<string>(),
+          totalMinutes: 0,
+          evidenceCount: 0,
+        };
+        existing.aliases.add(row.subscriberName);
+        existing.totalMinutes += row.durationMinutes;
+        existing.evidenceCount++;
+        subscriberAccum.set(key, existing);
+      }
+    }
+
+    const topicMappings: TopicMapping[] = [...topicAccum.entries()].map(([, data]) => ({
+      name: data.name,
+      normalizedName: normalizeName(data.name),
+      orgId: data.orgId,
+      parentCategory: data.parentCategory,
+      totalMinutes: data.totalMinutes,
+      evidenceCount: data.evidenceCount,
+    }));
+
+    const subscriberMappings: SubscriberMapping[] = [...subscriberAccum.entries()].map(
+      ([, data]) => ({
+        name: data.name,
+        normalizedName: normalizeName(data.name),
+        orgId: data.orgId,
+        aliases: [...data.aliases],
+        totalMinutes: data.totalMinutes,
+        evidenceCount: data.evidenceCount,
+      })
+    );
+
+    return { topicMappings, subscriberMappings };
   }
 }
 

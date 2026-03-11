@@ -476,6 +476,18 @@ export async function updateOrganizationSettings(
 
 export type DashboardPeriod = "yesterday" | "today" | "week" | "month" | "ytd" | "all";
 
+export interface TopicDistributionEntry {
+  topicName: string;
+  totalMinutes: number;
+  percentage: number;
+}
+
+export interface SubscriberDistributionEntry {
+  subscriberName: string;
+  totalMinutes: number;
+  percentage: number;
+}
+
 export interface DashboardMetrics {
   period: string;
   hasData: boolean;
@@ -498,6 +510,8 @@ export interface DashboardMetrics {
     workPct: number;
     meetingPct: number;
   }>;
+  topicDistribution?: TopicDistributionEntry[];
+  subscriberDistribution?: SubscriberDistributionEntry[];
   dailyTrend: Array<{
     date: string;
     avgActiveMinutes: number;

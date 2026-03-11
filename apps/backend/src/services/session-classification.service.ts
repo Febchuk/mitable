@@ -34,6 +34,8 @@ export interface ClassifiedActivity {
   category: string;
   minutes: number;
   description: string;
+  topic?: string; // Higher-level theme, e.g. "Debugging API Issues"
+  subscriber?: string; // Client/subscriber name, e.g. "Acme Corp" or null
 }
 
 /**
@@ -144,7 +146,7 @@ export async function classifySession(sessionId: string): Promise<ClassifiedActi
 Meeting, Development, Communication, Documentation, Design, Research, Project Management, Browsing, Other
 
 **Output format — strict JSON, no markdown:**
-{"activities":[{"activity":"Short descriptive name","category":"Category","minutes":N,"description":"1-2 sentence description"}]}
+{"activities":[{"activity":"Short descriptive name","category":"Category","minutes":N,"description":"1-2 sentence description","topic":"Higher-level theme","subscriber":"Client name or null"}]}
 
 **Rules:**
 1. Total minutes across all activities MUST equal ${totalMinutes}
@@ -154,6 +156,8 @@ Meeting, Development, Communication, Documentation, Design, Research, Project Ma
 5. Meeting-related windows (Teams meeting, Zoom call, Google Meet, etc.) = "Meeting"
 6. Be specific in names: "Sprint planning with team" not "Meeting in Teams"
 7. If a session summary exists below, use it to inform your classification
+8. **topic**: A higher-level theme grouping (3-5 words). More specific than category, broader than the activity name. E.g., "Debugging API Issues" (under Development), "Sprint Planning" (under Meeting). Aim for 2-4 unique topics per session.
+9. **subscriber**: If work is for/about a specific client, subscriber, or external stakeholder, provide their name. Clues: Slack channel names (#acme-support → "Acme"), ticket titles (ACME-1234 → "Acme"), window titles with company names, project names referencing clients. If internal work or no client context → null.
 
 ${session.name ? `Session name: "${session.name}"` : ""}
 ${summaryContext ? `Session summary: ${summaryContext.slice(0, 500)}` : ""}

@@ -8,7 +8,7 @@ import { graphRetrievalService } from "./graph-retrieval.service";
 import { graphMapperService } from "./graph-mapper.service";
 import { graphScoringService } from "./graph-scoring.service";
 import { SOURCE_RELIABILITY_WEIGHTS } from "./task-archetype-map";
-import type { GraphSyncResultV2 } from "./types";
+import type { GraphSyncResultV2, GraphSyncResultV3 } from "./types";
 
 const logger = createLogger({ context: "graph-sync" });
 
@@ -27,6 +27,8 @@ class GraphSyncService {
     syncedAppBehaviors: number;
     syncedPatterns: number;
     syncedPreferences: number;
+    syncedSubscribers: number;
+    syncedTopics: number;
     pipelineStats: GraphSyncResultV2["pipelineStats"];
   }> {
     const users = await db
@@ -43,6 +45,8 @@ class GraphSyncService {
         syncedAppBehaviors: 0,
         syncedPatterns: 0,
         syncedPreferences: 0,
+        syncedSubscribers: 0,
+        syncedTopics: 0,
         pipelineStats: undefined,
       };
     }
@@ -53,6 +57,8 @@ class GraphSyncService {
     let syncedAppBehaviors = 0;
     let syncedPatterns = 0;
     let syncedPreferences = 0;
+    let syncedSubscribers = 0;
+    let syncedTopics = 0;
 
     // Index pipeline outputs by user for efficient lookup
     const behaviorsByUser = new Map<string, typeof pipelineResult.appBehaviors>();
@@ -251,11 +257,93 @@ class GraphSyncService {
       syncedPatterns++;
     }
 
+    // Subscriber writes (from Stage E)
+    for (const sub of pipelineResult.subscriberMappings) {
+      // Find the person key for a user in this org
+      const orgUser = users.find((u) => u.orgId === sub.orgId);
+      if (!orgUser) continue;
+      const profile = await graphRetrievalService.getUserGraphProfile(
+        orgUser.userId,
+        orgUser.orgId
+      );
+
+      const { weight } = graphScoringService.computeWeight({
+        oldWeight: 0,
+        daysSinceLastSeen: 0,
+        sourceReliability: SOURCE_RELIABILITY_WEIGHTS.workstream!,
+        confidence: Math.min(1, sub.evidenceCount / 10),
+      });
+
+      await graphClientService.runQuery(
+        `
+        MERGE (org:Organization {orgId: $orgId})
+        MERGE (sub:Subscriber {normalizedName: $normalizedName, orgId: $orgId})
+        SET sub.name = $name, sub.aliases = $aliases, sub.totalMinutes = $totalMinutes, sub.lastSeenAt = datetime()
+        MERGE (person:Person {personKey: $personKey})
+        MERGE (person)-[r:SERVES]->(sub)
+        SET r.weight = $weight, r.totalMinutes = $totalMinutes, r.evidenceCount = $evidenceCount, r.lastSeenAt = datetime()
+        `,
+        {
+          orgId: sub.orgId,
+          normalizedName: sub.normalizedName,
+          name: sub.name,
+          aliases: sub.aliases,
+          totalMinutes: sub.totalMinutes,
+          personKey: profile.personKey,
+          weight,
+          evidenceCount: sub.evidenceCount,
+        }
+      );
+      syncedSubscribers++;
+    }
+
+    // Topic writes (from Stage E)
+    for (const topic of pipelineResult.topicMappings) {
+      const orgUser = users.find((u) => u.orgId === topic.orgId);
+      if (!orgUser) continue;
+      const profile = await graphRetrievalService.getUserGraphProfile(
+        orgUser.userId,
+        orgUser.orgId
+      );
+
+      const { weight } = graphScoringService.computeWeight({
+        oldWeight: 0,
+        daysSinceLastSeen: 0,
+        sourceReliability: SOURCE_RELIABILITY_WEIGHTS.workstream!,
+        confidence: Math.min(1, topic.evidenceCount / 10),
+      });
+
+      await graphClientService.runQuery(
+        `
+        MERGE (topic:Topic {normalizedName: $normalizedName, orgId: $orgId})
+        SET topic.name = $name, topic.parentCategory = $parentCategory, topic.totalMinutes = $totalMinutes, topic.lastSeenAt = datetime()
+        MERGE (person:Person {personKey: $personKey})
+        MERGE (person)-[r:WORKS_ON_TOPIC]->(topic)
+        SET r.weight = $weight, r.totalMinutes = $totalMinutes, r.evidenceCount = $evidenceCount, r.lastSeenAt = datetime()
+        MERGE (task:TaskArchetype {name: $parentCategory})
+        MERGE (topic)-[:TOPIC_IN_CATEGORY]->(task)
+        `,
+        {
+          orgId: topic.orgId,
+          normalizedName: topic.normalizedName,
+          name: topic.name,
+          parentCategory: topic.parentCategory,
+          totalMinutes: topic.totalMinutes,
+          personKey: profile.personKey,
+          weight,
+          evidenceCount: topic.evidenceCount,
+        }
+      );
+      syncedTopics++;
+    }
+
     return {
       syncedUsers: users.length,
       syncedAppBehaviors,
       syncedPatterns,
       syncedPreferences,
+      syncedSubscribers,
+      syncedTopics,
       pipelineStats: pipelineResult.stats,
     };
   }
@@ -369,7 +457,7 @@ class GraphSyncService {
     return snapshotCount;
   }
 
-  async runNightlySync(): Promise<GraphSyncResultV2> {
+  async runNightlySync(): Promise<GraphSyncResultV3> {
     const startedAt = new Date();
     let runId: string | null = null;
 
@@ -392,13 +480,15 @@ class GraphSyncService {
 
     if (!config.graph.enabled) {
       const finishedAt = new Date();
-      const disabledResult: GraphSyncResultV2 = {
+      const disabledResult: GraphSyncResultV3 = {
         success: true,
         syncedUsers: 0,
         syncedWorkstreams: 0,
         syncedPreferences: 0,
         syncedAppBehaviors: 0,
         syncedPatterns: 0,
+        syncedSubscribers: 0,
+        syncedTopics: 0,
         durationMs: finishedAt.getTime() - startedAt.getTime(),
         startedAt: startedAt.toISOString(),
         finishedAt: finishedAt.toISOString(),
@@ -440,13 +530,15 @@ class GraphSyncService {
       const snapshotsCreated = await this.materializeVisibilitySnapshots(config.graph.lookbackDays);
 
       const finishedAt = new Date();
-      const result: GraphSyncResultV2 = {
+      const result: GraphSyncResultV3 = {
         success: true,
         syncedUsers: mapperResult.syncedUsers,
         syncedWorkstreams: Number(workstreamCountRow?.count || 0),
         syncedPreferences: mapperResult.syncedPreferences,
         syncedAppBehaviors: mapperResult.syncedAppBehaviors,
         syncedPatterns: mapperResult.syncedPatterns,
+        syncedSubscribers: mapperResult.syncedSubscribers,
+        syncedTopics: mapperResult.syncedTopics,
         pipelineStats: mapperResult.pipelineStats,
         durationMs: finishedAt.getTime() - startedAt.getTime(),
         startedAt: startedAt.toISOString(),
@@ -469,6 +561,8 @@ class GraphSyncService {
               snapshotsCreated,
               syncedAppBehaviors: result.syncedAppBehaviors,
               syncedPatterns: result.syncedPatterns,
+              syncedSubscribers: result.syncedSubscribers,
+              syncedTopics: result.syncedTopics,
               pipelineStats: result.pipelineStats,
             },
           })
@@ -485,13 +579,15 @@ class GraphSyncService {
       return result;
     } catch (error) {
       const finishedAt = new Date();
-      const result: GraphSyncResultV2 = {
+      const result: GraphSyncResultV3 = {
         success: false,
         syncedUsers: 0,
         syncedWorkstreams: 0,
         syncedPreferences: 0,
         syncedAppBehaviors: 0,
         syncedPatterns: 0,
+        syncedSubscribers: 0,
+        syncedTopics: 0,
         durationMs: finishedAt.getTime() - startedAt.getTime(),
         startedAt: startedAt.toISOString(),
         finishedAt: finishedAt.toISOString(),

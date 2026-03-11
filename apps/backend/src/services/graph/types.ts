@@ -6,7 +6,9 @@ export type GraphFactType =
   | "workflow_pattern"
   | "app_behavior"
   | "style_preference"
-  | "domain_hint";
+  | "domain_hint"
+  | "subscriber"
+  | "topic";
 
 export interface GraphFact {
   factType: GraphFactType;
@@ -94,10 +96,30 @@ export interface WorkflowPatternResult {
   avgDurationMinutes: number;
 }
 
+export interface TopicMapping {
+  name: string;
+  normalizedName: string;
+  orgId: string;
+  parentCategory: string;
+  totalMinutes: number;
+  evidenceCount: number;
+}
+
+export interface SubscriberMapping {
+  name: string;
+  normalizedName: string;
+  orgId: string;
+  aliases: string[];
+  totalMinutes: number;
+  evidenceCount: number;
+}
+
 export interface MapperPipelineResult {
   appBehaviors: AppBehavior[];
   archetypeMappings: TaskArchetypeMapping[];
   workflowPatterns: WorkflowPatternResult[];
+  topicMappings: TopicMapping[];
+  subscriberMappings: SubscriberMapping[];
   stats: {
     rawEventCount: number;
     afterDedupeCount: number;
@@ -129,8 +151,18 @@ export interface UserGraphProfileV2 extends UserGraphProfile {
   appBehaviors: AppBehaviorFact[];
 }
 
+export interface UserGraphProfileV3 extends UserGraphProfileV2 {
+  subscribers: GraphFact[];
+  topics: GraphFact[];
+}
+
 export interface GraphSyncResultV2 extends GraphSyncResult {
   syncedAppBehaviors: number;
   syncedPatterns: number;
   pipelineStats?: MapperPipelineResult["stats"];
+}
+
+export interface GraphSyncResultV3 extends GraphSyncResultV2 {
+  syncedSubscribers: number;
+  syncedTopics: number;
 }
