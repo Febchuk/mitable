@@ -30,7 +30,9 @@ export async function getKnownCustomers(organizationId: string): Promise<string[
 
   const settings = (org?.settings as Record<string, unknown>) || {};
   const customers = settings.knownCustomers;
-  return Array.isArray(customers) ? customers.filter((c): c is string => typeof c === "string") : [];
+  return Array.isArray(customers)
+    ? customers.filter((c): c is string => typeof c === "string")
+    : [];
 }
 
 /**

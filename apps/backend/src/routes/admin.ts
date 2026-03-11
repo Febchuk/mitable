@@ -2565,7 +2565,10 @@ router.patch(
       const currentSettings = (organization.settings as Record<string, unknown>) || {};
       // Validate knownCustomers if provided
       if (knownCustomers !== undefined) {
-        if (!Array.isArray(knownCustomers) || !knownCustomers.every((c: unknown) => typeof c === "string")) {
+        if (
+          !Array.isArray(knownCustomers) ||
+          !knownCustomers.every((c: unknown) => typeof c === "string")
+        ) {
           res.status(400).json({
             success: false,
             error: {

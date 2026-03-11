@@ -84,9 +84,7 @@ async function main() {
 
   const settings = (org.settings as Record<string, unknown>) || {};
   const existingCustomers = Array.isArray(settings.knownCustomers) ? settings.knownCustomers : [];
-  const existingNormalized = new Set(
-    (existingCustomers as string[]).map((n) => normalizeName(n))
-  );
+  const existingNormalized = new Set((existingCustomers as string[]).map((n) => normalizeName(n)));
 
   const toAdd = dedupedNames.filter((n) => !existingNormalized.has(normalizeName(n)));
   const merged = [...(existingCustomers as string[]), ...toAdd];

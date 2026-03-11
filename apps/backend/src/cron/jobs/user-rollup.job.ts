@@ -294,9 +294,7 @@ export async function processUserDay(
   );
 
   // Auto-discover customers from Day Analyzer output
-  const subscribers = result.blocks
-    .map((b) => b.subscriberName)
-    .filter((s): s is string => !!s);
+  const subscribers = result.blocks.map((b) => b.subscriberName).filter((s): s is string => !!s);
   addDiscoveredCustomers(user.organizationId, subscribers).catch((err) =>
     logger.warn({ err: String(err) }, "Failed to persist discovered customers")
   );

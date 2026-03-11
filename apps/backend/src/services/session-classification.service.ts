@@ -138,9 +138,10 @@ export async function classifySession(sessionId: string): Promise<ClassifiedActi
     ? `\n\nAudio transcript excerpt:\n${transcriptSnippet}`
     : "";
 
-  const knownCustomersList = knownCustomers.length > 0
-    ? knownCustomers.map((c) => `- ${c}`).join("\n")
-    : "(none known yet — discover new ones from the data)";
+  const knownCustomersList =
+    knownCustomers.length > 0
+      ? knownCustomers.map((c) => `- ${c}`).join("\n")
+      : "(none known yet — discover new ones from the data)";
 
   const prompt = `You are a work-activity analyst. Given timestamped screen capture observations from a ${totalMinutes}-minute work session, build a **narrative timeline** of what the person actually did and classify it into distinct activities.
 
@@ -196,9 +197,7 @@ ${lines.join("\n")}${transcriptContext}`;
       .where(eq(schema.monitoringSessions.id, sessionId));
 
     // Auto-discover new customers from classification output
-    const newSubscribers = activities
-      .map((a) => a.subscriber)
-      .filter((s): s is string => !!s);
+    const newSubscribers = activities.map((a) => a.subscriber).filter((s): s is string => !!s);
     addDiscoveredCustomers(session.organizationId, newSubscribers).catch((err) =>
       logger.warn({ err: String(err) }, "Failed to persist discovered customers")
     );

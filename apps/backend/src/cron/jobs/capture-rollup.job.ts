@@ -52,9 +52,10 @@ async function classifyActivitiesWithGroq(
   // Deduplicate and limit to keep prompt small
   const uniqueLines = [...new Set(captureLines)].slice(0, 80);
 
-  const knownCustomerSection = knownCustomers.length > 0
-    ? `**KNOWN CUSTOMERS (check these first):**\n${knownCustomers.map((c) => `- ${c}`).join("\n")}\n\n`
-    : "";
+  const knownCustomerSection =
+    knownCustomers.length > 0
+      ? `**KNOWN CUSTOMERS (check these first):**\n${knownCustomers.map((c) => `- ${c}`).join("\n")}\n\n`
+      : "";
 
   const prompt = `You are a work activity classifier. Given a list of screen capture observations from a user's workday, classify them into high-level activities.
 
@@ -328,12 +329,14 @@ async function processUserCaptures(
 
   // ── Classify activities via Groq ───────────────────────────
 
-  const activities = await classifyActivitiesWithGroq(captureLines, totalActiveMinutes, knownCustomers);
+  const activities = await classifyActivitiesWithGroq(
+    captureLines,
+    totalActiveMinutes,
+    knownCustomers
+  );
 
   // Auto-discover new customers from Groq output
-  const newSubscribers = activities
-    .map((a) => a.subscriber)
-    .filter((s): s is string => !!s);
+  const newSubscribers = activities.map((a) => a.subscriber).filter((s): s is string => !!s);
   addDiscoveredCustomers(user.organizationId, newSubscribers).catch((err) =>
     logger.warn({ err: String(err) }, "Failed to persist discovered customers from capture-rollup")
   );
