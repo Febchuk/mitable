@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import MetricCards from "./MetricCards";
 import ActivityBreakdown from "./ActivityBreakdown";
-import TopicBreakdown, { getTopicColor } from "./TopicBreakdown";
-import SubscriberBreakdown, { getSubscriberColor } from "./SubscriberBreakdown";
+// import TopicBreakdown from "./TopicBreakdown";
+import { getTopicColor } from "./TopicBreakdown";
+// import SubscriberBreakdown from "./SubscriberBreakdown";
+import { getSubscriberColor } from "./SubscriberBreakdown";
 import OrgInsights from "./OrgInsights";
 import ChatPanel from "./ChatPanel";
 import DrillDownPanel from "./DrillDownPanel";
@@ -12,7 +14,7 @@ import type { TimeRange, MetricData, ActivityEntry, WorkBlock, WeeklyTrendPoint 
 import {
   useDashboardMetrics,
   useDrillDown,
-  useOrganizationSettings,
+  // useOrganizationSettings,
 } from "@/console/src/hooks/queries/admin";
 import type { DashboardPeriod, DashboardMetrics } from "@/console/src/services/adminService";
 
@@ -170,17 +172,16 @@ function transformApiData(api: DashboardMetrics): {
 }
 
 export default function DashboardView() {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [chatOpen, setChatOpen] = useState(false);
   const [drillDownMetric, setDrillDownMetric] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("yesterday");
 
   const { data: apiData } = useDashboardMetrics(timeRangeToPeriod[timeRange]);
   const { data: drillDownData } = useDrillDown(drillDownMetric, timeRangeToPeriod[timeRange]);
-  const { data: orgSettings } = useOrganizationSettings();
-
-  const showCustomer = orgSettings?.settings?.showCustomerBreakdown !== false;
-  const showTopic = orgSettings?.settings?.showTopicBreakdown !== false;
+  // const { data: orgSettings } = useOrganizationSettings();
+  // const showCustomer = orgSettings?.settings?.showCustomerBreakdown !== false;
+  // const showTopic = orgSettings?.settings?.showTopicBreakdown !== false;
 
   const data = useMemo(() => {
     if (apiData?.hasData) {
@@ -232,10 +233,10 @@ export default function DashboardView() {
     setDrillDownMetric(metricKey);
   };
 
-  const handleSubscriberDrillDown = (label: string) => {
-    if (label === "Internal / Unattributed") return;
-    navigate(`/customer/${encodeURIComponent(label)}`);
-  };
+  // const handleSubscriberDrillDown = (label: string) => {
+  //   if (label === "Internal / Unattributed") return;
+  //   navigate(`/customer/${encodeURIComponent(label)}`);
+  // };
 
   const closeDrillDown = () => {
     setDrillDownMetric(null);
