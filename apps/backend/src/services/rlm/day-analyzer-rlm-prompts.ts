@@ -10,7 +10,7 @@ import { DAY_ANALYZER_TOOLS } from "./day-analyzer-tools";
 /**
  * Generate the system prompt for Day Analyzer RLM
  */
-export function getDayAnalyzerSystemPrompt(): string {
+export function getDayAnalyzerSystemPrompt(knownCustomers: string[] = []): string {
   const toolDescriptions = DAY_ANALYZER_TOOLS.map((tool) => {
     const params = tool.parameters
       .map((p) => `${p.name}: ${p.type}${p.required ? " (required)" : " (optional)"}`)
@@ -95,7 +95,9 @@ BLOCK QUALITY:
 
 TOPIC & SUBSCRIBER TAGGING:
 - When emitting blocks, provide a **topic** (3-5 word higher-level theme) that groups related activities. E.g., "Debugging API Issues", "Sprint Planning", "Client Onboarding". Aim for 2-4 unique topics across the day. Use consistent naming — if two blocks relate to the same theme, use the same topic string.
-- If the work is for a specific client, customer, or external stakeholder, provide their **subscriber** name. Look for clues in: Slack channel names (#acme-support → "Acme"), ticket/issue titles (ACME-1234 → "Acme"), window titles with company names, project names referencing clients. If internal work, omit the subscriber field.
+- **KNOWN CUSTOMERS:**
+${knownCustomers.length > 0 ? knownCustomers.map((c) => `  - ${c}`).join("\n") : "  (none known yet)"}
+- When emitting blocks, ALWAYS check the subscriber field against the known customer list above first. Look for partial matches in window titles, Slack channels, ticket IDs. Assign a known customer whenever there's a reasonable match. Only invent new customer names if the evidence is clear and distinct from all known customers. When in doubt, assign a customer.
 
 GROUNDING:
 - Only reference apps, people, topics, and activities that appear in the actual data
