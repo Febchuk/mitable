@@ -52,37 +52,76 @@ interface RoleProfile {
 
 const ROLE_PROFILES: Record<string, RoleProfile> = {
   engineer: {
-    categories: { development: 0.5, review: 0.15, communication: 0.1, meeting: 0.1, research: 0.1, documentation: 0.05 },
+    categories: {
+      development: 0.5,
+      review: 0.15,
+      communication: 0.1,
+      meeting: 0.1,
+      research: 0.1,
+      documentation: 0.05,
+    },
     customerWeights: [0.3, 0.2, 0.15, 0.35],
     workMinRange: [240, 360],
     meetingMinRange: [30, 90],
   },
   pm: {
-    categories: { planning: 0.3, communication: 0.25, meeting: 0.25, documentation: 0.1, review: 0.1 },
+    categories: {
+      planning: 0.3,
+      communication: 0.25,
+      meeting: 0.25,
+      documentation: 0.1,
+      review: 0.1,
+    },
     customerWeights: [0.25, 0.25, 0.25, 0.25],
     workMinRange: [180, 300],
     meetingMinRange: [90, 180],
   },
   customer_success: {
-    categories: { communication: 0.35, meeting: 0.3, documentation: 0.15, planning: 0.1, research: 0.1 },
+    categories: {
+      communication: 0.35,
+      meeting: 0.3,
+      documentation: 0.15,
+      planning: 0.1,
+      research: 0.1,
+    },
     customerWeights: [0.35, 0.3, 0.25, 0.1],
     workMinRange: [150, 270],
     meetingMinRange: [120, 210],
   },
   sales: {
-    categories: { meeting: 0.4, communication: 0.3, planning: 0.15, research: 0.1, documentation: 0.05 },
+    categories: {
+      meeting: 0.4,
+      communication: 0.3,
+      planning: 0.15,
+      research: 0.1,
+      documentation: 0.05,
+    },
     customerWeights: [0.3, 0.35, 0.25, 0.1],
     workMinRange: [120, 240],
     meetingMinRange: [150, 240],
   },
   design: {
-    categories: { design: 0.45, review: 0.2, communication: 0.1, meeting: 0.1, research: 0.1, documentation: 0.05 },
+    categories: {
+      design: 0.45,
+      review: 0.2,
+      communication: 0.1,
+      meeting: 0.1,
+      research: 0.1,
+      documentation: 0.05,
+    },
     customerWeights: [0.3, 0.25, 0.1, 0.35],
     workMinRange: [240, 360],
     meetingMinRange: [30, 90],
   },
   devops: {
-    categories: { development: 0.4, review: 0.15, research: 0.15, documentation: 0.1, meeting: 0.1, communication: 0.1 },
+    categories: {
+      development: 0.4,
+      review: 0.15,
+      research: 0.15,
+      documentation: 0.1,
+      meeting: 0.1,
+      communication: 0.1,
+    },
     customerWeights: [0.1, 0.05, 0.05, 0.8],
     workMinRange: [270, 390],
     meetingMinRange: [20, 60],
@@ -113,17 +152,11 @@ function rand(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function weightedPick<T>(items: T[], weights: number[]): T {
-  const total = weights.reduce((a, b) => a + b, 0);
-  let r = Math.random() * total;
-  for (let i = 0; i < items.length; i++) {
-    r -= weights[i]!;
-    if (r <= 0) return items[i]!;
-  }
-  return items[items.length - 1]!;
-}
-
-function distributeMinutes(total: number, buckets: string[], weights: Record<string, number>): Map<string, number> {
+function distributeMinutes(
+  total: number,
+  buckets: string[],
+  weights: Record<string, number>
+): Map<string, number> {
   const result = new Map<string, number>();
   const weightArr = buckets.map((b) => weights[b] || 0);
   const weightTotal = weightArr.reduce((a, b) => a + b, 0);
@@ -244,7 +277,10 @@ async function main() {
           const perApp = Math.round(mins / apps.length);
           for (const app of apps) appMinutes.set(app, (appMinutes.get(app) || 0) + perApp);
         }
-        const appBreakdownUpd = [...appMinutes.entries()].map(([app, minutes]) => ({ app, minutes }));
+        const appBreakdownUpd = [...appMinutes.entries()].map(([app, minutes]) => ({
+          app,
+          minutes,
+        }));
 
         await db
           .update(schema.userDailyActivities)
@@ -351,7 +387,9 @@ async function main() {
       for (let b = 0; b < numBlocks; b++) {
         const durMin = Math.round(activeMin / numBlocks) + rand(-15, 15);
         const clampedDur = Math.max(15, Math.min(durMin, 120));
-        const startTime = new Date(`${dateStr}T${String(blockStartHour).padStart(2, "0")}:${String(rand(0, 30)).padStart(2, "0")}:00Z`);
+        const startTime = new Date(
+          `${dateStr}T${String(blockStartHour).padStart(2, "0")}:${String(rand(0, 30)).padStart(2, "0")}:00Z`
+        );
         const endTime = new Date(startTime.getTime() + clampedDur * 60 * 1000);
 
         const blockType = b % 3 === 2 && meetingMin > 30 ? "meeting" : "work";
