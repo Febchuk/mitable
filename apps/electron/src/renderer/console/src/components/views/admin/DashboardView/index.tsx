@@ -286,7 +286,7 @@ export default function DashboardView() {
             periodLabel={timeRangeLabels[timeRange]}
             onDrillDown={handleDrillDown}
           />
-          {showTopic && (
+          {/* {showTopic && (
             <TopicBreakdown
               topics={data.topicBreakdown}
               periodLabel={timeRangeLabels[timeRange]}
@@ -299,7 +299,7 @@ export default function DashboardView() {
               periodLabel={timeRangeLabels[timeRange]}
               onDrillDown={handleSubscriberDrillDown}
             />
-          )}
+          )} */}
           <OrgInsights
             workBlocks={data.workBlocks}
             weeklyTrend={data.trend}
