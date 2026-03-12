@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Sparkles } from "lucide-react";
+//import { Sparkles } from "lucide-react";
 import MetricCards from "./MetricCards";
 import ActivityBreakdown from "./ActivityBreakdown";
 import TopicBreakdown, { getTopicColor } from "./TopicBreakdown";
@@ -333,16 +333,7 @@ export default function DashboardView() {
         </>
       )}
 
-      {/* Minimized chat button — fixed to viewport bottom-right */}
-      {!chatOpen && !drillDownMetric && (
-        <button
-          onClick={() => setChatOpen(true)}
-          className="fixed bottom-8 right-8 z-30 flex items-center gap-2 px-4 py-2.5 rounded-full bg-indigo text-white text-sm font-medium shadow-lg hover:bg-indigo/90 transition-colors"
-        >
-          <Sparkles size={16} />
-          AI Assistant
-        </button>
-      )}
+      {/* Minimized chat button — disabled for now */}
     </div>
   );
 }
