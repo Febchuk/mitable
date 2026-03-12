@@ -32,6 +32,7 @@ const EXCLUDED_SUBSCRIBERS = new Set([
   "internal",
   "unattributed",
   "internal/unattributed",
+  "internal / unattributed",
   "n/a",
   "none",
   "unknown",
@@ -39,7 +40,11 @@ const EXCLUDED_SUBSCRIBERS = new Set([
 ]);
 
 function isExcludedSubscriber(name: string): boolean {
-  return EXCLUDED_SUBSCRIBERS.has(name.toLowerCase().trim());
+  const normalized = name.toLowerCase().trim();
+  if (EXCLUDED_SUBSCRIBERS.has(normalized)) return true;
+  // Also match variants like "Internal / Unattributed" vs "internal/unattributed"
+  const collapsed = normalized.replace(/\s+/g, "");
+  return EXCLUDED_SUBSCRIBERS.has(collapsed);
 }
 
 /**

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import MetricCards from "./MetricCards";
 import ActivityBreakdown from "./ActivityBreakdown";
@@ -114,12 +114,24 @@ function transformApiData(api: DashboardMetrics): {
     },
   ];
 
-  const activityBreakdown: ActivityEntry[] = (api.activityDistribution || []).map((d) => ({
-    id: d.category,
-    label: d.category.charAt(0).toUpperCase() + d.category.slice(1),
-    hours: Math.round((d.totalMinutes / 60) * 10) / 10,
-    color: CATEGORY_COLORS[d.category] || CATEGORY_COLORS.other,
-  }));
+  const activityBreakdown: ActivityEntry[] = (() => {
+    const merged = new Map<string, ActivityEntry>();
+    for (const d of api.activityDistribution || []) {
+      const key = d.category.toLowerCase();
+      const existing = merged.get(key);
+      if (existing) {
+        existing.hours = Math.round((existing.hours + d.totalMinutes / 60) * 10) / 10;
+      } else {
+        merged.set(key, {
+          id: key,
+          label: key.charAt(0).toUpperCase() + key.slice(1),
+          hours: Math.round((d.totalMinutes / 60) * 10) / 10,
+          color: CATEGORY_COLORS[d.category] || CATEGORY_COLORS[key] || CATEGORY_COLORS.other,
+        });
+      }
+    }
+    return [...merged.values()];
+  })();
 
   const workBlocks: WorkBlock[] = [
     { label: "Work", value: m.avgWorkPercentage, color: "#6366F1" },
@@ -143,25 +155,12 @@ function transformApiData(api: DashboardMetrics): {
   const subscriberBreakdown: SubscriberEntry[] = (() => {
     const dist = api.subscriberDistribution || [];
     const totalSubMinutes = dist.reduce((s, d) => s + d.totalMinutes, 0);
-    const totalAllMinutes =
-      (api.metrics.totalTeamWorkMinutes || 0) + (api.metrics.totalTeamMeetingMinutes || 0);
-    const unattributedMinutes = Math.max(0, totalAllMinutes - totalSubMinutes);
-
     const entries: SubscriberEntry[] = dist.map((s, i) => ({
       label: s.subscriberName,
-      value: s.percentage,
+      value: totalSubMinutes > 0 ? Math.round((s.totalMinutes / totalSubMinutes) * 100) : 0,
       hours: Math.round((s.totalMinutes / 60) * 10) / 10,
       color: getSubscriberColor(i),
     }));
-
-    if (unattributedMinutes > 0 && totalAllMinutes > 0) {
-      entries.push({
-        label: "Internal / Unattributed",
-        value: Math.round((unattributedMinutes / totalAllMinutes) * 100),
-        hours: Math.round((unattributedMinutes / 60) * 10) / 10,
-        color: "#A1A1A1",
-      });
-    }
 
     return entries;
   })();
@@ -169,11 +168,26 @@ function transformApiData(api: DashboardMetrics): {
   return { metrics, activityBreakdown, workBlocks, trend, topicBreakdown, subscriberBreakdown };
 }
 
+const VALID_TIME_RANGES = new Set<TimeRange>(["yesterday", "week", "month", "ytd", "all"]);
+
 export default function DashboardView() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [chatOpen, setChatOpen] = useState(false);
   const [drillDownMetric, setDrillDownMetric] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>("yesterday");
+
+  const initialPeriod = searchParams.get("period") as TimeRange | null;
+  const [timeRange, setTimeRange] = useState<TimeRange>(
+    initialPeriod && VALID_TIME_RANGES.has(initialPeriod) ? initialPeriod : "yesterday"
+  );
+
+  const handleTimeRangeChange = useCallback(
+    (range: TimeRange) => {
+      setTimeRange(range);
+      setSearchParams({ period: range }, { replace: true });
+    },
+    [setSearchParams]
+  );
 
   const { data: apiData } = useDashboardMetrics(timeRangeToPeriod[timeRange]);
   const { data: drillDownData } = useDrillDown(drillDownMetric, timeRangeToPeriod[timeRange]);
@@ -232,8 +246,7 @@ export default function DashboardView() {
   };
 
   const handleSubscriberDrillDown = (label: string) => {
-    if (label === "Internal / Unattributed") return;
-    navigate(`/customer/${encodeURIComponent(label)}`);
+    navigate(`/customer/${encodeURIComponent(label)}?period=${timeRange}`);
   };
 
   const closeDrillDown = () => {
@@ -256,7 +269,7 @@ export default function DashboardView() {
             {(Object.keys(timeRangeLabels) as TimeRange[]).map((key) => (
               <button
                 key={key}
-                onClick={() => setTimeRange(key)}
+                onClick={() => handleTimeRangeChange(key)}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-normal ${
                   timeRange === key
                     ? "bg-indigo text-white shadow-sm"

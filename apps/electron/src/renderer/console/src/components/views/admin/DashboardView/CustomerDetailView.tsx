@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useCallback, useMemo, useState } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useSubscriberDrillDown } from "@/console/src/hooks/queries/admin";
@@ -48,16 +48,37 @@ export default function CustomerDetailView() {
   const { name } = useParams<{ name: string }>();
   const navigate = useNavigate();
   const decodedName = decodeURIComponent(name || "");
-  const [timeRange, setTimeRange] = useState<TimeRange>("week");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialPeriod = searchParams.get("period") as TimeRange | null;
+  const validRanges = new Set<TimeRange>(["yesterday", "week", "month", "ytd", "all"]);
+  const [timeRange, setTimeRange] = useState<TimeRange>(
+    initialPeriod && validRanges.has(initialPeriod) ? initialPeriod : "week"
+  );
+
+  const handleTimeRangeChange = useCallback(
+    (range: TimeRange) => {
+      setTimeRange(range);
+      setSearchParams({ period: range }, { replace: true });
+    },
+    [setSearchParams]
+  );
 
   const period = timeRangeToPeriod[timeRange];
   const { data, isLoading } = useSubscriberDrillDown(decodedName || null, period);
+
+  const [showAllProjects, setShowAllProjects] = useState(false);
+  const MAX_VISIBLE_PROJECTS = 15;
 
   // Build project color map from breakdown order
   const projectColorMap = new Map<string, string>();
   data?.breakdown.forEach((item, i) => {
     projectColorMap.set(item.label, PROJECT_COLORS[i % PROJECT_COLORS.length]!);
   });
+
+  const visibleProjects = useMemo(() => {
+    if (!data) return [];
+    return showAllProjects ? data.breakdown : data.breakdown.slice(0, MAX_VISIBLE_PROJECTS);
+  }, [data, showAllProjects]);
 
   // Format trend dates for chart
   const chartData = (data?.trend || []).map((point) => {
@@ -98,7 +119,7 @@ export default function CustomerDetailView() {
       <div className="flex items-start justify-between">
         <div>
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate(`/dashboard?period=${timeRange}`)}
             className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors mb-3"
           >
             <ArrowLeft size={14} />
@@ -111,7 +132,7 @@ export default function CustomerDetailView() {
           {(Object.keys(timeRangeLabels) as TimeRange[]).map((key) => (
             <button
               key={key}
-              onClick={() => setTimeRange(key)}
+              onClick={() => handleTimeRangeChange(key)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-normal ${
                 timeRange === key
                   ? "bg-indigo text-white shadow-sm"
@@ -203,9 +224,14 @@ export default function CustomerDetailView() {
         {/* Projects Breakdown */}
         <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
           <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-          <h3 className="relative text-sm font-semibold text-text-primary mb-4">Projects</h3>
-          <div className="relative space-y-3">
-            {data.breakdown.map((item, i) => (
+          <h3 className="relative text-sm font-semibold text-text-primary mb-4">
+            Projects
+            {data.breakdown.length > 0 && (
+              <span className="text-text-tertiary font-normal ml-2 text-xs">{data.breakdown.length}</span>
+            )}
+          </h3>
+          <div className="relative space-y-3 max-h-[400px] overflow-y-auto overflow-x-hidden pr-1">
+            {visibleProjects.map((item, i) => (
               <div key={item.label}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-sm text-text-primary">{item.label}</span>
@@ -231,6 +257,16 @@ export default function CustomerDetailView() {
             ))}
             {data.breakdown.length === 0 && (
               <p className="text-xs text-text-tertiary text-center py-8">No project data</p>
+            )}
+            {data.breakdown.length > MAX_VISIBLE_PROJECTS && (
+              <button
+                onClick={() => setShowAllProjects((prev) => !prev)}
+                className="w-full text-center text-xs text-indigo hover:text-indigo/80 py-2 transition-colors"
+              >
+                {showAllProjects
+                  ? "Show less"
+                  : `Show all ${data.breakdown.length} projects`}
+              </button>
             )}
           </div>
         </div>

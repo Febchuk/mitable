@@ -65,8 +65,8 @@ export default function TopicBreakdown({ topics, periodLabel, onDrillDown }: Top
         ))}
       </div>
 
-      {/* Legend list */}
-      <div className="relative space-y-2">
+      {/* Legend list — scrollable when many topics */}
+      <div className="relative space-y-2 max-h-[320px] overflow-y-auto overflow-x-hidden pr-1">
         {topics.map((topic) => {
           const pct = totalHours > 0 ? Math.round((topic.hours / totalHours) * 100) : 0;
           return (

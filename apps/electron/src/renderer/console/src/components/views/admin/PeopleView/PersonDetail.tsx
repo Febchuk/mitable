@@ -1066,15 +1066,14 @@ export default function PersonDetail() {
 
               {/* Project / Topic breakdown (bar list) */}
               {showTopic && person.projectBreakdown.length > 0 && (
-                <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-                  <h3 className="relative text-sm font-semibold text-text-primary mb-4">
+                <div className="relative rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+                  <h3 className="text-sm font-semibold text-text-primary mb-4">
                     Projects / Topics
                     <span className="text-text-secondary font-normal ml-2">
                       {timeRangeLabels[timeRange]}
                     </span>
                   </h3>
-                  <div className="relative space-y-3">
+                  <div className="space-y-3 max-h-[320px] overflow-y-auto overflow-x-hidden pr-1">
                     {person.projectBreakdown.map((project) => {
                       const maxHours = person.projectBreakdown[0]?.hours || 1;
                       return (

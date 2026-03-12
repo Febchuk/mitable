@@ -24,6 +24,7 @@ import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/session
 import { closeAudioConnection } from "./audio.js";
 import { logger } from "../lib/logger";
 import { scheduleInactivityRollup, cancelInactivityRollup } from "../cron/jobs/inactivity-trigger";
+import { runBlockAnalyzer } from "../services/block-analyzer-orchestrator.service";
 import { classifySession } from "../services/session-classification.service";
 import { materializeSession } from "../services/activity-materializer.service";
 import { cleanupStaleSessions } from "../services/stale-session-cleanup.service";
@@ -1169,7 +1170,7 @@ router.post(
             }
           }
 
-          // Run ingestion in parallel with classify → materialize chain
+          // Run ingestion in parallel with Block Analyzer RLM
           Promise.all([
             // Chunk + embed session data
             SessionIngestionService.ingestSession(id)
@@ -1189,21 +1190,31 @@ router.post(
                   .set({ ingestionStatus: "failed" })
                   .where(eq(schema.monitoringSessions.id, id));
               }),
-            // Classify (Claude → OpenAI fallback) then materialize activity blocks
-            classifySession(id)
-              .catch((error) => {
-                log.error("Session classification failed", {
-                  sessionId: id,
-                  error: error instanceof Error ? error.message : String(error),
+            // Block Analyzer RLM: full agentic classification → activity blocks + admin metrics
+            runBlockAnalyzer(id).catch((error) => {
+              log.error("Block Analyzer failed — falling back to classify → materialize", {
+                sessionId: id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+              // Fallback: use the old lightweight pipeline
+              return classifySession(id)
+                .catch((classifyError) => {
+                  log.error("Fallback classification also failed", {
+                    sessionId: id,
+                    error:
+                      classifyError instanceof Error
+                        ? classifyError.message
+                        : String(classifyError),
+                  });
+                })
+                .then(() => materializeSession(id))
+                .catch((matError) => {
+                  log.error("Fallback materialization also failed", {
+                    sessionId: id,
+                    error: matError instanceof Error ? matError.message : String(matError),
+                  });
                 });
-              })
-              .then(() => materializeSession(id))
-              .catch((error) => {
-                log.error("Activity materialization failed", {
-                  sessionId: id,
-                  error: error instanceof Error ? error.message : String(error),
-                });
-              }),
+            }),
           ]);
         })
         .catch(async (error) => {

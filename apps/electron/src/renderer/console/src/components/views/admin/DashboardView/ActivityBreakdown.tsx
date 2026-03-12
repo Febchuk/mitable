@@ -47,13 +47,13 @@ export default function ActivityBreakdown({
         ))}
       </div>
 
-      {/* Legend list */}
-      <div className="relative space-y-2">
+      {/* Legend list — scrollable when many activities */}
+      <div className="relative space-y-2 max-h-[320px] overflow-y-auto overflow-x-hidden pr-1">
         {activities.map((activity) => {
           const pct = totalHours > 0 ? Math.round((activity.hours / totalHours) * 100) : 0;
           return (
             <div
-              key={activity.label}
+              key={activity.id}
               className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
               onClick={() => onDrillDown(activity.label)}
             >
