@@ -246,6 +246,7 @@ export default function DashboardView() {
   };
 
   const handleSubscriberDrillDown = (label: string) => {
+    if (label === "Internal / Unattributed") return;
     navigate(`/customer/${encodeURIComponent(label)}?period=${timeRange}`);
   };
 

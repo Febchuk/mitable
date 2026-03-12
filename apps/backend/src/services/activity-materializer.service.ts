@@ -24,6 +24,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { normalizeName } from "./normalize-name.js";
 import { syncSubscriberToGraph, syncTopicToGraph } from "./graph/graph-incremental-sync.service.js";
+import { getKnownCustomers } from "./known-customers.service.js";
 
 const logger = createLogger({ context: "activity-materializer" });
 
@@ -162,6 +163,20 @@ export async function materializeSession(sessionId: string): Promise<void> {
       });
     }
 
+    // Fetch known customers for subscriber-from-topic fallback
+    const knownCustomers = await getKnownCustomers(session.organizationId);
+
+    // 3b. Infer subscriberName from topic/block name when missing
+    if (knownCustomers.length > 0) {
+      for (const block of blocks) {
+        if (!block.subscriberName) {
+          const textToSearch = `${block.topicName || ""} ${block.name}`.toLowerCase();
+          const matched = knownCustomers.find((c) => textToSearch.includes(c.toLowerCase()));
+          if (matched) block.subscriberName = matched;
+        }
+      }
+    }
+
     // 4. Enrich blocks with app names from captures (for appBreakdown)
     const captures = await db
       .select({ appName: schema.sessionCaptures.appName })
@@ -234,7 +249,7 @@ export async function materializeSession(sessionId: string): Promise<void> {
       }
 
       // 8. Recalculate daily aggregate stats from ALL blocks for this day
-      await recalculateDailyStats(dailyActivityId, tx);
+      await recalculateDailyStats(dailyActivityId, tx, knownCustomers);
     });
 
     // Fire-and-forget: sync topics/subscribers to Neo4j graph
@@ -287,7 +302,8 @@ export async function materializeSession(sessionId: string): Promise<void> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function recalculateDailyStats(
   dailyActivityId: string,
-  txOrDb: any = db
+  txOrDb: any = db,
+  knownCustomers: string[] = []
 ): Promise<void> {
   // Fetch all blocks for this day
   const blocks = await txOrDb
@@ -343,14 +359,22 @@ export async function recalculateDailyStats(
     }
 
     // Subscriber breakdown (normalize key, keep longest display name)
-    if (block.subscriberName) {
-      const sKey = normalizeName(block.subscriberName);
+    // Fallback: infer subscriber from topic name if it mentions a known customer
+    let effectiveSubscriber = block.subscriberName as string | null;
+    if (!effectiveSubscriber && block.topicName && knownCustomers.length > 0) {
+      const topicLower = (block.topicName as string).toLowerCase();
+      const matched = knownCustomers.find((c) => topicLower.includes(c.toLowerCase()));
+      if (matched) effectiveSubscriber = matched;
+    }
+
+    if (effectiveSubscriber) {
+      const sKey = normalizeName(effectiveSubscriber);
       subscriberMinutes[sKey] = (subscriberMinutes[sKey] || 0) + block.durationMinutes;
       if (
         !subscriberDisplayNames[sKey] ||
-        block.subscriberName.length > subscriberDisplayNames[sKey].length
+        effectiveSubscriber.length > subscriberDisplayNames[sKey].length
       ) {
-        subscriberDisplayNames[sKey] = block.subscriberName;
+        subscriberDisplayNames[sKey] = effectiveSubscriber;
       }
     }
   }

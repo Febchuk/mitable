@@ -298,7 +298,8 @@ export async function processUserDay(
     dailyActivityId,
     result,
     sessions.length,
-    captures.length
+    captures.length,
+    knownCustomers
   );
 
   // Auto-discover customers from Day Analyzer output
@@ -395,7 +396,8 @@ async function writeResults(
   existingId: string | undefined,
   result: Awaited<ReturnType<typeof dayAnalyzerRLMService.analyzeDay>>,
   totalSessions: number,
-  totalCaptures: number
+  totalCaptures: number,
+  knownCustomers: string[] = []
 ): Promise<void> {
   await db.transaction(async (tx) => {
     // Upsert user_daily_activities
@@ -462,32 +464,40 @@ async function writeResults(
       dailyActivityId = inserted!.id;
     }
 
-    // Insert activity blocks
+    // Insert activity blocks (infer subscriber from topic/name when missing)
     if (result.blocks.length > 0) {
       await tx.insert(schema.activityBlocks).values(
-        result.blocks.map((block, index) => ({
-          dailyActivityId,
-          userId,
-          blockType: block.type,
-          name: block.name,
-          startTime: block.startTime,
-          endTime: block.endTime,
-          durationMinutes: block.durationMinutes,
-          description: block.description,
-          apps: JSON.stringify(block.apps),
-          category: block.category,
-          topicName: block.topicName || null,
-          subscriberName: block.subscriberName || null,
-          participants: block.participants ? JSON.stringify(block.participants) : "[]",
-          sourceSessionIds: JSON.stringify(block.sourceSessionIds),
-          sequenceNumber: index,
-        }))
+        result.blocks.map((block, index) => {
+          let subscriber = block.subscriberName || null;
+          if (!subscriber && knownCustomers.length > 0) {
+            const text = `${block.topicName || ""} ${block.name}`.toLowerCase();
+            const matched = knownCustomers.find((c) => text.includes(c.toLowerCase()));
+            if (matched) subscriber = matched;
+          }
+          return {
+            dailyActivityId,
+            userId,
+            blockType: block.type,
+            name: block.name,
+            startTime: block.startTime,
+            endTime: block.endTime,
+            durationMinutes: block.durationMinutes,
+            description: block.description,
+            apps: JSON.stringify(block.apps),
+            category: block.category,
+            topicName: block.topicName || null,
+            subscriberName: subscriber,
+            participants: block.participants ? JSON.stringify(block.participants) : "[]",
+            sourceSessionIds: JSON.stringify(block.sourceSessionIds),
+            sequenceNumber: index,
+          };
+        })
       );
     }
 
     // Recalculate daily aggregates (categoryBreakdown, topicBreakdown, subscriberBreakdown)
     // from the freshly-inserted blocks — single source of truth
-    await recalculateDailyStats(dailyActivityId, tx);
+    await recalculateDailyStats(dailyActivityId, tx, knownCustomers);
   });
 
   logger.info(
