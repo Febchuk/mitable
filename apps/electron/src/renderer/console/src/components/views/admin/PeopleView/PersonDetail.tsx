@@ -30,6 +30,7 @@ import {
   useDashboardPersonDetail,
   useUserDrillDown,
   useCategoryActivities,
+  useSubscriberActivities,
   useOrganizationSettings,
 } from "@/console/src/hooks/queries/admin";
 import type {
@@ -485,6 +486,7 @@ export default function PersonDetail() {
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [workFilter, setWorkFilter] = useState<"all" | "session" | "doc">("all");
   const [workSearchQuery, setWorkSearchQuery] = useState("");
+  const [selectedSubscriber, setSelectedSubscriber] = useState<string | null>(null);
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
 
@@ -501,6 +503,11 @@ export default function PersonDetail() {
   const { data: categoryData } = useCategoryActivities(
     id || "",
     selectedCategory,
+    timeRangeToPeriod[timeRange]
+  );
+  const { data: subscriberData } = useSubscriberActivities(
+    id || "",
+    selectedSubscriber,
     timeRangeToPeriod[timeRange]
   );
   const { data: docData, isLoading: docLoading } = useDocument(selectedDocId || "");
@@ -520,6 +527,7 @@ export default function PersonDetail() {
   const closeDrillDown = () => {
     setDrillDownMetric(null);
     setSelectedCategory(null);
+    setSelectedSubscriber(null);
   };
 
   const person = useMemo(() => {
@@ -1046,7 +1054,15 @@ export default function PersonDetail() {
                     </div>
                     <div className="flex-1 space-y-2">
                       {person.customerBreakdown.map((entry) => (
-                        <div key={entry.label} className="flex items-center justify-between">
+                        <div
+                          key={entry.label}
+                          onClick={() => {
+                            setDrillDownMetric(null);
+                            setSelectedCategory(null);
+                            setSelectedSubscriber(entry.label);
+                          }}
+                          className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
+                        >
                           <div className="flex items-center gap-2">
                             <div
                               className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -1268,6 +1284,117 @@ export default function PersonDetail() {
       {drillDownMetric && drillDownData && (
         <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
           <DrillDownPanel data={drillDownData} onClose={closeDrillDown} />
+        </div>
+      )}
+
+      {/* Subscriber activity list panel (per-user — for customer breakdown) */}
+      {selectedSubscriber && (
+        <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
+          <div className="flex flex-col h-full rounded-xl border border-stroke-subtle bg-canvas-raised overflow-hidden">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-stroke-subtle shrink-0">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={closeDrillDown}
+                  className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  <ArrowLeft size={14} />
+                  Back
+                </button>
+                <button
+                  onClick={closeDrillDown}
+                  className="p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <h2 className="text-lg font-semibold text-text-primary mt-2">{selectedSubscriber}</h2>
+              <p className="text-xs text-text-secondary mt-0.5">
+                {subscriberData
+                  ? `${subscriberData.totalHours}h across ${subscriberData.activityCount} activities · ${timeRangeLabels[timeRange]}`
+                  : "Loading..."}
+              </p>
+            </div>
+
+            {/* Activity list */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {!subscriberData ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : subscriberData.activities.length === 0 ? (
+                <p className="text-sm text-text-tertiary text-center py-12">
+                  No activities for this customer in the selected period.
+                </p>
+              ) : (
+                subscriberData.activities.map((act) => {
+                  const date = new Date(act.startTime);
+                  const dateStr = date.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  });
+                  const timeStr = date.toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                  });
+                  const hours = Math.floor(act.durationMinutes / 60);
+                  const mins = act.durationMinutes % 60;
+                  const duration =
+                    hours > 0 ? `${hours}h ${mins > 0 ? `${mins}m` : ""}` : `${mins}m`;
+
+                  return (
+                    <div
+                      key={act.id}
+                      className="rounded-lg border border-stroke-subtle bg-canvas-overlay/50 p-3 hover:border-indigo/30 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                              act.blockType === "meeting"
+                                ? "text-yellow-400 bg-yellow-500/15"
+                                : "text-indigo-light bg-indigo/15"
+                            }`}
+                          >
+                            {act.blockType === "meeting" ? (
+                              <Calendar size={14} />
+                            ) : (
+                              <Briefcase size={14} />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-medium text-text-primary leading-snug">
+                              {act.name}
+                            </p>
+                            {act.description && act.description !== act.name && (
+                              <p className="text-xs text-text-secondary mt-0.5 line-clamp-2 leading-relaxed">
+                                {act.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-xs font-medium text-text-secondary whitespace-nowrap shrink-0">
+                          {duration}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2 ml-[38px]">
+                        <span className="text-[10px] text-text-tertiary flex items-center gap-1">
+                          <Clock size={10} />
+                          {dateStr}, {timeStr}
+                        </span>
+                        {act.category && (
+                          <span className="text-[9px] font-medium text-text-tertiary bg-canvas-overlay px-1.5 py-0.5 rounded">
+                            {act.category}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
       )}
 

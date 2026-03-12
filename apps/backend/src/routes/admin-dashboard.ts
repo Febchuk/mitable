@@ -1874,6 +1874,95 @@ router.get(
 );
 
 // ============================================================================
+// GET /admin/dashboard/people/:id/subscriber-activities/:subscriber?period=...
+// Returns individual activity blocks for a user filtered by subscriber + period.
+// Used by the per-user Customer / Client drill-down panel.
+// ============================================================================
+router.get(
+  "/dashboard/people/:id/subscriber-activities/:subscriber",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
+
+      const targetUserId = req.params.id;
+      const subscriber = decodeURIComponent(req.params.subscriber);
+      const period = (req.query.period as string) || "all";
+
+      // Verify user belongs to same org
+      const [targetUser] = await db
+        .select({ id: schema.users.id, organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, targetUserId))
+        .limit(1);
+
+      if (!targetUser || targetUser.organizationId !== admin.organizationId) {
+        res.status(404).json({ error: "Not Found" });
+        return;
+      }
+
+      // Build date conditions
+      const conditions = [
+        eq(schema.activityBlocks.userId, targetUserId),
+        sql`LOWER(COALESCE(${schema.activityBlocks.subscriberName}, '')) = ${subscriber.toLowerCase()}`,
+      ];
+
+      if (period !== "all") {
+        const { startDate, endDate } = resolveDateRange(period);
+        conditions.push(gte(schema.activityBlocks.startTime, new Date(startDate)));
+        conditions.push(lte(schema.activityBlocks.startTime, new Date(endDate + "T23:59:59.999Z")));
+      }
+
+      const blocks = await db
+        .select({
+          id: schema.activityBlocks.id,
+          name: schema.activityBlocks.name,
+          description: schema.activityBlocks.description,
+          category: schema.activityBlocks.category,
+          blockType: schema.activityBlocks.blockType,
+          startTime: schema.activityBlocks.startTime,
+          endTime: schema.activityBlocks.endTime,
+          durationMinutes: schema.activityBlocks.durationMinutes,
+          apps: schema.activityBlocks.apps,
+          sessionId: schema.activityBlocks.sessionId,
+          subscriberName: schema.activityBlocks.subscriberName,
+        })
+        .from(schema.activityBlocks)
+        .where(and(...conditions))
+        .orderBy(desc(schema.activityBlocks.startTime));
+
+      const totalMinutes = blocks.reduce((s, b) => s + b.durationMinutes, 0);
+
+      res.json({
+        subscriber,
+        period,
+        totalMinutes,
+        totalHours: Math.round((totalMinutes / 60) * 10) / 10,
+        activityCount: blocks.length,
+        activities: blocks.map((b) => ({
+          id: b.id,
+          name: b.name,
+          description: b.description,
+          category: b.category,
+          blockType: b.blockType,
+          startTime: b.startTime.toISOString(),
+          endTime: b.endTime.toISOString(),
+          durationMinutes: b.durationMinutes,
+          apps: b.apps,
+          sessionId: b.sessionId,
+        })),
+      });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error fetching subscriber activities");
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: "Failed to fetch subscriber activities" });
+    }
+  }
+);
+
+// ============================================================================
 // POST /admin/dashboard/chat
 // AI assistant that answers questions about dashboard data
 // ============================================================================
