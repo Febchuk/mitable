@@ -294,11 +294,7 @@ export default function DashboardView() {
         {/* Charts grid: 2x2 layout */}
         <div className="grid grid-cols-2 gap-4">
           {showTopic && (
-            <TopicBreakdown
-              topics={data.topicBreakdown}
-              periodLabel={timeRangeLabels[timeRange]}
-              onDrillDown={handleDrillDown}
-            />
+            <TopicBreakdown topics={data.topicBreakdown} periodLabel={timeRangeLabels[timeRange]} />
           )}
           {showCustomer && (
             <SubscriberBreakdown

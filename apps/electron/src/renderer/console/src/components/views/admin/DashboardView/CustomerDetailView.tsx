@@ -227,7 +227,9 @@ export default function CustomerDetailView() {
           <h3 className="relative text-sm font-semibold text-text-primary mb-4">
             Projects
             {data.breakdown.length > 0 && (
-              <span className="text-text-tertiary font-normal ml-2 text-xs">{data.breakdown.length}</span>
+              <span className="text-text-tertiary font-normal ml-2 text-xs">
+                {data.breakdown.length}
+              </span>
             )}
           </h3>
           <div className="relative space-y-3 max-h-[400px] overflow-y-auto overflow-x-hidden pr-1">
@@ -263,9 +265,7 @@ export default function CustomerDetailView() {
                 onClick={() => setShowAllProjects((prev) => !prev)}
                 className="w-full text-center text-xs text-indigo hover:text-indigo/80 py-2 transition-colors"
               >
-                {showAllProjects
-                  ? "Show less"
-                  : `Show all ${data.breakdown.length} projects`}
+                {showAllProjects ? "Show less" : `Show all ${data.breakdown.length} projects`}
               </button>
             )}
           </div>

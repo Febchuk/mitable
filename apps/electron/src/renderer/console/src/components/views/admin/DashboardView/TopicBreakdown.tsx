@@ -8,7 +8,6 @@ interface TopicEntry {
 interface TopicBreakdownProps {
   topics: TopicEntry[];
   periodLabel: string;
-  onDrillDown: (label: string) => void;
 }
 
 const TOPIC_COLORS = [
@@ -28,7 +27,7 @@ export function getTopicColor(index: number): string {
   return TOPIC_COLORS[index % TOPIC_COLORS.length]!;
 }
 
-export default function TopicBreakdown({ topics, periodLabel, onDrillDown }: TopicBreakdownProps) {
+export default function TopicBreakdown({ topics, periodLabel }: TopicBreakdownProps) {
   const totalHours = topics.reduce((sum, t) => sum + t.hours, 0);
 
   if (topics.length === 0) {
@@ -72,8 +71,7 @@ export default function TopicBreakdown({ topics, periodLabel, onDrillDown }: Top
           return (
             <div
               key={topic.id}
-              className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
-              onClick={() => onDrillDown(topic.label)}
+              className="flex items-center justify-between rounded-lg px-2 py-1.5 -mx-2"
             >
               <div className="flex items-center gap-2.5">
                 <div
