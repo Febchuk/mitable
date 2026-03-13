@@ -3,12 +3,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 //import { Sparkles } from "lucide-react";
 import MetricCards from "./MetricCards";
 import ActivityBreakdown from "./ActivityBreakdown";
-import TopicBreakdown, { getTopicColor } from "./TopicBreakdown";
 import SubscriberBreakdown, { getSubscriberColor } from "./SubscriberBreakdown";
 import OrgInsights from "./OrgInsights";
 import ChatPanel from "./ChatPanel";
 import DrillDownPanel from "./DrillDownPanel";
-import type { TimeRange, MetricData, ActivityEntry, WorkBlock, WeeklyTrendPoint } from "./mockData";
+import type { TimeRange, MetricData, ActivityEntry, WeeklyTrendPoint } from "./mockData";
 import {
   useDashboardMetrics,
   useDrillDown,
@@ -56,13 +55,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: "#A1A1A1",
 };
 
-interface TopicEntry {
-  id: string;
-  label: string;
-  hours: number;
-  color: string;
-}
-
 interface SubscriberEntry {
   label: string;
   value: number;
@@ -73,9 +65,7 @@ interface SubscriberEntry {
 function transformApiData(api: DashboardMetrics): {
   metrics: MetricData[];
   activityBreakdown: ActivityEntry[];
-  workBlocks: WorkBlock[];
   trend: WeeklyTrendPoint[];
-  topicBreakdown: TopicEntry[];
   subscriberBreakdown: SubscriberEntry[];
 } {
   const m = api.metrics;
@@ -133,23 +123,11 @@ function transformApiData(api: DashboardMetrics): {
     return [...merged.values()];
   })();
 
-  const workBlocks: WorkBlock[] = [
-    { label: "Work", value: m.avgWorkPercentage, color: "#6366F1" },
-    { label: "Meetings", value: m.avgMeetingPercentage, color: "#F59E0B" },
-  ];
-
   const trend: WeeklyTrendPoint[] = (api.dailyTrend || []).map((d) => ({
     day: d.date,
     activities: Math.round(d.avgWorkMinutes),
     meetings: Math.round(d.avgMeetingMinutes),
     docs: 0,
-  }));
-
-  const topicBreakdown: TopicEntry[] = (api.topicDistribution || []).map((t, i) => ({
-    id: t.topicName.toLowerCase().replace(/\s+/g, "-"),
-    label: t.topicName,
-    hours: Math.round((t.totalMinutes / 60) * 10) / 10,
-    color: getTopicColor(i),
   }));
 
   const subscriberBreakdown: SubscriberEntry[] = (() => {
@@ -165,7 +143,7 @@ function transformApiData(api: DashboardMetrics): {
     return entries;
   })();
 
-  return { metrics, activityBreakdown, workBlocks, trend, topicBreakdown, subscriberBreakdown };
+  return { metrics, activityBreakdown, trend, subscriberBreakdown };
 }
 
 const VALID_TIME_RANGES = new Set<TimeRange>(["yesterday", "week", "month", "ytd", "all"]);
@@ -193,7 +171,6 @@ export default function DashboardView() {
   const { data: drillDownData } = useDrillDown(drillDownMetric, timeRangeToPeriod[timeRange]);
   const { data: orgSettings } = useOrganizationSettings();
   const showCustomer = orgSettings?.settings?.showCustomerBreakdown !== false;
-  const showTopic = orgSettings?.settings?.showTopicBreakdown !== false;
 
   const data = useMemo(() => {
     if (apiData?.hasData) {
@@ -231,9 +208,7 @@ export default function DashboardView() {
         },
       ],
       activityBreakdown: [],
-      workBlocks: [],
       trend: [],
-      topicBreakdown: [],
       subscriberBreakdown: [],
     };
   }, [apiData]);
@@ -257,7 +232,7 @@ export default function DashboardView() {
   return (
     <div className="relative h-full overflow-hidden">
       {/* Dashboard content — full width, no scroll */}
-      <div className="h-full overflow-y-auto p-6 flex flex-col gap-4">
+      <div className="h-full overflow-y-auto p-6 pb-16 space-y-4">
         {/* Header */}
         <div className="flex items-end justify-between shrink-0">
           <div>
@@ -292,11 +267,8 @@ export default function DashboardView() {
           <MetricCards metrics={data.metrics} onDrillDown={handleDrillDown} />
         </div>
 
-        {/* Charts grid: 2x2 layout */}
+        {/* Charts grid */}
         <div className="grid grid-cols-2 gap-4">
-          {showTopic && (
-            <TopicBreakdown topics={data.topicBreakdown} periodLabel={timeRangeLabels[timeRange]} />
-          )}
           {showCustomer && (
             <SubscriberBreakdown
               subscribers={data.subscriberBreakdown}
@@ -309,12 +281,10 @@ export default function DashboardView() {
             periodLabel={timeRangeLabels[timeRange]}
             onDrillDown={handleDrillDown}
           />
-          <OrgInsights
-            workBlocks={data.workBlocks}
-            weeklyTrend={data.trend}
-            periodLabel={timeRangeLabels[timeRange]}
-          />
         </div>
+
+        {/* Activity Trend — full width */}
+        <OrgInsights weeklyTrend={data.trend} periodLabel={timeRangeLabels[timeRange]} />
       </div>
 
       {/* Drill-down overlay panel */}

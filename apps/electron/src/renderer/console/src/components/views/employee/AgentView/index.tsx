@@ -178,7 +178,9 @@ export default function AgentView() {
                 toolName={msg.toolName}
               />
             ))}
-            {isLoading && <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />}
+            {isLoading && (
+              <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />
+            )}
             <div ref={messagesEndRef} />
           </div>
         )}

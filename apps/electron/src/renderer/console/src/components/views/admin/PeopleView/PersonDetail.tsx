@@ -900,110 +900,6 @@ export default function PersonDetail() {
           ))}
         </div>
 
-        {/* Activity breakdown + Weekly trend */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Activity breakdown */}
-          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-            <h3 className="relative text-sm font-semibold text-text-primary mb-4">
-              Activity Breakdown
-              <span className="text-text-secondary font-normal ml-2">
-                {timeRangeLabels[timeRange]}
-              </span>
-            </h3>
-            <div className="relative flex h-3 rounded-full overflow-hidden mb-4">
-              {person.activities.map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    width: `${totalActivityHours > 0 ? (a.hours / totalActivityHours) * 100 : 0}%`,
-                    backgroundColor: a.color,
-                  }}
-                />
-              ))}
-            </div>
-            <div className="relative space-y-2">
-              {person.activities.map((a) => (
-                <div
-                  key={a.id}
-                  onClick={() => handleDrillDown(a.label)}
-                  className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: a.color }}
-                    />
-                    <span className="text-xs text-text-primary">{a.label}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-text-secondary">{a.hours}h</span>
-                    <span className="text-[10px] text-text-tertiary w-7 text-right">
-                      {totalActivityHours > 0
-                        ? Math.round((a.hours / totalActivityHours) * 100)
-                        : 0}
-                      %
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Weekly trend */}
-          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-            <h3 className="relative text-sm font-semibold text-text-primary mb-4">
-              Weekly Trend
-              <span className="text-text-secondary font-normal ml-2">Hours per day</span>
-            </h3>
-            <div className="relative h-[180px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={person.weeklyTrend} barGap={2}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis
-                    dataKey="day"
-                    tick={{ fill: "#A1A1A1", fontSize: 11 }}
-                    axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: "#A1A1A1", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={30}
-                  />
-                  <Tooltip
-                    content={<ChartTooltipCustom />}
-                    cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                  />
-                  <Bar
-                    dataKey="focus"
-                    name="Focus"
-                    fill="#6366F1"
-                    radius={[3, 3, 0, 0]}
-                    stackId="a"
-                  />
-                  <Bar
-                    dataKey="meetings"
-                    name="Meetings"
-                    fill="#F59E0B"
-                    radius={[0, 0, 0, 0]}
-                    stackId="a"
-                  />
-                  <Bar
-                    dataKey="other"
-                    name="Other"
-                    fill="#818CF8"
-                    radius={[3, 3, 0, 0]}
-                    stackId="a"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
         {/* Customer / Client + Project / Topic breakdown */}
         {(showCustomer || showTopic) &&
           (person.customerBreakdown.length > 0 || person.projectBreakdown.length > 0) && (
@@ -1116,10 +1012,113 @@ export default function PersonDetail() {
             </div>
           )}
 
-        {/* Recent work + Top topics */}
-        <div className="grid grid-cols-3 gap-4">
-          {/* Recent work — session summaries + docs */}
-          <div className="col-span-2 relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+        {/* Activity breakdown + Weekly trend */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Activity breakdown */}
+          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
+            <h3 className="relative text-sm font-semibold text-text-primary mb-4">
+              Activity Breakdown
+              <span className="text-text-secondary font-normal ml-2">
+                {timeRangeLabels[timeRange]}
+              </span>
+            </h3>
+            <div className="relative flex h-3 rounded-full overflow-hidden mb-4">
+              {person.activities.map((a) => (
+                <div
+                  key={a.id}
+                  style={{
+                    width: `${totalActivityHours > 0 ? (a.hours / totalActivityHours) * 100 : 0}%`,
+                    backgroundColor: a.color,
+                  }}
+                />
+              ))}
+            </div>
+            <div className="relative space-y-2">
+              {person.activities.map((a) => (
+                <div
+                  key={a.id}
+                  onClick={() => handleDrillDown(a.label)}
+                  className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: a.color }}
+                    />
+                    <span className="text-xs text-text-primary">{a.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-text-secondary">{a.hours}h</span>
+                    <span className="text-[10px] text-text-tertiary w-7 text-right">
+                      {totalActivityHours > 0
+                        ? Math.round((a.hours / totalActivityHours) * 100)
+                        : 0}
+                      %
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Weekly trend */}
+          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
+            <h3 className="relative text-sm font-semibold text-text-primary mb-4">
+              Weekly Trend
+              <span className="text-text-secondary font-normal ml-2">Hours per day</span>
+            </h3>
+            <div className="relative h-[180px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={person.weeklyTrend} barGap={2}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fill: "#A1A1A1", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "#A1A1A1", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={30}
+                  />
+                  <Tooltip
+                    content={<ChartTooltipCustom />}
+                    cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                  />
+                  <Bar
+                    dataKey="focus"
+                    name="Focus"
+                    fill="#6366F1"
+                    radius={[3, 3, 0, 0]}
+                    stackId="a"
+                  />
+                  <Bar
+                    dataKey="meetings"
+                    name="Meetings"
+                    fill="#F59E0B"
+                    radius={[0, 0, 0, 0]}
+                    stackId="a"
+                  />
+                  <Bar
+                    dataKey="other"
+                    name="Other"
+                    fill="#818CF8"
+                    radius={[3, 3, 0, 0]}
+                    stackId="a"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent work */}
+        <div>
+          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
             <div className="relative space-y-3 mb-4">
               <h3 className="text-sm font-semibold text-text-primary">
@@ -1248,34 +1247,6 @@ export default function PersonDetail() {
                 </div>
               );
             })()}
-          </div>
-
-          {/* Top topics */}
-          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-            <h3 className="relative text-sm font-semibold text-text-primary mb-4">
-              Top Topics
-              <span className="text-text-secondary font-normal ml-2">Most worked on</span>
-            </h3>
-            <div className="relative space-y-3">
-              {person.topTopics.map((topic) => {
-                const maxCount = person.topTopics[0].count;
-                return (
-                  <div key={topic.label}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-text-primary">{topic.label}</span>
-                      <span className="text-[10px] text-text-tertiary">{topic.count} blocks</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-canvas-overlay overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-indigo transition-all duration-normal"
-                        style={{ width: `${maxCount > 0 ? (topic.count / maxCount) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </div>
       </div>

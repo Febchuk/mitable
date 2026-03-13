@@ -67,11 +67,21 @@ function formatToolLabel(name: string): string {
   return labels[name] || "Working...";
 }
 
-export function AgentThinking({ toolName, toolDetail }: { toolName?: string | null; toolDetail?: string | null }) {
+export function AgentThinking({
+  toolName,
+  toolDetail,
+}: {
+  toolName?: string | null;
+  toolDetail?: string | null;
+}) {
   const label = toolName ? formatToolLabel(toolName) : "Thinking...";
   const icon = toolName ? <ToolIcon name={toolName} /> : null;
   // Show command/file/query snippet for extra context (e.g. "Running command... find ~ -name *.pdf")
-  const detail = toolDetail ? (toolDetail.length > 50 ? toolDetail.slice(0, 50) + "..." : toolDetail) : null;
+  const detail = toolDetail
+    ? toolDetail.length > 50
+      ? toolDetail.slice(0, 50) + "..."
+      : toolDetail
+    : null;
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 bg-muted/30">
@@ -85,7 +95,9 @@ export function AgentThinking({ toolName, toolDetail }: { toolName?: string | nu
           <span>{label}</span>
         </div>
         {detail && (
-          <span className="ml-[22px] truncate text-xs text-muted-foreground/60 font-mono">{detail}</span>
+          <span className="ml-[22px] truncate text-xs text-muted-foreground/60 font-mono">
+            {detail}
+          </span>
         )}
       </div>
     </div>
@@ -95,9 +107,20 @@ export function AgentThinking({ toolName, toolDetail }: { toolName?: string | nu
 function ToolIcon({ name }: { name?: string }) {
   if (!name) return <Terminal className="h-3 w-3" />;
   const lower = name.toLowerCase();
-  if (lower.includes("file") || lower.includes("read") || lower.includes("write") || lower.includes("edit") || lower === "glob")
+  if (
+    lower.includes("file") ||
+    lower.includes("read") ||
+    lower.includes("write") ||
+    lower.includes("edit") ||
+    lower === "glob"
+  )
     return <FileText className="h-3 w-3" />;
-  if (lower.includes("web") || lower.includes("search") || lower.includes("fetch") || lower === "grep")
+  if (
+    lower.includes("web") ||
+    lower.includes("search") ||
+    lower.includes("fetch") ||
+    lower === "grep"
+  )
     return <Globe className="h-3 w-3" />;
   return <Terminal className="h-3 w-3" />;
 }

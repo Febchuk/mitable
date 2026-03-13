@@ -486,6 +486,8 @@ export interface TopicDistributionEntry {
   percentage: number;
 }
 
+// Note: TopicDistributionEntry kept — still used by PersonDetail's Projects/Topics view
+
 export interface SubscriberDistributionEntry {
   subscriberName: string;
   totalMinutes: number;
@@ -514,7 +516,6 @@ export interface DashboardMetrics {
     workPct: number;
     meetingPct: number;
   }>;
-  topicDistribution?: TopicDistributionEntry[];
   subscriberDistribution?: SubscriberDistributionEntry[];
   dailyTrend: Array<{
     date: string;
