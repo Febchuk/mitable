@@ -2647,7 +2647,6 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
 });
 
 /**
-<<<<<<< HEAD
  * GET /admin/graph/users/:userId/work-insights?window=7d|30d|90d
  * Returns graph-derived work profile for a single employee in the same org.
  * Now includes appBehaviors and populated patterns from V2 profile.
