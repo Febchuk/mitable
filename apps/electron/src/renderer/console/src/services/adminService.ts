@@ -761,6 +761,7 @@ export interface CategoryActivity {
   id: string;
   name: string;
   description: string | null;
+  category?: string;
   blockType: string;
   startTime: string;
   endTime: string;
@@ -789,6 +790,30 @@ export async function fetchCategoryActivities(
     );
   } catch (error) {
     logger.error("Error fetching category activities:", error);
+    throw error;
+  }
+}
+
+export interface SubscriberActivitiesResponse {
+  subscriber: string;
+  period: string;
+  totalMinutes: number;
+  totalHours: number;
+  activityCount: number;
+  activities: CategoryActivity[];
+}
+
+export async function fetchSubscriberActivities(
+  userId: string,
+  subscriber: string,
+  period: DashboardPeriod = "all"
+): Promise<SubscriberActivitiesResponse> {
+  try {
+    return await apiRequest<SubscriberActivitiesResponse>(
+      `/admin/dashboard/people/${userId}/subscriber-activities/${encodeURIComponent(subscriber)}?period=${period}`
+    );
+  } catch (error) {
+    logger.error("Error fetching subscriber activities:", error);
     throw error;
   }
 }

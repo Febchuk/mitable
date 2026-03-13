@@ -245,7 +245,8 @@ export async function materializeSession(sessionId: string): Promise<void> {
           session.organizationId,
           block.subscriberName,
           personKey,
-          block.durationMinutes
+          block.durationMinutes,
+          1
         ).catch((err) =>
           logger.warn({ err: String(err) }, "Graph subscriber sync failed (non-fatal)")
         );
@@ -256,7 +257,8 @@ export async function materializeSession(sessionId: string): Promise<void> {
           block.topicName,
           personKey,
           block.category,
-          block.durationMinutes
+          block.durationMinutes,
+          1
         ).catch((err) => logger.warn({ err: String(err) }, "Graph topic sync failed (non-fatal)"));
       }
     }

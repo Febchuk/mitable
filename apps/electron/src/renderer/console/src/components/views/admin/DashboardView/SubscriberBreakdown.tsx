@@ -95,7 +95,7 @@ export default function SubscriberBreakdown({
             </PieChart>
           </ResponsiveContainer>
         </div>
-        <div className="flex-1 space-y-2">
+        <div className="flex-1 space-y-2 max-h-[320px] overflow-y-auto overflow-x-hidden pr-1">
           {subscribers.map((entry) => (
             <div
               key={entry.label}
