@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authRouter } from "./routes/auth.js";
 import { requireAuth, optionalAuth } from "./middleware/auth.js";
+import agentRouter from "./routes/agent.js";
 import roadmapsRouter from "./routes/roadmaps.js";
 // DEPRECATED: Old multi-agent chat system (OrchestratorService → KnowledgeAgent/Groq)
 // Admin Ask now uses /admin/ask/chat (Claude). Employees have no chat UI.
@@ -36,6 +37,7 @@ router.use("/documents", documentsRouter);
 router.use("/billing", billingRouter);
 router.use("/stripe", stripeRouter);
 router.use("/artifacts", artifactsRouter);
+router.use("/agent", agentRouter);
 
 /**
  * DEPRECATED: /guides routes

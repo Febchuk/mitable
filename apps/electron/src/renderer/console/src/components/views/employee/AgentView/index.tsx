@@ -1,0 +1,219 @@
+import { useState, useRef, useEffect, useCallback } from "react";
+import { ArrowUp, Square, Bot } from "lucide-react";
+import AgentMessage, { AgentThinking } from "./AgentMessage";
+
+// Simple UUID fallback for renderer
+function generateId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant" | "tool" | "error";
+  content: string;
+  toolName?: string;
+}
+
+const SUGGESTION_CHIPS = [
+  {
+    label: "What did I work on today?",
+    prompt: "What did I work on today? Summarize my sessions.",
+  },
+  {
+    label: "Draft a standup update",
+    prompt: "Draft a standup update based on my recent work sessions.",
+  },
+  { label: "List files in home", prompt: "List the files in my home directory." },
+];
+
+export default function AgentView() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [conversationId] = useState(() => generateId());
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Listen for agent events from main process
+  useEffect(() => {
+    if (!window.consoleAPI?.onAgentMessageEvent) return;
+
+    const unsubscribe = window.consoleAPI.onAgentMessageEvent((event) => {
+      switch (event.type) {
+        case "result":
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: generateId(),
+              role: "assistant",
+              content: String(event.data),
+            },
+          ]);
+          setIsLoading(false);
+          break;
+        case "tool_use":
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: generateId(),
+              role: "tool",
+              content: `Using tool: ${(event.data as { name?: string })?.name || "unknown"}`,
+              toolName: (event.data as { name?: string })?.name,
+            },
+          ]);
+          break;
+        case "error":
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: generateId(),
+              role: "error",
+              content: String(event.data),
+            },
+          ]);
+          setIsLoading(false);
+          break;
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isLoading) return;
+
+      const userMessage: ChatMessage = {
+        id: generateId(),
+        role: "user",
+        content: text.trim(),
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      setInput("");
+      setIsLoading(true);
+
+      try {
+        await window.consoleAPI?.agentSendMessage(conversationId, text.trim());
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateId(),
+            role: "error",
+            content: "Failed to send message. Please try again.",
+          },
+        ]);
+        setIsLoading(false);
+      }
+    },
+    [conversationId, isLoading]
+  );
+
+  const handleCancel = useCallback(() => {
+    window.consoleAPI?.agentCancel();
+    setIsLoading(false);
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(input);
+    }
+  };
+
+  const isEmpty = messages.length === 0;
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto">
+        {isEmpty ? (
+          <div className="flex h-full flex-col items-center justify-center gap-6 px-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10">
+              <Bot className="h-7 w-7 text-violet-500" />
+            </div>
+            <div className="text-center">
+              <h2 className="text-lg font-semibold">Mitable Agent</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Ask me about your work, draft messages, or run tasks.
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {SUGGESTION_CHIPS.map((chip) => (
+                <button
+                  key={chip.label}
+                  onClick={() => sendMessage(chip.prompt)}
+                  className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="pb-4">
+            {messages.map((msg) => (
+              <AgentMessage
+                key={msg.id}
+                role={msg.role}
+                content={msg.content}
+                toolName={msg.toolName}
+              />
+            ))}
+            {isLoading && <AgentThinking />}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* Input area */}
+      <div className="border-t border-border p-3">
+        <div className="relative flex items-end gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask the agent anything..."
+            rows={1}
+            className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            style={{
+              height: "auto",
+              overflow: input.split("\n").length > 4 ? "auto" : "hidden",
+            }}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = "auto";
+              target.style.height = Math.min(target.scrollHeight, 128) + "px";
+            }}
+          />
+          {isLoading ? (
+            <button
+              onClick={handleCancel}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-destructive text-destructive-foreground transition-colors hover:bg-destructive/90"
+            >
+              <Square className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <button
+              onClick={() => sendMessage(input)}
+              disabled={!input.trim()}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

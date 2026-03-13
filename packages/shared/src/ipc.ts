@@ -131,6 +131,11 @@ export const IPC_CHANNELS = {
 
   // Update Navigation
   NAVIGATE_TO_UPDATE: "navigate-to-update", // Main → Console: navigate to profile/update section
+
+  // Agent system
+  AGENT_SEND_MESSAGE: "agent-send-message", // Console → Main: send message to agent
+  AGENT_MESSAGE_EVENT: "agent-message-event", // Main → Console: stream agent events
+  AGENT_CANCEL: "agent-cancel", // Console → Main: cancel agent query
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

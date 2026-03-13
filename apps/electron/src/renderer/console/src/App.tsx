@@ -40,6 +40,7 @@ import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
 import AskView from "./components/views/admin/AskView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import SetupView from "./components/views/admin/SetupView";
+import AgentView from "./components/views/employee/AgentView";
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as monitoringService from "./services/monitoringService";
@@ -386,6 +387,7 @@ function App() {
                         {/* Focused Sessions Routes */}
                         <Route path="monitoring" element={<MonitoringView />} />
                         <Route path="monitoring/:sessionId" element={<SessionDetail />} />
+                        <Route path="agent" element={<AgentView />} />
                         <Route path="profile" element={<UserProfilePage />} />
                         {/* Legacy routes (hidden from nav but accessible via URL) */}
                         <Route path="chats" element={<ChatsView />} />

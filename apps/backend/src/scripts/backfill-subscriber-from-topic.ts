@@ -15,7 +15,7 @@
  */
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getKnownCustomers, getOrgName } from "../services/known-customers.service.js";
 import { recalculateDailyStats } from "../services/activity-materializer.service.js";
 
