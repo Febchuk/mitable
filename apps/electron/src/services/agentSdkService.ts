@@ -49,7 +49,7 @@ function findClaudeCodeExecutable(): string | undefined {
 }
 
 export interface AgentMessageEvent {
-  type: "result" | "tool_use" | "error" | "init" | "text_delta";
+  type: "result" | "tool_use" | "error" | "init" | "text_delta" | "assistant_text";
   data: unknown;
 }
 
@@ -148,7 +148,27 @@ class AgentSdkService {
       })) {
         const msgType = (msg as { type?: string }).type;
         const msgSubtype = (msg as { subtype?: string }).subtype;
-        logger.info("Agent message received", { type: msgType, subtype: msgSubtype });
+
+        // Log details for debugging tool hangs
+        if (msgType === "assistant") {
+          const blocks = (msg as { message?: { content?: Array<{ type: string; name?: string; input?: Record<string, unknown> }> } }).message?.content || [];
+          const toolBlocks = blocks.filter((b) => b.type === "tool_use");
+          const summary = toolBlocks.map((b) => {
+            const inputSnippet = b.input?.command
+              ? String(b.input.command).slice(0, 100)
+              : b.input?.pattern
+                ? String(b.input.pattern).slice(0, 60)
+                : undefined;
+            return `${b.name}${inputSnippet ? `: ${inputSnippet}` : ""}`;
+          });
+          logger.info("Agent message received", {
+            type: msgType,
+            tools: summary.length ? summary : undefined,
+            hasText: blocks.some((b) => b.type === "text"),
+          });
+        } else {
+          logger.info("Agent message received", { type: msgType, subtype: msgSubtype });
+        }
 
         // Final result (success or error)
         if ("result" in msg && (msg as { type?: string }).type === "result") {
@@ -165,12 +185,34 @@ class AgentSdkService {
         // Assistant message — contains the actual response content
         else if ((msg as { type?: string }).type === "assistant") {
           const assistantMsg = msg as {
-            message?: { content?: Array<{ type: string; text?: string }> };
+            message?: { content?: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }> };
           };
-          const textBlocks = assistantMsg.message?.content?.filter((b) => b.type === "text") || [];
+          const content = assistantMsg.message?.content || [];
+
+          // Forward tool_use blocks as progress indicators (include input snippet for context)
+          for (const block of content) {
+            if (block.type === "tool_use" && block.name) {
+              // Extract a short snippet from tool input for UI context
+              const detail = block.input?.command
+                ? String(block.input.command).slice(0, 80)
+                : block.input?.file_path
+                  ? String(block.input.file_path).split("/").pop()
+                  : block.input?.pattern
+                    ? String(block.input.pattern).slice(0, 60)
+                    : block.input?.query
+                      ? String(block.input.query).slice(0, 60)
+                      : block.input?.url
+                        ? String(block.input.url).slice(0, 60)
+                        : undefined;
+              callbacks.onEvent({ type: "tool_use", data: { name: block.name, detail } });
+            }
+          }
+
+          // Forward text blocks as intermediate text (not final result — keeps loading state)
+          const textBlocks = content.filter((b) => b.type === "text");
           const text = textBlocks.map((b) => b.text || "").join("");
           if (text) {
-            callbacks.onEvent({ type: "result", data: text });
+            callbacks.onEvent({ type: "assistant_text", data: text });
           }
         }
         // Session init
