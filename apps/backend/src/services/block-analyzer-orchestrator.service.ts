@@ -38,8 +38,7 @@ export async function runBlockAnalyzer(sessionId: string): Promise<void> {
 
   try {
     if (!blockAnalyzerRLMService.isAvailable()) {
-      logger.warn("Block Analyzer RLM not available — no LLM configured");
-      return;
+      throw new Error("Block Analyzer RLM not available — no LLM configured");
     }
 
     // 1. Fetch session metadata
@@ -62,8 +61,7 @@ export async function runBlockAnalyzer(sessionId: string): Promise<void> {
       .limit(1);
 
     if (!session) {
-      logger.warn({ sessionId }, "Session not found for block analysis");
-      return;
+      throw new Error(`Session ${sessionId} not found for block analysis`);
     }
 
     const sessionStartMs = new Date(session.startedAt).getTime();
@@ -279,5 +277,6 @@ export async function runBlockAnalyzer(sessionId: string): Promise<void> {
       },
       "Block Analyzer pipeline failed"
     );
+    throw error;
   }
 }

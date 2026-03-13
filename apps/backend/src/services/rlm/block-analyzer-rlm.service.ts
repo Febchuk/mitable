@@ -11,7 +11,7 @@
  * Input: Session captures, transcripts, master story, known customers
  * Output: Structured activity blocks + session-level metrics
  *
- * Uses Claude Sonnet 4.5 with extended thinking (primary),
+ * Uses Claude Haiku 4.5 (primary),
  * GPT-5 (fallback), DeepSeek V3.2 (last resort).
  */
 

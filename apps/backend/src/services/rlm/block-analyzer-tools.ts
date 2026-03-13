@@ -199,14 +199,20 @@ export const EMIT_WORK_BLOCK: BlockAnalyzerTool = {
     },
   ],
   execute: (params, env) => {
+    const start = new Date(params.startTime);
+    const end = new Date(params.endTime);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return { error: "Invalid date format for startTime or endTime" };
+    }
+    if (end <= start) {
+      return { error: "endTime must be after startTime" };
+    }
     const block: EmittedBlock = {
       type: "work",
       name: params.name,
-      startTime: new Date(params.startTime),
-      endTime: new Date(params.endTime),
-      durationMinutes: Math.round(
-        (new Date(params.endTime).getTime() - new Date(params.startTime).getTime()) / 60000
-      ),
+      startTime: start,
+      endTime: end,
+      durationMinutes: Math.round((end.getTime() - start.getTime()) / 60000),
       description: params.description,
       apps: params.apps || [],
       category: params.category || "other",
@@ -287,14 +293,20 @@ export const EMIT_MEETING_BLOCK: BlockAnalyzerTool = {
     },
   ],
   execute: (params, env) => {
+    const start = new Date(params.startTime);
+    const end = new Date(params.endTime);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return { error: "Invalid date format for startTime or endTime" };
+    }
+    if (end <= start) {
+      return { error: "endTime must be after startTime" };
+    }
     const block: EmittedBlock = {
       type: "meeting",
       name: params.name,
-      startTime: new Date(params.startTime),
-      endTime: new Date(params.endTime),
-      durationMinutes: Math.round(
-        (new Date(params.endTime).getTime() - new Date(params.startTime).getTime()) / 60000
-      ),
+      startTime: start,
+      endTime: end,
+      durationMinutes: Math.round((end.getTime() - start.getTime()) / 60000),
       description: params.description,
       apps: params.apps || [],
       category: params.category || "other",
