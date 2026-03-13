@@ -51,7 +51,9 @@ const excludeMainProcessPlugin = (): Plugin => {
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ["electron-store"] })],
+    plugins: [
+      externalizeDepsPlugin({ exclude: ["electron-store", "@anthropic-ai/claude-agent-sdk"] }),
+    ],
     build: {
       rollupOptions: {
         input: {
