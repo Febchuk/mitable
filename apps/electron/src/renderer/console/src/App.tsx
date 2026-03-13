@@ -39,6 +39,7 @@ import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
 import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
 import AskView from "./components/views/admin/AskView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
+import ReportsView from "./components/views/admin/ReportsView";
 import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
 import { useEffect, useRef } from "react";
@@ -373,6 +374,7 @@ function App() {
                         <Route path="people/new" element={<AddNewUser />} />
                         <Route path="people/:id" element={<PersonDetail />} />
                         <Route path="ask" element={<AskView />} />
+                        <Route path="reports" element={<ReportsView />} />
                         <Route path="integrations" element={<IntegrationsView />} />
                         <Route path="setup" element={<SetupView />} />
                         {/* Employee Routes */}

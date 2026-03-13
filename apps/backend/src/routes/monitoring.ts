@@ -23,7 +23,6 @@ import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { closeAudioConnection } from "./audio.js";
 import { logger } from "../lib/logger";
-import { scheduleInactivityRollup, cancelInactivityRollup } from "../cron/jobs/inactivity-trigger";
 import { runBlockAnalyzer } from "../services/block-analyzer-orchestrator.service";
 import { classifySession } from "../services/session-classification.service";
 import { materializeSession } from "../services/activity-materializer.service";
@@ -246,9 +245,6 @@ router.post("/sessions", requireAuth, async (req: Request, res: Response): Promi
       windowCount: initialWindows.length,
       hasRelatedDocs: !!relatedDocsContext,
     });
-
-    // Cancel any pending inactivity rollup — user is starting a new session
-    cancelInactivityRollup(userId);
 
     res.json({
       success: true,
@@ -914,9 +910,6 @@ router.post(
           60 * 60 * 1000
         );
 
-        // Still schedule inactivity rollup — session ended even if too short for summary
-        scheduleInactivityRollup(userId);
-
         res.json({
           success: true,
           session: {
@@ -1346,10 +1339,6 @@ router.post(
         },
         60 * 60 * 1000
       ); // 1 hour
-
-      // Schedule inactivity rollup — if no new session starts within 30 min,
-      // run the full Day Analyzer RLM for this user's day
-      scheduleInactivityRollup(userId);
 
       res.json({
         success: true,

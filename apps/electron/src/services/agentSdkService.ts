@@ -151,7 +151,14 @@ class AgentSdkService {
 
         // Log details for debugging tool hangs
         if (msgType === "assistant") {
-          const blocks = (msg as { message?: { content?: Array<{ type: string; name?: string; input?: Record<string, unknown> }> } }).message?.content || [];
+          const blocks =
+            (
+              msg as {
+                message?: {
+                  content?: Array<{ type: string; name?: string; input?: Record<string, unknown> }>;
+                };
+              }
+            ).message?.content || [];
           const toolBlocks = blocks.filter((b) => b.type === "tool_use");
           const summary = toolBlocks.map((b) => {
             const inputSnippet = b.input?.command
@@ -185,7 +192,14 @@ class AgentSdkService {
         // Assistant message — contains the actual response content
         else if ((msg as { type?: string }).type === "assistant") {
           const assistantMsg = msg as {
-            message?: { content?: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }> };
+            message?: {
+              content?: Array<{
+                type: string;
+                text?: string;
+                name?: string;
+                input?: Record<string, unknown>;
+              }>;
+            };
           };
           const content = assistantMsg.message?.content || [];
 

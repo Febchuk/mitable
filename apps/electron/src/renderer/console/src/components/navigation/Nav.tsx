@@ -1,7 +1,6 @@
 import {
   Users,
   BarChart3,
-  Plug,
   FileText,
   Paperclip,
   CalendarDays,
@@ -54,8 +53,8 @@ export default function Nav() {
         <NavItem to="/dashboard" icon={BarChart3} label="Dashboard" />
         <NavItem to="/people" icon={Users} label="People" />
         <NavItem to="/ask" icon={Sparkles} label="Ask" />
+        <NavItem to="/reports" icon={FileText} label="Reports" />
         <NavItem to="/agent" icon={Bot} label="Agent" />
-        <NavItem to="/integrations" icon={Plug} label="Integrations" />
       </nav>
     );
   }
