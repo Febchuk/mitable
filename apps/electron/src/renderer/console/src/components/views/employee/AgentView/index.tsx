@@ -33,6 +33,7 @@ export default function AgentView() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTool, setActiveTool] = useState<{ name: string; detail?: string } | null>(null);
   const [conversationId] = useState(() => generateId());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -49,6 +50,7 @@ export default function AgentView() {
     const unsubscribe = window.consoleAPI.onAgentMessageEvent((event) => {
       switch (event.type) {
         case "result":
+          setActiveTool(null);
           setMessages((prev) => [
             ...prev,
             {
@@ -59,18 +61,25 @@ export default function AgentView() {
           ]);
           setIsLoading(false);
           break;
-        case "tool_use":
+        case "assistant_text":
+          // Intermediate text from agent (e.g. "Let me search...") — show it but keep loading
+          setActiveTool(null);
           setMessages((prev) => [
             ...prev,
             {
               id: generateId(),
-              role: "tool",
-              content: `Using tool: ${(event.data as { name?: string })?.name || "unknown"}`,
-              toolName: (event.data as { name?: string })?.name,
+              role: "assistant",
+              content: String(event.data),
             },
           ]);
           break;
+        case "tool_use": {
+          const toolData = event.data as { name?: string; detail?: string };
+          setActiveTool(toolData?.name ? { name: toolData.name, detail: toolData.detail } : null);
+          break;
+        }
         case "error":
+          setActiveTool(null);
           setMessages((prev) => [
             ...prev,
             {
@@ -169,7 +178,7 @@ export default function AgentView() {
                 toolName={msg.toolName}
               />
             ))}
-            {isLoading && <AgentThinking />}
+            {isLoading && <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />}
             <div ref={messagesEndRef} />
           </div>
         )}
