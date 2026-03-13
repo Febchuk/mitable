@@ -131,9 +131,10 @@ class AgentSdkService {
           mcpServers: { mitable: mitableTools },
           systemPrompt,
           maxTurns: 25,
-          // acceptEdits allows file operations without interactive prompts
-          // "default" blocks waiting for stdin which never comes in headless mode
-          permissionMode: "acceptEdits",
+          // bypassPermissions skips all interactive prompts — required for headless
+          // operation (no stdin). Tool access is already restricted via allowedTools.
+          permissionMode: "bypassPermissions",
+          allowDangerouslySkipPermissions: true,
           env: {
             ...process.env,
             // Point Claude Code to our backend proxy (which injects the real API key)
