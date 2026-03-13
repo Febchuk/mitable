@@ -96,6 +96,10 @@ const IPC_CHANNELS = {
   SHOW_RECAP_NOTIFICATION: "show-recap-notification",
   // Update Navigation
   NAVIGATE_TO_UPDATE: "navigate-to-update",
+  // Agent system
+  AGENT_SEND_MESSAGE: "agent-send-message",
+  AGENT_MESSAGE_EVENT: "agent-message-event",
+  AGENT_CANCEL: "agent-cancel",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -613,6 +617,21 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     };
     ipcRenderer.on(IPC_CHANNELS.NAVIGATE_TO_UPDATE, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.NAVIGATE_TO_UPDATE, handler);
+  },
+
+  // Agent system
+  agentSendMessage: (conversationId: string, message: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_SEND_MESSAGE, conversationId, message),
+
+  agentCancel: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.AGENT_CANCEL),
+
+  onAgentMessageEvent: (
+    callback: (data: { type: string; data: unknown }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, data: { type: string; data: unknown }) =>
+      callback(data);
+    ipcRenderer.on(IPC_CHANNELS.AGENT_MESSAGE_EVENT, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_MESSAGE_EVENT, handler);
   },
 });
 

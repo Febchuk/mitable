@@ -30,6 +30,8 @@ import { captureService } from "./services/captureService";
 import { isBlockedByPolicy } from "./services/capturePolicy";
 import { passiveMonitorService } from "./services/passiveMonitorService";
 import { notificationService } from "./services/notificationService";
+import { agentSdkService } from "./services/agentSdkService";
+import { skillsStore } from "./services/skillsStore";
 
 // Force dark theme for consistent vibrancy effect regardless of system settings
 nativeTheme.themeSource = "dark";
@@ -1351,6 +1353,9 @@ function setupIPC() {
 
   // PDF export handler
   setupPdfExportHandler();
+
+  // Agent IPC handlers
+  setupAgentHandlers();
 }
 
 // Custom notification handlers (Granola-style prompts)
@@ -3020,6 +3025,36 @@ function setupPdfExportHandler() {
       }
     }
   );
+}
+
+function setupAgentHandlers() {
+  const agentLogger = createLogger("Agent");
+
+  // Send message to agent
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_SEND_MESSAGE,
+    async (_event, conversationId: string, message: string) => {
+      agentLogger.info("Agent message received", { conversationId });
+      await agentSdkService.sendMessage(conversationId, message, {
+        onEvent: (event) => {
+          if (consoleWindow && !consoleWindow.isDestroyed()) {
+            consoleWindow.webContents.send(IPC_CHANNELS.AGENT_MESSAGE_EVENT, event);
+          }
+        },
+      });
+    }
+  );
+
+  // Cancel active agent query
+  ipcMain.handle(IPC_CHANNELS.AGENT_CANCEL, async () => {
+    agentLogger.info("Agent cancel requested");
+    agentSdkService.cancel();
+  });
+
+  // Decay stale skills on startup
+  skillsStore.decayStaleSkills().catch((e) => {
+    agentLogger.error("Failed to decay stale skills", e);
+  });
 }
 
 app.on("will-quit", () => {

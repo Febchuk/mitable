@@ -283,6 +283,11 @@ interface ConsoleAPI {
 
   // Navigation - Navigate to update/profile page (from update notification click)
   onNavigateToUpdate: (callback: () => void) => () => void;
+
+  // Agent system
+  agentSendMessage: (conversationId: string, message: string) => Promise<void>;
+  agentCancel: () => Promise<void>;
+  onAgentMessageEvent: (callback: (data: { type: string; data: unknown }) => void) => () => void;
 }
 
 declare global {
