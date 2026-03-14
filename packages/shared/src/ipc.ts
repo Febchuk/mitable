@@ -137,6 +137,11 @@ export const IPC_CHANNELS = {
   AGENT_MESSAGE_EVENT: "agent-message-event", // Main → Console: stream agent events
   AGENT_CANCEL: "agent-cancel", // Console → Main: cancel agent query
   AGENT_APPROVE_PLAN: "agent-approve-plan", // Console → Main: approve or deny proposed plan
+
+  // Browser Bridge (Chrome Extension WebSocket)
+  BROWSER_BRIDGE_STATUS: "browser-bridge-status", // Console → Main: is extension connected?
+  BROWSER_BRIDGE_GET_INFO: "browser-bridge-get-info", // Console → Main: get port/token/connected
+  BROWSER_BRIDGE_CONNECTION_UPDATE: "browser-bridge-connection-update", // Main → Console: connection state changed
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

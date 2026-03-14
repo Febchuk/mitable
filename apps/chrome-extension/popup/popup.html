@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Mitable Browser Bridge</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <img src="../icons/icon-48.png" alt="Mitable" class="logo" />
+        <h1>Mitable</h1>
+      </div>
+
+      <div class="status-card">
+        <div class="status-row">
+          <span class="status-dot" id="statusDot"></span>
+          <span class="status-text" id="statusText">Checking...</span>
+        </div>
+      </div>
+
+      <button id="reconnectBtn" class="btn" style="display: none">Reconnect</button>
+
+      <p class="footer">
+        Bridge connects your browser to the Mitable desktop app for AI-powered actions.
+      </p>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

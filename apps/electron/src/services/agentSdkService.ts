@@ -7,6 +7,7 @@ import { execSync } from "child_process";
 import { createLogger } from "../lib/logger";
 import { skillsStore, type AgentSkill } from "./skillsStore";
 import { authManager } from "./authManager";
+import { browserBridgeService } from "./browserBridgeService";
 
 const logger = createLogger("AgentSdkService");
 
@@ -58,10 +59,20 @@ const READ_ONLY_TOOLS = [
   "mcp__mitable__get_my_sessions",
   "mcp__mitable__get_daily_summary",
   "mcp__mitable__slack_list_channels",
+  "mcp__mitable__browser_status",
+  "mcp__mitable__browser_extract",
+  "mcp__mitable__browser_get_tabs",
 ];
 
 // Phase 2: all tools including write/mutate
-const ALL_TOOLS = [...READ_ONLY_TOOLS, "Write", "Edit", "Bash", "mcp__mitable__slack_send_message"];
+const ALL_TOOLS = [
+  ...READ_ONLY_TOOLS,
+  "Write",
+  "Edit",
+  "Bash",
+  "mcp__mitable__slack_send_message",
+  "mcp__mitable__browser_navigate",
+];
 
 const ACTION_PLAN_MARKER = "[ACTION_PLAN]";
 
@@ -457,9 +468,124 @@ class AgentSdkService {
       }
     );
 
+    // Browser Bridge tools
+    const browserStatusTool = tool(
+      "browser_status",
+      "Check if the Mitable Chrome Extension is connected. Returns connection status.",
+      {},
+      async () => {
+        const connected = browserBridgeService.isConnected();
+        const info = browserBridgeService.getConnectionInfo();
+        const text = connected
+          ? `Chrome extension connected (port ${info.port})`
+          : "Chrome extension not connected. The user needs to install and enable the Mitable Chrome Extension.";
+        return { content: [{ type: "text" as const, text }] };
+      }
+    );
+
+    const browserNavigateTool = tool(
+      "browser_navigate",
+      "Navigate to a URL in the user's Chrome browser. Can target a specific tab or the active tab. IMPORTANT: Always confirm with the user before navigating.",
+      {
+        url: z.string().describe("The URL to navigate to"),
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID to navigate (from browser_get_tabs). Omit for active tab."),
+        waitForLoad: z
+          .boolean()
+          .optional()
+          .describe("Wait for page to finish loading (default true)"),
+      },
+      async ({ url, tabId, waitForLoad }) => {
+        const response = await browserBridgeService.sendCommand("navigate", {
+          url,
+          tabId,
+          waitForLoad: waitForLoad ?? true,
+        });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { url: string; title: string; tabId: number };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Navigated to: ${result.title}\nURL: ${result.url}\nTab ID: ${result.tabId}`,
+            },
+          ],
+        };
+      }
+    );
+
+    const browserExtractTool = tool(
+      "browser_extract",
+      "Extract content from the current page in the user's Chrome browser. Can extract plain text or structured data (headings, links, etc.).",
+      {
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID (from browser_get_tabs). Omit for active tab."),
+        mode: z
+          .enum(["text", "structured"])
+          .optional()
+          .describe(
+            "'text' for plain text content, 'structured' for headings/links/text (default 'text')"
+          ),
+        selector: z.string().optional().describe("CSS selector to extract from a specific element"),
+      },
+      async ({ tabId, mode, selector }) => {
+        const response = await browserBridgeService.sendCommand("extract", {
+          tabId,
+          mode: mode ?? "text",
+          selector,
+        });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { content: string };
+        return { content: [{ type: "text" as const, text: result.content }] };
+      }
+    );
+
+    const browserGetTabsTool = tool(
+      "browser_get_tabs",
+      "List all open tabs in the user's Chrome browser with their URLs, titles, and IDs.",
+      {},
+      async () => {
+        const response = await browserBridgeService.sendCommand("get_tabs", {});
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as {
+          tabs: Array<{ id: number; url: string; title: string; active: boolean }>;
+        };
+        const tabList = result.tabs
+          .map((t) => `${t.active ? "→ " : "  "}[${t.id}] ${t.title}\n    ${t.url}`)
+          .join("\n");
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Open tabs (${result.tabs.length}):\n${tabList}`,
+            },
+          ],
+        };
+      }
+    );
+
     return createSdkMcpServer({
       name: "mitable",
-      tools: [getMySessionsTool, getDailySummaryTool, slackChannelsTool, slackSendTool],
+      tools: [
+        getMySessionsTool,
+        getDailySummaryTool,
+        slackChannelsTool,
+        slackSendTool,
+        browserStatusTool,
+        browserNavigateTool,
+        browserExtractTool,
+        browserGetTabsTool,
+      ],
     });
   }
 
@@ -477,6 +603,7 @@ class AgentSdkService {
 3. **Web**: Search the web and fetch pages
 4. **Work context**: Access the user's captured work sessions, activity data, and daily summaries via Mitable tools
 5. **Integrations**: Send Slack messages (more integrations coming)
+6. **Browser control**: Navigate, read content, and list tabs in the user's Chrome browser (requires Mitable Chrome Extension)
 
 ## User's Work Context (Auto-Generated Skills)
 ${skillsSection}

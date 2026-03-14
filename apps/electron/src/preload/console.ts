@@ -101,6 +101,10 @@ const IPC_CHANNELS = {
   AGENT_MESSAGE_EVENT: "agent-message-event",
   AGENT_CANCEL: "agent-cancel",
   AGENT_APPROVE_PLAN: "agent-approve-plan",
+  // Browser Bridge
+  BROWSER_BRIDGE_STATUS: "browser-bridge-status",
+  BROWSER_BRIDGE_GET_INFO: "browser-bridge-get-info",
+  BROWSER_BRIDGE_CONNECTION_UPDATE: "browser-bridge-connection-update",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -636,6 +640,22 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       callback(data);
     ipcRenderer.on(IPC_CHANNELS.AGENT_MESSAGE_EVENT, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_MESSAGE_EVENT, handler);
+  },
+
+  // Browser Bridge
+  getBrowserBridgeStatus: (): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BROWSER_BRIDGE_STATUS),
+
+  getBrowserBridgeInfo: (): Promise<{
+    port: number;
+    token: string;
+    connected: boolean;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_BRIDGE_GET_INFO),
+
+  onBrowserBridgeConnectionUpdate: (callback: (connected: boolean) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, connected: boolean) => callback(connected);
+    ipcRenderer.on(IPC_CHANNELS.BROWSER_BRIDGE_CONNECTION_UPDATE, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.BROWSER_BRIDGE_CONNECTION_UPDATE, handler);
   },
 });
 
