@@ -1,12 +1,22 @@
-import { Bot, User, Loader2, Terminal, FileText, Globe, AlertCircle } from "lucide-react";
+import {
+  Bot,
+  User,
+  Loader2,
+  Terminal,
+  FileText,
+  Globe,
+  AlertCircle,
+  ClipboardList,
+} from "lucide-react";
 
 interface AgentMessageProps {
   role: "user" | "assistant" | "tool" | "error";
   content: string;
   toolName?: string;
+  isPlan?: boolean;
 }
 
-export default function AgentMessage({ role, content, toolName }: AgentMessageProps) {
+export default function AgentMessage({ role, content, toolName, isPlan }: AgentMessageProps) {
   if (role === "tool") {
     return (
       <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground">
@@ -28,6 +38,25 @@ export default function AgentMessage({ role, content, toolName }: AgentMessagePr
   }
 
   const isUser = role === "user";
+
+  if (isPlan && !isUser) {
+    return (
+      <div className="flex items-start gap-3 px-4 py-3 bg-muted/30">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-500/10">
+          <Bot className="h-4 w-4 text-violet-500" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex items-center gap-1.5">
+            <ClipboardList className="h-3.5 w-3.5 text-violet-500" />
+            <span className="text-xs font-medium text-violet-500">Proposed Plan</span>
+          </div>
+          <div className="border-l-2 border-violet-400 pl-3 text-sm leading-relaxed whitespace-pre-wrap break-words">
+            {content}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex items-start gap-3 px-4 py-3 ${isUser ? "" : "bg-muted/30"}`}>

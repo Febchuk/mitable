@@ -100,6 +100,7 @@ const IPC_CHANNELS = {
   AGENT_SEND_MESSAGE: "agent-send-message",
   AGENT_MESSAGE_EVENT: "agent-message-event",
   AGENT_CANCEL: "agent-cancel",
+  AGENT_APPROVE_PLAN: "agent-approve-plan",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -624,6 +625,9 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.invoke(IPC_CHANNELS.AGENT_SEND_MESSAGE, conversationId, message),
 
   agentCancel: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.AGENT_CANCEL),
+
+  agentApprovePlan: (conversationId: string, approved: boolean): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_APPROVE_PLAN, conversationId, approved),
 
   onAgentMessageEvent: (
     callback: (data: { type: string; data: unknown }) => void

@@ -287,6 +287,7 @@ interface ConsoleAPI {
   // Agent system
   agentSendMessage: (conversationId: string, message: string) => Promise<void>;
   agentCancel: () => Promise<void>;
+  agentApprovePlan: (conversationId: string, approved: boolean) => Promise<void>;
   onAgentMessageEvent: (callback: (data: { type: string; data: unknown }) => void) => () => void;
 }
 

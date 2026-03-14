@@ -136,6 +136,7 @@ export const IPC_CHANNELS = {
   AGENT_SEND_MESSAGE: "agent-send-message", // Console → Main: send message to agent
   AGENT_MESSAGE_EVENT: "agent-message-event", // Main → Console: stream agent events
   AGENT_CANCEL: "agent-cancel", // Console → Main: cancel agent query
+  AGENT_APPROVE_PLAN: "agent-approve-plan", // Console → Main: approve or deny proposed plan
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

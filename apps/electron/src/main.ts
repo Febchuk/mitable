@@ -3051,6 +3051,25 @@ function setupAgentHandlers() {
     agentSdkService.cancel();
   });
 
+  // Approve or deny a proposed agent plan
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_APPROVE_PLAN,
+    async (_event, conversationId: string, approved: boolean) => {
+      agentLogger.info("Agent plan response", { conversationId, approved });
+      if (approved) {
+        await agentSdkService.approvePlan(conversationId, {
+          onEvent: (event) => {
+            if (consoleWindow && !consoleWindow.isDestroyed()) {
+              consoleWindow.webContents.send(IPC_CHANNELS.AGENT_MESSAGE_EVENT, event);
+            }
+          },
+        });
+      } else {
+        agentSdkService.denyPlan(conversationId);
+      }
+    }
+  );
+
   // Decay stale skills on startup
   skillsStore.decayStaleSkills().catch((e) => {
     agentLogger.error("Failed to decay stale skills", e);
