@@ -61,13 +61,7 @@ const READ_ONLY_TOOLS = [
 ];
 
 // Phase 2: all tools including write/mutate
-const ALL_TOOLS = [
-  ...READ_ONLY_TOOLS,
-  "Write",
-  "Edit",
-  "Bash",
-  "mcp__mitable__slack_send_message",
-];
+const ALL_TOOLS = [...READ_ONLY_TOOLS, "Write", "Edit", "Bash", "mcp__mitable__slack_send_message"];
 
 const ACTION_PLAN_MARKER = "[ACTION_PLAN]";
 
@@ -92,7 +86,14 @@ You operate in a two-phase approval flow:
 The user will then approve or deny. Only after approval will you receive full tool access to execute.`;
 
 export interface AgentMessageEvent {
-  type: "result" | "tool_use" | "error" | "init" | "text_delta" | "assistant_text" | "plan_proposed";
+  type:
+    | "result"
+    | "tool_use"
+    | "error"
+    | "init"
+    | "text_delta"
+    | "assistant_text"
+    | "plan_proposed";
   data: unknown;
 }
 
@@ -114,10 +115,7 @@ class AgentSdkService {
     await this.runQuery(conversationId, message, callbacks, READ_ONLY_TOOLS, true);
   }
 
-  async approvePlan(
-    conversationId: string,
-    callbacks: AgentCallbacks
-  ): Promise<void> {
+  async approvePlan(conversationId: string, callbacks: AgentCallbacks): Promise<void> {
     const planText = this.pendingPlans.get(conversationId);
     if (!planText) {
       callbacks.onEvent({ type: "error", data: "No pending plan to approve." });
@@ -221,7 +219,14 @@ class AgentSdkService {
 
         // Log details for debugging tool hangs
         if (msgType === "assistant") {
-          const blocks = (msg as { message?: { content?: Array<{ type: string; name?: string; input?: Record<string, unknown> }> } }).message?.content || [];
+          const blocks =
+            (
+              msg as {
+                message?: {
+                  content?: Array<{ type: string; name?: string; input?: Record<string, unknown> }>;
+                };
+              }
+            ).message?.content || [];
           const toolBlocks = blocks.filter((b) => b.type === "tool_use");
           const summary = toolBlocks.map((b) => {
             const inputSnippet = b.input?.command
@@ -264,7 +269,14 @@ class AgentSdkService {
         // Assistant message — contains the actual response content
         else if ((msg as { type?: string }).type === "assistant") {
           const assistantMsg = msg as {
-            message?: { content?: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }> };
+            message?: {
+              content?: Array<{
+                type: string;
+                text?: string;
+                name?: string;
+                input?: Record<string, unknown>;
+              }>;
+            };
           };
           const content = assistantMsg.message?.content || [];
 

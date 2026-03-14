@@ -251,7 +251,9 @@ export default function AgentView() {
                 isPlan={msg.isPlan}
               />
             ))}
-            {isLoading && <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />}
+            {isLoading && (
+              <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />
+            )}
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -286,7 +288,9 @@ export default function AgentView() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={pendingPlan ? "Accept or deny the plan above..." : "Ask the agent anything..."}
+            placeholder={
+              pendingPlan ? "Accept or deny the plan above..." : "Ask the agent anything..."
+            }
             rows={1}
             disabled={inputDisabled}
             className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
