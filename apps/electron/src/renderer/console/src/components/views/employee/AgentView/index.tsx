@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowUp, Square, Bot } from "lucide-react";
+import { ArrowUp, Square, Bot, Check, X } from "lucide-react";
 import AgentMessage, { AgentThinking } from "./AgentMessage";
 
 // Simple UUID fallback for renderer
@@ -15,6 +15,7 @@ interface ChatMessage {
   role: "user" | "assistant" | "tool" | "error";
   content: string;
   toolName?: string;
+  isPlan?: boolean;
 }
 
 const SUGGESTION_CHIPS = [
@@ -34,9 +35,12 @@ export default function AgentView() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeTool, setActiveTool] = useState<{ name: string; detail?: string } | null>(null);
+  const [pendingPlan, setPendingPlan] = useState(false);
   const [conversationId] = useState(() => generateId());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Track where the current turn's messages start so we can dedup on plan_proposed
+  const turnStartIndexRef = useRef<number>(0);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -59,6 +63,31 @@ export default function AgentView() {
               content: String(event.data),
             },
           ]);
+          setIsLoading(false);
+          break;
+        case "plan_proposed":
+          // Replace streamed assistant_text messages from this turn with the clean plan
+          setActiveTool(null);
+          setMessages((prev) => {
+            const startIdx = turnStartIndexRef.current;
+            // Keep messages before this turn, drop intermediate assistant_text from this turn
+            const beforeTurn = prev.slice(0, startIdx);
+            const duringTurn = prev.slice(startIdx);
+            const nonStreamed = duringTurn.filter(
+              (m) => m.role !== "assistant" && m.role !== "tool"
+            );
+            return [
+              ...beforeTurn,
+              ...nonStreamed,
+              {
+                id: generateId(),
+                role: "assistant" as const,
+                content: String(event.data),
+                isPlan: true,
+              },
+            ];
+          });
+          setPendingPlan(true);
           setIsLoading(false);
           break;
         case "assistant_text":
@@ -89,6 +118,7 @@ export default function AgentView() {
             },
           ]);
           setIsLoading(false);
+          setPendingPlan(false);
           break;
       }
     });
@@ -98,7 +128,7 @@ export default function AgentView() {
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!text.trim() || isLoading) return;
+      if (!text.trim() || isLoading || pendingPlan) return;
 
       const userMessage: ChatMessage = {
         id: generateId(),
@@ -106,7 +136,12 @@ export default function AgentView() {
         content: text.trim(),
       };
 
-      setMessages((prev) => [...prev, userMessage]);
+      setMessages((prev) => {
+        const next = [...prev, userMessage];
+        // Mark where this turn's messages start (after the user message)
+        turnStartIndexRef.current = next.length;
+        return next;
+      });
       setInput("");
       setIsLoading(true);
 
@@ -124,13 +159,49 @@ export default function AgentView() {
         setIsLoading(false);
       }
     },
-    [conversationId, isLoading]
+    [conversationId, isLoading, pendingPlan]
   );
 
   const handleCancel = useCallback(() => {
     window.consoleAPI?.agentCancel();
     setIsLoading(false);
   }, []);
+
+  const handleApprove = useCallback(async () => {
+    setPendingPlan(false);
+    setIsLoading(true);
+    // Mark turn start for Phase 2 messages
+    setMessages((prev) => {
+      turnStartIndexRef.current = prev.length;
+      return prev;
+    });
+    try {
+      await window.consoleAPI?.agentApprovePlan(conversationId, true);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateId(),
+          role: "error",
+          content: "Failed to execute plan. Please try again.",
+        },
+      ]);
+      setIsLoading(false);
+    }
+  }, [conversationId]);
+
+  const handleDeny = useCallback(() => {
+    setPendingPlan(false);
+    window.consoleAPI?.agentApprovePlan(conversationId, false);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: generateId(),
+        role: "assistant",
+        content: "Plan cancelled. What would you like to do instead?",
+      },
+    ]);
+  }, [conversationId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -140,6 +211,7 @@ export default function AgentView() {
   };
 
   const isEmpty = messages.length === 0;
+  const inputDisabled = isLoading || pendingPlan;
 
   return (
     <div className="flex h-full flex-col">
@@ -176,6 +248,7 @@ export default function AgentView() {
                 role={msg.role}
                 content={msg.content}
                 toolName={msg.toolName}
+                isPlan={msg.isPlan}
               />
             ))}
             {isLoading && <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />}
@@ -183,6 +256,27 @@ export default function AgentView() {
           </div>
         )}
       </div>
+
+      {/* Plan approval bar */}
+      {pendingPlan && (
+        <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-2 bg-muted/30">
+          <span className="mr-auto text-xs text-muted-foreground">Execute this plan?</span>
+          <button
+            onClick={handleDeny}
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+            Deny
+          </button>
+          <button
+            onClick={handleApprove}
+            className="flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-violet-700"
+          >
+            <Check className="h-3.5 w-3.5" />
+            Accept
+          </button>
+        </div>
+      )}
 
       {/* Input area */}
       <div className="border-t border-border p-3">
@@ -192,9 +286,10 @@ export default function AgentView() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask the agent anything..."
+            placeholder={pendingPlan ? "Accept or deny the plan above..." : "Ask the agent anything..."}
             rows={1}
-            className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            disabled={inputDisabled}
+            className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               height: "auto",
               overflow: input.split("\n").length > 4 ? "auto" : "hidden",
@@ -215,7 +310,7 @@ export default function AgentView() {
           ) : (
             <button
               onClick={() => sendMessage(input)}
-              disabled={!input.trim()}
+              disabled={!input.trim() || inputDisabled}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ArrowUp className="h-4 w-4" />

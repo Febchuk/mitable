@@ -48,8 +48,51 @@ function findClaudeCodeExecutable(): string | undefined {
   return undefined;
 }
 
+// Phase 1: read-only tools (no mutations)
+const READ_ONLY_TOOLS = [
+  "Read",
+  "Glob",
+  "Grep",
+  "WebSearch",
+  "WebFetch",
+  "mcp__mitable__get_my_sessions",
+  "mcp__mitable__get_daily_summary",
+  "mcp__mitable__slack_list_channels",
+];
+
+// Phase 2: all tools including write/mutate
+const ALL_TOOLS = [
+  ...READ_ONLY_TOOLS,
+  "Write",
+  "Edit",
+  "Bash",
+  "mcp__mitable__slack_send_message",
+];
+
+const ACTION_PLAN_MARKER = "[ACTION_PLAN]";
+
+const PLAN_MODE_INSTRUCTIONS = `
+
+## Action Approval Protocol
+You operate in a two-phase approval flow:
+
+**For informational requests** (questions about work, summaries, searches):
+- Answer directly using read-only tools. Do NOT include the [ACTION_PLAN] marker.
+
+**For action requests** (file writes, shell commands, Slack messages, edits):
+- Do NOT execute the action. Instead, present a clear numbered plan of what you will do.
+- End your response with the exact text: [ACTION_PLAN]
+- Example format:
+  Here's what I'll do:
+  1. Create file ~/hello.txt with content "Hello World"
+  2. Make it executable with chmod +x
+
+  [ACTION_PLAN]
+
+The user will then approve or deny. Only after approval will you receive full tool access to execute.`;
+
 export interface AgentMessageEvent {
-  type: "result" | "tool_use" | "error" | "init" | "text_delta" | "assistant_text";
+  type: "result" | "tool_use" | "error" | "init" | "text_delta" | "assistant_text" | "plan_proposed";
   data: unknown;
 }
 
@@ -59,12 +102,51 @@ export type AgentCallbacks = {
 
 class AgentSdkService {
   private sessions: Map<string, string> = new Map(); // conversationId → sessionId
+  private pendingPlans: Map<string, string> = new Map(); // conversationId → plan text
   private abortController: AbortController | null = null;
 
   async sendMessage(
     conversationId: string,
     message: string,
     callbacks: AgentCallbacks
+  ): Promise<void> {
+    // Phase 1: read-only tools with plan-mode instructions
+    await this.runQuery(conversationId, message, callbacks, READ_ONLY_TOOLS, true);
+  }
+
+  async approvePlan(
+    conversationId: string,
+    callbacks: AgentCallbacks
+  ): Promise<void> {
+    const planText = this.pendingPlans.get(conversationId);
+    if (!planText) {
+      callbacks.onEvent({ type: "error", data: "No pending plan to approve." });
+      return;
+    }
+
+    this.pendingPlans.delete(conversationId);
+
+    // Phase 2: resume session with full tools and execute
+    await this.runQuery(
+      conversationId,
+      "User approved the plan. Execute it now.",
+      callbacks,
+      ALL_TOOLS,
+      false
+    );
+  }
+
+  denyPlan(conversationId: string): void {
+    this.pendingPlans.delete(conversationId);
+    logger.info("Plan denied", { conversationId });
+  }
+
+  private async runQuery(
+    conversationId: string,
+    message: string,
+    callbacks: AgentCallbacks,
+    tools: string[],
+    isPlanPhase: boolean
   ): Promise<void> {
     const apiUrl = authManager.getApiBaseUrl();
     const accessToken = authManager.getAccessToken();
@@ -79,7 +161,7 @@ class AgentSdkService {
 
     // Read skills from local filesystem
     const skills = await skillsStore.getRelevant();
-    const systemPrompt = this.buildSystemPrompt(skills);
+    const systemPrompt = this.buildSystemPrompt(skills, isPlanPhase);
 
     // Create custom MCP server with integration tools
     const mitableTools = this.createMitableToolsServer(apiUrl, accessToken);
@@ -105,7 +187,12 @@ class AgentSdkService {
         claudePath,
         apiUrl,
         hasResume: !!resumeId,
+        isPlanPhase,
+        toolCount: tools.length,
       });
+
+      // Accumulate text from assistant_text events during this turn for dedup on plan_proposed
+      let accumulatedText = "";
 
       for await (const msg of query({
         prompt: message,
@@ -113,21 +200,7 @@ class AgentSdkService {
           ...(resumeId ? { resume: resumeId } : {}),
           pathToClaudeCodeExecutable: claudePath,
           cwd: app.getPath("home"),
-          allowedTools: [
-            "Read",
-            "Write",
-            "Edit",
-            "Bash",
-            "Glob",
-            "Grep",
-            "WebSearch",
-            "WebFetch",
-            // MCP tools must be explicitly allowed (prefixed with mcp__<server>__)
-            "mcp__mitable__get_my_sessions",
-            "mcp__mitable__get_daily_summary",
-            "mcp__mitable__slack_list_channels",
-            "mcp__mitable__slack_send_message",
-          ],
+          allowedTools: tools,
           mcpServers: { mitable: mitableTools },
           systemPrompt,
           maxTurns: 25,
@@ -179,7 +252,16 @@ class AgentSdkService {
               data: resultMsg.errors?.join("\n") || "Agent encountered an error",
             });
           } else {
-            callbacks.onEvent({ type: "result", data: resultMsg.result || "" });
+            const resultText = resultMsg.result || "";
+
+            // Check for plan marker in the final result
+            if (isPlanPhase && resultText.includes(ACTION_PLAN_MARKER)) {
+              const cleanPlan = resultText.replace(ACTION_PLAN_MARKER, "").trim();
+              this.pendingPlans.set(conversationId, cleanPlan);
+              callbacks.onEvent({ type: "plan_proposed", data: cleanPlan });
+            } else {
+              callbacks.onEvent({ type: "result", data: resultText });
+            }
           }
         }
         // Assistant message — contains the actual response content
@@ -212,6 +294,7 @@ class AgentSdkService {
           const textBlocks = content.filter((b) => b.type === "text");
           const text = textBlocks.map((b) => b.text || "").join("");
           if (text) {
+            accumulatedText += text;
             callbacks.onEvent({ type: "assistant_text", data: text });
           }
         }
@@ -231,7 +314,7 @@ class AgentSdkService {
         }
       }
 
-      logger.info("Agent query completed", { conversationId });
+      logger.info("Agent query completed", { conversationId, isPlanPhase });
     } catch (error) {
       logger.error("Agent query failed", error);
       callbacks.onEvent({
@@ -372,13 +455,13 @@ class AgentSdkService {
     });
   }
 
-  private buildSystemPrompt(skills: AgentSkill[]): string {
+  private buildSystemPrompt(skills: AgentSkill[], isPlanPhase: boolean): string {
     const skillsSection =
       skills.length > 0
         ? skills.map((s) => `### ${s.name}\n${s.contextSummary}`).join("\n\n")
         : "No skills available yet. The user hasn't captured enough work sessions for skill generation.";
 
-    return `You are Mitable Agent — a personal AI assistant that helps users take action based on their captured work context.
+    const basePrompt = `You are Mitable Agent — a personal AI assistant that helps users take action based on their captured work context.
 
 ## Your Capabilities
 1. **File operations**: Read, write, and edit files on the user's machine
@@ -396,6 +479,8 @@ ${skillsSection}
 - Match the user's communication style from their skills when drafting messages
 - Be concise — users want quick actions, not essays
 - When asked about work patterns or time spent, use the session data tools to give data-driven answers`;
+
+    return isPlanPhase ? basePrompt + PLAN_MODE_INSTRUCTIONS : basePrompt;
   }
 }
 
