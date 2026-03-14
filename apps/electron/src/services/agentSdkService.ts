@@ -191,9 +191,6 @@ class AgentSdkService {
         toolCount: tools.length,
       });
 
-      // Accumulate text from assistant_text events during this turn for dedup on plan_proposed
-      let accumulatedText = "";
-
       for await (const msg of query({
         prompt: message,
         options: {
@@ -294,7 +291,6 @@ class AgentSdkService {
           const textBlocks = content.filter((b) => b.type === "text");
           const text = textBlocks.map((b) => b.text || "").join("");
           if (text) {
-            accumulatedText += text;
             callbacks.onEvent({ type: "assistant_text", data: text });
           }
         }
