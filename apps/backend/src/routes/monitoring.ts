@@ -1602,6 +1602,8 @@ router.post(
       capturedAt,
       // Optional activity metadata from Electron
       intervalEvidence,
+      // Optional browser context from browser bridge
+      browserContext,
     }: {
       frameId: string;
       currentImage: string; // Base64 image data
@@ -1621,6 +1623,11 @@ router.post(
         cutCount: number;
         mouseClickCount: number;
         mouseScrollCount: number;
+      };
+      browserContext?: {
+        activeTabUrl: string;
+        activeTabTitle: string;
+        tabCount: number;
       };
     } = req.body;
 
@@ -1725,6 +1732,7 @@ router.post(
         previousFrame: previousImage,
         windowInfo,
         timestamp: new Date().toISOString(),
+        browserContext,
       });
 
       // Step 2: Classify activity using Classifier (interpret delta into meaningful activity)

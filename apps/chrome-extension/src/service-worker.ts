@@ -140,6 +140,27 @@ async function handleRequest(request: BridgeRequest): Promise<void> {
         );
         break;
 
+      case "click":
+        await handleClick(
+          id,
+          payload as { selector: string; text?: string; tabId?: number }
+        );
+        break;
+
+      case "type":
+        await handleType(
+          id,
+          payload as { selector: string; text: string; clear?: boolean; tabId?: number }
+        );
+        break;
+
+      case "wait":
+        await handleWait(
+          id,
+          payload as { selector: string; timeout?: number; tabId?: number }
+        );
+        break;
+
       default:
         sendResponse({
           id,
@@ -317,6 +338,201 @@ async function handleExtract(
       });
     }
   }
+}
+
+/** Click an element in a tab */
+async function handleClick(
+  requestId: string,
+  payload: { selector: string; text?: string; tabId?: number }
+): Promise<void> {
+  const { selector, text, tabId } = payload;
+  const targetTabId = await resolveTabId(tabId);
+  if (targetTabId === null) {
+    sendResponse({ id: requestId, type: "response", action: "click", payload: null, success: false, error: "No active tab found" });
+    return;
+  }
+
+  const message: ContentScriptRequest = { type: "dom_click", selector, text };
+
+  try {
+    const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
+    if (response?.success) {
+      sendResponse({ id: requestId, type: "response", action: "click", payload: { clicked: true, tagName: response.tagName, textContent: response.textContent }, success: true });
+    } else {
+      sendResponse({ id: requestId, type: "response", action: "click", payload: null, success: false, error: response?.error || "Click failed" });
+    }
+  } catch {
+    // Fallback: inject script
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: targetTabId },
+        func: injectedClickElement,
+        args: [selector, text || null],
+      });
+      const result = results[0]?.result as { success: boolean; tagName?: string; textContent?: string; error?: string } | null;
+      if (result?.success) {
+        sendResponse({ id: requestId, type: "response", action: "click", payload: { clicked: true, tagName: result.tagName, textContent: result.textContent }, success: true });
+      } else {
+        sendResponse({ id: requestId, type: "response", action: "click", payload: null, success: false, error: result?.error || "Click failed via scripting API" });
+      }
+    } catch (scriptErr) {
+      sendResponse({ id: requestId, type: "response", action: "click", payload: null, success: false, error: `Failed to click: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+    }
+  }
+}
+
+/** Type text into an element in a tab */
+async function handleType(
+  requestId: string,
+  payload: { selector: string; text: string; clear?: boolean; tabId?: number }
+): Promise<void> {
+  const { selector, text, clear = true, tabId } = payload;
+  const targetTabId = await resolveTabId(tabId);
+  if (targetTabId === null) {
+    sendResponse({ id: requestId, type: "response", action: "type", payload: null, success: false, error: "No active tab found" });
+    return;
+  }
+
+  const message: ContentScriptRequest = { type: "dom_type", selector, text, clear };
+
+  try {
+    const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
+    if (response?.success) {
+      sendResponse({ id: requestId, type: "response", action: "type", payload: { typed: true, tagName: response.tagName, value: response.textContent }, success: true });
+    } else {
+      sendResponse({ id: requestId, type: "response", action: "type", payload: null, success: false, error: response?.error || "Type failed" });
+    }
+  } catch {
+    // Fallback: inject script
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: targetTabId },
+        func: injectedTypeIntoElement,
+        args: [selector, text, clear],
+      });
+      const result = results[0]?.result as { success: boolean; tagName?: string; value?: string; error?: string } | null;
+      if (result?.success) {
+        sendResponse({ id: requestId, type: "response", action: "type", payload: { typed: true, tagName: result.tagName, value: result.value }, success: true });
+      } else {
+        sendResponse({ id: requestId, type: "response", action: "type", payload: null, success: false, error: result?.error || "Type failed via scripting API" });
+      }
+    } catch (scriptErr) {
+      sendResponse({ id: requestId, type: "response", action: "type", payload: null, success: false, error: `Failed to type: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+    }
+  }
+}
+
+/** Wait for an element to appear in a tab */
+async function handleWait(
+  requestId: string,
+  payload: { selector: string; timeout?: number; tabId?: number }
+): Promise<void> {
+  const { selector, timeout = 10000, tabId } = payload;
+  const targetTabId = await resolveTabId(tabId);
+  if (targetTabId === null) {
+    sendResponse({ id: requestId, type: "response", action: "wait", payload: null, success: false, error: "No active tab found" });
+    return;
+  }
+
+  const message: ContentScriptRequest = { type: "dom_wait", selector, timeout };
+
+  try {
+    const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
+    if (response?.success) {
+      sendResponse({ id: requestId, type: "response", action: "wait", payload: { found: true, tagName: response.tagName, textContent: response.textContent }, success: true });
+    } else {
+      sendResponse({ id: requestId, type: "response", action: "wait", payload: { found: false }, success: false, error: response?.error || "Wait timed out" });
+    }
+  } catch {
+    // Fallback: inject script
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: targetTabId },
+        func: injectedWaitForElement,
+        args: [selector, timeout],
+      });
+      const result = results[0]?.result as { success: boolean; found: boolean; tagName?: string; textContent?: string; error?: string } | null;
+      if (result?.success) {
+        sendResponse({ id: requestId, type: "response", action: "wait", payload: { found: true, tagName: result.tagName, textContent: result.textContent }, success: true });
+      } else {
+        sendResponse({ id: requestId, type: "response", action: "wait", payload: { found: false }, success: false, error: result?.error || "Wait timed out" });
+      }
+    } catch (scriptErr) {
+      sendResponse({ id: requestId, type: "response", action: "wait", payload: null, success: false, error: `Failed to wait: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+    }
+  }
+}
+
+/** Resolve a tabId, defaulting to the active tab */
+async function resolveTabId(tabId?: number): Promise<number | null> {
+  if (tabId) return tabId;
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return activeTab?.id ?? null;
+}
+
+/** Injected function: click an element */
+function injectedClickElement(selector: string, text: string | null): { success: boolean; tagName?: string; textContent?: string; error?: string } {
+  let el = document.querySelector(selector);
+
+  // Fallback: find by text using TreeWalker
+  if (!el && text) {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
+      acceptNode(node) {
+        const elem = node as HTMLElement;
+        if (elem.children.length === 0 && elem.textContent?.trim().includes(text)) {
+          return NodeFilter.FILTER_ACCEPT;
+        }
+        return NodeFilter.FILTER_SKIP;
+      },
+    });
+    el = walker.nextNode() as Element | null;
+  }
+
+  if (!el) {
+    return { success: false, error: `No element found for selector: ${selector}${text ? ` or text: "${text}"` : ""}` };
+  }
+
+  (el as HTMLElement).click();
+  return { success: true, tagName: el.tagName.toLowerCase(), textContent: el.textContent?.trim().slice(0, 200) || "" };
+}
+
+/** Injected function: type into an element */
+function injectedTypeIntoElement(selector: string, text: string, clear: boolean): { success: boolean; tagName?: string; value?: string; error?: string } {
+  const el = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | null;
+  if (!el) return { success: false, error: `No element found for selector: ${selector}` };
+
+  el.focus();
+  if (clear) el.value = "";
+  el.value += text;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+
+  return { success: true, tagName: el.tagName.toLowerCase(), value: el.value.slice(0, 200) };
+}
+
+/** Injected function: wait for an element */
+function injectedWaitForElement(selector: string, timeout: number): Promise<{ success: boolean; found: boolean; tagName?: string; textContent?: string; error?: string }> {
+  return new Promise((resolve) => {
+    const existing = document.querySelector(selector);
+    if (existing) {
+      resolve({ success: true, found: true, tagName: existing.tagName.toLowerCase(), textContent: existing.textContent?.trim().slice(0, 200) || "" });
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const el = document.querySelector(selector);
+      if (el) {
+        clearInterval(interval);
+        clearTimeout(timer);
+        resolve({ success: true, found: true, tagName: el.tagName.toLowerCase(), textContent: el.textContent?.trim().slice(0, 200) || "" });
+      }
+    }, 200);
+
+    const timer = setTimeout(() => {
+      clearInterval(interval);
+      resolve({ success: false, found: false, error: `Timeout: element "${selector}" not found within ${timeout}ms` });
+    }, timeout);
+  });
 }
 
 /** Injected function for chrome.scripting.executeScript fallback */

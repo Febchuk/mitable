@@ -28,6 +28,7 @@ import { authManager } from "./authManager";
 import { focusWindowTracker } from "./focusWindowTracker";
 import { activityTracker, type IntervalEvidence } from "./activityTracker";
 import { windowDetectionService } from "./windowDetectionService";
+import { browserBridgeService } from "./browserBridgeService";
 import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
 import type {
   SelectedWindowInfo,
@@ -847,6 +848,34 @@ class MonitoringSessionService {
         return;
       }
 
+      // Enrich with browser context if active window is a browser
+      let browserContext: { activeTabUrl: string; activeTabTitle: string; tabCount: number } | undefined;
+      const browserApps = ["chrome", "google chrome", "arc", "edge", "safari", "firefox", "brave"];
+      if (
+        browserApps.some((b) => (windowInfo.appName || "").toLowerCase().includes(b)) &&
+        browserBridgeService.isConnected()
+      ) {
+        try {
+          const tabsResponse = await Promise.race([
+            browserBridgeService.sendCommand("get_tabs", {}),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+          ]);
+          if (tabsResponse.success) {
+            const tabs = (tabsResponse.payload as { tabs: Array<{ id: number; url: string; title: string; active: boolean }> }).tabs;
+            const activeTab = tabs.find((t) => t.active);
+            if (activeTab) {
+              browserContext = {
+                activeTabUrl: activeTab.url,
+                activeTabTitle: activeTab.title,
+                tabCount: tabs.length,
+              };
+            }
+          }
+        } catch {
+          // Timeout or error — skip enrichment silently
+        }
+      }
+
       // Trigger async frame analysis (don't block capture loop)
       this.analyzeFrameAsync(
         this.activeSession.id,
@@ -859,7 +888,8 @@ class MonitoringSessionService {
           captureTrigger: trigger,
           capturedAt: new Date(frameMetadata.timestamp).getTime(),
         },
-        intervalEvidence
+        intervalEvidence,
+        browserContext
       );
     } catch (error) {
       logger.error(" Error saving capture:", error);
@@ -880,7 +910,8 @@ class MonitoringSessionService {
       captureTrigger: "periodic" | "focus_change" | "manual";
       capturedAt: number;
     },
-    intervalEvidence?: IntervalEvidence
+    intervalEvidence?: IntervalEvidence,
+    browserContext?: { activeTabUrl: string; activeTabTitle: string; tabCount: number }
   ): Promise<void> {
     // Don't attempt analysis if no auth token
     if (!authManager.getAccessToken()) {
@@ -913,6 +944,8 @@ class MonitoringSessionService {
             }),
             // Include interval evidence (activity metadata)
             ...(intervalEvidence && { intervalEvidence }),
+            // Include browser context when available
+            ...(browserContext && { browserContext }),
           }),
         }
       );

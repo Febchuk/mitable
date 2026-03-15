@@ -42,6 +42,15 @@ export default function AgentView() {
   // Track where the current turn's messages start so we can dedup on plan_proposed
   const turnStartIndexRef = useRef<number>(0);
 
+  // Browser bridge connection status
+  const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    window.consoleAPI?.getBrowserBridgeStatus().then(setBridgeConnected);
+    const unsub = window.consoleAPI?.onBrowserBridgeConnectionUpdate(setBridgeConnected);
+    return () => unsub?.();
+  }, []);
+
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -215,6 +224,24 @@ export default function AgentView() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Browser bridge status bar */}
+      {bridgeConnected !== null && (
+        <div
+          className={`flex items-center gap-2 px-3 py-1.5 text-xs ${
+            bridgeConnected
+              ? "bg-green-500/10 text-green-600 dark:text-green-400"
+              : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              bridgeConnected ? "bg-green-500" : "bg-amber-500"
+            }`}
+          />
+          {bridgeConnected ? "Browser bridge connected" : "Browser extension not connected"}
+        </div>
+      )}
+
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
         {isEmpty ? (

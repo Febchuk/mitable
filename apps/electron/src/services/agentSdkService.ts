@@ -62,6 +62,7 @@ const READ_ONLY_TOOLS = [
   "mcp__mitable__browser_status",
   "mcp__mitable__browser_extract",
   "mcp__mitable__browser_get_tabs",
+  "mcp__mitable__browser_wait",
 ];
 
 // Phase 2: all tools including write/mutate
@@ -72,6 +73,8 @@ const ALL_TOOLS = [
   "Bash",
   "mcp__mitable__slack_send_message",
   "mcp__mitable__browser_navigate",
+  "mcp__mitable__browser_click",
+  "mcp__mitable__browser_type",
 ];
 
 const ACTION_PLAN_MARKER = "[ACTION_PLAN]";
@@ -574,6 +577,109 @@ class AgentSdkService {
       }
     );
 
+    const browserClickTool = tool(
+      "browser_click",
+      "Click an element in the user's Chrome browser. Finds by CSS selector, with optional text content fallback. IMPORTANT: Always confirm with the user before clicking.",
+      {
+        selector: z.string().describe("CSS selector for the element to click"),
+        text: z
+          .string()
+          .optional()
+          .describe("Visible text content to match as fallback if selector fails"),
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID (from browser_get_tabs). Omit for active tab."),
+      },
+      async ({ selector, text, tabId }) => {
+        const response = await browserBridgeService.sendCommand("click", { selector, text, tabId });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { clicked: boolean; tagName: string; textContent: string };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Clicked <${result.tagName}>${result.textContent ? `: "${result.textContent}"` : ""}`,
+            },
+          ],
+        };
+      }
+    );
+
+    const browserTypeTool = tool(
+      "browser_type",
+      "Type text into an input or textarea element in the user's Chrome browser. IMPORTANT: Always confirm with the user before typing.",
+      {
+        selector: z.string().describe("CSS selector for the input element"),
+        text: z.string().describe("Text to type into the element"),
+        clear: z
+          .boolean()
+          .optional()
+          .describe("Clear the field before typing (default true)"),
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID (from browser_get_tabs). Omit for active tab."),
+      },
+      async ({ selector, text, clear, tabId }) => {
+        const response = await browserBridgeService.sendCommand("type", {
+          selector,
+          text,
+          clear: clear ?? true,
+          tabId,
+        });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { typed: boolean; tagName: string; value: string };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Typed into <${result.tagName}>. Current value: "${result.value}"`,
+            },
+          ],
+        };
+      }
+    );
+
+    const browserWaitTool = tool(
+      "browser_wait",
+      "Wait for an element to appear in the DOM of the user's Chrome browser. Polls every 200ms until found or timeout.",
+      {
+        selector: z.string().describe("CSS selector to wait for"),
+        timeout: z
+          .number()
+          .optional()
+          .describe("Maximum wait time in milliseconds (default 10000)"),
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID (from browser_get_tabs). Omit for active tab."),
+      },
+      async ({ selector, timeout, tabId }) => {
+        const response = await browserBridgeService.sendCommand(
+          "wait",
+          { selector, timeout: timeout ?? 10000, tabId },
+          (timeout ?? 10000) + 5000 // Bridge timeout slightly longer than element timeout
+        );
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { found: boolean; tagName: string; textContent: string };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Found <${result.tagName}>${result.textContent ? `: "${result.textContent}"` : ""}`,
+            },
+          ],
+        };
+      }
+    );
+
     return createSdkMcpServer({
       name: "mitable",
       tools: [
@@ -585,6 +691,9 @@ class AgentSdkService {
         browserNavigateTool,
         browserExtractTool,
         browserGetTabsTool,
+        browserClickTool,
+        browserTypeTool,
+        browserWaitTool,
       ],
     });
   }
@@ -603,7 +712,7 @@ class AgentSdkService {
 3. **Web**: Search the web and fetch pages
 4. **Work context**: Access the user's captured work sessions, activity data, and daily summaries via Mitable tools
 5. **Integrations**: Send Slack messages (more integrations coming)
-6. **Browser control**: Navigate, read content, and list tabs in the user's Chrome browser (requires Mitable Chrome Extension)
+6. **Browser control**: Navigate, read content, click elements, type text, wait for elements, and list tabs in the user's Chrome browser (requires Mitable Chrome Extension)
 
 ## User's Work Context (Auto-Generated Skills)
 ${skillsSection}

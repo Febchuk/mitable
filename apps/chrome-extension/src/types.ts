@@ -31,14 +31,17 @@ export interface BridgeConfig {
 }
 
 /** Content script message types */
-export interface ContentScriptRequest {
-  type: "dom_extract";
-  mode: "text" | "structured";
-  selector?: string;
-}
+export type ContentScriptRequest =
+  | { type: "dom_extract"; mode: "text" | "structured"; selector?: string }
+  | { type: "dom_click"; selector: string; text?: string }
+  | { type: "dom_type"; selector: string; text: string; clear: boolean }
+  | { type: "dom_wait"; selector: string; timeout: number };
 
 export interface ContentScriptResponse {
   success: boolean;
   content?: string;
+  tagName?: string;
+  textContent?: string;
+  found?: boolean;
   error?: string;
 }
