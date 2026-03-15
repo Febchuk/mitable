@@ -23,7 +23,7 @@ export interface BridgeEvent extends BridgeMessage {
   type: "event";
 }
 
-/** Connection config read from native messaging host */
+/** Connection config from bridge discovery */
 export interface BridgeConfig {
   port: number;
   token: string;

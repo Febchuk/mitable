@@ -3,7 +3,7 @@
   "name": "Mitable Browser Bridge",
   "version": "1.0.0",
   "description": "Connects your Chrome browser to Mitable for AI-powered browser control",
-  "permissions": ["activeTab", "tabs", "scripting", "nativeMessaging", "storage", "alarms"],
+  "permissions": ["activeTab", "tabs", "scripting", "storage", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "dist/service-worker.js",

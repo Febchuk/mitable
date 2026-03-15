@@ -1,51 +1,51 @@
 import type {
-  BridgeConfig,
   BridgeRequest,
   BridgeResponse,
   ContentScriptRequest,
   ContentScriptResponse,
 } from "./types";
 
-const NATIVE_HOST_NAME = "com.mitable.browser_bridge";
+const DISCOVERY_PORTS = [19876, 19877, 19878, 19879, 19880];
 const RECONNECT_DELAYS = [1000, 3000, 10000]; // Exponential backoff
 
 let ws: WebSocket | null = null;
 let reconnectAttempt = 0;
 let isConnected = false;
 
-/** Read connection config via Native Messaging */
-function readConfig(): Promise<BridgeConfig> {
-  return new Promise((resolve) => {
+/** Discover the bridge by scanning known ports for the HTTP config endpoint */
+async function discoverBridge(): Promise<{ port: number; token: string } | null> {
+  for (const port of DISCOVERY_PORTS) {
     try {
-      chrome.runtime.sendNativeMessage(NATIVE_HOST_NAME, { action: "get_config" }, (response) => {
-        if (chrome.runtime.lastError) {
-          resolve({ port: 0, token: "", error: chrome.runtime.lastError.message });
-          return;
-        }
-        resolve(response as BridgeConfig);
-      });
-    } catch (err) {
-      resolve({ port: 0, token: "", error: String(err) });
+      const res = await fetch(`http://127.0.0.1:${port}/mitable-bridge/config`);
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      if (data && data.name === "mitable" && typeof data.token === "string") {
+        return { port, token: data.token };
+      }
+    } catch {
+      // Port not listening or not our service, try next
     }
-  });
+  }
+  return null;
 }
 
 /** Connect to the Electron WebSocket server */
 async function connect(): Promise<void> {
   if (ws && ws.readyState === WebSocket.OPEN) return;
 
-  const config = await readConfig();
-  if (config.error || !config.port || !config.token) {
-    console.warn("[MitableBridge] Cannot connect:", config.error || "No config");
+  const bridge = await discoverBridge();
+  if (!bridge) {
+    console.warn("[MitableBridge] Cannot connect: Mitable bridge not found on any port");
     scheduleReconnect();
     return;
   }
 
   try {
-    ws = new WebSocket(`ws://127.0.0.1:${config.port}/browser-bridge?token=${config.token}`);
+    ws = new WebSocket(`ws://127.0.0.1:${bridge.port}?token=${bridge.token}`);
 
     ws.onopen = () => {
-      console.log("[MitableBridge] Connected to Electron");
+      console.log("[MitableBridge] Connected to Electron on port", bridge.port);
       isConnected = true;
       reconnectAttempt = 0;
       updateBadge(true);

@@ -4,9 +4,12 @@ import { writeFileSync, unlinkSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { app } from "electron";
 import { createLogger } from "../lib/logger";
-import type { IncomingMessage } from "http";
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from "http";
 
 const logger = createLogger("BrowserBridge");
+
+const BRIDGE_PORT = 19876;
+const BRIDGE_PORT_RANGE = 5;
 
 // Config file location: ~/.mitable/browser-bridge.json
 function getConfigDir(): string {
@@ -15,19 +18,6 @@ function getConfigDir(): string {
 
 function getConfigPath(): string {
   return join(getConfigDir(), "browser-bridge.json");
-}
-
-/** Native Messaging host manifest path (macOS) */
-function getNativeMessagingHostDir(): string {
-  if (process.platform === "darwin") {
-    return join(
-      app.getPath("home"),
-      "Library/Application Support/Google/Chrome/NativeMessagingHosts"
-    );
-  }
-  // Windows: HKEY_CURRENT_USER registry (not file-based, skip for now)
-  // Linux: ~/.config/google-chrome/NativeMessagingHosts/
-  return join(app.getPath("home"), ".config/google-chrome/NativeMessagingHosts");
 }
 
 // WebSocket protocol message types
@@ -52,6 +42,7 @@ type ConnectionListener = (connected: boolean) => void;
 
 class BrowserBridgeService {
   private wss: WebSocketServer | null = null;
+  private httpServer: Server | null = null;
   private client: WebSocket | null = null;
   private token: string = "";
   private port: number = 0;
@@ -62,7 +53,7 @@ class BrowserBridgeService {
   > = new Map();
   private connectionListeners: Set<ConnectionListener> = new Set();
 
-  /** Start the WebSocket server on a random port */
+  /** Start the HTTP + WebSocket server on a fixed port */
   async start(): Promise<void> {
     if (this.wss) {
       logger.warn("BrowserBridgeService already started");
@@ -72,28 +63,47 @@ class BrowserBridgeService {
     // Generate auth token
     this.token = randomBytes(32).toString("hex");
 
-    // Create WebSocket server on random port, bound to localhost only
-    this.wss = new WebSocketServer({ port: 0, host: "127.0.0.1" });
+    // Create HTTP server that serves the config endpoint
+    this.httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
+      if (req.method === "GET" && req.url === "/mitable-bridge/config") {
+        // No CORS headers — web pages can't read this; extensions bypass CORS via host_permissions
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ token: this.token, name: "mitable" }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
 
-    await new Promise<void>((resolve) => {
-      this.wss!.on("listening", () => {
-        const addr = this.wss!.address();
-        if (typeof addr === "object" && addr) {
-          this.port = addr.port;
-        }
-        resolve();
+    // Create WebSocket server in noServer mode
+    this.wss = new WebSocketServer({ noServer: true });
+
+    // Handle HTTP upgrade → WebSocket
+    this.httpServer.on("upgrade", (req: IncomingMessage, socket, head) => {
+      const url = new URL(req.url || "", `http://127.0.0.1:${this.port}`);
+      const token = url.searchParams.get("token");
+
+      if (token !== this.token) {
+        logger.warn("Rejected WebSocket upgrade: invalid token");
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+        socket.destroy();
+        return;
+      }
+
+      this.wss!.handleUpgrade(req, socket, head, (ws) => {
+        this.wss!.emit("connection", ws, req);
       });
     });
 
-    logger.info(`WebSocket server listening on 127.0.0.1:${this.port}`);
+    // Try binding to ports in range
+    this.port = await this.bindToPort();
 
-    // Write config file
+    logger.info(`HTTP + WebSocket server listening on 127.0.0.1:${this.port}`);
+
+    // Write config file (useful for debugging / CLI tools)
     this.writeConfigFile();
 
-    // Register native messaging host
-    this.registerNativeMessagingHost();
-
-    // Handle connections
+    // Handle WebSocket connections
     this.wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       this.handleConnection(ws, req);
     });
@@ -104,6 +114,38 @@ class BrowserBridgeService {
         this.client.ping();
       }
     }, 20_000);
+  }
+
+  /** Try binding to ports BRIDGE_PORT through BRIDGE_PORT + BRIDGE_PORT_RANGE - 1 */
+  private bindToPort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      let attempt = 0;
+
+      const tryNext = (): void => {
+        if (attempt >= BRIDGE_PORT_RANGE) {
+          reject(new Error(`Failed to bind to any port in range ${BRIDGE_PORT}-${BRIDGE_PORT + BRIDGE_PORT_RANGE - 1}`));
+          return;
+        }
+
+        const port = BRIDGE_PORT + attempt;
+        attempt++;
+
+        this.httpServer!.once("error", (err: NodeJS.ErrnoException) => {
+          if (err.code === "EADDRINUSE") {
+            logger.warn(`Port ${port} in use, trying next...`);
+            tryNext();
+          } else {
+            reject(err);
+          }
+        });
+
+        this.httpServer!.listen(port, "127.0.0.1", () => {
+          resolve(port);
+        });
+      };
+
+      tryNext();
+    });
   }
 
   /** Stop the server and clean up */
@@ -135,6 +177,11 @@ class BrowserBridgeService {
     if (this.wss) {
       this.wss.close();
       this.wss = null;
+    }
+
+    if (this.httpServer) {
+      this.httpServer.close();
+      this.httpServer = null;
     }
 
     // Delete config file
@@ -285,61 +332,6 @@ class BrowserBridgeService {
     logger.info(`Config written to ${configPath}`);
   }
 
-  private registerNativeMessagingHost(): void {
-    try {
-      const hostDir = getNativeMessagingHostDir();
-      if (!existsSync(hostDir)) {
-        mkdirSync(hostDir, { recursive: true });
-      }
-
-      // The native messaging host script reads ~/.mitable/browser-bridge.json
-      // and returns its contents via stdout using the NM protocol
-      const hostScriptPath = join(getConfigDir(), "native-messaging-host.js");
-
-      // Write the host script
-      const hostScript = `#!/usr/bin/env node
-// Native Messaging host for Mitable Browser Bridge
-// Reads ~/.mitable/browser-bridge.json and returns it to the Chrome extension
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-
-function sendMessage(msg) {
-  const json = JSON.stringify(msg);
-  const header = Buffer.alloc(4);
-  header.writeUInt32LE(json.length, 0);
-  process.stdout.write(header);
-  process.stdout.write(json);
-}
-
-try {
-  const configPath = path.join(os.homedir(), ".mitable", "browser-bridge.json");
-  const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-  sendMessage(config);
-} catch (err) {
-  sendMessage({ error: err.message });
-}
-`;
-      writeFileSync(hostScriptPath, hostScript, { mode: 0o755 });
-
-      // Write the Native Messaging host manifest
-      const manifestPath = join(hostDir, "com.mitable.browser_bridge.json");
-      const manifest = {
-        name: "com.mitable.browser_bridge",
-        description: "Mitable Browser Bridge - provides WebSocket connection info",
-        path: hostScriptPath,
-        type: "stdio",
-        // Allow any extension during development; restrict in production
-        allowed_origins: [
-          "chrome-extension://*/", // Allows any extension (dev sideload)
-        ],
-      };
-      writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-      logger.info(`Native messaging host registered at ${manifestPath}`);
-    } catch (err) {
-      logger.error("Failed to register native messaging host:", err);
-    }
-  }
 }
 
 export const browserBridgeService = new BrowserBridgeService();
