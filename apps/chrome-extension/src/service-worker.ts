@@ -161,6 +161,69 @@ async function handleRequest(request: BridgeRequest): Promise<void> {
         );
         break;
 
+      case "screenshot":
+        await handleScreenshot(
+          id,
+          payload as { tabId?: number; quality?: number; format?: "png" | "jpeg" }
+        );
+        break;
+
+      case "scroll":
+        await handleScroll(
+          id,
+          payload as { direction?: "up" | "down"; amount?: number; selector?: string; position?: "top" | "bottom"; tabId?: number }
+        );
+        break;
+
+      case "select":
+        await handleSelect(
+          id,
+          payload as { selector: string; value: string; tabId?: number }
+        );
+        break;
+
+      case "hover":
+        await handleHover(
+          id,
+          payload as { selector: string; tabId?: number }
+        );
+        break;
+
+      case "read_element":
+        await handleReadElement(
+          id,
+          payload as { selector: string; properties?: string[]; tabId?: number }
+        );
+        break;
+
+      case "keyboard":
+        await handleKeyboard(
+          id,
+          payload as { key: string; modifiers?: ("ctrl" | "shift" | "alt" | "meta")[]; tabId?: number }
+        );
+        break;
+
+      case "execute_js":
+        await handleExecuteJs(
+          id,
+          payload as { code: string; tabId?: number }
+        );
+        break;
+
+      case "tab_open":
+        await handleTabOpen(
+          id,
+          payload as { url?: string }
+        );
+        break;
+
+      case "tab_close":
+        await handleTabClose(
+          id,
+          payload as { tabId: number }
+        );
+        break;
+
       default:
         sendResponse({
           id,
@@ -566,6 +629,492 @@ function extractPageContent(mode: string, selector: string | null): string {
 
   // Plain text mode
   return root.textContent?.trim().slice(0, 15000) || "";
+}
+
+/** Take a screenshot of the visible tab */
+async function handleScreenshot(
+  requestId: string,
+  payload: { tabId?: number; quality?: number; format?: "png" | "jpeg" }
+): Promise<void> {
+  const { tabId, quality = 80, format = "jpeg" } = payload;
+
+  try {
+    let windowId: number | undefined;
+
+    // If targeting a specific tab, activate it first
+    if (tabId) {
+      const tab = await chrome.tabs.update(tabId, { active: true });
+      windowId = tab.windowId;
+      // Wait for tab to become visible
+      await new Promise((r) => setTimeout(r, 150));
+    }
+
+    const dataUrl = await chrome.tabs.captureVisibleTab(windowId ?? chrome.windows.WINDOW_ID_CURRENT, {
+      format,
+      quality,
+    });
+
+    // Strip data URL prefix to get raw base64
+    const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+    const mimeType = format === "png" ? "image/png" : "image/jpeg";
+
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "screenshot",
+      payload: { type: "image", data: base64, mimeType },
+      success: true,
+    });
+  } catch (err) {
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "screenshot",
+      payload: null,
+      success: false,
+      error: `Screenshot failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+}
+
+/** Scroll the page */
+async function handleScroll(
+  requestId: string,
+  payload: { direction?: "up" | "down"; amount?: number; selector?: string; position?: "top" | "bottom"; tabId?: number }
+): Promise<void> {
+  const { direction, amount, selector, position, tabId } = payload;
+  const targetTabId = await resolveTabId(tabId);
+  if (targetTabId === null) {
+    sendResponse({ id: requestId, type: "response", action: "scroll", payload: null, success: false, error: "No active tab found" });
+    return;
+  }
+
+  const message: ContentScriptRequest = { type: "dom_scroll", direction, amount, selector, position };
+
+  try {
+    const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
+    if (response?.success) {
+      sendResponse({ id: requestId, type: "response", action: "scroll", payload: { scrollY: response.scrollY, scrollHeight: response.scrollHeight, tagName: response.tagName, textContent: response.textContent }, success: true });
+    } else {
+      sendResponse({ id: requestId, type: "response", action: "scroll", payload: null, success: false, error: response?.error || "Scroll failed" });
+    }
+  } catch {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: targetTabId },
+        func: injectedScrollPage,
+        args: [direction || "down", amount || 0, selector || null, position || null],
+      });
+      const result = results[0]?.result as { success: boolean; scrollY?: number; scrollHeight?: number; error?: string } | null;
+      if (result?.success) {
+        sendResponse({ id: requestId, type: "response", action: "scroll", payload: { scrollY: result.scrollY, scrollHeight: result.scrollHeight }, success: true });
+      } else {
+        sendResponse({ id: requestId, type: "response", action: "scroll", payload: null, success: false, error: result?.error || "Scroll failed via scripting API" });
+      }
+    } catch (scriptErr) {
+      sendResponse({ id: requestId, type: "response", action: "scroll", payload: null, success: false, error: `Failed to scroll: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+    }
+  }
+}
+
+/** Select an option from a dropdown */
+async function handleSelect(
+  requestId: string,
+  payload: { selector: string; value: string; tabId?: number }
+): Promise<void> {
+  const { selector, value, tabId } = payload;
+  const targetTabId = await resolveTabId(tabId);
+  if (targetTabId === null) {
+    sendResponse({ id: requestId, type: "response", action: "select", payload: null, success: false, error: "No active tab found" });
+    return;
+  }
+
+  const message: ContentScriptRequest = { type: "dom_select", selector, value };
+
+  try {
+    const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
+    if (response?.success) {
+      sendResponse({ id: requestId, type: "response", action: "select", payload: { selected: true, tagName: response.tagName, textContent: response.textContent }, success: true });
+    } else {
+      sendResponse({ id: requestId, type: "response", action: "select", payload: null, success: false, error: response?.error || "Select failed" });
+    }
+  } catch {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: targetTabId },
+        func: injectedSelectOption,
+        args: [selector, value],
+      });
+      const result = results[0]?.result as { success: boolean; tagName?: string; textContent?: string; error?: string } | null;
+      if (result?.success) {
+        sendResponse({ id: requestId, type: "response", action: "select", payload: { selected: true, tagName: result.tagName, textContent: result.textContent }, success: true });
+      } else {
+        sendResponse({ id: requestId, type: "response", action: "select", payload: null, success: false, error: result?.error || "Select failed via scripting API" });
+      }
+    } catch (scriptErr) {
+      sendResponse({ id: requestId, type: "response", action: "select", payload: null, success: false, error: `Failed to select: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+    }
+  }
+}
+
+/** Hover over an element */
+async function handleHover(
+  requestId: string,
+  payload: { selector: string; tabId?: number }
+): Promise<void> {
+  const { selector, tabId } = payload;
+  const targetTabId = await resolveTabId(tabId);
+  if (targetTabId === null) {
+    sendResponse({ id: requestId, type: "response", action: "hover", payload: null, success: false, error: "No active tab found" });
+    return;
+  }
+
+  const message: ContentScriptRequest = { type: "dom_hover", selector };
+
+  try {
+    const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
+    if (response?.success) {
+      sendResponse({ id: requestId, type: "response", action: "hover", payload: { hovered: true, tagName: response.tagName, textContent: response.textContent }, success: true });
+    } else {
+      sendResponse({ id: requestId, type: "response", action: "hover", payload: null, success: false, error: response?.error || "Hover failed" });
+    }
+  } catch {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: targetTabId },
+        func: injectedHoverElement,
+        args: [selector],
+      });
+      const result = results[0]?.result as { success: boolean; tagName?: string; textContent?: string; error?: string } | null;
+      if (result?.success) {
+        sendResponse({ id: requestId, type: "response", action: "hover", payload: { hovered: true, tagName: result.tagName, textContent: result.textContent }, success: true });
+      } else {
+        sendResponse({ id: requestId, type: "response", action: "hover", payload: null, success: false, error: result?.error || "Hover failed via scripting API" });
+      }
+    } catch (scriptErr) {
+      sendResponse({ id: requestId, type: "response", action: "hover", payload: null, success: false, error: `Failed to hover: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+    }
+  }
+}
+
+/** Read properties from an element */
+async function handleReadElement(
+  requestId: string,
+  payload: { selector: string; properties?: string[]; tabId?: number }
+): Promise<void> {
+  const { selector, properties, tabId } = payload;
+  const targetTabId = await resolveTabId(tabId);
+  if (targetTabId === null) {
+    sendResponse({ id: requestId, type: "response", action: "read_element", payload: null, success: false, error: "No active tab found" });
+    return;
+  }
+
+  const message: ContentScriptRequest = { type: "dom_read_element", selector, properties };
+
+  try {
+    const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
+    if (response?.success) {
+      sendResponse({ id: requestId, type: "response", action: "read_element", payload: { tagName: response.tagName, attributes: response.attributes }, success: true });
+    } else {
+      sendResponse({ id: requestId, type: "response", action: "read_element", payload: null, success: false, error: response?.error || "Read element failed" });
+    }
+  } catch {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: targetTabId },
+        func: injectedReadElement,
+        args: [selector, properties || null],
+      });
+      const result = results[0]?.result as { success: boolean; tagName?: string; attributes?: Record<string, unknown>; error?: string } | null;
+      if (result?.success) {
+        sendResponse({ id: requestId, type: "response", action: "read_element", payload: { tagName: result.tagName, attributes: result.attributes }, success: true });
+      } else {
+        sendResponse({ id: requestId, type: "response", action: "read_element", payload: null, success: false, error: result?.error || "Read element failed via scripting API" });
+      }
+    } catch (scriptErr) {
+      sendResponse({ id: requestId, type: "response", action: "read_element", payload: null, success: false, error: `Failed to read element: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+    }
+  }
+}
+
+/** Send keyboard events */
+async function handleKeyboard(
+  requestId: string,
+  payload: { key: string; modifiers?: ("ctrl" | "shift" | "alt" | "meta")[]; tabId?: number }
+): Promise<void> {
+  const { key, modifiers, tabId } = payload;
+  const targetTabId = await resolveTabId(tabId);
+  if (targetTabId === null) {
+    sendResponse({ id: requestId, type: "response", action: "keyboard", payload: null, success: false, error: "No active tab found" });
+    return;
+  }
+
+  const message: ContentScriptRequest = { type: "dom_keyboard", key, modifiers };
+
+  try {
+    const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
+    if (response?.success) {
+      sendResponse({ id: requestId, type: "response", action: "keyboard", payload: { sent: true, tagName: response.tagName, textContent: response.textContent }, success: true });
+    } else {
+      sendResponse({ id: requestId, type: "response", action: "keyboard", payload: null, success: false, error: response?.error || "Keyboard failed" });
+    }
+  } catch {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: targetTabId },
+        func: injectedSendKeyboardEvent,
+        args: [key, modifiers || []],
+      });
+      const result = results[0]?.result as { success: boolean; tagName?: string; textContent?: string; error?: string } | null;
+      if (result?.success) {
+        sendResponse({ id: requestId, type: "response", action: "keyboard", payload: { sent: true, tagName: result.tagName, textContent: result.textContent }, success: true });
+      } else {
+        sendResponse({ id: requestId, type: "response", action: "keyboard", payload: null, success: false, error: result?.error || "Keyboard failed via scripting API" });
+      }
+    } catch (scriptErr) {
+      sendResponse({ id: requestId, type: "response", action: "keyboard", payload: null, success: false, error: `Failed to send keyboard event: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+    }
+  }
+}
+
+/** Execute arbitrary JavaScript in a tab */
+async function handleExecuteJs(
+  requestId: string,
+  payload: { code: string; tabId?: number }
+): Promise<void> {
+  const { code, tabId } = payload;
+  const targetTabId = await resolveTabId(tabId);
+  if (targetTabId === null) {
+    sendResponse({ id: requestId, type: "response", action: "execute_js", payload: null, success: false, error: "No active tab found" });
+    return;
+  }
+
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: targetTabId },
+      world: "MAIN",
+      func: (jsCode: string) => {
+        try {
+          const fn = new Function(jsCode);
+          const result = fn();
+          // Handle promises
+          if (result && typeof result === "object" && typeof result.then === "function") {
+            return result.then((r: unknown) => JSON.stringify(r)?.slice(0, 10000));
+          }
+          return JSON.stringify(result)?.slice(0, 10000);
+        } catch (e) {
+          return `Error: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      },
+      args: [code],
+    });
+
+    const result = results[0]?.result;
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "execute_js",
+      payload: { result: result ?? "undefined" },
+      success: true,
+    });
+  } catch (err) {
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "execute_js",
+      payload: null,
+      success: false,
+      error: `JS execution failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+}
+
+/** Open a new tab */
+async function handleTabOpen(
+  requestId: string,
+  payload: { url?: string }
+): Promise<void> {
+  const { url } = payload;
+
+  try {
+    const tab = await chrome.tabs.create({ url: url || undefined, active: true });
+
+    if (url) {
+      // Wait for the tab to finish loading
+      await new Promise<void>((resolve) => {
+        const listener = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+          if (updatedTabId === tab.id && changeInfo.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(listener);
+            resolve();
+          }
+        };
+        chrome.tabs.onUpdated.addListener(listener);
+        setTimeout(() => {
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve();
+        }, 30_000);
+      });
+    }
+
+    const updatedTab = await chrome.tabs.get(tab.id!);
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "tab_open",
+      payload: { tabId: updatedTab.id, url: updatedTab.url, title: updatedTab.title },
+      success: true,
+    });
+  } catch (err) {
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "tab_open",
+      payload: null,
+      success: false,
+      error: `Failed to open tab: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+}
+
+/** Close a tab */
+async function handleTabClose(
+  requestId: string,
+  payload: { tabId: number }
+): Promise<void> {
+  const { tabId: targetTabId } = payload;
+
+  try {
+    await chrome.tabs.remove(targetTabId);
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "tab_close",
+      payload: { closed: true, tabId: targetTabId },
+      success: true,
+    });
+  } catch (err) {
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "tab_close",
+      payload: null,
+      success: false,
+      error: `Failed to close tab: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+}
+
+/** Injected function: scroll the page */
+function injectedScrollPage(
+  direction: string,
+  amount: number,
+  selector: string | null,
+  position: string | null
+): { success: boolean; scrollY?: number; scrollHeight?: number; tagName?: string; textContent?: string; error?: string } {
+  if (selector) {
+    const el = document.querySelector(selector);
+    if (!el) return { success: false, error: `No element found for selector: ${selector}` };
+    el.scrollIntoView({ block: "center", behavior: "instant" });
+    return { success: true, scrollY: window.scrollY, scrollHeight: document.documentElement.scrollHeight, tagName: el.tagName.toLowerCase(), textContent: el.textContent?.trim().slice(0, 200) || "" };
+  }
+  if (position === "top") {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  } else if (position === "bottom") {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" });
+  } else {
+    const pixels = amount || Math.floor(window.innerHeight * 0.8);
+    window.scrollBy({ top: direction === "up" ? -pixels : pixels, behavior: "instant" });
+  }
+  return { success: true, scrollY: window.scrollY, scrollHeight: document.documentElement.scrollHeight };
+}
+
+/** Injected function: select an option */
+function injectedSelectOption(
+  selector: string,
+  value: string
+): { success: boolean; tagName?: string; textContent?: string; error?: string } {
+  const el = document.querySelector(selector);
+  if (!el) return { success: false, error: `No element found for selector: ${selector}` };
+  if (el.tagName.toLowerCase() !== "select") return { success: false, error: `Element is <${el.tagName.toLowerCase()}>, not <select>` };
+  const selectEl = el as HTMLSelectElement;
+  const options = Array.from(selectEl.options);
+  const match = options.find((o) => o.value === value) || options.find((o) => o.textContent?.trim().toLowerCase() === value.toLowerCase());
+  if (!match) {
+    const available = options.map((o) => `"${o.textContent?.trim()}" (value="${o.value}")`).join(", ");
+    return { success: false, error: `No option matching "${value}". Available: ${available}` };
+  }
+  selectEl.value = match.value;
+  selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+  selectEl.dispatchEvent(new Event("input", { bubbles: true }));
+  return { success: true, tagName: "option", textContent: match.textContent?.trim() || "" };
+}
+
+/** Injected function: hover over an element */
+function injectedHoverElement(selector: string): { success: boolean; tagName?: string; textContent?: string; error?: string } {
+  const el = document.querySelector(selector);
+  if (!el) return { success: false, error: `No element found for selector: ${selector}` };
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const eventInit: MouseEventInit = { bubbles: true, clientX: cx, clientY: cy };
+  el.dispatchEvent(new MouseEvent("mouseenter", eventInit));
+  el.dispatchEvent(new MouseEvent("mouseover", eventInit));
+  el.dispatchEvent(new MouseEvent("mousemove", eventInit));
+  return { success: true, tagName: el.tagName.toLowerCase(), textContent: el.textContent?.trim().slice(0, 200) || "" };
+}
+
+/** Injected function: read element properties */
+function injectedReadElement(
+  selector: string,
+  properties: string[] | null
+): { success: boolean; tagName?: string; attributes?: Record<string, unknown>; error?: string } {
+  const el = document.querySelector(selector);
+  if (!el) return { success: false, error: `No element found for selector: ${selector}` };
+  const defaultProps = ["tagName", "id", "className", "textContent", "value", "href", "src", "disabled", "checked", "type", "placeholder"];
+  const props = properties && properties.length > 0 ? properties : defaultProps;
+  const attrs: Record<string, unknown> = {};
+  for (const prop of props) {
+    if (prop === "textContent") {
+      attrs[prop] = (el.textContent?.trim() || "").slice(0, 500);
+    } else if (prop === "boundingRect") {
+      attrs[prop] = el.getBoundingClientRect().toJSON();
+    } else if (prop in el) {
+      const val = (el as Record<string, unknown>)[prop];
+      if (typeof val !== "function") attrs[prop] = val;
+    } else {
+      const attrVal = el.getAttribute(prop);
+      if (attrVal !== null) attrs[prop] = attrVal;
+    }
+  }
+  return { success: true, tagName: el.tagName.toLowerCase(), attributes: attrs };
+}
+
+/** Injected function: send keyboard events */
+function injectedSendKeyboardEvent(
+  key: string,
+  modifiers: string[]
+): { success: boolean; tagName?: string; textContent?: string; error?: string } {
+  const target = document.activeElement || document.body;
+  const eventInit: KeyboardEventInit = {
+    key,
+    code: key.length === 1 ? `Key${key.toUpperCase()}` : key,
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: modifiers.includes("ctrl"),
+    shiftKey: modifiers.includes("shift"),
+    altKey: modifiers.includes("alt"),
+    metaKey: modifiers.includes("meta"),
+  };
+  target.dispatchEvent(new KeyboardEvent("keydown", eventInit));
+  target.dispatchEvent(new KeyboardEvent("keyup", eventInit));
+  if (key === "Enter" && target instanceof HTMLInputElement && target.form) {
+    target.form.requestSubmit();
+  }
+  if (key === "Escape") {
+    const dialog = document.querySelector("dialog[open]") as HTMLDialogElement | null;
+    if (dialog) dialog.close();
+  }
+  return { success: true, tagName: (target as HTMLElement).tagName?.toLowerCase() || "body", textContent: (target as HTMLElement).textContent?.trim().slice(0, 200) || "" };
 }
 
 /** Update extension badge to show connection status */

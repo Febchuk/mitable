@@ -63,6 +63,10 @@ const READ_ONLY_TOOLS = [
   "mcp__mitable__browser_extract",
   "mcp__mitable__browser_get_tabs",
   "mcp__mitable__browser_wait",
+  "mcp__mitable__browser_screenshot",
+  "mcp__mitable__browser_scroll",
+  "mcp__mitable__browser_hover",
+  "mcp__mitable__browser_read_element",
 ];
 
 // Phase 2: all tools including write/mutate
@@ -75,6 +79,11 @@ const ALL_TOOLS = [
   "mcp__mitable__browser_navigate",
   "mcp__mitable__browser_click",
   "mcp__mitable__browser_type",
+  "mcp__mitable__browser_select",
+  "mcp__mitable__browser_execute_js",
+  "mcp__mitable__browser_tab_open",
+  "mcp__mitable__browser_tab_close",
+  "mcp__mitable__browser_keyboard",
 ];
 
 const ACTION_PLAN_MARKER = "[ACTION_PLAN]";
@@ -680,6 +689,275 @@ class AgentSdkService {
       }
     );
 
+    const browserScreenshotTool = tool(
+      "browser_screenshot",
+      "Take a screenshot of the visible area in the user's Chrome browser. Returns an image the LLM can see directly.",
+      {
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID to screenshot. Will activate the tab first. Omit for current visible tab."),
+        quality: z
+          .number()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("JPEG quality 1-100 (default 80). Lower = smaller file."),
+        format: z
+          .enum(["png", "jpeg"])
+          .optional()
+          .describe("Image format (default 'jpeg'). JPEG is smaller, PNG is lossless."),
+      },
+      async ({ tabId, quality, format }) => {
+        const response = await browserBridgeService.sendCommand(
+          "screenshot",
+          { tabId, quality: quality ?? 80, format: format ?? "jpeg" },
+          20000
+        );
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { type: string; data: string; mimeType: string };
+        return {
+          content: [{ type: "image" as const, data: result.data, mimeType: result.mimeType }],
+        };
+      }
+    );
+
+    const browserScrollTool = tool(
+      "browser_scroll",
+      "Scroll the page in the user's Chrome browser. Can scroll by direction, to a specific element, or to top/bottom.",
+      {
+        direction: z
+          .enum(["up", "down"])
+          .optional()
+          .describe("Scroll direction (default 'down')"),
+        amount: z
+          .number()
+          .optional()
+          .describe("Pixels to scroll (default 80% of viewport height)"),
+        selector: z
+          .string()
+          .optional()
+          .describe("CSS selector to scroll into view (overrides direction/amount)"),
+        position: z
+          .enum(["top", "bottom"])
+          .optional()
+          .describe("Scroll to absolute position (overrides direction/amount)"),
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID. Omit for active tab."),
+      },
+      async ({ direction, amount, selector, position, tabId }) => {
+        const response = await browserBridgeService.sendCommand("scroll", {
+          direction, amount, selector, position, tabId,
+        });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { scrollY: number; scrollHeight: number; tagName?: string; textContent?: string };
+        const pos = `${Math.round(result.scrollY)}/${result.scrollHeight}px`;
+        const extra = result.tagName ? ` — scrolled to <${result.tagName}>` : "";
+        return {
+          content: [{ type: "text" as const, text: `Scrolled. Position: ${pos}${extra}` }],
+        };
+      }
+    );
+
+    const browserHoverTool = tool(
+      "browser_hover",
+      "Hover over an element in the user's Chrome browser to trigger hover menus, tooltips, or dropdowns.",
+      {
+        selector: z.string().describe("CSS selector for the element to hover over"),
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID. Omit for active tab."),
+      },
+      async ({ selector, tabId }) => {
+        const response = await browserBridgeService.sendCommand("hover", { selector, tabId });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { hovered: boolean; tagName: string; textContent: string };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Hovered <${result.tagName}>${result.textContent ? `: "${result.textContent}"` : ""}`,
+            },
+          ],
+        };
+      }
+    );
+
+    const browserReadElementTool = tool(
+      "browser_read_element",
+      "Inspect an element's properties in the user's Chrome browser (disabled state, value, href, class, bounding rect, etc.).",
+      {
+        selector: z.string().describe("CSS selector for the element to inspect"),
+        properties: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Properties to read (defaults: tagName, id, className, textContent, value, href, src, disabled, checked, type, placeholder). Special: 'boundingRect', 'computedStyle'."
+          ),
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID. Omit for active tab."),
+      },
+      async ({ selector, properties, tabId }) => {
+        const response = await browserBridgeService.sendCommand("read_element", {
+          selector, properties, tabId,
+        });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { tagName: string; attributes: Record<string, unknown> };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `<${result.tagName}> properties:\n${JSON.stringify(result.attributes, null, 2)}`,
+            },
+          ],
+        };
+      }
+    );
+
+    const browserSelectTool = tool(
+      "browser_select",
+      "Select an option from a <select> dropdown in the user's Chrome browser. Matches by option value or visible text. IMPORTANT: Always confirm with the user before selecting.",
+      {
+        selector: z.string().describe("CSS selector for the <select> element"),
+        value: z.string().describe("Option value or visible text to select"),
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID. Omit for active tab."),
+      },
+      async ({ selector, value, tabId }) => {
+        const response = await browserBridgeService.sendCommand("select", { selector, value, tabId });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { selected: boolean; tagName: string; textContent: string };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Selected "${result.textContent}" from dropdown`,
+            },
+          ],
+        };
+      }
+    );
+
+    const browserExecuteJsTool = tool(
+      "browser_execute_js",
+      "Execute arbitrary JavaScript in the user's Chrome browser tab. Runs in the MAIN world with access to page variables. IMPORTANT: Always confirm with the user before executing.",
+      {
+        code: z.string().describe("JavaScript code to execute. Can use return statement for a value."),
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID. Omit for active tab."),
+      },
+      async ({ code, tabId }) => {
+        const response = await browserBridgeService.sendCommand("execute_js", { code, tabId });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { result: string };
+        return {
+          content: [{ type: "text" as const, text: `Result: ${result.result}` }],
+        };
+      }
+    );
+
+    const browserTabOpenTool = tool(
+      "browser_tab_open",
+      "Open a new tab in the user's Chrome browser. IMPORTANT: Always confirm with the user before opening.",
+      {
+        url: z
+          .string()
+          .optional()
+          .describe("URL to navigate to. Omit for a blank new tab."),
+      },
+      async ({ url }) => {
+        const response = await browserBridgeService.sendCommand("tab_open", { url }, 35000);
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { tabId: number; url: string; title: string };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Opened tab [${result.tabId}]: ${result.title}\nURL: ${result.url}`,
+            },
+          ],
+        };
+      }
+    );
+
+    const browserTabCloseTool = tool(
+      "browser_tab_close",
+      "Close a tab in the user's Chrome browser. IMPORTANT: Always confirm with the user before closing.",
+      {
+        tabId: z.number().describe("Tab ID to close (from browser_get_tabs)"),
+      },
+      async ({ tabId: closeTabId }) => {
+        const response = await browserBridgeService.sendCommand("tab_close", { tabId: closeTabId });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        return {
+          content: [{ type: "text" as const, text: `Closed tab ${closeTabId}` }],
+        };
+      }
+    );
+
+    const browserKeyboardTool = tool(
+      "browser_keyboard",
+      "Send keyboard events to the focused element in the user's Chrome browser. Useful for pressing Enter, Escape, Tab, arrow keys, or keyboard shortcuts. IMPORTANT: Always confirm with the user before sending.",
+      {
+        key: z
+          .string()
+          .describe(
+            "Key to press (e.g., 'Enter', 'Escape', 'Tab', 'ArrowDown', 'a', 'Delete')"
+          ),
+        modifiers: z
+          .array(z.enum(["ctrl", "shift", "alt", "meta"]))
+          .optional()
+          .describe("Modifier keys to hold (e.g., ['ctrl', 'shift'])"),
+        tabId: z
+          .number()
+          .optional()
+          .describe("Specific tab ID. Omit for active tab."),
+      },
+      async ({ key, modifiers, tabId }) => {
+        const response = await browserBridgeService.sendCommand("keyboard", {
+          key, modifiers, tabId,
+        });
+        if (!response.success) {
+          return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
+        }
+        const result = response.payload as { sent: boolean; tagName: string; textContent: string };
+        const modStr = modifiers?.length ? `${modifiers.join("+")}+` : "";
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Sent ${modStr}${key} to <${result.tagName}>`,
+            },
+          ],
+        };
+      }
+    );
+
     return createSdkMcpServer({
       name: "mitable",
       tools: [
@@ -694,6 +972,15 @@ class AgentSdkService {
         browserClickTool,
         browserTypeTool,
         browserWaitTool,
+        browserScreenshotTool,
+        browserScrollTool,
+        browserHoverTool,
+        browserReadElementTool,
+        browserSelectTool,
+        browserExecuteJsTool,
+        browserTabOpenTool,
+        browserTabCloseTool,
+        browserKeyboardTool,
       ],
     });
   }
@@ -712,7 +999,7 @@ class AgentSdkService {
 3. **Web**: Search the web and fetch pages
 4. **Work context**: Access the user's captured work sessions, activity data, and daily summaries via Mitable tools
 5. **Integrations**: Send Slack messages (more integrations coming)
-6. **Browser control**: Navigate, read content, click elements, type text, wait for elements, and list tabs in the user's Chrome browser (requires Mitable Chrome Extension)
+6. **Browser control**: Navigate, screenshot, scroll, click, type, select, hover, keyboard, inspect elements, execute JS, manage tabs, and extract content in Chrome (requires Mitable Chrome Extension)
 
 ## User's Work Context (Auto-Generated Skills)
 ${skillsSection}
