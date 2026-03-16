@@ -492,7 +492,7 @@ class StorytellerRLMService {
       // Merge all available chunk summaries via the merge tool
       logger.info({ count: chunkSummaries.length }, "Fallback: merging all chunk summaries");
       try {
-        const mergeTool = (await import("./storyteller-tools")).getToolByName("merge_summaries");
+        const mergeTool = getToolByName("merge_summaries");
         if (mergeTool) {
           const merged = await mergeTool.execute({ summaries: chunkSummaries }, environment);
           if (typeof merged === "string" && merged.length > 0) {

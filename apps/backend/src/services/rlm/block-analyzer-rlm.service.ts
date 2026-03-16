@@ -161,6 +161,7 @@ class BlockAnalyzerRLMService {
     const toolCallHistory: ToolCallRecord[] = [];
     let iterations = 0;
     let consecutiveBadResponses = 0;
+    let nudgeCount = 0;
 
     while (iterations < maxIterations) {
       iterations++;
@@ -207,11 +208,12 @@ class BlockAnalyzerRLMService {
           const readCalls = toolCallHistory.filter(
             (t) => t.tool === "get_captures" || t.tool === "get_captures_by_time"
           ).length;
-          const shouldNudge = readCalls >= 8 && emitCalls === 0;
+          const shouldNudge = readCalls >= 8 && emitCalls === 0 && nudgeCount < 3;
 
           const nudge = shouldNudge
             ? `\n\nIMPORTANT: You have read ${readCalls} pages of captures but have not emitted any blocks yet. The master story already provides the high-level structure — you do NOT need to read every capture page. Start emitting blocks NOW using emit_work_block or emit_meeting_block. Use the master story for the activity structure and the captures you've already read for precise time boundaries.`
             : "";
+          if (shouldNudge) nudgeCount++;
 
           // Append tool result as user message
           messages.push({
