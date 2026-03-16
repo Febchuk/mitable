@@ -14,12 +14,16 @@
  */
 
 import { BrowserWindow, desktopCapturer } from "electron";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { createLogger } from "../lib/logger";
 import { isBlockedByPolicy, getCapturePolicy } from "./capturePolicy";
 import { windowDetectionService } from "./windowDetectionService";
 import { isSystemApp } from "../utils/browserTitleParser";
 import { IPC_CHANNELS } from "@mitable/shared";
 import type { SelectedWindowInfo } from "@mitable/shared";
+
+const execFileAsync = promisify(execFile);
 
 const logger = createLogger("FocusWindowTracker");
 
@@ -31,6 +35,9 @@ const POLL_INTERVAL_MS = 2000;
 
 // Cleanup interval for expired windows (30 seconds)
 const CLEANUP_INTERVAL_MS = 30 * 1000;
+
+// Prefix for synthetic window IDs created by AppleScript fallback (full-screen apps)
+const FULLSCREEN_WINDOW_ID_PREFIX = "fs-pid:";
 
 interface TrackedWindow {
   windowId: string;
@@ -269,9 +276,12 @@ class FocusWindowTracker {
       const activeWindow = await activeWin();
 
       // active-win can return null for full-screen apps (own Space) and other edge cases.
-      // Fallback: use desktopCapturer directly (get-windows fails in same scenarios, so skip it).
+      // Fallback chain: AppleScript (macOS) → desktopCapturer (cross-platform)
       if (!activeWindow) {
-        await this.tryAddFrontmostFromDesktopCapturer();
+        const handled = await this.tryAddFrontmostFromAppleScript();
+        if (!handled) {
+          await this.tryAddFrontmostFromDesktopCapturer();
+        }
         return;
       }
 
@@ -332,10 +342,139 @@ class FocusWindowTracker {
         isBrowser,
       });
     } catch (error) {
-      // active-win can throw (e.g. Command failed in full-screen Space) — use desktopCapturer
+      // active-win can throw (e.g. Command failed in full-screen Space)
+      // Fallback chain: AppleScript (macOS) → desktopCapturer (cross-platform)
       logger.error(" Error checking active window:", error);
-      await this.tryAddFrontmostFromDesktopCapturer();
+      const handled = await this.tryAddFrontmostFromAppleScript();
+      if (!handled) {
+        await this.tryAddFrontmostFromDesktopCapturer();
+      }
     }
+  }
+
+  /**
+   * macOS-only fallback: use AppleScript to detect the frontmost app when active-win
+   * returns null (full-screen apps on their own Space). AppleScript's System Events
+   * reliably reports the frontmost process even across Spaces.
+   *
+   * Returns true if a window was detected and tracked, false otherwise.
+   */
+  private async tryAddFrontmostFromAppleScript(): Promise<boolean> {
+    if (process.platform !== "darwin") return false;
+
+    try {
+      const script = `
+tell application "System Events"
+  set fp to first application process whose frontmost is true
+  set appName to name of fp
+  set pid to unix id of fp
+  try
+    set winTitle to name of first window of fp
+  on error
+    set winTitle to ""
+  end try
+  return appName & "||" & pid & "||" & winTitle
+end tell`;
+
+      const { stdout } = await execFileAsync("osascript", ["-e", script], {
+        timeout: 3000,
+      });
+
+      const parts = stdout.trim().split("||");
+      if (parts.length < 2) return false;
+
+      const appName = parts[0];
+      const pid = parts[1];
+      const windowTitle = parts.slice(2).join("||") || appName; // title may contain ||
+
+      if (!appName || !pid) return false;
+
+      // Check exclusions
+      const policy = getCapturePolicy();
+      const exclusionCheck = shouldExcludeWindow(windowTitle, appName, policy, this.currentUserId);
+      if (exclusionCheck.excluded) {
+        logger.info(
+          ` AppleScript fallback: skipping excluded app ${appName} (${exclusionCheck.reason})`
+        );
+        return false;
+      }
+
+      // Check for existing tracked window for this PID/app to avoid duplicates
+      const existingId = this.findTrackedWindowByPid(pid, appName);
+      if (existingId) {
+        // Refresh TTL on the existing entry
+        const existing = this.trackedWindows.get(existingId)!;
+        const now = Date.now();
+        existing.lastFocusedAt = now;
+        existing.expiresAt = now + WINDOW_TTL_MS;
+        existing.windowTitle = windowTitle;
+        this.lastActiveWindowId = existingId;
+        return true;
+      }
+
+      const syntheticId = `${FULLSCREEN_WINDOW_ID_PREFIX}${pid}`;
+
+      // Skip if same as last active window
+      if (syntheticId === this.lastActiveWindowId) {
+        return true;
+      }
+
+      const browserApps = [
+        "Google Chrome",
+        "Safari",
+        "Firefox",
+        "Arc",
+        "Microsoft Edge",
+        "Brave Browser",
+        "Opera",
+        "Opera GX",
+      ];
+      const isBrowser = browserApps.includes(appName);
+
+      this.lastActiveWindowId = syntheticId;
+      this.addOrRefreshWindow({
+        windowId: syntheticId,
+        appName,
+        windowTitle,
+        displayName: appName,
+        tabTitle: isBrowser ? windowTitle : undefined,
+        isBrowser,
+      });
+
+      logger.info(
+        ` AppleScript fallback: added full-screen window ${appName} (pid=${pid}, title="${windowTitle.substring(0, 40)}")`
+      );
+      return true;
+    } catch (error) {
+      logger.warn(" AppleScript fallback failed:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Find an existing tracked window for a given PID to prevent duplicates when
+   * a window transitions between windowed mode (OS window ID) and full-screen
+   * mode (synthetic PID-based ID).
+   *
+   * Matches by:
+   * 1. Existing synthetic ID for the same PID (fs-pid:NNN)
+   * 2. Existing entry with the same appName (only one window of that app is
+   *    visible in full-screen)
+   */
+  private findTrackedWindowByPid(pid: string, appName: string): string | null {
+    const syntheticId = `${FULLSCREEN_WINDOW_ID_PREFIX}${pid}`;
+    if (this.trackedWindows.has(syntheticId)) {
+      return syntheticId;
+    }
+
+    // Look for an existing entry with the same appName
+    for (const [windowId, window] of this.trackedWindows) {
+      if (window.appName === appName) {
+        return windowId;
+      }
+    }
+
+    return null;
   }
 
   /**
