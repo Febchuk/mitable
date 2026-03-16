@@ -606,7 +606,11 @@ class AgentSdkService {
         if (!response.success) {
           return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
         }
-        const result = response.payload as { clicked: boolean; tagName: string; textContent: string };
+        const result = response.payload as {
+          clicked: boolean;
+          tagName: string;
+          textContent: string;
+        };
         return {
           content: [
             {
@@ -624,10 +628,7 @@ class AgentSdkService {
       {
         selector: z.string().describe("CSS selector for the input element"),
         text: z.string().describe("Text to type into the element"),
-        clear: z
-          .boolean()
-          .optional()
-          .describe("Clear the field before typing (default true)"),
+        clear: z.boolean().optional().describe("Clear the field before typing (default true)"),
         tabId: z
           .number()
           .optional()
@@ -697,7 +698,9 @@ class AgentSdkService {
         tabId: z
           .number()
           .optional()
-          .describe("Specific tab ID to screenshot. Will activate the tab first. Omit for current visible tab."),
+          .describe(
+            "Specific tab ID to screenshot. Will activate the tab first. Omit for current visible tab."
+          ),
         quality: z
           .number()
           .min(1)
@@ -729,14 +732,8 @@ class AgentSdkService {
       "browser_scroll",
       "Scroll the page in the user's Chrome browser. Can scroll by direction, to a specific element, or to top/bottom.",
       {
-        direction: z
-          .enum(["up", "down"])
-          .optional()
-          .describe("Scroll direction (default 'down')"),
-        amount: z
-          .number()
-          .optional()
-          .describe("Pixels to scroll (default 80% of viewport height)"),
+        direction: z.enum(["up", "down"]).optional().describe("Scroll direction (default 'down')"),
+        amount: z.number().optional().describe("Pixels to scroll (default 80% of viewport height)"),
         selector: z
           .string()
           .optional()
@@ -745,19 +742,25 @@ class AgentSdkService {
           .enum(["top", "bottom"])
           .optional()
           .describe("Scroll to absolute position (overrides direction/amount)"),
-        tabId: z
-          .number()
-          .optional()
-          .describe("Specific tab ID. Omit for active tab."),
+        tabId: z.number().optional().describe("Specific tab ID. Omit for active tab."),
       },
       async ({ direction, amount, selector, position, tabId }) => {
         const response = await browserBridgeService.sendCommand("scroll", {
-          direction, amount, selector, position, tabId,
+          direction,
+          amount,
+          selector,
+          position,
+          tabId,
         });
         if (!response.success) {
           return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
         }
-        const result = response.payload as { scrollY: number; scrollHeight: number; tagName?: string; textContent?: string };
+        const result = response.payload as {
+          scrollY: number;
+          scrollHeight: number;
+          tagName?: string;
+          textContent?: string;
+        };
         const pos = `${Math.round(result.scrollY)}/${result.scrollHeight}px`;
         const extra = result.tagName ? ` — scrolled to <${result.tagName}>` : "";
         return {
@@ -771,17 +774,18 @@ class AgentSdkService {
       "Hover over an element in the user's Chrome browser to trigger hover menus, tooltips, or dropdowns.",
       {
         selector: z.string().describe("CSS selector for the element to hover over"),
-        tabId: z
-          .number()
-          .optional()
-          .describe("Specific tab ID. Omit for active tab."),
+        tabId: z.number().optional().describe("Specific tab ID. Omit for active tab."),
       },
       async ({ selector, tabId }) => {
         const response = await browserBridgeService.sendCommand("hover", { selector, tabId });
         if (!response.success) {
           return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
         }
-        const result = response.payload as { hovered: boolean; tagName: string; textContent: string };
+        const result = response.payload as {
+          hovered: boolean;
+          tagName: string;
+          textContent: string;
+        };
         return {
           content: [
             {
@@ -804,14 +808,13 @@ class AgentSdkService {
           .describe(
             "Properties to read (defaults: tagName, id, className, textContent, value, href, src, disabled, checked, type, placeholder). Special: 'boundingRect', 'computedStyle'."
           ),
-        tabId: z
-          .number()
-          .optional()
-          .describe("Specific tab ID. Omit for active tab."),
+        tabId: z.number().optional().describe("Specific tab ID. Omit for active tab."),
       },
       async ({ selector, properties, tabId }) => {
         const response = await browserBridgeService.sendCommand("read_element", {
-          selector, properties, tabId,
+          selector,
+          properties,
+          tabId,
         });
         if (!response.success) {
           return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
@@ -834,17 +837,22 @@ class AgentSdkService {
       {
         selector: z.string().describe("CSS selector for the <select> element"),
         value: z.string().describe("Option value or visible text to select"),
-        tabId: z
-          .number()
-          .optional()
-          .describe("Specific tab ID. Omit for active tab."),
+        tabId: z.number().optional().describe("Specific tab ID. Omit for active tab."),
       },
       async ({ selector, value, tabId }) => {
-        const response = await browserBridgeService.sendCommand("select", { selector, value, tabId });
+        const response = await browserBridgeService.sendCommand("select", {
+          selector,
+          value,
+          tabId,
+        });
         if (!response.success) {
           return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
         }
-        const result = response.payload as { selected: boolean; tagName: string; textContent: string };
+        const result = response.payload as {
+          selected: boolean;
+          tagName: string;
+          textContent: string;
+        };
         return {
           content: [
             {
@@ -860,11 +868,10 @@ class AgentSdkService {
       "browser_execute_js",
       "Execute arbitrary JavaScript in the user's Chrome browser tab. Runs in the MAIN world with access to page variables. IMPORTANT: Always confirm with the user before executing.",
       {
-        code: z.string().describe("JavaScript code to execute. Can use return statement for a value."),
-        tabId: z
-          .number()
-          .optional()
-          .describe("Specific tab ID. Omit for active tab."),
+        code: z
+          .string()
+          .describe("JavaScript code to execute. Can use return statement for a value."),
+        tabId: z.number().optional().describe("Specific tab ID. Omit for active tab."),
       },
       async ({ code, tabId }) => {
         const response = await browserBridgeService.sendCommand("execute_js", { code, tabId });
@@ -882,10 +889,7 @@ class AgentSdkService {
       "browser_tab_open",
       "Open a new tab in the user's Chrome browser. IMPORTANT: Always confirm with the user before opening.",
       {
-        url: z
-          .string()
-          .optional()
-          .describe("URL to navigate to. Omit for a blank new tab."),
+        url: z.string().optional().describe("URL to navigate to. Omit for a blank new tab."),
       },
       async ({ url }) => {
         const response = await browserBridgeService.sendCommand("tab_open", { url }, 35000);
@@ -927,21 +931,18 @@ class AgentSdkService {
       {
         key: z
           .string()
-          .describe(
-            "Key to press (e.g., 'Enter', 'Escape', 'Tab', 'ArrowDown', 'a', 'Delete')"
-          ),
+          .describe("Key to press (e.g., 'Enter', 'Escape', 'Tab', 'ArrowDown', 'a', 'Delete')"),
         modifiers: z
           .array(z.enum(["ctrl", "shift", "alt", "meta"]))
           .optional()
           .describe("Modifier keys to hold (e.g., ['ctrl', 'shift'])"),
-        tabId: z
-          .number()
-          .optional()
-          .describe("Specific tab ID. Omit for active tab."),
+        tabId: z.number().optional().describe("Specific tab ID. Omit for active tab."),
       },
       async ({ key, modifiers, tabId }) => {
         const response = await browserBridgeService.sendCommand("keyboard", {
-          key, modifiers, tabId,
+          key,
+          modifiers,
+          tabId,
         });
         if (!response.success) {
           return { content: [{ type: "text" as const, text: `Error: ${response.error}` }] };
@@ -986,7 +987,11 @@ class AgentSdkService {
     });
   }
 
-  private buildSystemPrompt(skills: AgentSkill[], isPlanPhase: boolean, memoryContent?: string): string {
+  private buildSystemPrompt(
+    skills: AgentSkill[],
+    isPlanPhase: boolean,
+    memoryContent?: string
+  ): string {
     const skillsSection =
       skills.length > 0
         ? skills.map((s) => `### ${s.name}\n${s.contextSummary}`).join("\n\n")

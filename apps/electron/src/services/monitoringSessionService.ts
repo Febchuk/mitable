@@ -849,7 +849,9 @@ class MonitoringSessionService {
       }
 
       // Enrich with browser context if active window is a browser
-      let browserContext: { activeTabUrl: string; activeTabTitle: string; tabCount: number } | undefined;
+      let browserContext:
+        | { activeTabUrl: string; activeTabTitle: string; tabCount: number }
+        | undefined;
       const browserApps = ["chrome", "google chrome", "arc", "edge", "safari", "firefox", "brave"];
       if (
         browserApps.some((b) => (windowInfo.appName || "").toLowerCase().includes(b)) &&
@@ -861,7 +863,11 @@ class MonitoringSessionService {
             new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
           ]);
           if (tabsResponse.success) {
-            const tabs = (tabsResponse.payload as { tabs: Array<{ id: number; url: string; title: string; active: boolean }> }).tabs;
+            const tabs = (
+              tabsResponse.payload as {
+                tabs: Array<{ id: number; url: string; title: string; active: boolean }>;
+              }
+            ).tabs;
             const activeTab = tabs.find((t) => t.active);
             if (activeTab) {
               browserContext = {

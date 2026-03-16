@@ -50,7 +50,12 @@ chrome.runtime.onMessage.addListener(
 
       case "dom_scroll":
         try {
-          const result = scrollPage(message.direction, message.amount, message.selector, message.position);
+          const result = scrollPage(
+            message.direction,
+            message.amount,
+            message.selector,
+            message.position
+          );
           sendResponse(result);
         } catch (err) {
           sendResponse({ success: false, error: err instanceof Error ? err.message : String(err) });
@@ -162,7 +167,10 @@ function findElement(selector: string, text?: string): Element | null {
 function clickElement(selector: string, text?: string): ContentScriptResponse {
   const el = findElement(selector, text);
   if (!el) {
-    return { success: false, error: `No element found for selector: ${selector}${text ? ` or text: "${text}"` : ""}` };
+    return {
+      success: false,
+      error: `No element found for selector: ${selector}${text ? ` or text: "${text}"` : ""}`,
+    };
   }
   (el as HTMLElement).click();
   return {
@@ -251,7 +259,9 @@ function selectOption(selector: string, value: string): ContentScriptResponse {
     options.find((o) => o.textContent?.trim().toLowerCase() === value.toLowerCase());
 
   if (!match) {
-    const available = options.map((o) => `"${o.textContent?.trim()}" (value="${o.value}")`).join(", ");
+    const available = options
+      .map((o) => `"${o.textContent?.trim()}" (value="${o.value}")`)
+      .join(", ");
     return { success: false, error: `No option matching "${value}". Available: ${available}` };
   }
 
@@ -293,8 +303,17 @@ function readElement(selector: string, properties?: string[]): ContentScriptResp
   if (!el) return { success: false, error: `No element found for selector: ${selector}` };
 
   const defaultProps = [
-    "tagName", "id", "className", "textContent", "value",
-    "href", "src", "disabled", "checked", "type", "placeholder",
+    "tagName",
+    "id",
+    "className",
+    "textContent",
+    "value",
+    "href",
+    "src",
+    "disabled",
+    "checked",
+    "type",
+    "placeholder",
   ];
   const props = properties && properties.length > 0 ? properties : defaultProps;
 
@@ -330,7 +349,10 @@ function readElement(selector: string, properties?: string[]): ContentScriptResp
 }
 
 /** Send keyboard events to the focused element */
-function sendKeyboardEvent(key: string, modifiers?: ("ctrl" | "shift" | "alt" | "meta")[]): ContentScriptResponse {
+function sendKeyboardEvent(
+  key: string,
+  modifiers?: ("ctrl" | "shift" | "alt" | "meta")[]
+): ContentScriptResponse {
   const target = document.activeElement || document.body;
   const mods = modifiers || [];
 
@@ -397,7 +419,11 @@ function waitForElement(selector: string, timeout: number): Promise<ContentScrip
 
     const timer = setTimeout(() => {
       clearInterval(interval);
-      resolve({ success: false, found: false, error: `Timeout: element "${selector}" not found within ${timeout}ms` });
+      resolve({
+        success: false,
+        found: false,
+        error: `Timeout: element "${selector}" not found within ${timeout}ms`,
+      });
     }, timeout);
   });
 }

@@ -36,7 +36,13 @@ export type ContentScriptRequest =
   | { type: "dom_click"; selector: string; text?: string }
   | { type: "dom_type"; selector: string; text: string; clear: boolean }
   | { type: "dom_wait"; selector: string; timeout: number }
-  | { type: "dom_scroll"; direction?: "up" | "down"; amount?: number; selector?: string; position?: "top" | "bottom" }
+  | {
+      type: "dom_scroll";
+      direction?: "up" | "down";
+      amount?: number;
+      selector?: string;
+      position?: "top" | "bottom";
+    }
   | { type: "dom_select"; selector: string; value: string }
   | { type: "dom_hover"; selector: string }
   | { type: "dom_read_element"; selector: string; properties?: string[] }

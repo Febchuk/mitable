@@ -123,7 +123,11 @@ class BrowserBridgeService {
 
       const tryNext = (): void => {
         if (attempt >= BRIDGE_PORT_RANGE) {
-          reject(new Error(`Failed to bind to any port in range ${BRIDGE_PORT}-${BRIDGE_PORT + BRIDGE_PORT_RANGE - 1}`));
+          reject(
+            new Error(
+              `Failed to bind to any port in range ${BRIDGE_PORT}-${BRIDGE_PORT + BRIDGE_PORT_RANGE - 1}`
+            )
+          );
           return;
         }
 
@@ -331,7 +335,6 @@ class BrowserBridgeService {
     writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
     logger.info(`Config written to ${configPath}`);
   }
-
 }
 
 export const browserBridgeService = new BrowserBridgeService();

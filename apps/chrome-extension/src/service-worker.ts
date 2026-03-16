@@ -184,10 +184,7 @@ async function handleRequest(request: BridgeRequest): Promise<void> {
         break;
 
       case "click":
-        await handleClick(
-          id,
-          payload as { selector: string; text?: string; tabId?: number }
-        );
+        await handleClick(id, payload as { selector: string; text?: string; tabId?: number });
         break;
 
       case "type":
@@ -198,10 +195,7 @@ async function handleRequest(request: BridgeRequest): Promise<void> {
         break;
 
       case "wait":
-        await handleWait(
-          id,
-          payload as { selector: string; timeout?: number; tabId?: number }
-        );
+        await handleWait(id, payload as { selector: string; timeout?: number; tabId?: number });
         break;
 
       case "screenshot":
@@ -214,22 +208,22 @@ async function handleRequest(request: BridgeRequest): Promise<void> {
       case "scroll":
         await handleScroll(
           id,
-          payload as { direction?: "up" | "down"; amount?: number; selector?: string; position?: "top" | "bottom"; tabId?: number }
+          payload as {
+            direction?: "up" | "down";
+            amount?: number;
+            selector?: string;
+            position?: "top" | "bottom";
+            tabId?: number;
+          }
         );
         break;
 
       case "select":
-        await handleSelect(
-          id,
-          payload as { selector: string; value: string; tabId?: number }
-        );
+        await handleSelect(id, payload as { selector: string; value: string; tabId?: number });
         break;
 
       case "hover":
-        await handleHover(
-          id,
-          payload as { selector: string; tabId?: number }
-        );
+        await handleHover(id, payload as { selector: string; tabId?: number });
         break;
 
       case "read_element":
@@ -242,29 +236,24 @@ async function handleRequest(request: BridgeRequest): Promise<void> {
       case "keyboard":
         await handleKeyboard(
           id,
-          payload as { key: string; modifiers?: ("ctrl" | "shift" | "alt" | "meta")[]; tabId?: number }
+          payload as {
+            key: string;
+            modifiers?: ("ctrl" | "shift" | "alt" | "meta")[];
+            tabId?: number;
+          }
         );
         break;
 
       case "execute_js":
-        await handleExecuteJs(
-          id,
-          payload as { code: string; tabId?: number }
-        );
+        await handleExecuteJs(id, payload as { code: string; tabId?: number });
         break;
 
       case "tab_open":
-        await handleTabOpen(
-          id,
-          payload as { url?: string }
-        );
+        await handleTabOpen(id, payload as { url?: string });
         break;
 
       case "tab_close":
-        await handleTabClose(
-          id,
-          payload as { tabId: number }
-        );
+        await handleTabClose(id, payload as { tabId: number });
         break;
 
       default:
@@ -280,9 +269,10 @@ async function handleRequest(request: BridgeRequest): Promise<void> {
 
     // Track action for popup display (skip ping)
     if (action !== "ping") {
-      const selectorValue = payload && typeof payload === "object" && "selector" in payload
-        ? String((payload as { selector?: string }).selector || "")
-        : undefined;
+      const selectorValue =
+        payload && typeof payload === "object" && "selector" in payload
+          ? String((payload as { selector?: string }).selector || "")
+          : undefined;
       trackAction(action, true, selectorValue);
     }
   } catch (err) {
@@ -465,7 +455,14 @@ async function handleClick(
   const { selector, text, tabId } = payload;
   const targetTabId = await resolveTabId(tabId);
   if (targetTabId === null) {
-    sendResponse({ id: requestId, type: "response", action: "click", payload: null, success: false, error: "No active tab found" });
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "click",
+      payload: null,
+      success: false,
+      error: "No active tab found",
+    });
     return;
   }
 
@@ -474,9 +471,22 @@ async function handleClick(
   try {
     const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
     if (response?.success) {
-      sendResponse({ id: requestId, type: "response", action: "click", payload: { clicked: true, tagName: response.tagName, textContent: response.textContent }, success: true });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "click",
+        payload: { clicked: true, tagName: response.tagName, textContent: response.textContent },
+        success: true,
+      });
     } else {
-      sendResponse({ id: requestId, type: "response", action: "click", payload: null, success: false, error: response?.error || "Click failed" });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "click",
+        payload: null,
+        success: false,
+        error: response?.error || "Click failed",
+      });
     }
   } catch {
     // Fallback: inject script
@@ -486,14 +496,39 @@ async function handleClick(
         func: injectedClickElement,
         args: [selector, text || null],
       });
-      const result = results[0]?.result as { success: boolean; tagName?: string; textContent?: string; error?: string } | null;
+      const result = results[0]?.result as {
+        success: boolean;
+        tagName?: string;
+        textContent?: string;
+        error?: string;
+      } | null;
       if (result?.success) {
-        sendResponse({ id: requestId, type: "response", action: "click", payload: { clicked: true, tagName: result.tagName, textContent: result.textContent }, success: true });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "click",
+          payload: { clicked: true, tagName: result.tagName, textContent: result.textContent },
+          success: true,
+        });
       } else {
-        sendResponse({ id: requestId, type: "response", action: "click", payload: null, success: false, error: result?.error || "Click failed via scripting API" });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "click",
+          payload: null,
+          success: false,
+          error: result?.error || "Click failed via scripting API",
+        });
       }
     } catch (scriptErr) {
-      sendResponse({ id: requestId, type: "response", action: "click", payload: null, success: false, error: `Failed to click: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "click",
+        payload: null,
+        success: false,
+        error: `Failed to click: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}`,
+      });
     }
   }
 }
@@ -506,7 +541,14 @@ async function handleType(
   const { selector, text, clear = true, tabId } = payload;
   const targetTabId = await resolveTabId(tabId);
   if (targetTabId === null) {
-    sendResponse({ id: requestId, type: "response", action: "type", payload: null, success: false, error: "No active tab found" });
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "type",
+      payload: null,
+      success: false,
+      error: "No active tab found",
+    });
     return;
   }
 
@@ -515,9 +557,22 @@ async function handleType(
   try {
     const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
     if (response?.success) {
-      sendResponse({ id: requestId, type: "response", action: "type", payload: { typed: true, tagName: response.tagName, value: response.textContent }, success: true });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "type",
+        payload: { typed: true, tagName: response.tagName, value: response.textContent },
+        success: true,
+      });
     } else {
-      sendResponse({ id: requestId, type: "response", action: "type", payload: null, success: false, error: response?.error || "Type failed" });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "type",
+        payload: null,
+        success: false,
+        error: response?.error || "Type failed",
+      });
     }
   } catch {
     // Fallback: inject script
@@ -527,14 +582,39 @@ async function handleType(
         func: injectedTypeIntoElement,
         args: [selector, text, clear],
       });
-      const result = results[0]?.result as { success: boolean; tagName?: string; value?: string; error?: string } | null;
+      const result = results[0]?.result as {
+        success: boolean;
+        tagName?: string;
+        value?: string;
+        error?: string;
+      } | null;
       if (result?.success) {
-        sendResponse({ id: requestId, type: "response", action: "type", payload: { typed: true, tagName: result.tagName, value: result.value }, success: true });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "type",
+          payload: { typed: true, tagName: result.tagName, value: result.value },
+          success: true,
+        });
       } else {
-        sendResponse({ id: requestId, type: "response", action: "type", payload: null, success: false, error: result?.error || "Type failed via scripting API" });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "type",
+          payload: null,
+          success: false,
+          error: result?.error || "Type failed via scripting API",
+        });
       }
     } catch (scriptErr) {
-      sendResponse({ id: requestId, type: "response", action: "type", payload: null, success: false, error: `Failed to type: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "type",
+        payload: null,
+        success: false,
+        error: `Failed to type: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}`,
+      });
     }
   }
 }
@@ -547,7 +627,14 @@ async function handleWait(
   const { selector, timeout = 10000, tabId } = payload;
   const targetTabId = await resolveTabId(tabId);
   if (targetTabId === null) {
-    sendResponse({ id: requestId, type: "response", action: "wait", payload: null, success: false, error: "No active tab found" });
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "wait",
+      payload: null,
+      success: false,
+      error: "No active tab found",
+    });
     return;
   }
 
@@ -556,9 +643,22 @@ async function handleWait(
   try {
     const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
     if (response?.success) {
-      sendResponse({ id: requestId, type: "response", action: "wait", payload: { found: true, tagName: response.tagName, textContent: response.textContent }, success: true });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "wait",
+        payload: { found: true, tagName: response.tagName, textContent: response.textContent },
+        success: true,
+      });
     } else {
-      sendResponse({ id: requestId, type: "response", action: "wait", payload: { found: false }, success: false, error: response?.error || "Wait timed out" });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "wait",
+        payload: { found: false },
+        success: false,
+        error: response?.error || "Wait timed out",
+      });
     }
   } catch {
     // Fallback: inject script
@@ -568,14 +668,40 @@ async function handleWait(
         func: injectedWaitForElement,
         args: [selector, timeout],
       });
-      const result = results[0]?.result as { success: boolean; found: boolean; tagName?: string; textContent?: string; error?: string } | null;
+      const result = results[0]?.result as {
+        success: boolean;
+        found: boolean;
+        tagName?: string;
+        textContent?: string;
+        error?: string;
+      } | null;
       if (result?.success) {
-        sendResponse({ id: requestId, type: "response", action: "wait", payload: { found: true, tagName: result.tagName, textContent: result.textContent }, success: true });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "wait",
+          payload: { found: true, tagName: result.tagName, textContent: result.textContent },
+          success: true,
+        });
       } else {
-        sendResponse({ id: requestId, type: "response", action: "wait", payload: { found: false }, success: false, error: result?.error || "Wait timed out" });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "wait",
+          payload: { found: false },
+          success: false,
+          error: result?.error || "Wait timed out",
+        });
       }
     } catch (scriptErr) {
-      sendResponse({ id: requestId, type: "response", action: "wait", payload: null, success: false, error: `Failed to wait: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "wait",
+        payload: null,
+        success: false,
+        error: `Failed to wait: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}`,
+      });
     }
   }
 }
@@ -588,7 +714,10 @@ async function resolveTabId(tabId?: number): Promise<number | null> {
 }
 
 /** Injected function: click an element */
-function injectedClickElement(selector: string, text: string | null): { success: boolean; tagName?: string; textContent?: string; error?: string } {
+function injectedClickElement(
+  selector: string,
+  text: string | null
+): { success: boolean; tagName?: string; textContent?: string; error?: string } {
   let el = document.querySelector(selector);
 
   // Fallback: find by text using TreeWalker
@@ -606,15 +735,26 @@ function injectedClickElement(selector: string, text: string | null): { success:
   }
 
   if (!el) {
-    return { success: false, error: `No element found for selector: ${selector}${text ? ` or text: "${text}"` : ""}` };
+    return {
+      success: false,
+      error: `No element found for selector: ${selector}${text ? ` or text: "${text}"` : ""}`,
+    };
   }
 
   (el as HTMLElement).click();
-  return { success: true, tagName: el.tagName.toLowerCase(), textContent: el.textContent?.trim().slice(0, 200) || "" };
+  return {
+    success: true,
+    tagName: el.tagName.toLowerCase(),
+    textContent: el.textContent?.trim().slice(0, 200) || "",
+  };
 }
 
 /** Injected function: type into an element */
-function injectedTypeIntoElement(selector: string, text: string, clear: boolean): { success: boolean; tagName?: string; value?: string; error?: string } {
+function injectedTypeIntoElement(
+  selector: string,
+  text: string,
+  clear: boolean
+): { success: boolean; tagName?: string; value?: string; error?: string } {
   const el = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | null;
   if (!el) return { success: false, error: `No element found for selector: ${selector}` };
 
@@ -628,11 +768,25 @@ function injectedTypeIntoElement(selector: string, text: string, clear: boolean)
 }
 
 /** Injected function: wait for an element */
-function injectedWaitForElement(selector: string, timeout: number): Promise<{ success: boolean; found: boolean; tagName?: string; textContent?: string; error?: string }> {
+function injectedWaitForElement(
+  selector: string,
+  timeout: number
+): Promise<{
+  success: boolean;
+  found: boolean;
+  tagName?: string;
+  textContent?: string;
+  error?: string;
+}> {
   return new Promise((resolve) => {
     const existing = document.querySelector(selector);
     if (existing) {
-      resolve({ success: true, found: true, tagName: existing.tagName.toLowerCase(), textContent: existing.textContent?.trim().slice(0, 200) || "" });
+      resolve({
+        success: true,
+        found: true,
+        tagName: existing.tagName.toLowerCase(),
+        textContent: existing.textContent?.trim().slice(0, 200) || "",
+      });
       return;
     }
 
@@ -641,13 +795,22 @@ function injectedWaitForElement(selector: string, timeout: number): Promise<{ su
       if (el) {
         clearInterval(interval);
         clearTimeout(timer);
-        resolve({ success: true, found: true, tagName: el.tagName.toLowerCase(), textContent: el.textContent?.trim().slice(0, 200) || "" });
+        resolve({
+          success: true,
+          found: true,
+          tagName: el.tagName.toLowerCase(),
+          textContent: el.textContent?.trim().slice(0, 200) || "",
+        });
       }
     }, 200);
 
     const timer = setTimeout(() => {
       clearInterval(interval);
-      resolve({ success: false, found: false, error: `Timeout: element "${selector}" not found within ${timeout}ms` });
+      resolve({
+        success: false,
+        found: false,
+        error: `Timeout: element "${selector}" not found within ${timeout}ms`,
+      });
     }, timeout);
   });
 }
@@ -703,10 +866,13 @@ async function handleScreenshot(
       await new Promise((r) => setTimeout(r, 150));
     }
 
-    const dataUrl = await chrome.tabs.captureVisibleTab(windowId ?? chrome.windows.WINDOW_ID_CURRENT, {
-      format,
-      quality,
-    });
+    const dataUrl = await chrome.tabs.captureVisibleTab(
+      windowId ?? chrome.windows.WINDOW_ID_CURRENT,
+      {
+        format,
+        quality,
+      }
+    );
 
     // Strip data URL prefix to get raw base64
     const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, "");
@@ -734,23 +900,60 @@ async function handleScreenshot(
 /** Scroll the page */
 async function handleScroll(
   requestId: string,
-  payload: { direction?: "up" | "down"; amount?: number; selector?: string; position?: "top" | "bottom"; tabId?: number }
+  payload: {
+    direction?: "up" | "down";
+    amount?: number;
+    selector?: string;
+    position?: "top" | "bottom";
+    tabId?: number;
+  }
 ): Promise<void> {
   const { direction, amount, selector, position, tabId } = payload;
   const targetTabId = await resolveTabId(tabId);
   if (targetTabId === null) {
-    sendResponse({ id: requestId, type: "response", action: "scroll", payload: null, success: false, error: "No active tab found" });
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "scroll",
+      payload: null,
+      success: false,
+      error: "No active tab found",
+    });
     return;
   }
 
-  const message: ContentScriptRequest = { type: "dom_scroll", direction, amount, selector, position };
+  const message: ContentScriptRequest = {
+    type: "dom_scroll",
+    direction,
+    amount,
+    selector,
+    position,
+  };
 
   try {
     const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
     if (response?.success) {
-      sendResponse({ id: requestId, type: "response", action: "scroll", payload: { scrollY: response.scrollY, scrollHeight: response.scrollHeight, tagName: response.tagName, textContent: response.textContent }, success: true });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "scroll",
+        payload: {
+          scrollY: response.scrollY,
+          scrollHeight: response.scrollHeight,
+          tagName: response.tagName,
+          textContent: response.textContent,
+        },
+        success: true,
+      });
     } else {
-      sendResponse({ id: requestId, type: "response", action: "scroll", payload: null, success: false, error: response?.error || "Scroll failed" });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "scroll",
+        payload: null,
+        success: false,
+        error: response?.error || "Scroll failed",
+      });
     }
   } catch {
     try {
@@ -759,14 +962,39 @@ async function handleScroll(
         func: injectedScrollPage,
         args: [direction || "down", amount || 0, selector || null, position || null],
       });
-      const result = results[0]?.result as { success: boolean; scrollY?: number; scrollHeight?: number; error?: string } | null;
+      const result = results[0]?.result as {
+        success: boolean;
+        scrollY?: number;
+        scrollHeight?: number;
+        error?: string;
+      } | null;
       if (result?.success) {
-        sendResponse({ id: requestId, type: "response", action: "scroll", payload: { scrollY: result.scrollY, scrollHeight: result.scrollHeight }, success: true });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "scroll",
+          payload: { scrollY: result.scrollY, scrollHeight: result.scrollHeight },
+          success: true,
+        });
       } else {
-        sendResponse({ id: requestId, type: "response", action: "scroll", payload: null, success: false, error: result?.error || "Scroll failed via scripting API" });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "scroll",
+          payload: null,
+          success: false,
+          error: result?.error || "Scroll failed via scripting API",
+        });
       }
     } catch (scriptErr) {
-      sendResponse({ id: requestId, type: "response", action: "scroll", payload: null, success: false, error: `Failed to scroll: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "scroll",
+        payload: null,
+        success: false,
+        error: `Failed to scroll: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}`,
+      });
     }
   }
 }
@@ -779,7 +1007,14 @@ async function handleSelect(
   const { selector, value, tabId } = payload;
   const targetTabId = await resolveTabId(tabId);
   if (targetTabId === null) {
-    sendResponse({ id: requestId, type: "response", action: "select", payload: null, success: false, error: "No active tab found" });
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "select",
+      payload: null,
+      success: false,
+      error: "No active tab found",
+    });
     return;
   }
 
@@ -788,9 +1023,22 @@ async function handleSelect(
   try {
     const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
     if (response?.success) {
-      sendResponse({ id: requestId, type: "response", action: "select", payload: { selected: true, tagName: response.tagName, textContent: response.textContent }, success: true });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "select",
+        payload: { selected: true, tagName: response.tagName, textContent: response.textContent },
+        success: true,
+      });
     } else {
-      sendResponse({ id: requestId, type: "response", action: "select", payload: null, success: false, error: response?.error || "Select failed" });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "select",
+        payload: null,
+        success: false,
+        error: response?.error || "Select failed",
+      });
     }
   } catch {
     try {
@@ -799,14 +1047,39 @@ async function handleSelect(
         func: injectedSelectOption,
         args: [selector, value],
       });
-      const result = results[0]?.result as { success: boolean; tagName?: string; textContent?: string; error?: string } | null;
+      const result = results[0]?.result as {
+        success: boolean;
+        tagName?: string;
+        textContent?: string;
+        error?: string;
+      } | null;
       if (result?.success) {
-        sendResponse({ id: requestId, type: "response", action: "select", payload: { selected: true, tagName: result.tagName, textContent: result.textContent }, success: true });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "select",
+          payload: { selected: true, tagName: result.tagName, textContent: result.textContent },
+          success: true,
+        });
       } else {
-        sendResponse({ id: requestId, type: "response", action: "select", payload: null, success: false, error: result?.error || "Select failed via scripting API" });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "select",
+          payload: null,
+          success: false,
+          error: result?.error || "Select failed via scripting API",
+        });
       }
     } catch (scriptErr) {
-      sendResponse({ id: requestId, type: "response", action: "select", payload: null, success: false, error: `Failed to select: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "select",
+        payload: null,
+        success: false,
+        error: `Failed to select: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}`,
+      });
     }
   }
 }
@@ -819,7 +1092,14 @@ async function handleHover(
   const { selector, tabId } = payload;
   const targetTabId = await resolveTabId(tabId);
   if (targetTabId === null) {
-    sendResponse({ id: requestId, type: "response", action: "hover", payload: null, success: false, error: "No active tab found" });
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "hover",
+      payload: null,
+      success: false,
+      error: "No active tab found",
+    });
     return;
   }
 
@@ -828,9 +1108,22 @@ async function handleHover(
   try {
     const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
     if (response?.success) {
-      sendResponse({ id: requestId, type: "response", action: "hover", payload: { hovered: true, tagName: response.tagName, textContent: response.textContent }, success: true });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "hover",
+        payload: { hovered: true, tagName: response.tagName, textContent: response.textContent },
+        success: true,
+      });
     } else {
-      sendResponse({ id: requestId, type: "response", action: "hover", payload: null, success: false, error: response?.error || "Hover failed" });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "hover",
+        payload: null,
+        success: false,
+        error: response?.error || "Hover failed",
+      });
     }
   } catch {
     try {
@@ -839,14 +1132,39 @@ async function handleHover(
         func: injectedHoverElement,
         args: [selector],
       });
-      const result = results[0]?.result as { success: boolean; tagName?: string; textContent?: string; error?: string } | null;
+      const result = results[0]?.result as {
+        success: boolean;
+        tagName?: string;
+        textContent?: string;
+        error?: string;
+      } | null;
       if (result?.success) {
-        sendResponse({ id: requestId, type: "response", action: "hover", payload: { hovered: true, tagName: result.tagName, textContent: result.textContent }, success: true });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "hover",
+          payload: { hovered: true, tagName: result.tagName, textContent: result.textContent },
+          success: true,
+        });
       } else {
-        sendResponse({ id: requestId, type: "response", action: "hover", payload: null, success: false, error: result?.error || "Hover failed via scripting API" });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "hover",
+          payload: null,
+          success: false,
+          error: result?.error || "Hover failed via scripting API",
+        });
       }
     } catch (scriptErr) {
-      sendResponse({ id: requestId, type: "response", action: "hover", payload: null, success: false, error: `Failed to hover: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "hover",
+        payload: null,
+        success: false,
+        error: `Failed to hover: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}`,
+      });
     }
   }
 }
@@ -859,7 +1177,14 @@ async function handleReadElement(
   const { selector, properties, tabId } = payload;
   const targetTabId = await resolveTabId(tabId);
   if (targetTabId === null) {
-    sendResponse({ id: requestId, type: "response", action: "read_element", payload: null, success: false, error: "No active tab found" });
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "read_element",
+      payload: null,
+      success: false,
+      error: "No active tab found",
+    });
     return;
   }
 
@@ -868,9 +1193,22 @@ async function handleReadElement(
   try {
     const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
     if (response?.success) {
-      sendResponse({ id: requestId, type: "response", action: "read_element", payload: { tagName: response.tagName, attributes: response.attributes }, success: true });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "read_element",
+        payload: { tagName: response.tagName, attributes: response.attributes },
+        success: true,
+      });
     } else {
-      sendResponse({ id: requestId, type: "response", action: "read_element", payload: null, success: false, error: response?.error || "Read element failed" });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "read_element",
+        payload: null,
+        success: false,
+        error: response?.error || "Read element failed",
+      });
     }
   } catch {
     try {
@@ -879,14 +1217,39 @@ async function handleReadElement(
         func: injectedReadElement,
         args: [selector, properties || null],
       });
-      const result = results[0]?.result as { success: boolean; tagName?: string; attributes?: Record<string, unknown>; error?: string } | null;
+      const result = results[0]?.result as {
+        success: boolean;
+        tagName?: string;
+        attributes?: Record<string, unknown>;
+        error?: string;
+      } | null;
       if (result?.success) {
-        sendResponse({ id: requestId, type: "response", action: "read_element", payload: { tagName: result.tagName, attributes: result.attributes }, success: true });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "read_element",
+          payload: { tagName: result.tagName, attributes: result.attributes },
+          success: true,
+        });
       } else {
-        sendResponse({ id: requestId, type: "response", action: "read_element", payload: null, success: false, error: result?.error || "Read element failed via scripting API" });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "read_element",
+          payload: null,
+          success: false,
+          error: result?.error || "Read element failed via scripting API",
+        });
       }
     } catch (scriptErr) {
-      sendResponse({ id: requestId, type: "response", action: "read_element", payload: null, success: false, error: `Failed to read element: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "read_element",
+        payload: null,
+        success: false,
+        error: `Failed to read element: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}`,
+      });
     }
   }
 }
@@ -899,7 +1262,14 @@ async function handleKeyboard(
   const { key, modifiers, tabId } = payload;
   const targetTabId = await resolveTabId(tabId);
   if (targetTabId === null) {
-    sendResponse({ id: requestId, type: "response", action: "keyboard", payload: null, success: false, error: "No active tab found" });
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "keyboard",
+      payload: null,
+      success: false,
+      error: "No active tab found",
+    });
     return;
   }
 
@@ -908,9 +1278,22 @@ async function handleKeyboard(
   try {
     const response = (await chrome.tabs.sendMessage(targetTabId, message)) as ContentScriptResponse;
     if (response?.success) {
-      sendResponse({ id: requestId, type: "response", action: "keyboard", payload: { sent: true, tagName: response.tagName, textContent: response.textContent }, success: true });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "keyboard",
+        payload: { sent: true, tagName: response.tagName, textContent: response.textContent },
+        success: true,
+      });
     } else {
-      sendResponse({ id: requestId, type: "response", action: "keyboard", payload: null, success: false, error: response?.error || "Keyboard failed" });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "keyboard",
+        payload: null,
+        success: false,
+        error: response?.error || "Keyboard failed",
+      });
     }
   } catch {
     try {
@@ -919,14 +1302,39 @@ async function handleKeyboard(
         func: injectedSendKeyboardEvent,
         args: [key, modifiers || []],
       });
-      const result = results[0]?.result as { success: boolean; tagName?: string; textContent?: string; error?: string } | null;
+      const result = results[0]?.result as {
+        success: boolean;
+        tagName?: string;
+        textContent?: string;
+        error?: string;
+      } | null;
       if (result?.success) {
-        sendResponse({ id: requestId, type: "response", action: "keyboard", payload: { sent: true, tagName: result.tagName, textContent: result.textContent }, success: true });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "keyboard",
+          payload: { sent: true, tagName: result.tagName, textContent: result.textContent },
+          success: true,
+        });
       } else {
-        sendResponse({ id: requestId, type: "response", action: "keyboard", payload: null, success: false, error: result?.error || "Keyboard failed via scripting API" });
+        sendResponse({
+          id: requestId,
+          type: "response",
+          action: "keyboard",
+          payload: null,
+          success: false,
+          error: result?.error || "Keyboard failed via scripting API",
+        });
       }
     } catch (scriptErr) {
-      sendResponse({ id: requestId, type: "response", action: "keyboard", payload: null, success: false, error: `Failed to send keyboard event: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}` });
+      sendResponse({
+        id: requestId,
+        type: "response",
+        action: "keyboard",
+        payload: null,
+        success: false,
+        error: `Failed to send keyboard event: ${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)}`,
+      });
     }
   }
 }
@@ -939,7 +1347,14 @@ async function handleExecuteJs(
   const { code, tabId } = payload;
   const targetTabId = await resolveTabId(tabId);
   if (targetTabId === null) {
-    sendResponse({ id: requestId, type: "response", action: "execute_js", payload: null, success: false, error: "No active tab found" });
+    sendResponse({
+      id: requestId,
+      type: "response",
+      action: "execute_js",
+      payload: null,
+      success: false,
+      error: "No active tab found",
+    });
     return;
   }
 
@@ -984,10 +1399,7 @@ async function handleExecuteJs(
 }
 
 /** Open a new tab */
-async function handleTabOpen(
-  requestId: string,
-  payload: { url?: string }
-): Promise<void> {
+async function handleTabOpen(requestId: string, payload: { url?: string }): Promise<void> {
   const { url } = payload;
 
   try {
@@ -1031,10 +1443,7 @@ async function handleTabOpen(
 }
 
 /** Close a tab */
-async function handleTabClose(
-  requestId: string,
-  payload: { tabId: number }
-): Promise<void> {
+async function handleTabClose(requestId: string, payload: { tabId: number }): Promise<void> {
   const { tabId: targetTabId } = payload;
 
   try {
@@ -1064,12 +1473,25 @@ function injectedScrollPage(
   amount: number,
   selector: string | null,
   position: string | null
-): { success: boolean; scrollY?: number; scrollHeight?: number; tagName?: string; textContent?: string; error?: string } {
+): {
+  success: boolean;
+  scrollY?: number;
+  scrollHeight?: number;
+  tagName?: string;
+  textContent?: string;
+  error?: string;
+} {
   if (selector) {
     const el = document.querySelector(selector);
     if (!el) return { success: false, error: `No element found for selector: ${selector}` };
     el.scrollIntoView({ block: "center", behavior: "instant" });
-    return { success: true, scrollY: window.scrollY, scrollHeight: document.documentElement.scrollHeight, tagName: el.tagName.toLowerCase(), textContent: el.textContent?.trim().slice(0, 200) || "" };
+    return {
+      success: true,
+      scrollY: window.scrollY,
+      scrollHeight: document.documentElement.scrollHeight,
+      tagName: el.tagName.toLowerCase(),
+      textContent: el.textContent?.trim().slice(0, 200) || "",
+    };
   }
   if (position === "top") {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -1079,7 +1501,11 @@ function injectedScrollPage(
     const pixels = amount || Math.floor(window.innerHeight * 0.8);
     window.scrollBy({ top: direction === "up" ? -pixels : pixels, behavior: "instant" });
   }
-  return { success: true, scrollY: window.scrollY, scrollHeight: document.documentElement.scrollHeight };
+  return {
+    success: true,
+    scrollY: window.scrollY,
+    scrollHeight: document.documentElement.scrollHeight,
+  };
 }
 
 /** Injected function: select an option */
@@ -1089,12 +1515,17 @@ function injectedSelectOption(
 ): { success: boolean; tagName?: string; textContent?: string; error?: string } {
   const el = document.querySelector(selector);
   if (!el) return { success: false, error: `No element found for selector: ${selector}` };
-  if (el.tagName.toLowerCase() !== "select") return { success: false, error: `Element is <${el.tagName.toLowerCase()}>, not <select>` };
+  if (el.tagName.toLowerCase() !== "select")
+    return { success: false, error: `Element is <${el.tagName.toLowerCase()}>, not <select>` };
   const selectEl = el as HTMLSelectElement;
   const options = Array.from(selectEl.options);
-  const match = options.find((o) => o.value === value) || options.find((o) => o.textContent?.trim().toLowerCase() === value.toLowerCase());
+  const match =
+    options.find((o) => o.value === value) ||
+    options.find((o) => o.textContent?.trim().toLowerCase() === value.toLowerCase());
   if (!match) {
-    const available = options.map((o) => `"${o.textContent?.trim()}" (value="${o.value}")`).join(", ");
+    const available = options
+      .map((o) => `"${o.textContent?.trim()}" (value="${o.value}")`)
+      .join(", ");
     return { success: false, error: `No option matching "${value}". Available: ${available}` };
   }
   selectEl.value = match.value;
@@ -1104,7 +1535,12 @@ function injectedSelectOption(
 }
 
 /** Injected function: hover over an element */
-function injectedHoverElement(selector: string): { success: boolean; tagName?: string; textContent?: string; error?: string } {
+function injectedHoverElement(selector: string): {
+  success: boolean;
+  tagName?: string;
+  textContent?: string;
+  error?: string;
+} {
   const el = document.querySelector(selector);
   if (!el) return { success: false, error: `No element found for selector: ${selector}` };
   const rect = el.getBoundingClientRect();
@@ -1114,7 +1550,11 @@ function injectedHoverElement(selector: string): { success: boolean; tagName?: s
   el.dispatchEvent(new MouseEvent("mouseenter", eventInit));
   el.dispatchEvent(new MouseEvent("mouseover", eventInit));
   el.dispatchEvent(new MouseEvent("mousemove", eventInit));
-  return { success: true, tagName: el.tagName.toLowerCase(), textContent: el.textContent?.trim().slice(0, 200) || "" };
+  return {
+    success: true,
+    tagName: el.tagName.toLowerCase(),
+    textContent: el.textContent?.trim().slice(0, 200) || "",
+  };
 }
 
 /** Injected function: read element properties */
@@ -1124,7 +1564,19 @@ function injectedReadElement(
 ): { success: boolean; tagName?: string; attributes?: Record<string, unknown>; error?: string } {
   const el = document.querySelector(selector);
   if (!el) return { success: false, error: `No element found for selector: ${selector}` };
-  const defaultProps = ["tagName", "id", "className", "textContent", "value", "href", "src", "disabled", "checked", "type", "placeholder"];
+  const defaultProps = [
+    "tagName",
+    "id",
+    "className",
+    "textContent",
+    "value",
+    "href",
+    "src",
+    "disabled",
+    "checked",
+    "type",
+    "placeholder",
+  ];
   const props = properties && properties.length > 0 ? properties : defaultProps;
   const attrs: Record<string, unknown> = {};
   for (const prop of props) {
@@ -1168,7 +1620,11 @@ function injectedSendKeyboardEvent(
     const dialog = document.querySelector("dialog[open]") as HTMLDialogElement | null;
     if (dialog) dialog.close();
   }
-  return { success: true, tagName: (target as HTMLElement).tagName?.toLowerCase() || "body", textContent: (target as HTMLElement).textContent?.trim().slice(0, 200) || "" };
+  return {
+    success: true,
+    tagName: (target as HTMLElement).tagName?.toLowerCase() || "body",
+    textContent: (target as HTMLElement).textContent?.trim().slice(0, 200) || "",
+  };
 }
 
 /** Update extension badge to show connection status */

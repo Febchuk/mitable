@@ -87,7 +87,7 @@ function setState(state: PopupState): void {
   agentBanner.style.display = "none";
 
   // Show footer for connected/automation, hide for others
-  mainFooter.style.display = (state === "connected" || state === "automation") ? "block" : "none";
+  mainFooter.style.display = state === "connected" || state === "automation" ? "block" : "none";
 
   switch (state) {
     case "connected":
@@ -366,10 +366,17 @@ chrome.runtime.sendMessage({ action: "getStatus" }, (response: BridgeStatus | un
 // Listen for storage changes (real-time updates)
 chrome.storage.onChanged.addListener((changes) => {
   const keys = [
-    "bridgeConnected", "bridgePort", "bridgeVersion",
-    "bridgeLastAction", "bridgeRecentActions", "bridgeAgentActive",
-    "bridgeSessionActive", "bridgeSessionStart",
-    "bridgeConnecting", "bridgeConnectingPort", "autoReconnect"
+    "bridgeConnected",
+    "bridgePort",
+    "bridgeVersion",
+    "bridgeLastAction",
+    "bridgeRecentActions",
+    "bridgeAgentActive",
+    "bridgeSessionActive",
+    "bridgeSessionStart",
+    "bridgeConnecting",
+    "bridgeConnectingPort",
+    "autoReconnect",
   ];
 
   let needsUpdate = false;
