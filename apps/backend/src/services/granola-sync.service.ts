@@ -17,6 +17,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
@@ -67,10 +68,24 @@ interface MeetingClassification {
 
 class GranolaSyncService {
   private anthropic: Anthropic | null = null;
+  private openai: OpenAI | null = null;
+  private deepseek: OpenAI | null = null;
 
   constructor() {
     if (config.anthropic.apiKey) {
       this.anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
+      logger.info("Granola sync using Claude Haiku 4.5");
+    }
+    if (config.openai.apiKey) {
+      this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+      logger.info("GPT-5 fallback configured for Granola sync");
+    }
+    if (config.deepseek.apiKey) {
+      this.deepseek = new OpenAI({
+        apiKey: config.deepseek.apiKey,
+        baseURL: "https://api.deepseek.com",
+      });
+      logger.info("DeepSeek V3.2 configured for Granola sync (last resort)");
     }
   }
 
@@ -207,25 +222,103 @@ class GranolaSyncService {
     return result;
   }
 
-  // ============================================================================
-  // Claude Haiku Single-Shot Classification
-  // ============================================================================
+  // ──────────────────────────────────────────────
+  // LLM Classification — Haiku 4.5 → GPT-5 → DeepSeek
+  // ──────────────────────────────────────────────
 
   /**
-   * Classify a single Granola meeting using Claude Haiku.
-   * Extracts subscriberName and topicName from meeting content.
-   * Falls back to null fields if Haiku is unavailable.
+   * Classify a single Granola meeting using LLM fallback chain.
+   * Haiku 4.5 (primary) → GPT-5 (fallback) → DeepSeek V3.2 (last resort).
+   * Returns null fields if all providers are exhausted.
    */
   private async classifyMeeting(
     meeting: GranolaMeeting,
     knownCustomers: string[],
     orgName: string | null
   ): Promise<MeetingClassification> {
-    if (!this.anthropic) {
-      logger.debug("No Anthropic client — skipping meeting classification");
-      return { subscriberName: null, topicName: meeting.title || null };
+    const fallback: MeetingClassification = {
+      subscriberName: null,
+      topicName: meeting.title || null,
+    };
+
+    if (!this.anthropic && !this.openai && !this.deepseek) {
+      logger.debug("No LLM clients available — skipping meeting classification");
+      return fallback;
     }
 
+    const prompt = this.buildClassificationPrompt(meeting, knownCustomers, orgName);
+
+    // 1. Try Claude Haiku 4.5
+    if (this.anthropic) {
+      const MAX_RETRIES = 2;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          return await this.classifyWithClaude(prompt);
+        } catch (error) {
+          const errStr = String(error);
+          const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+          if (isFatal) {
+            logger.warn(
+              { error: errStr },
+              "Claude auth/billing error — permanently disabling for this process"
+            );
+            this.anthropic = null;
+            break;
+          }
+          const isRetryable = /429|rate.?limit|529|overloaded/i.test(errStr);
+          if (isRetryable && attempt < MAX_RETRIES) {
+            const delayMs = (attempt + 1) * 5000;
+            logger.warn(
+              { error: errStr, attempt: attempt + 1, delayMs },
+              `Claude rate-limited/overloaded — retrying in ${delayMs / 1000}s`
+            );
+            await new Promise((r) => setTimeout(r, delayMs));
+            continue;
+          }
+          logger.warn(
+            { error: errStr, meetingId: meeting.id },
+            "Claude failed — falling back to GPT-5"
+          );
+          break;
+        }
+      }
+    }
+
+    // 2. Try GPT-5
+    if (this.openai) {
+      try {
+        return await this.classifyWithOpenAI(prompt, this.openai, "gpt-5");
+      } catch (error) {
+        logger.warn(
+          { error: String(error), meetingId: meeting.id },
+          "GPT-5 failed — falling back to DeepSeek"
+        );
+      }
+    }
+
+    // 3. Try DeepSeek V3.2
+    if (this.deepseek) {
+      try {
+        return await this.classifyWithOpenAI(prompt, this.deepseek, "deepseek-chat");
+      } catch (error) {
+        logger.warn(
+          { error: String(error), meetingId: meeting.id },
+          "DeepSeek also failed — all providers exhausted"
+        );
+      }
+    }
+
+    return fallback;
+  }
+
+  /**
+   * Build the classification prompt for a meeting.
+   */
+  private buildClassificationPrompt(
+    meeting: GranolaMeeting,
+    knownCustomers: string[],
+    orgName: string | null
+  ): string {
     const attendeeList = (meeting.attendees || [])
       .map((a) => [a.name, a.email].filter(Boolean).join(" "))
       .join(", ");
@@ -239,7 +332,7 @@ class GranolaSyncService {
         ? `Known customers/clients:\n${knownCustomers.map((c) => `- ${c}`).join("\n")}`
         : "No known customers yet.";
 
-    const prompt = `You are classifying a meeting from a user's Granola meeting notes.
+    return `You are classifying a meeting from a user's Granola meeting notes.
 
 ${orgContext}
 
@@ -262,37 +355,60 @@ Based on the meeting content, extract:
 
 Respond ONLY with JSON:
 { "subscriberName": "..." or null, "topicName": "..." }`;
+  }
 
-    try {
-      const response = await this.anthropic.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 200,
-        messages: [{ role: "user", content: prompt }],
-      });
+  /**
+   * Claude Haiku 4.5 single-shot classification.
+   */
+  private async classifyWithClaude(prompt: string): Promise<MeetingClassification> {
+    const response = await this.anthropic!.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 200,
+      messages: [{ role: "user", content: prompt }],
+    });
 
-      const textBlock = response.content.find((b) => b.type === "text");
-      if (!textBlock || textBlock.type !== "text") {
-        return { subscriberName: null, topicName: meeting.title || null };
-      }
-
-      const parsed = parseJsonResponse<MeetingClassification>(textBlock.text);
-      return {
-        subscriberName: parsed.subscriberName || null,
-        topicName: parsed.topicName || meeting.title || null,
-      };
-    } catch (error) {
-      const errStr = String(error);
-
-      // Fatal errors — disable client for this process
-      if (/401|403|invalid.*key|billing|authentication/i.test(errStr)) {
-        logger.warn({ error: errStr }, "Claude auth/billing error — disabling for this process");
-        this.anthropic = null;
-      } else {
-        logger.warn({ error: errStr, meetingId: meeting.id }, "Meeting classification failed");
-      }
-
-      return { subscriberName: null, topicName: meeting.title || null };
+    const textBlock = response.content.find((b) => b.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
+      throw new Error("Empty text response from Claude Haiku");
     }
+
+    const parsed = parseJsonResponse<MeetingClassification>(textBlock.text);
+    return {
+      subscriberName: parsed.subscriberName || null,
+      topicName: parsed.topicName || null,
+    };
+  }
+
+  /**
+   * OpenAI-compatible classification (GPT-5 or DeepSeek V3.2).
+   */
+  private async classifyWithOpenAI(
+    prompt: string,
+    client: OpenAI,
+    model: string
+  ): Promise<MeetingClassification> {
+    const response = await client.chat.completions.create({
+      model,
+      max_tokens: 200,
+      temperature: 0.2,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You classify meetings. Respond ONLY with valid JSON, no markdown or code fences.",
+        },
+        { role: "user", content: prompt },
+      ],
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) throw new Error(`Empty response from ${model}`);
+
+    const parsed = parseJsonResponse<MeetingClassification>(content);
+    return {
+      subscriberName: parsed.subscriberName || null,
+      topicName: parsed.topicName || null,
+    };
   }
 
   // ============================================================================
