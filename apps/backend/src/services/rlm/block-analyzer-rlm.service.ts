@@ -226,7 +226,10 @@ class BlockAnalyzerRLMService {
           );
 
           if (consecutiveBadResponses >= 3) {
-            logger.warn({ iteration: iterations }, "Block Analyzer: 3 consecutive bad responses — breaking");
+            logger.warn(
+              { iteration: iterations },
+              "Block Analyzer: 3 consecutive bad responses — breaking"
+            );
             break;
           }
 
@@ -234,7 +237,7 @@ class BlockAnalyzerRLMService {
           messages.push({
             role: "user",
             content:
-              "Your response was not a valid tool call or done signal. You must respond with a JSON object containing either a tool call or { \"done\": true }. If you have enough context from the master story and captures, start emitting blocks now with emit_work_block.",
+              'Your response was not a valid tool call or done signal. You must respond with a JSON object containing either a tool call or { "done": true }. If you have enough context from the master story and captures, start emitting blocks now with emit_work_block.',
           });
         }
       } catch (error) {
