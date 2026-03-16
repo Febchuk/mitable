@@ -698,12 +698,20 @@ class MonitoringSessionService {
         if (trackedWindowIds.length > 0) {
           const screenshot = await captureService.captureScreen();
           if (screenshot) {
+            // Enrich generic "Screen" appName with actual frontmost tracked app
+            const tracked = focusWindowTracker.getTrackedWindows();
+            if (tracked.length > 0 && screenshot.appName === "Screen") {
+              // Use the most recently tracked window (last in list = most recent focus)
+              const frontmost = tracked[tracked.length - 1];
+              screenshot.appName = frontmost.appName;
+              screenshot.windowTitle = frontmost.windowTitle || screenshot.windowTitle;
+            }
             this.activeSession.consecutiveEmptyCaptures = 0;
             this.activeSession.lastSuccessfulCaptureAt = Date.now();
             await this.processCapture(screenshot, trigger);
             this.broadcastCaptureProgress();
             logger.info(
-              "[CaptureService] Window capture returned 0 matches; used screen capture fallback."
+              `[CaptureService] Window capture returned 0 matches; used screen capture fallback (app=${screenshot.appName}).`
             );
             return;
           }
