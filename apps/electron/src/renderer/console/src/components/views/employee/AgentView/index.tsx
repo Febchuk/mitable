@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowUp, Square, Bot, Check, X } from "lucide-react";
+import { ArrowUp, Square, Bot, Check, X, ExternalLink } from "lucide-react";
 import AgentMessage, { AgentThinking } from "./AgentMessage";
 
 // Simple UUID fallback for renderer
@@ -41,6 +41,15 @@ export default function AgentView() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Track where the current turn's messages start so we can dedup on plan_proposed
   const turnStartIndexRef = useRef<number>(0);
+
+  // Browser bridge connection status
+  const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    window.consoleAPI?.getBrowserBridgeStatus().then(setBridgeConnected);
+    const unsub = window.consoleAPI?.onBrowserBridgeConnectionUpdate(setBridgeConnected);
+    return () => unsub?.();
+  }, []);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -215,6 +224,43 @@ export default function AgentView() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Browser bridge status bar */}
+      {bridgeConnected !== null && (
+        <div
+          className={`flex items-center gap-2 px-3 py-1.5 text-xs ${
+            bridgeConnected
+              ? "bg-green-500/10 text-green-600 dark:text-green-400"
+              : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              bridgeConnected ? "bg-green-500" : "bg-amber-500"
+            }`}
+          />
+          <span>
+            {bridgeConnected ? "Browser bridge connected" : "Browser extension not connected"}
+          </span>
+          {!bridgeConnected && (
+            <>
+              <span className="opacity-40">·</span>
+              <button
+                onClick={() =>
+                  window.open(
+                    "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev/mitable-browser-bridge.zip",
+                    "_blank"
+                  )
+                }
+                className="inline-flex items-center gap-1 underline underline-offset-2 hover:opacity-80"
+              >
+                Download
+                <ExternalLink className="h-3 w-3" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
         {isEmpty ? (

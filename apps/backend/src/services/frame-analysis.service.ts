@@ -52,6 +52,11 @@ export interface FrameAnalysisInput {
     windowTitle: string;
   };
   timestamp: string;
+  browserContext?: {
+    activeTabUrl: string;
+    activeTabTitle: string;
+    tabCount: number;
+  };
 }
 
 export interface FrameAnalysisResult {
@@ -117,12 +122,17 @@ class FrameAnalysisService {
         return this.createFirstFrameResult(input);
       }
 
-      // 2. Call Gemini Vision with Sensor Prompt
+      // 2. Call Gemini Vision with Sensor Prompt (enriched with browser context if available)
+      let userPrompt = SENSOR_USER_PROMPT;
+      if (input.browserContext) {
+        userPrompt += `\n\nBrowser context: The user is viewing "${input.browserContext.activeTabTitle}" (${input.browserContext.activeTabUrl})`;
+      }
+
       const visionResult = await geminiVisionFrameService.compareFrames(
         input.previousFrame,
         input.currentFrame,
         SENSOR_SYSTEM_PROMPT,
-        SENSOR_USER_PROMPT
+        userPrompt
       );
 
       // 3. Parse Sensor Response

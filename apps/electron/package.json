@@ -94,6 +94,7 @@
     "@types/dompurify": "^3.0.5",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@types/turndown": "^5.0.6",
+    "@types/ws": "^8.18.1",
     "@udecode/cn": "^52.0.11",
     "@untitledui/icons": "^0.0.21",
     "@uploadthing/react": "^7.3.3",
@@ -109,6 +110,7 @@
     "electron-updater": "^6.6.2",
     "framer-motion": "^12.23.24",
     "get-windows": "^9.2.3",
+    "gray-matter": "^4.0.3",
     "html2canvas-pro": "^1.6.0",
     "katex": "^0.16.25",
     "keytar": "^7.9.0",
@@ -145,6 +147,7 @@
     "uiohook-napi": "^1.5.4",
     "uploadthing": "^7.7.4",
     "use-file-picker": "^2.1.2",
+    "ws": "^8.19.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {

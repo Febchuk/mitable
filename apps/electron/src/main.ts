@@ -32,6 +32,7 @@ import { passiveMonitorService } from "./services/passiveMonitorService";
 import { notificationService } from "./services/notificationService";
 import { agentSdkService } from "./services/agentSdkService";
 import { skillsStore } from "./services/skillsStore";
+import { browserBridgeService } from "./services/browserBridgeService";
 
 // Force dark theme for consistent vibrancy effect regardless of system settings
 nativeTheme.themeSource = "dark";
@@ -2718,6 +2719,26 @@ app.whenReady().then(async () => {
   setupIPC();
   registerGlobalShortcuts();
 
+  // Start Browser Bridge WebSocket server for Chrome Extension
+  browserBridgeService.start().catch((err) => {
+    consoleLogger.error("Failed to start BrowserBridgeService:", err);
+  });
+
+  // Broadcast connection updates to console window
+  browserBridgeService.onConnectionChange((connected) => {
+    if (consoleWindow && !consoleWindow.isDestroyed()) {
+      consoleWindow.webContents.send(IPC_CHANNELS.BROWSER_BRIDGE_CONNECTION_UPDATE, connected);
+    }
+  });
+
+  // IPC handlers for browser bridge
+  ipcMain.handle(IPC_CHANNELS.BROWSER_BRIDGE_STATUS, () => {
+    return browserBridgeService.isConnected();
+  });
+  ipcMain.handle(IPC_CHANNELS.BROWSER_BRIDGE_GET_INFO, () => {
+    return browserBridgeService.getConnectionInfo();
+  });
+
   // Wire centralized notification service
   notificationService.setClickHandler(handleNotificationAction);
   notificationService.setUserIdProvider(() => currentUserContext?.userId ?? null);
@@ -3087,4 +3108,6 @@ app.on("before-quit", () => {
   focusWindowTracker.stop();
   // Ensure passive polling stops on quit
   passiveMonitorService.forceReset();
+  // Stop browser bridge WebSocket server
+  browserBridgeService.stop();
 });

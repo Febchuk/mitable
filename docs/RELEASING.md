@@ -67,6 +67,20 @@ git tag v0.1.12
 git push origin v0.1.12
 ```
 
+## Chrome Extension
+
+The Chrome extension has a separate release process. See [Chrome Web Store Publishing](./chrome-web-store-publishing.md) for full setup instructions.
+
+```bash
+# Bump version in apps/chrome-extension/manifest.json, then:
+git add apps/chrome-extension/manifest.json
+git commit -m "chore: bump chrome extension to 1.1.0"
+git tag chrome-v1.1.0
+git push origin main --tags
+```
+
+For sideloading (no CWS account needed), see the [Chrome Extension Install Guide](./chrome-extension-install.md).
+
 ## Infrastructure
 
 - **Primary CDN**: Cloudflare R2 (`mitable-releases` bucket)

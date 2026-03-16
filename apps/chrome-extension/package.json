@@ -1,0 +1,15 @@
+{
+  "name": "@mitable/chrome-extension",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mitable Browser Bridge Chrome Extension",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.37",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.3.3"
+  }
+}

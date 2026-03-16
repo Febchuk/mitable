@@ -1,0 +1,257 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Mitable Browser Bridge</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+
+    <!-- ============ MAIN VIEW ============ -->
+    <div id="mainView" class="view active">
+      <div class="header">
+        <div class="header-brand">
+          <img src="../icons/icon-48.png" alt="Mitable" class="header-logo" />
+          <div class="header-text">
+            <span class="header-title">Mitable</span>
+            <span class="header-subtitle">Browser Bridge</span>
+          </div>
+        </div>
+        <button id="settingsBtn" class="header-settings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="content">
+
+        <!-- ===== AGENT AUTOMATION BANNER ===== -->
+        <div id="agentBanner" data-state style="display:none">
+          <div class="agent-banner">
+            <div class="agent-banner-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              <span class="agent-banner-label">Agent is working</span>
+            </div>
+            <div class="agent-shimmer"></div>
+          </div>
+        </div>
+
+        <!-- ===== CONNECTED STATE ===== -->
+        <div id="stateConnected" data-state style="display:none">
+          <!-- Status -->
+          <div class="card" style="margin-bottom:10px">
+            <div class="status-card">
+              <span class="status-dot status-dot--connected"></span>
+              <div class="status-info">
+                <div class="status-label">Connected</div>
+                <div class="status-detail" id="connectedDetail">Port 19876 · v1.0.0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active tab -->
+          <div class="card" id="tabCard" style="margin-bottom:10px">
+            <div class="tab-card">
+              <div class="tab-favicon" id="tabFavicon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+              </div>
+              <div class="tab-info">
+                <div class="tab-title" id="tabTitle">No active tab</div>
+                <div class="tab-url" id="tabUrl"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bridge activity -->
+          <div style="margin-bottom:10px">
+            <div class="section-label">Bridge Activity</div>
+            <div class="card">
+              <!-- Idle (default) -->
+              <div id="activityIdle" class="activity-idle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/>
+                </svg>
+                <span>Idle · no recent actions</span>
+              </div>
+              <!-- Active actions -->
+              <div id="activityActive" style="display:none">
+                <div id="currentAction" class="current-action" style="display:none">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                  <div class="current-action-info">
+                    <div class="current-action-text" id="currentActionText"></div>
+                    <div class="current-action-selector" id="currentActionSelector"></div>
+                  </div>
+                </div>
+                <div id="recentActions">
+                  <div class="recent-label">Recent</div>
+                  <div id="recentList"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Session (shown only if active) -->
+          <div id="sessionCard" style="display:none">
+            <div class="session-card">
+              <span class="status-dot status-dot--session"></span>
+              <div class="session-info">
+                <div class="session-label">Session active</div>
+                <div class="session-detail" id="sessionDetail">Capturing since --</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== DISCONNECTED STATE ===== -->
+        <div id="stateDisconnected" data-state style="display:none">
+          <div class="card" style="margin-bottom:10px">
+            <div class="status-card">
+              <span class="status-dot status-dot--disconnected"></span>
+              <div class="status-info">
+                <div class="status-label">Disconnected</div>
+                <div class="status-detail status-detail--error">Desktop app not found</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="help-card" style="margin-bottom:10px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p>Make sure Mitable desktop app is running on this computer.</p>
+          </div>
+
+          <button id="reconnectBtn" class="btn-reconnect" style="margin-bottom:10px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            Reconnect
+          </button>
+
+          <div id="troubleshoot" class="troubleshoot">
+            <div class="troubleshoot-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+              Troubleshooting
+            </div>
+            <ul class="troubleshoot-body">
+              <li>Check that Mitable is open</li>
+              <li>Bridge starts automatically</li>
+              <li>Try restarting desktop app</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ===== CONNECTING STATE ===== -->
+        <div id="stateConnecting" data-state style="display:none">
+          <div class="card" style="margin-bottom:10px">
+            <div class="status-card">
+              <span class="spinner"></span>
+              <div class="status-info">
+                <div class="status-label">Searching for Mitable...</div>
+                <div class="status-detail">Scanning local ports</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card progress-card" style="margin-bottom:10px">
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+            <div class="progress-text" id="connectingPort">Checking port 19876...</div>
+          </div>
+
+          <p class="footer">Auto-connects when the desktop app is detected.</p>
+        </div>
+
+        <!-- ===== FOOTER (connected/agent states) ===== -->
+        <div id="mainFooter">
+          <p class="footer">Connects Chrome to Mitable desktop for AI-powered actions.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SETTINGS VIEW ============ -->
+    <div id="settingsView" class="view">
+      <div class="settings-header">
+        <button id="settingsBack" class="settings-back" title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          </svg>
+        </button>
+        <span class="settings-title">Settings</span>
+      </div>
+
+      <div class="content">
+        <div>
+          <div class="section-label">Connection</div>
+          <div class="card">
+            <div class="settings-group">
+              <div class="settings-row">
+                <span class="settings-key">Status</span>
+                <span class="settings-value" id="settingsStatus">
+                  <span class="status-dot status-dot--disconnected" id="settingsStatusDot" style="width:6px;height:6px"></span>
+                  <span id="settingsStatusText">Disconnected</span>
+                </span>
+              </div>
+              <div class="settings-row">
+                <span class="settings-key">Port</span>
+                <span class="settings-value" id="settingsPort">—</span>
+              </div>
+              <div class="settings-row">
+                <span class="settings-key">Version</span>
+                <span class="settings-value" id="settingsVersion">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label">Preferences</div>
+          <div class="card">
+            <div class="settings-group">
+              <div class="settings-row">
+                <span class="settings-key">Auto-reconnect</span>
+                <div id="toggleAutoReconnect" class="toggle active"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label">About</div>
+          <div class="card">
+            <div class="settings-group">
+              <div class="settings-row">
+                <span class="settings-key">Extension</span>
+                <span class="settings-value" id="settingsExtVersion">v1.0.0</span>
+              </div>
+              <div class="settings-row">
+                <span class="settings-key">Bridge</span>
+                <span class="settings-value" id="settingsBridgeVersion">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button id="openDesktopBtn" class="settings-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+          Open Mitable Desktop
+        </button>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

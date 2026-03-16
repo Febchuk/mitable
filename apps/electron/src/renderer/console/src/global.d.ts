@@ -289,6 +289,11 @@ interface ConsoleAPI {
   agentCancel: () => Promise<void>;
   agentApprovePlan: (conversationId: string, approved: boolean) => Promise<void>;
   onAgentMessageEvent: (callback: (data: { type: string; data: unknown }) => void) => () => void;
+
+  // Browser Bridge (Chrome Extension)
+  getBrowserBridgeStatus: () => Promise<boolean>;
+  getBrowserBridgeInfo: () => Promise<{ port: number; token: string; connected: boolean }>;
+  onBrowserBridgeConnectionUpdate: (callback: (connected: boolean) => void) => () => void;
 }
 
 declare global {
